@@ -30,10 +30,11 @@ export function annotations() {
           args: [],
         } as TTransformedAnnotation
         const key = ni.$.text.slice(1)
-        ni.accepted()
         if (target.annotations[key]) {
           console.log(ni.toString(), ni.$.getRange())
           ni.error('Duplicate annotation')
+        } else {
+          ni.accepted()
         }
         target.annotations[key] = a
         ni.move()
@@ -90,8 +91,7 @@ export function definition(...pipes: Array<TPipe | (() => TPipe)>) {
           target.definition = node
           return true
         }
-      }
-      if (!node) {
+      } else {
         ni.error('Unexpected token')
         return false
       }

@@ -89,8 +89,8 @@ importers:
         specifier: ^1.96.0
         version: 1.96.0
       intertation:
-        specifier: workspace:^
-        version: link:../..
+        specifier: file:../intertation
+        version: link:../intertation
       vscode-languageclient:
         specifier: ^8.1.0
         version: 8.1.0

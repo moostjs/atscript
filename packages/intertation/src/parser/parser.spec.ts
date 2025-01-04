@@ -9,34 +9,27 @@ import type { TGroupedNodes, TTransformedNode } from './types'
 
 describe('parser', () => {
   it('new pipe', () => {
-    const { ast, messages } = parseItn(`
-      public type Type = 123 | 321 & 'abcde' & string // comment
+    const { ast, messages } = parseItn(
+      `//  text comments
 
-      @mongo.collection
-      @mongo.collection
-      public interface III {
-        @label "test"
-        name: "value"
-        "name": "value"
-        "prop-2"?: number | string
-        nested: number | {
-          prop3: string
-          prop4: number
-        } & {
-          prop5: string
-          prop6: number
-        } | string
-      }
+@mongo.collection "partners"
+public interface Partner {
+    @label "Name"
+    @id "ID"
+    _id: string
 
-      public type public = number
-      `)
+    test2!: string
+}`,
+      undefined,
+      true
+    )
     console.log(ast.map(n => renderNode(n, 0)).join('\n\n'))
     console.log(
       messages
         .map(
           m => `${m.message}
-          parser.spec.ts:${m.range.start.line + 11}:${m.range.start.character + 1}
-          parser.spec.ts:${m.range.end.line + 11}:${m.range.end.character + 1}`
+          parser.spec.ts:${m.range.start.line + 12}:${m.range.start.character + 1}
+          parser.spec.ts:${m.range.end.line + 12}:${m.range.end.character + 1}`
         )
         .join('\n')
     )
@@ -71,7 +64,9 @@ describe('parser', () => {
 function renderNode(n: TTransformedNode | TGroupedNodes, level = 0): string {
   const indent = ' '.repeat(level * 2)
   if (n.isGroup) {
-    return `${indent}(\n${n.nodes.map(_n => renderNode(_n, level + 2)).join(` ${n.operator || ''}\n`)}\n${indent})`
+    return `${indent}(\n${n.nodes
+      .map(_n => renderNode(_n, level + 2))
+      .join(` ${n.operator || ''}\n`)}\n${indent})`
   }
   const a = n.annotations
     ? `${Object.entries(n.annotations)
@@ -90,7 +85,7 @@ function renderNode(n: TTransformedNode | TGroupedNodes, level = 0): string {
   ]
     .filter(Boolean)
     .map(t => t?.toString())
-    .join(
-      `\n${indent}`
-    )}${n.definition ? ': ' : ''}${n.definition?.isGroup ? `\n${def}` : def || ''}`
+    .join(`\n${indent}`)}${n.definition ? ': ' : ''}${
+    n.definition?.isGroup ? `\n${def}` : def || ''
+  }`
 }

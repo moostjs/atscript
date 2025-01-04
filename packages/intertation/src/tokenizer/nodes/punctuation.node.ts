@@ -21,7 +21,7 @@ export type TPunctuation =
  * Punctuation node
  */
 export const PunctuationNode = new BasicNode<TNodeData & { text: TPunctuation }>({
-  tokens: [/(?<text>[\n&+,\-./:;=?|])/u, ''],
+  tokens: [/(?<text>[\n!&+,\-./:;=?|])/u, ''],
   tokenOE: 'omit-omit',
   icon: '...',
 }).onMatch(context => {

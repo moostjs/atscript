@@ -18,13 +18,14 @@ export class NodeIterator {
   }
 
   isUnexpected(text: string) {
-    if (this.$) {
+    if (this.$ && !this.$.accepted && !this.badNodes.has(this.$)) {
       this.badNodes.set(this.$, text)
     }
   }
 
   accepted() {
     if (this.$) {
+      this.$.accepted = true
       this.badNodes.delete(this.$)
     }
   }

@@ -9,11 +9,11 @@ export function toVsCodeRange(
 ) {
   return {
     start: {
-      line: start.row,
+      line: start.row - 1,
       character: start.col + startOffset,
     },
     end: {
-      line: end.row,
+      line: end.row - 1,
       character: end.col + endOffset,
     },
   }

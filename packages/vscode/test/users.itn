@@ -1,9 +1,9 @@
-type TCryptoAlgorithm 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512'
+type TCryptoAlgorithm = 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512'
 
-@mongo.@mongo.collection '${1:collection_name}'
-public structure rvm.user {
+@mongo.collection 'users'
+public interface User {
     @label 'User "ID"'
-    @mongo.key string
+    @mongo.key 'string'
     _id: string
 
     @label "Email"
@@ -17,6 +17,8 @@ public structure rvm.user {
     @mongo.textIndex
     @description "Unique ID that can be used for login"
     username: string
+
+    t2: string
 
     password: {
         @label "Password Hash"

@@ -1,6 +1,10 @@
-@mongo.collection partners
-entity Partner {
-    @label "Partner ID (internal)"
-    @mongo.key string
+//  text comments
+
+@mongo.collection "partners"
+public interface Partner {
+    @label "Name"
+    @id "ID"
     _id: string
+
+    test2?: string
 }

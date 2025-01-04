@@ -4,11 +4,42 @@
   "name": "ITN",
   "patterns": [
     {
-      "name": "keyword.control.intertation",
-      "match": "\\b(structure|type|public)\\b"
+      "name": "comment.block.intertation",
+      "begin": "/\\*",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.begin.intertation"
+        }
+      },
+      "end": "\\*/",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.end.intertation"
+        }
+      },
+      "patterns": []
     },
     {
-      "name": "storage.type.annotation.intertation",
+      "name": "comment.line.double-slash.intertation",
+      "begin": "//",
+      "beginCaptures": {
+        "0": {
+          "name": "punctuation.definition.comment.intertation"
+        }
+      },
+      "end": "$",
+      "patterns": []
+    },
+    {
+      "name": "keyword.declaration.intertation",
+      "match": "\\b(interface|type)\\b"
+    },
+    {
+      "name": "storage.modifier.intertation",
+      "match": "\\b(public)\\b"
+    },
+    {
+      "name": "entity.name.function.intertation",
       "match": "@[A-Za-z0-9_.]+"
     },
     {
@@ -58,7 +89,7 @@
     },
     {
       "name": "support.type.intertation",
-      "match": "\\b(string|boolean|number)\\b"
+      "match": "\\b(string|boolean|number|void)\\b"
     }
   ],
   "repository": {},

@@ -5,7 +5,7 @@
   "version": "0.0.1",
   "main": "./dist/client/extension.js",
   "scripts": {
-    "compile": "tsc"
+    "build": "tsc"
   },
   "engines": {
     "vscode": "^1.70.0"
@@ -42,7 +42,7 @@
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0",
     "vscode-languageserver-textdocument": "^1.0.12",
-    "intertation": "workspace:^"
+    "intertation": "file:../intertation"
   },
   "author": "Artem Maltsev",
   "license": "ISC"

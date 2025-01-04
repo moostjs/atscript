@@ -13,6 +13,7 @@ export interface TNodeData {
   children?: TNodeData[]
   startOffset?: number
   endOffset?: number
+  accepted?: boolean
   getRange: () => {
     start: {
       line: number

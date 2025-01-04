@@ -4,12 +4,17 @@ import type {
   Diagnostic,
   InitializeParams,
   InitializeResult,
+  Range,
+  SemanticTokens,
+  SemanticTokensParams,
+  SemanticTokensRangeParams,
 } from 'vscode-languageserver/node'
 import {
   CompletionItemKind,
   createConnection,
   DiagnosticSeverity,
   ProposedFeatures,
+  SemanticTokensBuilder,
   TextDocuments,
   TextDocumentSyncKind,
 } from 'vscode-languageserver/node'
@@ -30,6 +35,22 @@ connection.onInitialize(
         resolveProvider: true,
         triggerCharacters: ['@', '.'],
       },
+      // Add semantic tokens capability:
+      semanticTokensProvider: {
+        // The legend must list the token types you plan to use
+        legend: {
+          tokenTypes: [
+            'interface',
+            'type',
+            'string',
+            'number',
+            // etc...
+          ],
+          tokenModifiers: [], // e.g. "static", "declaration", etc. if needed
+        },
+        full: true, // enable full document requests
+        range: true, // optionally enable range-based requests
+      },
     },
   })
 )
@@ -43,50 +64,70 @@ function validateTextDocument(textDocument: TextDocument) {
   const text = textDocument.getText()
   const diagnostics: Diagnostic[] = []
 
-  const { nodes, messages } = parseItn(text)
+  const { ast, messages } = parseItn(text)
 
-  // 1) A very naive check: if we see "@label" with no argument after it, produce an error
-  //    This is extremely simplified. Ideally you parse properly and detect string or quotes, etc.
-  // const labelRegex = /@label(\s+[^\s{]+)?/gu
-  // let match: RegExpExecArray | null
-  // while ((match = labelRegex.exec(text))) {
-  //   // match[1] is the argument after @label
-  //   if (!match[1]) {
-  //     // No argument found => error
-  //     const startPos = match.index
-  //     const endPos = startPos + match[0].length
-  //     diagnostics.push({
-  //       severity: DiagnosticSeverity.Error,
-  //       range: {
-  //         start: textDocument.positionAt(startPos),
-  //         end: textDocument.positionAt(endPos),
-  //       },
-  //       message: `@label annotation requires an argument`,
-  //       source: 'intertation-lsp',
-  //     })
-  //   }
-  // }
-
-  // const s2 = /:\s*string2/u.exec(text)?.index
-  // if (s2 !== undefined) {
-  //   const startPos = s2
-  //   const endPos = startPos + 'string2'.length
-  //   diagnostics.push({
-  //     severity: DiagnosticSeverity.Error,
-  //     range: {
-  //       start: textDocument.positionAt(startPos),
-  //       end: textDocument.positionAt(endPos),
-  //     },
-  //     message: `Unsupported type: string2`,
-  //     source: 'intertation-lsp',
-  //   })
-  // }
-
-  // 2) Another naive check: optional fields must have a question mark?
-  //    Or any other custom rules you want
+  messages.forEach(m => {
+    diagnostics.push({
+      severity: DiagnosticSeverity.Error,
+      range: m.range,
+      message: m.message,
+      source: 'intertation-lsp',
+    })
+  })
 
   // Send the computed diagnostics
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics })
+}
+
+connection.languages.semanticTokens.on((params: SemanticTokensParams): SemanticTokens => {
+  const doc = documents.get(params.textDocument.uri)
+  if (!doc) {
+    return { data: [] }
+  }
+  return getSemanticTokens(doc)
+})
+
+connection.languages.semanticTokens.onRange((params: SemanticTokensRangeParams): SemanticTokens => {
+  const doc = documents.get(params.textDocument.uri)
+  if (!doc) {
+    return { data: [] }
+  }
+  return getSemanticTokens(doc, params.range)
+})
+
+function getSemanticTokens(doc: TextDocument, range?: Range): SemanticTokens {
+  // 1) parse the doc using parseItn
+  const text = doc.getText(range)
+  const { ast } = parseItn(text)
+
+  console.log('getSemanticTokens', range, text)
+
+  // 2) We'll use a SemanticTokensBuilder to collect tokens
+  const builder = new SemanticTokensBuilder()
+
+  // 3) Walk your AST. For example, if you store global variables in ast.globals
+  //    or if parseItn returns a list of nodes, find their "start" and "end" or line/column.
+  //    Let's assume you have something like ast.globals = [{ name, start, end }, ...].
+  //    We'll produce a token for each global variable.
+
+  // if (ast.globals) {
+  //   for (const gVar of ast.globals) {
+  const startPos = doc.positionAt(5)
+  const endPos = doc.positionAt(25)
+  const length = 25 - 5
+
+  // push(line, startChar, length, tokenTypeIndex, tokenModifierBitset)
+  // The tokenTypeIndex is the index in your legend above.
+  // Suppose 'variable' was at index 0 in your tokenTypes.
+  const tokenType = Math.floor(Math.random() * 5) // or find it dynamically
+  const tokenModifiers = 0
+
+  builder.push(startPos.line, startPos.character, length, tokenType, tokenModifiers)
+  // }
+  // }
+
+  // 4) Once done, build and return
+  return builder.build()
 }
 
 // Provide completions for annotations and known types

@@ -40,7 +40,6 @@ export function $token(name: TNodeData['node'], text?: string[]) {
         if (opts.flag) {
           target.flags.set(opts.flag, new Token(ni.$))
         }
-        ni.accepted()
         if (opts.unique) {
           const key = opts.unique
           declarations[key] = declarations[key] || new Set<string>()
@@ -50,9 +49,10 @@ export function $token(name: TNodeData['node'], text?: string[]) {
           } else {
             storage.add(ni.$.text)
           }
-        }
-        if (opts.isGlobal && declarations.$reserved?.has(ni.$.text)) {
+        } else if (opts.isGlobal && declarations.$reserved?.has(ni.$.text)) {
           ni.error(`Reserved identifier "${ni.$.text}"`)
+        } else {
+          ni.accepted()
         }
         ni.move()
         if (opts.skip) {
@@ -61,7 +61,17 @@ export function $token(name: TNodeData['node'], text?: string[]) {
         return true
       } else {
         if (!opts.optional) {
-          ni.error(`Unexpected token`)
+          ni.error(
+            `Unexpected token. Expected ${opts.expect
+              .filter(v => v.text)
+              .map(v =>
+                [v.text]
+                  .flat()
+                  .map(v => `"${v}"`)
+                  .join(' or ')
+              )
+              .join(' or ')}`
+          )
         }
         return opts.optional
       }
