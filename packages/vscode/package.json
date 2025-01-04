@@ -1,0 +1,49 @@
+{
+  "name": "itn-vscode",
+  "displayName": "Interfaces with Annotations",
+  "description": "Syntax highlighting for .intertation files (.itn)",
+  "version": "0.0.1",
+  "main": "./dist/client/extension.js",
+  "scripts": {
+    "compile": "tsc"
+  },
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "intertation",
+        "aliases": [
+          "ITN",
+          "Annotated Data Structure"
+        ],
+        "extensions": [
+          ".intertation",
+          ".itn"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "intertation",
+        "scopeName": "source.intertation",
+        "path": "./syntaxes/intertation.tmLanguage.json"
+      }
+    ]
+  },
+  "publisher": "prostojs",
+  "dependencies": {
+    "@types/vscode": "^1.96.0",
+    "vscode-languageclient": "^8.1.0",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "intertation": "workspace:^"
+  },
+  "author": "Artem Maltsev",
+  "license": "ISC"
+}

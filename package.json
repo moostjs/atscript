@@ -1,0 +1,28 @@
+{
+  "name": "intertation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "6.3.0",
+    "@typescript-eslint/parser": "6.3.0",
+    "eslint": "8.55.0",
+    "eslint-import-resolver-typescript": "3.6.1",
+    "eslint-plugin-array-func": "4.0.0",
+    "eslint-plugin-import": "2.29.0",
+    "eslint-plugin-promise": "6.1.1",
+    "eslint-plugin-regexp": "2.5.0",
+    "eslint-plugin-simple-import-sort": "10.0.0",
+    "eslint-plugin-sonarjs": "0.23.0",
+    "eslint-plugin-unicorn": "49.0.0",
+    "eslint-plugin-yml": "1.10.0",
+    "prettier": "3.1.1",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,6 @@
+@mongo.collection partners
+entity Partner {
+    @label "Partner ID (internal)"
+    @mongo.key string
+    _id: string
+}

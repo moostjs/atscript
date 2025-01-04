@@ -1,0 +1,66 @@
+{
+  "fileTypes": ["intertation", "itn"],
+  "scopeName": "source.intertation",
+  "name": "ITN",
+  "patterns": [
+    {
+      "name": "keyword.control.intertation",
+      "match": "\\b(structure|type|public)\\b"
+    },
+    {
+      "name": "storage.type.annotation.intertation",
+      "match": "@[A-Za-z0-9_.]+"
+    },
+    {
+      "name": "constant.character.intertation",
+      "match": ":[A-Za-z0-9_.]+"
+    },
+    {
+      "name": "string.quoted.intertation",
+      "begin": "(['\"])",
+      "beginCaptures": {
+        "1": {
+          "name": "punctuation.definition.string.begin.intertation"
+        }
+      },
+      "end": "\\1",
+      "endCaptures": {
+        "0": {
+          "name": "punctuation.definition.string.end.intertation"
+        }
+      },
+      "patterns": [
+        {
+          "name": "constant.character.escape.intertation",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "match": "\\b([A-Za-z0-9_]+)(\\?)?(?=\\s*:)",
+      "name": "variable.other.property.intertation",
+      "captures": {
+        "1": {
+          "name": "variable.other.property-name.intertation"
+        },
+        "2": {
+          "name": "keyword.operator.optional.intertation"
+        }
+      }
+    },
+    {
+      "name": "punctuation.definition.braces.intertation",
+      "match": "[{}]"
+    },
+    {
+      "name": "support.type.union.intertation",
+      "match": "\\b[^\\s\"']+(\\s*\\|\\s*[^\\s\"']+)+\\b"
+    },
+    {
+      "name": "support.type.intertation",
+      "match": "\\b(string|boolean|number)\\b"
+    }
+  ],
+  "repository": {},
+  "injectionSelector": "L:source.intertation"
+}

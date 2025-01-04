@@ -1,0 +1,22 @@
+{
+  "name": "parser",
+  "version": "0.0.1",
+  "description": "",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "scripts": {
+    "build": "vite build",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@prostojs/parser": "^0.5.5"
+  },
+  "devDependencies": {
+    "vite": "^6.0.6",
+    "vite-plugin-dts": "^4.4.0",
+    "vitest": "^2.1.8"
+  }
+}
