@@ -9,7 +9,17 @@ export interface TExpect {
 }
 
 export interface TTransformedNode {
-  entity: 'interface' | 'type' | 'ref' | 'const' | 'value' | 'prop' | 'structure' | 'argument'
+  entity:
+    | 'interface'
+    | 'type'
+    | 'ref'
+    | 'const'
+    | 'value'
+    | 'prop'
+    | 'structure'
+    | 'argument'
+    | 'tuple'
+    | 'array'
   flags: Map<string, Token>
   isGroup?: false
   type?: Token

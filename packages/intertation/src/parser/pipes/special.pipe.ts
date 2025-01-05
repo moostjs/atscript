@@ -71,55 +71,76 @@ export function annotations() {
   }
 }
 
-export function definition(...pipes: Array<TPipe | (() => TPipe)>) {
+export function definition(pipes: Array<TPipe | (() => TPipe)>) {
   const opts = {
     sep: [] as TPunctuation[],
     priority: false,
     multiple: false,
+    from: undefined as TTokenizedAttrs | undefined,
+    debug: false,
   }
   return {
     handler(ni: NodeIterator, target: TTransformedNode) {
-      if (!ni.$) {
+      if (opts.debug) {
+        // eslint-disable-next-line no-debugger
+        debugger
+      }
+      if (!ni.$ && !opts.from) {
         return false
       }
+      if (opts.from && !target[opts.from]) {
+        ni.error(`Unexpected definition`)
+        return false
+      }
+      const fork = opts.from ? ni.fork(target[opts.from]?.children) : ni
+      if (opts.from && !fork.nodesLeft()) {
+        target.definition = {
+          isGroup: true,
+          nodes: [],
+        }
+        return true
+      }
       const resolvedPipes = pipes.map(p => (typeof p === 'function' ? p() : p))
-      const node = runPipesOnce(resolvedPipes, ni)
+      const node = runPipesOnce(resolvedPipes, fork)
       if (node) {
-        ni.accepted()
-        ni.move()
+        fork.accepted()
+        fork.move()
         if (!opts.multiple) {
           target.definition = node
           return true
         }
       } else {
-        ni.error('Unexpected token')
+        fork.error('Unexpected token')
         return false
       }
       const nodes = [node] as Array<TTransformedNode | Token>
-      while (opts.multiple && ni.$) {
+      while (opts.multiple && fork.$) {
         if (opts.sep.length > 0) {
-          if (ni.satisfies({ node: 'punctuation', text: opts.sep })) {
+          if (fork.satisfies({ node: 'punctuation', text: opts.sep })) {
             // keep going
             if (opts.priority) {
-              if (ni.next(['\n']).$) {
-                nodes.push(new Token(ni.$))
+              if (fork.next(['\n']).$) {
+                nodes.push(new Token(fork.$))
               } else {
-                ni.error('Unexpected end of group')
+                fork.error('Unexpected end of group')
                 break
               }
             }
-            ni.accepted()
-            ni.move()
+            fork.accepted()
+            fork.move()
           } else {
             // finished
             break
           }
         }
-        const nextNode = runPipesOnce(resolvedPipes, ni)
+        const nextNode = runPipesOnce(resolvedPipes, fork)
         if (nextNode) {
           nodes.push(nextNode)
-          ni.accepted()
-          ni.move()
+          fork.accepted()
+          fork.move()
+        } else {
+          fork.error('Unexpected token')
+          return false
         }
       }
       if (nodes.length === 1) {
@@ -127,6 +148,10 @@ export function definition(...pipes: Array<TPipe | (() => TPipe)>) {
         return true
       }
       if (opts.priority && opts.sep.length > 0) {
+        if (nodes.length % 2 === 0) {
+          fork.next().error('Error in group definition')
+          return false
+        }
         target.definition = groupByPriority(nodes, opts.sep)
       } else {
         target.definition = {
@@ -147,6 +172,14 @@ export function definition(...pipes: Array<TPipe | (() => TPipe)>) {
     },
     multiple() {
       opts.multiple = true
+      return this
+    },
+    from(attr: TTokenizedAttrs) {
+      opts.from = attr
+      return this
+    },
+    debug() {
+      opts.debug = true
       return this
     },
   }
@@ -170,7 +203,7 @@ export function unwrap(attr: TTokenizedAttrs) {
       }
       return true
     },
-    with(...pipes: TPipe[]) {
+    with(pipes: TPipe[]) {
       opts.pipes = pipes
       return this
     },

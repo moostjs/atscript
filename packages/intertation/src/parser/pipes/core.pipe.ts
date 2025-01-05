@@ -12,13 +12,16 @@ export interface TPipe {
   targetFactory: () => TTransformedNode
   pipe: Array<{ handler: THandler }>
   skipTokens: TPunctuation[]
+  toString: () => string
   stopCondition?: (ni: NodeIterator) => boolean
 }
 
 export function $pipe(entity: TTransformedNode['entity'], pipe: TPipe['pipe'] = []) {
+  pipe.forEach((p, i) => Object.assign(p, { toString: () => `${entity}.${i}` }))
   return {
     targetFactory: () => ({ entity, flags: new Map() }) as TTransformedNode,
     pipe,
+    toString: () => entity,
     skipTokens: [] as TPipe['skipTokens'],
     stopCondition: undefined as TPipe['stopCondition'],
     skip(...s: TPunctuation[]) {
@@ -49,8 +52,7 @@ function clone(declarations: TDeclorations): TDeclorations {
 }
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
-export function runPipes(pipes: TPipe[], _ni: NodeIterator, singlePass = false) {
-  let ni = _ni
+export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
   const nodes: TTransformedNode[] = []
   const declarations = {
     $reserved: new Set([
@@ -86,7 +88,7 @@ export function runPipes(pipes: TPipe[], _ni: NodeIterator, singlePass = false) 
       }
       if (matched) {
         nodes.push(target)
-        ni = fork
+        ni.unfork(fork)
         for (const [key, d] of Object.entries(_declarations)) {
           declarations[key] = d
         }
@@ -97,16 +99,17 @@ export function runPipes(pipes: TPipe[], _ni: NodeIterator, singlePass = false) 
         break
       }
     }
+    if (singlePass) {
+      return nodes
+    }
     ni.move()
     if (matched) {
       //
     } else {
+      // after error skip the whole line;
       while (ni.$ && !ni.satisfies({ node: 'punctuation', text: ['\n', ';'] })) {
         ni.move()
       }
-    }
-    if (singlePass) {
-      return nodes
     }
   }
   return nodes

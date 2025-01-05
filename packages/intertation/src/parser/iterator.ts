@@ -17,6 +17,11 @@ export class NodeIterator {
     return this.i
   }
 
+  unfork(fork: NodeIterator) {
+    this.i = fork.index
+    this.update()
+  }
+
   isUnexpected(text: string) {
     if (this.$ && !this.$.accepted && !this.badNodes.has(this.$)) {
       this.badNodes.set(this.$, text)
@@ -87,7 +92,7 @@ export class NodeIterator {
   }
 
   nodesLeft() {
-    return this.index < this.nodes.length
+    return this.nodes.length > 0 && this.index < this.nodes.length
   }
 
   satisfies(...rules: TExpect[]) {

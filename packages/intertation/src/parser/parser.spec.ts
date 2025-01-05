@@ -10,16 +10,9 @@ import type { TGroupedNodes, TTransformedNode } from './types'
 describe('parser', () => {
   it('new pipe', () => {
     const { ast, messages } = parseItn(
-      `//  text comments
-
-@mongo.collection "partners"
-public interface Partner {
-    @label "Name"
-    @id "ID"
-    _id: string
-
-    test2!: string
-}`,
+      `
+      type Test = number[][][][]
+`,
       undefined,
       true
     )
@@ -28,8 +21,8 @@ public interface Partner {
       messages
         .map(
           m => `${m.message}
-          parser.spec.ts:${m.range.start.line + 12}:${m.range.start.character + 1}
-          parser.spec.ts:${m.range.end.line + 12}:${m.range.end.character + 1}`
+          parser.spec.ts:${m.range.start.line + 13}:${m.range.start.character + 1}
+          parser.spec.ts:${m.range.end.line + 13}:${m.range.end.character + 1}`
         )
         .join('\n')
     )
