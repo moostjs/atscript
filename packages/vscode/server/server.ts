@@ -100,7 +100,7 @@ function getSemanticTokens(doc: TextDocument, range?: Range): SemanticTokens {
   const text = doc.getText(range)
   const { ast } = parseItn(text)
 
-  console.log('getSemanticTokens', range, text)
+  console.log('getSemanticTokens', range)
 
   // 2) We'll use a SemanticTokensBuilder to collect tokens
   const builder = new SemanticTokensBuilder()

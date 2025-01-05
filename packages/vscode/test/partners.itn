@@ -3,8 +3,12 @@
 @mongo.collection "partners"
 public interface Partner {
     @label "Name"
-    @id "ID"
-    _id: string
+    
+    nested1: {
+        test: '123'
+    }
 
-    test2?: string
+    nested2: {
+        test: ['567' | '890']
+    }
 }

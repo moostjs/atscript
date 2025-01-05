@@ -1,10 +1,10 @@
 type TCryptoAlgorithm = 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512'
 
 @mongo.collection 'users'
-public interface User {
+public interface User2 {
     @label 'User "ID"'
     @mongo.key 'string'
-    _id: string
+    _id: string[]
 
     @label "Email"
     @mongo.uniqueIndex "email"
@@ -43,7 +43,7 @@ public interface User {
 
         @label "Is Initial"
         isInitial: boolean        
-    }
+    },
   
     account: {
         @label "Is user active?"

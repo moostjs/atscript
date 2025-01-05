@@ -30,6 +30,7 @@ export function $token(name: TNodeData['node'], text?: string[]) {
     wrap: undefined as TTransformedNode['entity'] | undefined,
     wrapMultiple: false,
     debug: false,
+    eob: false, // end of block
   }
   return {
     expect: [{ node: name, text }] as TExpect[],
@@ -42,7 +43,7 @@ export function $token(name: TNodeData['node'], text?: string[]) {
       while (firstRun || opts.wrapMultiple) {
         firstRun = false
         if (!ni.$) {
-          return opts.optional
+          return opts.eob || opts.optional
         }
         if (ni.satisfies(...opts.expect)) {
           if (opts.empty && ni.$.children?.length) {
@@ -122,6 +123,11 @@ export function $token(name: TNodeData['node'], text?: string[]) {
     },
     or(t: { expect: TExpect[] }) {
       opts.expect.push(...t.expect)
+      return this
+    },
+    orEob() {
+      // end of block
+      opts.eob = true
       return this
     },
     unique(key: string) {

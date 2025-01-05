@@ -11,11 +11,23 @@ describe('parser', () => {
   it('new pipe', () => {
     const { ast, messages } = parseItn(
       `
-      type Test = { prop: value[] }[]
+@mongo.collection "partners"
+public interface Partner {
+    @label "name1"
+    forLabel: string
 
-      interface MyInterface {
-        a: Test[]
-      }
+    @label "name2"
+    nested1: {
+        test: '123'
+        test2: '123'
+        test3: '123'
+    }
+  
+    @label "name3"
+    nested2: {
+        test: '567'
+    }
+}
 `,
       undefined,
       true

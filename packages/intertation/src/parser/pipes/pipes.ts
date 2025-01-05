@@ -19,7 +19,7 @@ const allowedValues: TPipe[] = [
 
 const tuplePipe: TPipe['pipe'] = [
   //
-  block('[]').as('token').skip('\n'),
+  block('[]').as('token'),
   definition(allowedValues).from('token').separatedBy('&', '|', ',').respectPriority(),
   block('[]').optional().empty().wrap('array', true),
 ]
@@ -41,11 +41,12 @@ const props = $pipe('prop', [
   pun('?').asFlag('optional').optional().skip('\n'),
   pun(':').skip('\n'),
   definition(allowedValues).separatedBy('&', '|').respectPriority(),
+  pun(';', ',', '\n').orEob(),
 ]).skip('\n', ';', ',') as TPipe
 
 const interfacePipe = [
   //
-  block('{}').as('token').skip('\n', ';'),
+  block('{}').as('token'),
   unwrap('token').with([props]),
   block('[]').optional().empty().wrap('array', true),
   //
@@ -58,7 +59,7 @@ function interfaceBlock(array = false) {
   ) as TPipe
 }
 
-allowedValues.push(interfaceBlock(true))
+allowedValues.unshift(interfaceBlock(true))
 
 const structure = $pipe('interface', [
   annotations(),
@@ -84,4 +85,5 @@ export const pipes = {
   type,
   props,
   structure,
+  tuple,
 }
