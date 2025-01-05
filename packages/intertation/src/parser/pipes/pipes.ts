@@ -46,13 +46,13 @@ const props = $pipe('prop', [
 const interfacePipe = [
   //
   block('{}').as('token').skip('\n', ';'),
-  block('[]').optional().empty().wrap('array', true),
   unwrap('token').with([props]),
+  block('[]').optional().empty().wrap('array', true),
   //
 ]
 
 function interfaceBlock(array = false) {
-  return $pipe('structure', array ? interfacePipe : [interfacePipe[0], interfacePipe[2]]).skip(
+  return $pipe('structure', array ? interfacePipe : interfacePipe.slice(0, 2)).skip(
     '\n',
     ';'
   ) as TPipe

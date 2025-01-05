@@ -11,7 +11,11 @@ describe('parser', () => {
   it('new pipe', () => {
     const { ast, messages } = parseItn(
       `
-      type Test = number[][][][]
+      type Test = { prop: value[] }[]
+
+      interface MyInterface {
+        a: Test[]
+      }
 `,
       undefined,
       true
