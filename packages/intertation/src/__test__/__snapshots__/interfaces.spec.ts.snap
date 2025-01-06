@@ -1,0 +1,72 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`interfaces > interface with complex prop type 1`] = `
+"● [interface] "IName" type: interface <identifier>
+  = [structure] "{"  (
+      ● [prop] "a"
+        = [group] ""  (
+            ● [ref] "string" <|>
+            ● [ref] "number"
+          )
+       <>
+      ● [prop] "b"
+        = [structure] "{"  (
+            ● [prop] "c": [ref] "string" <>
+            ● [prop] "d": [ref] "number"
+          )
+       <>
+      ● [prop] "c"
+        = [tuple] "["  (
+            ● [ref] "string" <,>
+            ● [ref] "number"
+          )
+       <>
+      ● [prop] "d": [array] "["
+        = [group] "("  (
+            ● [ref] "string" <|>
+            ● [ref] "number"
+          )
+       <>
+      ● [prop] "e": [array] "[": [ref] "string" <>
+      ● [prop] "f"
+        = [group] ""  (
+            ● [ref] "string" <|>
+            ● [ref] "number" <|>
+            ● [structure] "{"  (
+                ● [prop] "g": [ref] "string"
+              )
+          )
+       <>
+      ● [prop] "g"
+        = [group] ""  (
+            ● [structure] "{"  (
+                ● [prop] "h": [ref] "string" <>
+                ● [prop] "i": [ref] "number"
+              ) <|>
+            ● [structure] "{"  (
+                ● [prop] "j": [ref] "string" <>
+                ● [prop] "k": [ref] "number"
+              )
+          )
+       <>
+      ● [prop] "l": [array] "["
+        = [group] "("  (
+            ● [structure] "{"  (
+                ● [prop] "m": [ref] "string" <>
+                ● [prop] "n": [ref] "number"
+              ) <|>
+            ● [group] ""  (
+                ● [structure] "{"  (
+                    ● [prop] "o": [ref] "string" <>
+                    ● [prop] "p": [ref] "number"
+                  ) <&>
+                ● [group] "("  (
+                    ● [ref] "string" <|>
+                    ● [ref] "number"
+                  )
+              )
+          )
+      
+    )
+"
+`;

@@ -3,18 +3,12 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/no-shadow */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import type { TPunctuation } from '../../tokenizer/nodes/punctuation.node'
-import type { TNodeData } from '../../tokenizer/types'
+import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
+import type { TLexicalToken } from '../../tokenizer/types'
 import type { NodeIterator } from '../iterator'
+import type { SemanticNode, TSemanticToken } from '../nodes'
 import { Token } from '../token'
-import type {
-  TDeclorations,
-  TExpect,
-  THandler,
-  TTarget,
-  TTokenizedAttrs,
-  TTransformedNode,
-} from '../types'
+import type { TDeclorations, TExpect, TTarget } from '../types'
 
 export const identifier = (...text: string[]) =>
   $token('identifier', text.length > 0 ? text : undefined)
@@ -24,17 +18,16 @@ export const block = (...text: Array<'{}' | '()' | '[]'>) =>
 export const pun = (...text: TPunctuation[]) =>
   $token('punctuation', text.length > 0 ? text : undefined)
 
-export function $token(name: TNodeData['node'], text?: string[]) {
+export function $token(name: TLexicalToken['type'], text?: string[]) {
   const opts = {
     optional: false,
-    as: undefined as TTokenizedAttrs | undefined,
-    flag: undefined as string | undefined,
+    saveAs: undefined as TSemanticToken | undefined,
     skip: undefined as string[] | undefined,
     unique: undefined as string | undefined,
     expect: [{ node: name, text }] as TExpect[],
     isGlobal: false,
     empty: false,
-    wrap: undefined as TTransformedNode['entity'] | undefined,
+    wrapper: undefined as (() => SemanticNode) | undefined,
     wrapMultiple: false,
     debug: false,
     eob: false, // end of block
@@ -73,11 +66,8 @@ export function $token(name: TNodeData['node'], text?: string[]) {
             ni.unexpected(false, `Expected empty block`)
             return opts.optional
           }
-          if (opts.as) {
-            target.node[opts.as] = new Token(ni.$)
-          }
-          if (opts.flag) {
-            target.node.flags.set(opts.flag, new Token(ni.$))
+          if (opts.saveAs) {
+            target.node.saveToken(new Token(ni.$), opts.saveAs)
           }
           if (opts.unique) {
             const key = opts.unique
@@ -94,14 +84,9 @@ export function $token(name: TNodeData['node'], text?: string[]) {
           } else {
             ni.accepted()
           }
-          if (opts.wrap) {
+          if (opts.wrapper) {
             const wrapped = target.node
-            target.node = {
-              entity: opts.wrap,
-              flags: new Map(),
-              token: new Token(ni.$),
-              definition: wrapped,
-            }
+            target.node = opts.wrapper().wrap(wrapped, new Token(ni.$))
           }
           ni.move()
           if (opts.skip) {
@@ -121,16 +106,12 @@ export function $token(name: TNodeData['node'], text?: string[]) {
       }
       return true
     },
-    as(value: TTokenizedAttrs) {
-      opts.as = value
+    saveAs(v: TSemanticToken) {
+      opts.saveAs = v
       return this
     },
-    asFlag(v: string) {
-      opts.flag = v
-      return this
-    },
-    wrap(entity: TTransformedNode['entity'], multiple = false) {
-      opts.wrap = entity
+    wrap(sn: () => SemanticNode, multiple = false) {
+      opts.wrapper = sn
       opts.wrapMultiple = multiple
       return this
     },

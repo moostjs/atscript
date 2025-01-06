@@ -1,7 +1,7 @@
 /* eslint-disable max-params */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import type { TPunctuation } from '../tokenizer/nodes/punctuation.node'
-import type { TNodeData } from '../tokenizer/types'
+import type { TPunctuation } from '../tokenizer/tokens/punctuation.token'
+import type { TLexicalToken } from '../tokenizer/types'
 import type { TExpect, TMessages } from './types'
 
 interface TNodeIteratorIssues {
@@ -10,21 +10,21 @@ interface TNodeIteratorIssues {
 
 export class NodeIterator {
   constructor(
-    private readonly nodes: TNodeData[],
+    private readonly nodes: TLexicalToken[],
     public readonly messages: TMessages = [],
-    public readonly badNodes: Map<TNodeData, string> = new Map(),
+    public readonly badNodes: Map<TLexicalToken, string> = new Map(),
     public readonly issues: TNodeIteratorIssues = {},
-    public readonly parent?: TNodeData,
+    public readonly parent?: TLexicalToken,
     private i = -1
   ) {}
 
-  $?: TNodeData
+  $?: TLexicalToken
 
   get index() {
     return this.i
   }
 
-  get lastNode(): TNodeData | undefined {
+  get lastNode(): TLexicalToken | undefined {
     return this.nodes[this.nodes.length - 1]
   }
 
@@ -46,7 +46,7 @@ export class NodeIterator {
   }
 
   toString() {
-    return this.$ ? `[${this.$.node}] ${this.$.text}` : `void`
+    return this.$ ? `[${this.$.type}] ${this.$.text}` : `void`
   }
 
   update() {
@@ -69,7 +69,7 @@ export class NodeIterator {
     return this.fork().move().skip(skip)
   }
 
-  fork(nodes?: TNodeData[]) {
+  fork(nodes?: TLexicalToken[]) {
     return new NodeIterator(
       nodes || this.nodes,
       this.messages,
@@ -82,8 +82,8 @@ export class NodeIterator {
 
   skip(pun?: string[]) {
     while (
-      this.$?.node === 'comment' ||
-      (this.$?.node === 'punctuation' && pun?.length && pun.includes(this.$.text))
+      this.$?.type === 'comment' ||
+      (this.$?.type === 'punctuation' && pun?.length && pun.includes(this.$.text))
     ) {
       this.move()
     }
@@ -107,7 +107,9 @@ export class NodeIterator {
 
   shouldHaveError(depth: number) {
     for (let i = this.i; i <= depth; i++) {
-      this.nodes[i].accepted = false
+      if (i < this.nodes.length) {
+        this.nodes[i].accepted = false
+      }
     }
   }
 
@@ -118,8 +120,8 @@ export class NodeIterator {
   satisfies(...rules: TExpect[]) {
     for (const rule of rules) {
       const passed = Array.isArray(rule.node)
-        ? rule.node.includes(this.$?.node as 'text')
-        : this.$?.node === rule.node
+        ? rule.node.includes(this.$?.type as 'text')
+        : this.$?.type === rule.node
       if (passed && rule.text === undefined) {
         return true
       }

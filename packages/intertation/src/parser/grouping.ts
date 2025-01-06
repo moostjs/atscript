@@ -2,16 +2,18 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable complexity */
 /* eslint-disable no-empty */
-import type { TPunctuation } from '../tokenizer/nodes/punctuation.node'
+import type { TPunctuation } from '../tokenizer/tokens/punctuation.token'
+import type { SemanticNode } from './nodes'
+import { $n, isGroup } from './nodes'
+import type { SemanticGroup } from './nodes/group-node'
 import { Token } from './token'
-import type { TGroupedNodes, TTransformedNode } from './types'
 
 export function groupByPriority(
-  nodes: Array<TTransformedNode | Token>,
+  nodes: Array<SemanticNode | Token>,
   priority: TPunctuation[]
-): TTransformedNode | TGroupedNodes | undefined {
+): SemanticNode | undefined {
   if (nodes.length === 1) {
-    return nodes[0] as TTransformedNode | TGroupedNodes
+    return nodes[0] as SemanticNode
   }
   if (nodes.length === 0) {
     return undefined
@@ -19,9 +21,9 @@ export function groupByPriority(
   if (nodes.length % 2 === 0) {
     throw new Error(`Invalid number of nodes ${nodes.length}. Odd number expected`)
   }
-  let currentPass = nodes as Array<TTransformedNode | TGroupedNodes | Token>
-  let temporaryResult = [] as Array<TTransformedNode | TGroupedNodes | Token>
-  let groupped = [] as Array<TTransformedNode | TGroupedNodes>
+  let currentPass = nodes
+  let temporaryResult = [] as Array<SemanticNode | Token>
+  let groupped = [] as SemanticNode[]
   for (const p of priority) {
     for (const [i, node] of currentPass.entries()) {
       const isOperator = i % 2 === 1
@@ -29,7 +31,7 @@ export function groupByPriority(
         throw new Error(`Unexpected token ${node.toString()} at ${i}`)
       } else if (isOperator && !(node instanceof Token)) {
         throw new Error(
-          `Unexpected token ${node.isGroup ? node.operator : node.token?.toString()} at ${i}`
+          `Unexpected token ${isGroup(node) ? node.op : node.token.toString()} at ${i}`
         )
       }
       if (isOperator) {
@@ -41,17 +43,13 @@ export function groupByPriority(
       const prev = (currentPass[i - 1] as Token | undefined)?.text
       const next = (currentPass[i + 1] as Token | undefined)?.text
       if (prev !== p && next !== p) {
-        temporaryResult.push(node as TTransformedNode)
+        temporaryResult.push(node as SemanticNode)
         continue
       }
       if (prev === p || next === p) {
-        groupped.push(node as TTransformedNode)
+        groupped.push(node as SemanticNode)
         if (next !== p) {
-          temporaryResult.push({
-            isGroup: true,
-            operator: p,
-            nodes: groupped,
-          })
+          temporaryResult.push(new $n.SemanticGroup(groupped, p))
           groupped = []
         }
       }
@@ -59,6 +57,6 @@ export function groupByPriority(
     currentPass = temporaryResult
     temporaryResult = []
   }
-  const output = currentPass[0] as TGroupedNodes
-  return output.nodes.length === 1 ? output.nodes[0] : output
+  const output = currentPass[0] as SemanticGroup
+  return output.length === 1 ? output.first : output
 }

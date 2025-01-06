@@ -1,16 +1,16 @@
 import { BasicNode } from '@prostojs/parser'
 
-import type { TNodeData } from '../types'
+import type { TLexicalToken } from '../types'
 
 /**
  * Number node
  */
-export const NumberNode = new BasicNode<TNodeData>({
+export const NumberToken = new BasicNode<TLexicalToken>({
   icon: 'N',
   tokens: [/\d[\p{ID_Continue}$]*/u, /[^\p{ID_Continue}$]/u],
   tokenOE: 'consume-eject',
 })
   .mapContent('text', 'join-clear')
   .onMatch(context => {
-    context.customData.node = 'number'
+    context.customData.type = 'number'
   })

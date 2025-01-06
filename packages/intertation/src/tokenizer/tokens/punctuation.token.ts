@@ -1,6 +1,6 @@
 import { BasicNode } from '@prostojs/parser'
 
-import type { TNodeData } from '../types'
+import type { TLexicalToken } from '../types'
 
 export type TPunctuation =
   | '\n'
@@ -20,10 +20,10 @@ export type TPunctuation =
 /**
  * Punctuation node
  */
-export const PunctuationNode = new BasicNode<TNodeData & { text: TPunctuation }>({
+export const PunctuationToken = new BasicNode<TLexicalToken & { text: TPunctuation }>({
   tokens: [/(?<text>[\n!&+,\-./:;=?|])/u, ''],
   tokenOE: 'omit-omit',
   icon: '...',
 }).onMatch(context => {
-  context.customData.node = 'punctuation'
+  context.customData.type = 'punctuation'
 })

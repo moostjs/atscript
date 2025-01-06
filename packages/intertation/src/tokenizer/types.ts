@@ -1,5 +1,5 @@
-export interface TNodeData {
-  node:
+export interface TLexicalToken {
+  type:
     | 'annotation'
     | 'comment'
     | 'punctuation'
@@ -9,8 +9,7 @@ export interface TNodeData {
     | 'block'
     | 'unknown'
   text: string
-  array?: '[]'
-  children?: TNodeData[]
+  children?: TLexicalToken[]
   startOffset?: number
   endOffset?: number
   accepted?: boolean

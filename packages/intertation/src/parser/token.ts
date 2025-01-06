@@ -1,7 +1,7 @@
-import type { TNodeData } from '../tokenizer/types'
+import type { TLexicalToken } from '../tokenizer/types'
 
 export class Token {
-  constructor(protected readonly _data: TNodeData) {}
+  constructor(protected readonly _data: TLexicalToken) {}
 
   toString() {
     const children = this.hasChildren ? ` (${this.children.length})` : ''
@@ -13,7 +13,7 @@ export class Token {
   }
 
   get type() {
-    return this._data.node // equals "punctuation" for operators like &, |, ...
+    return this._data.type // equals "punctuation" for operators like &, |, ...
   }
 
   get range() {

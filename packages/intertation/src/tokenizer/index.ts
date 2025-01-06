@@ -1,7 +1,7 @@
-import { mapContent, rootNode } from './nodes'
+import { mapContent, root } from './tokens'
 
 export function tokenize(source: string, debug = false) {
-  const tokens = rootNode.parse(source)
+  const tokens = root.parse(source)
   if (debug) {
     console.log(tokens.toTree())
   }

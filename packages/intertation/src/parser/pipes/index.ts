@@ -14,5 +14,8 @@ export function parseItn(
   return {
     ast: runPipes(_pipes, ni),
     messages: ni.getErrors(),
+    toString() {
+      return this.ast.map(a => a.toString()).join('\n')
+    },
   }
 }

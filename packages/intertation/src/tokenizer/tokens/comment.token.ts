@@ -1,8 +1,8 @@
 import { BasicNode } from '@prostojs/parser'
 
-import type { TNodeData } from '../types'
+import type { TLexicalToken } from '../types'
 
-const inline = new BasicNode<TNodeData>({
+const inline = new BasicNode<TLexicalToken>({
   // label only for tree view
   label: 'inline-comment',
   // icon only for tree view
@@ -15,10 +15,10 @@ const inline = new BasicNode<TNodeData>({
   .mapContent('text', 'join-clear')
   .popsAtEOFSource(true)
   .onMatch(context => {
-    context.customData.node = 'comment'
+    context.customData.type = 'comment'
   })
 
-const block = new BasicNode<TNodeData>({
+const block = new BasicNode<TLexicalToken>({
   label: 'block-comment',
   icon: '“',
   tokens: ['/*', '*/'],
@@ -27,7 +27,7 @@ const block = new BasicNode<TNodeData>({
   .mapContent('text', 'join-clear')
   .popsAtEOFSource(true)
   .onMatch(context => {
-    context.customData.node = 'comment'
+    context.customData.type = 'comment'
   })
 
 /**

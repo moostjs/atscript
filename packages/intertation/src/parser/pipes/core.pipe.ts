@@ -1,25 +1,49 @@
+/* eslint-disable unicorn/switch-case-braces */
 /* eslint-disable complexity */
 /* eslint-disable max-depth */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import type { TPunctuation } from '../../tokenizer/nodes/punctuation.node'
-import type { TNodeData } from '../../tokenizer/types'
+import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
+import type { TLexicalToken } from '../../tokenizer/types'
 import type { NodeIterator } from '../iterator'
-import type { TDeclorations, THandler, TTransformedNode } from '../types'
+import type { SemanticNode, TNodeEntity } from '../nodes'
+import { $n } from '../nodes'
+import type { TDeclorations, THandler } from '../types'
 import { $token } from './tokens.pipe'
 
 export interface TPipe {
-  targetFactory: () => TTransformedNode
+  targetFactory: () => SemanticNode
   pipe: Array<{ handler: THandler }>
   skipTokens: TPunctuation[]
   toString: () => string
   stopCondition?: (ni: NodeIterator) => boolean
 }
 
-export function $pipe(entity: TTransformedNode['entity'], pipe: TPipe['pipe'] = []) {
+export function $pipe(entity: TNodeEntity, pipe: TPipe['pipe'] = []) {
   pipe.forEach((p, i) => Object.assign(p, { toString: () => `${entity}.${i}` }))
   return {
-    targetFactory: () => ({ entity, flags: new Map() }) as TTransformedNode,
+    targetFactory: () => {
+      switch (entity) {
+        case 'interface':
+          return new $n.SemanticInterfaceNode()
+        case 'array':
+          return new $n.SemanticArrayNode()
+        case 'const':
+          return new $n.SemanticConstNode()
+        case 'group':
+          return new $n.SemanticGroup()
+        case 'prop':
+          return new $n.SemanticPropNode()
+        case 'type':
+          return new $n.SemanticTypeNode()
+        case 'ref':
+          return new $n.SemanticRefNode()
+        case 'structure':
+          return new $n.SemanticStructureNode()
+        case 'tuple':
+          return new $n.SemanticTupleNode()
+      }
+    },
     pipe,
     toString: () => entity,
     skipTokens: [] as TPipe['skipTokens'],
@@ -32,10 +56,10 @@ export function $pipe(entity: TTransformedNode['entity'], pipe: TPipe['pipe'] = 
       this.stopCondition = sc
       return this
     },
-    t(node: TNodeData['node'], skip: TPunctuation[] = []) {
+    t(node: TLexicalToken['type'], skip: TPunctuation[] = []) {
       this.pipe.push(
         $token(node)
-          .as('token')
+          .saveAs('identifier')
           .skip(...skip)
       )
       return this
@@ -53,7 +77,7 @@ function clone(declarations: TDeclorations): TDeclorations {
 
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
-  const nodes: TTransformedNode[] = []
+  const nodes: SemanticNode[] = []
   const declarations = {
     $reserved: new Set([
       'string',
@@ -126,6 +150,6 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
   return nodes
 }
 
-export function runPipesOnce(pipes: TPipe[], _ni: NodeIterator): TTransformedNode | undefined {
+export function runPipesOnce(pipes: TPipe[], _ni: NodeIterator): SemanticNode | undefined {
   return runPipes(pipes, _ni, true)[0]
 }

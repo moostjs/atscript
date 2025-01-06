@@ -1,5 +1,7 @@
-import type { TNodeData } from '../../tokenizer/types'
-import type { TTransformedNode } from '../types'
+import type { TLexicalToken } from '../../tokenizer/types'
+import type { TNodeEntity } from '../nodes'
+import { $n } from '../nodes'
+import { SemanticArrayNode } from '../nodes/array-node'
 import type { TPipe } from './core.pipe'
 import { $pipe } from './core.pipe'
 import { annotations, definition, unwrap } from './special.pipe'
@@ -19,21 +21,26 @@ const allowedValues: TPipe[] = [
 
 const tuplePipe: TPipe['pipe'] = [
   //
-  block('[]').as('token'),
+  block('[]').saveAs('identifier'),
   definition(allowedValues)
-    .from('token')
+    .from('identifier')
     .separatedBy('&', '|', ',')
     .skip('\n')
-    .respectPriority()
-    .pop(),
-  block('[]').optional().empty().wrap('array', true),
+    .respectPriority(),
+  block('[]')
+    .optional()
+    .empty()
+    .wrap(() => new SemanticArrayNode(), true),
 ]
 
 const groupPipe: TPipe['pipe'] = [
   //
-  block('()').as('token'),
-  definition(allowedValues).from('token').separatedBy('&', '|').skip('\n').respectPriority().pop(),
-  block('()').optional().empty().wrap('array', true),
+  block('()').saveAs('identifier'),
+  definition(allowedValues).from('identifier').separatedBy('&', '|').skip('\n').respectPriority(),
+  block('[]')
+    .optional()
+    .empty()
+    .wrap(() => new $n.SemanticArrayNode(), true),
 ]
 
 const tuple = $pipe('tuple', tuplePipe).skip('\n')
@@ -42,17 +49,17 @@ allowedValues.unshift(tuple)
 allowedValues.unshift(group)
 
 const type = $pipe('type', [
-  identifier('public').asFlag('public').optional().skip('\n'),
-  identifier('type').as('type').skip('\n').suppressEobError(),
-  identifier().as('name').unique('identifier').global().skip('\n'),
+  identifier('public').saveAs('public').optional().skip('\n'),
+  identifier('type').saveAs('type').skip('\n').suppressEobError(),
+  identifier().saveAs('identifier').unique('identifier').global().skip('\n'),
   pun('=').skip('\n'),
   definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
 ]).skip('\n', ';')
 
 const props = $pipe('prop', [
   annotations(),
-  identifier().or(text()).as('name').unique('prop').skip('\n'),
-  pun('?').asFlag('optional').optional().skip('\n'),
+  identifier().or(text()).saveAs('identifier').unique('prop').skip('\n'),
+  pun('?').saveAs('optional').optional().skip('\n'),
   pun(':').skip('\n'),
   definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
   pun(';', ',', '\n').orEob().lookBehind(),
@@ -60,9 +67,12 @@ const props = $pipe('prop', [
 
 const interfacePipe = [
   //
-  block('{}').as('token'),
-  unwrap('token').with([props]),
-  block('[]').optional().empty().wrap('array', true),
+  block('{}').saveAs('identifier'),
+  unwrap('identifier').with([props]),
+  block('[]')
+    .optional()
+    .empty()
+    .wrap(() => new $n.SemanticArrayNode(), true),
   //
 ]
 
@@ -77,20 +87,25 @@ allowedValues.unshift(interfaceBlock(true))
 
 const structure = $pipe('interface', [
   annotations(),
-  identifier('public').asFlag('public').optional().skip('\n'),
-  identifier('interface').as('type').skip('\n').suppressEobError(),
-  identifier().as('name').unique('identifier').global().skip('\n'),
+  identifier('public').saveAs('public').optional().skip('\n'),
+  identifier('interface').saveAs('type').skip('\n').suppressEobError(),
+  identifier().saveAs('identifier').unique('identifier').global().skip('\n'),
   definition([interfaceBlock()]),
 ]).skip('\n', ';')
 
 export function defineValuePipe(
-  entity: TTransformedNode['entity'],
-  name: TNodeData['node'],
+  entity: TNodeEntity,
+  name: TLexicalToken['type'],
   supportArray = false
 ) {
-  const steps = [$token(name).as('token')]
+  const steps = [$token(name).saveAs('identifier')]
   if (supportArray) {
-    steps.push(block('[]').optional().empty().wrap('array', true))
+    steps.push(
+      block('[]')
+        .optional()
+        .empty()
+        .wrap(() => new $n.SemanticArrayNode(), true)
+    )
   }
   return $pipe(entity, steps).skip('\n')
 }
