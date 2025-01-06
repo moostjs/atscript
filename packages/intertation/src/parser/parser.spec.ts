@@ -11,22 +11,12 @@ describe('parser', () => {
   it('new pipe', () => {
     const { ast, messages } = parseItn(
       `
-@mongo.collection "partners"
-public interface Partner {
-    @label "name1"
-    forLabel: string
-
-    @label "name2"
-    nested1: {
-        test: '123'
-        test2: '123'
-        test3: '123'
-    }
-  
-    @label "name3"
-    nested2: {
-        test: '567'
-    }
+@annotation true
+interface t {
+      @annotation true
+      a: number
+      true
+      b: string
 }
 `,
       undefined,
@@ -43,31 +33,6 @@ public interface Partner {
         .join('\n')
     )
   })
-  // it('swap handlers', () => {
-  //   const parser = new ItnParser()
-  //   const nodes = parser.parse(`
-  //     public type Type = 333
-  //     public type UnionType = string | number
-
-  //     @injectable 'FOR_EVENT', 333
-  //     @mongo.collection 'Users'
-  //     interface MyInterface {
-  //       @label 'My label'
-  //       prop1: 1 & 2 | 3 & 4
-  //       "text prop": string
-  //       nested: {
-  //         @label 'My label 2', 123
-  //         prop2: string
-  //         prop3?: 123
-  //       }[] | string
-  //     }
-  //     `)
-  //   console.log(parser.messages)
-  //   console.log(nodes.map(n => renderNode(n, 0)).join('\n\n'))
-  //   // expect({
-  //   //   nodes,
-  //   // }).toMatchFileSnapshot('./swap-handlers.json')
-  // })
 })
 
 function renderNode(n: TTransformedNode | TGroupedNodes, level = 0): string {

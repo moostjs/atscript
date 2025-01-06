@@ -74,10 +74,15 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
   } as TDeclorations
   while (ni.$) {
     let matched = true
+    let depth = ni.index
     for (const { targetFactory, pipe, skipTokens: skip, stopCondition } of pipes) {
-      const target = targetFactory()
+      const target = { node: targetFactory() }
       const fork = ni.fork()
       fork.skip(skip)
+      if (!fork.$) {
+        ni.unfork(fork)
+        break
+      }
       matched = true
       const _declarations = clone(declarations)
       for (const { handler } of pipe) {
@@ -86,8 +91,11 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
           break
         }
       }
+      if (fork.index > depth) {
+        depth = fork.index
+      }
       if (matched) {
-        nodes.push(target)
+        nodes.push(target.node)
         ni.unfork(fork)
         for (const [key, d] of Object.entries(_declarations)) {
           declarations[key] = d
@@ -102,14 +110,17 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
     if (singlePass) {
       return nodes
     }
+    if (!matched) {
+      ni.shouldHaveError(depth)
+      ni.move(depth - ni.index)
+    }
     ni.move()
     if (matched) {
       //
     } else {
+      ni.confirmIssues()
       // after error skip the whole line;
-      while (ni.$ && !ni.satisfies({ node: 'punctuation', text: ['\n', ';'] })) {
-        ni.move()
-      }
+      ni.skipUntil([';', '\n'])
     }
   }
   return nodes

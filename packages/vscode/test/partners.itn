@@ -1,5 +1,5 @@
 //  text comments
-
+/**/
 @mongo.collection "partners"
 public interface Partner {
     @label "Name"

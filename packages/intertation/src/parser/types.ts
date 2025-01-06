@@ -19,6 +19,7 @@ export interface TTransformedNode {
     | 'structure'
     | 'argument'
     | 'tuple'
+    | 'group'
     | 'array'
   flags: Map<string, Token>
   isGroup?: false
@@ -51,8 +52,8 @@ export type TMessages = Array<{
 
 export type TDeclorations = Record<string, Set<string> | undefined>
 export type TTokenizedAttrs = 'type' | 'token' | 'name'
-export type THandler = (
-  ni: NodeIterator,
-  target: TTransformedNode,
-  declarations: TDeclorations
-) => boolean
+
+export interface TTarget {
+  node: TTransformedNode
+}
+export type THandler = (ni: NodeIterator, target: TTarget, declarations: TDeclorations) => boolean

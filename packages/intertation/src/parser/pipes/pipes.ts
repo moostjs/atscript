@@ -20,19 +20,33 @@ const allowedValues: TPipe[] = [
 const tuplePipe: TPipe['pipe'] = [
   //
   block('[]').as('token'),
-  definition(allowedValues).from('token').separatedBy('&', '|', ',').respectPriority(),
+  definition(allowedValues)
+    .from('token')
+    .separatedBy('&', '|', ',')
+    .skip('\n')
+    .respectPriority()
+    .pop(),
   block('[]').optional().empty().wrap('array', true),
 ]
 
+const groupPipe: TPipe['pipe'] = [
+  //
+  block('()').as('token'),
+  definition(allowedValues).from('token').separatedBy('&', '|').skip('\n').respectPriority().pop(),
+  block('()').optional().empty().wrap('array', true),
+]
+
 const tuple = $pipe('tuple', tuplePipe).skip('\n')
+const group = $pipe('group', groupPipe).skip('\n')
 allowedValues.unshift(tuple)
+allowedValues.unshift(group)
 
 const type = $pipe('type', [
   identifier('public').asFlag('public').optional().skip('\n'),
-  identifier('type').as('type').skip('\n'),
+  identifier('type').as('type').skip('\n').suppressEobError(),
   identifier().as('name').unique('identifier').global().skip('\n'),
   pun('=').skip('\n'),
-  definition(allowedValues).separatedBy('&', '|').respectPriority(),
+  definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
 ]).skip('\n', ';')
 
 const props = $pipe('prop', [
@@ -40,8 +54,8 @@ const props = $pipe('prop', [
   identifier().or(text()).as('name').unique('prop').skip('\n'),
   pun('?').asFlag('optional').optional().skip('\n'),
   pun(':').skip('\n'),
-  definition(allowedValues).separatedBy('&', '|').respectPriority(),
-  pun(';', ',', '\n').orEob(),
+  definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
+  pun(';', ',', '\n').orEob().lookBehind(),
 ]).skip('\n', ';', ',') as TPipe
 
 const interfacePipe = [
@@ -64,7 +78,7 @@ allowedValues.unshift(interfaceBlock(true))
 const structure = $pipe('interface', [
   annotations(),
   identifier('public').asFlag('public').optional().skip('\n'),
-  identifier('interface').as('type').skip('\n'),
+  identifier('interface').as('type').skip('\n').suppressEobError(),
   identifier().as('name').unique('identifier').global().skip('\n'),
   definition([interfaceBlock()]),
 ]).skip('\n', ';')

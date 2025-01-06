@@ -7,7 +7,14 @@ import type { TPunctuation } from '../../tokenizer/nodes/punctuation.node'
 import type { TNodeData } from '../../tokenizer/types'
 import type { NodeIterator } from '../iterator'
 import { Token } from '../token'
-import type { TDeclorations, TExpect, THandler, TTokenizedAttrs, TTransformedNode } from '../types'
+import type {
+  TDeclorations,
+  TExpect,
+  THandler,
+  TTarget,
+  TTokenizedAttrs,
+  TTransformedNode,
+} from '../types'
 
 export const identifier = (...text: string[]) =>
   $token('identifier', text.length > 0 ? text : undefined)
@@ -31,10 +38,12 @@ export function $token(name: TNodeData['node'], text?: string[]) {
     wrapMultiple: false,
     debug: false,
     eob: false, // end of block
+    suppressEobError: false,
+    lookBehind: false,
   }
   return {
     expect: [{ node: name, text }] as TExpect[],
-    handler(ni: NodeIterator, target: TTransformedNode, declarations: TDeclorations) {
+    handler(ni: NodeIterator, target: TTarget, declarations: TDeclorations) {
       if (opts.debug) {
         // eslint-disable-next-line no-debugger
         debugger
@@ -43,40 +52,56 @@ export function $token(name: TNodeData['node'], text?: string[]) {
       while (firstRun || opts.wrapMultiple) {
         firstRun = false
         if (!ni.$) {
-          return opts.eob || opts.optional
+          const ok = opts.eob || opts.optional
+          if (!ok && !opts.suppressEobError) {
+            ni.unexpectedEOB()
+          }
+          return ok
         }
-        if (ni.satisfies(...opts.expect)) {
+        let matched = ni.satisfies(...opts.expect)
+        if (!matched && opts.lookBehind) {
+          matched = ni
+            .fork()
+            .move(-1)
+            .satisfies(...opts.expect)
+          if (matched) {
+            ni.move(-1)
+          }
+        }
+        if (matched) {
           if (opts.empty && ni.$.children?.length) {
-            ni.error(`Expected empty block`)
+            ni.unexpected(false, `Expected empty block`)
             return opts.optional
           }
           if (opts.as) {
-            target[opts.as] = new Token(ni.$)
+            target.node[opts.as] = new Token(ni.$)
           }
           if (opts.flag) {
-            target.flags.set(opts.flag, new Token(ni.$))
+            target.node.flags.set(opts.flag, new Token(ni.$))
           }
           if (opts.unique) {
             const key = opts.unique
             declarations[key] = declarations[key] || new Set<string>()
             const storage = declarations[key]
             if (storage.has(ni.$.text)) {
-              ni.error(`Duplicate ${key} "${ni.$.text}"`)
+              ni.unexpected(false, `Duplicate ${key} "${ni.$.text}"`)
             } else {
               storage.add(ni.$.text)
+              ni.accepted()
             }
           } else if (opts.isGlobal && declarations.$reserved?.has(ni.$.text)) {
-            ni.error(`Reserved identifier "${ni.$.text}"`)
+            ni.unexpected(false, `Reserved identifier "${ni.$.text}"`)
           } else {
             ni.accepted()
           }
           if (opts.wrap) {
-            const newTarget = { ...target }
-            target.entity = opts.wrap
-            target.flags = new Map()
-            target.token = new Token(ni.$)
-            target.annotations = {}
-            target.definition = newTarget
+            const wrapped = target.node
+            target.node = {
+              entity: opts.wrap,
+              flags: new Map(),
+              token: new Token(ni.$),
+              definition: wrapped,
+            }
           }
           ni.move()
           if (opts.skip) {
@@ -89,7 +114,7 @@ export function $token(name: TNodeData['node'], text?: string[]) {
           }
         } else {
           if (!opts.optional) {
-            ni.error(`Unexpected token`)
+            ni.unexpected()
           }
           return opts.optional
         }
@@ -130,12 +155,20 @@ export function $token(name: TNodeData['node'], text?: string[]) {
       opts.eob = true
       return this
     },
+    suppressEobError() {
+      opts.suppressEobError = true
+      return this
+    },
     unique(key: string) {
       opts.unique = key
       return this
     },
     global() {
       opts.isGlobal = true
+      return this
+    },
+    lookBehind() {
+      opts.lookBehind = true
       return this
     },
     debug() {

@@ -1,13 +1,20 @@
 /* eslint-disable max-params */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
+import type { TPunctuation } from '../tokenizer/nodes/punctuation.node'
 import type { TNodeData } from '../tokenizer/types'
 import type { TExpect, TMessages } from './types'
+
+interface TNodeIteratorIssues {
+  unexpectedEOB?: boolean
+}
 
 export class NodeIterator {
   constructor(
     private readonly nodes: TNodeData[],
     public readonly messages: TMessages = [],
     public readonly badNodes: Map<TNodeData, string> = new Map(),
+    public readonly issues: TNodeIteratorIssues = {},
+    public readonly parent?: TNodeData,
     private i = -1
   ) {}
 
@@ -17,19 +24,22 @@ export class NodeIterator {
     return this.i
   }
 
+  get lastNode(): TNodeData | undefined {
+    return this.nodes[this.nodes.length - 1]
+  }
+
+  unexpectedEOB() {
+    this.issues.unexpectedEOB = true
+  }
+
   unfork(fork: NodeIterator) {
     this.i = fork.index
     this.update()
   }
 
-  isUnexpected(text: string) {
-    if (this.$ && !this.$.accepted && !this.badNodes.has(this.$)) {
-      this.badNodes.set(this.$, text)
-    }
-  }
-
   accepted() {
-    if (this.$) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-boolean-literal-compare
+    if (this.$ && this.$.accepted !== false) {
       this.$.accepted = true
       this.badNodes.delete(this.$)
     }
@@ -64,6 +74,8 @@ export class NodeIterator {
       nodes || this.nodes,
       this.messages,
       this.badNodes,
+      this.issues,
+      nodes ? this.$ : this.parent,
       nodes ? 0 : this.i
     ).update()
   }
@@ -78,17 +90,25 @@ export class NodeIterator {
     return this
   }
 
-  error(msg: string) {
-    this.isUnexpected(msg)
-    // this.messages.push({
-    //   type: 'error',
-    //   message: msg,
-    //   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    //   range: this.$?.getRange?.() || {
-    //     start: { character: 1, line: 1 },
-    //     end: { character: 1, line: 1 },
-    //   },
-    // })
+  skipUntil(pun: TPunctuation[]) {
+    while (this.$ && !this.satisfies({ node: 'punctuation', text: pun })) {
+      this.move()
+    }
+  }
+
+  unexpected(force = false, msg = 'Unexpected token') {
+    if (force && this.$) {
+      this.$.accepted = false
+    }
+    if (this.$ && !this.badNodes.has(this.$)) {
+      this.badNodes.set(this.$, msg)
+    }
+  }
+
+  shouldHaveError(depth: number) {
+    for (let i = this.i; i <= depth; i++) {
+      this.nodes[i].accepted = false
+    }
   }
 
   nodesLeft() {
@@ -114,7 +134,28 @@ export class NodeIterator {
     return false
   }
 
+  confirmIssues() {
+    if (this.issues.unexpectedEOB) {
+      const node = this.lastNode || this.parent
+      const pos = node?.getRange().end || { character: 1, line: 1 }
+      this.messages.push({
+        type: 'error',
+        message: `Unexpected end of block`,
+        range: {
+          start: pos,
+          end: pos,
+        },
+      })
+      this.issues.unexpectedEOB = false
+    }
+  }
+
   getErrors(): TMessages {
+    this.badNodes.forEach((msg, node) => {
+      if (node.accepted) {
+        this.badNodes.delete(node)
+      }
+    })
     return Array.from(this.badNodes.entries(), ([node, msg]) => ({
       type: 'error',
       message: msg,
@@ -123,6 +164,6 @@ export class NodeIterator {
         start: { character: 1, line: 1 },
         end: { character: 1, line: 1 },
       },
-    }))
+    })).concat(this.messages) as TMessages
   }
 }

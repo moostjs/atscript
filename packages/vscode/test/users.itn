@@ -1,16 +1,30 @@
 type TCryptoAlgorithm = 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha3-224' | 'sha3-256' | 'sha3-384' | 'sha3-512'
 
-@mongo.collection 'users'
+type TUser = [string | number ]
+
+@mongo.collection  2332, 'users', 123213, 'fasdfsda'
+@label true
 public interface User2 {
     @label 'User "ID"'
     @mongo.key 'string'
-    _id: string[]
+    _id: (string[] | '123') & {
+        ppp: 123,
+    }
 
-    @label "Email"
-    @mongo.uniqueIndex "email"
+    @label true
+    @mongo.uniqueIndex "ema'il"
     @mongo.textIndex
     @description "Unique user email"
-    id: string    
+    id: string
+
+    
+    bool: true
+    bool2: false,
+    number: 123123 | number
+    
+    test: string
+    
+    aaa: TCryptoAlgorithm
 
     @label "User Name (public)"
     @mongo.uniqueIndex "userid"
@@ -36,7 +50,7 @@ public interface User2 {
 
             @label "Password Hash"
             hash: string            
-        }[]
+        }
 
         @label "Last Changed"
         lastChanged: number
@@ -89,6 +103,9 @@ public interface User2 {
         autoSend: boolean        
     }
 
+    requiredProp: string,
+    optionalProp?: string,
+    
     @label "First Name"
     @mongo.textIndex
     firstName?: string
