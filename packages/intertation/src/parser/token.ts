@@ -27,4 +27,8 @@ export class Token {
   get hasChildren() {
     return Boolean(this._data.children?.length)
   }
+
+  get multiline() {
+    return this._data.multiline
+  }
 }

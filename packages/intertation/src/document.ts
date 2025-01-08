@@ -5,24 +5,27 @@ import type { SemanticNode } from './parser/nodes'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
 import type { Token } from './parser/token'
-import type { TMessages } from './parser/types'
+import type { TMessages, TSeverity } from './parser/types'
 import { tokenize } from './tokenizer'
 
 export interface TItnDocumentConfig {
   reserved?: string[]
+  globalTypes?: string[]
 }
 
 export class ItnDocument {
   constructor(
     public readonly id: string,
     private readonly config: TItnDocumentConfig
-  ) {}
+  ) {
+    this.registry = new IdRegistry(config.reserved, config.globalTypes)
+  }
 
-  public readonly registry = new IdRegistry(this.config.reserved)
+  public readonly registry: IdRegistry
 
   public semanticMessages: TMessages = []
 
-  public nodesMessage: TMessages = []
+  public messages: TMessages = []
 
   public imports = new Map<string, { from: Token; tokens: Token[] }>()
 
@@ -60,24 +63,30 @@ export class ItnDocument {
   cleanup() {
     this.exports.clear()
     this.registry.clear()
-    this.nodesMessage = []
+    this.messages = []
     this.referred = []
     this.imports.clear()
     this._allMessages = undefined
   }
 
-  registerNodes(nodes: SemanticNode[]) {
+  private registerNodes(nodes: SemanticNode[]) {
     for (const node of nodes) {
       node.registerAtDocument(this)
-      this.referred.push(...node.referredIdentifiers)
+      node.referredIdentifiers.forEach(t => {
+        this.referred.push(t)
+      })
     }
   }
 
   registerImport(from: Token, tokens: Token[]) {
     this.imports.set(from.text, { from, tokens })
     tokens.forEach(t => {
-      this.registry.register(t)
+      this.registerDefinition(t)
     })
+  }
+
+  registerDefinition(token?: Token) {
+    this.registry.registerDefinition(token)
   }
 
   registerExport(node: SemanticNode) {
@@ -87,9 +96,12 @@ export class ItnDocument {
     }
   }
 
-  registerMessage(token: Token, message: string, type: 'error' | 'warning' = 'error') {
-    this.nodesMessage.push({
-      type,
+  registerMessage(token: Token, message: string, severity: TSeverity = 1) {
+    if (this._allMessages) {
+      this._allMessages = undefined
+    }
+    this.messages.push({
+      severity,
       message,
       range: token.range,
     })
@@ -101,30 +113,31 @@ export class ItnDocument {
     this._allMessages = undefined
   }
 
-  getAllMessages() {
+  getUnusedTokens() {
+    const refSet = new Set<string>(this.referred.map(r => r.text))
+    const tokens = [] as Token[]
+    for (const [key, token] of Array.from(this.registry.definitions.entries())) {
+      if (!refSet.has(key) && !this.exports.has(key)) {
+        tokens.push(token)
+      }
+    }
+    return tokens
+  }
+
+  getDiagMessages() {
+    console.log('node messages', this.messages)
     if (!this._allMessages) {
       this._allMessages = [
         ...this.referred
-          .filter(
-            t => !this.registry.reserved.has(t.text) && !this.registry.definitions.has(t.text)
-          )
+          .filter(t => !this.registry.isDefined(t))
           .map(t => ({
-            type: 'error',
+            severity: 1,
             message: `Unknown identifier "${t.text}"`,
             range: t.range,
           })),
-        ...Array.from(this.registry.duplicates, t => ({
-          type: 'error',
-          message: `Duplicate identifier "${t.text}"`,
-          range: t.range,
-        })),
-        ...Array.from(this.registry.forbidden, t => ({
-          type: 'error',
-          message: `Reserved keyword "${t.text}"`,
-          range: t.range,
-        })),
+        ...this.registry.getErrors(),
         ...this.semanticMessages,
-        ...this.nodesMessage,
+        ...this.messages,
       ] as TMessages
     }
     return this._allMessages

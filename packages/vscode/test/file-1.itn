@@ -1,15 +1,19 @@
 import { SomeTuple, SomeStructure } from './file-2'
 
 @mongo.collection 'someCollection'
-export interface SomeStructure1 {
+export interface SomeStructure12 {
     @label 'First Name'
     firstName: string
 
-    @label 'Last Name'
+    @label 'Last Name', 123
     lastName: string
 
     @label 'Age'
     age: number
+    
+    from: number & 123
+
+    export: number
 
     @label 'Contacts'
     contacts: Contacts[]
@@ -24,4 +28,10 @@ interface Contacts {
 
     @label 'Phone Number'
     phone: string
+}
+
+type test = 'fasdf'
+
+interface ttt {
+
 }

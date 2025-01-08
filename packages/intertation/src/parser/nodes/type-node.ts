@@ -9,9 +9,13 @@ export class SemanticTypeNode extends SemanticNode {
   }
 
   registerAtDocument(doc: ItnDocument): void {
-    doc.registry.register(this.token('identifier'))
+    super.registerAtDocument(doc)
+    doc.registerDefinition(this.token('identifier'))
     if (this.token('export')) {
       doc.registerExport(this)
+    }
+    if (this.definition) {
+      //
     }
   }
 }

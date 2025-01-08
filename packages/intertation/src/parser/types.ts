@@ -7,8 +7,15 @@ export interface TExpect {
   text?: string | string[]
 }
 
+export enum TSeverity {
+  Error = 1,
+  Warning = 2,
+  Info = 3,
+  Hint = 4,
+}
+
 export type TMessages = Array<{
-  type: 'error' | 'warning' | 'info' | 'hint'
+  severity: TSeverity
   message: string
   range: {
     start: { line: number; character: number }

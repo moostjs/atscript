@@ -3,8 +3,9 @@ type TCryptoAlgorithm = 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha
 type TUser = [string | number ]
 
 @mongo.collection  2332, 'users', 123213, 'fasdfsda'
-@label 'true'
-public interface User2 {
+@label true, false, undefined, null, 55, ""
+@label true, false, undefined, null, 55, ""
+export interface User2 {
     @label 'User "ID"'
     @mongo.key 'string'
     _id: (string[] | '123') & {
@@ -12,15 +13,14 @@ public interface User2 {
     }
 
     @label 'true'
-    @mongo.uniqueIndex "ema'il"
+    @mongo.uniqueIndex "ema'il" 
     @mongo.textIndex
     @description "Unique user email"
     id: string
-
     
     bool: true
     bool2: false,
-    number: 123123 | number
+    number: 123123 | false
     
     test: string
     
@@ -60,7 +60,7 @@ public interface User2 {
     },
   
     account: {
-        @label "Is user active?"
+        @label "Is user \"", 
         active: boolean
 
         @label "Is Locked"

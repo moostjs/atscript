@@ -7,7 +7,7 @@ export class SemanticInterfaceNode extends SemanticNode {
   }
 
   registerAtDocument(doc: ItnDocument): void {
-    doc.registry.register(this.token('identifier'))
+    doc.registerDefinition(this.token('identifier'))
     if (this.token('export')) {
       doc.registerExport(this)
     }

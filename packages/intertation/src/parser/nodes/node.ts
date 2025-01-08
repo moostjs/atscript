@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-confusing-void-expression */
 import type { ItnDocument } from '../../document'
 import type { Token } from '../token'
 import { isGroup } from '.'
@@ -16,7 +17,9 @@ export class SemanticNode {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   registerAtDocument(doc: ItnDocument): void {
-    // do nothing
+    if (this.definition) {
+      this.definition.registerAtDocument(doc)
+    }
   }
 
   get id() {

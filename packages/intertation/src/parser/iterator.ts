@@ -141,7 +141,7 @@ export class NodeIterator {
       const node = this.lastNode || this.parent
       const pos = node?.getRange().end || { character: 1, line: 1 }
       this.messages.push({
-        type: 'error',
+        severity: 1,
         message: `Unexpected end of block`,
         range: {
           start: pos,
@@ -159,7 +159,7 @@ export class NodeIterator {
       }
     })
     return Array.from(this.badNodes.entries(), ([node, msg]) => ({
-      type: 'error',
+      severity: 1,
       message: msg,
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       range: node.getRange?.() || {

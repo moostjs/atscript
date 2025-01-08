@@ -17,10 +17,14 @@ import { runPipes, runPipesOnce } from './core.pipe'
 export function annotations() {
   const opts = {
     annotation: { node: 'annotation' } as TExpect,
-    argument: { node: ['number', 'text'] } as TExpect,
+    argument: [
+      { node: ['number', 'text'] },
+      { node: 'identifier', text: ['true', 'false', 'undefined', 'null'] },
+    ] as TExpect[],
     comma: { node: 'punctuation', text: ',' } as TExpect,
     end: { node: 'punctuation', text: [';', '\n'] } as TExpect,
   }
+
   return {
     handler(ni: NodeIterator, target: TTarget) {
       while (ni.$ && ni.satisfies(opts.annotation)) {
@@ -37,7 +41,7 @@ export function annotations() {
           ni.accepted()
           ni.move()
         }
-        while (ni.satisfies(opts.argument)) {
+        while (ni.satisfies(...opts.argument)) {
           addArgument(new Token(ni.$))
           ni.accepted()
           ni.move()

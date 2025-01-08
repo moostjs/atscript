@@ -31,12 +31,12 @@ const repo = new ItnRepo(connection, documents)
 connection.onInitialize(
   (params: InitializeParams): InitializeResult => ({
     capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Full,
+      textDocumentSync: TextDocumentSyncKind.Incremental,
       // enable completion
-      completionProvider: {
-        resolveProvider: true,
-        triggerCharacters: ['@', '.'],
-      },
+      // completionProvider: {
+      //   resolveProvider: true,
+      //   triggerCharacters: ['@', '.'],
+      // },
       // Add semantic tokens capability:
       // semanticTokensProvider: {
       //   // The legend must list the token types you plan to use
@@ -109,37 +109,37 @@ function getSemanticTokens(doc: TextDocument, range?: Range): SemanticTokens {
 }
 
 // Provide completions for annotations and known types
-connection.onCompletion(
-  _textDocumentPosition =>
-    // Provide some static suggestions
-    [
-      {
-        label: '@label',
-        kind: CompletionItemKind.Keyword,
-        detail: 'Annotation: @label',
-      },
-      {
-        label: '@mongo.collection',
-        kind: CompletionItemKind.Keyword,
-        detail: 'Annotation: @mongo.collection',
-      },
-      {
-        label: 'string',
-        kind: CompletionItemKind.Keyword,
-        detail: 'Type: string',
-      },
-      {
-        label: 'boolean',
-        kind: CompletionItemKind.Keyword,
-        detail: 'Type: boolean',
-      },
-      {
-        label: 'number',
-        kind: CompletionItemKind.Keyword,
-        detail: 'Type: number',
-      },
-    ] as CompletionItem[]
-)
+// connection.onCompletion(
+//   _textDocumentPosition =>
+//     // Provide some static suggestions
+//     [
+//       {
+//         label: '@label',
+//         kind: CompletionItemKind.Keyword,
+//         detail: 'Annotation: @label',
+//       },
+//       {
+//         label: '@mongo.collection',
+//         kind: CompletionItemKind.Keyword,
+//         detail: 'Annotation: @mongo.collection',
+//       },
+//       {
+//         label: 'string',
+//         kind: CompletionItemKind.Keyword,
+//         detail: 'Type: string',
+//       },
+//       {
+//         label: 'boolean',
+//         kind: CompletionItemKind.Keyword,
+//         detail: 'Type: boolean',
+//       },
+//       {
+//         label: 'number',
+//         kind: CompletionItemKind.Keyword,
+//         detail: 'Type: number',
+//       },
+//     ] as CompletionItem[]
+// )
 
-// If needed, refine or resolve completion details
-connection.onCompletionResolve((item: CompletionItem) => item)
+// // If needed, refine or resolve completion details
+// connection.onCompletionResolve((item: CompletionItem) => item)

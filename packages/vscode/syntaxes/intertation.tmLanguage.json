@@ -3,17 +3,17 @@
   "scopeName": "source.intertation",
   "name": "ITN",
   "patterns": [
-    { "include": "#annotation-with-strings" },
+    { "include": "#annotation-with-args" },
     { "include": "#annotations" },
     { "include": "#comments" },
     { "include": "#strings" },
+    { "include": "#property-names" },
+    { "include": "#import-statement" },
     { "include": "#keywords" },
-    { "include": "#booleans" },
     { "include": "#numbers" },
     { "include": "#operators" },
     { "include": "#punctuation" },
-    { "include": "#global-types" },
-    { "include": "#property-names" }
+    { "include": "#global-types" }
   ],
   "repository": {
     "comments": {
@@ -42,7 +42,7 @@
         {
           "name": "string.quoted.single.intertation",
           "begin": "'",
-          "end": "'",
+          "end": "(?:'|\\n)",
           "patterns": [
             {
               "match": "\\\\.",
@@ -54,7 +54,7 @@
         {
           "name": "string.quoted.double.intertation",
           "begin": "\"",
-          "end": "\"",
+          "end": "(?:\"|\\n)",
           "patterns": [
             {
               "match": "\\\\.",
@@ -65,28 +65,66 @@
       ]
     },
 
-    "keywords": {
+    "import-statement": {
       "patterns": [
         {
-          "name": "keyword.control.import.intertation",
-          "match": "\\b(?:import|from|export)\\b"
-        },
-        {
-          "name": "storage.type.intertation",
-          "match": "\\b(?:type|interface)\\b"
-        },
-        {
-          "name": "entity.name.type.intertation",
-          "match": "(?<=\\b(?:interface|type)\\s+)\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+          "name": "meta.import.statement",
+          "begin": "(?<![A-Za-z0-9_$])\\bimport\\b(?!\\s*[:=])",
+          "beginCaptures": {
+            "0": {
+              "name": "keyword.control.import.intertation"
+            }
+          },
+          "end": "(?=;|$)",
+          "patterns": [
+            {
+              "match": "\\bfrom\\b",
+              "name": "keyword.control.from.intertation"
+            },
+            {
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.braces"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.braces"
+                }
+              },
+              "patterns": [
+                {
+                  "name": "entity.name.type.intertation",
+                  "match": "\\b[A-Za-z_$][A-Za-z0-9_$]*\\b"
+                }
+              ]
+            },
+            {
+              "include": "#strings"
+            }
+          ]
         }
       ]
     },
 
-    "booleans": {
+    "keywords": {
       "patterns": [
         {
-          "name": "constant.language.boolean.intertation",
-          "match": "\\b(?:true|false)\\b"
+          "match": "(?<![A-Za-z0-9_$])\\bexport\\b(?!\\s*[:=])",
+          "name": "keyword.control.export.intertation"
+        },
+        {
+          "match": "(\\b(?:type|interface)\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type"
+            },
+            "2": {
+              "name": "entity.name.type"
+            }
+          }
         }
       ]
     },
@@ -118,7 +156,7 @@
       ]
     },
 
-    "annotation-with-strings": {
+    "annotation-with-args": {
       "patterns": [
         {
           "name": "punctuation.definition.tag",
@@ -131,16 +169,8 @@
           "end": "(?=$|\\n|\\r|;)",
           "patterns": [
             {
-              "name": "comment",
-              "match": "\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'"
-            },
-            {
-              "name": "storage.type.intertation",
-              "match": "\\b\\d+(\\.\\d+)?\\b"
-            },
-            {
-              "name": "punctuation.separator.comma.annotation.intertation",
-              "match": ","
+              "name": "constant.language.boolean.intertation",
+              "match": "\\b(?:true|false|undefined|null)\\b"
             }
           ]
         }
@@ -192,7 +222,7 @@
       "patterns": [
         {
           "name": "support.type.primitive.intertation",
-          "match": "\\b(?:number|string|boolean|void|undefined|null|never|any|unknown|bigint|symbol)\\b(?!\\s*:)"
+          "match": "\\b(?:number|string|boolean|void|undefined|null|never|any|unknown|bigint|symbol|true|false)\\b(?!\\s*:)"
         }
       ]
     },

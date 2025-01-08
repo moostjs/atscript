@@ -1,36 +1,32 @@
 import type { SemanticImportNode } from './nodes/import-node'
 import type { Token } from './token'
+import type { TMessages } from './types'
 
 export class IdRegistry {
   public readonly reserved: Set<string>
 
+  public readonly globalTypes: Set<string>
+
   public readonly definitions = new Map<string, Token>()
-
-  private readonly exported = new Map<string, Token>()
-
-  private readonly imported = new Map<string, Token>()
 
   public readonly duplicates = new Set<Token>()
 
   public readonly forbidden = new Set<Token>()
 
-  constructor(reserved: string[] = []) {
-    this.reserved = new Set(['interface', 'type', 'import', 'from', 'export'].concat(reserved))
-  }
-
-  export(token: Token) {
-    this.register(token, 'export')
+  constructor(reserved: string[] = [], globalTypes: string[] = []) {
+    this.reserved = new Set(
+      ['interface', 'type', 'import', 'from', 'export'].concat(reserved).concat(globalTypes)
+    )
+    this.globalTypes = new Set(globalTypes)
   }
 
   clear() {
     this.definitions.clear()
-    this.exported.clear()
-    this.imported.clear()
     this.duplicates.clear()
     this.forbidden.clear()
   }
 
-  register(token?: Token, ie?: 'import' | 'export') {
+  registerDefinition(token?: Token) {
     if (!token) {
       return
     }
@@ -40,15 +36,26 @@ export class IdRegistry {
       this.duplicates.add(token)
     } else {
       this.definitions.set(token.text, token)
-      if (ie === 'export') {
-        this.exported.set(token.text, token)
-      } else if (ie === 'import') {
-        this.imported.set(token.text, token)
-      }
     }
   }
 
-  import(token: Token) {
-    this.register(token, 'import')
+  isDefined(t: string | Token) {
+    const text = typeof t === 'string' ? t : t.text
+    return this.definitions.has(text) || this.globalTypes.has(text)
+  }
+
+  getErrors(): TMessages {
+    return [
+      ...Array.from(this.duplicates, t => ({
+        severity: 1,
+        message: `Duplicate identifier "${t.text}"`,
+        range: t.range,
+      })),
+      ...Array.from(this.forbidden, t => ({
+        severity: 1,
+        message: `Reserved keyword "${t.text}"`,
+        range: t.range,
+      })),
+    ] as TMessages
   }
 }

@@ -1,21 +1,36 @@
+/* eslint-disable sonarjs/cognitive-complexity */
+/* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { readFile } from 'fs'
 import type { TMessages, Token } from 'intertation'
 import { ItnDocument } from 'intertation'
 import path from 'path'
 import type { createConnection, TextDocuments } from 'vscode-languageserver/node'
+import { DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { debounce } from './utils'
 
 const config = {
-  reserved: ['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'],
+  globalTypes: ['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'],
 }
 
 export class ItnRepo {
   private readonly itn = new Map<string, ItnDocument>()
 
   private readonly reading = new Map<string, Promise<ItnDocument>>()
+
+  private readonly changeQueue = [] as string[]
+
+  private readonly revalidateQueue = [] as string[]
+
+  private readonly pendingCheck = new Set<string>()
+
+  private readonly changedSet = new Set<string>()
+
+  private idle = true
+
+  private firstDocOpen = false
 
   // private readonly changeBuffer = new Map<id, >()
 
@@ -27,12 +42,83 @@ export class ItnRepo {
   ) {
     this.documents.onDidChangeContent(
       debounce(change => {
-        this.changed(change.document)
+        this.addToChangeQueue(change.document.uri)
+        if (!this.firstDocOpen) {
+          this.firstDocOpen = true
+          setTimeout(() => {
+            console.log('initial timeout', this.documents.all().length)
+            this.documents.all().forEach(doc => {
+              console.log('initially open doc', doc.uri)
+              if (doc.uri !== change.document.uri) {
+                this.addToRevalidateQueue(doc.uri)
+              }
+            })
+          }, 1500)
+        }
       }, 100)
     )
-    // Listen
     documents.listen(connection)
     connection.listen()
+  }
+
+  async runChecks() {
+    console.log('runChecks')
+    if (this.idle && (this.changeQueue.length > 0 || this.revalidateQueue.length > 0)) {
+      this.idle = false
+      await new Promise(resolve => setTimeout(resolve, 250))
+      console.log('Run Checks Started', {
+        change: this.changeQueue,
+        revalidate: this.revalidateQueue,
+      })
+      console.time('runchecks')
+      const ids = [] as string[]
+      while (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
+        console.log('while pass', this.changeQueue.length, this.revalidateQueue.length)
+        const isFromChangeQueue = this.changeQueue.length > 0
+        const id = isFromChangeQueue ? this.changeQueue.shift()! : this.revalidateQueue.shift()!
+        ids.push(id)
+        this.pendingCheck.delete(id)
+        const doc = await this.openDocument(id)
+        if (this.changedSet.has(id) && this.itn.has(id)) {
+          const text = this.documents.get(id)!.getText()
+          if (typeof text === 'string') {
+            doc.update(text)
+          }
+        }
+        const changed = this.changedSet.has(id)
+        this.changedSet.delete(id)
+        this.checkDoc(doc, changed)
+        await new Promise(resolve => setTimeout(resolve, 250))
+      }
+      console.timeEnd('runchecks')
+      console.log('Run Checks Finished', ids)
+      this.idle = true
+    }
+  }
+
+  addToChangeQueue(id: string) {
+    console.log('addToChangeQueue', id)
+    this.changedSet.add(id)
+    if (this.pendingCheck.has(id)) {
+      return
+    }
+    this.pendingCheck.add(id)
+    this.changeQueue.push(id)
+    if (this.idle) {
+      this.runChecks()
+    }
+  }
+
+  addToRevalidateQueue(id: string) {
+    console.log('addToRevalidateQueue', id)
+    if (this.pendingCheck.has(id)) {
+      return
+    }
+    this.pendingCheck.add(id)
+    this.revalidateQueue.push(id)
+    if (this.idle) {
+      this.runChecks()
+    }
   }
 
   openDocument(id: string, text: string): ItnDocument
@@ -48,12 +134,10 @@ export class ItnRepo {
       return itnDoc
     }
     if (this.itn.has(id)) {
-      console.log('from cache', id)
       return this.itn.get(id)!
     }
     const td = this.documents.get(id)
     if (td) {
-      console.log('from open documents', id)
       const itnDoc = new ItnDocument(id, config)
       this.itn.set(id, itnDoc)
       itnDoc.update(td.getText())
@@ -61,7 +145,6 @@ export class ItnRepo {
     }
     let promise = this.reading.get(id)
     if (!promise) {
-      console.log('reading from disk', id)
       promise = new Promise((resolve, reject) => {
         readFile(id.slice(7), 'utf8', (err, data) => {
           if (err) {
@@ -80,25 +163,33 @@ export class ItnRepo {
     return promise
   }
 
-  changed(textDoc: TextDocument) {
-    const itnDoc = this.openDocument(textDoc.uri, textDoc.getText())
-    this.checkDoc(itnDoc)
-    this.revalidateDependants(itnDoc)
-  }
-
   revalidateDependants(itnDoc: ItnDocument) {
     itnDoc.dependants.forEach(d => {
       d.clearMessages()
-      this.checkDoc(d)
+      this.addToRevalidateQueue(d.id)
+      // this.checkDoc(d)
     })
   }
 
-  async checkDoc(itnDoc: ItnDocument) {
+  async checkDoc(itnDoc: ItnDocument, changed = false) {
     await this.checkImports(itnDoc)
+    console.log('send diag', itnDoc.messages)
+    const unused = itnDoc.getUnusedTokens()
+    const messages = itnDoc.getDiagMessages()
     this.connection.sendDiagnostics({
       uri: itnDoc.id,
-      diagnostics: itnDoc.getAllMessages(),
+      diagnostics: messages.concat(
+        ...unused.map(t => ({
+          severity: DiagnosticSeverity.Hint,
+          range: t.range,
+          message: `Unused token: ${t.text}`,
+          tags: [DiagnosticTag.Unnecessary],
+        }))
+      ),
     })
+    if (changed) {
+      this.revalidateDependants(itnDoc)
+    }
   }
 
   async checkImports(itnDoc: ItnDocument) {
@@ -111,7 +202,11 @@ export class ItnRepo {
     itnDoc.updateDependencies(results.filter(Boolean) as ItnDocument[])
   }
 
-  async checkImport(itnDoc: ItnDocument, from: Token, tokens: Token[]) {
+  async checkImport(
+    itnDoc: ItnDocument,
+    from: Token,
+    tokens: Token[]
+  ): Promise<ItnDocument | undefined> {
     const forId = `file://${path.join(
       itnDoc.id.slice(7).split('/').slice(0, -1).join('/'),
       from.text
@@ -123,7 +218,7 @@ export class ItnRepo {
       for (const token of tokens) {
         if (!external.exports.has(token.text)) {
           errors.push({
-            type: 'error',
+            severity: 1,
             message: `"${from.text}" has no exported member "${token.text}"`,
             range: token.range,
           })
@@ -131,13 +226,13 @@ export class ItnRepo {
       }
     } catch (error) {
       errors.push({
-        type: 'error',
+        severity: 1,
         message: `"${from.text}" not found`,
         range: from.range,
       })
     }
     if (errors.length > 0) {
-      const messages = itnDoc.getAllMessages()
+      const messages = itnDoc.getDiagMessages()
       messages.push(...errors)
     }
     return external

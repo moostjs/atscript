@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-confusing-void-expression */
+import type { ItnDocument } from '../../document'
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { Token } from '../token'
 import { isGroup } from '.'
@@ -11,6 +13,12 @@ export class SemanticGroup extends SemanticNode {
     private operator?: TPunctuation
   ) {
     super('group')
+  }
+
+  registerAtDocument(doc: ItnDocument): void {
+    if (this.definition) {
+      this.unwrap().forEach(n => n.registerAtDocument(doc))
+    }
   }
 
   get length() {

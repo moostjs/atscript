@@ -13,6 +13,7 @@ export interface TLexicalToken {
   startOffset?: number
   endOffset?: number
   accepted?: boolean
+  multiline?: boolean
   getRange: () => {
     start: {
       line: number
