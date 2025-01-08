@@ -26,7 +26,6 @@ export class SemanticNode {
     return this.token('identifier')?.text
   }
 
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   get referredIdentifiers(): Token[] {
     if (isGroup(this)) {
       return this.getIdentifiersRecursive(this)

@@ -40,6 +40,10 @@
     "strings": {
       "patterns": [
         {
+          "match": "'([^']*)'|\"([^\"]*)\"",
+          "name": "string.quoted.single.import.intertation"
+        },
+        {
           "name": "string.quoted.single.intertation",
           "begin": "'",
           "end": "(?:'|\\n)",

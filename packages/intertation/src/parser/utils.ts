@@ -1,5 +1,6 @@
 /* eslint-disable max-params */
 import type { ProstoParserNodeContext } from '@prostojs/parser'
+import path from 'path'
 
 export function toVsCodeRange(
   start: ProstoParserNodeContext['startPos'],
@@ -20,3 +21,7 @@ export function toVsCodeRange(
 }
 
 export type TVsCodeRange = ReturnType<typeof toVsCodeRange>
+
+export function resolveItnFromPath(from: string, id: string) {
+  return `file://${path.join(id.slice(7).split('/').slice(0, -1).join('/'), from)}.itn`
+}

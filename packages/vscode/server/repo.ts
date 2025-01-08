@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { readFile } from 'fs'
 import type { TMessages, Token } from 'intertation'
-import { ItnDocument } from 'intertation'
+import { ItnDocument, resolveItnFromPath } from 'intertation'
 import path from 'path'
 import type { createConnection, TextDocuments } from 'vscode-languageserver/node'
 import { DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
@@ -59,6 +59,12 @@ export class ItnRepo {
     )
     documents.listen(connection)
     connection.listen()
+
+    connection.onDefinition(async params => {
+      console.log(params)
+      const itnDoc = await this.openDocument(params.textDocument.uri)
+      return itnDoc.getDefinitionByPos(params.position.line, params.position.character)
+    })
   }
 
   async runChecks() {
@@ -80,7 +86,7 @@ export class ItnRepo {
         this.pendingCheck.delete(id)
         const doc = await this.openDocument(id)
         if (this.changedSet.has(id) && this.itn.has(id)) {
-          const text = this.documents.get(id)!.getText()
+          const text = this.documents.get(id)?.getText()
           if (typeof text === 'string') {
             doc.update(text)
           }
@@ -207,10 +213,7 @@ export class ItnRepo {
     from: Token,
     tokens: Token[]
   ): Promise<ItnDocument | undefined> {
-    const forId = `file://${path.join(
-      itnDoc.id.slice(7).split('/').slice(0, -1).join('/'),
-      from.text
-    )}.itn`
+    const forId = resolveItnFromPath(from.text, itnDoc.id)
     const errors = [] as TMessages
     let external: ItnDocument | undefined
     try {

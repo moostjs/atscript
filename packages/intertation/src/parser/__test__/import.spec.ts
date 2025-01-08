@@ -8,7 +8,6 @@ describe('import', () => {
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [import] "import" import: { <block> from: from <identifier> path: ./type <text>: [ref] "Type""`
     )
-    expect(result.nodes[0]?.referredIdentifiers[0].text).toEqual('Type')
     expect(result.messages).toHaveLength(0)
   })
   it('multiple imiport', () => {

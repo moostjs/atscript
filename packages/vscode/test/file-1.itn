@@ -1,7 +1,7 @@
-import { SomeTuple, SomeStructure } from './file-2'
+import { RiskType, SomeStructure } from './file-2'
 
 @mongo.collection 'someCollection'
-export interface SomeStructure12 {
+export interface SomeStructure2 {
     @label 'First Name'
     firstName: string
 
@@ -19,7 +19,7 @@ export interface SomeStructure12 {
     contacts: Contacts[]
 
     @label 'Risk Profile'
-    riskProfile: SomeTuple
+    riskProfile: RiskType
 }
 
 interface Contacts {

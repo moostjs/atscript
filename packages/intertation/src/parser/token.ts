@@ -28,7 +28,15 @@ export class Token {
     return Boolean(this._data.children?.length)
   }
 
+  /**
+   * This is truth if the text token was ended with a newline character
+   */
   get multiline() {
     return this._data.multiline
   }
+
+  /**
+   * Set this to file path (e.g. "./src/file.itn") for path token in import statement
+   */
+  public navigatesToFile?: string
 }
