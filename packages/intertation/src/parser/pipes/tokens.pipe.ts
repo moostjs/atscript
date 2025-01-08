@@ -5,10 +5,11 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { TLexicalToken } from '../../tokenizer/types'
+import type { IdRegistry } from '../id-registry'
 import type { NodeIterator } from '../iterator'
 import type { SemanticNode, TSemanticToken } from '../nodes'
 import { Token } from '../token'
-import type { TDeclorations, TExpect, TTarget } from '../types'
+import type { TExpect, TTarget } from '../types'
 
 export const identifier = (...text: string[]) =>
   $token('identifier', text.length > 0 ? text : undefined)
@@ -23,7 +24,6 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
     optional: false,
     saveAs: undefined as TSemanticToken | undefined,
     skip: undefined as string[] | undefined,
-    unique: undefined as string | undefined,
     expect: [{ node: name, text }] as TExpect[],
     isGlobal: false,
     empty: false,
@@ -36,7 +36,7 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
   }
   return {
     expect: [{ node: name, text }] as TExpect[],
-    handler(ni: NodeIterator, target: TTarget, declarations: TDeclorations) {
+    handler(ni: NodeIterator, target: TTarget) {
       if (opts.debug) {
         // eslint-disable-next-line no-debugger
         debugger
@@ -69,21 +69,7 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
           if (opts.saveAs) {
             target.node.saveToken(new Token(ni.$), opts.saveAs)
           }
-          if (opts.unique) {
-            const key = opts.unique
-            declarations[key] = declarations[key] || new Set<string>()
-            const storage = declarations[key]
-            if (storage.has(ni.$.text)) {
-              ni.unexpected(false, `Duplicate ${key} "${ni.$.text}"`)
-            } else {
-              storage.add(ni.$.text)
-              ni.accepted()
-            }
-          } else if (opts.isGlobal && declarations.$reserved?.has(ni.$.text)) {
-            ni.unexpected(false, `Reserved identifier "${ni.$.text}"`)
-          } else {
-            ni.accepted()
-          }
+          ni.accepted()
           if (opts.wrapper) {
             const wrapped = target.node
             target.node = opts.wrapper().wrap(wrapped, new Token(ni.$))
@@ -138,10 +124,6 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
     },
     suppressEobError() {
       opts.suppressEobError = true
-      return this
-    },
-    unique(key: string) {
-      opts.unique = key
       return this
     },
     global() {

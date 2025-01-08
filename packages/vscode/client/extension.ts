@@ -8,7 +8,7 @@ let client: LanguageClient | undefined
 
 export function activate(context: ExtensionContext) {
   // The server is implemented in server/server.js (transpiled from server/server.ts).
-  const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server', 'server.js').fsPath
+  const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.js').fsPath
 
   // Optional debug options
   const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] }
@@ -28,7 +28,7 @@ export function activate(context: ExtensionContext) {
     documentSelector: [{ scheme: 'file', language: 'intertation' }],
     synchronize: {
       // watch .intertation files
-      fileEvents: workspace.createFileSystemWatcher('**/*.intertation'),
+      fileEvents: workspace.createFileSystemWatcher('**/*.itn'),
     },
   }
 

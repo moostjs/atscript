@@ -1,0 +1,27 @@
+import { SomeTuple, SomeStructure } from './file-2'
+
+@mongo.collection 'someCollection'
+export interface SomeStructure1 {
+    @label 'First Name'
+    firstName: string
+
+    @label 'Last Name'
+    lastName: string
+
+    @label 'Age'
+    age: number
+
+    @label 'Contacts'
+    contacts: Contacts[]
+
+    @label 'Risk Profile'
+    riskProfile: SomeTuple
+}
+
+interface Contacts {
+    @label 'Email'
+    email: string
+
+    @label 'Phone Number'
+    phone: string
+}

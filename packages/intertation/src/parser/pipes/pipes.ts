@@ -11,7 +11,7 @@ const ref = defineValuePipe('ref', 'identifier', true)
 const constText = defineValuePipe('const', 'text', false)
 const constNumber = defineValuePipe('const', 'number', false)
 
-const allowedValues: TPipe[] = [
+const allowedValuesPipeArray: TPipe[] = [
   ref,
   constText,
   constNumber,
@@ -19,10 +19,10 @@ const allowedValues: TPipe[] = [
   // add interface later
 ]
 
-const tuplePipe: TPipe['pipe'] = [
+const tuplePipeArray: TPipe['pipe'] = [
   //
   block('[]').saveAs('identifier'),
-  definition(allowedValues)
+  definition(allowedValuesPipeArray)
     .from('identifier')
     .separatedBy('&', '|', ',')
     .skip('\n')
@@ -33,39 +33,43 @@ const tuplePipe: TPipe['pipe'] = [
     .wrap(() => new SemanticArrayNode(), true),
 ]
 
-const groupPipe: TPipe['pipe'] = [
+const groupPipeArray: TPipe['pipe'] = [
   //
   block('()').saveAs('identifier'),
-  definition(allowedValues).from('identifier').separatedBy('&', '|').skip('\n').respectPriority(),
+  definition(allowedValuesPipeArray)
+    .from('identifier')
+    .separatedBy('&', '|')
+    .skip('\n')
+    .respectPriority(),
   block('[]')
     .optional()
     .empty()
     .wrap(() => new $n.SemanticArrayNode(), true),
 ]
 
-const tuple = $pipe('tuple', tuplePipe).skip('\n')
-const group = $pipe('group', groupPipe).skip('\n')
-allowedValues.unshift(tuple)
-allowedValues.unshift(group)
+const tuple = $pipe('tuple', tuplePipeArray).skip('\n')
+const group = $pipe('group', groupPipeArray).skip('\n')
+allowedValuesPipeArray.unshift(tuple)
+allowedValuesPipeArray.unshift(group)
 
 const type = $pipe('type', [
-  identifier('public').saveAs('public').optional().skip('\n'),
+  identifier('export').saveAs('export').optional().skip('\n'),
   identifier('type').saveAs('type').skip('\n').suppressEobError(),
-  identifier().saveAs('identifier').unique('identifier').global().skip('\n'),
+  identifier().saveAs('identifier').global().skip('\n'),
   pun('=').skip('\n'),
-  definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
+  definition(allowedValuesPipeArray).separatedBy('&', '|').skip('\n').respectPriority(),
 ]).skip('\n', ';')
 
 const props = $pipe('prop', [
   annotations(),
-  identifier().or(text()).saveAs('identifier').unique('prop').skip('\n'),
+  identifier().or(text()).saveAs('identifier').skip('\n'),
   pun('?').saveAs('optional').optional().skip('\n'),
   pun(':').skip('\n'),
-  definition(allowedValues).separatedBy('&', '|').skip('\n').respectPriority(),
+  definition(allowedValuesPipeArray).separatedBy('&', '|').skip('\n').respectPriority(),
   pun(';', ',', '\n').orEob().lookBehind(),
 ]).skip('\n', ';', ',') as TPipe
 
-const interfacePipe = [
+const structurePipeArray = [
   //
   block('{}').saveAs('identifier'),
   unwrap('identifier').with([props]),
@@ -76,21 +80,21 @@ const interfacePipe = [
   //
 ]
 
-function interfaceBlock(array = false) {
-  return $pipe('structure', array ? interfacePipe : interfacePipe.slice(0, 2)).skip(
+function structureBlock(array = false) {
+  return $pipe('structure', array ? structurePipeArray : structurePipeArray.slice(0, 2)).skip(
     '\n',
     ';'
   ) as TPipe
 }
 
-allowedValues.unshift(interfaceBlock(true))
+allowedValuesPipeArray.unshift(structureBlock(true))
 
-const structure = $pipe('interface', [
+const interfaceType = $pipe('interface', [
   annotations(),
-  identifier('public').saveAs('public').optional().skip('\n'),
+  identifier('export').saveAs('export').optional().skip('\n'),
   identifier('interface').saveAs('type').skip('\n').suppressEobError(),
-  identifier().saveAs('identifier').unique('identifier').global().skip('\n'),
-  definition([interfaceBlock()]),
+  identifier().saveAs('identifier').global().skip('\n'),
+  definition([structureBlock()]),
 ]).skip('\n', ';')
 
 export function defineValuePipe(
@@ -110,9 +114,22 @@ export function defineValuePipe(
   return $pipe(entity, steps).skip('\n')
 }
 
+const importPipe = $pipe('import', [
+  identifier('import').saveAs('identifier').skip('\n'),
+  block('{}').saveAs('import').skip('\n'),
+  identifier('from').saveAs('from').skip('\n'),
+  text().saveAs('path').skip(';', '\n'),
+  definition([$pipe('ref', [identifier().saveAs('identifier').skip('\n')])])
+    .from('import')
+    .separatedBy(',')
+    .skip('\n')
+    .respectPriority(),
+]).skip('\n', ';')
+
 export const pipes = {
   type,
   props,
-  structure,
+  interfaceType,
+  importPipe,
   tuple,
 }

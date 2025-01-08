@@ -1,3 +1,4 @@
+import type { ItnDocument } from '../../document'
 import type { Token } from '../token'
 import { isGroup } from '.'
 import type { TAnnotationTokens, TNodeEntity, TSemanticToken } from './types'
@@ -12,6 +13,35 @@ export class SemanticNode {
   protected definition?: SemanticNode
 
   protected annotations?: Map<string, TAnnotationTokens>
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  registerAtDocument(doc: ItnDocument): void {
+    // do nothing
+  }
+
+  get id() {
+    return this.token('identifier')?.text
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  get referredIdentifiers(): Token[] {
+    if (isGroup(this)) {
+      return this.getIdentifiersRecursive(this)
+    }
+    return this.definition ? this.getIdentifiersRecursive(this.definition) : []
+  }
+
+  getIdentifiersRecursive(node: SemanticNode): Token[] {
+    if (isGroup(node)) {
+      const r = [] as Token[]
+      for (const n of node.unwrap()) {
+        r.push(...this.getIdentifiersRecursive(n))
+      }
+      return r
+    } else {
+      return node.referredIdentifiers
+    }
+  }
 
   annotate(name: string, token: Token) {
     if (!this.annotations) {

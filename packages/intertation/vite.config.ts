@@ -1,4 +1,6 @@
 /* eslint-disable import/no-default-export */
+import { readFileSync } from 'node:fs'
+
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
@@ -14,9 +16,11 @@ export default defineConfig({
       formats: ['es', 'cjs'],
     },
     rollupOptions: {
-      external: [
-        /* Add external dependencies here (e.g., "react", "lodash") */
-      ],
+      external:
+        process.env.NODE_ENV === 'production'
+          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+            Object.keys(JSON.parse(readFileSync('./package.json').toString()).dependencies)
+          : [],
     },
   },
   plugins: [

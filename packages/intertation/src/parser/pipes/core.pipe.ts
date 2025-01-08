@@ -3,12 +3,13 @@
 /* eslint-disable max-depth */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
+import type { ItnDocument } from '../../document'
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { TLexicalToken } from '../../tokenizer/types'
 import type { NodeIterator } from '../iterator'
 import type { SemanticNode, TNodeEntity } from '../nodes'
 import { $n } from '../nodes'
-import type { TDeclorations, THandler } from '../types'
+import type { THandler } from '../types'
 import { $token } from './tokens.pipe'
 
 export interface TPipe {
@@ -42,6 +43,8 @@ export function $pipe(entity: TNodeEntity, pipe: TPipe['pipe'] = []) {
           return new $n.SemanticStructureNode()
         case 'tuple':
           return new $n.SemanticTupleNode()
+        case 'import':
+          return new $n.SemanticImportNode()
       }
     },
     pipe,
@@ -67,35 +70,9 @@ export function $pipe(entity: TNodeEntity, pipe: TPipe['pipe'] = []) {
   }
 }
 
-function clone(declarations: TDeclorations): TDeclorations {
-  const _declarations = {} as TDeclorations
-  for (const [key, d] of Object.entries(declarations)) {
-    _declarations[key] = new Set(d?.keys())
-  }
-  return _declarations
-}
-
 // eslint-disable-next-line sonarjs/cognitive-complexity
 export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
   const nodes: SemanticNode[] = []
-  const declarations = {
-    $reserved: new Set([
-      'string',
-      'number',
-      'boolean',
-      'any',
-      'void',
-      'unknown',
-      'never',
-      'interface',
-      'type',
-      'public',
-      'private',
-      'protected',
-      'class',
-      'function',
-    ]),
-  } as TDeclorations
   while (ni.$) {
     let matched = true
     let depth = ni.index
@@ -108,9 +85,9 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
         break
       }
       matched = true
-      const _declarations = clone(declarations)
+      // const _declarations = clone(declarations)
       for (const { handler } of pipe) {
-        if (!handler(fork, target, _declarations)) {
+        if (!handler(fork, target)) {
           matched = false
           break
         }
@@ -121,9 +98,9 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
       if (matched) {
         nodes.push(target.node)
         ni.unfork(fork)
-        for (const [key, d] of Object.entries(_declarations)) {
-          declarations[key] = d
-        }
+        // for (const [key, d] of Object.entries(reg)) {
+        //   declarations[key] = d
+        // }
         if (stopCondition && stopCondition(fork)) {
           return nodes
         }
@@ -150,6 +127,6 @@ export function runPipes(pipes: TPipe[], ni: NodeIterator, singlePass = false) {
   return nodes
 }
 
-export function runPipesOnce(pipes: TPipe[], _ni: NodeIterator): SemanticNode | undefined {
-  return runPipes(pipes, _ni, true)[0]
+export function runPipesOnce(pipes: TPipe[], ni: NodeIterator): SemanticNode | undefined {
+  return runPipes(pipes, ni, true)[0]
 }

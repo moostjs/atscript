@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseItn } from '../parser'
+import { parseItn } from '..'
 
 describe('types', () => {
   it('simple type', () => {
@@ -10,10 +10,10 @@ describe('types', () => {
     )
     expect(result.messages).toHaveLength(0)
   })
-  it('public type', () => {
-    const result = parseItn(`public type TypeName = string`)
+  it('export type', () => {
+    const result = parseItn(`export type TypeName = string`)
     expect(result.toString()).toMatchInlineSnapshot(
-      `"● [type] "TypeName" public: public <identifier> type: type <identifier>: [ref] "string""`
+      `"● [type] "TypeName" export: export <identifier> type: type <identifier>: [ref] "string""`
     )
 
     expect(result.messages).toHaveLength(0)
@@ -146,5 +146,22 @@ describe('types', () => {
     `)
 
     expect(result.messages).toHaveLength(0)
+  })
+})
+
+describe('referred identifiers in type', () => {
+  it('must detect referred identifiers', () => {
+    const { nodes } = parseItn(`type TypeName = ReferredType`)
+    expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual(['ReferredType'])
+  })
+  it('must detect complex referred identifiers', () => {
+    const { nodes } = parseItn(
+      `type TypeName = ReferredType | RefType2 & { prop: string, prop2: "notString" }`
+    )
+    expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual([
+      'ReferredType',
+      'RefType2',
+      'string',
+    ])
   })
 })

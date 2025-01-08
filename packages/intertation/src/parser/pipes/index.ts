@@ -4,18 +4,20 @@ import type { TPipe } from './core.pipe'
 import { runPipes } from './core.pipe'
 import { pipes } from './pipes'
 
+export { pipes } from './pipes'
+
 export function parseItn(
   source: string,
-  _pipes: TPipe[] = [pipes.type, pipes.structure],
+  _pipes: TPipe[] = [pipes.importPipe, pipes.type, pipes.interfaceType],
   debug = false
 ) {
   const rawTokens = tokenize(source, debug)
   const ni = new NodeIterator(rawTokens, []).move()
   return {
-    ast: runPipes(_pipes, ni),
+    nodes: runPipes(_pipes, ni),
     messages: ni.getErrors(),
     toString() {
-      return this.ast.map(a => a.toString()).join('\n')
+      return this.nodes.map(a => a.toString()).join('\n')
     },
   }
 }

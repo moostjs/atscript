@@ -1,6 +1,15 @@
 import type { Token } from '../token'
 
-export type TSemanticToken = 'type' | 'identifier' | 'array' | 'public' | 'optional'
+export type TSemanticToken =
+  | 'type'
+  | 'identifier'
+  | 'array'
+  | 'export'
+  | 'optional'
+  | 'import'
+  | 'path'
+  | 'from'
+
 export type TNodeEntity =
   | 'interface' //
   | 'type' //
@@ -11,6 +20,7 @@ export type TNodeEntity =
   | 'tuple' //
   | 'group' //
   | 'array' //
+  | 'import'
 
 export interface TAnnotationTokens {
   token: Token

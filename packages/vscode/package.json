@@ -3,9 +3,9 @@
   "displayName": "Interfaces with Annotations",
   "description": "Syntax highlighting for .intertation files (.itn)",
   "version": "0.0.1",
-  "main": "./dist/client/extension.js",
+  "main": "./dist/extension.js",
   "scripts": {
-    "build": "tsc"
+    "build": "vite build"
   },
   "engines": {
     "vscode": "^1.70.0"
@@ -38,12 +38,16 @@
   },
   "publisher": "prostojs",
   "dependencies": {
-    "@types/vscode": "^1.96.0",
+    "intertation": "file:../intertation",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0",
-    "vscode-languageserver-textdocument": "^1.0.12",
-    "intertation": "file:../intertation"
+    "vscode-languageserver-textdocument": "^1.0.12"
   },
   "author": "Artem Maltsev",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "@types/vscode": "^1.96.0",
+    "@types/node": "^22.10.5",
+    "vite": "^6.0.6"
+  }
 }

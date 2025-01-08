@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseItn } from '../parser'
+import { parseItn } from '..'
 
 describe('interfaces', () => {
   it('simple interface', () => {
@@ -15,10 +15,10 @@ describe('interfaces', () => {
     `)
     expect(result.messages).toHaveLength(0)
   })
-  it('public interface', () => {
-    const result = parseItn(`public interface IName { a: string; b: number }`)
+  it('export interface', () => {
+    const result = parseItn(`export interface IName { a: string; b: number }`)
     expect(result.toString()).toMatchInlineSnapshot(`
-      "● [interface] "IName" public: public <identifier> type: interface <identifier>
+      "● [interface] "IName" export: export <identifier> type: interface <identifier>
         = [structure] "{"  (
             ● [prop] "a": [ref] "string" <>
             ● [prop] "b": [ref] "number"
@@ -52,5 +52,24 @@ describe('interfaces', () => {
       }`)
     expect(result.toString()).toMatchSnapshot()
     expect(result.messages).toHaveLength(0)
+  })
+})
+
+describe('referred identifiers in interfaces', () => {
+  it('must detect referred identifiers', () => {
+    const { nodes } = parseItn(`interface IName {prop: string}`)
+    expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual(['string'])
+  })
+  it('must detect complex referred identifiers', () => {
+    const { nodes } = parseItn(
+      `interface IName {prop: string, prop2: number | string, prop3: { a: Ref1; b: Ref2 }}`
+    )
+    expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual([
+      'string',
+      'number',
+      'string',
+      'Ref1',
+      'Ref2',
+    ])
   })
 })

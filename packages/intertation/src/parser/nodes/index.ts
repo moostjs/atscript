@@ -1,6 +1,7 @@
 import { SemanticArrayNode } from './array-node'
 import { SemanticConstNode } from './const-node'
 import { SemanticGroup } from './group-node'
+import { SemanticImportNode } from './import-node'
 import { SemanticInterfaceNode } from './interface-node'
 import type { SemanticNode } from './node'
 import { SemanticPropNode } from './prop-node'
@@ -19,6 +20,7 @@ export const $n = {
   SemanticStructureNode,
   SemanticTupleNode,
   SemanticArrayNode,
+  SemanticImportNode,
 }
 
 export * from './node'
@@ -58,4 +60,8 @@ export function isTuple(node: SemanticNode): node is SemanticTupleNode {
 
 export function isArray(node: SemanticNode): node is SemanticArrayNode {
   return node instanceof SemanticArrayNode
+}
+
+export function isImport(node: SemanticNode): node is SemanticImportNode {
+  return node instanceof SemanticImportNode
 }

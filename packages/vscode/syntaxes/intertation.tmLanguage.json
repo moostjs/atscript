@@ -68,8 +68,12 @@
     "keywords": {
       "patterns": [
         {
+          "name": "keyword.control.import.intertation",
+          "match": "\\b(?:import|from|export)\\b"
+        },
+        {
           "name": "storage.type.intertation",
-          "match": "\\b(?:public|type|interface)\\b"
+          "match": "\\b(?:type|interface)\\b"
         },
         {
           "name": "entity.name.type.intertation",

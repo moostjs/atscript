@@ -1,4 +1,3 @@
-import { parseItn } from 'intertation'
 import type {
   CompletionItem,
   Diagnostic,
@@ -20,93 +19,72 @@ import {
 } from 'vscode-languageserver/node'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 
+import { ItnRepo } from './repo'
+
 // Create connection
 const connection = createConnection(ProposedFeatures.all)
-
 // Track open documents
 const documents = new TextDocuments<TextDocument>(TextDocument)
+
+const repo = new ItnRepo(connection, documents)
 
 connection.onInitialize(
   (params: InitializeParams): InitializeResult => ({
     capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
+      textDocumentSync: TextDocumentSyncKind.Full,
       // enable completion
       completionProvider: {
         resolveProvider: true,
         triggerCharacters: ['@', '.'],
       },
       // Add semantic tokens capability:
-      semanticTokensProvider: {
-        // The legend must list the token types you plan to use
-        legend: {
-          tokenTypes: [
-            'interface',
-            'type',
-            'string',
-            'number',
-            // etc...
-          ],
-          tokenModifiers: [], // e.g. "static", "declaration", etc. if needed
-        },
-        full: true, // enable full document requests
-        range: true, // optionally enable range-based requests
-      },
+      // semanticTokensProvider: {
+      //   // The legend must list the token types you plan to use
+      //   legend: {
+      //     tokenTypes: [
+      //       'interface',
+      //       'type',
+      //       'string',
+      //       'number',
+      //       // etc...
+      //     ],
+      //     tokenModifiers: [], // e.g. "static", "declaration", etc. if needed
+      //   },
+      //   full: true, // enable full document requests
+      //   range: true, // optionally enable range-based requests
+      // },
     },
   })
 )
 
 // Validate documents when they change
-documents.onDidChangeContent(change => {
-  validateTextDocument(change.document)
-})
 
-function validateTextDocument(textDocument: TextDocument) {
-  const text = textDocument.getText()
-  const diagnostics: Diagnostic[] = []
+// connection.languages.semanticTokens.on((params: SemanticTokensParams): SemanticTokens => {
+//   const doc = documents.get(params.textDocument.uri)
+//   if (!doc) {
+//     return { data: [] }
+//   }
+//   return getSemanticTokens(doc)
+// })
 
-  const { ast, messages } = parseItn(text)
-
-  messages.forEach(m => {
-    diagnostics.push({
-      severity: DiagnosticSeverity.Error,
-      range: m.range,
-      message: m.message,
-      source: 'intertation-lsp',
-    })
-  })
-
-  // Send the computed diagnostics
-  connection.sendDiagnostics({ uri: textDocument.uri, diagnostics })
-}
-
-connection.languages.semanticTokens.on((params: SemanticTokensParams): SemanticTokens => {
-  const doc = documents.get(params.textDocument.uri)
-  if (!doc) {
-    return { data: [] }
-  }
-  return getSemanticTokens(doc)
-})
-
-connection.languages.semanticTokens.onRange((params: SemanticTokensRangeParams): SemanticTokens => {
-  const doc = documents.get(params.textDocument.uri)
-  if (!doc) {
-    return { data: [] }
-  }
-  return getSemanticTokens(doc, params.range)
-})
+// connection.languages.semanticTokens.onRange((params: SemanticTokensRangeParams): SemanticTokens => {
+//   const doc = documents.get(params.textDocument.uri)
+//   if (!doc) {
+//     return { data: [] }
+//   }
+//   return getSemanticTokens(doc, params.range)
+// })
 
 function getSemanticTokens(doc: TextDocument, range?: Range): SemanticTokens {
   // 1) parse the doc using parseItn
-  const text = doc.getText(range)
-  const { ast } = parseItn(text)
-
-  console.log('getSemanticTokens', range)
+  // const text = doc.getText(range)
+  // const { nodes } = parseItn(text)
 
   // 2) We'll use a SemanticTokensBuilder to collect tokens
   const builder = new SemanticTokensBuilder()
 
   // 3) Walk your AST. For example, if you store global variables in ast.globals
-  //    or if parseItn returns a list of nodes, find their "start" and "end" or line/column.
+  //    or if parseItn returns a list o f nodes, find their "start" and "end" or line/column.
   //    Let's assume you have something like ast.globals = [{ name, start, end }, ...].
   //    We'll produce a token for each global variable.
 
@@ -165,7 +143,3 @@ connection.onCompletion(
 
 // If needed, refine or resolve completion details
 connection.onCompletionResolve((item: CompletionItem) => item)
-
-// Listen
-documents.listen(connection)
-connection.listen()

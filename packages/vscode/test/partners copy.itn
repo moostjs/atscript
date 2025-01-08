@@ -3,7 +3,7 @@
 //  text comments
 /**/
 @mongo.collection "partners"
-export interface Partner {
+public interface Partner {
     @label "Name"
     
     nested1: {
