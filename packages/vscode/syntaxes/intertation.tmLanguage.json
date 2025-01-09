@@ -41,30 +41,7 @@
       "patterns": [
         {
           "match": "'([^']*)'|\"([^\"]*)\"",
-          "name": "string.quoted.single.import.intertation"
-        },
-        {
-          "name": "string.quoted.single.intertation",
-          "begin": "'",
-          "end": "(?:'|\\n)",
-          "patterns": [
-            {
-              "match": "\\\\.",
-              "name": "constant.character.escape.intertation"
-            }
-          ]
-        },
-
-        {
-          "name": "string.quoted.double.intertation",
-          "begin": "\"",
-          "end": "(?:\"|\\n)",
-          "patterns": [
-            {
-              "match": "\\\\.",
-              "name": "constant.character.escape.intertation"
-            }
-          ]
+          "name": "variable.other.constant.intertation"
         }
       ]
     },
@@ -106,7 +83,8 @@
               ]
             },
             {
-              "include": "#strings"
+              "match": "'([^']*)'|\"([^\"]*)\"",
+              "name": "string.quoted.import.intertation"
             }
           ]
         }
@@ -136,7 +114,7 @@
     "numbers": {
       "patterns": [
         {
-          "name": "constant.numeric.intertation",
+          "name": "variable.other.constant.intertation",
           "match": "\\b\\d+(\\.\\d+)?\\b"
         }
       ]
@@ -172,6 +150,33 @@
           },
           "end": "(?=$|\\n|\\r|;)",
           "patterns": [
+            {
+              "name": "constant.numeric.intertation",
+              "match": "\\b\\d+(\\.\\d+)?\\b"
+            },
+            {
+              "name": "string.quoted.single.intertation",
+              "begin": "'",
+              "end": "(?:'|\\n)",
+              "patterns": [
+                {
+                  "match": "\\\\.",
+                  "name": "constant.character.escape.intertation"
+                }
+              ]
+            },
+
+            {
+              "name": "string.quoted.double.intertation",
+              "begin": "\"",
+              "end": "(?:\"|\\n)",
+              "patterns": [
+                {
+                  "match": "\\\\.",
+                  "name": "constant.character.escape.intertation"
+                }
+              ]
+            },
             {
               "name": "constant.language.boolean.intertation",
               "match": "\\b(?:true|false|undefined|null)\\b"
@@ -224,6 +229,10 @@
 
     "global-types": {
       "patterns": [
+        {
+          "name": "support.type.primitive.intertation",
+          "match": "\\b\\w+\\b(?!\\s*:)"
+        },
         {
           "name": "support.type.primitive.intertation",
           "match": "\\b(?:number|string|boolean|void|undefined|null|never|any|unknown|bigint|symbol|true|false)\\b(?!\\s*:)"

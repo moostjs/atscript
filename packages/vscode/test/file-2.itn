@@ -1,6 +1,6 @@
 // import { SomeStructure2 } from './file-1'
 
-export type RiskType = 'low' | 'medium' | 'high'
+export type RiskType = 'low' | 'medium' | 'high' | 0 | 1 | 2
 
 
 export interface SomeStructure {
