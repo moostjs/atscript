@@ -8,11 +8,16 @@
 import { readFile } from 'fs'
 import type { TMessages, Token } from 'intertation'
 import { ItnDocument, resolveItnFromPath } from 'intertation'
-import type { createConnection, TextDocuments } from 'vscode-languageserver/node'
+import type {
+  createConnection,
+  TextDocuments,
+  TextEdit,
+  WorkspaceEdit,
+} from 'vscode-languageserver/node'
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
-import type { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
+import type { TextDocument } from 'vscode-languageserver-textdocument'
 
-import { debounce } from './utils'
+import { createInsertTextRule, getItnFileCompletions } from './utils'
 
 const CHECKS_DELAY = 250
 
@@ -99,7 +104,7 @@ export class ItnRepo {
       }
 
       // Build a response with edits for each reference
-      const changes: Record<string, TextEdit[] | undefined> = {}
+      const changes: WorkspaceEdit['changes'] = {}
 
       references.forEach(ref => {
         if (!changes[ref.uri]) {
@@ -115,49 +120,86 @@ export class ItnRepo {
       return { changes }
     })
 
+    connection.onCompletionResolve(item => item)
+
     connection.onCompletion(async params => {
       const { textDocument, position, context } = params
-      if (context?.triggerKind === 1) {
-        return []
-      }
-      if (context?.triggerCharacter === '@') {
-        return [
-          {
-            label: 'Label',
-            kind: CompletionItemKind.Property,
-            insertText: 'label',
-            detail: 'Annotate with Label',
-            documentation: {
-              kind: 'markdown',
-              value: '# Label',
-            },
-          },
-          {
-            label: 'Description',
-            kind: CompletionItemKind.Property,
-            insertText: 'description',
-            detail: 'Annotate with Description',
-            documentation: {
-              kind: 'markdown',
-              value: '# Description',
-            },
-          },
-        ]
-      }
-      const itnDoc = await this.openDocument(textDocument.uri)
+      console.log(context)
       const document = documents.get(textDocument.uri)
-
       if (!document) {
-        return []
+        return
       }
-
       const text = document.getText()
       const offset = document.offsetAt(position)
-      console.log(params)
-      console.log(itnDoc.getTokenAt(position.line, position.character - 1))
-      console.log('>>>')
-      console.log(`${text.slice(offset - 10, offset)}∨${text.slice(offset, offset + 10)}`)
-      console.log('<<<')
+      const itnDoc = await this.openDocument(textDocument.uri)
+      const block = itnDoc.getBlockAt(position.line, position.character)
+      const rule = createInsertTextRule(text, offset, context?.triggerKind ?? 1)
+      if (block?.blockType === 'import' && block.fromPath) {
+        const target = await this.openDocument(resolveItnFromPath(block.fromPath, itnDoc.id))
+        if (target) {
+          const imports = itnDoc.imports.get(target.id)?.imports || []
+          const importsSet = new Set(imports.map(i => i.text))
+          return Array.from(target.exports.values())
+            .filter(n => !importsSet.has(n.id!) && rule.test(n.id!))
+            .map(node => ({
+              label: node.id,
+              kind:
+                node.entity === 'interface'
+                  ? CompletionItemKind.Interface
+                  : CompletionItemKind.TypeParameter,
+              detail: `${node.id} [${node.entity}]`,
+              insertText: rule.apply(node.id!),
+            }))
+        }
+      }
+      const token = itnDoc.getTokenAt(position.line, position.character)
+      console.log(token)
+      if (typeof token?.fromPath === 'string') {
+        const paths = getItnFileCompletions(itnDoc.id, token.fromPath)
+        return paths.map(path => ({
+          label: path,
+          kind: CompletionItemKind.File,
+          insertText: path,
+        }))
+      }
+      // if (context?.triggerCharacter === '@') {
+      //   return [
+      //     {
+      //       label: 'Label',
+      //       kind: CompletionItemKind.Property,
+      //       insertText: 'label',
+      //       detail: 'Annotate with Label',
+      //       documentation: {
+      //         kind: 'markdown',
+      //         value: '# Label',
+      //       },
+      //     },
+      //     {
+      //       label: 'Description',
+      //       kind: CompletionItemKind.Property,
+      //       insertText: 'description',
+      //       detail: 'Annotate with Description',
+      //       documentation: {
+      //         kind: 'markdown',
+      //         value: '# Description',
+      //       },
+      //     },
+      //   ]
+      // }
+      // const itnDoc = await this.openDocument(textDocument.uri)
+      // const document = documents.get(textDocument.uri)
+
+      // if (!document) {
+      //   return []
+      // }
+
+      // const text = document.getText()
+      // const offset = document.offsetAt(position)
+      // console.log(params)
+      // console.log(itnDoc.getTokenAt(position.line, position.character - 1))
+      // console.log('>>>')
+      // console.log(`${text.slice(offset - 10, offset)}∨${text.slice(offset, offset + 10)}`)
+      // console.log('<<<')
     })
   }
 

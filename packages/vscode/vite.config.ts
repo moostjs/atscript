@@ -3,8 +3,11 @@ import { readFileSync } from 'node:fs'
 
 import { defineConfig } from 'vite'
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-const external = Object.keys(JSON.parse(readFileSync('./package.json').toString()).dependencies)
+const external =
+  process.env.NODE_ENV === 'production'
+    ? // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+      Object.keys(JSON.parse(readFileSync('./package.json').toString()).dependencies)
+    : []
 
 export default defineConfig({
   build: {
@@ -18,7 +21,10 @@ export default defineConfig({
       formats: ['cjs'],
     },
     rollupOptions: {
-      external: [...external, 'vscode', 'path', 'fs', ...external.map(s => `${s}/node`)], // External dependencies
+      external:
+        process.env.NODE_ENV === 'production'
+          ? [...external, 'vscode', 'path', 'fs', ...external.map(s => `${s}/node`)]
+          : [], // External dependencies
     },
   },
 })

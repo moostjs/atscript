@@ -5,7 +5,7 @@ import { isGroup } from '.'
 import type { TAnnotationTokens, TNodeEntity, TSemanticToken } from './types'
 
 export class SemanticNode {
-  constructor(protected entity: TNodeEntity) {}
+  constructor(public entity: TNodeEntity) {}
 
   protected tokens?: Map<TSemanticToken, Token>
 

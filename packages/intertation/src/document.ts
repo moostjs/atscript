@@ -30,22 +30,49 @@ export class ItnDocument {
 
   public messages: TMessages = []
 
+  /**
+   * All the non-blocks tokens, that could be referred
+   */
   public tokensMap = [] as Array<Set<Token> | undefined>
 
+  /**
+   * All the block-tokens
+   */
   public blocksMap = [] as Array<Set<Token> | undefined>
 
+  /**
+   * Imports map by URI, contains from Token and imports[] tokens
+   */
   public imports = new Map<string, { from: Token; imports: Token[] }>()
 
+  /**
+   * Map of imported definitions by type/interface identifier
+   */
   public importedDefs = new Map<string, Token>()
 
+  /**
+   * Exported nodes by identifier
+   */
   public readonly exports = new Map<string, SemanticNode>()
 
+  /**
+   * List of tokens that refer to some type or interface
+   */
   public referred = [] as Token[]
 
+  /**
+   * Set of documents that this document depend on
+   */
   public readonly dependencies = new Set<ItnDocument>()
 
+  /**
+   * Set of documents that depend on this document
+   */
   public readonly dependants = new Set<ItnDocument>()
 
+  /**
+   * Map of dependencies (documents) by URI
+   */
   public readonly dependenciesMap = new Map<string, ItnDocument>()
 
   updateDependencies(docs: ItnDocument[]) {
@@ -238,6 +265,7 @@ export class ItnDocument {
     this.imports.set(importId, { from, imports })
     this.updateBlocksMap(block)
     block.blockType = 'import'
+    block.fromPath = from.text
     imports.forEach(t => {
       t.imported = true
       this.registerDefinition(t, true)
