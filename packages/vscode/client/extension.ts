@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 // client/extension.ts
 import type { ExtensionContext } from 'vscode'
 import { Uri, workspace } from 'vscode'
@@ -40,6 +41,14 @@ export function activate(context: ExtensionContext) {
     clientOptions
   )
   client.start()
+
+  workspace.findFiles('**/*.itn').then(files => {
+    console.log(files)
+    client!.sendNotification(
+      'workspace/files',
+      files.map(file => file.toString())
+    )
+  })
 
   // If you want to dispose it on extension deactivate
   context.subscriptions.push(client)

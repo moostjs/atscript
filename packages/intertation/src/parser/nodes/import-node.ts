@@ -9,12 +9,16 @@ export class SemanticImportNode extends SemanticNode {
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  get referredIdentifiers(): Token[] {
-    return []
-  }
+  // get referredIdentifiers(): Token[] {
+  //   return []
+  // }
 
   registerAtDocument(doc: ItnDocument): void {
-    const tokens = this.definition ? this.getIdentifiersRecursive(this.definition) : []
-    doc.registerImport(this.token('path')!, tokens)
+    const imports = this.definition ? this.getIdentifiersRecursive(this.definition) : []
+    doc.registerImport({
+      from: this.token('path')!,
+      imports,
+      block: this.token('inner')!,
+    })
   }
 }

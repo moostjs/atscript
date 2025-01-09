@@ -33,11 +33,13 @@ connection.onInitialize(
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
       definitionProvider: true,
+      referencesProvider: true,
+      renameProvider: true,
       // enable completion
-      // completionProvider: {
-      //   resolveProvider: true,
-      //   triggerCharacters: ['@', '.'],
-      // },
+      completionProvider: {
+        resolveProvider: true,
+        triggerCharacters: ['@', '.'],
+      },
       // Add semantic tokens capability:
       // semanticTokensProvider: {
       //   // The legend must list the token types you plan to use

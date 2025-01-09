@@ -38,5 +38,35 @@ export class Token {
   /**
    * Set this to file path (e.g. "./src/file.itn") for path token in import statement
    */
-  public navigatesToFile?: string
+  public fromPath?: string
+
+  /**
+   * All definitions that exported must be marked with this flag
+   */
+  public exported?: boolean
+
+  /**
+   * All the definitions must be marked with this flag
+   */
+  public isDefinition?: boolean
+
+  /**
+   * All the references must be marked with this flag
+   */
+  public isReference?: boolean
+
+  /**
+   * All the import tokens must be marked with this flag
+   */
+  public imported?: boolean
+
+  /**
+   * All the props must be marked with this flag
+   */
+  public isProp?: boolean
+
+  /**
+   * Block type
+   */
+  public blockType?: 'interface' | 'type' | 'import'
 }

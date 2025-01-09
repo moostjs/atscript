@@ -1,7 +1,7 @@
-import { RiskType, SomeStructure } from './file-2'
+import { RiskType, RiskStructure } from './file-2'
 
 @mongo.collection 'someCollection', 123, "sad'", true
-export interface SomeStructure2 {
+export interface SomeStructure {
     @label 'First Name'
     firstName: string
 
@@ -16,7 +16,7 @@ export interface SomeStructure2 {
     export: number
 
     @label 'Contacts'
-    contacts: test[]
+    contacts: Contacts[]
 
     @label 'Risk Profile'
     riskProfile: RiskType

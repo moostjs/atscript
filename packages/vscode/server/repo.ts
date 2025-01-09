@@ -1,15 +1,20 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
+/* eslint-disable complexity */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition */
+/* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { readFile } from 'fs'
 import type { TMessages, Token } from 'intertation'
 import { ItnDocument, resolveItnFromPath } from 'intertation'
-import path from 'path'
 import type { createConnection, TextDocuments } from 'vscode-languageserver/node'
-import { DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
+import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
+import type { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
 
 import { debounce } from './utils'
+
+const CHECKS_DELAY = 250
 
 const config = {
   globalTypes: ['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'],
@@ -30,8 +35,6 @@ export class ItnRepo {
 
   private idle = true
 
-  private firstDocOpen = false
-
   // private readonly changeBuffer = new Map<id, >()
 
   // private readonly revalidateDependantsBuffer = [] as ItnDocument[]
@@ -40,46 +43,141 @@ export class ItnRepo {
     private readonly connection: ReturnType<typeof createConnection>,
     private readonly documents: TextDocuments<TextDocument>
   ) {
-    this.documents.onDidChangeContent(
-      debounce(change => {
-        this.addToChangeQueue(change.document.uri)
-        if (!this.firstDocOpen) {
-          this.firstDocOpen = true
-          setTimeout(() => {
-            console.log('initial timeout', this.documents.all().length)
-            this.documents.all().forEach(doc => {
-              console.log('initially open doc', doc.uri)
-              if (doc.uri !== change.document.uri) {
-                this.addToRevalidateQueue(doc.uri)
-              }
-            })
-          }, 1500)
-        }
-      }, 100)
-    )
+    this.documents.onDidChangeContent(change => {
+      this.addToChangeQueue(change.document.uri)
+    })
+
     documents.listen(connection)
     connection.listen()
 
+    connection.onNotification('workspace/files', async (fileUris: string[]) => {
+      fileUris.forEach(uri => {
+        this.addToRevalidateQueue(uri)
+      })
+      this.checksDelay = 1
+      this.triggerChecks()
+      await this.currentCheck
+      this.checksDelay = CHECKS_DELAY
+    })
+
     connection.onDefinition(async params => {
-      console.log(params)
       const itnDoc = await this.openDocument(params.textDocument.uri)
-      return itnDoc.getDefinitionByPos(params.position.line, params.position.character)
+      return itnDoc.getToDefinitionAt(params.position.line, params.position.character)
+    })
+
+    connection.onReferences(async params => {
+      const itnDoc = await this.openDocument(params.textDocument.uri)
+      return itnDoc.getUsageListAt(params.position.line, params.position.character)
+    })
+
+    connection.onRenameRequest(async params => {
+      const { textDocument, position, newName } = params
+
+      // Open the document and find the token at the cursor
+      const itnDoc = await this.openDocument(textDocument.uri)
+      if (this.currentCheck) {
+        await this.currentCheck
+      }
+      const token = itnDoc.getTokenAt(position.line, position.character)
+      if (!token) {
+        return null // No token found at the cursor
+      }
+      const references = itnDoc.usageListFor(token)
+
+      if (!references || references.length === 0) {
+        return null // No references found
+      }
+
+      const def = token.isDefinition ? { uri: itnDoc.id, token } : itnDoc.getDefinitionFor(token)
+
+      if (def?.token) {
+        references.push({
+          uri: def.uri,
+          range: def.token.range,
+          token,
+        })
+      }
+
+      // Build a response with edits for each reference
+      const changes: Record<string, TextEdit[] | undefined> = {}
+
+      references.forEach(ref => {
+        if (!changes[ref.uri]) {
+          changes[ref.uri] = []
+        }
+
+        changes[ref.uri]!.push({
+          range: ref.range,
+          newText: newName,
+        })
+      })
+
+      return { changes }
+    })
+
+    connection.onCompletion(async params => {
+      const { textDocument, position, context } = params
+      if (context?.triggerKind === 1) {
+        return []
+      }
+      if (context?.triggerCharacter === '@') {
+        return [
+          {
+            label: 'Label',
+            kind: CompletionItemKind.Property,
+            insertText: 'label',
+            detail: 'Annotate with Label',
+            documentation: {
+              kind: 'markdown',
+              value: '# Label',
+            },
+          },
+          {
+            label: 'Description',
+            kind: CompletionItemKind.Property,
+            insertText: 'description',
+            detail: 'Annotate with Description',
+            documentation: {
+              kind: 'markdown',
+              value: '# Description',
+            },
+          },
+        ]
+      }
+      const itnDoc = await this.openDocument(textDocument.uri)
+      const document = documents.get(textDocument.uri)
+
+      if (!document) {
+        return []
+      }
+
+      const text = document.getText()
+      const offset = document.offsetAt(position)
+      console.log(params)
+      console.log(itnDoc.getTokenAt(position.line, position.character - 1))
+      console.log('>>>')
+      console.log(`${text.slice(offset - 10, offset)}∨${text.slice(offset, offset + 10)}`)
+      console.log('<<<')
     })
   }
 
+  checksDelay = CHECKS_DELAY
+
+  currentCheck?: Promise<void>
+
+  async triggerChecks() {
+    if (this.idle) {
+      this.currentCheck = this.runChecks()
+    }
+    return this.currentCheck
+  }
+
   async runChecks() {
-    console.log('runChecks')
     if (this.idle && (this.changeQueue.length > 0 || this.revalidateQueue.length > 0)) {
       this.idle = false
-      await new Promise(resolve => setTimeout(resolve, 250))
-      console.log('Run Checks Started', {
-        change: this.changeQueue,
-        revalidate: this.revalidateQueue,
-      })
-      console.time('runchecks')
+      await new Promise(resolve => setTimeout(resolve, this.checksDelay))
       const ids = [] as string[]
       while (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
-        console.log('while pass', this.changeQueue.length, this.revalidateQueue.length)
         const isFromChangeQueue = this.changeQueue.length > 0
         const id = isFromChangeQueue ? this.changeQueue.shift()! : this.revalidateQueue.shift()!
         ids.push(id)
@@ -94,37 +192,30 @@ export class ItnRepo {
         const changed = this.changedSet.has(id)
         this.changedSet.delete(id)
         this.checkDoc(doc, changed)
-        await new Promise(resolve => setTimeout(resolve, 250))
+        await new Promise(resolve => setTimeout(resolve, this.checksDelay))
       }
-      console.timeEnd('runchecks')
       console.log('Run Checks Finished', ids)
       this.idle = true
     }
   }
 
   addToChangeQueue(id: string) {
-    console.log('addToChangeQueue', id)
     this.changedSet.add(id)
     if (this.pendingCheck.has(id)) {
       return
     }
     this.pendingCheck.add(id)
     this.changeQueue.push(id)
-    if (this.idle) {
-      this.runChecks()
-    }
+    this.triggerChecks()
   }
 
   addToRevalidateQueue(id: string) {
-    console.log('addToRevalidateQueue', id)
     if (this.pendingCheck.has(id)) {
       return
     }
     this.pendingCheck.add(id)
     this.revalidateQueue.push(id)
-    if (this.idle) {
-      this.runChecks()
-    }
+    this.triggerChecks()
   }
 
   openDocument(id: string, text: string): ItnDocument
@@ -132,7 +223,6 @@ export class ItnRepo {
   openDocument(id: string, text?: string): ItnDocument | Promise<ItnDocument> {
     if (typeof text === 'string') {
       if (!this.itn.has(id)) {
-        console.log('create', id)
         this.itn.set(id, new ItnDocument(id, config))
       }
       const itnDoc = this.itn.get(id)!
@@ -151,9 +241,11 @@ export class ItnRepo {
     }
     let promise = this.reading.get(id)
     if (!promise) {
+      console.log('Reading from disk', id)
       promise = new Promise((resolve, reject) => {
-        readFile(id.slice(7), 'utf8', (err, data) => {
+        readFile(decodeURI(id.slice(7)), 'utf8', (err, data) => {
           if (err) {
+            console.error(err.message)
             reject(err)
             return
           }
@@ -179,7 +271,6 @@ export class ItnRepo {
 
   async checkDoc(itnDoc: ItnDocument, changed = false) {
     await this.checkImports(itnDoc)
-    console.log('send diag', itnDoc.messages)
     const unused = itnDoc.getUnusedTokens()
     const messages = itnDoc.getDiagMessages()
     this.connection.sendDiagnostics({
@@ -200,8 +291,8 @@ export class ItnRepo {
 
   async checkImports(itnDoc: ItnDocument) {
     const promise = Promise.all(
-      Array.from(itnDoc.imports.values(), async ({ from, tokens }) =>
-        this.checkImport(itnDoc, from, tokens)
+      Array.from(itnDoc.imports.values(), async ({ from, imports }) =>
+        this.checkImport(itnDoc, from, imports)
       )
     )
     const results = await promise
@@ -211,14 +302,14 @@ export class ItnRepo {
   async checkImport(
     itnDoc: ItnDocument,
     from: Token,
-    tokens: Token[]
+    imports: Token[]
   ): Promise<ItnDocument | undefined> {
     const forId = resolveItnFromPath(from.text, itnDoc.id)
     const errors = [] as TMessages
     let external: ItnDocument | undefined
     try {
       external = await this.openDocument(forId)
-      for (const token of tokens) {
+      for (const token of imports) {
         if (!external.exports.has(token.text)) {
           errors.push({
             severity: 1,

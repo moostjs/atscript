@@ -116,11 +116,11 @@ export function defineValuePipe(
 
 const importPipe = $pipe('import', [
   identifier('import').saveAs('identifier').skip('\n'),
-  block('{}').saveAs('import').skip('\n'),
+  block('{}').saveAs('inner').skip('\n'),
   identifier('from').saveAs('from').skip('\n'),
   text().saveAs('path').skip(';', '\n'),
   definition([$pipe('ref', [identifier().saveAs('identifier').skip('\n')])])
-    .from('import')
+    .from('inner')
     .separatedBy(',')
     .skip('\n')
     .respectPriority(),

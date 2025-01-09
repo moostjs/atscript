@@ -6,7 +6,7 @@ export type TSemanticToken =
   | 'array'
   | 'export'
   | 'optional'
-  | 'import'
+  | 'inner'
   | 'path'
   | 'from'
 

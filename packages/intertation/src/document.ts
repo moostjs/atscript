@@ -1,3 +1,4 @@
+/* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { IdRegistry } from './parser/id-registry'
@@ -7,7 +8,7 @@ import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
 import type { Token } from './parser/token'
 import type { TMessages, TSeverity } from './parser/types'
-import { resolveItnFromPath } from './parser/utils'
+import { getRelPath, resolveItnFromPath } from './parser/utils'
 import { tokenize } from './tokenizer'
 
 export interface TItnDocumentConfig {
@@ -29,9 +30,11 @@ export class ItnDocument {
 
   public messages: TMessages = []
 
-  public tokensMap = [] as Array<Token[] | undefined>
+  public tokensMap = [] as Array<Set<Token> | undefined>
 
-  public imports = new Map<string, { from: Token; tokens: Token[] }>()
+  public blocksMap = [] as Array<Set<Token> | undefined>
+
+  public imports = new Map<string, { from: Token; imports: Token[] }>()
 
   public importedDefs = new Map<string, Token>()
 
@@ -83,43 +86,110 @@ export class ItnDocument {
     this.imports.clear()
     this._allMessages = undefined
     this.tokensMap = []
+    this.blocksMap = []
   }
 
   private registerNodes(nodes: SemanticNode[]) {
     for (const node of nodes) {
       node.registerAtDocument(this)
       node.referredIdentifiers.forEach(t => {
+        t.isReference = true
         this.referred.push(t)
-        const line = t.range.start.line
-        this.tokensMap[line] = this.tokensMap[line] ?? []
-        this.tokensMap[line].push(t)
+        this.updateTokensMap(t)
       })
     }
   }
 
-  getDefinitionByPos(line: number, character: number) {
+  private updateTokensMap(t: Token) {
+    const line = t.range.start.line
+    this.tokensMap[line] = this.tokensMap[line] ?? new Set()
+    this.tokensMap[line].add(t)
+  }
+
+  private updateBlocksMap(t: Token) {
+    const line = t.range.start.line
+    this.blocksMap[line] = this.blocksMap[line] ?? new Set()
+    this.blocksMap[line].add(t)
+  }
+
+  getUsageListAt(line: number, character: number) {
+    const token = this.getTokenAt(line, character)
+    if (token) {
+      return this.usageListFor(token)
+    }
+  }
+
+  usageListFor(
+    token: Token
+  ): Array<{ uri: string; range: Token['range']; token: Token }> | undefined {
+    if (token.isDefinition) {
+      const refs = this.referred
+        .filter(t => t.text === token.text)
+        .map(r => ({
+          uri: this.id,
+          range: r.range,
+          token: r,
+        }))
+      if (token.exported) {
+        for (const d of this.dependants) {
+          const imp = d.imports.get(this.id)
+          if (imp?.imports.find(t => t.text === token.text)) {
+            refs.push(
+              ...d.referred
+                .filter(t => t.text === token.text)
+                .map(r => ({
+                  uri: d.id,
+                  range: r.range,
+                  token: r,
+                }))
+            )
+          }
+        }
+      }
+      return refs
+    } else {
+      const defForToken = this.getDefinitionFor(token)
+      if (defForToken?.token?.isDefinition && defForToken.doc) {
+        return defForToken.doc.usageListFor(defForToken.token)
+      }
+    }
+    return undefined
+  }
+
+  getBlockAt(line: number, character: number) {
+    const tokens = this.blocksMap[line]
+    if (!tokens) {
+      return undefined
+    }
+    return Array.from(tokens).find(
+      t => t.range.start.character <= character && t.range.end.character >= character
+    )
+  }
+
+  getTokenAt(line: number, character: number) {
     const tokens = this.tokensMap[line]
     if (!tokens) {
       return undefined
     }
-    const token = tokens.find(
+    return Array.from(tokens).find(
       t => t.range.start.character <= character && t.range.end.character >= character
     )
-    if (!token) {
-      return undefined
+  }
+
+  getDefinitionFor(token: Token): { uri: string; doc?: ItnDocument; token?: Token } | undefined {
+    if (token.isDefinition && !token.imported) {
+      return { uri: this.id, doc: this, token }
     }
-    if (token.navigatesToFile) {
-      const absolutePath = resolveItnFromPath(token.navigatesToFile, this.id)
-      return [
-        {
-          targetUri: absolutePath,
-          targetRange: zeroRange,
-          targetSelectionRange: zeroRange,
-          originSelectionRange: token.range,
-        },
-      ]
+    if (token.fromPath) {
+      const absolutePath = resolveItnFromPath(token.fromPath, this.id)
+
+      return { uri: absolutePath, doc: this.dependenciesMap.get(absolutePath), token }
     }
-    if (this.importedDefs.has(token.text) && this.dependenciesMap.size > 0) {
+    if (
+      (token.isReference || token.imported) &&
+      this.importedDefs.has(token.text) &&
+      this.dependenciesMap.size > 0
+    ) {
       const from = this.importedDefs.get(token.text)!.text
       const absolutePath = resolveItnFromPath(from, this.id)
       const targetDoc = this.dependenciesMap.get(absolutePath)
@@ -128,35 +198,65 @@ export class ItnDocument {
         return target
           ? {
               uri: targetDoc.id,
-              range: target.range,
+              doc: targetDoc,
+              token: target,
             }
-          : null
+          : undefined
       }
     }
-    const def = this.registry.definitions.get(token.text)
-    return def
-      ? {
-          uri: this.id,
-          range: def.range,
-        }
-      : null
+    if (token.isReference) {
+      const def = this.registry.definitions.get(token.text)
+      return def
+        ? {
+            uri: this.id,
+            doc: this,
+            token: def,
+          }
+        : undefined
+    }
   }
 
-  registerImport(from: Token, tokens: Token[]) {
-    this.imports.set(from.text, { from, tokens })
-    tokens.forEach(t => {
-      this.registerDefinition(t)
-      this.tokensMap[t.range.start.line] = this.tokensMap[t.range.start.line] ?? []
-      this.tokensMap[t.range.start.line]!.push(t)
+  getToDefinitionAt(line: number, character: number) {
+    const token = this.getTokenAt(line, character)
+    if (token) {
+      const result = this.getDefinitionFor(token)
+      return result
+        ? [
+            {
+              targetUri: result.uri,
+              targetRange: result.token?.range ?? zeroRange,
+              targetSelectionRange: result.token?.range ?? zeroRange,
+              originSelectionRange: token.range,
+            },
+          ]
+        : undefined
+    }
+  }
+
+  registerImport({ from, imports, block }: { from: Token; imports: Token[]; block: Token }) {
+    const importId = resolveItnFromPath(from.text, this.id)
+    this.imports.set(importId, { from, imports })
+    this.updateBlocksMap(block)
+    block.blockType = 'import'
+    imports.forEach(t => {
+      t.imported = true
+      this.registerDefinition(t, true)
+      this.updateTokensMap(t)
+      this.updateTokensMap(from)
       this.importedDefs.set(t.text, from)
-      this.tokensMap[from.range.start.line] = this.tokensMap[from.range.start.line] ?? []
-      this.tokensMap[from.range.start.line]!.push(from)
-      from.navigatesToFile = from.text
+      from.fromPath = from.text
     })
   }
 
-  registerDefinition(token?: Token) {
-    this.registry.registerDefinition(token)
+  registerDefinition(token?: Token, asImport = false) {
+    if (token) {
+      token.isDefinition = !asImport
+      if (asImport) {
+        token.isReference = true
+      }
+      this.updateTokensMap(token)
+      this.registry.registerDefinition(token)
+    }
   }
 
   registerExport(node: SemanticNode) {
@@ -195,7 +295,6 @@ export class ItnDocument {
   }
 
   getDiagMessages() {
-    console.log('node messages', this.messages)
     if (!this._allMessages) {
       this._allMessages = [
         ...this.referred
