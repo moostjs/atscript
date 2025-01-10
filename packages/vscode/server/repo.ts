@@ -124,7 +124,6 @@ export class ItnRepo {
 
     connection.onCompletion(async params => {
       const { textDocument, position, context } = params
-      console.log(context)
       const document = documents.get(textDocument.uri)
       if (!document) {
         return
@@ -153,13 +152,13 @@ export class ItnRepo {
         }
       }
       const token = itnDoc.getTokenAt(position.line, position.character)
-      console.log(token)
       if (typeof token?.fromPath === 'string') {
-        const paths = getItnFileCompletions(itnDoc.id, token.fromPath)
+        const dif = position.character - token.range.start.character - 1
+        const paths = getItnFileCompletions(itnDoc.id, token.fromPath.slice(0, dif))
         return paths.map(path => ({
           label: path,
           kind: CompletionItemKind.File,
-          insertText: path,
+          insertText: path.split('/').pop(),
         }))
       }
       // if (context?.triggerCharacter === '@') {
@@ -236,7 +235,7 @@ export class ItnRepo {
         this.checkDoc(doc, changed)
         await new Promise(resolve => setTimeout(resolve, this.checksDelay))
       }
-      console.log('Run Checks Finished', ids)
+      // console.log('Run Checks Finished', ids)
       this.idle = true
     }
   }

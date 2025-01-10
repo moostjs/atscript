@@ -1,7 +1,6 @@
 import { RiskStructure, RiskType } from './file-2'
 
 
-
 @mongo.collection 'someCollection', 123, "sad'", true
 export interface SomeStructure {
     @label 'First Name'

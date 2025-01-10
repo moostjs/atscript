@@ -1,3 +1,4 @@
+/* eslint-disable max-params */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable complexity */
 /* eslint-disable sonarjs/cognitive-complexity */
@@ -25,6 +26,7 @@ export function createInsertTextRule(
 ): {
   test: (insertText: string) => boolean
   apply: (insertText: string) => string
+  word: string
 } {
   const i = offset - 1
   let needSpace = false
@@ -48,12 +50,14 @@ export function createInsertTextRule(
     apply(insertText: string) {
       return (needSpace ? ' ' : '') + insertText
     },
+    word,
   }
 }
 
 export function getItnFileCompletions(uri: string, word: string): string[] {
   const docPath = decodeURIComponent(uri.slice(7))
-  const dir = path.join(path.dirname(docPath), word || './')
+  const targetPath = path.join(path.dirname(docPath), `${word || './'}.itn`)
+  const dir = path.dirname(targetPath)
   let files: string[] = []
 
   try {
@@ -63,13 +67,9 @@ export function getItnFileCompletions(uri: string, word: string): string[] {
     return []
   }
 
-  console.log({ files })
-
   const match = word.split('/').pop() ?? ''
 
-  const result = files
+  return files
     .filter(name => name.endsWith('.itn') && name.startsWith(match))
     .map(name => getRelPath(uri, `file://${path.join(dir, name).slice(0, -4)}`))
-  console.log({ result })
-  return result
 }
