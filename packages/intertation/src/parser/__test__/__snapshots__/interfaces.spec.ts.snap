@@ -1,5 +1,16 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`interfaces > interface with chains 1`] = `
+"● [interface] "IName" type: interface <identifier>
+  = [structure] "{"  (
+      ● [prop] "a": [ref] "ref1".["ref2"] <>
+      ● [prop] "b": [ref] "ref3".["ref4"] <>
+      ● [prop] "c": [ref] "ref5".["ref6"] <>
+      ● [prop] "d": [ref] "ref7".["ref8"]
+    )
+"
+`;
+
 exports[`interfaces > interface with complex prop type 1`] = `
 "● [interface] "IName" type: interface <identifier>
   = [structure] "{"  (

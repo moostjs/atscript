@@ -128,6 +128,8 @@ export class ItnRepo {
       if (!document) {
         return
       }
+      console.log('completion triggered', context, position)
+      await this.currentCheck
       const text = document.getText()
       const offset = document.offsetAt(position)
       const itnDoc = await this.openDocument(textDocument.uri)
@@ -154,11 +156,28 @@ export class ItnRepo {
       const token = itnDoc.getTokenAt(position.line, position.character)
       if (typeof token?.fromPath === 'string') {
         const dif = position.character - token.range.start.character - 1
-        const paths = getItnFileCompletions(itnDoc.id, token.fromPath.slice(0, dif))
-        return paths.map(path => ({
+        const paths = await getItnFileCompletions(itnDoc.id, token.fromPath.slice(0, dif))
+        // console.log(result)
+        return paths.map(({ path, isDirectory }) => ({
           label: path,
-          kind: CompletionItemKind.File,
-          insertText: path.split('/').pop(),
+          kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
+          command: isDirectory
+            ? {
+                command: 'editor.action.triggerSuggest',
+                title: 'Trigger Suggest',
+              }
+            : undefined,
+          textEdit: {
+            replace: {
+              start: { line: token.range.start.line, character: token.range.start.character + 1 },
+              end: { line: token.range.end.line, character: token.range.end.character - 1 },
+            },
+            range: {
+              start: { line: token.range.start.line, character: token.range.start.character + 1 },
+              end: { line: token.range.end.line, character: token.range.end.character - 1 },
+            },
+            newText: isDirectory ? `${path}/` : path,
+          },
         }))
       }
       // if (context?.triggerCharacter === '@') {

@@ -4,10 +4,10 @@ import { $n } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
 import type { TPipe } from './core.pipe'
 import { $pipe } from './core.pipe'
-import { annotations, definition, unwrap } from './special.pipe'
+import { annotations, definition, refWithChain, unwrap } from './special.pipe'
 import { $token, block, identifier, pun, text } from './tokens.pipe'
 
-const ref = defineValuePipe('ref', 'identifier', true)
+const ref = $pipe('ref', [refWithChain()]) // defineValuePipe('ref', 'identifier', true)
 const constText = defineValuePipe('const', 'text', false)
 const constNumber = defineValuePipe('const', 'number', false)
 

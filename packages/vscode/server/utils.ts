@@ -54,22 +54,53 @@ export function createInsertTextRule(
   }
 }
 
-export function getItnFileCompletions(uri: string, word: string): string[] {
+export async function getItnFileCompletions(
+  uri: string,
+  word: string
+): Promise<Array<{ path: string; isDirectory: boolean }>> {
+  // Convert "file:///..." => absolute path
   const docPath = decodeURIComponent(uri.slice(7))
+
+  // For historical consistency, replicate original logic:
   const targetPath = path.join(path.dirname(docPath), `${word || './'}.itn`)
   const dir = path.dirname(targetPath)
-  let files: string[] = []
 
+  let entries: fs.Dirent[]
   try {
-    files = fs.readdirSync(dir)
+    // Read directory with Dirent objects
+    entries = await fs.promises.readdir(dir, { withFileTypes: true })
   } catch {
     // Directory doesn't exist or is not readable
     return []
   }
 
+  // If user typed './some', then match = 'some'
+  // If user typed '../foo/bar', then match = 'bar'
+  // If user typed '', then match = ''
   const match = word.split('/').pop() ?? ''
 
-  return files
-    .filter(name => name.endsWith('.itn') && name.startsWith(match))
-    .map(name => getRelPath(uri, `file://${path.join(dir, name).slice(0, -4)}`))
+  // Collect directories and .itn files that start with `match`
+  // Directories => we return them with a trailing slash
+  // .itn files => remove the extension
+  return entries
+    .filter(entry => entry.name.startsWith(match))
+    .map(entry => {
+      if (entry.isDirectory()) {
+        // Append slash so user can continue navigating deeper
+        return {
+          path: getRelPath(uri, `file://${path.join(dir, entry.name)}`),
+          isDirectory: true,
+        }
+      } else if (entry.isFile() && entry.name.endsWith('.itn')) {
+        // Remove the .itn extension
+        const fileNoExt = path.join(dir, entry.name).slice(0, -4)
+        return {
+          path: getRelPath(uri, `file://${fileNoExt}`),
+          isDirectory: false,
+        }
+      }
+      // Not a directory or an .itn file => skip
+      return undefined
+    })
+    .filter(Boolean) as Array<{ path: string; isDirectory: boolean }>
 }

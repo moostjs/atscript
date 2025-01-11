@@ -53,6 +53,17 @@ describe('interfaces', () => {
     expect(result.toString()).toMatchSnapshot()
     expect(result.messages).toHaveLength(0)
   })
+
+  it('interface with chains', () => {
+    const result = parseItn(`interface IName {
+        a: ref1.ref2;
+        b: ref3["ref4"],
+        c: ref5["ref6"]
+        d: ref7["ref8"] 
+      }`)
+    expect(result.toString()).toMatchSnapshot()
+    expect(result.messages).toHaveLength(0)
+  })
 })
 
 describe('referred identifiers in interfaces', () => {

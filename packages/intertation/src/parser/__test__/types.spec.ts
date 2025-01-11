@@ -61,7 +61,7 @@ describe('types', () => {
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" type: type <identifier>: [array] "[": [ref] "string""`
     )
-
+    console.log(result.messages)
     expect(result.messages).toHaveLength(0)
   })
   it('type array of group', () => {

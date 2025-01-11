@@ -7,12 +7,93 @@
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import { groupByPriority } from '../grouping'
 import type { NodeIterator } from '../iterator'
-import type { SemanticNode, TAnnotationTokens, TSemanticToken } from '../nodes'
-import { $n } from '../nodes'
+import type { SemanticNode, TSemanticToken } from '../nodes'
+import { $n, isRef } from '../nodes'
+import { SemanticArrayNode } from '../nodes/array-node'
 import { Token } from '../token'
 import type { TExpect, TTarget } from '../types'
 import type { TPipe } from './core.pipe'
 import { runPipes, runPipesOnce } from './core.pipe'
+
+export function refWithChain() {
+  const s = {
+    id: { node: 'identifier' } as TExpect,
+    dot: { node: 'punctuation', text: '.' } as TExpect,
+    block: { node: 'block', text: '[' } as TExpect,
+    end: { node: 'punctuation', text: ';' } as TExpect,
+  }
+  return {
+    handler(ni: NodeIterator, target: TTarget) {
+      ni.skip(['\n'])
+      if (!ni.$) {
+        return false
+      }
+      if (ni.satisfies(s.id)) {
+        ni.accepted()
+        target.node.saveToken(new Token(ni.$), 'identifier')
+      } else {
+        return false
+      }
+      ni.move()
+      // ni.skip(['\n'])
+      if (ni.fork().skip(['\n']).satisfies(s.end)) {
+        // after ";" return true
+        ni.skip(['\n', ';'])
+        return true
+      }
+      const fork = ni.fork()
+      let isDot = fork.skip(['\n']).satisfies(s.dot)
+      let isBlock = fork.satisfies(s.block)
+      // const chain = [] as Token[]
+      while (fork.$ && (isDot || isBlock)) {
+        if (isBlock) {
+          if (fork.$.children?.length === 0) {
+            // is array
+            target.node = new SemanticArrayNode().wrap(target.node, new Token(fork.$))
+            fork.move()
+            fork.skip(['\n', ';'])
+            ni.unfork(fork)
+            return true
+          } else if (fork.$.children?.length === 1 && fork.$.children[0].type === 'text') {
+            // chaining
+            if (isRef(target.node)) {
+              target.node.addChain(new Token(fork.$.children[0]))
+            }
+          } else {
+            return true
+          }
+        } else {
+          fork.skip(['\n'])
+          // eslint-disable-next-line no-lonely-if
+          if (fork.next().satisfies(s.id)) {
+            fork.move()
+            if (isRef(target.node)) {
+              target.node.addChain(new Token(fork.$))
+            }
+          } else {
+            fork.unexpected()
+            fork.move(1)
+            fork.unexpected()
+            ni.unfork(fork)
+            ni.move()
+            ni.skip([';', '\n'])
+            return true
+          }
+        }
+        fork.move()
+        ni.unfork(fork)
+        if (ni.fork().skip(['\n']).satisfies(s.end)) {
+          // after ";" return true
+          ni.skip(['\n', ';'])
+          return true
+        }
+        isDot = fork.skip(['\n']).satisfies(s.dot)
+        isBlock = fork.satisfies(s.block)
+      }
+      return true
+    },
+  }
+}
 
 export function annotations() {
   const opts = {

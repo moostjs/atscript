@@ -23,7 +23,7 @@ export type TMessages = Array<{
   }
 }>
 
-export interface TTarget {
-  node: SemanticNode
+export interface TTarget<T extends SemanticNode = SemanticNode> {
+  node: T
 }
 export type THandler = (ni: NodeIterator, target: TTarget) => boolean
