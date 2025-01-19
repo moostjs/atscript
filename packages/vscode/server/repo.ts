@@ -20,7 +20,6 @@ import type {
   createConnection,
   Position,
   TextDocuments,
-  TextEdit,
   WorkspaceEdit,
 } from 'vscode-languageserver/node'
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
@@ -49,9 +48,9 @@ export class ItnRepo {
 
   private idle = true
 
-  // private readonly changeBuffer = new Map<id, >()
+  checksDelay = CHECKS_DELAY
 
-  // private readonly revalidateDependantsBuffer = [] as ItnDocument[]
+  currentCheck?: Promise<void>
 
   constructor(
     private readonly connection: ReturnType<typeof createConnection>,
@@ -306,10 +305,6 @@ export class ItnRepo {
       },
     })) as CompletionItem[]
   }
-
-  checksDelay = CHECKS_DELAY
-
-  currentCheck?: Promise<void>
 
   async triggerChecks() {
     if (this.idle) {
