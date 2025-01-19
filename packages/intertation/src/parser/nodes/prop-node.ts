@@ -10,7 +10,6 @@ export class SemanticPropNode extends SemanticNode {
   registerAtDocument(doc: ItnDocument): void {
     super.registerAtDocument(doc)
     const token = this.token('identifier')
-    console.log(this.tokens)
     if (token && token.type === 'text' && token.multiline) {
       doc.registerMessage(token, 'Unexpected end of string')
     }

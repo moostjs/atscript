@@ -66,11 +66,17 @@ export function refWithChain() {
           fork.skip(['\n'])
           // eslint-disable-next-line no-lonely-if
           if (fork.next().satisfies(s.id)) {
+            if (isRef(target.node)) {
+              target.node.addDot(new Token(fork.$))
+            }
             fork.move()
             if (isRef(target.node)) {
               target.node.addChain(new Token(fork.$))
             }
           } else {
+            if (isRef(target.node)) {
+              target.node.addDot(new Token(fork.$))
+            }
             fork.unexpected()
             fork.move(1)
             fork.unexpected()

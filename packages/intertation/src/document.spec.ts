@@ -1,11 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable sonarjs/no-duplicate-string */
-import { randomBytes } from 'crypto'
 import { describe, expect, it } from 'vitest'
 
 import { ItnDocument } from './document'
-
-const abc = ''
 
 describe('document', () => {
   it('should register import', () => {
@@ -184,8 +181,8 @@ describe('document', () => {
       type Type = 'text'
       interface TName { prop: Type }
       `)
-    expect(doc.getTokenAt(1, 14)).toEqual(expect.objectContaining({ text: 'Type' }))
-    expect(doc.getTokenAt(1, 14)).toEqual(expect.objectContaining({ text: 'Type' }))
+    expect(doc.tokensIndex.at(1, 14)).toEqual(expect.objectContaining({ text: 'Type' }))
+    expect(doc.tokensIndex.at(1, 14)).toEqual(expect.objectContaining({ text: 'Type' }))
   })
 
   it('should mark tokens with proper flags', () => {
@@ -201,54 +198,87 @@ describe('document', () => {
       `)
     // Imported
     let p = [1, 20] as [number, number]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'Imported')
-    expect(doc.getTokenAt(...p)).toHaveProperty('imported', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'Imported')
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('imported', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isReference', true)
     // './file-2'
     p = [1, 35]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', './file-2')
-    expect(doc.getTokenAt(...p)).toHaveProperty('fromPath', './file-2')
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', './file-2')
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('fromPath', './file-2')
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isReference', true)
     // Type
     p = [2, 14]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'Type')
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('exported', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'Type')
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('exported', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isReference', true)
     // 'string'
     p = [2, 23]
-    expect(doc.getTokenAt(...p)).toBeUndefined()
+    expect(doc.tokensIndex.at(...p)).toBeUndefined()
     // Exported
     p = [3, 22]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'Exported')
-    expect(doc.getTokenAt(...p)).toHaveProperty('exported', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'Exported')
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('exported', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isReference', true)
     // IFace
     p = [4, 19]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'IFace')
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('exported', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'IFace')
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('exported', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isReference', true)
     // >prop<: Type
     // p = [5, 11] // todo: add isProp flag logic
-    // expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'prop')
-    // expect(doc.getTokenAt(...p)).not.toHaveProperty('exported', true)
-    // expect(doc.getTokenAt(...p)).not.toHaveProperty('isDefinition', true)
-    // expect(doc.getTokenAt(...p)).toHaveProperty('isProp', true)
+    // expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'prop')
+    // expect(doc.tokensIndex.at(...p)).not.toHaveProperty('exported', true)
+    // expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isDefinition', true)
+    // expect(doc.tokensIndex.at(...p)).toHaveProperty('isProp', true)
     // prop: >Type<
     p = [5, 17]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'Type')
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('exported', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'Type')
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('exported', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isReference', true)
     // prop2: >string<
     p = [6, 17]
-    expect(doc.getTokenAt(...p)).toHaveProperty('_data.text', 'string')
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('exported', true)
-    expect(doc.getTokenAt(...p)).not.toHaveProperty('isDefinition', true)
-    expect(doc.getTokenAt(...p)).toHaveProperty('isReference', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('_data.text', 'string')
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('exported', true)
+    expect(doc.tokensIndex.at(...p)).not.toHaveProperty('isDefinition', true)
+    expect(doc.tokensIndex.at(...p)).toHaveProperty('isReference', true)
+  })
+
+  it('should detect duplicate props', () => {
+    const doc = new ItnDocument('file:///home/test.itn', {
+      globalTypes: ['number', 'string'],
+    })
+    doc.update(`interface IFace {
+        prop: string
+        prop: number
+      }`)
+    expect(doc.getDiagMessages()).toEqual([
+      {
+        severity: 1,
+        message: 'Duplicate prop identifier',
+        range: {
+          start: { character: 8, line: 2 },
+          end: { character: 12, line: 2 },
+        },
+      },
+    ])
+  })
+
+  it('should register structure block in map', () => {
+    const doc = new ItnDocument('file:///home/test.itn', {
+      globalTypes: ['number', 'string'],
+    })
+    doc.update(`interface IFace {
+        prop: string
+        prop: number
+      }`)
+    const block = doc.blocksIndex.at(1, 2)
+    expect(block).toBeDefined()
+    expect(block?.blockType).toBe('structure')
   })
 })

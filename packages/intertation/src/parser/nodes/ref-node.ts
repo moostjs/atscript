@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+import type { ItnDocument } from '../../document'
 import type { Token } from '../token'
 import { SemanticNode } from './node'
 
@@ -7,14 +9,36 @@ export class SemanticRefNode extends SemanticNode {
   }
 
   get referredIdentifiers(): Token[] {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return [this.token('identifier')!]
   }
 
   protected _chain = [] as Token[]
 
+  protected _dots = [] as Token[]
+
+  registerAtDocument(doc: ItnDocument): void {
+    super.registerAtDocument(doc)
+    this.token('identifier')!.index = 0
+    this._chain.forEach(c => {
+      doc.tokensIndex.add(c)
+    })
+    this._dots.forEach(d => {
+      doc.tokensIndex.add(d)
+    })
+  }
+
   addChain(token: Token) {
+    token.parentNode = this
+    token.isChain = true
+    token.index = this._chain.length + 1
     this._chain.push(token)
+  }
+
+  addDot(token: Token) {
+    token.parentNode = this
+    token.isChain = true
+    token.index = this._chain.length
+    this._dots.push(token)
   }
 
   get chain(): Token[] {

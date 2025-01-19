@@ -16,7 +16,7 @@ export class SemanticGroup extends SemanticNode {
   }
 
   registerAtDocument(doc: ItnDocument): void {
-    if (this.definition) {
+    if (this.nodes.length > 0) {
       this.unwrap().forEach(n => n.registerAtDocument(doc))
     }
   }

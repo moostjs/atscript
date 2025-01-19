@@ -7,9 +7,18 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { readFile } from 'fs'
 import type { TMessages, Token } from 'intertation'
-import { ItnDocument, resolveItnFromPath } from 'intertation'
+import {
+  getRelPath,
+  isInterface,
+  isRef,
+  isStructure,
+  ItnDocument,
+  resolveItnFromPath,
+} from 'intertation'
 import type {
+  CompletionItem,
   createConnection,
+  Position,
   TextDocuments,
   TextEdit,
   WorkspaceEdit,
@@ -17,7 +26,7 @@ import type {
 import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
-import { createInsertTextRule, getItnFileCompletions } from './utils'
+import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
 
 const CHECKS_DELAY = 250
 
@@ -83,7 +92,7 @@ export class ItnRepo {
       if (this.currentCheck) {
         await this.currentCheck
       }
-      const token = itnDoc.getTokenAt(position.line, position.character)
+      const token = itnDoc.tokensIndex.at(position.line, position.character)
       if (!token) {
         return null // No token found at the cursor
       }
@@ -133,92 +142,169 @@ export class ItnRepo {
       const text = document.getText()
       const offset = document.offsetAt(position)
       const itnDoc = await this.openDocument(textDocument.uri)
-      const block = itnDoc.getBlockAt(position.line, position.character)
-      const rule = createInsertTextRule(text, offset, context?.triggerKind ?? 1)
+      const block = itnDoc.blocksIndex.at(position.line, position.character)
+
+      // import { here } from '...'
       if (block?.blockType === 'import' && block.fromPath) {
-        const target = await this.openDocument(resolveItnFromPath(block.fromPath, itnDoc.id))
-        if (target) {
-          const imports = itnDoc.imports.get(target.id)?.imports || []
-          const importsSet = new Set(imports.map(i => i.text))
-          return Array.from(target.exports.values())
-            .filter(n => !importsSet.has(n.id!) && rule.test(n.id!))
-            .map(node => ({
-              label: node.id,
+        return this.getImportBlockCompletions(itnDoc, block, text, offset, context?.triggerKind)
+      }
+
+      // import { ... } from 'here'
+      const token = itnDoc.tokensIndex.at(position.line, position.character)
+      if (typeof token?.fromPath === 'string') {
+        return this.getImportPathCompletions(itnDoc, token, position)
+      }
+
+      // declared (imported) types or exported from other documents
+      const before = charBefore(text, offset, [/[\s\w]/u])
+      if (block?.blockType === 'structure' && before && [':', '|', '&'].includes(before)) {
+        return this.getDeclarationsCompletions(itnDoc, text)
+      }
+
+      // autocomplete for defined nodes
+      if (token?.parentNode && isRef(token.parentNode)) {
+        const id = token.parentNode.token('identifier')
+        if (!id) {
+          return undefined
+        }
+        const node = itnDoc.getDeclarationOwnerNode(id.text)
+        if (!node || (!isStructure(node) && !isInterface(node))) {
+          return undefined
+        }
+        console.log('props', node.props.keys())
+        const options = Array.from(node.props.keys())
+        if (token.type === 'punctuation') {
+          // after dot
+          return options.map(o => ({
+            label: o,
+            kind: CompletionItemKind.Property,
+            insertText: o,
+          })) as CompletionItem[]
+        } else if (['identifier', 'text'].includes(token.type)) {
+          // inside identifier
+        }
+      }
+    })
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
+  async getDeclarationsCompletions(
+    itnDoc: ItnDocument,
+    text: string
+  ): Promise<CompletionItem[] | undefined> {
+    const defs = Array.from(itnDoc.registry.definitions.entries())
+    const items = [] as CompletionItem[]
+    const exporters = new Map<string, ItnDocument>()
+    const importSet = new Set<string>()
+    for (const [key, token] of defs) {
+      let t = token
+      if (token.fromPath) {
+        let exporter = exporters.get(token.fromPath)
+        if (!exporter) {
+          exporter = await this.openDocument(resolveItnFromPath(token.fromPath, itnDoc.id))
+          exporters.set(token.fromPath, exporter)
+        }
+        t = exporter.registry.definitions.get(token.text)!
+        importSet.add(token.text)
+      }
+      items.push({
+        label: key,
+        kind:
+          t.parentNode?.entity === 'interface'
+            ? CompletionItemKind.Interface
+            : CompletionItemKind.TypeParameter,
+        detail: token.fromPath ? `imported from '${token.fromPath}'` : undefined,
+      })
+    }
+    for (const doc of this.itn.values()) {
+      if (doc !== itnDoc) {
+        for (const node of doc.exports.values()) {
+          const token = node.token('identifier')
+          if (token && !importSet.has(token.text)) {
+            const fromPath = getRelPath(itnDoc.id, doc.id)
+            const importEdit = addImport(text, token.text, fromPath)
+            items.push({
+              label: token.text,
               kind:
                 node.entity === 'interface'
                   ? CompletionItemKind.Interface
                   : CompletionItemKind.TypeParameter,
-              detail: `${node.id} [${node.entity}]`,
-              insertText: rule.apply(node.id!),
-            }))
+              detail: `add import from '${fromPath}'`,
+              labelDetails: {
+                description: `${fromPath}`,
+              },
+              additionalTextEdits: [importEdit],
+            })
+          }
         }
       }
-      const token = itnDoc.getTokenAt(position.line, position.character)
-      if (typeof token?.fromPath === 'string') {
-        const dif = position.character - token.range.start.character - 1
-        const paths = await getItnFileCompletions(itnDoc.id, token.fromPath.slice(0, dif))
-        // console.log(result)
-        return paths.map(({ path, isDirectory }) => ({
-          label: path,
-          kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
-          command: isDirectory
-            ? {
-                command: 'editor.action.triggerSuggest',
-                title: 'Trigger Suggest',
-              }
-            : undefined,
-          textEdit: {
-            replace: {
-              start: { line: token.range.start.line, character: token.range.start.character + 1 },
-              end: { line: token.range.end.line, character: token.range.end.character - 1 },
-            },
-            range: {
-              start: { line: token.range.start.line, character: token.range.start.character + 1 },
-              end: { line: token.range.end.line, character: token.range.end.character - 1 },
-            },
-            newText: isDirectory ? `${path}/` : path,
+    }
+    return items
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
+  async getImportBlockCompletions(
+    itnDoc: ItnDocument,
+    block: Token,
+    text: string,
+    offset: number,
+    triggerKind?: 1 | 2 | 3
+  ): Promise<CompletionItem[] | undefined> {
+    const rule = createInsertTextRule(text, offset, triggerKind ?? 1)
+    const target = await this.openDocument(resolveItnFromPath(block.fromPath!, itnDoc.id))
+    if (target) {
+      const imports = itnDoc.imports.get(target.id)?.imports || []
+      const importsSet = new Set(imports.map(i => i.text))
+      return Array.from(target.exports.values())
+        .filter(n => !importsSet.has(n.id!) && rule.test(n.id!))
+        .map(node => ({
+          label: node.id,
+          kind:
+            node.entity === 'interface'
+              ? CompletionItemKind.Interface
+              : CompletionItemKind.TypeParameter,
+          labelDetails: { description: `${node.id} [${node.entity}]` },
+          insertText: rule.apply(node.id!),
+        })) as CompletionItem[]
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  async getImportPathCompletions(
+    itnDoc: ItnDocument,
+    token: Token,
+    position: Position
+  ): Promise<CompletionItem[] | undefined> {
+    const dif = position.character - token.range.start.character - 1
+    const paths = await getItnFileCompletions(itnDoc.id, token.fromPath!.slice(0, dif))
+    // console.log(result)
+    return paths.map(({ path, isDirectory }) => ({
+      label: path,
+      kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
+      command: isDirectory
+        ? {
+            command: 'editor.action.triggerSuggest',
+            title: 'Trigger Suggest',
+          }
+        : undefined,
+      textEdit: {
+        replace: {
+          start: {
+            line: token.range.start.line,
+            character: token.range.start.character + 1,
           },
-        }))
-      }
-      // if (context?.triggerCharacter === '@') {
-      //   return [
-      //     {
-      //       label: 'Label',
-      //       kind: CompletionItemKind.Property,
-      //       insertText: 'label',
-      //       detail: 'Annotate with Label',
-      //       documentation: {
-      //         kind: 'markdown',
-      //         value: '# Label',
-      //       },
-      //     },
-      //     {
-      //       label: 'Description',
-      //       kind: CompletionItemKind.Property,
-      //       insertText: 'description',
-      //       detail: 'Annotate with Description',
-      //       documentation: {
-      //         kind: 'markdown',
-      //         value: '# Description',
-      //       },
-      //     },
-      //   ]
-      // }
-      // const itnDoc = await this.openDocument(textDocument.uri)
-      // const document = documents.get(textDocument.uri)
-
-      // if (!document) {
-      //   return []
-      // }
-
-      // const text = document.getText()
-      // const offset = document.offsetAt(position)
-      // console.log(params)
-      // console.log(itnDoc.getTokenAt(position.line, position.character - 1))
-      // console.log('>>>')
-      // console.log(`${text.slice(offset - 10, offset)}∨${text.slice(offset, offset + 10)}`)
-      // console.log('<<<')
-    })
+          end: { line: token.range.end.line, character: token.range.end.character - 1 },
+        },
+        range: {
+          start: {
+            line: token.range.start.line,
+            character: token.range.start.character + 1,
+          },
+          end: { line: token.range.end.line, character: token.range.end.character - 1 },
+        },
+        newText: isDirectory ? `${path}/` : path,
+      },
+    })) as CompletionItem[]
   }
 
   checksDelay = CHECKS_DELAY
@@ -254,7 +340,6 @@ export class ItnRepo {
         this.checkDoc(doc, changed)
         await new Promise(resolve => setTimeout(resolve, this.checksDelay))
       }
-      // console.log('Run Checks Finished', ids)
       this.idle = true
     }
   }
@@ -301,7 +386,6 @@ export class ItnRepo {
     }
     let promise = this.reading.get(id)
     if (!promise) {
-      console.log('Reading from disk', id)
       promise = new Promise((resolve, reject) => {
         readFile(decodeURI(id.slice(7)), 'utf8', (err, data) => {
           if (err) {
@@ -325,7 +409,6 @@ export class ItnRepo {
     itnDoc.dependants.forEach(d => {
       d.clearMessages()
       this.addToRevalidateQueue(d.id)
-      // this.checkDoc(d)
     })
   }
 

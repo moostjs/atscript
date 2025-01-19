@@ -15,7 +15,6 @@ export class SemanticNode {
 
   protected annotations?: Map<string, TAnnotationTokens>
 
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   registerAtDocument(doc: ItnDocument): void {
     if (this.definition) {
       this.definition.registerAtDocument(doc)
@@ -49,12 +48,15 @@ export class SemanticNode {
     if (!this.annotations) {
       this.annotations = new Map()
     }
+    token.parentNode = this
     const a = {
       token,
       args: [],
     } as TAnnotationTokens
     this.annotations.set(name, a)
     return (arg: Token) => {
+      arg.parentNode = this
+      arg.index = a.args.length
       a.args.push(arg)
     }
   }
@@ -85,6 +87,7 @@ export class SemanticNode {
     if (!this.tokens) {
       this.tokens = new Map()
     }
+    token.parentNode = this
     this.tokens.set(semantic, token)
     return this
   }

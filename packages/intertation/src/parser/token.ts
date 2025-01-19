@@ -1,4 +1,5 @@
 import type { TLexicalToken } from '../tokenizer/types'
+import type { SemanticNode } from './nodes'
 
 export class Token {
   constructor(protected readonly _data: TLexicalToken) {}
@@ -66,7 +67,16 @@ export class Token {
   public isProp?: boolean
 
   /**
+   * Refs chained via . or ["propName"] are marked with this flag
+   */
+  public isChain?: boolean
+
+  public parentNode?: SemanticNode
+
+  public index?: number
+
+  /**
    * Block type
    */
-  public blockType?: 'interface' | 'type' | 'import'
+  public blockType?: 'structure' | 'type' | 'import'
 }

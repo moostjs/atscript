@@ -1,6 +1,6 @@
 import type { ItnDocument } from '../../document'
 import type { Token } from '../token'
-import { isGroup } from '.'
+import { isGroup, isStructure } from '.'
 import { SemanticNode } from './node'
 
 export class SemanticTypeNode extends SemanticNode {

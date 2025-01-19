@@ -43,7 +43,6 @@ export function activate(context: ExtensionContext) {
   client.start()
 
   workspace.findFiles('**/*.itn').then(files => {
-    console.log(files)
     client!.sendNotification(
       'workspace/files',
       files.map(file => file.toString())

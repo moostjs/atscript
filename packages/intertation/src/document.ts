@@ -8,7 +8,10 @@ import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
 import type { Token } from './parser/token'
 import type { TMessages, TSeverity } from './parser/types'
-import { getRelPath, resolveItnFromPath } from './parser/utils'
+import { resolveItnFromPath } from './parser/utils'
+import { BlocksIndex } from './token-index/blocks-index'
+import { TokensIndex } from './token-index/tokens-index'
+import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
 
 export interface TItnDocumentConfig {
@@ -33,12 +36,12 @@ export class ItnDocument {
   /**
    * All the non-blocks tokens, that could be referred
    */
-  public tokensMap = [] as Array<Set<Token> | undefined>
+  public tokensIndex: ITokensIndex = new TokensIndex()
 
   /**
    * All the block-tokens
    */
-  public blocksMap = [] as Array<Set<Token> | undefined>
+  public blocksIndex: ITokensIndex = new BlocksIndex()
 
   /**
    * Imports map by URI, contains from Token and imports[] tokens
@@ -56,11 +59,6 @@ export class ItnDocument {
   public readonly exports = new Map<string, SemanticNode>()
 
   /**
-   * List of tokens that refer to some type or interface
-   */
-  public referred = [] as Token[]
-
-  /**
    * Set of documents that this document depend on
    */
   public readonly dependencies = new Set<ItnDocument>()
@@ -69,6 +67,11 @@ export class ItnDocument {
    * Set of documents that depend on this document
    */
   public readonly dependants = new Set<ItnDocument>()
+
+  /**
+   * List of tokens that refer to some type or interface
+   */
+  public referred = [] as Token[]
 
   /**
    * Map of dependencies (documents) by URI
@@ -112,8 +115,8 @@ export class ItnDocument {
     this.referred = []
     this.imports.clear()
     this._allMessages = undefined
-    this.tokensMap = []
-    this.blocksMap = []
+    this.tokensIndex = new TokensIndex()
+    this.blocksIndex = new BlocksIndex()
   }
 
   private registerNodes(nodes: SemanticNode[]) {
@@ -122,25 +125,13 @@ export class ItnDocument {
       node.referredIdentifiers.forEach(t => {
         t.isReference = true
         this.referred.push(t)
-        this.updateTokensMap(t)
+        this.tokensIndex.add(t)
       })
     }
   }
 
-  private updateTokensMap(t: Token) {
-    const line = t.range.start.line
-    this.tokensMap[line] = this.tokensMap[line] ?? new Set()
-    this.tokensMap[line].add(t)
-  }
-
-  private updateBlocksMap(t: Token) {
-    const line = t.range.start.line
-    this.blocksMap[line] = this.blocksMap[line] ?? new Set()
-    this.blocksMap[line].add(t)
-  }
-
   getUsageListAt(line: number, character: number) {
-    const token = this.getTokenAt(line, character)
+    const token = this.tokensIndex.at(line, character)
     if (token) {
       return this.usageListFor(token)
     }
@@ -181,26 +172,6 @@ export class ItnDocument {
       }
     }
     return undefined
-  }
-
-  getBlockAt(line: number, character: number) {
-    const tokens = this.blocksMap[line]
-    if (!tokens) {
-      return undefined
-    }
-    return Array.from(tokens).find(
-      t => t.range.start.character <= character && t.range.end.character >= character
-    )
-  }
-
-  getTokenAt(line: number, character: number) {
-    const tokens = this.tokensMap[line]
-    if (!tokens) {
-      return undefined
-    }
-    return Array.from(tokens).find(
-      t => t.range.start.character <= character && t.range.end.character >= character
-    )
   }
 
   getDefinitionFor(token: Token): { uri: string; doc?: ItnDocument; token?: Token } | undefined {
@@ -244,7 +215,7 @@ export class ItnDocument {
   }
 
   getToDefinitionAt(line: number, character: number) {
-    const token = this.getTokenAt(line, character)
+    const token = this.tokensIndex.at(line, character)
     if (token) {
       const result = this.getDefinitionFor(token)
       return result
@@ -263,14 +234,15 @@ export class ItnDocument {
   registerImport({ from, imports, block }: { from: Token; imports: Token[]; block: Token }) {
     const importId = resolveItnFromPath(from.text, this.id)
     this.imports.set(importId, { from, imports })
-    this.updateBlocksMap(block)
+    this.blocksIndex.add(block)
     block.blockType = 'import'
     block.fromPath = from.text
     imports.forEach(t => {
       t.imported = true
+      t.fromPath = from.text
       this.registerDefinition(t, true)
-      this.updateTokensMap(t)
-      this.updateTokensMap(from)
+      this.tokensIndex.add(t)
+      this.tokensIndex.add(from)
       this.importedDefs.set(t.text, from)
       from.fromPath = from.text
     })
@@ -282,8 +254,19 @@ export class ItnDocument {
       if (asImport) {
         token.isReference = true
       }
-      this.updateTokensMap(token)
+      this.tokensIndex.add(token)
       this.registry.registerDefinition(token)
+    }
+  }
+
+  getDeclarationOwnerNode(identifier: string): SemanticNode | undefined {
+    const def = this.registry.definitions.get(identifier)
+    if (def?.imported && def.fromPath) {
+      const absolutePath = resolveItnFromPath(def.fromPath, this.id)
+      const doc = this.dependenciesMap.get(absolutePath)
+      return doc?.getDeclarationOwnerNode(identifier)
+    } else if (!def?.imported) {
+      return def?.parentNode
     }
   }
 
@@ -312,7 +295,7 @@ export class ItnDocument {
   }
 
   getUnusedTokens() {
-    const refSet = new Set<string>(this.referred.map(r => r.text))
+    const refSet = new Set<string>(this.referred.filter(r => !r.imported).map(r => r.text))
     const tokens = [] as Token[]
     for (const [key, token] of Array.from(this.registry.definitions.entries())) {
       if (!refSet.has(key) && !this.exports.has(key)) {

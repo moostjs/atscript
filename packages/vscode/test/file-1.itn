@@ -19,9 +19,13 @@ export interface SomeStructure {
     @label 'Contacts'
     contacts: Contacts[]
 
+    email: Contacts.email
+
     @label 'Risk Profile'
     riskProfile: RiskType
 }
+
+export type SomeType = test
 
 interface Contacts {
     @label 'Email'
