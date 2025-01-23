@@ -3,6 +3,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { ItnDocument } from './document'
+import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
+import type { SemanticStructureNode } from './parser/nodes/structure-node'
+
+const primitives = new Map<string, SemanticPrimitiveNode>()
+primitives.set('string', new SemanticPrimitiveNode('string'))
+primitives.set('number', new SemanticPrimitiveNode('number'))
 
 describe('document', () => {
   it('should register import', () => {
@@ -249,10 +255,14 @@ describe('document', () => {
     expect(doc.tokensIndex.at(...p)).toHaveProperty('isReference', true)
   })
 
+  it('should recognize primitives', () => {
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
+    doc.update(`interface IFace {prop: string}`)
+    expect(doc.registry.isDefined('string')).toBeTruthy()
+  })
+
   it('should detect duplicate props', () => {
-    const doc = new ItnDocument('file:///home/test.itn', {
-      globalTypes: ['number', 'string'],
-    })
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
     doc.update(`interface IFace {
         prop: string
         prop: number
@@ -270,9 +280,7 @@ describe('document', () => {
   })
 
   it('should register structure block in map', () => {
-    const doc = new ItnDocument('file:///home/test.itn', {
-      globalTypes: ['number', 'string'],
-    })
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
     doc.update(`interface IFace {
         prop: string
         prop: number
@@ -280,5 +288,144 @@ describe('document', () => {
     const block = doc.blocksIndex.at(1, 2)
     expect(block).toBeDefined()
     expect(block?.blockType).toBe('structure')
+  })
+
+  it('should unwind primitive types', () => {
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
+    doc.update(`interface IFace {
+        prop: { nested1: { nested2: string } }
+      }`)
+    const str = doc.unwindType('string')
+    expect(str).toBeDefined()
+    expect(str?.def).toBeDefined()
+    const num = doc.unwindType('number')
+    expect(num).toBeDefined()
+    expect(num?.def).toBeDefined()
+  })
+
+  it('should unwind interfaces props in simple interface', () => {
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
+    doc.update(`interface IFace {
+        prop: { nested1: { nested2: string } }
+      }`)
+    const prop = doc.unwindType('IFace', ['prop'])?.def
+    const nested1 = doc.unwindType('IFace', ['prop', 'nested1'])?.def
+    // const nested2 = doc.unwindType('IFace', ['prop', 'nested1', 'nested2'])
+    expect(prop).toBeDefined()
+    expect(prop!.entity).toBe('structure')
+    expect(nested1).toBeDefined()
+    expect(nested1!.entity).toBe('structure')
+    // expect(nested2).toBeDefined()
+  })
+  it('should unwind interfaces via type', () => {
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
+    doc.update(`interface IFace {
+        prop: { nested1: { nested2: string } }
+      }
+      type TFace1 = IFace
+      type TFace2 = TFace1`)
+    const type = doc.unwindType('TFace2')?.def
+    const prop = doc.unwindType('TFace2', ['prop'])?.def
+    const nested1 = doc.unwindType('TFace2', ['prop', 'nested1'])?.def
+    // const nested2 = doc.unwindType('TFace2', ['prop', 'nested1', 'nested2'])
+    expect(type).toBeDefined()
+    expect(type!.entity).toBe('interface')
+    expect(prop).toBeDefined()
+    expect(prop!.entity).toBe('structure')
+    expect(nested1).toBeDefined()
+    expect(nested1!.entity).toBe('structure')
+    // expect(nested2).toBeDefined()
+  })
+  it('should unwind interfaces with nested interfaces', () => {
+    const doc = new ItnDocument('file:///home/test.itn', { primitives })
+    doc.update(`interface IFace1 {
+        prop: { nested1: { nested2: string } }
+      }
+      interface IFace2 {
+          prop1: IFace1
+          prop2: IFace1.prop
+          prop3: IFace1.prop.nested1
+          prop4: IFace1.prop.nested1.nested2
+        }
+      }`)
+    const prop1 = doc.unwindType('IFace2', ['prop1'])?.def
+    expect(prop1).toBeDefined()
+    expect(prop1?.entity).toBe('interface')
+    const prop2 = doc.unwindType('IFace2', ['prop2'])?.def
+    expect(prop2).toBeDefined()
+    expect(prop2?.entity).toBe('structure')
+    expect(Array.from((prop2 as SemanticStructureNode).props.keys())).toEqual(['nested1'])
+    const prop2Nested = doc.unwindType('IFace2', ['prop2', 'nested1'])?.def
+    expect(prop2Nested).toBeDefined()
+    expect(prop2Nested?.entity).toBe('structure')
+    expect(Array.from((prop2Nested as SemanticStructureNode).props.keys())).toEqual(['nested2'])
+    const prop2Nested2 = doc.unwindType('IFace2', ['prop2', 'nested1', 'nested2'])?.def
+    expect(prop2Nested2).toBeDefined()
+    expect(prop2Nested2?.entity).toBe('primitive')
+    expect(prop2Nested2?.id).toBe('string')
+    const prop3 = doc.unwindType('IFace2', ['prop3'])?.def
+    expect(prop3).toBeDefined()
+    expect(prop3?.entity).toBe('structure')
+    expect(Array.from((prop3 as SemanticStructureNode).props.keys())).toEqual(['nested2'])
+    const prop4 = doc.unwindType('IFace2', ['prop4'])?.def
+    expect(prop4).toBeDefined()
+    expect(prop4?.entity).toBe('primitive')
+    expect(prop4?.id).toBe('string')
+  })
+
+  it('should return definition for chained ref level 2', () => {
+    const doc = new ItnDocument('file-1.itn', { primitives })
+    doc.update(
+      `
+       interface IName { prop: { prop2: string } }
+       interface IName2 { prop2: IName.prop.prop2 }
+      `
+    )
+    const resultingRange = {
+      start: {
+        line: 1,
+        character: 33,
+      },
+      end: {
+        line: 1,
+        character: 38,
+      },
+    }
+    const def = doc.getToDefinitionAt(2, 47)?.[0]
+    expect(def).toEqual(
+      expect.objectContaining({
+        targetUri: 'file-1.itn',
+        targetRange: resultingRange,
+        targetSelectionRange: resultingRange,
+      })
+    )
+  })
+
+  it('should return definition for chained ref level 1', () => {
+    const doc = new ItnDocument('file-1.itn', { primitives })
+    doc.update(
+      `
+       interface IName { prop: { prop2: string } }
+       interface IName2 { prop2: IName.prop.prop2 }
+      `
+    )
+    const resultingRange = {
+      start: {
+        line: 1,
+        character: 25,
+      },
+      end: {
+        line: 1,
+        character: 29,
+      },
+    }
+    const def = doc.getToDefinitionAt(2, 42)?.[0]
+    expect(def).toEqual(
+      expect.objectContaining({
+        targetUri: 'file-1.itn',
+        targetRange: resultingRange,
+        targetSelectionRange: resultingRange,
+      })
+    )
   })
 })

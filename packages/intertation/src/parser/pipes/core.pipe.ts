@@ -3,7 +3,6 @@
 /* eslint-disable max-depth */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import type { ItnDocument } from '../../document'
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { TLexicalToken } from '../../tokenizer/types'
 import type { NodeIterator } from '../iterator'
@@ -45,6 +44,8 @@ export function $pipe(entity: TNodeEntity, pipe: TPipe['pipe'] = []) {
           return new $n.SemanticTupleNode()
         case 'import':
           return new $n.SemanticImportNode()
+        case 'primitive':
+          throw new Error("Can't create pipe for primitive node")
       }
     },
     pipe,

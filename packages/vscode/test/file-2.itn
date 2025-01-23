@@ -1,11 +1,13 @@
-import { SomeStructure } from './file-1'
+import { Partner } from './partners'
+import { SomeStructure, SomeType } from './file-1'
 
 export type RiskType = 'low' | 'medium' | 'high' | 0 | 1 | 2
 
 export interface RiskStructure {
     props: string
     risk: RiskType
-    email: SomeStructure.email
+    email: SomeType.email
+    risk2?: RiskStructure
 }
 
 type LocalType = string

@@ -21,6 +21,7 @@ export type TNodeEntity =
   | 'group' //
   | 'array' //
   | 'import'
+  | 'primitive'
 
 export interface TAnnotationTokens {
   token: Token

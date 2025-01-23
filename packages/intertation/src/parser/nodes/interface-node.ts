@@ -2,6 +2,7 @@
 import type { ItnDocument } from '../../document'
 import { isStructure } from '.'
 import { SemanticNode } from './node'
+import type { SemanticPropNode } from './prop-node'
 
 export class SemanticInterfaceNode extends SemanticNode {
   constructor() {
@@ -20,8 +21,10 @@ export class SemanticInterfaceNode extends SemanticNode {
 
   get props() {
     if (this.definition) {
-      return isStructure(this.definition) ? this.definition.props : new Map<string, SemanticNode>()
+      return isStructure(this.definition)
+        ? this.definition.props
+        : new Map<string, SemanticPropNode>()
     }
-    return new Map<string, SemanticNode>()
+    return new Map<string, SemanticPropNode>()
   }
 }

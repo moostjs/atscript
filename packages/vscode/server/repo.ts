@@ -1,3 +1,4 @@
+/* eslint-disable max-depth */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
@@ -6,14 +7,16 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { readFile } from 'fs'
-import type { TMessages, Token } from 'intertation'
+import type { SemanticNode, TMessages, Token } from 'intertation'
 import {
   getRelPath,
   isInterface,
+  isProp,
   isRef,
   isStructure,
   ItnDocument,
   resolveItnFromPath,
+  SemanticPrimitiveNode,
 } from 'intertation'
 import type {
   CompletionItem,
@@ -30,8 +33,11 @@ import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } fr
 const CHECKS_DELAY = 250
 
 const config = {
-  globalTypes: ['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'],
+  primitives: new Map<string, SemanticPrimitiveNode>(),
 }
+;['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'].forEach(s => {
+  config.primitives.set(s, new SemanticPrimitiveNode(s))
+})
 
 export class ItnRepo {
   private readonly itn = new Map<string, ItnDocument>()
@@ -80,7 +86,10 @@ export class ItnRepo {
 
     connection.onReferences(async params => {
       const itnDoc = await this.openDocument(params.textDocument.uri)
-      return itnDoc.getUsageListAt(params.position.line, params.position.character)
+      return itnDoc.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
+        uri: r.uri,
+        range: r.range,
+      }))
     })
 
     connection.onRenameRequest(async params => {
@@ -159,6 +168,9 @@ export class ItnRepo {
       if (block?.blockType === 'structure' && before && [':', '|', '&'].includes(before)) {
         return this.getDeclarationsCompletions(itnDoc, text)
       }
+      if (block?.blockType === undefined && before && ['=', '|', '&'].includes(before)) {
+        return this.getDeclarationsCompletions(itnDoc, text)
+      }
 
       // autocomplete for defined nodes
       if (token?.parentNode && isRef(token.parentNode)) {
@@ -166,21 +178,20 @@ export class ItnRepo {
         if (!id) {
           return undefined
         }
-        const node = itnDoc.getDeclarationOwnerNode(id.text)
-        if (!node || (!isStructure(node) && !isInterface(node))) {
-          return undefined
-        }
-        console.log('props', node.props.keys())
-        const options = Array.from(node.props.keys())
-        if (token.type === 'punctuation') {
-          // after dot
-          return options.map(o => ({
-            label: o,
+        const chain =
+          token.text === '.' ? token.parentNode.chain : token.parentNode.chain.slice(0, -1)
+        const unwound = itnDoc.unwindType(id.text, chain)
+        if (unwound?.def) {
+          let options: SemanticNode[] | undefined
+          if (isInterface(unwound.def) || isStructure(unwound.def)) {
+            options = Array.from(unwound.def.props.values())
+          } else if (isProp(unwound.def) && unwound.def.nestedProps) {
+            options = Array.from(unwound.def.nestedProps.values())
+          }
+          return options?.map(t => ({
+            label: t.id,
             kind: CompletionItemKind.Property,
-            insertText: o,
           })) as CompletionItem[]
-        } else if (['identifier', 'text'].includes(token.type)) {
-          // inside identifier
         }
       }
     })
@@ -238,6 +249,14 @@ export class ItnRepo {
         }
       }
     }
+    const keys = Array.from(config.primitives.keys())
+    items.push(
+      ...keys.map(k => ({
+        label: k,
+        kind: CompletionItemKind.Keyword,
+        detail: `primitive "${k}"`,
+      }))
+    )
     return items
   }
 

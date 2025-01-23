@@ -1,4 +1,3 @@
-import type { SemanticImportNode } from './nodes/import-node'
 import type { Token } from './token'
 import type { TMessages } from './types'
 

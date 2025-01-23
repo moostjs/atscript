@@ -138,4 +138,8 @@ export class SemanticNode {
     }
     return ''
   }
+
+  getDefinition() {
+    return this.definition
+  }
 }

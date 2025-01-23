@@ -4,6 +4,7 @@ import { SemanticGroup } from './group-node'
 import { SemanticImportNode } from './import-node'
 import { SemanticInterfaceNode } from './interface-node'
 import type { SemanticNode } from './node'
+import { SemanticPrimitiveNode } from './primitive-node'
 import { SemanticPropNode } from './prop-node'
 import { SemanticRefNode } from './ref-node'
 import { SemanticStructureNode } from './structure-node'
@@ -21,47 +22,63 @@ export const $n = {
   SemanticTupleNode,
   SemanticArrayNode,
   SemanticImportNode,
+  SemanticPrimitiveNode,
 }
 
-export * from './node'
+export { SemanticArrayNode } from './array-node'
+export { SemanticConstNode } from './const-node'
+export { SemanticGroup } from './group-node'
+export { SemanticImportNode } from './import-node'
+export { SemanticInterfaceNode } from './interface-node'
+export { SemanticNode } from './node'
+export { SemanticPrimitiveNode } from './primitive-node'
+export { SemanticPropNode } from './prop-node'
+export { SemanticRefNode } from './ref-node'
+export { SemanticStructureNode } from './structure-node'
+export { SemanticTupleNode } from './tuple-node'
+export { SemanticTypeNode } from './type-node'
 export * from './types'
 
-export function isGroup(node: SemanticNode): node is SemanticGroup {
+export function isGroup(node?: SemanticNode): node is SemanticGroup {
   return node instanceof SemanticGroup
 }
 
-export function isInterface(node: SemanticNode): node is SemanticInterfaceNode {
+export function isInterface(node?: SemanticNode): node is SemanticInterfaceNode {
   return node instanceof SemanticInterfaceNode
 }
 
-export function isType(node: SemanticNode): node is SemanticTypeNode {
+export function isType(node?: SemanticNode): node is SemanticTypeNode {
   return node instanceof SemanticTypeNode
 }
 
-export function isRef(node: SemanticNode): node is SemanticRefNode {
+export function isRef(node?: SemanticNode): node is SemanticRefNode {
   return node instanceof SemanticRefNode
 }
 
-export function isConst(node: SemanticNode): node is SemanticConstNode {
+export function isConst(node?: SemanticNode): node is SemanticConstNode {
   return node instanceof SemanticConstNode
 }
 
-export function isProp(node: SemanticNode): node is SemanticPropNode {
+export function isProp(node?: SemanticNode): node is SemanticPropNode {
   return node instanceof SemanticPropNode
 }
 
-export function isStructure(node: SemanticNode): node is SemanticStructureNode {
+export function isStructure(node?: SemanticNode): node is SemanticStructureNode {
   return node instanceof SemanticStructureNode
 }
 
-export function isTuple(node: SemanticNode): node is SemanticTupleNode {
+export function isTuple(node?: SemanticNode): node is SemanticTupleNode {
   return node instanceof SemanticTupleNode
 }
 
-export function isArray(node: SemanticNode): node is SemanticArrayNode {
+export function isArray(node?: SemanticNode): node is SemanticArrayNode {
   return node instanceof SemanticArrayNode
 }
 
-export function isImport(node: SemanticNode): node is SemanticImportNode {
+export function isImport(node?: SemanticNode): node is SemanticImportNode {
   return node instanceof SemanticImportNode
+}
+
+export function isPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode {
+  return node instanceof SemanticPrimitiveNode
 }

@@ -1,9 +1,13 @@
+/* eslint-disable max-depth */
+/* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
 import type { SemanticNode } from './parser/nodes'
+import { isInterface, isProp, isRef, isStructure, isType } from './parser/nodes'
+import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
 import type { Token } from './parser/token'
@@ -16,7 +20,7 @@ import { tokenize } from './tokenizer'
 
 export interface TItnDocumentConfig {
   reserved?: string[]
-  globalTypes?: string[]
+  primitives?: Map<string, SemanticPrimitiveNode>
 }
 
 export class ItnDocument {
@@ -24,7 +28,7 @@ export class ItnDocument {
     public readonly id: string,
     private readonly config: TItnDocumentConfig
   ) {
-    this.registry = new IdRegistry(config.reserved, config.globalTypes)
+    this.registry = new IdRegistry(config.reserved, Array.from(config.primitives?.keys() || []))
   }
 
   public readonly registry: IdRegistry
@@ -130,6 +134,72 @@ export class ItnDocument {
     }
   }
 
+  unwindType(
+    name: string,
+    chain: string[] | Token[] = []
+  ):
+    | {
+        doc: ItnDocument
+        node?: SemanticNode
+        def: SemanticNode
+      }
+    | undefined {
+    const decl = this.getDeclarationOwnerNode(name)
+    if (!decl) {
+      return undefined
+    }
+    let node: SemanticNode | undefined
+    let def: SemanticNode | undefined = decl.node
+    let doc = decl.doc
+    const resolveRef = () => {
+      if (isRef(def)) {
+        const d = doc.unwindType(def.token('identifier')!.text, def.chain)
+        doc = d?.doc || doc
+        def = d?.def
+      }
+    }
+    const resolveType = () => {
+      while (isType(def)) {
+        def = def.getDefinition()
+        node = def
+        resolveRef()
+      }
+    }
+    resolveType()
+    if (!def) {
+      return undefined
+    }
+    for (const item of chain) {
+      const itemText = typeof item === 'string' ? item : item.text
+      // const token = item instanceof Token ? item : undefined
+      if (!def) {
+        return undefined
+      }
+      if (isProp(def)) {
+        if (def.nestedProps?.get(itemText)) {
+          def = def.nestedProps.get(itemText)
+        } else {
+          def = def.nestedType
+          resolveRef()
+          resolveType()
+          if (isStructure(def) || isInterface(def)) {
+            def = def.props.get(itemText)
+          }
+        }
+      } else if (isStructure(def) || isInterface(def)) {
+        def = def.props.get(itemText)
+      }
+    }
+    while (isProp(def)) {
+      node = def
+      def = def.getDefinition()
+      resolveRef()
+      resolveType()
+    }
+
+    return def ? { def, doc, node } : undefined
+  }
+
   getUsageListAt(line: number, character: number) {
     const token = this.tokensIndex.at(line, character)
     if (token) {
@@ -165,6 +235,10 @@ export class ItnDocument {
         }
       }
       return refs
+      // eslint-disable-next-line max-statements-per-line
+    }
+    if (isProp(token.parentNode)) {
+      // todo[2025-12-31]: find usages for props
     } else {
       const defForToken = this.getDefinitionFor(token)
       if (defForToken?.token?.isDefinition && defForToken.doc) {
@@ -217,17 +291,32 @@ export class ItnDocument {
   getToDefinitionAt(line: number, character: number) {
     const token = this.tokensIndex.at(line, character)
     if (token) {
-      const result = this.getDefinitionFor(token)
-      return result
-        ? [
+      if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
+        const id = token.parentNode.id!
+        const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
+        if (unwound?.node) {
+          return [
             {
-              targetUri: result.uri,
-              targetRange: result.token?.range ?? zeroRange,
-              targetSelectionRange: result.token?.range ?? zeroRange,
+              targetUri: unwound.doc.id,
+              targetRange: unwound.node.token('identifier')?.range ?? zeroRange,
+              targetSelectionRange: unwound.node.token('identifier')?.range ?? zeroRange,
               originSelectionRange: token.range,
             },
           ]
-        : undefined
+        }
+      } else {
+        const result = this.getDefinitionFor(token)
+        return result
+          ? [
+              {
+                targetUri: result.uri,
+                targetRange: result.token?.range ?? zeroRange,
+                targetSelectionRange: result.token?.range ?? zeroRange,
+                originSelectionRange: token.range,
+              },
+            ]
+          : undefined
+      }
     }
   }
 
@@ -259,14 +348,32 @@ export class ItnDocument {
     }
   }
 
-  getDeclarationOwnerNode(identifier: string): SemanticNode | undefined {
+  getDeclarationOwnerNode(identifier: string):
+    | {
+        doc: ItnDocument
+        node?: SemanticNode
+        token?: Token
+      }
+    | undefined {
+    if (this.config.primitives?.has(identifier)) {
+      return {
+        doc: this,
+        node: this.config.primitives.get(identifier),
+      }
+    }
     const def = this.registry.definitions.get(identifier)
     if (def?.imported && def.fromPath) {
       const absolutePath = resolveItnFromPath(def.fromPath, this.id)
       const doc = this.dependenciesMap.get(absolutePath)
       return doc?.getDeclarationOwnerNode(identifier)
     } else if (!def?.imported) {
-      return def?.parentNode
+      return def
+        ? {
+            doc: this,
+            node: def.parentNode,
+            token: def,
+          }
+        : undefined
     }
   }
 
@@ -308,17 +415,34 @@ export class ItnDocument {
   getDiagMessages() {
     if (!this._allMessages) {
       this._allMessages = [
-        ...this.referred
-          .filter(t => !this.registry.isDefined(t))
-          .map(t => ({
-            severity: 1,
-            message: `Unknown identifier "${t.text}"`,
-            range: t.range,
-          })),
         ...this.registry.getErrors(),
         ...this.semanticMessages,
         ...this.messages,
       ] as TMessages
+      for (const t of this.referred) {
+        if (!this.registry.isDefined(t)) {
+          this._allMessages.push({
+            severity: 1,
+            message: `Unknown identifier "${t.text}"`,
+            range: t.range,
+          })
+          continue
+        }
+        if (isRef(t.parentNode) && t.parentNode.hasChain) {
+          const length = t.parentNode.chain.length - 1
+          for (let i = length; i >= 0; i--) {
+            const token = t.parentNode.chain[i]
+            const decl = this.unwindType(t.parentNode.id!, t.parentNode.chain.slice(0, i + 1))
+            if (!decl?.def) {
+              this._allMessages.push({
+                severity: 1,
+                message: `Unknown member "${token.text}"`,
+                range: token.range,
+              })
+            }
+          }
+        }
+      }
     }
     return this._allMessages
   }

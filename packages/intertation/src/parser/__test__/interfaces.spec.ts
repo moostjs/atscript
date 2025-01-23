@@ -1,6 +1,10 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest'
 
+import { ItnDocument } from '../../document'
 import { parseItn } from '..'
+import type { SemanticInterfaceNode } from '../nodes/interface-node'
+import type { SemanticPropNode } from '../nodes/prop-node'
 
 describe('interfaces', () => {
   it('simple interface', () => {
@@ -82,5 +86,39 @@ describe('referred identifiers in interfaces', () => {
       'Ref1',
       'Ref2',
     ])
+  })
+
+  describe('nested props and types', () => {
+    it('must return nested props', () => {
+      const { nodes } = parseItn(`interface IName {prop: { nested: string }}`)
+      const interfaceNode = nodes[0] as SemanticInterfaceNode
+      interfaceNode.registerAtDocument(new ItnDocument('1', {}))
+      const prop = interfaceNode.props.get('prop') as SemanticPropNode
+      expect(prop).toBeDefined()
+      expect(prop.nestedProps).toBeDefined()
+      expect(prop.nestedProps?.get('nested')).toBeDefined()
+    })
+    it('must return deeply nested props', () => {
+      const { nodes } = parseItn(`interface IName {prop: { nested: { nested2: string } }}`)
+      const interfaceNode = nodes[0] as SemanticInterfaceNode
+      interfaceNode.registerAtDocument(new ItnDocument('1', {}))
+      const prop = interfaceNode.props.get('prop') as SemanticPropNode
+      expect(prop).toBeDefined()
+      expect(prop.nestedProps).toBeDefined()
+      expect(prop.nestedProps?.get('nested')).toBeDefined()
+      expect(
+        (prop.nestedProps?.get('nested') as SemanticPropNode).nestedProps?.get('nested2')
+      ).toBeDefined()
+    })
+    it('must return nested type', () => {
+      const { nodes } = parseItn(`interface IName {prop: SomeType}`)
+      const interfaceNode = nodes[0] as SemanticInterfaceNode
+      interfaceNode.registerAtDocument(new ItnDocument('1', {}))
+      const prop = interfaceNode.props.get('prop') as SemanticPropNode
+      expect(prop).toBeDefined()
+      expect(prop.nestedType).toBeDefined()
+      expect(prop.nestedType!.entity).toEqual('ref')
+      expect(prop.nestedType!.token('identifier')!.text).toEqual('SomeType')
+    })
   })
 })

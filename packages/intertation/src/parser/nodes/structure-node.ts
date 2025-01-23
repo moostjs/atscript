@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { ItnDocument } from '../../document'
+import { isProp } from '.'
 import { SemanticGroup } from './group-node'
-import type { SemanticNode } from './node'
+import type { SemanticPropNode } from './prop-node'
 
 export class SemanticStructureNode extends SemanticGroup {
   constructor() {
@@ -9,7 +10,7 @@ export class SemanticStructureNode extends SemanticGroup {
     this.entity = 'structure'
   }
 
-  public readonly props = new Map<string, SemanticNode>()
+  public readonly props = new Map<string, SemanticPropNode>()
 
   registerAtDocument(doc: ItnDocument): void {
     super.registerAtDocument(doc)
@@ -29,6 +30,10 @@ export class SemanticStructureNode extends SemanticGroup {
       }
       if (this.props.has(name)) {
         doc.registerMessage(token, 'Duplicate prop identifier')
+        continue
+      }
+      if (!isProp(node)) {
+        doc.registerMessage(token, 'Non-prop node')
         continue
       }
       this.props.set(name, node)

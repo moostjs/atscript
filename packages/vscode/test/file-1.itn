@@ -21,12 +21,18 @@ export interface SomeStructure {
 
     email: Contacts.email
 
+    nested: {
+        prop1: {
+            prop2: string
+        }
+    }
+
     @label 'Risk Profile'
     riskProfile: RiskType
 }
 
-export type SomeType = test
-
+export type SomeType = SomeStructure
+ 
 interface Contacts {
     @label 'Email'
     email: string
@@ -36,7 +42,3 @@ interface Contacts {
 }
 
 type test = Contacts
-
-interface ttt {
-
-}
