@@ -1,17 +1,11 @@
 import type {
-  CompletionItem,
-  Diagnostic,
   InitializeParams,
   InitializeResult,
   Range,
   SemanticTokens,
-  SemanticTokensParams,
-  SemanticTokensRangeParams,
 } from 'vscode-languageserver/node'
 import {
-  CompletionItemKind,
   createConnection,
-  DiagnosticSeverity,
   ProposedFeatures,
   SemanticTokensBuilder,
   TextDocuments,
@@ -19,14 +13,14 @@ import {
 } from 'vscode-languageserver/node'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 
-import { ItnRepo } from './repo'
+import { VscodeItnRepo } from './repo'
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all)
 // Track open documents
 const documents = new TextDocuments<TextDocument>(TextDocument)
 
-const repo = new ItnRepo(connection, documents)
+const repo = new VscodeItnRepo(connection, documents)
 
 connection.onInitialize(
   (params: InitializeParams): InitializeResult => ({
@@ -35,26 +29,23 @@ connection.onInitialize(
       definitionProvider: true,
       referencesProvider: true,
       renameProvider: true,
+      hoverProvider: true,
       // enable completion
       completionProvider: {
         resolveProvider: true,
         triggerCharacters: ['@', '.', ',', '{', "'", '"'],
       },
-      // Add semantic tokens capability:
+      signatureHelpProvider: {
+        triggerCharacters: [',', ' '],
+        retriggerCharacters: [',', ' '],
+      },
       // semanticTokensProvider: {
-      //   // The legend must list the token types you plan to use
       //   legend: {
-      //     tokenTypes: [
-      //       'interface',
-      //       'type',
-      //       'string',
-      //       'number',
-      //       // etc...
-      //     ],
-      //     tokenModifiers: [], // e.g. "static", "declaration", etc. if needed
+      //     tokenTypes: ['property'],
+      //     tokenModifiers: ['readonly'],
       //   },
-      //   full: true, // enable full document requests
-      //   range: true, // optionally enable range-based requests
+      //   range: true,
+      //   // full: true,
       // },
     },
   })

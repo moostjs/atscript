@@ -132,7 +132,7 @@
     "annotations": {
       "patterns": [
         {
-          "name": "punctuation.definition.tag",
+          "name": "variable.other.constant.intertation",
           "match": "@[A-Za-z0-9_.]+"
         }
       ]
@@ -141,11 +141,11 @@
     "annotation-with-args": {
       "patterns": [
         {
-          "name": "punctuation.definition.tag",
+          "name": "variable.other.constant.intertation",
           "begin": "(@[A-Za-z0-9_.]+)",
           "beginCaptures": {
             "1": {
-              "name": "punctuation.definition.tag"
+              "name": "variable.other.constant.intertation"
             }
           },
           "end": "(?=$|\\n|\\r|;)",

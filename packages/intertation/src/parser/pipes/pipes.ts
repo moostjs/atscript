@@ -53,6 +53,7 @@ allowedValuesPipeArray.unshift(tuple)
 allowedValuesPipeArray.unshift(group)
 
 const type = $pipe('type', [
+  annotations(),
   identifier('export').saveAs('export').optional().skip('\n'),
   identifier('type').saveAs('type').skip('\n').suppressEobError(),
   identifier().saveAs('identifier').global().skip('\n'),

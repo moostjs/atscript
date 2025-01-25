@@ -6,44 +6,45 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { readFile } from 'fs'
-import type { SemanticNode, TMessages, Token } from 'intertation'
+
+import type { SemanticNode, Token } from 'intertation'
 import {
   getRelPath,
+  isAnnotationSpec,
   isInterface,
   isProp,
   isRef,
   isStructure,
   ItnDocument,
+  ItnRepo,
   resolveItnFromPath,
-  SemanticPrimitiveNode,
 } from 'intertation'
 import type {
   CompletionItem,
   createConnection,
+  Hover,
+  MarkupContent,
   Position,
+  Range,
+  SemanticTokens,
   TextDocuments,
   WorkspaceEdit,
 } from 'vscode-languageserver/node'
-import { CompletionItemKind, DiagnosticSeverity, DiagnosticTag } from 'vscode-languageserver/node'
+import {
+  CompletionItemKind,
+  DiagnosticSeverity,
+  DiagnosticTag,
+  ParameterInformation,
+  SemanticTokensBuilder,
+  SignatureInformation,
+} from 'vscode-languageserver/node'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
 
-const CHECKS_DELAY = 250
+const CHECKS_DELAY = 100
 
-const config = {
-  primitives: new Map<string, SemanticPrimitiveNode>(),
-}
-;['string', 'number', 'boolean', 'true', 'false', 'undefined', 'null', 'void'].forEach(s => {
-  config.primitives.set(s, new SemanticPrimitiveNode(s))
-})
-
-export class ItnRepo {
-  private readonly itn = new Map<string, ItnDocument>()
-
-  private readonly reading = new Map<string, Promise<ItnDocument>>()
-
+export class VscodeItnRepo extends ItnRepo {
   private readonly changeQueue = [] as string[]
 
   private readonly revalidateQueue = [] as string[]
@@ -62,6 +63,7 @@ export class ItnRepo {
     private readonly connection: ReturnType<typeof createConnection>,
     private readonly documents: TextDocuments<TextDocument>
   ) {
+    super()
     this.documents.onDidChangeContent(change => {
       this.addToChangeQueue(change.document.uri)
     })
@@ -145,11 +147,11 @@ export class ItnRepo {
       if (!document) {
         return
       }
-      console.log('completion triggered', context, position)
-      await this.currentCheck
       const text = document.getText()
       const offset = document.offsetAt(position)
       const itnDoc = await this.openDocument(textDocument.uri)
+      await this.currentCheck
+
       const block = itnDoc.blocksIndex.at(position.line, position.character)
 
       // import { here } from '...'
@@ -157,10 +159,68 @@ export class ItnRepo {
         return this.getImportBlockCompletions(itnDoc, block, text, offset, context?.triggerKind)
       }
 
-      // import { ... } from 'here'
       const token = itnDoc.tokensIndex.at(position.line, position.character)
+      // import { ... } from 'here'
       if (typeof token?.fromPath === 'string') {
         return this.getImportPathCompletions(itnDoc, token, position)
+      }
+
+      // autocomplete for annotations
+      if (itnDoc.config.annotations) {
+        // eslint-disable-next-line unicorn/no-lonely-if
+        if (token?.isAnnotation && itnDoc.config.annotations) {
+          const prev = token.text.slice(1).split('.').slice(0, -1)
+          let a = itnDoc.config.annotations
+          for (const item of prev) {
+            if (a[item] && !isAnnotationSpec(a[item])) {
+              a = a[item]
+            } else {
+              return
+            }
+          }
+          return Object.keys(a).flatMap(key => {
+            const options = [
+              {
+                label: key,
+                kind: CompletionItemKind.Folder,
+                insertText: `${key}.`,
+                command: {
+                  command: 'editor.action.triggerSuggest',
+                  title: 'Trigger Suggest',
+                },
+              },
+            ] as CompletionItem[]
+            if (isAnnotationSpec(a[key]) && a[key].config.arguments?.length) {
+              const aName = `@${[...prev, key].join('.')}`
+              const documentation = {
+                kind: 'markdown',
+                value: a[key].renderDoc(aName) || '',
+              } as MarkupContent
+              options[0].documentation = documentation
+              options[0].kind = CompletionItemKind.Keyword
+              options[0].command = undefined
+              options[0].insertText = undefined
+              options.push({
+                label: key,
+                labelDetails: {
+                  detail: ` (snippet)`,
+                },
+                kind: CompletionItemKind.Snippet,
+                insertText: `${key} ${a[key].argumentsSnippet}`,
+                insertTextFormat: 2,
+                documentation: {
+                  kind: 'markdown',
+                  value: `## Snippet\n\n${documentation.value}`,
+                },
+                command: {
+                  command: 'editor.action.triggerParameterHints',
+                  title: 'Trigger Signature Help',
+                },
+              })
+            }
+            return options
+          })
+        }
       }
 
       // declared (imported) types or exported from other documents
@@ -195,6 +255,160 @@ export class ItnRepo {
         }
       }
     })
+
+    connection.onSignatureHelp(async params => {
+      const { textDocument, position } = params
+      const document = documents.get(textDocument.uri)
+      if (!document) {
+        return
+      }
+      const aContext = await this.getAnnotationContextAt(document, position)
+      if (!aContext) {
+        return
+      }
+
+      const { currentIndex, annotationSpec, annotationToken } = aContext
+      if (!annotationSpec) {
+        return
+      }
+
+      const args = annotationSpec.config.arguments || []
+
+      // eslint-disable-next-line sonarjs/no-nested-template-literals
+      const label = `${annotationToken.text} ${args
+        .map(a => `${a.name}${a.optional ? '?' : ''}: ${a.type}`)
+        .join(', ')}`
+      const descr = annotationSpec.config.description
+      // Define signature information
+      const signature = SignatureInformation.create(`${label}`, descr)
+
+      // Define parameter-specific information
+      signature.parameters = args.map(a =>
+        ParameterInformation.create(
+          `${a.name}${a.optional ? '?' : ''}: ${a.type}`,
+          `${a.description}`
+        )
+      )
+
+      return {
+        signatures: [signature],
+        activeSignature: 0,
+        activeParameter: currentIndex,
+      }
+    })
+
+    connection.onHover(async params => {
+      const { textDocument, position } = params
+      const document = documents.get(textDocument.uri)
+      if (!document) {
+        return
+      }
+      const aContext = await this.getAnnotationContextAt(document, position)
+      if (!aContext) {
+        return
+      }
+      const { annotationSpec, itnDoc, annotationToken } = aContext
+      if (!annotationSpec) {
+        return
+      }
+      const token = itnDoc.tokensIndex.at(position.line, position.character)
+      if (!token) {
+        return
+      }
+      if (token === annotationToken) {
+        return {
+          contents: {
+            kind: 'markdown',
+            value: annotationSpec.renderDoc(token.text),
+          },
+          range: token.range,
+        } as Hover
+      }
+      if (
+        typeof token.index === 'number' &&
+        annotationSpec.config.arguments?.length &&
+        annotationSpec.config.arguments.length > token.index
+      ) {
+        return {
+          contents: {
+            kind: 'markdown',
+            value: annotationSpec.renderDoc(token.index),
+          },
+          range: token.range,
+        } as Hover
+      }
+    })
+
+    // connection.languages.semanticTokens.onRange(async params =>
+    //   this.provideSemanticTokens(params.textDocument.uri, params.range)
+    // )
+  }
+
+  // async provideSemanticTokens(uri: string, range?: Range) {
+  //   const document = this.documents.get(uri)
+  //   if (!document) {
+  //     return { data: [] } as SemanticTokens
+  //   }
+
+  //   const itnDoc = await this.openDocument(document.uri)
+  //   if (!itnDoc || itnDoc.resolvedAnnotations.length === 0) {
+  //     return { data: [] } as SemanticTokens
+  //   }
+  //   // await this.currentCheck
+
+  //   const builder = new SemanticTokensBuilder()
+  //   itnDoc.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
+  //   itnDoc.resolvedAnnotations.forEach(token => {
+  //     if (
+  //       range &&
+  //       range.start.line <= token.range.start.line &&
+  //       range.end.line >= token.range.end.line
+  //     ) {
+  //       builder.push(token.range.start.line, token.range.start.character, token.text.length, 0, 1)
+  //     }
+  //   })
+
+  //   return builder.build()
+  // }
+
+  async getAnnotationContextAt(document: TextDocument, position: Position) {
+    const text = document.getText()
+    const offset = document.offsetAt(position)
+
+    // Get the text from the start of the line up to the cursor
+    const lineStartOffset = text.lastIndexOf('\n', offset - 1) + 1
+    const lineText = text.slice(lineStartOffset, offset)
+
+    // Check if the line starts with an annotation (e.g., @label)
+    const annotationMatch = /^\s*@([.0-9A-Za-z]*)/u.exec(lineText)
+    if (!annotationMatch) {
+      return
+    }
+    // await this.currentCheck
+    const itnDoc = await this.openDocument(document.uri)
+    const annotationToken = itnDoc.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
+    if (!annotationToken?.parentNode) {
+      return
+    }
+    let argToken = itnDoc.tokensIndex.at(position.line, position.character)
+    const currentAnnotation = annotationToken.parentNode.annotations?.get(annotationMatch[1])
+    if (!argToken && currentAnnotation) {
+      for (let i = currentAnnotation.args.length - 1; i >= 0; i--) {
+        const argI = currentAnnotation.args[i]
+        if (argI.range.end.character < position.character) {
+          argToken = currentAnnotation.args[i + 1]
+          break
+        }
+      }
+    }
+    const annotationSpec = itnDoc.resolveAnnotation(annotationToken.text.slice(1))
+    return {
+      itnDoc,
+      annotationToken,
+      argToken,
+      currentIndex: argToken?.index ?? (currentAnnotation?.args.length || 0),
+      annotationSpec,
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
@@ -226,7 +440,8 @@ export class ItnRepo {
         detail: token.fromPath ? `imported from '${token.fromPath}'` : undefined,
       })
     }
-    for (const doc of this.itn.values()) {
+    for (const docPromise of this.itn.values()) {
+      const doc = await docPromise
       if (doc !== itnDoc) {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
@@ -249,7 +464,7 @@ export class ItnRepo {
         }
       }
     }
-    const keys = Array.from(config.primitives.keys())
+    const keys = itnDoc.primitives.map(p => p.id)
     items.push(
       ...keys.map(k => ({
         label: k,
@@ -295,7 +510,6 @@ export class ItnRepo {
   ): Promise<CompletionItem[] | undefined> {
     const dif = position.character - token.range.start.character - 1
     const paths = await getItnFileCompletions(itnDoc.id, token.fromPath!.slice(0, dif))
-    // console.log(result)
     return paths.map(({ path, isDirectory }) => ({
       label: path,
       kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
@@ -351,8 +565,10 @@ export class ItnRepo {
         }
         const changed = this.changedSet.has(id)
         this.changedSet.delete(id)
-        this.checkDoc(doc, changed)
-        await new Promise(resolve => setTimeout(resolve, this.checksDelay))
+        await this.checkDoc(doc, changed)
+        if (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.checksDelay))
+        }
       }
       this.idle = true
     }
@@ -377,46 +593,15 @@ export class ItnRepo {
     this.triggerChecks()
   }
 
-  openDocument(id: string, text: string): ItnDocument
-  openDocument(id: string): Promise<ItnDocument>
-  openDocument(id: string, text?: string): ItnDocument | Promise<ItnDocument> {
-    if (typeof text === 'string') {
-      if (!this.itn.has(id)) {
-        this.itn.set(id, new ItnDocument(id, config))
-      }
-      const itnDoc = this.itn.get(id)!
-      itnDoc.update(text)
-      return itnDoc
-    }
-    if (this.itn.has(id)) {
-      return this.itn.get(id)!
-    }
+  protected async _openDocument(id: string, text?: string): Promise<ItnDocument> {
     const td = this.documents.get(id)
     if (td) {
-      const itnDoc = new ItnDocument(id, config)
-      this.itn.set(id, itnDoc)
+      const { compiled } = await this.resolveConfig(id)
+      const itnDoc = new ItnDocument(id, compiled)
       itnDoc.update(td.getText())
       return itnDoc
     }
-    let promise = this.reading.get(id)
-    if (!promise) {
-      promise = new Promise((resolve, reject) => {
-        readFile(decodeURI(id.slice(7)), 'utf8', (err, data) => {
-          if (err) {
-            console.error(err.message)
-            reject(err)
-            return
-          }
-          const itnDoc = new ItnDocument(id, config)
-          itnDoc.update(data.toString())
-          this.itn.set(id, itnDoc)
-          this.reading.delete(id)
-          resolve(itnDoc)
-        })
-      })
-      this.reading.set(id, promise)
-    }
-    return promise
+    return super._openDocument(id, text)
   }
 
   revalidateDependants(itnDoc: ItnDocument) {
@@ -444,48 +629,5 @@ export class ItnRepo {
     if (changed) {
       this.revalidateDependants(itnDoc)
     }
-  }
-
-  async checkImports(itnDoc: ItnDocument) {
-    const promise = Promise.all(
-      Array.from(itnDoc.imports.values(), async ({ from, imports }) =>
-        this.checkImport(itnDoc, from, imports)
-      )
-    )
-    const results = await promise
-    itnDoc.updateDependencies(results.filter(Boolean) as ItnDocument[])
-  }
-
-  async checkImport(
-    itnDoc: ItnDocument,
-    from: Token,
-    imports: Token[]
-  ): Promise<ItnDocument | undefined> {
-    const forId = resolveItnFromPath(from.text, itnDoc.id)
-    const errors = [] as TMessages
-    let external: ItnDocument | undefined
-    try {
-      external = await this.openDocument(forId)
-      for (const token of imports) {
-        if (!external.exports.has(token.text)) {
-          errors.push({
-            severity: 1,
-            message: `"${from.text}" has no exported member "${token.text}"`,
-            range: token.range,
-          })
-        }
-      }
-    } catch (error) {
-      errors.push({
-        severity: 1,
-        message: `"${from.text}" not found`,
-        range: from.range,
-      })
-    }
-    if (errors.length > 0) {
-      const messages = itnDoc.getDiagMessages()
-      messages.push(...errors)
-    }
-    return external
   }
 }

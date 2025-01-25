@@ -27,3 +27,7 @@ export interface TAnnotationTokens {
   token: Token
   args: Token[]
 }
+
+export interface TPrimitiveConfig {
+  documentation?: string
+}

@@ -86,7 +86,9 @@ export async function getItnFileCompletions(
   // Directories => we return them with a trailing slash
   // .itn files => remove the extension
   return entries
-    .filter(entry => entry.name.startsWith(match))
+    .filter(
+      entry => entry.name.startsWith(match) && path.join(entry.parentPath, entry.name) !== docPath
+    )
     .map(entry => {
       if (entry.isDirectory()) {
         // Append slash so user can continue navigating deeper

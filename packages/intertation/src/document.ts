@@ -1,17 +1,22 @@
+/* eslint-disable @typescript-eslint/no-confusing-void-expression */
 /* eslint-disable max-depth */
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import type { AnnotationSpec } from './annotations'
+import { isAnnotationSpec } from './annotations'
+import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
-import type { SemanticNode } from './parser/nodes'
+import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
 import { isInterface, isProp, isRef, isStructure, isType } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
 import type { Token } from './parser/token'
-import type { TMessages, TSeverity } from './parser/types'
+import type { TMessages } from './parser/types'
+import { TSeverity } from './parser/types'
 import { resolveItnFromPath } from './parser/utils'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
@@ -21,12 +26,13 @@ import { tokenize } from './tokenizer'
 export interface TItnDocumentConfig {
   reserved?: string[]
   primitives?: Map<string, SemanticPrimitiveNode>
+  annotations?: TAnnotationsTree
 }
 
 export class ItnDocument {
   constructor(
     public readonly id: string,
-    private readonly config: TItnDocumentConfig
+    public readonly config: TItnDocumentConfig
   ) {
     this.registry = new IdRegistry(config.reserved, Array.from(config.primitives?.keys() || []))
   }
@@ -82,6 +88,22 @@ export class ItnDocument {
    */
   public readonly dependenciesMap = new Map<string, ItnDocument>()
 
+  get primitives() {
+    return Array.from(this.config.primitives?.values() ?? [])
+  }
+
+  resolveAnnotation(name: string) {
+    const parts = name.split('.')
+    let current: TAnnotationsTree | AnnotationSpec | undefined = this.config.annotations
+    for (const part of parts) {
+      if (!current || isAnnotationSpec(current)) {
+        return undefined
+      }
+      current = current[part]
+    }
+    return isAnnotationSpec(current) ? current : undefined
+  }
+
   updateDependencies(docs: ItnDocument[]) {
     const newDependencies = new Set(docs)
 
@@ -121,6 +143,7 @@ export class ItnDocument {
     this._allMessages = undefined
     this.tokensIndex = new TokensIndex()
     this.blocksIndex = new BlocksIndex()
+    this.resolvedAnnotations = []
   }
 
   private registerNodes(nodes: SemanticNode[]) {
@@ -131,6 +154,20 @@ export class ItnDocument {
         this.referred.push(t)
         this.tokensIndex.add(t)
       })
+    }
+  }
+
+  public resolvedAnnotations: Token[] = []
+
+  registerAnnotation(mainToken: Token, args?: Token[]) {
+    this.tokensIndex.add(mainToken)
+    args?.forEach(a => this.tokensIndex.add(a))
+    const annotationSpec = this.resolveAnnotation(mainToken.text.slice(1))
+    if (annotationSpec) {
+      this.registerMessages(annotationSpec.validate(mainToken, args || []))
+      this.resolvedAnnotations.push(mainToken)
+    } else {
+      this.registerMessage(mainToken, 'Unknown annotation', TSeverity.Warning, 'dim')
     }
   }
 
@@ -384,7 +421,8 @@ export class ItnDocument {
     }
   }
 
-  registerMessage(token: Token, message: string, severity: TSeverity = 1) {
+  // eslint-disable-next-line max-params
+  registerMessage(token: Token, message: string, severity: TSeverity = 1, tag?: 'dim' | 'crossed') {
     if (this._allMessages) {
       this._allMessages = undefined
     }
@@ -392,7 +430,14 @@ export class ItnDocument {
       severity,
       message,
       range: token.range,
+      tags: tag === 'dim' ? [1] : tag === 'crossed' ? [2] : [],
     })
+  }
+
+  registerMessages(messages?: TMessages) {
+    if (messages) {
+      this.messages.push(...messages)
+    }
   }
 
   private _allMessages = undefined as TMessages | undefined

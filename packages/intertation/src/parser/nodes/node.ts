@@ -13,12 +13,15 @@ export class SemanticNode {
 
   protected definition?: SemanticNode
 
-  protected annotations?: Map<string, TAnnotationTokens>
+  public annotations?: Map<string, TAnnotationTokens>
 
   registerAtDocument(doc: ItnDocument): void {
     if (this.definition) {
       this.definition.registerAtDocument(doc)
     }
+    Array.from(this.annotations?.values() || []).forEach(val => {
+      doc.registerAnnotation(val.token, val.args)
+    })
   }
 
   get id() {
@@ -57,6 +60,7 @@ export class SemanticNode {
     return (arg: Token) => {
       arg.parentNode = this
       arg.index = a.args.length
+      arg.annotationRef = token
       a.args.push(arg)
     }
   }

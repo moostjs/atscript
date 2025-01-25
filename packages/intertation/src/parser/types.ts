@@ -21,6 +21,7 @@ export type TMessages = Array<{
     start: { line: number; character: number }
     end: { line: number; character: number }
   }
+  tags?: Array<1 | 2>
 }>
 
 export interface TTarget<T extends SemanticNode = SemanticNode> {

@@ -73,6 +73,15 @@ export class Token {
 
   public parentNode?: SemanticNode
 
+  get isAnnotation(): boolean {
+    return this._data.type === 'annotation'
+  }
+
+  /**
+   * Only for annotation arguments: reference to their annotation token
+   */
+  annotationRef?: Token
+
   public index?: number
 
   /**

@@ -7,7 +7,7 @@ import type { TLexicalToken } from '../types'
  */
 export const AIdentifierToken = new BasicNode<TLexicalToken>({
   icon: '@',
-  tokens: [/@[\p{ID_Start}$_][\p{ID_Continue}$.]*/u, /[^\p{ID_Continue}$.]/u],
+  tokens: [/@[\p{ID_Continue}$.]*/u, /[^\p{ID_Continue}$.]/u],
   tokenOE: '-eject',
 })
   .mapContent('text', 'join-clear')

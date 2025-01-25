@@ -2,6 +2,7 @@
 /* eslint-disable sonarjs/no-duplicate-string */
 import { describe, expect, it } from 'vitest'
 
+import { AnnotationSpec } from './annotations'
 import { ItnDocument } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
@@ -427,5 +428,19 @@ describe('document', () => {
         targetSelectionRange: resultingRange,
       })
     )
+  })
+
+  it('should resolve annotation spec', () => {
+    const doc = new ItnDocument('file-1.itn', {
+      primitives,
+      annotations: {
+        level1: {
+          level2: new AnnotationSpec({}),
+        },
+      },
+    })
+    expect(doc.resolveAnnotation('level1.level2')).toBeDefined()
+    expect(doc.resolveAnnotation('level1.level2.config')).toBeUndefined()
+    expect(doc.resolveAnnotation('level1')).toBeUndefined()
   })
 })

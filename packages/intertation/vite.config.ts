@@ -22,6 +22,7 @@ export default defineConfig({
               // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
               ...Object.keys(JSON.parse(readFileSync('./package.json').toString()).dependencies),
               'path',
+              /^node:/u,
             ]
           : [],
     },

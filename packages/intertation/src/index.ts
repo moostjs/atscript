@@ -1,5 +1,8 @@
+export * from './annotations'
+export * from './config'
 export * from './document'
 export * from './parser/nodes'
 export * from './parser/token'
 export type { TMessages } from './parser/types'
 export { getRelPath, resolveItnFromPath } from './parser/utils'
+export * from './repo'
