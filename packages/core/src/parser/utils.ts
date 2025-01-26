@@ -2,6 +2,7 @@
 /* eslint-disable max-params */
 import type { ProstoParserNodeContext } from '@prostojs/parser'
 import path from 'path'
+import { URL } from 'url'
 
 export function toVsCodeRange(
   start: ProstoParserNodeContext['startPos'],

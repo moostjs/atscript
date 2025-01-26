@@ -5,7 +5,6 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { TLexicalToken } from '../../tokenizer/types'
-import type { IdRegistry } from '../id-registry'
 import type { NodeIterator } from '../iterator'
 import type { SemanticNode, TSemanticToken } from '../nodes'
 import { Token } from '../token'

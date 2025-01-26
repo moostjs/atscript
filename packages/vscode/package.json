@@ -4,9 +4,16 @@
   "description": "Syntax highlighting for anscript (.as)",
   "version": "0.0.1",
   "private": true,
-  "main": "./dist/extension.js",
+  "main": "./dist/extension.cjs",
+  "build": {
+    "format": "cjs",
+    "entries": [
+      "client/extension.ts",
+      "server/server.ts"
+    ],
+    "dts": false
+  },
   "scripts": {
-    "build": "vite build",
     "test": "vitest"
   },
   "engines": {
@@ -51,7 +58,6 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/vscode": "^1.96.0",
-    "vite": "^6.0.6",
     "vitest": "^2.1.8"
   }
 }

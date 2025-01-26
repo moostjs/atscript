@@ -25,8 +25,6 @@ import type {
   Hover,
   MarkupContent,
   Position,
-  Range,
-  SemanticTokens,
   TextDocuments,
   WorkspaceEdit,
 } from 'vscode-languageserver/node'
@@ -35,7 +33,6 @@ import {
   DiagnosticSeverity,
   DiagnosticTag,
   ParameterInformation,
-  SemanticTokensBuilder,
   SignatureInformation,
 } from 'vscode-languageserver/node'
 import type { TextDocument } from 'vscode-languageserver-textdocument'

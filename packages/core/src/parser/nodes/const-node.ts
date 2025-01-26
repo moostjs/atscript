@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { AnscriptDoc } from '../../document'
-import type { Token } from '../token'
 import { SemanticNode } from './node'
 
 export class SemanticConstNode extends SemanticNode {

@@ -10,7 +10,7 @@ let client: LanguageClient | undefined
 export function activate(context: ExtensionContext) {
   // The server is implemented in server/server.js (transpiled from server/server.ts).
   console.log('client', process.env)
-  const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.js').fsPath
+  const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.cjs').fsPath
 
   // Optional debug options
   const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] }

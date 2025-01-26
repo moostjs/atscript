@@ -1,6 +1,4 @@
 import type { AnscriptDoc } from '../../document'
-import type { Token } from '../token'
-import { isGroup, isStructure } from '.'
 import { SemanticNode } from './node'
 
 export class SemanticTypeNode extends SemanticNode {

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "target": "es2020",
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM", "WebWorker", "DOM.Iterable"],
+    "noUnusedLocals": true,
+    "types": ["node", "@prostojs/dye/global"],
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "removeComments": true,
+    "outDir": ".types"
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/server/**/*.ts", "packages/*/client/**/*.ts", "globals.d.ts"],
+  "exclude": [
+    "**/*.spec.ts"
+  ]
+}

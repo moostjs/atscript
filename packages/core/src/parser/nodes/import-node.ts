@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AnscriptDoc } from '../../document'
-import type { Token } from '../token'
 import { SemanticNode } from './node'
 
 export class SemanticImportNode extends SemanticNode {

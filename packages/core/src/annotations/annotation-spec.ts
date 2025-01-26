@@ -1,7 +1,7 @@
 /* eslint-disable complexity */
 /* eslint-disable sonarjs/cognitive-complexity */
 import type { TAnnotationsTree } from '../config'
-import type { SemanticNode, TNodeEntity } from '../parser/nodes'
+import type { TNodeEntity } from '../parser/nodes'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
 import type { TLexicalToken } from '../tokenizer/types'
