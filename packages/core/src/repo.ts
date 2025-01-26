@@ -2,59 +2,72 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { existsSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-
-import type { TAnscriptConfig } from './config'
+import { TAnscriptConfig } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
-import { getDefaultAnscriptConfig } from './default-anscript-config'
-import type { TAnscriptDocConfig } from './document'
 import { AnscriptDoc } from './document'
-import { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
+import { PluginManager } from './plugin/plugin-manager'
 
-interface TConfigCache {
-  compiled: TAnscriptDocConfig
+interface TPluginManagers {
+  manager: PluginManager
   file?: string
   dependants: Set<string>
 }
 
 export class AnscriptRepo {
-  constructor(private readonly root = process.cwd()) {}
+  constructor(
+    private readonly root = process.cwd(),
+    private readonly forceConfig?: TAnscriptConfig
+  ) {}
 
   /**
    * Configs cache
    */
-  protected readonly configs = new Map<string, Promise<TConfigCache>>()
+  protected readonly configs = new Map<string, Promise<TPluginManagers>>()
 
   /**
    * .as Documents cache
    */
   protected readonly anscripts = new Map<string, Promise<AnscriptDoc>>()
 
-  async loadConfigFor(id: string): Promise<TConfigCache> {
+  protected forcedManager: TPluginManagers | undefined
+
+  async loadPluginManagerFor(id: string): Promise<TPluginManagers> {
+    if (this.forceConfig) {
+      if (!this.forcedManager) {
+        this.forcedManager = {
+          manager: new PluginManager(this.forceConfig),
+          dependants: new Set(),
+        }
+      }
+      return this.forcedManager
+    }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
       const rawConfig = await loadConfig(configFile)
+      const manager = new PluginManager(rawConfig)
+      await manager.getDocConfig()
       return {
         file: configFile,
-        compiled: compileConfig(rawConfig),
+        manager,
         dependants: new Set(),
       }
     } else {
+      const manager = new PluginManager({})
+      await manager.getDocConfig()
       return {
-        compiled: {},
+        manager,
         dependants: new Set(),
       }
     }
   }
 
-  async resolveConfig(id: string): Promise<TConfigCache> {
+  async resolveConfig(id: string): Promise<TPluginManagers> {
     let config = this.configs.get(id)
     if (!config) {
-      config = this.loadConfigFor(id)
+      config = this.loadPluginManagerFor(id)
       config.then(c => {
         c.dependants.add(id)
       })
@@ -83,38 +96,43 @@ export class AnscriptRepo {
   }
 
   protected async _openDocument(id: string, text?: string): Promise<AnscriptDoc> {
-    const filePath = decodeURI(id.slice(7))
-    if (existsSync(filePath)) {
-      const { compiled } = await this.resolveConfig(id)
-      const asncript = new AnscriptDoc(id, compiled)
-      asncript.update(text || (await readFile(filePath, 'utf8')).toString())
-      return asncript
+    const { manager } = await this.resolveConfig(id)
+    const newId = await manager.resolve(id)
+    if (!newId) {
+      throw new Error(`Document not resolved: ${id}`)
     }
-    throw new Error(`File not found: ${filePath}`)
+    const content = text || (await manager.load(newId))
+    if (typeof content !== 'string') {
+      throw new Error(`Document not found: ${newId}`)
+    }
+    const anscript = new AnscriptDoc(id, await manager.getDocConfig(), manager)
+    anscript.update(content)
+    await manager.onDocumnet(anscript)
+    return anscript
   }
 
-  async checkDoc(asncript: AnscriptDoc) {
-    await this.checkImports(asncript)
+  async checkDoc(anscript: AnscriptDoc) {
+    await this.checkImports(anscript)
   }
 
-  async checkImports(asncript: AnscriptDoc) {
+  async checkImports(anscript: AnscriptDoc) {
     const promise = Promise.all(
-      Array.from(asncript.imports.values(), async ({ from, imports }) =>
-        this.checkImport(asncript, from, imports)
+      Array.from(anscript.imports.values(), async ({ from, imports }) =>
+        this.checkImport(anscript, from, imports)
       )
     )
     const results = await promise
-    asncript.updateDependencies(results.filter(Boolean) as AnscriptDoc[])
+    anscript.updateDependencies(results.filter(Boolean) as AnscriptDoc[])
   }
 
   async checkImport(
-    asncript: AnscriptDoc,
+    anscript: AnscriptDoc,
     from: Token,
     imports: Token[]
   ): Promise<AnscriptDoc | undefined> {
-    const forId = resolveAnscriptFromPath(from.text, asncript.id)
-    if (forId === asncript.id) {
-      const messages = asncript.getDiagMessages()
+    const forId = resolveAnscriptFromPath(from.text, anscript.id)
+    if (forId === anscript.id) {
+      const messages = anscript.getDiagMessages()
       messages.push({
         severity: 1,
         message: '"import" cannot import itself',
@@ -143,24 +161,9 @@ export class AnscriptRepo {
       })
     }
     if (errors.length > 0) {
-      const messages = asncript.getDiagMessages()
+      const messages = anscript.getDiagMessages()
       messages.push(...errors)
     }
     return external
   }
-}
-
-function compileConfig(raw?: TAnscriptConfig): TAnscriptDocConfig {
-  const itnConfig = getDefaultAnscriptConfig()
-  if (raw?.primitives) {
-    itnConfig.primitives = itnConfig.primitives || new Map()
-    for (const [key, value] of Object.entries(raw.primitives)) {
-      itnConfig.primitives.set(key, new SemanticPrimitiveNode(key, value))
-    }
-  }
-  if (raw?.annotations) {
-    itnConfig.annotations = itnConfig.annotations || {}
-    Object.assign(itnConfig.annotations, raw.annotations)
-  }
-  return itnConfig
 }

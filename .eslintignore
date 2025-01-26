@@ -3,3 +3,4 @@
 dist
 # <<< domelint-end
 scripts
+__snapshots__

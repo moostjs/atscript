@@ -1,7 +1,7 @@
 {
   "name": "@anscript/vscode",
-  "displayName": "Interfaces with Annotations",
-  "description": "Syntax highlighting for anscript (.as)",
+  "displayName": "Anscript: Annotate things",
+  "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.0.0",
   "private": true,
   "main": "./dist/extension.cjs",
@@ -29,10 +29,9 @@
         "aliases": [
           "as",
           "anscript",
-          "Annotated Data Structure"
+          "Annotate things"
         ],
         "extensions": [
-          ".anscript",
           ".as"
         ],
         "configuration": "./language-configuration.json"

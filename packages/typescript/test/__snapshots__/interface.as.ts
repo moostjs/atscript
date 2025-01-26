@@ -1,0 +1,3 @@
+interface TITest {
+  prop: string;
+}

@@ -1,0 +1,4 @@
+{
+    "exclude": ["../../tsconfig.json"],
+    "include": ["*.ts", "global.d.ts"]
+}

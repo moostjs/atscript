@@ -6,11 +6,11 @@ type TUser = [string | number ]
 @label 'true'
 export interface User2 {
     @label 'User "ID"'
+    @mongo.key 'ObjectId'
     _id: (string[] | '123') & {
         ppp: 123,
     }
     
-    @mongo.key 'ObjectId'
     @label 'true'
     @mongo.uniqueIndex "ema'il" 
     @mongo.textIndex

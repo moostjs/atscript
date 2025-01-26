@@ -24,6 +24,7 @@
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/server/**/*.ts", "packages/*/client/**/*.ts", "globals.d.ts"],
   "exclude": [
-    "**/*.spec.ts"
+    "**/*.spec.ts",
+    "__snapshots__"
   ]
 }

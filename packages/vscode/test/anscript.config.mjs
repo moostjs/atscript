@@ -33,6 +33,7 @@ class MongoKeyType extends AnnotationSpec {
 }
 
 export default defineConfig({
+  unknownAnnotation: 'error',
   primitives: {
     custom: {},
   },

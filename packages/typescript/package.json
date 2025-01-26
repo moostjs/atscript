@@ -1,7 +1,7 @@
 {
-  "name": "anscript",
+  "name": "@anscript/typescript",
   "version": "0.0.0",
-  "description": "Anscript: Configuration and build plugins.",
+  "description": "Anscript: typescript-gen support.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -20,10 +20,7 @@
   "keywords": [
     "anscript",
     "annotations",
-    "vite-plugin",
-    "rolldown-plugin",
-    "config",
-    "runtime"
+    "typescript"
   ],
   "author": "",
   "license": "ISC",

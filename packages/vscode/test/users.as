@@ -12,6 +12,7 @@ export interface User2 {
     }
 
     @label 'true'
+    @dummy 'test'
     @mongo.uniqueIndex "ema'il" 
     @mongo.index 'someIndex', true
     @description "Unique user email"

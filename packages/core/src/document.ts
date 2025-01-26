@@ -18,23 +18,31 @@ import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
+import { PluginManager } from './plugin/plugin-manager'
+import { TAnscriptPlugin, TAnscriptRenderContext } from './plugin/types'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
 
 export interface TAnscriptDocConfig {
-  reserved?: string[]
   primitives?: Map<string, SemanticPrimitiveNode>
   annotations?: TAnnotationsTree
+  unknownAnnotation?: 'allow' | 'warn' | 'error'
+  plugins?: TAnscriptPlugin[]
 }
 
 export class AnscriptDoc {
   constructor(
     public readonly id: string,
-    public readonly config: TAnscriptDocConfig
+    public readonly config: TAnscriptDocConfig,
+    private readonly manager?: PluginManager
   ) {
-    this.registry = new IdRegistry(config.reserved, Array.from(config.primitives?.keys() || []))
+    this.registry = new IdRegistry(Array.from(config.primitives?.keys() || []))
+  }
+
+  get name() {
+    return this.id.split('/').pop()?.replace(/\.as$/, '')
   }
 
   public readonly registry: IdRegistry
@@ -92,6 +100,10 @@ export class AnscriptDoc {
     return Array.from(this.config.primitives?.values() ?? [])
   }
 
+  async render(context: TAnscriptRenderContext) {
+    return this.manager?.render(this, context)
+  }
+
   resolveAnnotation(name: string) {
     const parts = name.split('.')
     let current: TAnnotationsTree | AnnotationSpec | undefined = this.config.annotations
@@ -121,16 +133,18 @@ export class AnscriptDoc {
     })
   }
 
+  public nodes: SemanticNode[] = []
+
   update(text: string, debug = false) {
     this.cleanup()
     const rawTokens = tokenize(text, debug)
     const ni = new NodeIterator(rawTokens, []).move()
-    const nodes = runPipes([pipes.importPipe, pipes.type, pipes.interfaceType], ni)
+    this.nodes = runPipes([pipes.importPipe, pipes.type, pipes.interfaceType], ni)
     if (debug) {
-      console.log(nodes.map(n => n.toString()).join('\n'))
+      console.log(this.nodes.map(n => n.toString()).join('\n'))
     }
     this.semanticMessages = ni.getErrors()
-    this.registerNodes(nodes)
+    this.registerNodes(this.nodes)
   }
 
   cleanup() {
@@ -167,12 +181,24 @@ export class AnscriptDoc {
       this.registerMessages(annotationSpec.validate(mainToken, args || []))
       this.resolvedAnnotations.push(mainToken)
     } else {
-      this.registerMessage(
-        mainToken,
-        `Unknown annotation "${mainToken.text}"`,
-        TSeverity.Warning,
-        'dim'
-      )
+      let severity: 0 | 1 | 2 = 0
+      switch (this.config.unknownAnnotation) {
+        case 'warn':
+          severity = 2
+          break
+        case 'error':
+          severity = 1
+          break
+        default:
+      }
+      if (severity > 0) {
+        this.registerMessage(
+          mainToken,
+          `Unknown annotation "${mainToken.text}"`,
+          severity as 1,
+          'dim'
+        )
+      }
     }
   }
 

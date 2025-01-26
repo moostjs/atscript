@@ -9,6 +9,7 @@
     "node ": true,
     "browser": false
   },
+  "ignorePatterns": ["**/__snapshots__/**/*", "node_modules", "dist"],
   "globals": {
     "process": "readonly",
     "console": "readonly",
