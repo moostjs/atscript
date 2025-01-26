@@ -2,7 +2,7 @@
   "name": "@anscript/vscode",
   "displayName": "Interfaces with Annotations",
   "description": "Syntax highlighting for anscript (.as)",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "private": true,
   "main": "./dist/extension.cjs",
   "build": {
