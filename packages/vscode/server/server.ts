@@ -13,14 +13,14 @@ import {
 } from 'vscode-languageserver/node'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 
-import { VscodeItnRepo } from './repo'
+import { VscodeAnscriptRepo } from './repo'
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all)
 // Track open documents
 const documents = new TextDocuments<TextDocument>(TextDocument)
 
-const repo = new VscodeItnRepo(connection, documents)
+const repo = new VscodeAnscriptRepo(connection, documents)
 
 connection.onInitialize(
   (params: InitializeParams): InitializeResult => ({

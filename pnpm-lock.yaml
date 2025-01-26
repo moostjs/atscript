@@ -51,7 +51,7 @@ importers:
         specifier: ^5.7.2
         version: 5.7.2
 
-  packages/intertation:
+  packages/core:
     dependencies:
       '@prostojs/parser':
         specifier: ^0.5.11
@@ -75,9 +75,9 @@ importers:
 
   packages/vscode:
     dependencies:
-      intertation:
-        specifier: file:../intertation
-        version: link:../intertation
+      '@anscript/core':
+        specifier: workspace:^
+        version: link:../core
       vscode-languageclient:
         specifier: ^8.1.0
         version: 8.1.0

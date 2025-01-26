@@ -17,7 +17,7 @@ export default defineConfig({
     emptyOutDir: true,
     lib: {
       entry: ['client/extension.ts', 'server/server.ts'],
-      name: 'intertation',
+      name: 'anscript',
       formats: ['cjs'],
     },
     rollupOptions: {

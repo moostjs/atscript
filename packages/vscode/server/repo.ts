@@ -7,18 +7,18 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token } from 'intertation'
+import type { SemanticNode, Token } from '@anscript/core'
 import {
+  AnscriptDoc,
+  AnscriptRepo,
   getRelPath,
   isAnnotationSpec,
   isInterface,
   isProp,
   isRef,
   isStructure,
-  ItnDocument,
-  ItnRepo,
-  resolveItnFromPath,
-} from 'intertation'
+  resolveAnscriptFromPath,
+} from '@anscript/core'
 import type {
   CompletionItem,
   createConnection,
@@ -44,7 +44,7 @@ import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } fr
 
 const CHECKS_DELAY = 100
 
-export class VscodeItnRepo extends ItnRepo {
+export class VscodeAnscriptRepo extends AnscriptRepo {
   private readonly changeQueue = [] as string[]
 
   private readonly revalidateQueue = [] as string[]
@@ -82,13 +82,13 @@ export class VscodeItnRepo extends ItnRepo {
     })
 
     connection.onDefinition(async params => {
-      const itnDoc = await this.openDocument(params.textDocument.uri)
-      return itnDoc.getToDefinitionAt(params.position.line, params.position.character)
+      const asncript = await this.openDocument(params.textDocument.uri)
+      return asncript.getToDefinitionAt(params.position.line, params.position.character)
     })
 
     connection.onReferences(async params => {
-      const itnDoc = await this.openDocument(params.textDocument.uri)
-      return itnDoc.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
+      const asncript = await this.openDocument(params.textDocument.uri)
+      return asncript.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
         uri: r.uri,
         range: r.range,
       }))
@@ -98,21 +98,23 @@ export class VscodeItnRepo extends ItnRepo {
       const { textDocument, position, newName } = params
 
       // Open the document and find the token at the cursor
-      const itnDoc = await this.openDocument(textDocument.uri)
+      const asncript = await this.openDocument(textDocument.uri)
       if (this.currentCheck) {
         await this.currentCheck
       }
-      const token = itnDoc.tokensIndex.at(position.line, position.character)
+      const token = asncript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return null // No token found at the cursor
       }
-      const references = itnDoc.usageListFor(token)
+      const references = asncript.usageListFor(token)
 
       if (!references || references.length === 0) {
         return null // No references found
       }
 
-      const def = token.isDefinition ? { uri: itnDoc.id, token } : itnDoc.getDefinitionFor(token)
+      const def = token.isDefinition
+        ? { uri: asncript.id, token }
+        : asncript.getDefinitionFor(token)
 
       if (def?.token) {
         references.push({
@@ -149,28 +151,28 @@ export class VscodeItnRepo extends ItnRepo {
       }
       const text = document.getText()
       const offset = document.offsetAt(position)
-      const itnDoc = await this.openDocument(textDocument.uri)
+      const asncript = await this.openDocument(textDocument.uri)
       await this.currentCheck
 
-      const block = itnDoc.blocksIndex.at(position.line, position.character)
+      const block = asncript.blocksIndex.at(position.line, position.character)
 
       // import { here } from '...'
       if (block?.blockType === 'import' && block.fromPath) {
-        return this.getImportBlockCompletions(itnDoc, block, text, offset, context?.triggerKind)
+        return this.getImportBlockCompletions(asncript, block, text, offset, context?.triggerKind)
       }
 
-      const token = itnDoc.tokensIndex.at(position.line, position.character)
+      const token = asncript.tokensIndex.at(position.line, position.character)
       // import { ... } from 'here'
       if (typeof token?.fromPath === 'string') {
-        return this.getImportPathCompletions(itnDoc, token, position)
+        return this.getImportPathCompletions(asncript, token, position)
       }
 
       // autocomplete for annotations
-      if (itnDoc.config.annotations) {
+      if (asncript.config.annotations) {
         // eslint-disable-next-line unicorn/no-lonely-if
-        if (token?.isAnnotation && itnDoc.config.annotations) {
+        if (token?.isAnnotation && asncript.config.annotations) {
           const prev = token.text.slice(1).split('.').slice(0, -1)
-          let a = itnDoc.config.annotations
+          let a = asncript.config.annotations
           for (const item of prev) {
             if (a[item] && !isAnnotationSpec(a[item])) {
               a = a[item]
@@ -194,7 +196,7 @@ export class VscodeItnRepo extends ItnRepo {
               const aName = `@${[...prev, key].join('.')}`
               const documentation = {
                 kind: 'markdown',
-                value: a[key].renderDoc(aName) || '',
+                value: a[key].renderDocs(aName) || '',
               } as MarkupContent
               options[0].documentation = documentation
               options[0].kind = CompletionItemKind.Keyword
@@ -221,15 +223,35 @@ export class VscodeItnRepo extends ItnRepo {
             return options
           })
         }
+        const aContext = await this.getAnnotationContextAt(document, position)
+        const arg = aContext?.annotationSpec?.config.arguments?.[aContext.currentIndex]
+        if (arg?.values?.length) {
+          return arg.values?.map(v => ({
+            label: arg.type === 'string' ? `'${v}'` : v,
+            kind: CompletionItemKind.Value,
+          }))
+        }
+        if (arg?.type === 'boolean') {
+          return [
+            {
+              label: 'true',
+              kind: CompletionItemKind.Value,
+            },
+            {
+              label: 'false',
+              kind: CompletionItemKind.Value,
+            },
+          ]
+        }
       }
 
       // declared (imported) types or exported from other documents
       const before = charBefore(text, offset, [/[\s\w]/u])
       if (block?.blockType === 'structure' && before && [':', '|', '&'].includes(before)) {
-        return this.getDeclarationsCompletions(itnDoc, text)
+        return this.getDeclarationsCompletions(asncript, text)
       }
       if (block?.blockType === undefined && before && ['=', '|', '&'].includes(before)) {
-        return this.getDeclarationsCompletions(itnDoc, text)
+        return this.getDeclarationsCompletions(asncript, text)
       }
 
       // autocomplete for defined nodes
@@ -240,7 +262,7 @@ export class VscodeItnRepo extends ItnRepo {
         }
         const chain =
           token.text === '.' ? token.parentNode.chain : token.parentNode.chain.slice(0, -1)
-        const unwound = itnDoc.unwindType(id.text, chain)
+        const unwound = asncript.unwindType(id.text, chain)
         if (unwound?.def) {
           let options: SemanticNode[] | undefined
           if (isInterface(unwound.def) || isStructure(unwound.def)) {
@@ -307,11 +329,11 @@ export class VscodeItnRepo extends ItnRepo {
       if (!aContext) {
         return
       }
-      const { annotationSpec, itnDoc, annotationToken } = aContext
+      const { annotationSpec, asncript, annotationToken } = aContext
       if (!annotationSpec) {
         return
       }
-      const token = itnDoc.tokensIndex.at(position.line, position.character)
+      const token = asncript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return
       }
@@ -319,7 +341,7 @@ export class VscodeItnRepo extends ItnRepo {
         return {
           contents: {
             kind: 'markdown',
-            value: annotationSpec.renderDoc(token.text),
+            value: annotationSpec.renderDocs(token.text),
           },
           range: token.range,
         } as Hover
@@ -332,7 +354,7 @@ export class VscodeItnRepo extends ItnRepo {
         return {
           contents: {
             kind: 'markdown',
-            value: annotationSpec.renderDoc(token.index),
+            value: annotationSpec.renderDocs(token.index),
           },
           range: token.range,
         } as Hover
@@ -350,15 +372,15 @@ export class VscodeItnRepo extends ItnRepo {
   //     return { data: [] } as SemanticTokens
   //   }
 
-  //   const itnDoc = await this.openDocument(document.uri)
-  //   if (!itnDoc || itnDoc.resolvedAnnotations.length === 0) {
+  //   const asncript = await this.openDocument(document.uri)
+  //   if (!asncript || asncript.resolvedAnnotations.length === 0) {
   //     return { data: [] } as SemanticTokens
   //   }
   //   // await this.currentCheck
 
   //   const builder = new SemanticTokensBuilder()
-  //   itnDoc.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
-  //   itnDoc.resolvedAnnotations.forEach(token => {
+  //   asncript.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
+  //   asncript.resolvedAnnotations.forEach(token => {
   //     if (
   //       range &&
   //       range.start.line <= token.range.start.line &&
@@ -385,12 +407,12 @@ export class VscodeItnRepo extends ItnRepo {
       return
     }
     // await this.currentCheck
-    const itnDoc = await this.openDocument(document.uri)
-    const annotationToken = itnDoc.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
+    const asncript = await this.openDocument(document.uri)
+    const annotationToken = asncript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
     if (!annotationToken?.parentNode) {
       return
     }
-    let argToken = itnDoc.tokensIndex.at(position.line, position.character)
+    let argToken = asncript.tokensIndex.at(position.line, position.character)
     const currentAnnotation = annotationToken.parentNode.annotations?.get(annotationMatch[1])
     if (!argToken && currentAnnotation) {
       for (let i = currentAnnotation.args.length - 1; i >= 0; i--) {
@@ -401,9 +423,9 @@ export class VscodeItnRepo extends ItnRepo {
         }
       }
     }
-    const annotationSpec = itnDoc.resolveAnnotation(annotationToken.text.slice(1))
+    const annotationSpec = asncript.resolveAnnotation(annotationToken.text.slice(1))
     return {
-      itnDoc,
+      asncript,
       annotationToken,
       argToken,
       currentIndex: argToken?.index ?? (currentAnnotation?.args.length || 0),
@@ -413,19 +435,19 @@ export class VscodeItnRepo extends ItnRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   async getDeclarationsCompletions(
-    itnDoc: ItnDocument,
+    asncript: AnscriptDoc,
     text: string
   ): Promise<CompletionItem[] | undefined> {
-    const defs = Array.from(itnDoc.registry.definitions.entries())
+    const defs = Array.from(asncript.registry.definitions.entries())
     const items = [] as CompletionItem[]
-    const exporters = new Map<string, ItnDocument>()
+    const exporters = new Map<string, AnscriptDoc>()
     const importSet = new Set<string>()
     for (const [key, token] of defs) {
       let t = token
       if (token.fromPath) {
         let exporter = exporters.get(token.fromPath)
         if (!exporter) {
-          exporter = await this.openDocument(resolveItnFromPath(token.fromPath, itnDoc.id))
+          exporter = await this.openDocument(resolveAnscriptFromPath(token.fromPath, asncript.id))
           exporters.set(token.fromPath, exporter)
         }
         t = exporter.registry.definitions.get(token.text)!
@@ -440,13 +462,13 @@ export class VscodeItnRepo extends ItnRepo {
         detail: token.fromPath ? `imported from '${token.fromPath}'` : undefined,
       })
     }
-    for (const docPromise of this.itn.values()) {
+    for (const docPromise of this.anscripts.values()) {
       const doc = await docPromise
-      if (doc !== itnDoc) {
+      if (doc !== asncript) {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
           if (token && !importSet.has(token.text)) {
-            const fromPath = getRelPath(itnDoc.id, doc.id)
+            const fromPath = getRelPath(asncript.id, doc.id)
             const importEdit = addImport(text, token.text, fromPath)
             items.push({
               label: token.text,
@@ -464,7 +486,7 @@ export class VscodeItnRepo extends ItnRepo {
         }
       }
     }
-    const keys = itnDoc.primitives.map(p => p.id)
+    const keys = asncript.primitives.map(p => p.id)
     items.push(
       ...keys.map(k => ({
         label: k,
@@ -477,16 +499,16 @@ export class VscodeItnRepo extends ItnRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   async getImportBlockCompletions(
-    itnDoc: ItnDocument,
+    asncript: AnscriptDoc,
     block: Token,
     text: string,
     offset: number,
     triggerKind?: 1 | 2 | 3
   ): Promise<CompletionItem[] | undefined> {
     const rule = createInsertTextRule(text, offset, triggerKind ?? 1)
-    const target = await this.openDocument(resolveItnFromPath(block.fromPath!, itnDoc.id))
+    const target = await this.openDocument(resolveAnscriptFromPath(block.fromPath!, asncript.id))
     if (target) {
-      const imports = itnDoc.imports.get(target.id)?.imports || []
+      const imports = asncript.imports.get(target.id)?.imports || []
       const importsSet = new Set(imports.map(i => i.text))
       return Array.from(target.exports.values())
         .filter(n => !importsSet.has(n.id!) && rule.test(n.id!))
@@ -504,12 +526,12 @@ export class VscodeItnRepo extends ItnRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   async getImportPathCompletions(
-    itnDoc: ItnDocument,
+    asncript: AnscriptDoc,
     token: Token,
     position: Position
   ): Promise<CompletionItem[] | undefined> {
     const dif = position.character - token.range.start.character - 1
-    const paths = await getItnFileCompletions(itnDoc.id, token.fromPath!.slice(0, dif))
+    const paths = await getItnFileCompletions(asncript.id, token.fromPath!.slice(0, dif))
     return paths.map(({ path, isDirectory }) => ({
       label: path,
       kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
@@ -557,7 +579,7 @@ export class VscodeItnRepo extends ItnRepo {
         ids.push(id)
         this.pendingCheck.delete(id)
         const doc = await this.openDocument(id)
-        if (this.changedSet.has(id) && this.itn.has(id)) {
+        if (this.changedSet.has(id) && this.anscripts.has(id)) {
           const text = this.documents.get(id)?.getText()
           if (typeof text === 'string') {
             doc.update(text)
@@ -593,30 +615,30 @@ export class VscodeItnRepo extends ItnRepo {
     this.triggerChecks()
   }
 
-  protected async _openDocument(id: string, text?: string): Promise<ItnDocument> {
+  protected async _openDocument(id: string, text?: string): Promise<AnscriptDoc> {
     const td = this.documents.get(id)
     if (td) {
       const { compiled } = await this.resolveConfig(id)
-      const itnDoc = new ItnDocument(id, compiled)
-      itnDoc.update(td.getText())
-      return itnDoc
+      const asncript = new AnscriptDoc(id, compiled)
+      asncript.update(td.getText())
+      return asncript
     }
     return super._openDocument(id, text)
   }
 
-  revalidateDependants(itnDoc: ItnDocument) {
-    itnDoc.dependants.forEach(d => {
+  revalidateDependants(asncript: AnscriptDoc) {
+    asncript.dependants.forEach(d => {
       d.clearMessages()
       this.addToRevalidateQueue(d.id)
     })
   }
 
-  async checkDoc(itnDoc: ItnDocument, changed = false) {
-    await this.checkImports(itnDoc)
-    const unused = itnDoc.getUnusedTokens()
-    const messages = itnDoc.getDiagMessages()
+  async checkDoc(asncript: AnscriptDoc, changed = false) {
+    await this.checkImports(asncript)
+    const unused = asncript.getUnusedTokens()
+    const messages = asncript.getDiagMessages()
     this.connection.sendDiagnostics({
-      uri: itnDoc.id,
+      uri: asncript.id,
       diagnostics: messages.concat(
         ...unused.map(t => ({
           severity: DiagnosticSeverity.Hint,
@@ -627,7 +649,7 @@ export class VscodeItnRepo extends ItnRepo {
       ),
     })
     if (changed) {
-      this.revalidateDependants(itnDoc)
+      this.revalidateDependants(asncript)
     }
   }
 }

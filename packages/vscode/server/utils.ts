@@ -7,8 +7,8 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
+import { getRelPath } from '@anscript/core'
 import fs from 'fs'
-import { getRelPath, resolveItnFromPath } from 'intertation'
 import path from 'path'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -65,7 +65,7 @@ export async function getItnFileCompletions(
   const docPath = decodeURIComponent(uri.slice(7))
 
   // For historical consistency, replicate original logic:
-  const targetPath = path.join(path.dirname(docPath), `${word || './'}.itn`)
+  const targetPath = path.join(path.dirname(docPath), `${word || './'}.as`)
   const dir = path.dirname(targetPath)
 
   let entries: fs.Dirent[]
@@ -82,9 +82,9 @@ export async function getItnFileCompletions(
   // If user typed '', then match = ''
   const match = word.split('/').pop() ?? ''
 
-  // Collect directories and .itn files that start with `match`
+  // Collect directories and .as files that start with `match`
   // Directories => we return them with a trailing slash
-  // .itn files => remove the extension
+  // .as files => remove the extension
   return entries
     .filter(
       entry => entry.name.startsWith(match) && path.join(entry.parentPath, entry.name) !== docPath
@@ -96,15 +96,15 @@ export async function getItnFileCompletions(
           path: getRelPath(uri, `file://${path.join(dir, entry.name)}`),
           isDirectory: true,
         }
-      } else if (entry.isFile() && entry.name.endsWith('.itn')) {
-        // Remove the .itn extension
+      } else if (entry.isFile() && entry.name.endsWith('.as')) {
+        // Remove the .as extension
         const fileNoExt = path.join(dir, entry.name).slice(0, -4)
         return {
           path: getRelPath(uri, `file://${fileNoExt}`),
           isDirectory: false,
         }
       }
-      // Not a directory or an .itn file => skip
+      // Not a directory or an .as file => skip
       return undefined
     })
     .filter(Boolean) as Array<{ path: string; isDirectory: boolean }>

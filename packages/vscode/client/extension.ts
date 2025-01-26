@@ -9,6 +9,7 @@ let client: LanguageClient | undefined
 
 export function activate(context: ExtensionContext) {
   // The server is implemented in server/server.js (transpiled from server/server.ts).
+  console.log('client', process.env)
   const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.js').fsPath
 
   // Optional debug options
@@ -25,24 +26,24 @@ export function activate(context: ExtensionContext) {
 
   // Client options: define how the language client works
   const clientOptions: LanguageClientOptions = {
-    // register server for ITN language
-    documentSelector: [{ scheme: 'file', language: 'intertation' }],
+    // register server for Anscript language
+    documentSelector: [{ scheme: 'file', language: 'anscript' }],
     synchronize: {
-      // watch .intertation files
-      fileEvents: workspace.createFileSystemWatcher('**/*.itn'),
+      // watch .anscript files
+      fileEvents: workspace.createFileSystemWatcher('**/*.as'),
     },
   }
 
   // Create the language client and start it
   client = new LanguageClient(
-    'adsLangServer', // internal ID
-    'ITN Language Server', // display name
+    'anscriptLangServer', // internal ID
+    'Anscript Language Server', // display name
     serverOptions,
     clientOptions
   )
   client.start()
 
-  workspace.findFiles('**/*.itn').then(files => {
+  workspace.findFiles('**/*.as').then(files => {
     client!.sendNotification(
       'workspace/files',
       files.map(file => file.toString())

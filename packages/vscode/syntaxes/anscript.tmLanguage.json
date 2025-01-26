@@ -1,0 +1,257 @@
+{
+  "fileTypes": ["anscript", "as"],
+  "scopeName": "source.anscript",
+  "name": "AS",
+  "patterns": [
+    { "include": "#annotation-with-args" },
+    { "include": "#annotations" },
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#property-names" },
+    { "include": "#import-statement" },
+    { "include": "#keywords" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#punctuation" },
+    { "include": "#global-types" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.anscript",
+          "match": "//.*$"
+        },
+
+        {
+          "name": "comment.block.anscript",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            {
+              "match": "\\*\\/",
+              "name": "invalid.illegal.stray.end-of-comment.anscript"
+            }
+          ]
+        }
+      ]
+    },
+
+    "strings": {
+      "patterns": [
+        {
+          "match": "'([^']*)'|\"([^\"]*)\"",
+          "name": "variable.other.constant.anscript"
+        }
+      ]
+    },
+
+    "import-statement": {
+      "patterns": [
+        {
+          "name": "meta.import.statement",
+          "begin": "(?<![A-Za-z0-9_$])\\bimport\\b(?!\\s*[:=])",
+          "beginCaptures": {
+            "0": {
+              "name": "keyword.control.import.anscript"
+            }
+          },
+          "end": "(?=;|$)",
+          "patterns": [
+            {
+              "match": "\\bfrom\\b",
+              "name": "keyword.control.from.anscript"
+            },
+            {
+              "begin": "\\{",
+              "beginCaptures": {
+                "0": {
+                  "name": "punctuation.section.braces"
+                }
+              },
+              "end": "\\}",
+              "endCaptures": {
+                "0": {
+                  "name": "punctuation.section.braces"
+                }
+              },
+              "patterns": [
+                {
+                  "name": "entity.name.type.anscript",
+                  "match": "\\b[A-Za-z_$][A-Za-z0-9_$]*\\b"
+                }
+              ]
+            },
+            {
+              "match": "'([^']*)'|\"([^\"]*)\"",
+              "name": "string.quoted.import.anscript"
+            }
+          ]
+        }
+      ]
+    },
+
+    "keywords": {
+      "patterns": [
+        {
+          "match": "(?<![A-Za-z0-9_$])\\bexport\\b(?!\\s*[:=])",
+          "name": "keyword.control.export.anscript"
+        },
+        {
+          "match": "(\\b(?:type|interface)\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type"
+            },
+            "2": {
+              "name": "entity.name.type"
+            }
+          }
+        }
+      ]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "name": "variable.other.constant.anscript",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.anscript",
+          "match": "[|&=]"
+        }
+      ]
+    },
+
+    "annotations": {
+      "patterns": [
+        {
+          "name": "variable.other.constant.anscript",
+          "match": "@[A-Za-z0-9_.]+"
+        }
+      ]
+    },
+
+    "annotation-with-args": {
+      "patterns": [
+        {
+          "name": "variable.other.constant.anscript",
+          "begin": "(@[A-Za-z0-9_.]+)",
+          "beginCaptures": {
+            "1": {
+              "name": "variable.other.constant.anscript"
+            }
+          },
+          "end": "(?=$|\\n|\\r|;)",
+          "patterns": [
+            {
+              "name": "constant.numeric.anscript",
+              "match": "\\b\\d+(\\.\\d+)?\\b"
+            },
+            {
+              "name": "string.quoted.single.anscript",
+              "begin": "'",
+              "end": "(?:'|\\n)",
+              "patterns": [
+                {
+                  "match": "\\\\.",
+                  "name": "constant.character.escape.anscript"
+                }
+              ]
+            },
+
+            {
+              "name": "string.quoted.double.anscript",
+              "begin": "\"",
+              "end": "(?:\"|\\n)",
+              "patterns": [
+                {
+                  "match": "\\\\.",
+                  "name": "constant.character.escape.anscript"
+                }
+              ]
+            },
+            {
+              "name": "constant.language.boolean.anscript",
+              "match": "\\b(?:true|false|undefined|null)\\b"
+            }
+          ]
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.comma.anscript",
+          "match": ","
+        },
+        {
+          "name": "punctuation.terminator.statement.anscript",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.key-value.anscript",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.section.parens.begin.anscript",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.anscript",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.section.braces.begin.anscript",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.braces.end.anscript",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.anscript",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.anscript",
+          "match": "\\]"
+        }
+      ]
+    },
+
+    "global-types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.anscript",
+          "match": "\\b\\w+\\b(?!\\s*:)"
+        },
+        {
+          "name": "support.type.primitive.anscript",
+          "match": "\\b(?:number|string|boolean|void|undefined|null|never|any|unknown|bigint|symbol|true|false)\\b(?!\\s*:)"
+        }
+      ]
+    },
+
+    "property-names": {
+      "patterns": [
+        {
+          "name": "variable.object.property.required.anscript",
+          "match": "\\b([A-Za-z_$][A-Za-z0-9_$]*)\\b(?=\\s*:)"
+        },
+        {
+          "name": "variable.object.property.optional.anscript",
+          "match": "\\b([A-Za-z_$][A-Za-z0-9_$]*)\\b(?=\\?\\s*:)"
+        }
+      ]
+    }
+  },
+  "injectionSelector": "L:source.anscript"
+}
