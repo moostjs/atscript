@@ -1,13 +1,17 @@
 import path from 'path'
 import { glob } from 'glob' // or any other glob library
-import { TAnscriptConfigInput } from './config'
+import { TAnscriptConfigInput, TAnscriptConfigOutput } from './config'
 import { AnscriptRepo } from './repo'
 import { AnscriptDoc } from './document'
 import { TOutputExtended } from './plugin'
 import { TMessages } from './parser/types'
 
 export async function build(config: TAnscriptConfigInput) {
-  const rootDir = config.rootDir ? path.join(process.cwd(), config.rootDir) : process.cwd()
+  const rootDir = config.rootDir
+    ? config.rootDir.startsWith('/')
+      ? config.rootDir
+      : path.join(process.cwd(), config.rootDir)
+    : process.cwd()
   config.rootDir = rootDir
 
   const repo = new AnscriptRepo(rootDir, config)
@@ -59,12 +63,12 @@ export class BuildRepo {
     return docMessages
   }
 
-  async generate(config: { outDir?: string }) {
+  async generate(config: TAnscriptConfigOutput) {
     const outFiles: TOutputExtended[] = []
 
     // Collect build outputs from each document
     for (const document of this.docs) {
-      const out = await document.render({ action: 'build' })
+      const out = await document.render(config.context)
       if (out?.length) {
         outFiles.push(...out)
       }

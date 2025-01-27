@@ -24,9 +24,11 @@ export class TsTypeAlias extends TsArtifact {
     const exportPrefix = this.renderExportPrefix()
     const typeString = this.targetType.render() // get the inline type expression
 
-    return [docBlock, `${exportPrefix}type ${this.name} = ${typeString};`]
-      .filter(Boolean)
-      .join('\n')
+    return (
+      '\n' +
+      [docBlock, `${exportPrefix}type ${this.name} = ${typeString};`].filter(Boolean).join('\n') +
+      '\n'
+    )
   }
 
   /**
@@ -38,8 +40,10 @@ export class TsTypeAlias extends TsArtifact {
     const exportPrefix = this.renderExportPrefix() || 'declare '
     const typeString = this.targetType.renderTypes() // inline type expression for d.ts
 
-    return [docBlock, `${exportPrefix}type ${this.name} = ${typeString};`]
-      .filter(Boolean)
-      .join('\n')
+    return (
+      '\n' +
+      [docBlock, `${exportPrefix}type ${this.name} = ${typeString};`].filter(Boolean).join('\n') +
+      '\n'
+    )
   }
 }

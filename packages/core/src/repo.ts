@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { TAnscriptConfig } from './config'
+import { TAnscriptConfigInput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AnscriptDoc } from './document'
 import type { Token } from './parser/token'
@@ -19,7 +19,7 @@ interface TPluginManagers {
 export class AnscriptRepo {
   constructor(
     private readonly root = process.cwd(),
-    private readonly forceConfig?: TAnscriptConfig
+    private readonly forceConfig?: TAnscriptConfigInput
   ) {}
 
   /**

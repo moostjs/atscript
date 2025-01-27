@@ -48,10 +48,13 @@ export function refWithChain() {
       while (fork.$ && (isDot || isBlock)) {
         if (isBlock) {
           if (fork.$.children?.length === 0) {
-            // is array
-            target.node = new SemanticArrayNode().wrap(target.node, new Token(fork.$))
-            fork.move()
-            fork.skip(['\n', ';'])
+            while (isBlock && fork.$.children?.length === 0) {
+              // is array
+              target.node = new SemanticArrayNode().wrap(target.node, new Token(fork.$))
+              fork.move()
+              fork.skip(['\n', ';'])
+              isBlock = fork.satisfies(s.block)
+            }
             ni.unfork(fork)
             return true
           } else if (fork.$.children?.length === 1 && fork.$.children[0].type === 'text') {

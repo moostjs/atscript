@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { TAnscriptConfig } from '../config'
+import { TAnscriptConfigInput } from '../config'
 import { defu } from 'defu'
 import { AnscriptDoc, TAnscriptDocConfig } from '../document'
 import type { TAnscriptRenderContext, TOutput } from './types'
@@ -12,7 +12,7 @@ export interface TOutputExtended extends TOutput {
 }
 
 export class PluginManager {
-  constructor(private readonly cfg: TAnscriptConfig) {}
+  constructor(private readonly cfg: TAnscriptConfigInput) {}
 
   name = 'plugin-manager'
 
@@ -41,7 +41,10 @@ export class PluginManager {
     return this._docConfig
   }
 
-  async config(config: TAnscriptConfig, processed = new Set<string>()): Promise<TAnscriptConfig> {
+  async config(
+    config: TAnscriptConfigInput,
+    processed = new Set<string>()
+  ): Promise<TAnscriptConfigInput> {
     const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
     for (const plugin of filtered) {
       if (processed.has(plugin.name)) continue

@@ -63,6 +63,14 @@ describe('types', () => {
     )
     expect(result.messages).toHaveLength(0)
   })
+
+  it('type simple array2', () => {
+    const result = parseAnscript(`type TypeName = string[][]`)
+    expect(result.toString()).toMatchInlineSnapshot(
+      `"● [type] "TypeName" type: type <identifier>: [array] "[": [array] "[": [ref] "string""`
+    )
+    expect(result.messages).toHaveLength(0)
+  })
   it('type array of group', () => {
     const result = parseAnscript(`type TypeName = (string | number)[]`)
     expect(result.toString()).toMatchInlineSnapshot(`

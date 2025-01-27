@@ -123,7 +123,7 @@ export class TsImport extends TsArtifact {
     // 6. Append " from '...' "
     statement += ` from '${this.fromPath}';`
 
-    return [docBlock, statement].filter(Boolean).join('\n')
+    return [docBlock, statement].filter(Boolean).join('\n') + '\n'
   }
 
   // --------------------------------------------------------------------------

@@ -67,6 +67,10 @@ const props = $pipe('prop', [
   pun('?').saveAs('optional').optional().skip('\n'),
   pun(':').skip('\n'),
   definition(allowedValuesPipeArray).separatedBy('&', '|').skip('\n').respectPriority(),
+  // block('[]')
+  //   .optional()
+  //   .empty()
+  //   .wrap(() => new $n.SemanticArrayNode(), true),
   pun(';', ',', '\n').orEob().lookBehind(),
 ]).skip('\n', ';', ',') as TPipe
 

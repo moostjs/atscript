@@ -2,6 +2,8 @@ type TCryptoAlgorithm = 'md5' | 'sha224' | 'sha256' | 'sha384' | 'sha512' | 'sha
 
 type TUser = [string | number ]
 
+type TArray = string[][]
+
 @mongo.collection '2332'
 @label 'true'
 export interface User2 {
@@ -10,6 +12,10 @@ export interface User2 {
     _id: (string[] | '123') & {
         ppp: 123,
     }
+
+    array2: string[][]
+
+    array3: [string, string][][][]
 
     @label 'true'
     @dummy 'test'

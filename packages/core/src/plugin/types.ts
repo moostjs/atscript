@@ -1,4 +1,4 @@
-import { TAnscriptConfig } from '../config'
+import { TAnscriptConfigInput } from '../config'
 import { AnscriptDoc } from '../document'
 
 export interface TOutput {
@@ -6,16 +6,14 @@ export interface TOutput {
   content: string
 }
 
-export interface TAnscriptRenderContext {
-  action: 'build' | 'extension'
-}
+export type TAnscriptRenderContext = 'prepare' | 'build'
 
 export interface TAnscriptPlugin {
   name: string
 
   config?: (
-    config: TAnscriptConfig
-  ) => Promise<TAnscriptConfig | undefined> | TAnscriptConfig | undefined
+    config: TAnscriptConfigInput
+  ) => Promise<TAnscriptConfigInput | undefined> | TAnscriptConfigInput | undefined
 
   resolve?: (id: string) => Promise<string | undefined> | string | undefined
 

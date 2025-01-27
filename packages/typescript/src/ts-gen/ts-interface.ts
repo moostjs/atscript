@@ -49,9 +49,13 @@ export class TsInterface extends TsArtifact {
     // (and ignoring union/intersection except possibly as object-literal combos).
     const structureString = this.structureAsInterfaceBody()
 
-    return [docBlock, `${exportPrefix}interface ${this.name}${extendsClause} ${structureString}`]
-      .filter(Boolean)
-      .join('\n')
+    return (
+      '\n' +
+      [docBlock, `${exportPrefix}interface ${this.name}${extendsClause} ${structureString}`]
+        .filter(Boolean)
+        .join('\n') +
+      '\n'
+    )
   }
 
   // --------------------------------------------------------------------------

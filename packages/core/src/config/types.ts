@@ -1,6 +1,6 @@
 import type { AnnotationSpec } from '../annotations/annotation-spec'
 import type { TPrimitiveConfig } from '../parser/nodes'
-import { TAnscriptPlugin } from '../plugin/types'
+import { TAnscriptPlugin, TAnscriptRenderContext } from '../plugin/types'
 
 export interface TAnscriptConfigInput {
   rootDir?: string
@@ -14,6 +14,7 @@ export interface TAnscriptConfigInput {
 }
 
 export interface TAnscriptConfigOutput {
+  context: TAnscriptRenderContext
   outDir?: string
 }
 

@@ -109,15 +109,19 @@ export class TsClass extends TsArtifact {
       .map(line => `  ${line}`)
       .join('\n')
 
-    return [
-      docBlock,
-      decoratorsBlock,
-      `${exportPrefix}class ${this.name}${heritageClause} {`,
-      indentedClassBody,
-      '}',
-    ]
-      .filter(Boolean)
-      .join('\n')
+    return (
+      '\n' +
+      [
+        docBlock,
+        decoratorsBlock,
+        `${exportPrefix}class ${this.name}${heritageClause} {`,
+        indentedClassBody,
+        '}',
+      ]
+        .filter(Boolean)
+        .join('\n') +
+      '\n'
+    )
   }
 
   // --------------------------------------------------------------------------
@@ -150,13 +154,12 @@ export class TsClass extends TsArtifact {
       .map(line => `  ${line}`)
       .join('\n')
 
-    return [
-      docBlock,
-      `${exportPrefix}class ${this.name}${heritageClause} {`,
-      indentedClassBody,
-      '}',
-    ]
-      .filter(Boolean)
-      .join('\n')
+    return (
+      '\n' +
+      [docBlock, `${exportPrefix}class ${this.name}${heritageClause} {`, indentedClassBody, '}']
+        .filter(Boolean)
+        .join('\n') +
+      '\n'
+    )
   }
 }
