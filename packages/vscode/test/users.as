@@ -4,13 +4,18 @@ type TUser = [string | number ]
 
 type TArray = string[][]
 
+type TTT = {
+    @label 'aaa'
+    abc: string
+}
+
 @mongo.collection '2332'
 @label 'true'
 export interface User2 {
     @label 'User "ID"'
     @mongo.key 'ObjectId'
     _id: (string[] | '123') & {
-        ppp: 123,
+        ppp: int,
     }
 
     array2: string[][]

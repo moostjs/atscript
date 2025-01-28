@@ -78,4 +78,100 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/imports.d.ts')
     )
   })
+
+  it('must render basic interface metadata', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/interface-metadata.as'],
+      plugins: [tsPlugin()],
+    })
+    const out = await repo.generate({ context: 'build' })
+    expect(out).toHaveLength(1)
+    expect(out[0].name).toBe('interface-metadata.ts')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/interface-metadata.ts')
+    )
+    const outDts = await repo.generate({ context: 'prepare' })
+    expect(outDts).toHaveLength(1)
+    expect(outDts[0].name).toBe('interface-metadata.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/interface-metadata.d.ts')
+    )
+  })
+  it('must render metadata inherited from other interface', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/inherit-metadata.as'],
+      plugins: [tsPlugin()],
+    })
+    const out = await repo.generate({ context: 'build' })
+    expect(out).toHaveLength(1)
+    expect(out[0].name).toBe('inherit-metadata.ts')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-metadata.ts')
+    )
+    const outDts = await repo.generate({ context: 'prepare' })
+    expect(outDts).toHaveLength(1)
+    expect(outDts[0].name).toBe('inherit-metadata.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-metadata.d.ts')
+    )
+  })
+  it('must render metadata inherited from type', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/inherit-from-type.as'],
+      plugins: [tsPlugin()],
+    })
+    const out = await repo.generate({ context: 'build' })
+    expect(out).toHaveLength(1)
+    expect(out[0].name).toBe('inherit-from-type.ts')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-from-type.ts')
+    )
+    const outDts = await repo.generate({ context: 'prepare' })
+    expect(outDts).toHaveLength(1)
+    expect(outDts[0].name).toBe('inherit-from-type.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-from-type.d.ts')
+    )
+  })
+  it('must render metadata inherited from multiple ancestors', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/inherit-chain.as'],
+      plugins: [tsPlugin()],
+    })
+    const out = await repo.generate({ context: 'build' })
+    expect(out).toHaveLength(1)
+    expect(out[0].name).toBe('inherit-chain.ts')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-chain.ts')
+    )
+    const outDts = await repo.generate({ context: 'prepare' })
+    expect(outDts).toHaveLength(1)
+    expect(outDts[0].name).toBe('inherit-chain.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/inherit-chain.d.ts')
+    )
+  })
+  it('must render real-world example (entity with address)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/real-world-1.as'],
+      plugins: [tsPlugin()],
+    })
+    const out = await repo.generate({ context: 'build' })
+    expect(out).toHaveLength(1)
+    expect(out[0].name).toBe('real-world-1.ts')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/real-world-1.ts')
+    )
+    const outDts = await repo.generate({ context: 'prepare' })
+    expect(outDts).toHaveLength(1)
+    expect(outDts[0].name).toBe('real-world-1.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/real-world-1.d.ts')
+    )
+  })
 })

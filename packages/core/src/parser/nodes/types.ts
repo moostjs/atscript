@@ -29,5 +29,11 @@ export interface TAnnotationTokens {
 }
 
 export interface TPrimitiveConfig {
+  nativeTypes?: {
+    [name in 'typescript' | 'java' | 'python' | 'csharp' | 'go']?: string
+  }
+  nativeConstructors?: {
+    [name in 'typescript' | 'java' | 'python' | 'csharp' | 'go']?: string
+  }
   documentation?: string
 }

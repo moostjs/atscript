@@ -1,4 +1,5 @@
 import { TsType } from './ts-type'
+import { wrapProp } from './utils'
 
 /**
  * Represents an object type literal (a set of properties),
@@ -71,7 +72,7 @@ export class TsStructure extends TsType {
       // If prop.type is TsStructure, it also extends TsType, so `.render()` works.
 
       const questionMark = prop.optional ? '?' : ''
-      return `${prefix}  ${prop.name}${questionMark}: ${propType};`
+      return `${prefix}  ${wrapProp(prop.name)}${questionMark}: ${propType};`
     })
 
     const objectLiteral = `{\n${lines.join('\n')}\n${prefix}}`

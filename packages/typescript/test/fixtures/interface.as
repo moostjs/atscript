@@ -3,6 +3,8 @@ export interface PublicInterface {
 
     pirmiitiveUn: string | number
 
+    interger: int
+
     literal: 'value'
 
     number: 5

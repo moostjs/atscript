@@ -13,21 +13,23 @@ import {
   isGroup,
   isImport,
   isInterface,
+  isPrimitive,
   isRef,
   isStructure,
   isTuple,
   isType,
 } from '@anscript/core'
 import { TsArtifact } from './ts-gen/ts-artifact'
-import { TsInterface } from './ts-gen/ts-interface'
 import { TsStructure } from './ts-gen/ts-structure'
 import { TsClass } from './ts-gen/ts-class'
 import { TsProperty } from './ts-gen/ts-prop'
-import { TsMethod } from './ts-gen/ts-method'
 import { TsType } from './ts-gen/ts-type'
 import { TsTuple } from './ts-gen/ts-tuple'
 import { TsTypeAlias } from './ts-gen/ts-type-alias'
 import { TsImport } from './ts-gen/ts-import'
+import { genAnnotations, annotateProps } from './annotate-props'
+import { escapeQuotes } from './ts-gen/utils'
+import { TsObject } from './ts-gen/ts-object'
 
 export const tsPlugin: () => TAnscriptPlugin = () => {
   return {
@@ -52,7 +54,11 @@ export const tsPlugin: () => TAnscriptPlugin = () => {
 }
 
 function renderDocument(doc: AnscriptDoc, context: TAnscriptRenderContext): string {
-  const tsArtifacts = [] as TsArtifact[]
+  const tsArtifacts = [
+    new TsImport('@anscript/typescript/runtime')
+      .addNamed('defineAnnotatedType')
+      .addNamed('type TAnscriptTypeObject'),
+  ] as TsArtifact[]
   const unused = new Set(doc.getUnusedTokens().map(t => t.text))
   for (const n of doc.nodes) {
     if (isInterface(n)) {
@@ -62,12 +68,15 @@ function renderDocument(doc: AnscriptDoc, context: TAnscriptRenderContext): stri
         continue
       }
       const interfaceName = node.id!
-      const exported = !!node.token('export')
-      if (exported) {
-        tsArtifacts.push(createClass(interfaceName, node))
-      } else {
-        tsArtifacts.push(createInterface(interfaceName, node))
+      // const exported = !!node.token('export')
+      // if (exported) {
+      tsArtifacts.push(createClass(doc, interfaceName, node))
+      if (context !== 'prepare') {
+        tsArtifacts.push(annotateProps(doc, interfaceName, node))
       }
+      // } else {
+      //   tsArtifacts.push(createInterface(interfaceName, node))
+      // }
       continue
     }
     if (isType(n)) {
@@ -76,7 +85,7 @@ function renderDocument(doc: AnscriptDoc, context: TAnscriptRenderContext): stri
         // skip unused types
         continue
       }
-      tsArtifacts.push(createTypeAlias(node.id!, node))
+      tsArtifacts.push(createTypeAlias(doc, node.id!, node))
       continue
     }
     if (isImport(n)) {
@@ -112,87 +121,90 @@ function createImport(node: SemanticImportNode, unused: Set<string>): TsImport |
   return isUnusedImport ? undefined : t
 }
 
-function createTypeAlias(name: string, node: SemanticTypeNode) {
+function createTypeAlias(doc: AnscriptDoc, name: string, node: SemanticTypeNode) {
   const exported = !!node.token('export')
-  const t = new TsTypeAlias(name, createType(node.getDefinition()!))
+  const t = new TsTypeAlias(name, createType(doc, node.getDefinition()!))
   if (exported) {
     t.exportAs('named')
   }
   return t
 }
 
-function createInterface(name: string, node: SemanticInterfaceNode): TsInterface {
-  const exported = !!node.token('export')
+// function createInterface(name: string, node: SemanticInterfaceNode): TsInterface {
+//   const exported = !!node.token('export')
 
-  const a = new TsInterface(name, createStructure(node.getDefinition()))
-  if (exported) {
-    a.exportAs('named')
-  }
+//   const a = new TsInterface(name, createStructure(node.getDefinition()))
+//   if (exported) {
+//     a.exportAs('named')
+//   }
 
-  return a
-}
+//   return a
+// }
 
-function createStructure(node?: SemanticNode): TsStructure {
+function createStructure(doc: AnscriptDoc, node?: SemanticNode): TsStructure {
   const s = new TsStructure()
   if (isStructure(node)) {
     for (const prop of Array.from(node.props.values())) {
       const optional = !!prop.token('optional')
       const def = prop.getDefinition()
       if (def) {
-        s.addProp(prop.id!, createType(def), optional)
+        s.addProp(prop.id!, createType(doc, def), optional)
       }
     }
   }
   return s
 }
 
-function createType(n: SemanticNode): TsType {
+function createType(doc: AnscriptDoc, n: SemanticNode): TsType {
   if (isStructure(n)) {
-    return createStructure(n)
+    return createStructure(doc, n)
   }
   if (isTuple(n)) {
     const tuple = new TsTuple()
     for (const child of n.unwrap()) {
-      tuple.addItem(createType(child))
+      tuple.addItem(createType(doc, child))
     }
     return tuple
   }
   if (isGroup(n)) {
     const operator = n.op
     const firstNode = n.first
-    const s = createType(firstNode)
+    const s = createType(doc, firstNode)
     for (const child of n.unwrap().slice(1)) {
       if (operator === '|') {
-        s.union(createType(child))
+        s.union(createType(doc, child))
       } else {
-        s.intersection(createType(child))
+        s.intersection(createType(doc, child))
       }
     }
     return s
   }
   if (isConst(n)) {
-    const name =
-      n.token('identifier')?.type === 'number' ? n.id! : `"${n.id!.replace(/"/g, '\\"')}"`
+    const name = n.token('identifier')?.type === 'number' ? n.id! : `"${escapeQuotes(n.id!)}"`
     return new TsType(name)
   }
   if (isRef(n)) {
     const node = n as SemanticRefNode
+    const target = doc.getDeclarationOwnerNode(node.id!)?.node
+    if (isPrimitive(target)) {
+      return new TsType(target.config?.nativeTypes?.typescript ?? 'unknown')
+    }
     let name = node.id!
     for (const c of node.chain) {
-      name += `["${c.text.replace(/"/g, '\\"')}"]`
+      name += `["${escapeQuotes(c.text)}"]`
     }
     return new TsType(name)
   }
   if (isArray(n)) {
     const node = n as SemanticArrayNode
-    const type = createType(node.getDefinition()!)
+    const type = createType(doc, node.getDefinition()!)
     type.array()
     return type
   }
   throw new Error(`Could not create type: unsupported node ${(n as SemanticNode).toString()}`)
 }
 
-function createClass(name: string, node: SemanticInterfaceNode): TsClass {
+function createClass(doc: AnscriptDoc, name: string, node: SemanticInterfaceNode): TsClass {
   const exported = !!node.token('export')
 
   const a = new TsClass(name)
@@ -203,7 +215,7 @@ function createClass(name: string, node: SemanticInterfaceNode): TsClass {
   if (isStructure(struct)) {
     for (const prop of Array.from(struct.props.values())) {
       const optional = !!prop.token('optional')
-      const type = createType(prop.getDefinition()!)
+      const type = createType(doc, prop.getDefinition()!)
       const p = new TsProperty(prop.id!, type)
       if (optional) {
         p.optional()
@@ -211,9 +223,13 @@ function createClass(name: string, node: SemanticInterfaceNode): TsClass {
       a.addProp(p)
     }
   }
-  const m = new TsMethod('static get __anscriptMeta', [], 'any')
-  m.addBodyLine('return {}')
-  a.addMethod(m)
+  a.addProp(new TsProperty('__is_anscript_annotated_type', 'boolean', 'true').static())
+  const typeObj = new TsObject()
+    .addEntry('kind', '"object"')
+    .addEntry('type', name)
+    .addEntry('props', 'new Map()')
+  a.addProp(new TsProperty('type', 'TAnscriptTypeObject', typeObj.render()).static().forceType())
+  a.addProp(new TsProperty('metadata', 'any', genAnnotations(node).render()).static())
 
   return a
 }

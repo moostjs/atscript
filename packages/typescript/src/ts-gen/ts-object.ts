@@ -1,3 +1,4 @@
+import { TsArray } from './ts-array'
 import { TsArtifact } from './ts-artifact'
 import { TsValue } from './ts-value'
 
@@ -15,18 +16,31 @@ import { TsValue } from './ts-value'
  * Indentation is managed via the `prefix` parameter, which increments for nested structures.
  */
 export class TsObject extends TsArtifact {
-  private entries: Array<{ key: string; value: TsValue | TsObject }> = []
+  protected entries: Array<{ key: string; value: TsValue | TsObject | TsArray }> = []
 
   constructor() {
     super('object-literal')
   }
 
-  public addEntry(key: string, value: TsObject | TsValue | string | number | boolean): this {
+  public addEntry(
+    key: string,
+    value:
+      | TsObject
+      | TsValue
+      | TsArray
+      | string
+      | number
+      | boolean
+      | { render(prefix?: string): string }
+  ): this {
     this.entries.push({
       key,
       value:
-        value instanceof TsValue || value instanceof TsObject
-          ? value
+        value instanceof TsValue ||
+        value instanceof TsObject ||
+        value instanceof TsArray ||
+        Object.hasOwn(value as object, 'render')
+          ? (value as TsValue)
           : new TsValue(value.toString()).setType(typeof value),
     })
     return this
@@ -40,7 +54,7 @@ export class TsObject extends TsArtifact {
 
     if (this.entries.length === 0) {
       // Empty object
-      return [docBlock, `${prefix}{}`, ''].filter(Boolean).join('\n')
+      return [docBlock, `{}`, ''].filter(Boolean).join('\n')
     }
 
     // Increase indentation for child lines
@@ -87,7 +101,7 @@ export class TsObject extends TsArtifact {
     })
 
     // Wrap in braces
-    return [docBlock, `${prefix}{`, ...lines, `${prefix}}`].filter(Boolean).join('\n')
+    return [docBlock, `{`, ...lines, `${prefix}}`].filter(Boolean).join('\n')
   }
 
   /**
