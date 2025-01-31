@@ -6,7 +6,7 @@ export {
   AnscriptDoc,
   build,
   BuildRepo,
-  TOutputExtended,
+  type TOutputExtended,
   type TAnscriptConfig,
   type TAnnotationSpecConfig,
   type TPrimitiveConfig,

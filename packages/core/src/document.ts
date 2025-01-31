@@ -42,7 +42,7 @@ export class AnscriptDoc {
   }
 
   get name() {
-    return this.id.split('/').pop()?.replace(/\.as$/, '')
+    return this.id.split('/').pop()
   }
 
   public readonly registry: IdRegistry

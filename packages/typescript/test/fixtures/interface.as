@@ -47,4 +47,6 @@ export interface PublicInterface {
     objectUnion2: string | { a: 'a' }
 
     objectIntersection: { a: 'a' } & { b: 'b' }
+
+    grouping: string | ((number & boolean) & { a: "b" } | 'c')
 }

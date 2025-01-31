@@ -5,6 +5,7 @@ import { AnscriptDoc, TAnscriptDocConfig } from '../document'
 import type { TAnscriptRenderContext, TOutput } from './types'
 import { getDefaultAnscriptConfig } from '../default-anscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
+import path from 'node:path'
 
 export interface TOutputExtended extends TOutput {
   id: string
@@ -99,7 +100,10 @@ export class PluginManager {
             ...newFiles.map(f => ({
               ...f,
               id: doc.id,
-              target: '',
+              target: path.join(
+                path.dirname(doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id),
+                f.name
+              ),
             }))
           )
         }

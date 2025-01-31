@@ -18,7 +18,7 @@ export interface TAnscriptConfigOutput {
   outDir?: string
 }
 
-export type TAnscriptConfig = TAnscriptConfigInput & TAnscriptConfigOutput
+export type TAnscriptConfig = TAnscriptConfigInput & Omit<TAnscriptConfigOutput, 'context'>
 
 export interface TAnnotationsTree {
   [key: string]: TAnnotationsTree | AnnotationSpec

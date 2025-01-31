@@ -40,45 +40,45 @@ export { SemanticTypeNode } from './type-node'
 export * from './types'
 
 export function isGroup(node?: SemanticNode): node is SemanticGroup {
-  return node instanceof SemanticGroup
+  return node?.entity === 'group' || node?.entity === 'structure' || node?.entity === 'tuple'
 }
 
 export function isInterface(node?: SemanticNode): node is SemanticInterfaceNode {
-  return node instanceof SemanticInterfaceNode
+  return node?.entity === 'interface'
 }
 
 export function isType(node?: SemanticNode): node is SemanticTypeNode {
-  return node instanceof SemanticTypeNode
+  return node?.entity === 'type'
 }
 
 export function isRef(node?: SemanticNode): node is SemanticRefNode {
-  return node instanceof SemanticRefNode
+  return node?.entity === 'ref'
 }
 
 export function isConst(node?: SemanticNode): node is SemanticConstNode {
-  return node instanceof SemanticConstNode
+  return node?.entity === 'const'
 }
 
 export function isProp(node?: SemanticNode): node is SemanticPropNode {
-  return node instanceof SemanticPropNode
+  return node?.entity === 'prop'
 }
 
 export function isStructure(node?: SemanticNode): node is SemanticStructureNode {
-  return node instanceof SemanticStructureNode
+  return node?.entity === 'structure'
 }
 
 export function isTuple(node?: SemanticNode): node is SemanticTupleNode {
-  return node instanceof SemanticTupleNode
+  return node?.entity === 'tuple'
 }
 
 export function isArray(node?: SemanticNode): node is SemanticArrayNode {
-  return node instanceof SemanticArrayNode
+  return node?.entity === 'array'
 }
 
 export function isImport(node?: SemanticNode): node is SemanticImportNode {
-  return node instanceof SemanticImportNode
+  return node?.entity === 'import'
 }
 
 export function isPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode {
-  return node instanceof SemanticPrimitiveNode
+  return node?.entity === 'primitive'
 }

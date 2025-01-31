@@ -68,8 +68,8 @@ const DEFAULT_CONFIG_BASE = 'anscript.config'
 /**
  * Resolves nearest config file
  */
-export async function resolveConfigFile(itnUri: string, root: string): Promise<string | undefined> {
-  const startDir = path.dirname(itnUri)
+export async function resolveConfigFile(docUri: string, root: string): Promise<string | undefined> {
+  const startDir = path.dirname(docUri)
   let currentDir = startDir
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
@@ -91,7 +91,7 @@ export async function resolveConfigFile(itnUri: string, root: string): Promise<s
 
 async function findConfigFileName(d: string): Promise<string | undefined> {
   const p = d.startsWith('file://') ? d.slice(7) : d
-  const filesInWorkingDirectory = new Set(await readdir(p))
+  const filesInWorkingDirectory = new Set(await readdir(decodeURIComponent(p)))
   for (const extension of SUPPORTED_CONFIG_FORMATS) {
     const fileName = `${DEFAULT_CONFIG_BASE}${extension}`
     if (filesInWorkingDirectory.has(fileName)) {
@@ -106,7 +106,9 @@ export async function loadTsConfig(configFile: string): Promise<TAnscriptConfig>
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(pathToFileURL(file).href)).default
   } finally {
+    console.error('Could not load config file', file)
     fs.unlink(file, () => {}) // Ignore errors
+    return {}
   }
 }
 

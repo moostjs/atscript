@@ -38,6 +38,7 @@ import {
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
+import { writeFile } from 'node:fs/promises'
 
 const CHECKS_DELAY = 100
 
@@ -68,10 +69,25 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     documents.listen(connection)
     connection.listen()
 
+    connection.onDidSaveTextDocument(async params => {
+      const anscript = await this.openDocument(params.textDocument.uri)
+      await this.checkDoc(anscript, true)
+      await this.currentCheck
+      const out = await anscript.render('prepare')
+      for (const o of out || []) {
+        if (o.target) {
+          writeFile(o.target, o.content)
+          console.log('created', o.target)
+        }
+      }
+    })
+
     connection.onNotification('workspace/files', async (fileUris: string[]) => {
-      fileUris.forEach(uri => {
-        this.addToRevalidateQueue(uri)
-      })
+      fileUris
+        .filter(uri => uri.search('node_modules') < 0)
+        .forEach(uri => {
+          this.addToRevalidateQueue(uri)
+        })
       this.checksDelay = 1
       this.triggerChecks()
       await this.currentCheck
