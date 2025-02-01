@@ -30,6 +30,6 @@ export declare class WithMetadata {
   }
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof WithMetadata>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 // prettier-ignore-end

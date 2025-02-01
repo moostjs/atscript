@@ -10,6 +10,10 @@ import dtsPlugin from 'rollup-plugin-dts'
 import { writeFileSync } from 'fs'
 import pkg from '../package.json' assert { type: 'json' }
 import path from 'path'
+import swcPlugin from 'unplugin-swc'
+
+const swc = swcPlugin.rolldown()
+
 let i = 1
 
 const info = dye('blue').attachConsole()
@@ -50,15 +54,17 @@ async function generateTypes() {
   await $`npx tsc`.nothrow()
 
   for (const ws of workspaces) {
-    const { entries, dts } = getBuildOptions(ws)
-    if (!dts) {
-      continue
-    }
-    for (const entry of entries) {
-      const p = entry.split('/').slice(0, -1).join('/')
-      const source = path.join('./.types', ws, p)
-      const target = path.join('./packages', ws, 'dist', p)
-      await $`mkdir -p ./packages/${ws}/dist && rsync -a ${source}/ ${target}/ --delete`
+    const builds = getBuildOptions(ws)
+    for (const { entries, dts } of builds) {
+      if (!dts) {
+        continue
+      }
+      for (const entry of entries) {
+        const p = entry.split('/').slice(0, -1).join('/')
+        const source = path.join('./.types', ws, p)
+        const target = path.join('./packages', ws, 'dist', p)
+        await $`mkdir -p ./packages/${ws}/dist && rsync -a ${source}/ ${target}/ --delete`
+      }
     }
   }
   for (const ws of workspaces) {
@@ -80,32 +86,32 @@ const FORMATS = {
 }
 
 async function rollupTypes(ws) {
-  const { entries, dts } = getBuildOptions(ws)
-  if (!dts) {
-    await $`rm -rf ./packages/${ws}/dist`
-    await $`mkdir -p ./packages/${ws}/dist`
-    return
-  }
+  const builds = getBuildOptions(ws)
   const files = []
-  for (const entry of entries) {
-    const fileName = entry
-      .split('/')
-      .pop()
-      .replace(/\.\w+$/u, '')
-    const p = entry.split('/').slice(0, -1).join('/')
-    const input = path.join('packages', ws, 'dist', p, `${fileName}.d.ts`)
-    const inputOptions = {
-      input,
-      plugins: [dtsPlugin()],
-      external: externals.get(ws),
+  for (const { entries, dts } of builds) {
+    if (!dts) {
+      continue
     }
-    const bundle = await rollup(inputOptions)
-    const { output } = await bundle.generate({ format: FORMATS.esm.format })
-    const target = `./packages/${ws}/dist/${fileName}.d.ts`
-    files.push({
-      name: target,
-      code: output[0].code,
-    })
+    for (const entry of entries) {
+      const fileName = entry
+        .split('/')
+        .pop()
+        .replace(/\.\w+$/u, '')
+      const p = entry.split('/').slice(0, -1).join('/')
+      const input = path.join('packages', ws, 'dist', p, `${fileName}.d.ts`)
+      const inputOptions = {
+        input,
+        plugins: [dtsPlugin()],
+        external: externals.get(ws),
+      }
+      const bundle = await rollup(inputOptions)
+      const { output } = await bundle.generate({ format: FORMATS.esm.format })
+      const target = `./packages/${ws}/dist/${fileName}.d.ts`
+      files.push({
+        name: target,
+        code: output[0].code,
+      })
+    }
   }
   await $`rm -rf ./packages/${ws}/dist`
   await $`mkdir -p ./packages/${ws}/dist`
@@ -122,31 +128,33 @@ async function generateBundles() {
   }
 }
 
-const dplg = dyePlugin()
+const _dye = dyePlugin()
 async function rolldownPackages(ws) {
-  const { entries, formats } = getBuildOptions(ws)
-  for (const entry of entries) {
-    const inputOptions = {
-      input: path.join(`packages/${ws}`, entry),
-      external: externals.get(ws),
-      define: {
-        __VERSION__: JSON.stringify(pkg.version),
-      },
-      plugins: [dplg],
+  const builds = getBuildOptions(ws)
+  for (const { entries, formats } of builds) {
+    for (const entry of entries) {
+      const inputOptions = {
+        input: path.join(`packages/${ws}`, entry),
+        external: externals.get(ws),
+        define: {
+          __VERSION__: JSON.stringify(pkg.version),
+        },
+        plugins: [_dye, swc],
+      }
+      const fileName = entry
+        .split('/')
+        .pop()
+        .replace(/\.\w+$/u, '')
+      const bundle = await rolldown(inputOptions)
+      const created = []
+      for (const f of formats) {
+        const { ext, format } = FORMATS[f]
+        const { output } = await bundle.generate({ format })
+        const target = `./packages/${ws}/dist/${fileName}${ext}`
+        writeFileSync(target, output[0].code)
+        created.push(target)
+      }
+      done(created.join(' \t'))
     }
-    const fileName = entry
-      .split('/')
-      .pop()
-      .replace(/\.\w+$/u, '')
-    const bundle = await rolldown(inputOptions)
-    const created = []
-    for (const f of formats) {
-      const { ext, format } = FORMATS[f]
-      const { output } = await bundle.generate({ format })
-      const target = `./packages/${ws}/dist/${fileName}${ext}`
-      writeFileSync(target, output[0].code)
-      created.push(target)
-    }
-    done(created.join(' \t'))
   }
 }

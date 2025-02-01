@@ -70,7 +70,6 @@ export class BuildRepo {
 
   async generate(config: TAnscriptConfigOutput, docs = this.docs) {
     const outFiles: TOutput[] = []
-
     // Collect build outputs from each document
     for (const document of docs) {
       const out = await document.render(config.format)
@@ -90,6 +89,11 @@ export class BuildRepo {
       } else {
         outFile.target = path.join(path.dirname(docPath), outFile.fileName)
       }
+    }
+
+    if (this.repo.forceConfig && this.docs === docs && this.docs[0]) {
+      const { manager } = await this.repo.loadPluginManagerFor(this.docs[0].id)
+      await manager.buildEnd(outFiles, config.format, this.repo)
     }
 
     return outFiles

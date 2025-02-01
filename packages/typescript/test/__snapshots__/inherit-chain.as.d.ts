@@ -22,7 +22,7 @@ declare class I1 {
   prop?: TType
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof I1>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 
 /**
@@ -33,6 +33,6 @@ export declare class I2 {
   prop?: I1["prop"]
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof I2>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 // prettier-ignore-end

@@ -20,7 +20,7 @@ declare class Address {
   zip: string
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof Address>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 
 /**
@@ -33,7 +33,7 @@ declare class Contact {
   value: string
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof Contact>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 
 /**
@@ -47,6 +47,6 @@ export declare class Entity {
   contacts: Contact[]
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof Entity>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 // prettier-ignore-end

@@ -1,5 +1,7 @@
+import { TOutput } from '../build'
 import { TAnscriptConfig } from '../config'
 import { AnscriptDoc } from '../document'
+import { AnscriptRepo } from '../repo'
 
 export interface TPluginOutput {
   fileName: string
@@ -25,6 +27,12 @@ export interface TAnscriptPlugin {
     doc: AnscriptDoc,
     format: TAnscriptRenderFormat
   ) => Promise<TPluginOutput[]> | TPluginOutput[]
+
+  buildEnd?: (
+    output: TOutput[],
+    format: TAnscriptRenderFormat,
+    repo: AnscriptRepo
+  ) => Promise<void> | void
 }
 
 export const createAnscriptPlugin = (plugin: TAnscriptPlugin) => plugin

@@ -34,6 +34,10 @@
         "extensions": [
           ".as"
         ],
+        "icon": {
+          "light": "./icons/as-file.svg",
+          "dark": "./icons/as-file.svg"
+        },
         "configuration": "./language-configuration.json"
       }
     ],
@@ -43,7 +47,13 @@
         "scopeName": "source.anscript",
         "path": "./syntaxes/anscript.tmLanguage.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "explorer.fileNesting.enabled": true,
+      "explorer.fileNesting.patterns": {
+        "*.as": "${capture}.as.d.ts"
+      }
+    }
   },
   "publisher": "moost",
   "dependencies": {

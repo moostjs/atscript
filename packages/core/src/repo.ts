@@ -19,8 +19,8 @@ interface TPluginManagers {
 
 export class AnscriptRepo {
   constructor(
-    protected readonly root = process.cwd(),
-    private readonly forceConfig?: TAnscriptConfigInput
+    public readonly root = process.cwd(),
+    public readonly forceConfig?: TAnscriptConfigInput
   ) {}
 
   protected configFormat?: 'esm' | 'cjs'

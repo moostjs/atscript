@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 // client/extension.ts
 import type { ExtensionContext } from 'vscode'
-import { Uri, workspace } from 'vscode'
+import { Uri, workspace, ConfigurationTarget } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node'
 
@@ -55,6 +55,16 @@ export function activate(context: ExtensionContext) {
 
   // If you want to dispose it on extension deactivate
   context.subscriptions.push(client)
+
+  // const filesConfig = workspace.getConfiguration('files')
+  // filesConfig.update('explorer.fileNesting.enabled', true, ConfigurationTarget.Global)
+  // filesConfig.update(
+  //   'explorer.fileNesting.patterns',
+  //   {
+  //     '*.as': '${capture}.as.d.ts',
+  //   },
+  //   ConfigurationTarget.Global
+  // )
 }
 
 export function deactivate(): Thenable<void> | undefined {

@@ -14,10 +14,23 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "cli.cjs"
+  ],
+  "bin": {
+    "asc": "./cli.cjs"
+  },
+  "build": [
+    {},
+    {
+      "format": "cjs",
+      "entries": [
+        "src/cli/cli.ts"
+      ],
+      "dts": false
+    }
   ],
   "scripts": {
-    "build": "vite build",
     "test": "vitest"
   },
   "keywords": [
@@ -28,7 +41,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anscript/core": "workspace:^"
+    "@anscript/core": "workspace:^",
+    "@moostjs/event-cli": "^0.5.21",
+    "moost": "^0.5.21"
   },
   "devDependencies": {
     "vitest": "^2.1.8"

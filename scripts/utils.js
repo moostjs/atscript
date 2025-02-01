@@ -26,11 +26,12 @@ export function getExternals(ws) {
 export function getBuildOptions(ws) {
   const pkgPath = getWorkspacePath(ws ? `packages/${ws}/package.json` : 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath))
-  return {
-    entries: pkg?.build?.entries || ['src/index.ts'],
-    formats: pkg?.build?.format ? [pkg?.build?.format] : ['esm', 'cjs'],
-    dts: pkg?.build?.dts ?? true,
-  }
+  const buildArray = Array.isArray(pkg?.build) ? pkg.build : pkg?.build ? [pkg.build] : [{}]
+  return buildArray.map(build => ({
+    entries: build.entries || ['src/index.ts'],
+    formats: build.format ? [build.format] : ['esm', 'cjs'],
+    dts: build.dts ?? true,
+  }))
 }
 
 export function getWorkspacePath(target) {

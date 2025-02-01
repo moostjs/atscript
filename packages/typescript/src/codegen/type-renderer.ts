@@ -98,7 +98,7 @@ export class TypeRenderer extends BaseRenderer {
     if (asClass) {
       this.writeln('static __is_anscript_annotated_type: boolean')
       this.writeln(`static type: TAnscriptTypeObject<keyof ${asClass}>`)
-      this.writeln(`static metadata: TMetadataMap<any>`)
+      this.writeln(`static metadata: TMetadataMap<AnscriptMetadata>`)
     }
     this.pop()
   }

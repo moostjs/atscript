@@ -5,6 +5,8 @@ import { AnscriptDoc, TAnscriptDocConfig } from '../document'
 import type { TAnscriptRenderFormat, TPluginOutput } from './types'
 import { getDefaultAnscriptConfig } from '../default-anscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
+import { TOutput } from '../build'
+import { AnscriptRepo } from '../repo'
 
 export interface TOutputWithSource extends TPluginOutput {
   source: string
@@ -109,5 +111,13 @@ export class PluginManager {
       }
     }
     return files
+  }
+
+  async buildEnd(output: TOutput[], format: TAnscriptRenderFormat, repo: AnscriptRepo) {
+    for (const plugin of this.plugins) {
+      if (plugin.buildEnd) {
+        await plugin.buildEnd(output, format, repo)
+      }
+    }
   }
 }

@@ -54,6 +54,6 @@ export declare class PublicInterface {
   }) | "c"))
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof PublicInterface>
-  static metadata: TMetadataMap<any>
+  static metadata: TMetadataMap<AnscriptMetadata>
 }
 // prettier-ignore-end
