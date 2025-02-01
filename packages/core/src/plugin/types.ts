@@ -1,19 +1,19 @@
-import { TAnscriptConfigInput } from '../config'
+import { TAnscriptConfig } from '../config'
 import { AnscriptDoc } from '../document'
 
-export interface TOutput {
-  name: string
+export interface TPluginOutput {
+  fileName: string
   content: string
 }
 
-export type TAnscriptRenderContext = 'prepare' | 'build'
+export type TAnscriptRenderFormat = string
 
 export interface TAnscriptPlugin {
   name: string
 
   config?: (
-    config: TAnscriptConfigInput
-  ) => Promise<TAnscriptConfigInput | undefined> | TAnscriptConfigInput | undefined
+    config: TAnscriptConfig
+  ) => Promise<TAnscriptConfig | undefined> | TAnscriptConfig | undefined
 
   resolve?: (id: string) => Promise<string | undefined> | string | undefined
 
@@ -21,7 +21,10 @@ export interface TAnscriptPlugin {
 
   onDocumnet?: (doc: AnscriptDoc) => Promise<void> | void
 
-  render?: (doc: AnscriptDoc, context: TAnscriptRenderContext) => Promise<TOutput[]> | TOutput[]
+  render?: (
+    doc: AnscriptDoc,
+    format: TAnscriptRenderFormat
+  ) => Promise<TPluginOutput[]> | TPluginOutput[]
 }
 
 export const createAnscriptPlugin = (plugin: TAnscriptPlugin) => plugin

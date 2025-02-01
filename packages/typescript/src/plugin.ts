@@ -4,14 +4,23 @@ import { TypeRenderer, JsRenderer } from './codegen'
 export const tsPlugin: () => TAnscriptPlugin = () => {
   return {
     name: 'typesccript',
-    render(doc, context) {
-      return [
-        {
-          name: context === 'prepare' ? `${doc.name}.d.ts` : `${doc.name}.js`,
-          content:
-            context === 'prepare' ? new TypeRenderer(doc).render() : new JsRenderer(doc).render(),
-        },
-      ]
+    render(doc, format) {
+      if (format === 'dts') {
+        return [
+          {
+            fileName: `${doc.name}.d.ts`,
+            content: new TypeRenderer(doc).render(),
+          },
+        ]
+      }
+      if (format === 'js') {
+        return [
+          {
+            fileName: `${doc.name}.js`,
+            content: new JsRenderer(doc).render(),
+          },
+        ]
+      }
     },
   } as TAnscriptPlugin
 }

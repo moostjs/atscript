@@ -11,23 +11,11 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
-    "./runtime": {
-      "types": "./dist/runtime.d.ts",
-      "import": "./dist/runtime.mjs",
-      "require": "./dist/runtime.cjs"
-    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist"
   ],
-  "build": {
-    "entries": [
-      "src/index.ts",
-      "src/runtime.ts"
-    ],
-    "dts": true
-  },
   "scripts": {
     "build": "vite build",
     "test": "vitest"

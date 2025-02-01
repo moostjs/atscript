@@ -11,6 +11,7 @@ import type { SemanticNode, Token } from '@anscript/core'
 import {
   AnscriptDoc,
   AnscriptRepo,
+  BuildRepo,
   getRelPath,
   isAnnotationSpec,
   isInterface,
@@ -38,7 +39,8 @@ import {
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
-import { writeFile } from 'node:fs/promises'
+import { writeFile, mkdir } from 'node:fs/promises'
+import path from 'path'
 
 const CHECKS_DELAY = 100
 
@@ -62,6 +64,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     private readonly documents: TextDocuments<TextDocument>
   ) {
     super()
+    this.configFormat = 'cjs'
     this.documents.onDidChangeContent(change => {
       this.addToChangeQueue(change.document.uri)
     })
@@ -69,17 +72,24 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     documents.listen(connection)
     connection.listen()
 
-    connection.onDidSaveTextDocument(async params => {
-      const anscript = await this.openDocument(params.textDocument.uri)
-      await this.checkDoc(anscript, true)
-      await this.currentCheck
-      const out = await anscript.render('prepare')
-      for (const o of out || []) {
-        if (o.target) {
-          writeFile(o.target, o.content)
-          console.log('created', o.target)
+    connection.onDidChangeWatchedFiles(async params => {
+      for (const change of params.changes) {
+        console.log({ change, pass: /anscript\.config\.[mc]?[tj]s$/.test(change.uri) })
+        if (/anscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
+          this.onConfigChanged(change.uri)
         }
       }
+    })
+
+    connection.onDidSaveTextDocument(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
+      const anscript = await this.openDocument(params.textDocument.uri)
+      const { manager } = await this.resolveConfig(anscript.id)
+      const config = await manager.config()
+      const bld = new BuildRepo(config.rootDir!, this, [anscript])
+      await bld.write({ format: 'dts', outDir: config.outDir })
     })
 
     connection.onNotification('workspace/files', async (fileUris: string[]) => {
@@ -95,11 +105,17 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     })
 
     connection.onDefinition(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const anscript = await this.openDocument(params.textDocument.uri)
       return anscript.getToDefinitionAt(params.position.line, params.position.character)
     })
 
     connection.onReferences(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const anscript = await this.openDocument(params.textDocument.uri)
       return anscript.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
         uri: r.uri,
@@ -108,6 +124,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     })
 
     connection.onRenameRequest(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const { textDocument, position, newName } = params
 
       // Open the document and find the token at the cursor
@@ -157,6 +176,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     connection.onCompletionResolve(item => item)
 
     connection.onCompletion(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const { textDocument, position, context } = params
       const document = documents.get(textDocument.uri)
       if (!document) {
@@ -292,6 +314,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     })
 
     connection.onSignatureHelp(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const { textDocument, position } = params
       const document = documents.get(textDocument.uri)
       if (!document) {
@@ -333,6 +358,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     })
 
     connection.onHover(async params => {
+      if (!params.textDocument.uri.endsWith('.as')) {
+        return
+      }
       const { textDocument, position } = params
       const document = documents.get(textDocument.uri)
       if (!document) {
@@ -377,6 +405,19 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     // connection.languages.semanticTokens.onRange(async params =>
     //   this.provideSemanticTokens(params.textDocument.uri, params.range)
     // )
+  }
+
+  async onConfigChanged(_configFile: string) {
+    const configFile = _configFile.startsWith('file://') ? _configFile.slice(7) : _configFile
+    this.configFiles.delete(configFile)
+    for (const [id, cache] of Array.from(this.configs.entries())) {
+      const { file } = await cache
+      if (file === configFile) {
+        this.configs.delete(id)
+        this.anscripts.delete(id)
+        this.addToRevalidateQueue(id)
+      }
+    }
   }
 
   // async provideSemanticTokens(uri: string, range?: Range) {

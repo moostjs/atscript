@@ -3,10 +3,15 @@ import { glob } from 'glob' // or any other glob library
 import { TAnscriptConfigInput, TAnscriptConfigOutput } from './config'
 import { AnscriptRepo } from './repo'
 import { AnscriptDoc } from './document'
-import { TOutputExtended } from './plugin'
+import { TOutputWithSource } from './plugin'
 import { TMessages } from './parser/types'
+import { mkdir, writeFile } from 'fs/promises'
 
-export async function build(config: TAnscriptConfigInput) {
+export interface TOutput extends TOutputWithSource {
+  target: string
+}
+
+export async function build(config: Partial<TAnscriptConfigInput>) {
   const rootDir = config.rootDir
     ? config.rootDir.startsWith('/')
       ? config.rootDir
@@ -14,7 +19,8 @@ export async function build(config: TAnscriptConfigInput) {
     : process.cwd()
   config.rootDir = rootDir
 
-  const repo = new AnscriptRepo(rootDir, config)
+  console.log('build', config)
+  const repo = new AnscriptRepo(rootDir, config as TAnscriptConfigInput)
 
   // Gather a list of .as file entries from either user-provided `entries` or by globbing.
   const entries: string[] = []
@@ -63,30 +69,41 @@ export class BuildRepo {
     return docMessages
   }
 
-  async generate(config: TAnscriptConfigOutput) {
-    const outFiles: TOutputExtended[] = []
+  async generate(config: TAnscriptConfigOutput, docs = this.docs) {
+    const outFiles: TOutput[] = []
 
     // Collect build outputs from each document
-    for (const document of this.docs) {
-      const out = await document.render(config.context)
+    for (const document of docs) {
+      const out = await document.render(config.format)
       if (out?.length) {
-        outFiles.push(...out)
+        outFiles.push(...(out as TOutput[]))
       }
     }
 
     // Fill `target` for each output file
     for (const outFile of outFiles) {
       // Convert URI-like `id` to a normal file path
-      const docPath = outFile.id.replace(/^file:\/\//, '')
+      const docPath = outFile.source.replace(/^file:\/\//, '')
       if (config.outDir) {
         const rel = path.relative(this.rootDir, docPath)
         const relDir = path.dirname(rel)
-        outFile.target = path.join(this.rootDir, config.outDir, relDir, outFile.name)
+        outFile.target = path.join(this.rootDir, config.outDir, relDir, outFile.fileName)
       } else {
-        outFile.target = path.join(path.dirname(docPath), outFile.name)
+        outFile.target = path.join(path.dirname(docPath), outFile.fileName)
       }
     }
 
+    return outFiles
+  }
+
+  async write(config: TAnscriptConfigOutput, docs = this.docs) {
+    const outFiles = await this.generate(config, docs)
+    for (const o of outFiles) {
+      if (o.target) {
+        await mkdir(path.dirname(o.target), { recursive: true })
+        writeFile(o.target, o.content)
+      }
+    }
     return outFiles
   }
 }

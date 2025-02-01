@@ -10,7 +10,7 @@ import { rolldown } from 'rolldown'
 
 import type { TAnscriptConfig } from './types'
 
-async function bundleTsConfig(configFile: string): Promise<string> {
+async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
   const dirnameVarName = 'injected_original_dirname'
   const filenameVarName = 'injected_original_filename'
   const importMetaUrlVarName = 'injected_original_import_meta_url'
@@ -48,9 +48,10 @@ async function bundleTsConfig(configFile: string): Promise<string> {
   const outputDir = path.dirname(configFile)
   const result = await bundle.write({
     dir: outputDir,
-    format: 'esm',
+    format: forceFormat || 'esm',
     sourcemap: 'inline',
-    entryFileNames: 'anscript.config.[hash].js',
+    entryFileNames:
+      forceFormat === 'cjs' ? 'anscript.config.[hash].cjs' : 'anscript.config.[hash].mjs',
   })
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
   const fileName = result.output.find(
@@ -100,29 +101,36 @@ async function findConfigFileName(d: string): Promise<string | undefined> {
   }
 }
 
-export async function loadTsConfig(configFile: string): Promise<TAnscriptConfig> {
-  const file = await bundleTsConfig(configFile)
+export async function loadTsConfig(
+  configFile: string,
+  forceFormat?: 'cjs' | 'esm'
+): Promise<TAnscriptConfig> {
+  const file = await bundleTsConfig(configFile, forceFormat)
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(pathToFileURL(file).href)).default
-  } finally {
-    console.error('Could not load config file', file)
-    fs.unlink(file, () => {}) // Ignore errors
+  } catch (error) {
+    console.error('Could not load config file', file, error)
     return {}
+  } finally {
+    fs.unlink(file, () => {})
   }
 }
 
-export async function loadConfig(configPath: string): Promise<TAnscriptConfig> {
+export async function loadConfig(
+  configPath: string,
+  forceFormat?: 'cjs' | 'esm'
+): Promise<TAnscriptConfig> {
   // eslint-disable-next-line no-param-reassign
   const ext = path.extname(configPath)
-
   try {
     if (SUPPORTED_JS_CONFIG_FORMATS.includes(ext)) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member
-      return (await import(pathToFileURL(configPath).href)).default
+      return forceFormat
+        ? await loadTsConfig(path.resolve(configPath), forceFormat)
+        : (await import(pathToFileURL(configPath).href)).default
     } else if (SUPPORTED_TS_CONFIG_FORMATS.includes(ext)) {
       const rawConfigPath = path.resolve(configPath)
-      return await loadTsConfig(rawConfigPath)
+      return await loadTsConfig(rawConfigPath, forceFormat)
     } else {
       throw new Error(
         `Unsupported config format. Expected: \`${SUPPORTED_CONFIG_FORMATS.join(
@@ -131,7 +139,6 @@ export async function loadConfig(configPath: string): Promise<TAnscriptConfig> {
       )
     }
   } catch (error) {
-    console.error(error)
     throw new Error('Error happened while loading config.')
   }
 }

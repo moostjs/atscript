@@ -1,4 +1,4 @@
-import { defineAnnotatedType as $ } from "@anscript/typescript/runtime"
+import { defineAnnotatedType as $ } from "@anscript/typescript"
 
 class ISource {}
 $("object", ISource)

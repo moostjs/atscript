@@ -1,19 +1,19 @@
 import { readFile } from 'node:fs/promises'
-import { TAnscriptConfigInput } from '../config'
+import { TAnscriptConfig, TAnscriptConfigInput } from '../config'
 import { defu } from 'defu'
 import { AnscriptDoc, TAnscriptDocConfig } from '../document'
-import type { TAnscriptRenderContext, TOutput } from './types'
+import type { TAnscriptRenderFormat, TPluginOutput } from './types'
 import { getDefaultAnscriptConfig } from '../default-anscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
-import path from 'node:path'
 
-export interface TOutputExtended extends TOutput {
-  id: string
-  target: string
+export interface TOutputWithSource extends TPluginOutput {
+  source: string
 }
 
 export class PluginManager {
-  constructor(private readonly cfg: TAnscriptConfigInput) {}
+  constructor(private readonly cfg: TAnscriptConfig) {}
+
+  _config!: TAnscriptConfig
 
   name = 'plugin-manager'
 
@@ -25,7 +25,7 @@ export class PluginManager {
 
   async getDocConfig(): Promise<TAnscriptDocConfig> {
     if (!this._docConfig) {
-      const raw = await this.config(this.cfg)
+      const raw = await this.config()
       this._docConfig = getDefaultAnscriptConfig()
       if (raw?.primitives) {
         this._docConfig.primitives = this._docConfig.primitives || new Map()
@@ -43,19 +43,22 @@ export class PluginManager {
   }
 
   async config(
-    config: TAnscriptConfigInput,
+    config: TAnscriptConfig = this.cfg,
     processed = new Set<string>()
-  ): Promise<TAnscriptConfigInput> {
-    const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
-    for (const plugin of filtered) {
-      if (processed.has(plugin.name)) continue
-      defu(await plugin.config?.(config), config)
-      processed.add(plugin.name)
+  ): Promise<TAnscriptConfig> {
+    if (!this._config) {
+      const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
+      for (const plugin of filtered) {
+        if (processed.has(plugin.name)) continue
+        defu(await plugin.config?.(config), config)
+        processed.add(plugin.name)
+      }
+      if (processed.size !== filtered.length) {
+        return this.config(config, processed)
+      }
+      this._config = config
     }
-    if (processed.size !== filtered.length) {
-      return this.config(config, processed)
-    }
-    return config
+    return this._config
   }
 
   async resolve(id: string) {
@@ -90,20 +93,16 @@ export class PluginManager {
     }
   }
 
-  async render(doc: AnscriptDoc, context: TAnscriptRenderContext) {
-    const files: TOutputExtended[] = []
+  async render(doc: AnscriptDoc, format: TAnscriptRenderFormat) {
+    const files: TOutputWithSource[] = []
     for (const plugin of this.plugins) {
       if (plugin.render) {
-        const newFiles = await plugin.render(doc, context)
+        const newFiles = await plugin.render(doc, format)
         if (newFiles?.length > 0) {
           files.push(
             ...newFiles.map(f => ({
               ...f,
-              id: doc.id,
-              target: path.join(
-                path.dirname(doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id),
-                f.name
-              ),
+              source: doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id,
             }))
           )
         }

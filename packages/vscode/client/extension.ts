@@ -9,7 +9,6 @@ let client: LanguageClient | undefined
 
 export function activate(context: ExtensionContext) {
   // The server is implemented in server/server.js (transpiled from server/server.ts).
-  console.log('client', process.env)
   const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.cjs').fsPath
 
   // Optional debug options
@@ -29,8 +28,12 @@ export function activate(context: ExtensionContext) {
     // register server for Anscript language
     documentSelector: [{ scheme: 'file', language: 'anscript' }],
     synchronize: {
-      // watch .anscript files
-      fileEvents: workspace.createFileSystemWatcher('**/*.as'),
+      fileEvents: [
+        // watch .as files
+        workspace.createFileSystemWatcher('**/*.as'),
+        // watch anscript config files
+        workspace.createFileSystemWatcher('**/anscript.config.{js,ts,mjs,mts,cjs,cts}'),
+      ],
     },
   }
 

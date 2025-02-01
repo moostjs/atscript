@@ -1,9 +1,9 @@
 import type { AnnotationSpec } from '../annotations/annotation-spec'
 import type { TPrimitiveConfig } from '../parser/nodes'
-import { TAnscriptPlugin, TAnscriptRenderContext } from '../plugin/types'
+import { TAnscriptPlugin, TAnscriptRenderFormat } from '../plugin/types'
 
 export interface TAnscriptConfigInput {
-  rootDir?: string
+  rootDir: string
   entries?: string[]
   primitives?: Record<string, TPrimitiveConfig>
   annotations?: TAnnotationsTree
@@ -14,11 +14,11 @@ export interface TAnscriptConfigInput {
 }
 
 export interface TAnscriptConfigOutput {
-  context: TAnscriptRenderContext
+  format: TAnscriptRenderFormat
   outDir?: string
 }
 
-export type TAnscriptConfig = TAnscriptConfigInput & Omit<TAnscriptConfigOutput, 'context'>
+export type TAnscriptConfig = Partial<TAnscriptConfigInput & TAnscriptConfigOutput>
 
 export interface TAnnotationsTree {
   [key: string]: TAnnotationsTree | AnnotationSpec

@@ -19,7 +19,7 @@ import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
-import { TAnscriptPlugin, TAnscriptRenderContext } from './plugin/types'
+import { TAnscriptPlugin, TAnscriptRenderFormat } from './plugin/types'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
@@ -100,8 +100,8 @@ export class AnscriptDoc {
     return Array.from(this.config.primitives?.values() ?? [])
   }
 
-  async render(context: TAnscriptRenderContext) {
-    return this.manager?.render(this, context)
+  async render(format: TAnscriptRenderFormat) {
+    return this.manager?.render(this, format)
   }
 
   resolveAnnotation(name: string) {
@@ -134,8 +134,13 @@ export class AnscriptDoc {
   }
 
   public nodes: SemanticNode[] = []
+  private _text: string = ''
+  get text() {
+    return this._text
+  }
 
   update(text: string, debug = false) {
+    this._text = text
     this.cleanup()
     const rawTokens = tokenize(text, debug)
     const ni = new NodeIterator(rawTokens, []).move()

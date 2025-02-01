@@ -1,4 +1,4 @@
-import { defineAnnotatedType as $ } from "@anscript/typescript/runtime"
+import { defineAnnotatedType as $ } from "@anscript/typescript"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 

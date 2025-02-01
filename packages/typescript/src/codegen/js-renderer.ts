@@ -17,7 +17,7 @@ import { escapeQuotes } from './utils'
 
 export class JsRenderer extends BaseRenderer {
   pre() {
-    this.writeln('import { defineAnnotatedType as $ } from "@anscript/typescript/runtime"')
+    this.writeln('import { defineAnnotatedType as $ } from "@anscript/typescript"')
   }
 
   renderInterface(node: SemanticInterfaceNode): void {

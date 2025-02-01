@@ -2,7 +2,8 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { TAnscriptConfigInput } from './config'
+import path from 'node:path'
+import { TAnscriptConfigInput, TAnscriptConfigOutput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AnscriptDoc } from './document'
 import type { Token } from './parser/token'
@@ -18,9 +19,11 @@ interface TPluginManagers {
 
 export class AnscriptRepo {
   constructor(
-    private readonly root = process.cwd(),
+    protected readonly root = process.cwd(),
     private readonly forceConfig?: TAnscriptConfigInput
   ) {}
+
+  protected configFormat?: 'esm' | 'cjs'
 
   /**
    * Configs cache
@@ -34,6 +37,14 @@ export class AnscriptRepo {
 
   protected forcedManager: TPluginManagers | undefined
 
+  /**
+   * cache for raw content of config files
+   */
+  protected configFiles = new Map<
+    string,
+    Promise<Partial<TAnscriptConfigInput & TAnscriptConfigOutput>>
+  >()
+
   async loadPluginManagerFor(id: string): Promise<TPluginManagers> {
     if (this.forceConfig) {
       if (!this.forcedManager) {
@@ -46,16 +57,26 @@ export class AnscriptRepo {
     }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
-      const rawConfig = await loadConfig(configFile)
+      const globalPathToConfig = path.join(this.root, configFile)
+      if (!this.configFiles.has(globalPathToConfig)) {
+        const rawConfigPromise = loadConfig(configFile, this.configFormat)
+        this.configFiles.set(globalPathToConfig, rawConfigPromise)
+      }
+      const rawConfig = await this.configFiles.get(globalPathToConfig)!
+      if (!rawConfig.rootDir) {
+        rawConfig.rootDir = path.dirname(configFile)
+      }
       const manager = new PluginManager(rawConfig)
       await manager.getDocConfig()
       return {
-        file: configFile,
+        file: globalPathToConfig,
         manager,
         dependants: new Set(),
       }
     } else {
-      const manager = new PluginManager({})
+      const manager = new PluginManager({
+        rootDir: process.cwd(),
+      })
       await manager.getDocConfig()
       return {
         manager,
