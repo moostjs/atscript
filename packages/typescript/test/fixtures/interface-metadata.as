@@ -5,6 +5,9 @@ export interface WithMetadata {
     @label 'Prop1'
     prop1: string
 
+    @mul 1
+    @mul 2
+    @mul 3
     @long.nested.name 'Prop-2'
     @long.nested.name2 'Prop-2-2'
     'prop-2': int
@@ -17,6 +20,7 @@ export interface WithMetadata {
         @label 'Prop4'
         prop4: string
 
+        @obj 'str', 123, false
         nested2: {
             nested3: {
                 a: float

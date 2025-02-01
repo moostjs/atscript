@@ -1,3 +1,4 @@
+// eslint-disable max-params
 /* eslint-disable max-depth */
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable complexity */
@@ -227,7 +228,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
                 },
               },
             ] as CompletionItem[]
-            if (isAnnotationSpec(a[key]) && a[key].config.arguments?.length) {
+            if (isAnnotationSpec(a[key]) && a[key].arguments.length) {
               const aName = `@${[...prev, key].join('.')}`
               const documentation = {
                 kind: 'markdown',
@@ -259,7 +260,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
           })
         }
         const aContext = await this.getAnnotationContextAt(document, position)
-        const arg = aContext?.annotationSpec?.config.arguments?.[aContext.currentIndex]
+        const arg = aContext?.annotationSpec?.arguments[aContext.currentIndex]
         if (arg?.values?.length) {
           return arg.values?.map(v => ({
             label: arg.type === 'string' ? `'${v}'` : v,
@@ -332,7 +333,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         return
       }
 
-      const args = annotationSpec.config.arguments || []
+      const args = annotationSpec.arguments
 
       // eslint-disable-next-line sonarjs/no-nested-template-literals
       const label = `${annotationToken.text} ${args
@@ -387,11 +388,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
           range: token.range,
         } as Hover
       }
-      if (
-        typeof token.index === 'number' &&
-        annotationSpec.config.arguments?.length &&
-        annotationSpec.config.arguments.length > token.index
-      ) {
+      if (typeof token.index === 'number' && annotationSpec.arguments.length > token.index) {
         return {
           contents: {
             kind: 'markdown',
@@ -467,7 +464,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       return
     }
     let argToken = anscript.tokensIndex.at(position.line, position.character)
-    const currentAnnotation = annotationToken.parentNode.annotations?.get(annotationMatch[1])
+    const currentAnnotation = annotationToken.parentNode.annotations?.find(
+      a => a.name === annotationMatch[1] && a.token.range.start.line === position.line
+    )
     if (!argToken && currentAnnotation) {
       for (let i = currentAnnotation.args.length - 1; i >= 0; i--) {
         const argI = currentAnnotation.args[i]

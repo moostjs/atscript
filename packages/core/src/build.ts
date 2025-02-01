@@ -19,7 +19,6 @@ export async function build(config: Partial<TAnscriptConfigInput>) {
     : process.cwd()
   config.rootDir = rootDir
 
-  console.log('build', config)
   const repo = new AnscriptRepo(rootDir, config as TAnscriptConfigInput)
 
   // Gather a list of .as file entries from either user-provided `entries` or by globbing.

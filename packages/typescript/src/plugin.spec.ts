@@ -1,9 +1,41 @@
-import { build } from '@anscript/core'
+import { AnnotationSpec, build } from '@anscript/core'
 import { describe, expect, it } from 'vitest'
 import { tsPlugin } from './plugin'
 import path from 'path'
 
 const wd = process.cwd().replace(/src$/, '')
+
+const annotations = {
+  label: new AnnotationSpec({
+    argument: {
+      name: 'value',
+      type: 'string',
+    },
+  }),
+  mul: new AnnotationSpec({
+    multiple: true,
+    argument: {
+      name: 'value',
+      type: 'number',
+    },
+  }),
+  obj: new AnnotationSpec({
+    argument: [
+      {
+        name: 'prop1',
+        type: 'string',
+      },
+      {
+        name: 'prop2',
+        type: 'number',
+      },
+      {
+        name: 'prop3',
+        type: 'boolean',
+      },
+    ],
+  }),
+}
 
 describe('ts-plugin', () => {
   it('must render interface', async () => {
@@ -11,6 +43,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/interface.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -30,6 +63,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/type.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -47,6 +81,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/multiple-interface.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -66,6 +101,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/imports.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -84,6 +120,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/interface-metadata.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -103,6 +140,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/inherit-metadata.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -122,6 +160,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/inherit-from-type.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -141,6 +180,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/inherit-chain.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -160,6 +200,7 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/real-world-1.as'],
       plugins: [tsPlugin()],
+      annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)

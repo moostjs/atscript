@@ -14,6 +14,9 @@ $("object", WithMetadata)
     $()
       .designType("number")
       .type(Number)
+      .annotate("mul", 1, true)
+      .annotate("mul", 2, true)
+      .annotate("mul", 3, true)
       .annotate("long.nested.name", "Prop-2")
       .annotate("long.nested.name2", "Prop-2-2")
       .$type
@@ -73,6 +76,7 @@ $("object", WithMetadata)
               )
               .$type
           )
+          .annotate("obj", { prop1: "str",  prop2: 123,  prop3: false })
           .$type
       )
       .annotate("nested", true)

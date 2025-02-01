@@ -15,6 +15,7 @@ $("object", Address)
       .designType("string")
       .type(String)
       .annotate("label", "Address Line 2")
+      .optional()
       .$type
   ).prop(
     "city",
@@ -56,12 +57,12 @@ $("object", Contact)
           .designType("string")
           .type(String)
           .value("phone")
-          .$def)
+          .$type)
       .item($()
           .designType("string")
           .type(String)
           .value("email")
-          .$def)
+          .$type)
       .$type
   ).prop(
     "value",
@@ -91,15 +92,15 @@ $("object", Entity)
       .$type
   ).prop(
     "address",
-    $("ref")
+    $()
       .refTo(Address)
       .$type
   ).prop(
     "contacts",
     $("array")
-      .of($("ref")
+      .of($()
           .refTo(Contact)
-          .$def)
+          .$type)
       .annotate("label", "Contacts")
       .$type
   )

@@ -6,17 +6,20 @@ import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
 import type { TLexicalToken } from '../tokenizer/types'
 
+export interface TAnnotationArgument {
+  optional?: boolean
+  name: string
+  type: 'string' | 'number' | 'boolean'
+  description?: string
+  values?: string[]
+}
+
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 export interface TAnnotationSpecConfig {
+  multiple?: boolean
   description?: string
   nodeType?: TNodeEntity[]
-  arguments?: Array<{
-    optional?: boolean
-    name: string
-    type: 'string' | 'number' | 'boolean'
-    description?: string
-    values?: string[]
-  }>
+  argument?: TAnnotationArgument[] | TAnnotationArgument
 }
 
 export class AnnotationSpec {
@@ -25,11 +28,18 @@ export class AnnotationSpec {
 
   constructor(public readonly config: TAnnotationSpecConfig) {}
 
+  get arguments(): TAnnotationArgument[] {
+    if (!this.config.argument) {
+      return []
+    }
+    return Array.isArray(this.config.argument) ? this.config.argument : [this.config.argument]
+  }
+
   get argumentsSnippet(): string {
-    if (!this.config.arguments || this.config.arguments.length === 0) {
+    if (this.arguments.length === 0) {
       return ''
     }
-    return this.config.arguments
+    return this.arguments
       .map((arg, index) => {
         const placeholderIndex = index + 1 // Snippet placeholders are 1-based
         const defaultValue = this.getDefaultValueForType(arg.name, arg.type)
@@ -67,13 +77,25 @@ export class AnnotationSpec {
 
   validate(mainToken: Token, args: Token[]): TMessages | undefined {
     const messages: TMessages = []
-    const specArgs = this.config.arguments ?? []
+    const specArgs = this.arguments
 
     if (!mainToken.parentNode) {
       return
     }
 
-    // 0. Check node type
+    // 0. Check multiple
+    if (
+      mainToken.parentNode.countAnnotations(mainToken.text.slice(1)) > 1 &&
+      !this.config.multiple
+    ) {
+      messages.push({
+        severity: 1,
+        message: `Multiple "${mainToken.text}" annotations are not allowed.`,
+        range: mainToken.range,
+      })
+    }
+
+    // 1. Check node type
     if (
       this.config.nodeType &&
       this.config.nodeType.length > 0 &&
@@ -88,7 +110,7 @@ export class AnnotationSpec {
       })
     }
 
-    // 1. Check for correct number of arguments
+    // 2. Check for correct number of arguments
     const requiredCount = specArgs.filter(a => !a.optional).length
 
     if (args.length < requiredCount) {
@@ -112,7 +134,7 @@ export class AnnotationSpec {
       })
     }
 
-    // 2. Validate each argument by index
+    // 3. Validate each argument by index
     // eslint-disable-next-line unicorn/no-for-loop
     for (let i = 0; i < args.length; i++) {
       const token = args[i]
@@ -125,7 +147,7 @@ export class AnnotationSpec {
       const tokenType = token.type
       const valueText = token.text
 
-      // 2a. Check type
+      // 3a. Check type
       const typeMessage = this.validateType(tokenType, argSpec.type)
       if (typeMessage) {
         messages.push({
@@ -136,7 +158,7 @@ export class AnnotationSpec {
         continue
       }
 
-      // 2b. If the spec has an allowed values list, verify membership
+      // 3b. If the spec has an allowed values list, verify membership
       const values = argSpec.type === 'boolean' ? ['true', 'false'] : argSpec.values
       if (values && !values.includes(valueText)) {
         messages.push({
@@ -154,13 +176,13 @@ export class AnnotationSpec {
 
   renderDocs(index: number | string) {
     if (typeof index === 'number') {
-      const a = this.config.arguments?.[index]
+      const a = this.arguments[index]
       if (a) {
         const values = a.values ? `\n\nValues:\n${a.values.join(', ')}` : ''
         return `### \`${a.name}${a.optional ? '?' : ''}: ${a.type}\`\n\n${a.description}${values}`
       }
     } else {
-      const args = this.config.arguments || []
+      const args = this.arguments
       return `### ${index} ${args
         .map(a => `\`${a.name}${a.optional ? '?' : ''}: ${a.type}\``)
         .join(', ')}\n\n${this.config.description}`

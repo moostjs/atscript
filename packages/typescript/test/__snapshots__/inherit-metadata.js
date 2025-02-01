@@ -30,19 +30,20 @@ export class ITarget {}
 $("object", ITarget)
   .prop(
     "firstName",
-    $("ref")
+    $()
       .refTo(ISource, ["firstName"])
       .$type
   ).prop(
     "lastName",
-    $("ref")
+    $()
       .refTo(ISource, ["lastName"])
       .annotate("label", "Last Name (optional)")
       .annotate("required", false)
+      .optional()
       .$type
   ).prop(
     "age",
-    $("ref")
+    $()
       .refTo(ISource, ["age"])
       .$type
   )

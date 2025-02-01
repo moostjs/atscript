@@ -6,19 +6,19 @@ export class People {}
 $("object", People)
   .prop(
     "groupName",
-    $("ref")
+    $()
       .refTo(TPrimitive)
       .$type
   ).prop(
     "size",
-    $("ref")
+    $()
       .refTo(TNumber)
       .$type
   ).prop(
     "users",
     $("array")
-      .of($("ref")
+      .of($()
           .refTo(User)
-          .$def)
+          .$type)
       .$type
   )

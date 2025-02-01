@@ -13,13 +13,14 @@ export class SemanticNode {
 
   protected definition?: SemanticNode
 
-  public annotations?: Map<string, TAnnotationTokens>
+  public annotations?: TAnnotationTokens[]
+  public annotationsCounter?: Map<string, number>
 
   registerAtDocument(doc: AnscriptDoc): void {
     if (this.definition) {
       this.definition.registerAtDocument(doc)
     }
-    Array.from(this.annotations?.values() || []).forEach(val => {
+    this.annotations?.forEach(val => {
       doc.registerAnnotation(val.token, val.args)
     })
   }
@@ -47,16 +48,29 @@ export class SemanticNode {
     }
   }
 
+  countAnnotations(name: string) {
+    return this.annotationsCounter?.get(name) ?? 0
+  }
+
   annotate(name: string, token: Token) {
     if (!this.annotations) {
-      this.annotations = new Map()
+      this.annotations = []
+    }
+    if (!this.annotationsCounter) {
+      this.annotationsCounter = new Map()
+    }
+    if (this.annotationsCounter.has(name)) {
+      this.annotationsCounter.set(name, this.annotationsCounter.get(name)! + 1)
+    } else {
+      this.annotationsCounter.set(name, 1)
     }
     token.parentNode = this
     const a = {
+      name,
       token,
       args: [],
     } as TAnnotationTokens
-    this.annotations.set(name, a)
+    this.annotations.push(a)
     return (arg: Token) => {
       arg.parentNode = this
       arg.index = a.args.length
@@ -65,9 +79,9 @@ export class SemanticNode {
     }
   }
 
-  hasAnnotation(name: string) {
-    return this.annotations?.has(name)
-  }
+  // hasAnnotation(name: string) {
+  //   return this.annotations?.has(name)
+  // }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, @typescript-eslint/class-literal-property-style
   get length() {

@@ -119,11 +119,11 @@ export function annotations() {
     handler(ni: NodeIterator, target: TTarget) {
       while (ni.$ && ni.satisfies(opts.annotation)) {
         const key = ni.$.text?.slice(1)
-        if (target.node.hasAnnotation(key)) {
-          ni.unexpected(false, 'Duplicate annotation')
-        } else {
-          ni.accepted()
-        }
+        // if (target.node.hasAnnotation(key)) {
+        //   ni.unexpected(false, 'Duplicate annotation')
+        // } else {
+        ni.accepted()
+        // }
         const addArgument = target.node.annotate(key, new Token(ni.$))
         ni.move()
         while (ni.satisfies(opts.comma)) {

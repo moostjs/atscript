@@ -14,11 +14,11 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($()
           .designType("number")
           .type(Number)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "interger",
@@ -46,7 +46,7 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "tuple2",
@@ -54,11 +54,11 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "tupleArray",
@@ -67,12 +67,12 @@ $("object", PublicInterface)
           .item($()
               .designType("string")
               .type(String)
-              .$def)
+              .$type)
           .item($()
               .designType("string")
               .type(String)
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "array",
@@ -80,7 +80,7 @@ $("object", PublicInterface)
       .of($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "array2",
@@ -89,8 +89,8 @@ $("object", PublicInterface)
           .of($()
               .designType("string")
               .type(String)
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "array3",
@@ -100,9 +100,9 @@ $("object", PublicInterface)
               .of($()
                   .designType("string")
                   .type(String)
-                  .$def)
-              .$def)
-          .$def)
+                  .$type)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "complexArray",
@@ -111,12 +111,12 @@ $("object", PublicInterface)
           .item($()
               .designType("string")
               .type(String)
-              .$def)
+              .$type)
           .item($()
               .designType("number")
               .type(Number)
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "complexArray2",
@@ -126,13 +126,13 @@ $("object", PublicInterface)
               .item($()
                   .designType("string")
                   .type(String)
-                  .$def)
+                  .$type)
               .item($()
                   .designType("number")
                   .type(Number)
-                  .$def)
-              .$def)
-          .$def)
+                  .$type)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "complexArray3",
@@ -143,14 +143,14 @@ $("object", PublicInterface)
                   .item($()
                       .designType("string")
                       .type(String)
-                      .$def)
+                      .$type)
                   .item($()
                       .designType("number")
                       .type(Number)
-                      .$def)
-                  .$def)
-              .$def)
-          .$def)
+                      .$type)
+                  .$type)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "complexArray4",
@@ -158,13 +158,13 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($("array")
           .of($()
               .designType("number")
               .type(Number)
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .$type
   ).prop(
     "complexArray5",
@@ -173,12 +173,12 @@ $("object", PublicInterface)
           .of($()
               .designType("string")
               .type(String)
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .item($()
           .designType("number")
           .type(Number)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "object",
@@ -194,6 +194,7 @@ $("object", PublicInterface)
         $()
           .designType("number")
           .type(Number)
+          .optional()
           .$type
       ).prop(
         "nested",
@@ -209,6 +210,7 @@ $("object", PublicInterface)
             $()
               .designType("boolean")
               .type(Boolean)
+              .optional()
               .$type
           )
           .$type
@@ -219,6 +221,7 @@ $("object", PublicInterface)
     $()
       .designType("string")
       .type(String)
+      .optional()
       .$type
   ).prop(
     "objectUnion1",
@@ -232,11 +235,11 @@ $("object", PublicInterface)
               .value("a")
               .$type
           )
-          .$def)
+          .$type)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .$type
   ).prop(
     "objectUnion2",
@@ -244,7 +247,7 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($("object")
           .prop(
             "a",
@@ -254,7 +257,7 @@ $("object", PublicInterface)
               .value("a")
               .$type
           )
-          .$def)
+          .$type)
       .$type
   ).prop(
     "objectIntersection",
@@ -268,7 +271,7 @@ $("object", PublicInterface)
               .value("a")
               .$type
           )
-          .$def)
+          .$type)
       .item($("object")
           .prop(
             "b",
@@ -278,7 +281,7 @@ $("object", PublicInterface)
               .value("b")
               .$type
           )
-          .$def)
+          .$type)
       .$type
   ).prop(
     "grouping",
@@ -286,19 +289,19 @@ $("object", PublicInterface)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($("union")
           .item($("intersection")
               .item($("intersection")
                   .item($()
                       .designType("number")
                       .type(Number)
-                      .$def)
+                      .$type)
                   .item($()
                       .designType("boolean")
                       .type(Boolean)
-                      .$def)
-                  .$def)
+                      .$type)
+                  .$type)
               .item($("object")
                   .prop(
                     "a",
@@ -308,13 +311,13 @@ $("object", PublicInterface)
                       .value("b")
                       .$type
                   )
-                  .$def)
-              .$def)
+                  .$type)
+              .$type)
           .item($()
               .designType("string")
               .type(String)
               .value("c")
-              .$def)
-          .$def)
+              .$type)
+          .$type)
       .$type
   )

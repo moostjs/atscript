@@ -11,9 +11,10 @@ import {
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
+  TAnnotationTokens,
 } from '@anscript/core'
 import { BaseRenderer } from './base-renderer'
-import { escapeQuotes } from './utils'
+import { escapeQuotes, wrapProp } from './utils'
 
 export class JsRenderer extends BaseRenderer {
   pre() {
@@ -58,7 +59,7 @@ export class JsRenderer extends BaseRenderer {
         const chain = ref.hasChain
           ? `, [${ref.chain.map(c => `"${escapeQuotes(c.text)}"`).join(', ')}]`
           : ''
-        this.writeln(`$("ref"${name ? `, ${name}` : ''})`)
+        this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
           .writeln(`.refTo(${ref.id!}${chain})`)
           .unindent()
@@ -114,18 +115,6 @@ export class JsRenderer extends BaseRenderer {
     }
   }
 
-  defineMetadata(node: SemanticNode) {
-    node.annotations?.forEach(a => {
-      let targetValue = 'true'
-      if (a.args.length) {
-        targetValue =
-          a.args[0].type === 'text' ? `"${escapeQuotes(a.args[0].text)}"` : a.args[0].text
-      }
-      this.writeln(`.annotate("${escapeQuotes(a.token.text.slice(1))}", ${targetValue})`)
-    })
-    return this
-  }
-
   defineConst(node: SemanticConstNode) {
     const t = node.token('identifier')?.type
     const designType = t === 'text' ? 'string' : t === 'number' ? 'number' : 'unknown'
@@ -164,11 +153,15 @@ export class JsRenderer extends BaseRenderer {
   defineObject(node: SemanticStructureNode) {
     const props = Array.from(node.props.values())
     for (const prop of props) {
+      const optional = !!prop.token('optional')
       this.writeln(`.prop(`)
       this.indent()
       this.writeln(`"${escapeQuotes(prop.id!)}",`)
       this.annotateType(prop.getDefinition())
       this.indent().defineMetadata(prop).unindent()
+      if (optional) {
+        this.writeln('  .optional()')
+      }
       this.writeln('  .$type')
       this.unindent()
       this.write(`)`)
@@ -182,7 +175,7 @@ export class JsRenderer extends BaseRenderer {
       this.write('.item(')
       this.indent()
       this.annotateType(item)
-      this.write('  .$def')
+      this.write('  .$type')
       this.writeln(`)`)
       this.unindent()
     }
@@ -192,9 +185,58 @@ export class JsRenderer extends BaseRenderer {
     this.write('.of(')
     this.indent()
     this.annotateType(node.getDefinition())
-    this.write('  .$def')
+    this.write('  .$type')
     this.writeln(`)`)
     this.unindent()
     return this
+  }
+
+  defineMetadata(node: SemanticNode) {
+    node.annotations?.forEach(an => {
+      this.resolveAnnotationValue(node, an)
+    })
+    return this
+  }
+
+  resolveAnnotationValue(node: SemanticNode, an: TAnnotationTokens) {
+    const spec = this.doc.resolveAnnotation(an.name)
+    let targetValue = 'true'
+    let multiple: boolean | undefined = false
+    if (spec) {
+      // resolve according spec
+      multiple = spec.config.multiple
+      const length = spec.arguments.length
+      if (length !== 0) {
+        if (Array.isArray(spec.config.argument)) {
+          // as object
+          targetValue = '{ '
+          let i = 0
+          for (const aSpec of spec.arguments) {
+            targetValue += `${wrapProp(aSpec.name)}: ${
+              aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[i]?.text
+            }${i === length - 1 ? '' : ', '} `
+            i++
+          }
+          targetValue += '}'
+        } else {
+          // as constant
+          const aSpec = spec.arguments[0]
+          targetValue =
+            aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[0]?.text
+        }
+      }
+    } else {
+      // generic resolve
+      multiple = node.countAnnotations(an.name) > 1 || an.args.length > 1
+      if (an.args.length) {
+        targetValue =
+          an.args[0].type === 'text' ? `"${escapeQuotes(an.args[0].text)}"` : an.args[0].text
+      }
+    }
+    if (multiple) {
+      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${targetValue}, true)`)
+    } else {
+      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${targetValue})`)
+    }
   }
 }

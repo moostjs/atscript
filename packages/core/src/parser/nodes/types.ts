@@ -24,6 +24,7 @@ export type TNodeEntity =
   | 'primitive'
 
 export interface TAnnotationTokens {
+  name: string
   token: Token
   args: Token[]
 }

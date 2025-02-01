@@ -11,11 +11,11 @@ $("union", TPirmiitiveUn)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
   .item($()
       .designType("number")
       .type(Number)
-      .$def)
+      .$type)
 
 
 export class TLiteral {}
@@ -37,7 +37,7 @@ $("tuple", TTuple1)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
 
 
 export class TTuple2 {}
@@ -45,11 +45,11 @@ $("tuple", TTuple2)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
 
 
 export class TTupleArray {}
@@ -58,12 +58,12 @@ $("array", TTupleArray)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
-      .$def)
+          .$type)
+      .$type)
 
 
 export class TArray {}
@@ -71,7 +71,7 @@ $("array", TArray)
   .of($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
 
 
 export class TArray2 {}
@@ -80,8 +80,8 @@ $("array", TArray2)
       .of($()
           .designType("string")
           .type(String)
-          .$def)
-      .$def)
+          .$type)
+      .$type)
 
 
 export class TArray3 {}
@@ -91,9 +91,9 @@ $("array", TArray3)
           .of($()
               .designType("string")
               .type(String)
-              .$def)
-          .$def)
-      .$def)
+              .$type)
+          .$type)
+      .$type)
 
 
 export class TComplexArray {}
@@ -102,12 +102,12 @@ $("array", TComplexArray)
       .item($()
           .designType("string")
           .type(String)
-          .$def)
+          .$type)
       .item($()
           .designType("number")
           .type(Number)
-          .$def)
-      .$def)
+          .$type)
+      .$type)
 
 
 export class TComplexArray2 {}
@@ -117,13 +117,13 @@ $("array", TComplexArray2)
           .item($()
               .designType("string")
               .type(String)
-              .$def)
+              .$type)
           .item($()
               .designType("number")
               .type(Number)
-              .$def)
-          .$def)
-      .$def)
+              .$type)
+          .$type)
+      .$type)
 
 
 export class TComplexArray3 {}
@@ -134,14 +134,14 @@ $("array", TComplexArray3)
               .item($()
                   .designType("string")
                   .type(String)
-                  .$def)
+                  .$type)
               .item($()
                   .designType("number")
                   .type(Number)
-                  .$def)
-              .$def)
-          .$def)
-      .$def)
+                  .$type)
+              .$type)
+          .$type)
+      .$type)
 
 
 export class TComplexArray4 {}
@@ -149,13 +149,13 @@ $("union", TComplexArray4)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
   .item($("array")
       .of($()
           .designType("number")
           .type(Number)
-          .$def)
-      .$def)
+          .$type)
+      .$type)
 
 
 export class TComplexArray5 {}
@@ -164,12 +164,12 @@ $("union", TComplexArray5)
       .of($()
           .designType("string")
           .type(String)
-          .$def)
-      .$def)
+          .$type)
+      .$type)
   .item($()
       .designType("number")
       .type(Number)
-      .$def)
+      .$type)
 
 
 export class TObject {}
@@ -185,6 +185,7 @@ $("object", TObject)
     $()
       .designType("number")
       .type(Number)
+      .optional()
       .$type
   ).prop(
     "nested",
@@ -200,6 +201,7 @@ $("object", TObject)
         $()
           .designType("boolean")
           .type(Boolean)
+          .optional()
           .$type
       )
       .$type
@@ -217,11 +219,11 @@ $("union", TObjectUnion1)
           .value("a")
           .$type
       )
-      .$def)
+      .$type)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
 
 
 export class TObjectUnion2 {}
@@ -229,7 +231,7 @@ $("union", TObjectUnion2)
   .item($()
       .designType("string")
       .type(String)
-      .$def)
+      .$type)
   .item($("object")
       .prop(
         "a",
@@ -239,7 +241,7 @@ $("union", TObjectUnion2)
           .value("a")
           .$type
       )
-      .$def)
+      .$type)
 
 
 export class TObjectIntersection {}
@@ -253,7 +255,7 @@ $("intersection", TObjectIntersection)
           .value("a")
           .$type
       )
-      .$def)
+      .$type)
   .item($("object")
       .prop(
         "b",
@@ -263,4 +265,4 @@ $("intersection", TObjectIntersection)
           .value("b")
           .$type
       )
-      .$def)
+      .$type)

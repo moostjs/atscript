@@ -6,12 +6,12 @@ $("union", TContactType)
       .designType("string")
       .type(String)
       .value("phone")
-      .$def)
+      .$type)
   .item($()
       .designType("string")
       .type(String)
       .value("email")
-      .$def)
+      .$type)
 
 
 export class Address {}
@@ -53,7 +53,7 @@ class Contact {}
 $("object", Contact)
   .prop(
     "type",
-    $("ref")
+    $()
       .refTo(TContactType)
       .$type
   ).prop(
@@ -67,6 +67,7 @@ $("object", Contact)
     $()
       .designType("string")
       .type(String)
+      .optional()
       .$type
   )
 
@@ -87,14 +88,14 @@ $("object", User)
       .$type
   ).prop(
     "address",
-    $("ref")
+    $()
       .refTo(Address)
       .$type
   ).prop(
     "contacts",
     $("array")
-      .of($("ref")
+      .of($()
           .refTo(Contact)
-          .$def)
+          .$type)
       .$type
   )

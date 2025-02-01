@@ -1,21 +1,21 @@
 export interface TAnscriptTypeComplex {
   kind: 'union' | 'intersection' | 'tuple'
-  items: TAnscriptTypeDef[]
+  items: TAnscriptAnnotatedType[]
 }
 
 export interface TAnscriptTypeArray {
   kind: 'array'
-  of: TAnscriptTypeDef
+  of: TAnscriptAnnotatedType
 }
 
-export interface TAnscriptTypeObject {
+export interface TAnscriptTypeObject<K extends string = string> {
   kind: 'object'
 
   /**
    * type constructor
    */
   type: Function | undefined
-  props: Map<string, TAnscriptAnnotatedType>
+  props: Map<K, TAnscriptAnnotatedType>
 }
 
 export interface TAnscriptTypeFinal {
@@ -47,6 +47,7 @@ export interface TAnscriptAnnotatedType {
   __is_anscript_annotated_type: true
   type: TAnscriptTypeDef
   metadata: Map<string, unknown>
+  optional?: boolean
 }
 
 /**
@@ -102,16 +103,20 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       this.$def.value = value
       return this
     },
-    of(value: TAnscriptTypeDef) {
+    of(value: TAnscriptAnnotatedType) {
       this.$def.of = value
       return this
     },
-    item(value: TAnscriptTypeDef) {
+    item(value: TAnscriptAnnotatedType) {
       this.$def.items.push(value)
       return this
     },
     prop(name: string, value: TAnscriptAnnotatedType) {
       this.$def.props.set(name, value)
+      return this
+    },
+    optional() {
+      this.$type.optional = true
       return this
     },
     refTo(type: any, chain?: string[]) {
@@ -133,7 +138,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
           throw new Error(`"${typeName}" is not annotated type`)
         }
         this.$type = {
-          ...newBase,
+          __is_anscript_annotated_type: true,
+          type: newBase.type,
           metadata: newBase.metadata ? new Map<string, unknown>(newBase.metadata) : metadata,
         }
         this.$metadata = this.$type.metadata
@@ -142,8 +148,19 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       }
       return this
     },
-    annotate(key: string, value: any) {
-      this.$metadata.set(key, value)
+    annotate(key: string, value: any, asArray?: boolean) {
+      if (asArray) {
+        if (this.$metadata.has(key)) {
+          const a = this.$metadata.get(key)
+          if (Array.isArray(a)) {
+            a.push(value)
+          } else {
+            this.$metadata.set(key, [a, value])
+          }
+        }
+      } else {
+        this.$metadata.set(key, value)
+      }
       // const parts = key.split('.')
       // let currentObj = this.$metadata as any
 
@@ -166,4 +183,15 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     },
   }
   return handle
+}
+
+/**
+ * Anscript Metadata Map with typed setters/getters
+ */
+export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]> {
+  // Get returns O[K] for exactly that key (plus undefined if key not present)
+  get<K extends keyof O>(key: K): O[K] | undefined
+
+  // Set enforces that the value must match O[K]
+  set<K extends keyof O>(key: K, value: O[K]): this
 }
