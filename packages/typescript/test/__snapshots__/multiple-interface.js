@@ -20,30 +20,35 @@ $("object", Address)
     "line1",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "line2",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "city",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "state",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "zip",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   )
@@ -60,12 +65,14 @@ $("object", Contact)
     "value",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "label",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .optional()
       .$type
@@ -78,12 +85,14 @@ $("object", User)
     "firstName",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
     "lastName",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(

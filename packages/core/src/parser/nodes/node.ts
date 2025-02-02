@@ -25,6 +25,10 @@ export class SemanticNode {
     })
   }
 
+  get documentation(): string | undefined {
+    return undefined
+  }
+
   get id() {
     return this.token('identifier')?.text
   }

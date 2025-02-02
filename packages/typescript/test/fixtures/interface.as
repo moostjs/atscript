@@ -3,7 +3,9 @@ export interface PublicInterface {
 
     pirmiitiveUn: string | number
 
-    interger: int
+    email: string.email
+
+    interger: number.int
 
     literal: 'value'
 

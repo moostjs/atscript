@@ -31,9 +31,9 @@ declare type TAge = number
  * @see {@link ./inherit-from-type.as:13:18}
  */
 export declare class ITarget {
-  firstName: TFirstName
-  lastName?: TLastName
-  age: TAge
+  firstName: string
+  lastName?: string
+  age: number
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AnscriptMetadata>

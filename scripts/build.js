@@ -13,6 +13,7 @@ import path from 'path'
 import swcPlugin from 'unplugin-swc'
 
 const swc = swcPlugin.rolldown()
+const _dye = dyePlugin()
 
 let i = 1
 
@@ -40,11 +41,21 @@ for (const ws of workspaces) {
 
 async function run() {
   console.log()
+  let types = true
   if (target) {
     info(`Target: ${dye('bold')(target)}`)
     console.log()
+    types = false
+    for (const build of getBuildOptions(target)) {
+      if (build.dts !== false) {
+        types = true
+        break
+      }
+    }
   }
-  await generateTypes()
+  if (types) {
+    await generateTypes()
+  }
   await generateBundles()
 }
 run()
@@ -128,7 +139,6 @@ async function generateBundles() {
   }
 }
 
-const _dye = dyePlugin()
 async function rolldownPackages(ws) {
   const builds = getBuildOptions(ws)
   for (const { entries, formats } of builds) {

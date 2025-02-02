@@ -3,6 +3,7 @@ import { defineAnnotatedType as $ } from "@anscript/typescript"
 class TType {}
 $("", TType)
   .designType("string")
+  .flags("string")
   .type(String)
   .annotate("fromTType", true)
   .annotate("from", "TType")
@@ -16,7 +17,9 @@ $("object", I1)
   .prop(
     "prop",
     $()
-      .refTo(TType)
+      .designType("string")
+      .flags("string")
+      .type(String)
       .annotate("fromI1", true)
       .annotate("from", "I1")
       .annotate("pass2", "I1")
@@ -30,7 +33,9 @@ $("object", I2)
   .prop(
     "prop",
     $()
-      .refTo(I1, ["prop"])
+      .designType("string")
+      .flags("string")
+      .type(String)
       .annotate("fromI2", true)
       .annotate("from", "I2")
       .annotate("pass3", "I2")

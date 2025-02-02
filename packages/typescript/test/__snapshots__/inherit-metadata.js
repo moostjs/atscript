@@ -6,6 +6,7 @@ $("object", ISource)
     "firstName",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "First Name")
       .$type
@@ -13,6 +14,7 @@ $("object", ISource)
     "lastName",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Last Name")
       .$type
@@ -20,6 +22,7 @@ $("object", ISource)
     "age",
     $()
       .designType("number")
+      .flags("number")
       .type(Number)
       .annotate("min", 18)
       .$type
@@ -31,12 +34,16 @@ $("object", ITarget)
   .prop(
     "firstName",
     $()
-      .refTo(ISource, ["firstName"])
+      .designType("string")
+      .flags("string")
+      .type(String)
       .$type
   ).prop(
     "lastName",
     $()
-      .refTo(ISource, ["lastName"])
+      .designType("string")
+      .flags("string")
+      .type(String)
       .annotate("label", "Last Name (optional)")
       .annotate("required", false)
       .optional()
@@ -44,6 +51,8 @@ $("object", ITarget)
   ).prop(
     "age",
     $()
-      .refTo(ISource, ["age"])
+      .designType("number")
+      .flags("number")
+      .type(Number)
       .$type
   )

@@ -6,6 +6,7 @@ $("object", Address)
     "line1",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Address Line 1")
       .$type
@@ -13,6 +14,7 @@ $("object", Address)
     "line2",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Address Line 2")
       .optional()
@@ -21,6 +23,7 @@ $("object", Address)
     "city",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "City")
       .$type
@@ -28,6 +31,7 @@ $("object", Address)
     "state",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "State")
       .$type
@@ -35,6 +39,7 @@ $("object", Address)
     "zip",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Zip")
       .$type
@@ -48,6 +53,7 @@ $("object", Contact)
     "name",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   ).prop(
@@ -68,6 +74,7 @@ $("object", Contact)
     "value",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .$type
   )
@@ -80,6 +87,7 @@ $("object", Entity)
     "id",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Legal ID")
       .$type
@@ -87,6 +95,7 @@ $("object", Entity)
     "name",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Name")
       .$type

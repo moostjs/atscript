@@ -35,6 +35,8 @@ export interface TAnscriptTypeFinal {
    * value for literals
    */
   value?: string | number | boolean
+
+  flags: Set<string>
 }
 
 export type TAnscriptTypeDef =
@@ -73,6 +75,9 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
   if (kind === 'object') {
     type.props = new Map()
   }
+  if (!kind) {
+    type.flags = new Set()
+  }
   const metadata = new Map<string, unknown>()
   if (base) {
     Object.assign(base, {
@@ -91,6 +96,12 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     $type: base,
     $def: type,
     $metadata: metadata,
+    flags(...flags: string[]) {
+      for (const flag of flags) {
+        this.$def.flags.add(flag)
+      }
+      return this
+    },
     designType(value: TAnscriptTypeFinal['designType']) {
       this.$def.designType = value
       return this

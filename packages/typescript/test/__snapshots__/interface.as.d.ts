@@ -15,7 +15,8 @@ import type { TAnscriptTypeObject, TMetadataMap } from "@anscript/typescript"
 export declare class PublicInterface {
   primitive: string
   pirmiitiveUn: string | number
-  interger: number
+  email: string /* email */
+  interger: number /* int */
   literal: "value"
   number: 5
   tuple1: [string]

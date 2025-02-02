@@ -10,7 +10,7 @@ import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
 import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
-import { isInterface, isProp, isRef, isStructure, isType } from './parser/nodes'
+import { isInterface, isPrimitive, isProp, isRef, isStructure, isType } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
@@ -256,7 +256,7 @@ export class AnscriptDoc {
             def = def.props.get(itemText)
           }
         }
-      } else if (isStructure(def) || isInterface(def)) {
+      } else if (isStructure(def) || isInterface(def) || isPrimitive(def)) {
         def = def.props.get(itemText)
       }
     }

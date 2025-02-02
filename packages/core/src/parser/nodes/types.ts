@@ -29,12 +29,21 @@ export interface TAnnotationTokens {
   args: Token[]
 }
 
-export interface TPrimitiveConfig {
-  nativeTypes?: {
-    [name in 'typescript' | 'java' | 'python' | 'csharp' | 'go']?: string
-  }
-  nativeConstructors?: {
-    [name in 'typescript' | 'java' | 'python' | 'csharp' | 'go']?: string
-  }
+type TPrimitiveTargets = 'typescript' // potentially extendable to other languages like python, java, etc
+
+type TPrimitiveMaps = {
+  [name in TPrimitiveTargets]?: string
+}
+
+export interface TPrimitiveBaseConfig {
+  base: 'numeric' | 'string' | 'boolean' | 'void' | 'null'
+  lang?: TPrimitiveMaps
   documentation?: string
+  flags?: Set<string>
+}
+
+export interface TPrimitiveConfig extends TPrimitiveBaseConfig {
+  extensions?: {
+    [name: string]: Partial<TPrimitiveConfig>
+  }
 }

@@ -50,7 +50,7 @@ export class JsRenderer extends BaseRenderer {
     switch (node.entity) {
       case 'ref': {
         const ref = node as SemanticRefNode
-        const decl = this.doc.getDeclarationOwnerNode(ref.id!)?.node
+        const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
         if (isPrimitive(decl)) {
           this.annotateType(decl, name)
           return this
@@ -144,9 +144,19 @@ export class JsRenderer extends BaseRenderer {
     return this
   }
   definePrimitive(node: SemanticPrimitiveNode) {
-    const designType = node.config?.nativeTypes?.typescript ?? 'unknown'
-    const type = node.config?.nativeConstructors?.typescript ?? 'Object'
+    const designType = node.config.lang?.typescript ?? node.config.base ?? 'unknown'
+    const type =
+      {
+        string: 'String',
+        number: 'Number',
+        boolean: 'Boolean',
+      }[designType] || 'Object'
     this.writeln(`.designType("${escapeQuotes(designType)}")`)
+    this.writeln(
+      `.flags(${Array.from(node.flags)
+        .map(f => `"${escapeQuotes(f)}"`)
+        .join(', ')})`
+    )
     this.writeln(`.type(${type})`)
     return this
   }

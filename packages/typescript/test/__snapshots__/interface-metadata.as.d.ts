@@ -14,15 +14,15 @@ import type { TAnscriptTypeObject, TMetadataMap } from "@anscript/typescript"
  */
 export declare class WithMetadata {
   prop1: string
-  "prop-2": number
+  "prop-2": int
   obj: {
     prop3: string
     prop4: string
     nested2: {
       nested3: {
-        a: number
+        a: float
         b: string
-        d: boolean
+        d: true
         e: null
         f: undefined
       }

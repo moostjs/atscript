@@ -16,6 +16,7 @@ import {
   getRelPath,
   isAnnotationSpec,
   isInterface,
+  isPrimitive,
   isProp,
   isRef,
   isStructure,
@@ -75,7 +76,6 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
 
     connection.onDidChangeWatchedFiles(async params => {
       for (const change of params.changes) {
-        console.log({ change, pass: /anscript\.config\.[mc]?[tj]s$/.test(change.uri) })
         if (/anscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
           this.onConfigChanged(change.uri)
         }
@@ -305,10 +305,13 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
             options = Array.from(unwound.def.props.values())
           } else if (isProp(unwound.def) && unwound.def.nestedProps) {
             options = Array.from(unwound.def.nestedProps.values())
+          } else if (isPrimitive(unwound.def)) {
+            options = Array.from(unwound.def.props.values())
           }
           return options?.map(t => ({
             label: t.id,
             kind: CompletionItemKind.Property,
+            documentation: t.documentation,
           })) as CompletionItem[]
         }
       }
@@ -367,16 +370,29 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       if (!document) {
         return
       }
+      const anscript = await this.openDocument(document.uri)
+      const token = anscript.tokensIndex.at(position.line, position.character)
+      if (!token) {
+        return
+      }
+      if (isRef(token.parentNode)) {
+        const def = anscript.unwindType(token.parentNode.id!, token.parentNode.chain)?.def
+        if (isPrimitive(def)) {
+          return {
+            contents: {
+              kind: 'markdown',
+              value: def.documentation,
+            },
+            range: token.range,
+          } as Hover
+        }
+      }
       const aContext = await this.getAnnotationContextAt(document, position)
       if (!aContext) {
         return
       }
-      const { annotationSpec, anscript, annotationToken } = aContext
+      const { annotationSpec, annotationToken } = aContext
       if (!annotationSpec) {
-        return
-      }
-      const token = anscript.tokensIndex.at(position.line, position.character)
-      if (!token) {
         return
       }
       if (token === annotationToken) {
@@ -539,13 +555,17 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         }
       }
     }
-    const keys = anscript.primitives.map(p => p.id)
+    const primitives = anscript.primitives
     items.push(
-      ...keys.map(k => ({
-        label: k,
-        kind: CompletionItemKind.Keyword,
-        detail: `primitive "${k}"`,
-      }))
+      ...primitives.map(
+        p =>
+          ({
+            label: p.id,
+            kind: CompletionItemKind.Keyword,
+            detail: `primitive "${p.id}"`,
+            documentation: p.config.documentation,
+          }) as CompletionItem
+      )
     )
     return items
   }

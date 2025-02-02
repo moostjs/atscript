@@ -19,7 +19,7 @@ declare type TType = string
  * @see {@link ./inherit-chain.as:8:11}
  */
 declare class I1 {
-  prop?: TType
+  prop?: string
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof I1>
   static metadata: TMetadataMap<AnscriptMetadata>
@@ -30,7 +30,7 @@ declare class I1 {
  * @see {@link ./inherit-chain.as:15:18}
  */
 export declare class I2 {
-  prop?: I1["prop"]
+  prop?: string /* prop */
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof I2>
   static metadata: TMetadataMap<AnscriptMetadata>

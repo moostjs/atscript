@@ -3,6 +3,7 @@ import { defineAnnotatedType as $ } from "@anscript/typescript"
 class TFirstName {}
 $("", TFirstName)
   .designType("string")
+  .flags("string")
   .type(String)
   .annotate("label", "First Name")
 
@@ -10,6 +11,7 @@ $("", TFirstName)
 class TLastName {}
 $("", TLastName)
   .designType("string")
+  .flags("string")
   .type(String)
   .annotate("label", "Last Name")
 
@@ -17,6 +19,7 @@ $("", TLastName)
 class TAge {}
 $("", TAge)
   .designType("number")
+  .flags("number")
   .type(Number)
   .annotate("min", 18)
 
@@ -26,12 +29,16 @@ $("object", ITarget)
   .prop(
     "firstName",
     $()
-      .refTo(TFirstName)
+      .designType("string")
+      .flags("string")
+      .type(String)
       .$type
   ).prop(
     "lastName",
     $()
-      .refTo(TLastName)
+      .designType("string")
+      .flags("string")
+      .type(String)
       .annotate("label", "Last Name (optional)")
       .annotate("required", false)
       .optional()
@@ -39,6 +46,8 @@ $("object", ITarget)
   ).prop(
     "age",
     $()
-      .refTo(TAge)
+      .designType("number")
+      .flags("number")
+      .type(Number)
       .$type
   )

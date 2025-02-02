@@ -60,9 +60,13 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (isRef(def)) {
       const node = def as SemanticRefNode
-      const target = this.doc.getDeclarationOwnerNode(node.id!)?.node
-      if (isPrimitive(target)) {
-        return this.write(target.config?.nativeTypes?.typescript ?? 'unknown')
+      const unwound = this.doc.unwindType(node.id!, node.chain)
+      if (isPrimitive(unwound?.def)) {
+        this.write(unwound.def.config?.lang?.typescript ?? unwound.def.config?.base ?? 'unknown')
+        if (node.hasChain) {
+          this.write(` /* ${node.chain.map(c => c.text).join('.')} */`)
+        }
+        return
       }
       let name = node.id!
       for (const c of node.chain) {

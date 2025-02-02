@@ -6,14 +6,14 @@ $("object", WithMetadata)
     "prop1",
     $()
       .designType("string")
+      .flags("string")
       .type(String)
       .annotate("label", "Prop1")
       .$type
   ).prop(
     "prop-2",
     $()
-      .designType("number")
-      .type(Number)
+      .refTo(int)
       .annotate("mul", 1, true)
       .annotate("mul", 2, true)
       .annotate("mul", 3, true)
@@ -27,6 +27,7 @@ $("object", WithMetadata)
         "prop3",
         $()
           .designType("string")
+          .flags("string")
           .type(String)
           .annotate("label", "Prop3")
           .$type
@@ -34,6 +35,7 @@ $("object", WithMetadata)
         "prop4",
         $()
           .designType("string")
+          .flags("string")
           .type(String)
           .annotate("label", "Prop4")
           .$type
@@ -46,32 +48,33 @@ $("object", WithMetadata)
               .prop(
                 "a",
                 $()
-                  .designType("number")
-                  .type(Number)
+                  .refTo(float)
                   .$type
               ).prop(
                 "b",
                 $()
                   .designType("string")
+                  .flags("string")
                   .type(String)
                   .$type
               ).prop(
                 "d",
                 $()
-                  .designType("boolean")
-                  .type(Boolean)
+                  .refTo(true)
                   .$type
               ).prop(
                 "e",
                 $()
                   .designType("null")
+                  .flags("null")
                   .type(Object)
                   .$type
               ).prop(
                 "f",
                 $()
                   .designType("undefined")
-                  .type(undefined)
+                  .flags("undefined")
+                  .type(Object)
                   .$type
               )
               .$type

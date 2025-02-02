@@ -26,9 +26,9 @@ declare class ISource {
  * @see {@link ./inherit-metadata.as:14:18}
  */
 export declare class ITarget {
-  firstName: ISource["firstName"]
-  lastName?: ISource["lastName"]
-  age: ISource["age"]
+  firstName: string /* firstName */
+  lastName?: string /* lastName */
+  age: number /* age */
   static __is_anscript_annotated_type: boolean
   static type: TAnscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AnscriptMetadata>
