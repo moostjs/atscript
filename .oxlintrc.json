@@ -15,6 +15,7 @@
     "console": "readonly",
     "Buffer": "readonly",
     "setTimeout": "readonly",
+    "URL": "readonly",
     "__DYE_RESET__": "readonly",
     "__DYE_COLOR_OFF__": "readonly",
     "__DYE_BG_OFF__": "readonly",

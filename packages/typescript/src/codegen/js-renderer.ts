@@ -17,17 +17,34 @@ import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
 export class JsRenderer extends BaseRenderer {
+  postAnnotate = [] as SemanticNode[]
+
   pre() {
     this.writeln('import { defineAnnotatedType as $ } from "@anscript/typescript"')
+  }
+
+  post() {
+    for (const node of this.postAnnotate) {
+      this.annotateType(node.getDefinition(), node.id)
+      this.indent().defineMetadata(node).unindent()
+      this.writeln()
+    }
+    super.post()
   }
 
   renderInterface(node: SemanticInterfaceNode): void {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
-    this.writeln(`class ${node.id!} {}`)
-    this.annotateType(node.getDefinition(), node.id)
-    this.indent().defineMetadata(node).unindent()
+    this.write(`class ${node.id!}`)
+    this.blockln('{}')
+    this.writeln('static __is_anscript_annotated_type = true')
+    this.writeln('static type = {}')
+    this.writeln('static metadata = new Map()')
+    this.popln()
+    this.postAnnotate.push(node)
+    // this.annotateType(node.getDefinition(), node.id)
+    // this.indent().defineMetadata(node).unindent()
     this.writeln()
   }
 
@@ -35,9 +52,15 @@ export class JsRenderer extends BaseRenderer {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
-    this.writeln(`class ${node.id!} {}`)
-    this.annotateType(node.getDefinition(), node.id)
-    this.indent().defineMetadata(node).unindent()
+    this.write(`class ${node.id!}`)
+    this.blockln('{}')
+    this.writeln('static __is_anscript_annotated_type = true')
+    this.writeln('static type = {}')
+    this.writeln('static metadata = new Map()')
+    this.popln()
+    this.postAnnotate.push(node)
+    // this.annotateType(node.getDefinition(), node.id)
+    // this.indent().defineMetadata(node).unindent()
     this.writeln()
   }
 

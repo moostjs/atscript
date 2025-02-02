@@ -1,6 +1,25 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class Address {}
+class Address{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+class Contact{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class Entity{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("object", Address)
   .prop(
     "line1",
@@ -46,8 +65,6 @@ $("object", Address)
   )
   .annotate("label", "Address")
 
-
-class Contact {}
 $("object", Contact)
   .prop(
     "name",
@@ -80,8 +97,6 @@ $("object", Contact)
   )
   .annotate("label", "Contact")
 
-
-export class Entity {}
 $("object", Entity)
   .prop(
     "id",

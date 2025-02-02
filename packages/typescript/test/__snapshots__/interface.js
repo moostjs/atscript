@@ -1,6 +1,11 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-export class PublicInterface {}
+export class PublicInterface{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("object", PublicInterface)
   .prop(
     "primitive",

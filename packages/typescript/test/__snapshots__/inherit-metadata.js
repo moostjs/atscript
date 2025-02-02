@@ -1,6 +1,18 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class ISource {}
+class ISource{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class ITarget{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("object", ISource)
   .prop(
     "firstName",
@@ -28,8 +40,6 @@ $("object", ISource)
       .$type
   )
 
-
-export class ITarget {}
 $("object", ITarget)
   .prop(
     "firstName",

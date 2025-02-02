@@ -27,6 +27,19 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
+  const positive = {
+    documentation: 'Number that greater than or equal to zero.',
+  }
+
+  const negative = {
+    documentation: 'Number that less than or equal to zero.',
+  }
+
+  const positiveOrNegative = {
+    positive,
+    negative,
+  }
+
   defaultAnscriptConfig.primitives!.set(
     'number',
     new SemanticPrimitiveNode('number', {
@@ -36,13 +49,17 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
       },
       documentation: 'Represents numeric data.',
       extensions: {
+        ...positiveOrNegative,
         single: {
+          extensions: positiveOrNegative,
           documentation: 'Represents a single-precision floating-point number.',
         },
         double: {
+          extensions: positiveOrNegative,
           documentation: 'Represents a double-precision floating-point number.',
         },
         int: {
+          extensions: positiveOrNegative,
           documentation: 'Represents an integer number.',
           lang: {
             typescript: 'number',

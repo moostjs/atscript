@@ -1,6 +1,32 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class TContactType {}
+class TContactType{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class Address{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+class Contact{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class User{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("union", TContactType)
   .item($()
       .designType("string")
@@ -13,8 +39,6 @@ $("union", TContactType)
       .value("email")
       .$type)
 
-
-export class Address {}
 $("object", Address)
   .prop(
     "line1",
@@ -53,8 +77,6 @@ $("object", Address)
       .$type
   )
 
-
-class Contact {}
 $("object", Contact)
   .prop(
     "type",
@@ -78,8 +100,6 @@ $("object", Contact)
       .$type
   )
 
-
-export class User {}
 $("object", User)
   .prop(
     "firstName",

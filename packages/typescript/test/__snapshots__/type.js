@@ -1,13 +1,142 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-export class TPrimitive {}
+export class TPrimitive{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TPirmiitiveUn{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TLiteral{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TNumber{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TTuple1{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TTuple2{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TTupleArray{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TArray{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TArray2{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TArray3{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TComplexArray{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TComplexArray2{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TComplexArray3{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TComplexArray4{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TComplexArray5{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TObject{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TObjectUnion1{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TObjectUnion2{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class TObjectIntersection{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("", TPrimitive)
   .designType("string")
   .flags("string")
   .type(String)
 
-
-export class TPirmiitiveUn {}
 $("union", TPirmiitiveUn)
   .item($()
       .designType("string")
@@ -20,22 +149,16 @@ $("union", TPirmiitiveUn)
       .type(Number)
       .$type)
 
-
-export class TLiteral {}
 $("", TLiteral)
   .designType("string")
   .type(String)
   .value("value")
 
-
-export class TNumber {}
 $("", TNumber)
   .designType("number")
   .type(Number)
   .value(5)
 
-
-export class TTuple1 {}
 $("tuple", TTuple1)
   .item($()
       .designType("string")
@@ -43,8 +166,6 @@ $("tuple", TTuple1)
       .type(String)
       .$type)
 
-
-export class TTuple2 {}
 $("tuple", TTuple2)
   .item($()
       .designType("string")
@@ -57,8 +178,6 @@ $("tuple", TTuple2)
       .type(String)
       .$type)
 
-
-export class TTupleArray {}
 $("array", TTupleArray)
   .of($("tuple")
       .item($()
@@ -73,8 +192,6 @@ $("array", TTupleArray)
           .$type)
       .$type)
 
-
-export class TArray {}
 $("array", TArray)
   .of($()
       .designType("string")
@@ -82,8 +199,6 @@ $("array", TArray)
       .type(String)
       .$type)
 
-
-export class TArray2 {}
 $("array", TArray2)
   .of($("array")
       .of($()
@@ -93,8 +208,6 @@ $("array", TArray2)
           .$type)
       .$type)
 
-
-export class TArray3 {}
 $("array", TArray3)
   .of($("array")
       .of($("array")
@@ -106,8 +219,6 @@ $("array", TArray3)
           .$type)
       .$type)
 
-
-export class TComplexArray {}
 $("array", TComplexArray)
   .of($("union")
       .item($()
@@ -122,8 +233,6 @@ $("array", TComplexArray)
           .$type)
       .$type)
 
-
-export class TComplexArray2 {}
 $("array", TComplexArray2)
   .of($("array")
       .of($("union")
@@ -140,8 +249,6 @@ $("array", TComplexArray2)
           .$type)
       .$type)
 
-
-export class TComplexArray3 {}
 $("array", TComplexArray3)
   .of($("array")
       .of($("array")
@@ -160,8 +267,6 @@ $("array", TComplexArray3)
           .$type)
       .$type)
 
-
-export class TComplexArray4 {}
 $("union", TComplexArray4)
   .item($()
       .designType("string")
@@ -176,8 +281,6 @@ $("union", TComplexArray4)
           .$type)
       .$type)
 
-
-export class TComplexArray5 {}
 $("union", TComplexArray5)
   .item($("array")
       .of($()
@@ -192,8 +295,6 @@ $("union", TComplexArray5)
       .type(Number)
       .$type)
 
-
-export class TObject {}
 $("object", TObject)
   .prop(
     "prop1",
@@ -232,8 +333,6 @@ $("object", TObject)
       .$type
   )
 
-
-export class TObjectUnion1 {}
 $("union", TObjectUnion1)
   .item($("object")
       .prop(
@@ -251,8 +350,6 @@ $("union", TObjectUnion1)
       .type(String)
       .$type)
 
-
-export class TObjectUnion2 {}
 $("union", TObjectUnion2)
   .item($()
       .designType("string")
@@ -270,8 +367,6 @@ $("union", TObjectUnion2)
       )
       .$type)
 
-
-export class TObjectIntersection {}
 $("intersection", TObjectIntersection)
   .item($("object")
       .prop(

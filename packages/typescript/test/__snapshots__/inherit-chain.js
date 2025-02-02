@@ -1,6 +1,25 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class TType {}
+class TType{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+class I1{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class I2{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("", TType)
   .designType("string")
   .flags("string")
@@ -11,8 +30,6 @@ $("", TType)
   .annotate("pass2", "TType")
   .annotate("pass3", "TType")
 
-
-class I1 {}
 $("object", I1)
   .prop(
     "prop",
@@ -27,8 +44,6 @@ $("object", I1)
       .$type
   )
 
-
-export class I2 {}
 $("object", I2)
   .prop(
     "prop",

@@ -1,6 +1,11 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-export class WithMetadata {}
+export class WithMetadata{
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
 $("object", WithMetadata)
   .prop(
     "prop1",
