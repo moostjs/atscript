@@ -5,11 +5,11 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AnnotationSpec } from './annotations'
-import { isAnnotationSpec } from './annotations'
+import { isAnnotationSpec, resolveAnnotation } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
-import type { SemanticNode } from './parser/nodes'
+import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
 import { isInterface, isProp, isRef, isStructure, isType } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
@@ -105,15 +105,7 @@ export class AnscriptDoc {
   }
 
   resolveAnnotation(name: string) {
-    const parts = name.split('.')
-    let current: TAnnotationsTree | AnnotationSpec | undefined = this.config.annotations
-    for (const part of parts) {
-      if (!current || isAnnotationSpec(current)) {
-        return undefined
-      }
-      current = current[part]
-    }
-    return isAnnotationSpec(current) ? current : undefined
+    return resolveAnnotation(name, this.config.annotations)
   }
 
   updateDependencies(docs: AnscriptDoc[]) {
@@ -163,6 +155,7 @@ export class AnscriptDoc {
     this.tokensIndex = new TokensIndex()
     this.blocksIndex = new BlocksIndex()
     this.resolvedAnnotations = []
+    this.annotations = []
   }
 
   private registerNodes(nodes: SemanticNode[]) {
@@ -177,8 +170,12 @@ export class AnscriptDoc {
   }
 
   public resolvedAnnotations: Token[] = []
+  public annotations: TAnnotationTokens[] = []
 
-  registerAnnotation(mainToken: Token, args?: Token[]) {
+  registerAnnotation(annotationTokens: TAnnotationTokens) {
+    this.annotations.push(annotationTokens)
+    const mainToken = annotationTokens.token
+    const args = annotationTokens.args
     this.tokensIndex.add(mainToken)
     args?.forEach(a => this.tokensIndex.add(a))
     const annotationSpec = this.resolveAnnotation(mainToken.text.slice(1))

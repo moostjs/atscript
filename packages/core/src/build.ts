@@ -91,7 +91,7 @@ export class BuildRepo {
       }
     }
 
-    if (this.repo.forceConfig && this.docs === docs && this.docs[0]) {
+    if (this.repo.sharedConfig && this.docs === docs && this.docs[0]) {
       const { manager } = await this.repo.loadPluginManagerFor(this.docs[0].id)
       await manager.buildEnd(outFiles, config.format, this.repo)
     }

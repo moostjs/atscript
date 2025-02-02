@@ -21,5 +21,5 @@ export interface TAnscriptConfigOutput {
 export type TAnscriptConfig = Partial<TAnscriptConfigInput & TAnscriptConfigOutput>
 
 export interface TAnnotationsTree {
-  [key: string]: TAnnotationsTree | AnnotationSpec
+  [key: string]: AnnotationSpec | TAnnotationsTree
 }

@@ -15,7 +15,7 @@ export interface TOutputWithSource extends TPluginOutput {
 export class PluginManager {
   constructor(private readonly cfg: TAnscriptConfig) {}
 
-  _config!: TAnscriptConfig
+  private _config!: TAnscriptConfig
 
   name = 'plugin-manager'
 

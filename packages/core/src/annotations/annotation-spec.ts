@@ -211,3 +211,18 @@ export class AnnotationSpec {
 export function isAnnotationSpec(a?: TAnnotationsTree | AnnotationSpec): a is AnnotationSpec {
   return Boolean(a) && (a as AnnotationSpec).__is_annotation_spec
 }
+
+export function resolveAnnotation(
+  name: string,
+  annotationsTree?: TAnnotationsTree
+): AnnotationSpec | undefined {
+  const parts = name.split('.')
+  let current: TAnnotationsTree | AnnotationSpec | undefined = annotationsTree
+  for (const part of parts) {
+    if (!current || isAnnotationSpec(current)) {
+      return undefined
+    }
+    current = current[part]
+  }
+  return isAnnotationSpec(current) ? current : undefined
+}

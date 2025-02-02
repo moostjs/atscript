@@ -1,7 +1,13 @@
 import { Controller, Description, InjectMoostLogger, Optional, TConsoleBase } from 'moost'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import path from 'path'
-import { build, loadConfig, TAnscriptConfig, TAnscriptConfigOutput } from '@anscript/core'
+import {
+  build,
+  loadConfig,
+  resolveConfigFile,
+  TAnscriptConfig,
+  TAnscriptConfigOutput,
+} from '@anscript/core'
 import { existsSync } from 'fs'
 import { tsPlugin } from '../plugin'
 
@@ -37,8 +43,8 @@ export class Commands {
   }
 
   async getConfig(configFile?: string): Promise<TAnscriptConfig> {
+    const root = process.cwd()
     if (configFile) {
-      const root = process.cwd()
       const c = path.join(root, configFile)
       if (!existsSync(c)) {
         this.logger.error(
@@ -49,6 +55,12 @@ export class Commands {
       this.logger.log(`Using config file ${__DYE_CYAN__}${configFile}${__DYE_COLOR_OFF__}`)
       return loadConfig(c)
     } else {
+      const resolved = await resolveConfigFile(root)
+      if (resolved) {
+        this.logger.log(`Using config file ${__DYE_CYAN__}${resolved}${__DYE_COLOR_OFF__}`)
+        return loadConfig(resolved)
+      }
+      this.logger.log(`No anscript config file found`)
       return {
         format: 'dts',
         plugins: [tsPlugin()],

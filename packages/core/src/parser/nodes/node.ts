@@ -21,7 +21,7 @@ export class SemanticNode {
       this.definition.registerAtDocument(doc)
     }
     this.annotations?.forEach(val => {
-      doc.registerAnnotation(val.token, val.args)
+      doc.registerAnnotation(val)
     })
   }
 

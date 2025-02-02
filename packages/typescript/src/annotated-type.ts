@@ -157,6 +157,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
           } else {
             this.$metadata.set(key, [a, value])
           }
+        } else {
+          this.$metadata.set(key, [value])
         }
       } else {
         this.$metadata.set(key, value)

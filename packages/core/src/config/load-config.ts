@@ -69,8 +69,12 @@ const DEFAULT_CONFIG_BASE = 'anscript.config'
 /**
  * Resolves nearest config file
  */
-export async function resolveConfigFile(docUri: string, root: string): Promise<string | undefined> {
-  const startDir = path.dirname(docUri)
+export async function resolveConfigFile(
+  docUri: string,
+  _root?: string
+): Promise<string | undefined> {
+  const startDir = docUri.endsWith('.as') ? path.dirname(docUri) : docUri
+  const root = _root || startDir
   let currentDir = startDir
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition

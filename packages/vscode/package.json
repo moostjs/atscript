@@ -67,6 +67,6 @@
   "devDependencies": {
     "@types/node": "^22.10.5",
     "@types/vscode": "^1.96.0",
-    "vitest": "^2.1.8"
+    "vitest": "^3.0.0"
   }
 }

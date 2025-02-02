@@ -10,6 +10,7 @@ import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
+import { resolveAnnotation } from './annotations'
 
 interface TPluginManagers {
   manager: PluginManager
@@ -20,7 +21,7 @@ interface TPluginManagers {
 export class AnscriptRepo {
   constructor(
     public readonly root = process.cwd(),
-    public readonly forceConfig?: TAnscriptConfigInput
+    public readonly sharedConfig?: TAnscriptConfigInput
   ) {}
 
   protected configFormat?: 'esm' | 'cjs'
@@ -35,7 +36,7 @@ export class AnscriptRepo {
    */
   protected readonly anscripts = new Map<string, Promise<AnscriptDoc>>()
 
-  protected forcedManager: TPluginManagers | undefined
+  public sharedPluginManager: TPluginManagers | undefined
 
   /**
    * cache for raw content of config files
@@ -45,15 +46,85 @@ export class AnscriptRepo {
     Promise<Partial<TAnscriptConfigInput & TAnscriptConfigOutput>>
   >()
 
+  getSharedPluginManager() {
+    return this.sharedPluginManager?.manager
+  }
+
+  async getUsedAnnotations() {
+    type TAnnotationValue = 'string' | 'number' | 'boolean' | 'unknown'
+    type TAnnotationValueObj = Record<string, TAnnotationValue | undefined>
+    type TUsedAnnotation = {
+      isArray?: boolean
+      fromSpec?: boolean
+      types: Set<TAnnotationValueObj | TAnnotationValue>
+    }
+    const config = (await this.getSharedPluginManager()?.config()) || {}
+    const annotations = {} as Record<string, TUsedAnnotation | undefined>
+    for (const doc of Array.from(this.anscripts.values())) {
+      const awaited = await doc
+      for (const { name, token, args } of awaited.annotations) {
+        if (!annotations[name]) {
+          let types = new Set<TAnnotationValueObj | TAnnotationValue>()
+          let isArray = false
+          const fromSpec = resolveAnnotation(name, config.annotations)
+          if (fromSpec) {
+            isArray = !!fromSpec.config.multiple
+            if (Array.isArray(fromSpec.config.argument)) {
+              // object
+              const o = {} as TAnnotationValueObj
+              for (const a of fromSpec.arguments) {
+                o[a.name] = a.type
+              }
+              types.add(o)
+            } else if (fromSpec.config.argument) {
+              // argument.type
+              types.add(fromSpec.config.argument.type)
+            } else {
+              // boolean
+              types.add('boolean')
+            }
+          }
+          annotations[name] = {
+            isArray,
+            fromSpec: !!fromSpec,
+            types,
+          }
+        }
+        if (annotations[name].fromSpec) {
+          continue
+        }
+        const isArray = token.parentNode!.countAnnotations(name) > 1
+        if (isArray) {
+          annotations[name].isArray = true
+        }
+        for (const arg of args) {
+          if (arg.type === 'text') {
+            annotations[name].types.add('string')
+          } else if (arg.type === 'number') {
+            annotations[name].types.add('number')
+          } else if (arg.type === 'identifier' && ['true', 'false'].includes(arg.text)) {
+            annotations[name].types.add('boolean')
+          } else {
+            annotations[name].types.add('unknown')
+          }
+        }
+        if (args.length === 0) {
+          annotations[name].types.add('boolean')
+        }
+      }
+    }
+    return annotations
+  }
+
   async loadPluginManagerFor(id: string): Promise<TPluginManagers> {
-    if (this.forceConfig) {
-      if (!this.forcedManager) {
-        this.forcedManager = {
-          manager: new PluginManager(this.forceConfig),
+    if (this.sharedConfig) {
+      if (!this.sharedPluginManager) {
+        this.sharedPluginManager = {
+          manager: new PluginManager(this.sharedConfig),
           dependants: new Set(),
         }
       }
-      return this.forcedManager
+      return this.sharedPluginManager
     }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
