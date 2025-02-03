@@ -1,3 +1,4 @@
+// eslint-disable max-lines
 import {
   isAnnotatedType,
   TAnscriptAnnotatedType,
@@ -13,8 +14,26 @@ interface TError {
   details?: TError[]
 }
 
+export interface TValidatorOptions {
+  partial: boolean | 'deep'
+  unknwonProps: 'strip' | 'ignore' | 'error'
+  errorLimit: number
+}
+
 export class Validator {
-  constructor(protected readonly def: TAnscriptAnnotatedType) {}
+  protected opts: TValidatorOptions
+
+  constructor(
+    protected readonly def: TAnscriptAnnotatedType,
+    opts?: Partial<TValidatorOptions>
+  ) {
+    this.opts = {
+      partial: false,
+      unknwonProps: 'error',
+      errorLimit: 10,
+      ...opts,
+    }
+  }
 
   public errors: TError[] = []
   protected stackErrors: TError[][] = []
@@ -177,6 +196,14 @@ export class Validator {
     const typeKeys = new Set()
     for (const [key, item] of def.type.props.entries()) {
       typeKeys.add(key)
+      if (value[key] === undefined) {
+        if (
+          this.opts.partial === 'deep' ||
+          (this.opts.partial === true && this.stackPath.length <= 1)
+        ) {
+          continue
+        }
+      }
       this.push(key)
       if (this._validate(item, value[key])) {
         this.pop(false)
@@ -186,11 +213,17 @@ export class Validator {
       }
     }
     for (const key of valueKeys) {
-      if (!typeKeys.has(key)) {
-        this.push(key)
-        this.error(`Unexpected property`)
-        this.pop(true)
-        passed = false
+      if (this.opts.unknwonProps !== 'ignore') {
+        if (!typeKeys.has(key)) {
+          if (this.opts.unknwonProps === 'error') {
+            this.push(key)
+            this.error(`Unexpected property`)
+            this.pop(true)
+            passed = false
+          } else if (this.opts.unknwonProps === 'strip') {
+            delete value[key]
+          }
+        }
       }
     }
     return passed

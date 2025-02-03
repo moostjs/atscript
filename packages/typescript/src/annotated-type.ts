@@ -1,4 +1,4 @@
-import { Validator } from './validator'
+import { Validator, type TValidatorOptions } from './validator'
 
 // eslint-disable max-lines
 export interface TAnscriptTypeComplex {
@@ -51,7 +51,7 @@ export type TAnscriptTypeDef =
 export interface TAnscriptAnnotatedType<T = TAnscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
-  validator: () => Validator
+  validator: (opts?: TValidatorOptions) => Validator
   metadata: Map<string, unknown>
   optional?: boolean
 }
@@ -87,8 +87,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       __is_anscript_annotated_type: true,
       metadata,
       type,
-      validator() {
-        return new Validator(this as TAnscriptAnnotatedType)
+      validator(opts?: TValidatorOptions) {
+        return new Validator(this as TAnscriptAnnotatedType, opts)
       },
     })
   } else {
@@ -96,8 +96,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       __is_anscript_annotated_type: true,
       metadata,
       type,
-      validator() {
-        return new Validator(this)
+      validator(opts?: TValidatorOptions) {
+        return new Validator(this, opts)
       },
     }
   }
@@ -271,8 +271,8 @@ function mergeIntersection(
       },
       metadata: mergeMetadata(left.metadata, right.metadata),
       optional: left.optional || right.optional,
-      validator() {
-        return new Validator(this)
+      validator(opts?: TValidatorOptions) {
+        return new Validator(this, opts)
       },
     }
   }
@@ -291,8 +291,8 @@ function mergeIntersection(
       },
       metadata: mergeMetadata(left.metadata, right.metadata),
       optional: left.optional || right.optional,
-      validator() {
-        return new Validator(this)
+      validator(opts?: TValidatorOptions) {
+        return new Validator(this, opts)
       },
     }
   } else {
@@ -306,8 +306,8 @@ function mergeIntersection(
         },
         metadata: mergeMetadata(left.metadata, right.metadata),
         optional: left.optional || right.optional,
-        validator() {
-          return new Validator(this)
+        validator(opts?: TValidatorOptions) {
+          return new Validator(this, opts)
         },
       }
     } else {

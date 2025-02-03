@@ -42,10 +42,11 @@ describe('Validator at primitives', () => {
 })
 
 describe('Validator at objects', () => {
+  const simpleObj = defineAnnotatedType('object')
+    .prop('name', defineAnnotatedType().designType('string').$type)
+    .prop('age', defineAnnotatedType().designType('number').$type)
   it('should validate object', () => {
-    const t = defineAnnotatedType('object')
-      .prop('name', defineAnnotatedType().designType('string').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
+    const t = simpleObj
     const validator = new Validator(t.$type)
     expect(validator.validate({ name: 'John', age: 30 }, true)).toBe(true)
     expect(validator.validate({ name: 'John', age: '30' }, true)).toBe(false)
@@ -61,18 +62,20 @@ describe('Validator at objects', () => {
     expect(validator.validate({ name: 'John', age: '30' }, true)).toBe(false)
     expect(validator.validate({ name: 'John', age: 30, email: 'test@test.com' }, true)).toBe(true)
   })
+  const deepObjectType = defineAnnotatedType('object')
+    .prop('name', defineAnnotatedType().designType('string').$type)
+    .prop('age', defineAnnotatedType().designType('number').$type)
+    .prop(
+      'address',
+      defineAnnotatedType('object')
+        .prop('street', defineAnnotatedType().designType('string').$type)
+        .prop('city', defineAnnotatedType().designType('string').$type)
+        .prop('state', defineAnnotatedType().designType('string').$type)
+        .prop('zip', defineAnnotatedType().designType('number').$type).$type
+    )
+
   it('should validate nested objects', () => {
-    const t = defineAnnotatedType('object')
-      .prop('name', defineAnnotatedType().designType('string').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
-      .prop(
-        'address',
-        defineAnnotatedType('object')
-          .prop('street', defineAnnotatedType().designType('string').$type)
-          .prop('city', defineAnnotatedType().designType('string').$type)
-          .prop('state', defineAnnotatedType().designType('string').$type)
-          .prop('zip', defineAnnotatedType().designType('number').$type).$type
-      )
+    const t = deepObjectType
     const validator = new Validator(t.$type)
     expect(
       validator.validate(
@@ -94,6 +97,35 @@ describe('Validator at objects', () => {
         true
       )
     ).toBe(false)
+  })
+
+  it('should validate object with partial option', () => {
+    const t = deepObjectType
+    const validator = new Validator(t.$type, { partial: true })
+    expect(validator.validate({}, true)).toBe(true)
+    expect(validator.validate({ address: {} }, true)).toBe(false)
+  })
+
+  it('should validate object with deep partial option', () => {
+    const t = deepObjectType
+    const validator = new Validator(t.$type, { partial: 'deep' })
+    expect(validator.validate({}, true)).toBe(true)
+    expect(validator.validate({ address: {} }, true)).toBe(true)
+  })
+
+  it('should validate object ignoring unknown props', () => {
+    const t = simpleObj
+    const validator = new Validator(t.$type, { unknwonProps: 'ignore' })
+    expect(validator.validate({ name: 'John', age: 25 }, true)).toBe(true)
+    expect(validator.validate({ name: 'John', age: 25, dummy: true }, true)).toBe(true)
+  })
+
+  it('should validate object stripping unknown props', () => {
+    const t = simpleObj
+    const validator = new Validator(t.$type, { unknwonProps: 'strip' })
+    const o = { name: 'John', age: 25, dummy: true }
+    expect(validator.validate(o, true)).toBe(true)
+    expect(o.dummy).toBeUndefined()
   })
 })
 
