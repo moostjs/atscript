@@ -300,13 +300,14 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
           token.text === '.' ? token.parentNode.chain : token.parentNode.chain.slice(0, -1)
         const unwound = anscript.unwindType(id.text, chain)
         if (unwound?.def) {
+          const def = anscript.mergeIntersection(unwound.def)
           let options: SemanticNode[] | undefined
-          if (isInterface(unwound.def) || isStructure(unwound.def)) {
-            options = Array.from(unwound.def.props.values())
-          } else if (isProp(unwound.def) && unwound.def.nestedProps) {
-            options = Array.from(unwound.def.nestedProps.values())
-          } else if (isPrimitive(unwound.def)) {
-            options = Array.from(unwound.def.props.values())
+          if (isInterface(def) || isStructure(def)) {
+            options = Array.from(def.props.values())
+          } else if (isProp(def) && def.nestedProps) {
+            options = Array.from(def.nestedProps.values())
+          } else if (isPrimitive(def)) {
+            options = Array.from(def.props.values())
           }
           return options?.map(t => ({
             label: t.id,

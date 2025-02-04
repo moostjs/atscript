@@ -1,4 +1,8 @@
 import type { Token } from '../token'
+import { SemanticArrayNode } from './array-node'
+import { SemanticConstNode } from './const-node'
+import { SemanticStructureNode } from './structure-node'
+import { SemanticTupleNode } from './tuple-node'
 
 export type TSemanticToken =
   | 'type'
@@ -29,17 +33,10 @@ export interface TAnnotationTokens {
   args: Token[]
 }
 
-type TPrimitiveTargets = 'typescript' // potentially extendable to other languages like python, java, etc
-
-type TPrimitiveMaps = {
-  [name in TPrimitiveTargets]?: string
-}
-
 export interface TPrimitiveBaseConfig {
-  base: 'numeric' | 'string' | 'boolean' | 'void' | 'null'
-  lang?: TPrimitiveMaps
+  type?: TPrimitiveTypeDef
   documentation?: string
-  flags?: Set<string>
+  flags?: string[]
 }
 
 export interface TPrimitiveConfig extends TPrimitiveBaseConfig {
@@ -47,3 +44,35 @@ export interface TPrimitiveConfig extends TPrimitiveBaseConfig {
     [name: string]: Partial<TPrimitiveConfig>
   }
 }
+
+export interface TPrimitiveTypeComplex {
+  kind: 'union' | 'intersection' | 'tuple'
+  items: TPrimitiveTypeDef[]
+  optional?: boolean
+}
+
+export interface TPrimitiveTypeArray {
+  kind: 'array'
+  of: TPrimitiveTypeDef
+  optional?: boolean
+}
+
+export interface TPrimitiveTypeObject {
+  kind: 'object'
+  props: Record<string, TPrimitiveTypeDef>
+  optional?: boolean
+}
+
+export type TPrimitiveTypeFinal = 'string' | 'number' | 'boolean' | 'void' | 'null'
+export type TPrimitiveTypeFinalOptional = {
+  kind: 'final'
+  value: TPrimitiveTypeFinal
+  optional: true
+}
+
+export type TPrimitiveTypeDef =
+  | TPrimitiveTypeComplex
+  | TPrimitiveTypeArray
+  | TPrimitiveTypeObject
+  | TPrimitiveTypeFinal
+  | TPrimitiveTypeFinalOptional

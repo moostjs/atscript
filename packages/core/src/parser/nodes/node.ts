@@ -142,12 +142,13 @@ export class SemanticNode {
 
   renderAnnotations() {
     if (this.annotations) {
-      return `${Array.from(
-        this.annotations.entries(),
-        ([name, { args }]) =>
-          // eslint-disable-next-line sonarjs/no-nested-template-literals
-          `@${name} ${args.map(a => (a.type === 'text' ? `"${a.text}"` : a.text)).join(' ')}`
-      ).join('\n')}\n`
+      return `${this.annotations
+        ?.map(
+          ({ token, args }) =>
+            // eslint-disable-next-line sonarjs/no-nested-template-literals
+            `${token.text} ${args.map(a => (a.type === 'text' ? `"${a.text}"` : a.text)).join(' ')}`
+        )
+        .join('\n')}\n`
     }
     return ''
   }

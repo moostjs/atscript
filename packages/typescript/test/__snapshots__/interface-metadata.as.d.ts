@@ -33,4 +33,12 @@ export declare class WithMetadata {
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
+
+/**
+ * Anscript type **SomeType**
+ * @see {@link ./interface-metadata.as:37:13}
+ */
+export type SomeType = {
+  a: "b"
+}
 // prettier-ignore-end

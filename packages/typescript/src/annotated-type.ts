@@ -4,21 +4,23 @@ import { Validator, type TValidatorOptions } from './validator'
 export interface TAnscriptTypeComplex {
   kind: 'union' | 'intersection' | 'tuple'
   items: TAnscriptAnnotatedType[]
+
+  flags: Set<string>
 }
 
 export interface TAnscriptTypeArray {
   kind: 'array'
   of: TAnscriptAnnotatedType
+
+  flags: Set<string>
 }
 
 export interface TAnscriptTypeObject<K extends string = string> {
   kind: 'object'
 
-  /**
-   * type constructor
-   */
-  type: Function | undefined
   props: Map<K, TAnscriptAnnotatedType>
+
+  flags: Set<string>
 }
 
 export interface TAnscriptTypeFinal {
@@ -28,11 +30,6 @@ export interface TAnscriptTypeFinal {
    * design type
    */
   designType: 'string' | 'number' | 'boolean' | 'undefined' | 'null' | 'object' | 'any' | 'never'
-
-  /**
-   * type constructor
-   */
-  type: Function | undefined
 
   /**
    * value for literals
@@ -78,9 +75,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
   if (kind === 'object') {
     type.props = new Map()
   }
-  if (!kind) {
-    type.flags = new Set()
-  }
+  type.flags = new Set()
   const metadata = (base?.metadata || new Map<string, unknown>()) as Map<string, unknown>
   if (base) {
     Object.assign(base, {
@@ -116,10 +111,6 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       this.$def.designType = value
       return this
     },
-    type(value: any) {
-      this.$def.type = value
-      return this
-    },
     value(value: string | number | boolean) {
       this.$def.value = value
       return this
@@ -129,53 +120,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       return this
     },
     item(value: TAnscriptAnnotatedType) {
-      // If not an intersection, just push the item.
-      if (this.$def.kind !== 'intersection') {
-        this.$def.items.push(value)
-        return this
-      }
-
-      // We are in "intersection" mode:
-      const newItemDef = value.type
-
-      // 1. If the incoming item is an object, try merging it with an existing object item.
-      if (newItemDef.kind === 'object') {
-        if (!this._existingObject) {
-          // No object item yet, so just add this one.
-          this._existingObject = value as TAnscriptAnnotatedType<TAnscriptTypeObject>
-          // cloning props to avoid mutation to the original type when merging
-          const oldPropsMap = this._existingObject.type.props
-          this._existingObject.type = {
-            kind: 'object',
-            type: Object,
-            props: new Map(),
-          }
-          for (const [propName, propType] of oldPropsMap.entries()) {
-            this._existingObject.type.props.set(propName, propType)
-          }
-          this.$def.items.push(value)
-        } else {
-          const existingObject = this._existingObject
-          // Merge object-level metadata (right overrides left).
-          existingObject.metadata = mergeMetadata(existingObject.metadata, value.metadata)
-
-          // Merge props with the existing object item.
-          for (const [propName, newPropType] of newItemDef.props.entries()) {
-            const oldPropType = existingObject.type.props.get(propName)
-            if (oldPropType) {
-              // Merge these two prop types into a single intersection type.
-              existingObject.type.props.set(propName, mergeIntersection(oldPropType, newPropType))
-            } else {
-              // If this prop doesn't exist in old object, just add it.
-              existingObject.type.props.set(propName, newPropType)
-            }
-          }
-        }
-      } else {
-        // 2. If the new item isn't an object, just push it into the intersection items.
-        this.$def.items.push(value)
-      }
-
+      this.$def.items.push(value)
       return this
     },
     prop(name: string, value: TAnscriptAnnotatedType) {
@@ -245,93 +190,4 @@ export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]>
 
   // Set enforces that the value must match O[K]
   set<K extends keyof O>(key: K, value: O[K]): this
-}
-
-/**
- * Merges two annotated types into a single intersection type.
- * Also merges metadata so right side's keys override left side's.
- *
- * Additional rule for final, same-designType:
- * If both sides are final (kind === '') and share the same designType,
- * simply merge metadata + flags (no intersection node is created).
- */
-function mergeIntersection(
-  left: TAnscriptAnnotatedType,
-  right: TAnscriptAnnotatedType
-): TAnscriptAnnotatedType {
-  // Special case: both final and same designType => no intersection node needed.
-  if (left.type.kind === '' && right.type.kind === '') {
-    return {
-      __is_anscript_annotated_type: true,
-      type: {
-        kind: '',
-        designType: left.type.designType === right.type.designType ? left.type.designType : 'never',
-        type: left.type.type,
-        flags: new Set([...left.type.flags, ...right.type.flags]),
-      },
-      metadata: mergeMetadata(left.metadata, right.metadata),
-      optional: left.optional || right.optional,
-      validator(opts?: TValidatorOptions) {
-        return new Validator(this, opts)
-      },
-    }
-  }
-
-  // If `left` is already an intersection...
-  if (left.type.kind === 'intersection') {
-    // Merge all items from right into left's items
-    return {
-      __is_anscript_annotated_type: true,
-      type: {
-        ...left.type,
-        items:
-          right.type.kind === 'intersection'
-            ? [...left.type.items, ...right.type.items]
-            : [...left.type.items, right],
-      },
-      metadata: mergeMetadata(left.metadata, right.metadata),
-      optional: left.optional || right.optional,
-      validator(opts?: TValidatorOptions) {
-        return new Validator(this, opts)
-      },
-    }
-  } else {
-    // If `left` is not an intersection, but `right` is, flatten into right:
-    if (right.type.kind === 'intersection') {
-      return {
-        __is_anscript_annotated_type: true,
-        type: {
-          ...right.type,
-          items: [left, ...right.type.items],
-        },
-        metadata: mergeMetadata(left.metadata, right.metadata),
-        optional: left.optional || right.optional,
-        validator(opts?: TValidatorOptions) {
-          return new Validator(this, opts)
-        },
-      }
-    } else {
-      // Neither is an intersection => create new intersection with both.
-      const merged = defineAnnotatedType('intersection').item(left).item(right)
-      // Combine their metadata on the new intersection type.
-      merged.$type.metadata = mergeMetadata(left.metadata, right.metadata)
-      merged.$type.optional = left.optional || right.optional
-      return merged.$type
-    }
-  }
-}
-
-/**
- * Copies all entries from `leftMeta` into a new Map, then overrides
- * any matching keys with `rightMeta` entries. Right wins on conflicts.
- */
-function mergeMetadata(
-  leftMeta: Map<string, unknown>,
-  rightMeta: Map<string, unknown>
-): Map<string, unknown> {
-  const result = new Map(leftMeta)
-  for (const [key, val] of rightMeta.entries()) {
-    result.set(key, val)
-  }
-  return result
 }

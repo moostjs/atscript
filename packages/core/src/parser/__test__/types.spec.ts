@@ -156,6 +156,26 @@ describe('types', () => {
 
     expect(result.messages).toHaveLength(0)
   })
+
+  it('must contain annotations', () => {
+    const result = parseAnscript(`@label 'My Type'\ntype TypeName = {
+      @label 'A'
+      a: string
+      @label 'B'
+      b: number
+    }`)
+    expect(result.toString()).toMatchInlineSnapshot(`
+      "@label "My Type"
+      ● [type] "TypeName" type: type <identifier>
+        = [structure] "{"  (
+            @label "A"
+            ● [prop] "a": [ref] "string" <>
+            @label "B"
+            ● [prop] "b": [ref] "number"
+          )
+      "
+    `)
+  })
 })
 
 describe('referred identifiers in type', () => {

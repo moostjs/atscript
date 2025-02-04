@@ -32,3 +32,9 @@ export interface WithMetadata {
         }
     }
 }
+
+@id 'Some type'
+export type SomeType = {
+    @label 'Prop1'
+    a: 'b'
+}

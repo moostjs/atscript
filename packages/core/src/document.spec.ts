@@ -1,3 +1,4 @@
+// eslint-disable max-lines
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable sonarjs/no-duplicate-string */
 import { describe, expect, it } from 'vitest'
@@ -6,10 +7,11 @@ import { AnnotationSpec } from './annotations'
 import { AnscriptDoc } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
+import { isGroup, SemanticGroup } from './parser/nodes'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
-primitives.set('string', new SemanticPrimitiveNode('string'))
-primitives.set('number', new SemanticPrimitiveNode('number'))
+primitives.set('string', new SemanticPrimitiveNode('string', { type: 'string' }))
+primitives.set('number', new SemanticPrimitiveNode('number', { type: 'number' }))
 
 describe('document', () => {
   it('should register import', () => {
@@ -442,5 +444,89 @@ describe('document', () => {
     expect(doc.resolveAnnotation('level1.level2')).toBeDefined()
     expect(doc.resolveAnnotation('level1.level2.config')).toBeUndefined()
     expect(doc.resolveAnnotation('level1')).toBeUndefined()
+  })
+})
+
+describe('document/merging intersections', () => {
+  it('must merge two structures', () => {
+    const doc = new AnscriptDoc('file-1.as', { primitives })
+    doc.update(`type MyType = {a: string} & {b: number}`)
+    const def = doc.nodes[0].getDefinition()
+    expect(isGroup(def)).toBeTruthy()
+    expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
+      "
+      ● [structure] ""  (
+          
+          ● [prop] "a": [ref] "string" <>
+          
+          ● [prop] "b": [ref] "number"
+        )"
+    `)
+  })
+  it('must merge two intersected structures', () => {
+    const doc = new AnscriptDoc('file-1.as', { primitives })
+    doc.update(`type MyType = {a: string; c: string} & {b: number, c: string}`)
+    const def = doc.nodes[0].getDefinition()
+    expect(isGroup(def)).toBeTruthy()
+    expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
+      "
+      ● [structure] ""  (
+          
+          ● [prop] "a": [ref] "string" <>
+          
+          ● [prop] "c": [ref] "string" <>
+          
+          ● [prop] "b": [ref] "number"
+        )"
+    `)
+  })
+  it('must merge two intersected structures with conflicting prop type', () => {
+    const doc = new AnscriptDoc('file-1.as', { primitives })
+    doc.update(`type MyType = {a: string; c: string} & {b: number, c: number}`)
+    const def = doc.nodes[0].getDefinition()
+    expect(isGroup(def)).toBeTruthy()
+    expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
+      "
+      ● [structure] ""  (
+          
+          ● [prop] "a": [ref] "string" <>
+          
+          ● [prop] "c": [ref] "never" <>
+          
+          ● [prop] "b": [ref] "number"
+        )"
+    `)
+  })
+  it('must merge two deep objects', () => {
+    const doc = new AnscriptDoc('file-1.as', { primitives })
+    doc.update(`type MyType = {a: string; b: { c: number }} & {b: { c: number, d: string }}`)
+    const def = doc.nodes[0].getDefinition()
+    expect(isGroup(def)).toBeTruthy()
+    expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
+      "
+      ● [structure] ""  (
+          
+          ● [prop] "a": [ref] "string" <>
+          
+          ● [prop] "b"
+            
+            = [structure] ""  (
+                
+                ● [prop] "c": [ref] "number" <>
+                
+                ● [prop] "d": [ref] "string"
+              )
+          
+        )"
+    `)
+  })
+  it('must merge object and non-object', () => {
+    const doc = new AnscriptDoc('file-1.as', { primitives })
+    doc.update(`type MyType = {a: string } & number`)
+    const def = doc.nodes[0].getDefinition()
+    expect(isGroup(def)).toBeTruthy()
+    expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(
+      `"● [ref] "never""`
+    )
   })
 })

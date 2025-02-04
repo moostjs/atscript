@@ -1,27 +1,27 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class TContactType{
+class TContactType {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
-export class Address{
+export class Address {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
-class Contact{
+class Contact {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
-export class User{
+export class User {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -30,50 +30,38 @@ export class User{
 $("union", TContactType)
   .item($()
       .designType("string")
-      .type(String)
       .value("phone")
       .$type)
   .item($()
       .designType("string")
-      .type(String)
       .value("email")
       .$type)
 
 $("object", Address)
   .prop(
     "line1",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "line2",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "city",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "state",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "zip",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   )
 
@@ -85,17 +73,13 @@ $("object", Contact)
       .$type
   ).prop(
     "value",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "label",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .optional()
       .$type
   )
@@ -103,17 +87,13 @@ $("object", Contact)
 $("object", User)
   .prop(
     "firstName",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "lastName",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "address",

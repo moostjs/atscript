@@ -1,20 +1,35 @@
+// eslint-disable max-lines
 /* eslint-disable @typescript-eslint/no-confusing-void-expression */
 /* eslint-disable max-depth */
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { AnnotationSpec } from './annotations'
-import { isAnnotationSpec, resolveAnnotation } from './annotations'
+import { resolveAnnotation } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
-import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
-import { isInterface, isPrimitive, isProp, isRef, isStructure, isType } from './parser/nodes'
+import {
+  SemanticGroup,
+  SemanticNode,
+  SemanticPropNode,
+  SemanticRefNode,
+  SemanticStructureNode,
+  TAnnotationTokens,
+} from './parser/nodes'
+import {
+  isGroup,
+  isInterface,
+  isPrimitive,
+  isProp,
+  isRef,
+  isStructure,
+  isType,
+} from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
-import type { Token } from './parser/token'
+import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
@@ -24,6 +39,7 @@ import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
+import { mergeAnnotations } from './utils'
 
 export interface TAnscriptDocConfig {
   primitives?: Map<string, SemanticPrimitiveNode>
@@ -202,8 +218,30 @@ export class AnscriptDoc {
         )
       }
     }
+    0
   }
 
+  /**
+   * Recursively resolves a type reference (and any property chain) to find the final underlying definition.
+   *
+   * This method performs a **multi-step** resolution:
+   *  1. Locates the declaration owner of the type (via `getDeclarationOwnerNode`).
+   *  2. Follows references, type aliases, or nested property chains:
+   *     - For “Ref” nodes, it uses the identifier to look up the next type.
+   *     - For “Type” nodes, it calls `getDefinition()` to move to the underlying structure.
+   *     - For property chains (`chain`), it navigates nested properties or nested types,
+   *       resolving each level until the final type is reached.
+   *
+   * @param {string} name - The name of the type or identifier to resolve.
+   * @param {Array<string | Token>} [chain=[]] - An optional chain of properties or tokens, each of which
+   *  refines the path to the final type (e.g., for `SomeType.prop1.prop2`, `chain` might be `[ "prop1", "prop2" ]`).
+   * @returns {Object | undefined} An object containing:
+   *   - `doc`: The `AnscriptDoc` where the final definition is located.
+   *   - `node`: The last encountered `SemanticNode` before reaching the final underlying definition (often a `Prop` node).
+   *   - `def`: The final resolved `SemanticNode`.
+   *
+   * If the type cannot be resolved or does not exist, returns `undefined`.
+   */
   unwindType(
     name: string,
     chain: string[] | Token[] = []
@@ -318,6 +356,22 @@ export class AnscriptDoc {
     return undefined
   }
 
+  /**
+   * Retrieves the definition (i.e., the “go to definition” target) for a given token.
+   *
+   * This method provides a **single-step** resolution of the defining token:
+   *  - If the token is defined in the same document, returns that definition.
+   *  - If the token is imported, follows the import to return the defining token from the relevant document.
+   *  - If the token is a reference to a locally defined identifier, retrieves the local definition.
+   *
+   * @param {Token} token - The token for which to locate the definition.
+   * @returns {Object | undefined} An object containing:
+   *   - `uri`: The file path (URI) of the document where the definition is found.
+   *   - `doc`: The `AnscriptDoc` instance that owns the definition (if found).
+   *   - `token`: The defining token itself (if found).
+   *
+   * If no definition is found, returns `undefined`.
+   */
   getDefinitionFor(token: Token): { uri: string; doc?: AnscriptDoc; token?: Token } | undefined {
     if (token.isDefinition && !token.imported) {
       return { uri: this.id, doc: this, token }
@@ -418,6 +472,25 @@ export class AnscriptDoc {
     }
   }
 
+  /**
+   * Finds the owning document and semantic node responsible for declaring a given identifier.
+   *
+   * This method checks:
+   * 1. Whether the identifier is a known primitive (from this document’s config).
+   * 2. If there's a local definition in this document's registry.
+   *    - If the definition is imported, it resolves the `fromPath`, locates the correct `AnscriptDoc`
+   *      in the dependency map, and recursively tries to get the declaration owner there.
+   *    - If the definition is local (not imported), it returns the current document (`this`) along with
+   *      the parent node that owns the definition and the token itself.
+   *
+   * @param {string} identifier - The name/identifier whose declaring node should be found.
+   * @returns {{ doc: AnscriptDoc; node?: SemanticNode; token?: Token } | undefined} An object containing:
+   *  - `doc`: The `AnscriptDoc` in which the identifier was ultimately declared.
+   *  - `node`: The parent `SemanticNode` that defines or owns the declaration (if applicable).
+   *  - `token`: The specific token for the declaration (if applicable).
+   *
+   * If no declaration is found, returns `undefined`.
+   */
   getDeclarationOwnerNode(identifier: string):
     | {
         doc: AnscriptDoc
@@ -506,23 +579,167 @@ export class AnscriptDoc {
           })
           continue
         }
-        if (isRef(t.parentNode) && t.parentNode.hasChain) {
-          const length = t.parentNode.chain.length - 1
-          for (let i = length; i >= 0; i--) {
-            const token = t.parentNode.chain[i]
-            const decl = this.unwindType(t.parentNode.id!, t.parentNode.chain.slice(0, i + 1))
-            if (!decl?.def) {
-              this._allMessages.push({
-                severity: 1,
-                message: `Unknown member "${token.text}"`,
-                range: token.range,
-              })
+        if (isRef(t.parentNode)) {
+          const def = this.unwindType(t.parentNode.id!, t.parentNode.chain)?.def
+          if (isPrimitive(def) && !def.config.type) {
+            // disallow using primitives with undefined type
+            const token = t.parentNode.chain[t.parentNode.chain.length - 1] || t
+            this._allMessages.push({
+              severity: 1,
+              message: 'Invalid type',
+              range: token.range,
+            })
+          }
+          if (t.parentNode.hasChain) {
+            // check for unknown members in chain
+            const length = t.parentNode.chain.length - 1
+            for (let i = length; i >= 0; i--) {
+              const token = t.parentNode.chain[i]
+              const decl = this.unwindType(t.parentNode.id!, t.parentNode.chain.slice(0, i + 1))
+              if (!decl?.def) {
+                this._allMessages.push({
+                  severity: 1,
+                  message: `Unknown member "${token.text}"`,
+                  range: token.range,
+                })
+              }
             }
           }
         }
       }
     }
     return this._allMessages
+  }
+
+  mergeIntersection(node: SemanticNode): SemanticNode {
+    if (!isGroup(node)) {
+      return node
+    }
+    if (node.op !== '&') {
+      return node
+    }
+    const nodes = node.unwrap()
+    if (nodes.length === 0) {
+      return node
+    }
+    if (nodes.length === 1) {
+      return nodes[0]
+    }
+    const newGroup = [] as SemanticNode[]
+    let left = nodes[0]
+    for (let i = 1; i < nodes.length; i++) {
+      const right = nodes[i]
+      const merged = this.mergeDefs(left, right)
+      if (merged.length === 2) {
+        left = merged[1]
+        newGroup.push(merged[0])
+      } else {
+        left = merged[0]
+      }
+    }
+    newGroup.push(left)
+    if (newGroup.length > 1) {
+      const newNode = new SemanticGroup(newGroup, '&')
+      return newNode
+    } else {
+      return newGroup[0]
+    }
+  }
+
+  mergeDefs(
+    _left: SemanticNode,
+    _right: SemanticNode
+  ): [SemanticNode] | [SemanticNode, SemanticNode] {
+    let left: SemanticNode | undefined = _left
+    let right: SemanticNode | undefined = _right
+    if (isRef(left)) {
+      left = this.unwindType(left.id!, left.chain)?.def
+    }
+    if (isRef(right)) {
+      right = this.unwindType(right.id!, right.chain)?.def
+    }
+    if (!left || !right) {
+      return [_left, _right]
+    }
+    if (isPrimitive(left) && isPrimitive(right)) {
+      // todo: properly merge primitives
+      if (left.config.type === right.config.type) {
+        return [left]
+      }
+      const never = new SemanticRefNode()
+      never.saveToken(
+        new Token({
+          text: 'never',
+          type: 'identifier',
+          getRange: () => zeroRange,
+        }),
+        'identifier'
+      )
+      return [never]
+    }
+    if ((isStructure(left) || isInterface(left)) && (isStructure(right) || isInterface(right))) {
+      // merging objects
+      const mergedProps: SemanticPropNode[] = []
+      const allProps = new Set([...left.props.keys(), ...right.props.keys()])
+      for (const key of allProps) {
+        const leftProp = left.props.get(key)
+        const rightProp = right.props.get(key)
+        let mergedDef: SemanticNode
+        if (leftProp && rightProp) {
+          const grp = new SemanticGroup(
+            [leftProp.getDefinition()!, rightProp.getDefinition()!],
+            '&'
+          )
+          mergedDef = this.mergeIntersection(grp)
+        } else {
+          const oldProp = (leftProp || rightProp)!
+          mergedDef = this.mergeIntersection(oldProp.getDefinition()!)
+        }
+        const prop = new SemanticPropNode()
+        prop.saveToken((leftProp || rightProp)!.token('identifier')!, 'identifier')
+        if (isPrimitive(mergedDef)) {
+          const name = mergedDef.id!
+          mergedDef = new SemanticRefNode()
+          mergedDef.saveToken(
+            new Token({
+              text: name,
+              type: 'identifier',
+              getRange: () => zeroRange,
+            }),
+            'identifier'
+          )
+        }
+        prop.define(mergedDef)
+        prop.annotations = mergeAnnotations(leftProp?.annotations, rightProp?.annotations)
+        const oldProps = [leftProp, rightProp].filter(Boolean) as SemanticPropNode[]
+        let optionalToken = oldProps[0]?.token('optional')
+        for (const oldProp of oldProps) {
+          if (!oldProp.token('optional')) {
+            optionalToken = undefined
+            break
+          }
+        }
+        if (optionalToken) {
+          prop.saveToken(optionalToken, 'optional')
+        }
+        mergedProps.push(prop)
+      }
+      const mergedStructure = new SemanticStructureNode()
+      mergedStructure.setProps(mergedProps)
+      mergedStructure.annotations = mergeAnnotations(left.annotations, right.annotations)
+      return [mergedStructure]
+    }
+    // all other cases are not supported, returning never
+    const never = new SemanticRefNode()
+    never.saveToken(
+      new Token({
+        text: 'never',
+        type: 'identifier',
+        getRange: () => zeroRange,
+      }),
+      'identifier'
+    )
+    return [never]
   }
 }
 

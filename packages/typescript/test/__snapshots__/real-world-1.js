@@ -1,20 +1,20 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-class Address{
+class Address {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
-class Contact{
+class Contact {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
-export class Entity{
+export class Entity {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -23,43 +23,33 @@ export class Entity{
 $("object", Address)
   .prop(
     "line1",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Address Line 1")
       .$type
   ).prop(
     "line2",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Address Line 2")
       .optional()
       .$type
   ).prop(
     "city",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "City")
       .$type
   ).prop(
     "state",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "State")
       .$type
   ).prop(
     "zip",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Zip")
       .$type
   )
@@ -68,31 +58,25 @@ $("object", Address)
 $("object", Contact)
   .prop(
     "name",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "type",
     $("union")
       .item($()
           .designType("string")
-          .type(String)
           .value("phone")
           .$type)
       .item($()
           .designType("string")
-          .type(String)
           .value("email")
           .$type)
       .$type
   ).prop(
     "value",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   )
   .annotate("label", "Contact")
@@ -100,18 +84,14 @@ $("object", Contact)
 $("object", Entity)
   .prop(
     "id",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Legal ID")
       .$type
   ).prop(
     "name",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Name")
       .$type
   ).prop(

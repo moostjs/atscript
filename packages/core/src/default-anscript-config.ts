@@ -9,12 +9,16 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   }
 
   defaultAnscriptConfig.primitives!.set(
+    'never',
+    new SemanticPrimitiveNode('never', {
+      documentation: 'Represents impossible type.',
+    })
+  )
+
+  defaultAnscriptConfig.primitives!.set(
     'string',
     new SemanticPrimitiveNode('string', {
-      base: 'string',
-      lang: {
-        typescript: 'string',
-      },
+      type: 'string',
       documentation: 'Represents textual data.',
       extensions: {
         email: {
@@ -43,10 +47,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   defaultAnscriptConfig.primitives!.set(
     'number',
     new SemanticPrimitiveNode('number', {
-      base: 'numeric',
-      lang: {
-        typescript: 'number',
-      },
+      type: 'number',
       documentation: 'Represents numeric data.',
       extensions: {
         ...positiveOrNegative,
@@ -61,9 +62,6 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
         int: {
           extensions: positiveOrNegative,
           documentation: 'Represents an integer number.',
-          lang: {
-            typescript: 'number',
-          },
         },
       },
     })
@@ -72,10 +70,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   defaultAnscriptConfig.primitives!.set(
     'boolean',
     new SemanticPrimitiveNode('boolean', {
-      base: 'boolean',
-      lang: {
-        typescript: 'boolean',
-      },
+      type: 'boolean',
       documentation: 'Represents true/false values.',
       extensions: {
         true: {
@@ -91,10 +86,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   defaultAnscriptConfig.primitives!.set(
     'null',
     new SemanticPrimitiveNode('null', {
-      base: 'null',
-      lang: {
-        typescript: 'null',
-      },
+      type: 'null',
       documentation: 'Represents NULL value.',
     })
   )
@@ -102,10 +94,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   defaultAnscriptConfig.primitives!.set(
     'void',
     new SemanticPrimitiveNode('void', {
-      base: 'void',
-      lang: {
-        typescript: 'undefined',
-      },
+      type: 'void',
       documentation: 'Represents no value.',
     })
   )
@@ -113,10 +102,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
   defaultAnscriptConfig.primitives!.set(
     'undefined',
     new SemanticPrimitiveNode('undefined', {
-      base: 'void',
-      lang: {
-        typescript: 'undefined',
-      },
+      type: 'void',
       documentation: 'Represents no value.',
     })
   )

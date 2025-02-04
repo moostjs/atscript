@@ -187,7 +187,7 @@ export class Validator {
   }
 
   protected validateObject(def: TAnscriptAnnotatedType<TAnscriptTypeObject>, value: any): boolean {
-    if (typeof value !== 'object' || value === null) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       this.error('Expected object')
       return false
     }
@@ -240,39 +240,40 @@ export class Validator {
       }
       return true
     }
+    const typeOfValue = Array.isArray(value) ? 'array' : typeof value
     switch (def.type.designType) {
       case 'never':
-        this.error(`No value allowed`)
+        this.error(`This type is impossible, must be an internal problem`)
         return false
       case 'any':
         return true
       case 'string':
-        if (typeof value !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeof value}`)
+        if (typeOfValue !== def.type.designType) {
+          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return this.validateString(def.type.flags, value)
       case 'number':
-        if (typeof value !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeof value}`)
+        if (typeOfValue !== def.type.designType) {
+          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return this.validateNumber(def.type.flags, value)
       case 'boolean':
-        if (typeof value !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeof value}`)
+        if (typeOfValue !== def.type.designType) {
+          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return true
       case 'undefined':
         if (value !== undefined) {
-          this.error(`Expected ${def.type.designType}, got ${typeof value}`)
+          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return true
       case 'null':
         if (value !== null) {
-          this.error(`Expected ${def.type.designType}, got ${typeof value}`)
+          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return true

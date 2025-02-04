@@ -8,9 +8,11 @@ import {
   SemanticArrayNode,
   SemanticInterfaceNode,
   SemanticNode,
+  SemanticPrimitiveNode,
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
+  TPrimitiveTypeDef,
 } from '@anscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
@@ -64,7 +66,7 @@ export class TypeRenderer extends BaseRenderer {
       const node = def as SemanticRefNode
       const unwound = this.doc.unwindType(node.id!, node.chain)
       if (isPrimitive(unwound?.def)) {
-        this.write(unwound.def.config?.lang?.typescript ?? unwound.def.config?.base ?? 'unknown')
+        this.write(renderPrimitiveTypeDef(unwound.def.config.type))
         if (node.hasChain) {
           this.write(` /* ${node.chain.map(c => c.text).join('.')} */`)
         }
@@ -142,5 +144,42 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(` * Anscript ${node.entity} **${node.id!}**`)
     this.writeln(` * @see {@link ./${this.doc.name}${rangeStr}}`)
     this.writeln(` */`)
+  }
+}
+
+function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
+  if (!def) {
+    return 'unknown'
+  }
+  // If it's a direct final type, return it
+  if (typeof def === 'string') {
+    return def === 'void' ? 'undefined' : def
+  }
+
+  switch (def.kind) {
+    case 'final':
+      return def.value === 'void' ? 'undefined' : def.value
+    case 'union':
+      return def.items.map(renderPrimitiveTypeDef).join(' | ')
+    case 'intersection':
+      return def.items.map(renderPrimitiveTypeDef).join(' & ')
+    case 'tuple':
+      return `[${def.items.map(renderPrimitiveTypeDef).join(', ')}]`
+    case 'array':
+      return `${renderPrimitiveTypeDef(def.of)}[]`
+    case 'object': {
+      const props = Object.entries(def.props)
+        .map(
+          ([key, val]) =>
+            `${wrapProp(key)}${
+              typeof val === 'object' && val.optional ? '?' : ''
+            }: ${renderPrimitiveTypeDef(val)}`
+        )
+        .join('; ')
+      return `{ ${props} }`
+    }
+    default:
+      // Fallback in case of unexpected input
+      return 'unknown'
   }
 }

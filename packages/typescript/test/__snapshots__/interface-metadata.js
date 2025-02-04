@@ -1,6 +1,13 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-export class WithMetadata{
+export class WithMetadata {
+  static __is_anscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+}
+
+
+export class SomeType {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -9,10 +16,8 @@ export class WithMetadata{
 $("object", WithMetadata)
   .prop(
     "prop1",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .annotate("label", "Prop1")
       .$type
   ).prop(
@@ -30,18 +35,14 @@ $("object", WithMetadata)
     $("object")
       .prop(
         "prop3",
-        $()
-          .designType("string")
+        $().designType("string")
           .flags("string")
-          .type(String)
           .annotate("label", "Prop3")
           .$type
       ).prop(
         "prop4",
-        $()
-          .designType("string")
+        $().designType("string")
           .flags("string")
-          .type(String)
           .annotate("label", "Prop4")
           .$type
       ).prop(
@@ -57,10 +58,8 @@ $("object", WithMetadata)
                   .$type
               ).prop(
                 "b",
-                $()
-                  .designType("string")
+                $().designType("string")
                   .flags("string")
-                  .type(String)
                   .$type
               ).prop(
                 "d",
@@ -69,17 +68,13 @@ $("object", WithMetadata)
                   .$type
               ).prop(
                 "e",
-                $()
-                  .designType("null")
+                $().designType("null")
                   .flags("null")
-                  .type(Object)
                   .$type
               ).prop(
                 "f",
-                $()
-                  .designType("undefined")
+                $().designType("undefined")
                   .flags("undefined")
-                  .type(Object)
                   .$type
               )
               .$type
@@ -93,3 +88,14 @@ $("object", WithMetadata)
   .annotate("id", "interface-with-metadata")
   .annotate("long.nested.name", "WithMetadata")
   .annotate("bool.flag", true)
+
+$("object", SomeType)
+  .prop(
+    "a",
+    $()
+      .designType("string")
+      .value("b")
+      .annotate("label", "Prop1")
+      .$type
+  )
+  .annotate("id", "Some type")

@@ -12,6 +12,16 @@ export class SemanticStructureNode extends SemanticGroup {
 
   public readonly props = new Map<string, SemanticPropNode>()
 
+  /**
+   * Shortcut to set props, used as utility
+   */
+  public setProps(props: SemanticPropNode[]) {
+    this.nodes = props
+    for (const prop of props) {
+      this.props.set(prop.id!, prop)
+    }
+  }
+
   registerAtDocument(doc: AnscriptDoc): void {
     super.registerAtDocument(doc)
     const block = this.token('identifier')!

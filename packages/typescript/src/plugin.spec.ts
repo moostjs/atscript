@@ -227,4 +227,24 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/real-world-1.as.d.ts')
     )
   })
+  it('must render interfaces/types with intersections', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/intersections.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('intersections.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/intersections.js')
+    )
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('intersections.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/intersections.as.d.ts')
+    )
+  })
 })

@@ -2,6 +2,7 @@ import {
   isGroup,
   isInterface,
   isPrimitive,
+  mergeAnnotations,
   SemanticArrayNode,
   SemanticConstNode,
   SemanticGroup,
@@ -12,6 +13,7 @@ import {
   SemanticStructureNode,
   SemanticTypeNode,
   TAnnotationTokens,
+  TPrimitiveTypeDef,
 } from '@anscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
@@ -36,15 +38,13 @@ export class JsRenderer extends BaseRenderer {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
-    this.write(`class ${node.id!}`)
+    this.write(`class ${node.id!} `)
     this.blockln('{}')
     this.writeln('static __is_anscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
     this.popln()
     this.postAnnotate.push(node)
-    // this.annotateType(node.getDefinition(), node.id)
-    // this.indent().defineMetadata(node).unindent()
     this.writeln()
   }
 
@@ -52,22 +52,21 @@ export class JsRenderer extends BaseRenderer {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
-    this.write(`class ${node.id!}`)
+    this.write(`class ${node.id!} `)
     this.blockln('{}')
     this.writeln('static __is_anscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
     this.popln()
     this.postAnnotate.push(node)
-    // this.annotateType(node.getDefinition(), node.id)
-    // this.indent().defineMetadata(node).unindent()
     this.writeln()
   }
 
-  annotateType(node?: SemanticNode, name?: string) {
-    if (!node) {
+  annotateType(_node?: SemanticNode, name?: string) {
+    if (!_node) {
       return
     }
+    const node = this.doc.mergeIntersection(_node)
 
     let kind = node.entity as string
     switch (node.entity) {
@@ -89,10 +88,11 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       case 'primitive': {
-        this.writeln(`$(${name ? `"", ${name}` : ''})`)
-          .indent()
-          .definePrimitive(node as SemanticPrimitiveNode)
-          .unindent()
+        this.definePrimitive(node as SemanticPrimitiveNode, name)
+        // this.writeln(`$(${name ? `"", ${name}` : ''})`)
+        //   .indent()
+        //   .definePrimitive(node as SemanticPrimitiveNode)
+        //   .unindent()
         return this
       }
       case 'const': {
@@ -143,46 +143,103 @@ export class JsRenderer extends BaseRenderer {
     const designType = t === 'text' ? 'string' : t === 'number' ? 'number' : 'unknown'
     const type = t === 'text' ? 'String' : t === 'number' ? 'Number' : 'undefined'
     this.writeln(`.designType("${escapeQuotes(designType)}")`)
-    this.writeln(`.type(${type})`)
     this.writeln(`.value(${t === 'text' ? `"${escapeQuotes(node.id!)}"` : node.id!})`)
     return this
   }
-  defineRef(node: SemanticRefNode) {
-    const def = this.doc.unwindType(node.id!, node.chain)?.def
-    if (!def) {
-      // imported?
-      this.writeln(`.refTo(${node.id!})`)
-      //   this.writeln('// unknown def ', node.id!)
-    }
-    if (isPrimitive(def)) {
-      this.definePrimitive(def)
-    }
-    if (isInterface(def)) {
-      // def.id!
-      this.writeln(`.refTo(${def.id!})`)
-    }
-    if (isGroup(def)) {
-      this.defineGroup(def)
-    }
-    return this
-  }
-  definePrimitive(node: SemanticPrimitiveNode) {
-    const designType = node.config.lang?.typescript ?? node.config.base ?? 'unknown'
-    const type =
-      {
-        string: 'String',
-        number: 'Number',
-        boolean: 'Boolean',
-      }[designType] || 'Object'
-    this.writeln(`.designType("${escapeQuotes(designType)}")`)
+  //   defineRef(node: SemanticRefNode) {
+  //     const def = this.doc.unwindType(node.id!, node.chain)?.def
+  //     if (!def) {
+  //       // imported?
+  //       this.writeln(`.refTo(${node.id!})`)
+  //       //   this.writeln('// unknown def ', node.id!)
+  //     }
+  //     if (isPrimitive(def)) {
+  //       this.definePrimitive(def)
+  //     }
+  //     if (isInterface(def)) {
+  //       // def.id!
+  //       this.writeln(`.refTo(${def.id!})`)
+  //     }
+  //     if (isGroup(def)) {
+  //       this.defineGroup(def)
+  //     }
+  //     return this
+  //   }
+  definePrimitive(node: SemanticPrimitiveNode, name?: string) {
+    this.renderPrimitiveDef(node.id! === 'never' ? 'never' : node.config.type, name)
     this.writeln(
-      `.flags(${Array.from(node.flags)
+      `  .flags(${Array.from(node.flags)
         .map(f => `"${escapeQuotes(f)}"`)
         .join(', ')})`
     )
-    this.writeln(`.type(${type})`)
     return this
   }
+
+  renderPrimitiveDef(def?: TPrimitiveTypeDef | 'never', name?: string) {
+    const d = (t?: string) => [`"${t || ''}"`, name].filter(Boolean).join(', ').replace(/^""$/, '')
+    if (!def) {
+      return this.writeln(`$(${d()}).designType("any")`)
+    }
+    // If it's a direct final type, return it
+    if (typeof def === 'string') {
+      return this.writeln(`$(${d()}).designType("${def === 'void' ? 'undefined' : def}")`)
+    }
+
+    switch (def.kind) {
+      case 'final':
+        return this.writeln(
+          `$(${d()}).designType("${def.value === 'void' ? 'undefined' : def.value}")`
+        )
+      case 'union':
+      case 'intersection':
+      case 'tuple':
+        this.writeln(`$(${d(def.kind)})`)
+        this.indent()
+        for (const itemDef of def.items) {
+          this.write(`.item(`)
+          this.indent()
+          this.renderPrimitiveDef(itemDef)
+          this.writeln('.$type')
+          this.unindent()
+          this.write(`)`)
+        }
+        this.unindent()
+        return
+      case 'array':
+        this.writeln(`$(${d('array')})`)
+        this.indent()
+        this.write('.of(')
+        this.indent()
+        this.renderPrimitiveDef(def.of)
+        this.writeln(`.$type`)
+        this.unindent()
+        this.writeln(`)`)
+        this.unindent()
+        return
+      case 'object':
+        this.writeln(`$(${d('object')})`)
+        this.indent()
+        for (const [key, propDef] of Object.entries(def.props)) {
+          const optional = typeof propDef === 'object' && propDef.optional
+          this.writeln(`.prop(`)
+          this.indent()
+          this.writeln(`"${escapeQuotes(key)}",`)
+          this.renderPrimitiveDef(propDef)
+          if (optional) {
+            this.writeln('.optional()')
+          }
+          this.writeln('.$type')
+          this.unindent()
+          this.write(`)`)
+        }
+        this.unindent()
+        return
+      default:
+        // Fallback in case of unexpected input
+        return this.writeln(`$(${d()}).designType("any")`)
+    }
+  }
+
   defineObject(node: SemanticStructureNode) {
     const props = Array.from(node.props.values())
     for (const prop of props) {
@@ -225,7 +282,8 @@ export class JsRenderer extends BaseRenderer {
   }
 
   defineMetadata(node: SemanticNode) {
-    node.annotations?.forEach(an => {
+    const annotations = mergeAnnotations(node.annotations, node.getDefinition()?.annotations)
+    annotations.forEach(an => {
       this.resolveAnnotationValue(node, an)
     })
     return this

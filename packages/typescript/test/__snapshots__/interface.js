@@ -1,6 +1,6 @@
 import { defineAnnotatedType as $ } from "@anscript/typescript"
 
-export class PublicInterface{
+export class PublicInterface {
   static __is_anscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -9,109 +9,83 @@ export class PublicInterface{
 $("object", PublicInterface)
   .prop(
     "primitive",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .$type
   ).prop(
     "pirmiitiveUn",
     $("union")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
-      .item($()
-          .designType("number")
+      .item($().designType("number")
           .flags("number")
-          .type(Number)
           .$type)
       .$type
   ).prop(
     "email",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("email", "string")
-      .type(String)
       .$type
   ).prop(
     "interger",
-    $()
-      .designType("number")
+    $().designType("number")
       .flags("int", "number")
-      .type(Number)
       .$type
   ).prop(
     "literal",
     $()
       .designType("string")
-      .type(String)
       .value("value")
       .$type
   ).prop(
     "number",
     $()
       .designType("number")
-      .type(Number)
       .value(5)
       .$type
   ).prop(
     "tuple1",
     $("tuple")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .$type
   ).prop(
     "tuple2",
     $("tuple")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .$type
   ).prop(
     "tupleArray",
     $("array")
       .of($("tuple")
-          .item($()
-              .designType("string")
+          .item($().designType("string")
               .flags("string")
-              .type(String)
               .$type)
-          .item($()
-              .designType("string")
+          .item($().designType("string")
               .flags("string")
-              .type(String)
               .$type)
           .$type)
       .$type
   ).prop(
     "array",
     $("array")
-      .of($()
-          .designType("string")
+      .of($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .$type
   ).prop(
     "array2",
     $("array")
       .of($("array")
-          .of($()
-              .designType("string")
+          .of($().designType("string")
               .flags("string")
-              .type(String)
               .$type)
           .$type)
       .$type
@@ -120,10 +94,8 @@ $("object", PublicInterface)
     $("array")
       .of($("array")
           .of($("array")
-              .of($()
-                  .designType("string")
+              .of($().designType("string")
                   .flags("string")
-                  .type(String)
                   .$type)
               .$type)
           .$type)
@@ -132,15 +104,11 @@ $("object", PublicInterface)
     "complexArray",
     $("array")
       .of($("union")
-          .item($()
-              .designType("string")
+          .item($().designType("string")
               .flags("string")
-              .type(String)
               .$type)
-          .item($()
-              .designType("number")
+          .item($().designType("number")
               .flags("number")
-              .type(Number)
               .$type)
           .$type)
       .$type
@@ -149,15 +117,11 @@ $("object", PublicInterface)
     $("array")
       .of($("array")
           .of($("union")
-              .item($()
-                  .designType("string")
+              .item($().designType("string")
                   .flags("string")
-                  .type(String)
                   .$type)
-              .item($()
-                  .designType("number")
+              .item($().designType("number")
                   .flags("number")
-                  .type(Number)
                   .$type)
               .$type)
           .$type)
@@ -168,15 +132,11 @@ $("object", PublicInterface)
       .of($("array")
           .of($("array")
               .of($("union")
-                  .item($()
-                      .designType("string")
+                  .item($().designType("string")
                       .flags("string")
-                      .type(String)
                       .$type)
-                  .item($()
-                      .designType("number")
+                  .item($().designType("number")
                       .flags("number")
-                      .type(Number)
                       .$type)
                   .$type)
               .$type)
@@ -185,16 +145,12 @@ $("object", PublicInterface)
   ).prop(
     "complexArray4",
     $("union")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .item($("array")
-          .of($()
-              .designType("number")
+          .of($().designType("number")
               .flags("number")
-              .type(Number)
               .$type)
           .$type)
       .$type
@@ -202,16 +158,12 @@ $("object", PublicInterface)
     "complexArray5",
     $("union")
       .item($("array")
-          .of($()
-              .designType("string")
+          .of($().designType("string")
               .flags("string")
-              .type(String)
               .$type)
           .$type)
-      .item($()
-          .designType("number")
+      .item($().designType("number")
           .flags("number")
-          .type(Number)
           .$type)
       .$type
   ).prop(
@@ -219,17 +171,13 @@ $("object", PublicInterface)
     $("object")
       .prop(
         "prop1",
-        $()
-          .designType("string")
+        $().designType("string")
           .flags("string")
-          .type(String)
           .$type
       ).prop(
         "prop2",
-        $()
-          .designType("number")
+        $().designType("number")
           .flags("number")
-          .type(Number)
           .optional()
           .$type
       ).prop(
@@ -237,17 +185,13 @@ $("object", PublicInterface)
         $("object")
           .prop(
             "prop3",
-            $()
-              .designType("boolean")
+            $().designType("boolean")
               .flags("boolean")
-              .type(Boolean)
               .$type
           ).prop(
             "prop4",
-            $()
-              .designType("boolean")
+            $().designType("boolean")
               .flags("boolean")
-              .type(Boolean)
               .optional()
               .$type
           )
@@ -256,10 +200,8 @@ $("object", PublicInterface)
       .$type
   ).prop(
     "optional",
-    $()
-      .designType("string")
+    $().designType("string")
       .flags("string")
-      .type(String)
       .optional()
       .$type
   ).prop(
@@ -270,31 +212,25 @@ $("object", PublicInterface)
             "a",
             $()
               .designType("string")
-              .type(String)
               .value("a")
               .$type
           )
           .$type)
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .$type
   ).prop(
     "objectUnion2",
     $("union")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .item($("object")
           .prop(
             "a",
             $()
               .designType("string")
-              .type(String)
               .value("a")
               .$type
           )
@@ -302,64 +238,33 @@ $("object", PublicInterface)
       .$type
   ).prop(
     "objectIntersection",
-    $("intersection")
-      .item($("object")
-          .prop(
-            "a",
-            $()
-              .designType("string")
-              .type(String)
-              .value("a")
-              .$type
-          )
-          .$type)
-      .item($("object")
-          .prop(
-            "b",
-            $()
-              .designType("string")
-              .type(String)
-              .value("b")
-              .$type
-          )
-          .$type)
+    $("object")
+      .prop(
+        "a",
+        $()
+          .designType("string")
+          .value("a")
+          .$type
+      ).prop(
+        "b",
+        $()
+          .designType("string")
+          .value("b")
+          .$type
+      )
       .$type
   ).prop(
     "grouping",
     $("union")
-      .item($()
-          .designType("string")
+      .item($().designType("string")
           .flags("string")
-          .type(String)
           .$type)
       .item($("union")
-          .item($("intersection")
-              .item($("intersection")
-                  .item($()
-                      .designType("number")
-                      .flags("number")
-                      .type(Number)
-                      .$type)
-                  .item($()
-                      .designType("boolean")
-                      .flags("boolean")
-                      .type(Boolean)
-                      .$type)
-                  .$type)
-              .item($("object")
-                  .prop(
-                    "a",
-                    $()
-                      .designType("string")
-                      .type(String)
-                      .value("b")
-                      .$type
-                  )
-                  .$type)
+          .item($().designType("never")
+              .flags("never")
               .$type)
           .item($()
               .designType("string")
-              .type(String)
               .value("c")
               .$type)
           .$type)

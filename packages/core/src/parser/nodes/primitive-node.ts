@@ -8,14 +8,13 @@ export class SemanticPrimitiveNode extends SemanticNode {
   ) {
     super('primitive')
     this.props = new Map()
-    this.flags = new Set([_id, ...Array.from(config.flags || [])])
+    this.flags = new Set([_id, ...(config?.flags || [])])
     for (const [ext, def] of Object.entries(config.extensions || {})) {
       const node = new SemanticPrimitiveNode(ext, {
-        base: def.base ?? config.base,
-        lang: def.lang ? { ...config.lang, ...def.lang } : config.lang,
+        type: def.type ?? config.type,
         documentation: def.documentation ?? config.documentation,
         extensions: def.extensions,
-        flags: new Set([...Array.from(def.flags || []), ...Array.from(this.flags)]),
+        flags: Array.from(new Set([...(def.flags || []), ...Array.from(this.flags)])),
       })
       this.props.set(ext, node)
     }
@@ -31,4 +30,13 @@ export class SemanticPrimitiveNode extends SemanticNode {
 
   public readonly props: Map<string, SemanticPrimitiveNode>
   public readonly flags: Set<string>
+
+  toString(level = 0, prefix = '●') {
+    const indent = ' '.repeat(level * 2)
+    let s = `${this.renderAnnotations()}${prefix} [${this.entity}] ${JSON.stringify(
+      this.config.type
+    )}`
+    s += this.renderChildren()
+    return indent + s.split('\n').join(`\n${indent}`)
+  }
 }
