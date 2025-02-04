@@ -39,6 +39,13 @@ export class Validator {
   protected stackErrors: TError[][] = []
   protected stackPath: string[] = []
 
+  protected isLimitExceeded() {
+    if (this.stackErrors.length > 0) {
+      return this.stackErrors[this.stackErrors.length - 1].length >= this.opts.errorLimit
+    }
+    return this.errors.length >= this.opts.errorLimit
+  }
+
   protected push(name: string) {
     this.stackPath.push(name)
     this.stackErrors.push([])
@@ -91,6 +98,9 @@ export class Validator {
   }
 
   protected _validate(def: TAnscriptAnnotatedType, value: any): boolean {
+    if (this.isLimitExceeded()) {
+      return false
+    }
     if (!isAnnotatedType(def)) {
       throw new Error('Can not validate not-annotated type')
     }
@@ -174,16 +184,21 @@ export class Validator {
       return false
     }
     let i = 0
+    let passed = true
     for (const item of value) {
       this.push(`[${i}]`)
       if (!this._validate(def.type.of, item)) {
+        passed = false
         this.pop(true)
-        return false
+        if (this.isLimitExceeded()) {
+          return false
+        }
+      } else {
+        this.pop(false)
       }
-      this.pop(false)
       i++
     }
-    return true
+    return passed
   }
 
   protected validateObject(def: TAnscriptAnnotatedType<TAnscriptTypeObject>, value: any): boolean {
@@ -210,6 +225,9 @@ export class Validator {
       } else {
         passed = false
         this.pop(true)
+        if (this.isLimitExceeded()) {
+          return false
+        }
       }
     }
     for (const key of valueKeys) {
@@ -219,6 +237,9 @@ export class Validator {
             this.push(key)
             this.error(`Unexpected property`)
             this.pop(true)
+            if (this.isLimitExceeded()) {
+              return false
+            }
             passed = false
           } else if (this.opts.unknwonProps === 'strip') {
             delete value[key]
