@@ -1,6 +1,6 @@
 {
   "name": "@ts-anscript/mongo",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Mongodb plugin for anscript.",
   "type": "module",
   "main": "dist/index.mjs",
