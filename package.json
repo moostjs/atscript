@@ -1,6 +1,6 @@
 {
   "name": "anscript",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Anscript is a language for describing data and interfaces with extensible annotations, enabling the generation of files at runtime for streamlined workflows.",
   "type": "module",
   "main": "index.js",
@@ -25,6 +25,7 @@
     "@types/node": "^22.10.5",
     "@typescript-eslint/eslint-plugin": "6.3.0",
     "@typescript-eslint/parser": "6.3.0",
+    "conventional-changelog-cli": "^5.0.0",
     "eslint": "8.55.0",
     "eslint-import-resolver-typescript": "3.6.1",
     "eslint-plugin-array-func": "4.0.0",
