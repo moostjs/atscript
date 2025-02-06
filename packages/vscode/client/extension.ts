@@ -88,8 +88,6 @@ export function activate(context: ExtensionContext) {
       )
     })
 
-    window.showInformationMessage('@ts-anscript/core detected, starting language server.')
-
     // If you want to dispose it on extension deactivate
     context.subscriptions.push(client)
   }

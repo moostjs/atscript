@@ -1,6 +1,6 @@
 {
-  "name": "@anscript/vscode",
-  "displayName": "Anscript: Annotate things",
+  "name": "@ts-anscript/vscode",
+  "displayName": "Anscript",
   "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.0.10",
   "private": true,
@@ -45,7 +45,7 @@
         "aliases": [
           "as",
           "anscript",
-          "Annotate things"
+          "Annotate Things"
         ],
         "extensions": [
           ".as"
@@ -73,7 +73,7 @@
   },
   "publisher": "mav-rik",
   "dependencies": {
-    "@ts-anscript/core": "^0.0.5"
+    "@ts-anscript/core": "^0.0.10"
   },
   "author": "Artem Maltsev",
   "license": "ISC",
@@ -90,8 +90,8 @@
     "url": "git+https://github.com/ts-anscript/anscript.git"
   },
   "scripts": {
-    "package": "pnpm vsce package --no-dependencies --pre-release",
-    "publish": "pnpm vsce publish --no-dependencies --pre-release",
+    "package": "pnpm vsce package --no-dependencies",
+    "publish": "pnpm vsce publish --no-dependencies",
     "test": "vitest"
   }
 }
