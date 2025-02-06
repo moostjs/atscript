@@ -17,7 +17,7 @@
     "dist"
   ],
   "scripts": {
-    "publish": "pnpm publish --access public",
+    "pub": "pnpm publish --access public",
     "test": "vitest"
   },
   "keywords": [
