@@ -73,7 +73,7 @@
   },
   "publisher": "mav-rik",
   "dependencies": {
-    "@ts-anscript/core": "^0.0.10"
+    "@ts-anscript/core": "workspace:^"
   },
   "author": "Artem Maltsev",
   "license": "ISC",
