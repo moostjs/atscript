@@ -79,7 +79,7 @@ $("object", WithMetadata)
                 "f",
                 $().designType("undefined")
                   .flags("undefined")
-                  .annotate("obj", { prop1: "123",  prop2: undefined,  prop3: undefined })
+                  .annotate("obj", { prop1: "123",  })
                   .$type
               )
               .$type

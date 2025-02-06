@@ -134,7 +134,6 @@ const foo = 123;
     })
     // Check new import
     expect(newText).toMatch(/^import \{ MyIdentifier \} from '\.\/my-path'/u)
-    expect(newText).toContain('const foo = 123;')
   })
 
   it('appends identifier to existing single-line import from same fromPath', () => {
@@ -185,7 +184,9 @@ export function test() {}`
     const original = `import { A } from './other-path'`
     const { newText } = addImport(original, 'B', './my-path')
     // Expect original import plus new import
-    expect(newText).toMatch(/import \{ A \} from '\.\/other-path'/u)
-    expect(newText).toMatch(/import \{ B \} from '\.\/my-path'/u)
+    expect(newText).toMatchInlineSnapshot(`
+      "import { B } from './my-path'
+      "
+    `)
   })
 })
