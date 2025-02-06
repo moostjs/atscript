@@ -2,7 +2,7 @@
   "name": "@ts-anscript/vscode",
   "displayName": "Anscript: Annotate things",
   "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "main": "./dist/extension.cjs",
   "build": {
