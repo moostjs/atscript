@@ -1,3 +1,12 @@
+## [0.0.6](https://github.com/intertation/intertation/compare/v0.0.5...v0.0.6) (2025-02-06)
+
+
+### Bug Fixes
+
+* **vscode:** fix build ([a10db0c](https://github.com/intertation/intertation/commit/a10db0c98561eaae4d910181108f94e250d783db))
+
+
+
 ## [0.0.5](https://github.com/intertation/intertation/compare/v0.0.4...v0.0.5) (2025-02-06)
 
 
