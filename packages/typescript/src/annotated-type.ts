@@ -5,14 +5,14 @@ export interface TAnscriptTypeComplex {
   kind: 'union' | 'intersection' | 'tuple'
   items: TAnscriptAnnotatedType[]
 
-  flags: Set<string>
+  flags: Set<AnscriptPrimitiveFlags>
 }
 
 export interface TAnscriptTypeArray {
   kind: 'array'
   of: TAnscriptAnnotatedType
 
-  flags: Set<string>
+  flags: Set<AnscriptPrimitiveFlags>
 }
 
 export interface TAnscriptTypeObject<K extends string = string> {
@@ -20,7 +20,7 @@ export interface TAnscriptTypeObject<K extends string = string> {
 
   props: Map<K, TAnscriptAnnotatedType>
 
-  flags: Set<string>
+  flags: Set<AnscriptPrimitiveFlags>
 }
 
 export interface TAnscriptTypeFinal {
@@ -36,20 +36,21 @@ export interface TAnscriptTypeFinal {
    */
   value?: string | number | boolean
 
-  flags: Set<string>
+  flags: Set<AnscriptPrimitiveFlags>
 }
-
+// AnscriptMetadata
+// AnscriptPrimitiveFlags
 export type TAnscriptTypeDef =
   | TAnscriptTypeComplex
   | TAnscriptTypeFinal
   | TAnscriptTypeArray
-  | TAnscriptTypeObject
+  | TAnscriptTypeObject<string>
 
 export interface TAnscriptAnnotatedType<T = TAnscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
   validator: (opts?: TValidatorOptions) => Validator
-  metadata: Map<string, unknown>
+  metadata: TMetadataMap<AnscriptMetadata>
   optional?: boolean
 }
 
@@ -100,7 +101,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     $type: base,
     $def: type,
     $metadata: metadata,
-    _existingObject: undefined as TAnscriptAnnotatedType<TAnscriptTypeObject> | undefined,
+    _existingObject: undefined as TAnscriptAnnotatedType | undefined,
     flags(...flags: string[]) {
       for (const flag of flags) {
         this.$def.flags.add(flag)

@@ -19,6 +19,9 @@ export class TokensIndex implements ITokensIndex {
    * @param token - The token to add to the index.
    */
   add(token: Token): void {
+    if (!token?.range) {
+      return
+    }
     const line = token.range.start.line
     // Initialize the line set if it doesn't exist
     this.tokensMap[line] = this.tokensMap[line] ?? new Set()

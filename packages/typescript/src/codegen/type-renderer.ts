@@ -8,7 +8,6 @@ import {
   SemanticArrayNode,
   SemanticInterfaceNode,
   SemanticNode,
-  SemanticPrimitiveNode,
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
@@ -104,8 +103,8 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln()
     }
     if (asClass) {
-      this.writeln('static __is_anscript_annotated_type: boolean')
-      this.writeln(`static type: TAnscriptTypeObject<keyof ${asClass}>`)
+      this.writeln('static __is_anscript_annotated_type: true')
+      this.writeln(`static type: TAnscriptTypeObject<keyof ${asClass}, AnscriptPrimitiveFlags>`)
       this.writeln(`static metadata: TMetadataMap<AnscriptMetadata>`)
       this.writeln(`static validator: () => Validator`)
     }

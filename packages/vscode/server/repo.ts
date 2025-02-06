@@ -41,8 +41,6 @@ import {
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
-import { writeFile, mkdir } from 'node:fs/promises'
-import path from 'path'
 
 const CHECKS_DELAY = 100
 
@@ -216,6 +214,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
               return
             }
           }
+          const parent = token.parentNode
           return Object.keys(a).flatMap(key => {
             const options = [
               {
@@ -228,33 +227,42 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
                 },
               },
             ] as CompletionItem[]
-            if (isAnnotationSpec(a[key]) && a[key].arguments.length) {
+            if (isAnnotationSpec(a[key])) {
+              const nodeType = a[key].config.nodeType
+              if (nodeType?.length && parent) {
+                // filter out annotations not suitable for the parent node
+                if (!nodeType.includes(parent.entity)) {
+                  return []
+                }
+              }
               const aName = `@${[...prev, key].join('.')}`
               const documentation = {
                 kind: 'markdown',
                 value: a[key].renderDocs(aName) || '',
               } as MarkupContent
               options[0].documentation = documentation
-              options[0].kind = CompletionItemKind.Keyword
+              options[0].kind = CompletionItemKind.Value
               options[0].command = undefined
               options[0].insertText = undefined
-              options.push({
-                label: key,
-                labelDetails: {
-                  detail: ` (snippet)`,
-                },
-                kind: CompletionItemKind.Snippet,
-                insertText: `${key} ${a[key].argumentsSnippet}`,
-                insertTextFormat: 2,
-                documentation: {
-                  kind: 'markdown',
-                  value: `## Snippet\n\n${documentation.value}`,
-                },
-                command: {
-                  command: 'editor.action.triggerParameterHints',
-                  title: 'Trigger Signature Help',
-                },
-              })
+              // if (a[key].arguments.length) {
+              //   options[0] = {
+              //     label: key,
+              //     labelDetails: {
+              //       detail: ` (snippet)`,
+              //     },
+              //     kind: CompletionItemKind.Snippet,
+              //     insertText: `${key} ${a[key].argumentsSnippet}`,
+              //     insertTextFormat: 2,
+              //     documentation: {
+              //       kind: 'markdown',
+              //       value: `## Snippet\n\n${documentation.value}`,
+              //     },
+              //     command: {
+              //       command: 'editor.action.triggerParameterHints',
+              //       title: 'Trigger Signature Help',
+              //     },
+              //   }
+              // }
             }
             return options
           })
@@ -312,7 +320,10 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
           return options?.map(t => ({
             label: t.id,
             kind: CompletionItemKind.Property,
-            documentation: t.documentation,
+            documentation: {
+              kind: 'markdown',
+              value: t.documentation,
+            },
           })) as CompletionItem[]
         }
       }
@@ -343,16 +354,16 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       const label = `${annotationToken.text} ${args
         .map(a => `${a.name}${a.optional ? '?' : ''}: ${a.type}`)
         .join(', ')}`
-      const descr = annotationSpec.config.description
+      const descr = { kind: 'markdown', value: annotationSpec.config.description }
       // Define signature information
-      const signature = SignatureInformation.create(`${label}`, descr)
+      const signature = SignatureInformation.create(`${label}`, descr as unknown as string)
 
       // Define parameter-specific information
       signature.parameters = args.map(a =>
-        ParameterInformation.create(
-          `${a.name}${a.optional ? '?' : ''}: ${a.type}`,
-          `${a.description}`
-        )
+        ParameterInformation.create(`${a.name}${a.optional ? '?' : ''}: ${a.type}`, {
+          kind: 'markdown',
+          value: a.description,
+        } as unknown as string)
       )
 
       return {
@@ -377,12 +388,21 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         return
       }
       if (isRef(token.parentNode)) {
-        const def = anscript.unwindType(token.parentNode.id!, token.parentNode.chain)?.def
-        if (isPrimitive(def)) {
+        const unwound = anscript.unwindType(token.parentNode.id!, token.parentNode.chain)
+        const def = unwound?.def
+        const node = unwound?.node
+        const docs = [] as string[]
+        if (node && node.documentation) {
+          docs.push(node.documentation)
+        }
+        if (def?.documentation) {
+          docs.push(def.documentation)
+        }
+        if (docs.length) {
           return {
             contents: {
               kind: 'markdown',
-              value: def.documentation,
+              value: docs.join('\n\n'),
             },
             range: token.range,
           } as Hover
@@ -564,7 +584,16 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
             label: p.id,
             kind: CompletionItemKind.Keyword,
             detail: `primitive "${p.id}"`,
-            documentation: p.config.documentation,
+            documentation: {
+              kind: 'markdown',
+              // todo: better format for primitive documentation
+              value:
+                p.config.documentation ||
+                'Contains:\n\n' +
+                  Object.keys(p.config.extensions || {})
+                    .map(k => `- **${k}** ${p.config.extensions![k].documentation || ''}`)
+                    .join('\n'),
+            },
           }) as CompletionItem
       )
     )

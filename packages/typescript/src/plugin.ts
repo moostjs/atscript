@@ -1,7 +1,7 @@
 import { TAnscriptPlugin } from '@anscript/core'
 import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
-import { wrapProp } from './codegen/utils'
+import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export const tsPlugin: () => TAnscriptPlugin = () => {
   return {
@@ -29,23 +29,28 @@ export const tsPlugin: () => TAnscriptPlugin = () => {
       if (format === 'dts') {
         // render anscript.d.ts
         const annotations = await repo.getUsedAnnotations()
-        console.log(annotations)
+        const flags = (await repo.getPrimitivesFlags()) || new Set()
         let rendered = [] as string[]
         for (const [key, val] of Object.entries(annotations)) {
-          const isArray = val!.isArray
+          const multiple = val!.multiple
           let typeLine = Array.from(val!.types)
             .map(t => {
-              if (typeof t === 'object') {
-                return `{ ${Object.entries(t)
-                  .map(([k, v]) => `${wrapProp(k)}: ${v}`)
+              if (t.type === 'object') {
+                return `{ ${Object.entries(t.props)
+                  .map(([k, v]) => `${wrapProp(k)}${v.optional ? '?' : ''}: ${v.type}`)
                   .join(', ')} }`
               } else {
-                return t
+                return t.optional ? `${t.type} | true` : t.type
               }
             })
             .join(' | ')
-          rendered.push(`${wrapProp(key)}: ${isArray ? '(' : ''}${typeLine}${isArray ? ')[]' : ''}`)
+          rendered.push(
+            `${wrapProp(key)}: ${multiple ? '(' : ''}${typeLine}${multiple ? ')[]' : ''}`
+          )
         }
+        let renderedFlags = Array.from(flags)
+          .map(f => `"${escapeQuotes(f)}"`)
+          .join(' | ')
         output.push({
           content:
             '/**\n' +
@@ -60,6 +65,9 @@ export const tsPlugin: () => TAnscriptPlugin = () => {
             '  interface AnscriptMetadata {\n    ' +
             rendered.join('\n    ') +
             '\n  }\n' +
+            '  type AnscriptPrimitiveFlags = ' +
+            renderedFlags +
+            '\n' +
             '}\n',
           fileName: 'anscript.d.ts',
           source: '',

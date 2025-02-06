@@ -9,6 +9,11 @@ export class Token {
     return `[${this.type}] "${this.text}"${children}`
   }
 
+  clone(replace: Partial<TLexicalToken>) {
+    const t = { ...this._data, ...replace }
+    return new Token(t)
+  }
+
   get text() {
     return this._data.text || '' // equals "text" for identifiers and operator for "punctuation"
   }

@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { TAnscriptConfig, TAnscriptConfigInput } from '../config'
+import { TAnnotationsTree, TAnscriptConfig, TAnscriptConfigInput } from '../config'
 import { defu } from 'defu'
 import { AnscriptDoc, TAnscriptDocConfig } from '../document'
 import type { TAnscriptRenderFormat, TPluginOutput } from './types'
@@ -7,6 +7,7 @@ import { getDefaultAnscriptConfig } from '../default-anscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
 import { TOutput } from '../build'
 import { AnscriptRepo } from '../repo'
+import { AnnotationSpec, isAnnotationSpec } from '../annotations'
 
 export interface TOutputWithSource extends TPluginOutput {
   source: string
@@ -52,7 +53,7 @@ export class PluginManager {
       const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
       for (const plugin of filtered) {
         if (processed.has(plugin.name)) continue
-        defu(await plugin.config?.(config), config)
+        config = defu(await plugin.config?.(config), config)
         processed.add(plugin.name)
       }
       if (processed.size !== filtered.length) {
@@ -117,6 +118,26 @@ export class PluginManager {
     for (const plugin of this.plugins) {
       if (plugin.buildEnd) {
         await plugin.buildEnd(output, format, repo)
+      }
+    }
+  }
+
+  async loopInAnnotationsSpec(cb: (name: string, a: AnnotationSpec) => void) {
+    const config = await this.config()
+    const annotations = config.annotations || {}
+    return this._loopInAnnotationsSpec(annotations, cb)
+  }
+
+  private _loopInAnnotationsSpec(
+    annotations: TAnnotationsTree,
+    cb: (name: string, a: AnnotationSpec) => void,
+    prefix?: string
+  ) {
+    for (const [key, value] of Object.entries(annotations)) {
+      if (isAnnotationSpec(value)) {
+        cb(prefix ? `${prefix}.${key}` : key, value)
+      } else {
+        this._loopInAnnotationsSpec(value, cb, prefix ? `${prefix}.${key}` : key)
       }
     }
   }

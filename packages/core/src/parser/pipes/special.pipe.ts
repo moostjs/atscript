@@ -73,7 +73,7 @@ export function refWithChain() {
               target.node.addDot(new Token(fork.$))
             }
             fork.move()
-            if (isRef(target.node)) {
+            if (isRef(target.node) && fork.$) {
               target.node.addChain(new Token(fork.$))
             }
           } else {

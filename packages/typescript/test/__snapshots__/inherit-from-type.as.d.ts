@@ -34,8 +34,8 @@ export declare class ITarget {
   firstName: string
   lastName?: string
   age: number
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof ITarget>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof ITarget, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

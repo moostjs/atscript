@@ -18,8 +18,8 @@ export declare class People {
   groupName: TPrimitive
   size: TNumber
   users: User[]
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof People>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof People, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

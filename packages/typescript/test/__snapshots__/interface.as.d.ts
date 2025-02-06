@@ -53,8 +53,8 @@ export declare class PublicInterface {
   grouping: (string | ((number & boolean & {
     a: "b"
   }) | "c"))
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof PublicInterface>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof PublicInterface, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

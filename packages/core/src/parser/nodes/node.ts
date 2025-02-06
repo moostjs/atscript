@@ -25,8 +25,14 @@ export class SemanticNode {
     })
   }
 
+  protected _documentation?: string
+
+  public setDocumentation(s: string) {
+    this._documentation = s
+  }
+
   get documentation(): string | undefined {
-    return undefined
+    return this._documentation
   }
 
   get id() {

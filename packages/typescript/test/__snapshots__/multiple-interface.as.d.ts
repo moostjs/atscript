@@ -24,8 +24,8 @@ export declare class Address {
   city: string
   state: string
   zip: string
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof Address>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof Address, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -38,8 +38,8 @@ declare class Contact {
   type: TContactType
   value: string
   label?: string
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof Contact>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof Contact, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -53,8 +53,8 @@ export declare class User {
   lastName: string
   address: Address
   contacts: Contact[]
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof User>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof User, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

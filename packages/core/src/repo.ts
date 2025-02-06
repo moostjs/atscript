@@ -11,6 +11,7 @@ import type { TMessages } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { resolveAnnotation } from './annotations'
+import { SemanticPrimitiveNode } from './parser/nodes'
 
 interface TPluginManagers {
   manager: PluginManager
@@ -50,66 +51,114 @@ export class AnscriptRepo {
     return this.sharedPluginManager?.manager
   }
 
-  async getUsedAnnotations() {
-    type TAnnotationValue = 'string' | 'number' | 'boolean' | 'unknown'
-    type TAnnotationValueObj = Record<string, TAnnotationValue | undefined>
-    type TUsedAnnotation = {
-      isArray?: boolean
-      fromSpec?: boolean
-      types: Set<TAnnotationValueObj | TAnnotationValue>
+  async getPrimitivesFlags() {
+    const manager = await this.getSharedPluginManager()
+    if (!manager) {
+      return undefined
     }
-    const config = (await this.getSharedPluginManager()?.config()) || {}
+    const docConfig = await manager.getDocConfig()
+    const primitives = Array.from(docConfig.primitives?.entries() || [])
+    const flags = [] as string[]
+    const processed = new Set<SemanticPrimitiveNode>()
+    for (const [, primitive] of primitives) {
+      flags.push(...primitive.getAllFlags(processed))
+    }
+    return new Set(flags)
+  }
+
+  async getUsedAnnotations() {
+    type TAnnotationValue = {
+      optional?: boolean
+      type: 'string' | 'number' | 'boolean' | 'unknown'
+    }
+    type TAnnotationValueObj = { type: 'object'; props: Record<string, TAnnotationValue> }
+    type TUsedAnnotation = {
+      multiple?: boolean
+      fromSpec?: boolean
+      typeSet: Set<string>
+      types: (TAnnotationValueObj | TAnnotationValue)[]
+    }
+    const manager = await this.getSharedPluginManager()
     const annotations = {} as Record<string, TUsedAnnotation | undefined>
+
+    if (manager) {
+      await manager.loopInAnnotationsSpec((name, spec) => {
+        const types = [] as TUsedAnnotation['types']
+        const multiple = !!spec.config.multiple
+        if (Array.isArray(spec.config.argument)) {
+          // object
+          const o = { type: 'object', props: {} } as TAnnotationValueObj
+          for (const a of spec.arguments) {
+            o.props[a.name] = {
+              type: a.type,
+              optional: a.optional,
+            }
+          }
+          types.push(o)
+        } else if (spec.config.argument) {
+          // argument.type
+          types.push({
+            type: spec.config.argument.type,
+            optional: spec.config.argument.optional,
+          })
+        } else {
+          // boolean
+          types.push({ type: 'boolean' })
+        }
+
+        annotations[name] = {
+          multiple,
+          fromSpec: true,
+          typeSet: new Set(),
+          types,
+        }
+      })
+    }
+
     for (const doc of Array.from(this.anscripts.values())) {
       const awaited = await doc
       for (const { name, token, args } of awaited.annotations) {
+        if (annotations[name]?.fromSpec) {
+          continue
+        }
         if (!annotations[name]) {
-          let types = new Set<TAnnotationValueObj | TAnnotationValue>()
-          let isArray = false
-          const fromSpec = resolveAnnotation(name, config.annotations)
-          if (fromSpec) {
-            isArray = !!fromSpec.config.multiple
-            if (Array.isArray(fromSpec.config.argument)) {
-              // object
-              const o = {} as TAnnotationValueObj
-              for (const a of fromSpec.arguments) {
-                o[a.name] = a.type
-              }
-              types.add(o)
-            } else if (fromSpec.config.argument) {
-              // argument.type
-              types.add(fromSpec.config.argument.type)
-            } else {
-              // boolean
-              types.add('boolean')
-            }
-          }
+          let types = [] as TUsedAnnotation['types']
+          let multiple = false
           annotations[name] = {
-            isArray,
-            fromSpec: !!fromSpec,
+            multiple,
+            fromSpec: false,
+            typeSet: new Set(),
             types,
           }
         }
-        if (annotations[name].fromSpec) {
-          continue
-        }
         const isArray = token.parentNode!.countAnnotations(name) > 1
         if (isArray) {
-          annotations[name].isArray = true
+          annotations[name].multiple = true
         }
         for (const arg of args) {
           if (arg.type === 'text') {
-            annotations[name].types.add('string')
+            if (!annotations[name].typeSet.has('string')) {
+              annotations[name].typeSet.add('string')
+              annotations[name].types.push({ type: 'string' })
+            }
           } else if (arg.type === 'number') {
-            annotations[name].types.add('number')
+            if (!annotations[name].typeSet.has('number')) {
+              annotations[name].typeSet.add('number')
+              annotations[name].types.push({ type: 'number' })
+            }
           } else if (arg.type === 'identifier' && ['true', 'false'].includes(arg.text)) {
-            annotations[name].types.add('boolean')
-          } else {
-            annotations[name].types.add('unknown')
+            if (!annotations[name].typeSet.has('boolean')) {
+              annotations[name].typeSet.add('boolean')
+              annotations[name].types.push({ type: 'boolean' })
+            }
+          } else if (!annotations[name].typeSet.has('unknown')) {
+            annotations[name].typeSet.add('unknown')
+            annotations[name].types.push({ type: 'unknown' })
           }
         }
-        if (args.length === 0) {
-          annotations[name].types.add('boolean')
+        if (args.length === 0 && !annotations[name].typeSet.has('boolean')) {
+          annotations[name].typeSet.add('boolean')
+          annotations[name].types.push({ type: 'boolean' })
         }
       }
     }

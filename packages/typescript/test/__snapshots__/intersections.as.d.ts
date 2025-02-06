@@ -15,8 +15,8 @@ import type { TAnscriptTypeObject, TMetadataMap, Validator } from "@anscript/typ
 declare class IA {
   a: string
   b?: number
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof IA>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof IA, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -28,8 +28,8 @@ declare class IA {
 declare class IB {
   b: number
   c?: string
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof IB>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof IB, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -49,8 +49,8 @@ export declare class I1 {
   a: T["a"]
   b: T["b"]
   c: T["c"]
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof I1>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof I1, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

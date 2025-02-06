@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AnscriptDoc } from '../../document'
-import { isProp } from '.'
+import { isProp, SemanticNode, SemanticRefNode } from '.'
 import { SemanticGroup } from './group-node'
-import type { SemanticPropNode } from './prop-node'
+import { SemanticPropNode } from './prop-node'
+import { Token } from '../token'
 
 export class SemanticStructureNode extends SemanticGroup {
   constructor() {
@@ -48,5 +49,44 @@ export class SemanticStructureNode extends SemanticGroup {
       }
       this.props.set(name, node)
     }
+  }
+
+  addVirtualProp(opts: {
+    name: string
+    type: string | SemanticNode
+    documentation?: string
+    refToken?: Token
+  }) {
+    const token = opts.refToken || this.token('identifier')!
+    const propToken = token.clone({
+      type: 'identifier',
+      text: opts.name,
+    })
+    const prop = new SemanticPropNode()
+    if (opts.documentation) {
+      prop.setDocumentation(opts.documentation)
+    }
+    prop.saveToken(propToken, 'identifier')
+    if (typeof opts.type === 'string') {
+      const ref = new SemanticRefNode()
+      const [first, ...rest] = opts.type.split('.')
+      const refToken = token.clone({
+        type: 'identifier',
+        text: first,
+      })
+      ref.saveToken(refToken, 'identifier')
+      for (const chain of rest) {
+        const chainToken = token.clone({
+          type: 'identifier',
+          text: chain,
+        })
+        ref.addChain(chainToken)
+      }
+      prop.define(ref)
+    } else {
+      prop.define(opts.type)
+    }
+    this.nodes.push(prop)
+    this.props.set(opts.name, prop)
   }
 }

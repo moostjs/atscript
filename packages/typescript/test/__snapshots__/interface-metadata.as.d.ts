@@ -28,15 +28,15 @@ export declare class WithMetadata {
       }
     }
   }
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof WithMetadata>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof WithMetadata, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
 
 /**
  * Anscript type **SomeType**
- * @see {@link ./interface-metadata.as:37:13}
+ * @see {@link ./interface-metadata.as:42:13}
  */
 export type SomeType = {
   a: "b"

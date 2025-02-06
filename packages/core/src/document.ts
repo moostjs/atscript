@@ -196,7 +196,8 @@ export class AnscriptDoc {
     args?.forEach(a => this.tokensIndex.add(a))
     const annotationSpec = this.resolveAnnotation(mainToken.text.slice(1))
     if (annotationSpec) {
-      this.registerMessages(annotationSpec.validate(mainToken, args || []))
+      this.registerMessages(annotationSpec.validate(mainToken, args || [], this))
+      annotationSpec.modify(mainToken, args || [], this)
       this.resolvedAnnotations.push(mainToken)
     } else {
       let severity: 0 | 1 | 2 = 0

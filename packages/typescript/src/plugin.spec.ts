@@ -3,11 +3,18 @@ import { describe, expect, it } from 'vitest'
 import { tsPlugin } from './plugin'
 import path from 'path'
 
-const wd = process.cwd().replace(/src$/, '')
+const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
 const annotations = {
   label: new AnnotationSpec({
     argument: {
+      name: 'value',
+      type: 'string',
+    },
+  }),
+  labelOptional: new AnnotationSpec({
+    argument: {
+      optional: true,
       name: 'value',
       type: 'string',
     },
@@ -19,6 +26,14 @@ const annotations = {
       type: 'number',
     },
   }),
+  mulOptional: new AnnotationSpec({
+    multiple: true,
+    argument: {
+      optional: true,
+      name: 'value',
+      type: 'number',
+    },
+  }),
   obj: new AnnotationSpec({
     argument: [
       {
@@ -26,10 +41,12 @@ const annotations = {
         type: 'string',
       },
       {
+        optional: true,
         name: 'prop2',
         type: 'number',
       },
       {
+        optional: true,
         name: 'prop3',
         type: 'boolean',
       },

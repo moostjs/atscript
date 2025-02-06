@@ -20,8 +20,8 @@ declare type TType = string
  */
 declare class I1 {
   prop?: string
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof I1>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof I1, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -32,8 +32,8 @@ declare class I1 {
  */
 export declare class I2 {
   prop?: string /* prop */
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof I2>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof I2, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

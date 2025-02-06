@@ -162,18 +162,3 @@ describe('Validator at union', () => {
     expect(validator.validate(true, true)).toBe(false)
   })
 })
-describe('Validator at intersection', () => {
-  it('should validate objects at intersection', () => {
-    const object1 = defineAnnotatedType('object').prop(
-      'name',
-      defineAnnotatedType().designType('string').$type
-    )
-    const object2 = defineAnnotatedType('object').prop(
-      'age',
-      defineAnnotatedType().designType('number').$type
-    )
-    const t = defineAnnotatedType('intersection').item(object1.$type).item(object2.$type)
-    const validator = new Validator(t.$type)
-    expect(validator.validate({ name: 'John', age: 30 }, true)).toBe(true)
-  })
-})

@@ -16,8 +16,8 @@ declare class ISource {
   firstName: string
   lastName: string
   age: number
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof ISource>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof ISource, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }
@@ -30,8 +30,8 @@ export declare class ITarget {
   firstName: string /* firstName */
   lastName?: string /* lastName */
   age: number /* age */
-  static __is_anscript_annotated_type: boolean
-  static type: TAnscriptTypeObject<keyof ITarget>
+  static __is_anscript_annotated_type: true
+  static type: TAnscriptTypeObject<keyof ITarget, AnscriptPrimitiveFlags>
   static metadata: TMetadataMap<AnscriptMetadata>
   static validator: () => Validator
 }

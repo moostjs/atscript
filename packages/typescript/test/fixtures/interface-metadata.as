@@ -23,10 +23,15 @@ export interface WithMetadata {
         @obj 'str', 123, false
         nested2: {
             nested3: {
+                @label 'Prop5'
                 a: float
+                @labelOptional
                 b: string
+                @mul 3
                 d: true
+                @mulOptional
                 e: null
+                @obj '123'
                 f: undefined
             }
         }
@@ -35,6 +40,7 @@ export interface WithMetadata {
 
 @id 'Some type'
 export type SomeType = {
+    @id 'Some type'
     @label 'Prop1'
     a: 'b'
 }

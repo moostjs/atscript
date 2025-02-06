@@ -10,7 +10,12 @@ export {}
 declare global {
   interface AnscriptMetadata {
     label: string
+    labelOptional: string | true
+    mul: (number)[]
+    mulOptional: (number | true)[]
+    obj: { prop1: string, prop2?: number, prop3?: boolean }
     min: number
     required: boolean
   }
+  type AnscriptPrimitiveFlags = "never" | "string" | "email" | "phone" | "number" | "positive" | "negative" | "single" | "double" | "int" | "boolean" | "true" | "false" | "null" | "void" | "undefined"
 }

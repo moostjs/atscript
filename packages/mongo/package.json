@@ -1,0 +1,38 @@
+{
+  "name": "@anscript/mongo",
+  "version": "0.0.0",
+  "description": "Mongodb plugin for anscript.",
+  "type": "module",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "cli.cjs"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "keywords": [
+    "anscript",
+    "plugin",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anscript/core": "workspace:^",
+    "@anscript/typescript": "workspace:^",
+    "mongodb": "^6.13.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
+  }
+}

@@ -303,17 +303,25 @@ export class JsRenderer extends BaseRenderer {
           targetValue = '{ '
           let i = 0
           for (const aSpec of spec.arguments) {
-            targetValue += `${wrapProp(aSpec.name)}: ${
-              aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[i]?.text
-            }${i === length - 1 ? '' : ', '} `
+            if (an.args[i]) {
+              targetValue += `${wrapProp(aSpec.name)}: ${
+                aSpec.type === 'string' ? `"${escapeQuotes(an.args[i]?.text)}"` : an.args[i]?.text
+              }${i === length - 1 ? '' : ', '} `
+            } else {
+              // targetValue += `${wrapProp(aSpec.name)}: undefined${i === length - 1 ? '' : ', '} `
+            }
             i++
           }
           targetValue += '}'
         } else {
           // as constant
           const aSpec = spec.arguments[0]
-          targetValue =
-            aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[0]?.text
+          if (an.args[0]) {
+            targetValue =
+              aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[0]?.text
+          } else {
+            targetValue = 'true'
+          }
         }
       }
     } else {

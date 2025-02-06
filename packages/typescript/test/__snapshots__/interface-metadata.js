@@ -55,26 +55,31 @@ $("object", WithMetadata)
                 "a",
                 $()
                   .refTo(float)
+                  .annotate("label", "Prop5")
                   .$type
               ).prop(
                 "b",
                 $().designType("string")
                   .flags("string")
+                  .annotate("labelOptional", true)
                   .$type
               ).prop(
                 "d",
                 $()
                   .refTo(true)
+                  .annotate("mul", 3, true)
                   .$type
               ).prop(
                 "e",
                 $().designType("null")
                   .flags("null")
+                  .annotate("mulOptional", true, true)
                   .$type
               ).prop(
                 "f",
                 $().designType("undefined")
                   .flags("undefined")
+                  .annotate("obj", { prop1: "123",  prop2: undefined,  prop3: undefined })
                   .$type
               )
               .$type
@@ -95,6 +100,7 @@ $("object", SomeType)
     $()
       .designType("string")
       .value("b")
+      .annotate("id", "Some type")
       .annotate("label", "Prop1")
       .$type
   )
