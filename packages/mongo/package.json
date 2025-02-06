@@ -18,6 +18,7 @@
     "cli.cjs"
   ],
   "scripts": {
+    "publish": "pnpm publish --access public",
     "test": "vitest"
   },
   "keywords": [
