@@ -1,3 +1,7 @@
+## [0.0.5](https://github.com/intertation/intertation/compare/v0.0.4...v0.0.5) (2025-02-06)
+
+
+
 ## [0.0.4](https://github.com/intertation/intertation/compare/v0.0.3...v0.0.4) (2025-02-06)
 
 
