@@ -1,6 +1,6 @@
 {
   "name": "@ts-anscript/typescript",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Anscript: typescript-gen support.",
   "type": "module",
   "main": "dist/index.mjs",
