@@ -1,0 +1,7 @@
+.vscode
+node_modules
+server/
+client/
+test/
+.npmignore
+tsconfig.json

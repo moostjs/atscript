@@ -1,21 +1,42 @@
 {
-  "name": "@ts-anscript/vscode",
+  "name": "@anscript/vscode",
   "displayName": "Anscript: Annotate things",
   "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.0.5",
   "private": true,
   "main": "./dist/extension.cjs",
-  "build": {
-    "format": "cjs",
-    "entries": [
-      "client/extension.ts",
-      "server/server.ts"
-    ],
-    "dts": false
-  },
-  "scripts": {
-    "test": "vitest"
-  },
+  "icon": "./icons/as-logo.png",
+  "build": [
+    {
+      "format": "cjs",
+      "entries": [
+        "client/extension.ts"
+      ],
+      "external": [
+        "fs",
+        "path",
+        "vscode-languageclient",
+        "vscode-languageclient/node",
+        "vscode"
+      ],
+      "dts": false
+    },
+    {
+      "format": "cjs",
+      "entries": [
+        "server/server.ts"
+      ],
+      "external": [
+        "fs",
+        "path",
+        "vscode-languageserver",
+        "vscode-languageserver/node",
+        "vscode-languageserver-textdocument",
+        "@ts-anscript/core"
+      ],
+      "dts": false
+    }
+  ],
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -55,18 +76,36 @@
       }
     }
   },
-  "publisher": "moost",
+  "publisher": "mav-rik",
   "dependencies": {
-    "@ts-anscript/core": "workspace:^",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "@ts-anscript/core": "^0.0.5"
   },
   "author": "Artem Maltsev",
   "license": "ISC",
   "devDependencies": {
     "@types/node": "^22.10.5",
-    "@types/vscode": "^1.96.0",
+    "@types/vscode": "^1.80.0",
     "vitest": "^3.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ts-anscript/anscript.git"
+  },
+  "files": [
+    "dist",
+    "icons",
+    "syntaxes",
+    "language-configuration.json",
+    "demo.png",
+    "package.json",
+    "README.md"
+  ],
+  "scripts": {
+    "package": "pnpm vsce package --no-dependencies",
+    "publish": "pnpm vsce publish --no-dependencies",
+    "test": "vitest"
   }
 }

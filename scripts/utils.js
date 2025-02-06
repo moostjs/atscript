@@ -31,6 +31,7 @@ export function getBuildOptions(ws) {
     entries: build.entries || ['src/index.ts'],
     formats: build.format ? [build.format] : ['esm', 'cjs'],
     dts: build.dts ?? true,
+    external: build.external,
   }))
 }
 
