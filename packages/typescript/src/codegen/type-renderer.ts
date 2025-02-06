@@ -12,7 +12,7 @@ import {
   SemanticStructureNode,
   SemanticTypeNode,
   TPrimitiveTypeDef,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
@@ -27,7 +27,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAnscriptTypeObject, TMetadataMap, Validator } from "@anscript/typescript"'
+      'import type { TAnscriptTypeObject, TMetadataMap, Validator } from "@ts-anscript/typescript"'
     )
   }
 

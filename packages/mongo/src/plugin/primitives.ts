@@ -1,4 +1,4 @@
-import { TAnscriptConfig } from '@anscript/core'
+import { TAnscriptConfig } from '@ts-anscript/core'
 export const primitives: TAnscriptConfig['primitives'] = {
   mongo: {
     extensions: {

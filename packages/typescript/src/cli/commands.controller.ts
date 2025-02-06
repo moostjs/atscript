@@ -7,7 +7,7 @@ import {
   resolveConfigFile,
   TAnscriptConfig,
   TAnscriptConfigOutput,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 import { existsSync } from 'fs'
 import { tsPlugin } from '../plugin'
 

@@ -1,5 +1,5 @@
 {
-  "name": "@anscript/typescript",
+  "name": "@ts-anscript/typescript",
   "version": "0.0.2",
   "description": "Anscript: typescript-gen support.",
   "type": "module",
@@ -41,7 +41,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anscript/core": "workspace:^",
+    "@ts-anscript/core": "workspace:^",
     "@moostjs/event-cli": "^0.5.21",
     "moost": "^0.5.21"
   },

@@ -1,5 +1,5 @@
 {
-  "name": "@anscript/vscode",
+  "name": "@ts-anscript/vscode",
   "displayName": "Anscript: Annotate things",
   "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.0.2",
@@ -57,7 +57,7 @@
   },
   "publisher": "moost",
   "dependencies": {
-    "@anscript/core": "workspace:^",
+    "@ts-anscript/core": "workspace:^",
     "vscode-languageclient": "^8.1.0",
     "vscode-languageserver": "^8.1.0",
     "vscode-languageserver-textdocument": "^1.0.12"

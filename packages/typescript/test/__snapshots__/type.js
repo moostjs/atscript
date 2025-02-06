@@ -1,4 +1,4 @@
-import { defineAnnotatedType as $ } from "@anscript/typescript"
+import { defineAnnotatedType as $ } from "@ts-anscript/typescript"
 
 export class TPrimitive {
   static __is_anscript_annotated_type = true

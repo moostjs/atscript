@@ -1,4 +1,4 @@
-import { AnnotationSpec, build } from '@anscript/core'
+import { AnnotationSpec, build } from '@ts-anscript/core'
 import { describe, expect, it } from 'vitest'
 import { tsPlugin } from './plugin'
 import path from 'path'

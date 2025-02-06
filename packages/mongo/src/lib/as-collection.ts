@@ -5,7 +5,7 @@ import {
   TAnscriptAnnotatedType,
   TAnscriptTypeObject,
   TMetadataMap,
-} from '@anscript/typescript'
+} from '@ts-anscript/typescript'
 import { AsMongo } from './as-mongo'
 import { Collection } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'

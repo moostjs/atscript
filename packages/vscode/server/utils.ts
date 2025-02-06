@@ -7,7 +7,7 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
-import { getRelPath } from '@anscript/core'
+import { getRelPath } from '@ts-anscript/core'
 import fs from 'fs'
 import path from 'path'
 

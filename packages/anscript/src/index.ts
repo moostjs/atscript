@@ -13,4 +13,4 @@ export {
   type TAnnotationSpecConfig,
   type TPrimitiveConfig,
   type TAnscriptPlugin,
-} from '@anscript/core'
+} from '@ts-anscript/core'

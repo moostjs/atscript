@@ -1,4 +1,4 @@
-import { TAnscriptPlugin } from '@anscript/core'
+import { TAnscriptPlugin } from '@ts-anscript/core'
 import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
 import { escapeQuotes, wrapProp } from './codegen/utils'

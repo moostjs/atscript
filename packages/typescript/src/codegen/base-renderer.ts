@@ -7,7 +7,7 @@ import {
   SemanticNode,
   SemanticRefNode,
   SemanticTypeNode,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 import { CodePrinter } from './code-printer'
 
 export class BaseRenderer extends CodePrinter {

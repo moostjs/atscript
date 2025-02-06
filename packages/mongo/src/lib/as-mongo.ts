@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb'
-import { TAnscriptAnnotatedType } from '@anscript/typescript'
+import { TAnscriptAnnotatedType } from '@ts-anscript/typescript'
 import { AsCollection } from './as-collection'
 import { NoopLogger, TGenericLogger } from './logger'
 

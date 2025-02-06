@@ -5,6 +5,7 @@
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "private": true,
   "files": [
     "dist"
   ],
@@ -31,7 +32,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anscript/core": "workspace:^"
+    "@ts-anscript/core": "workspace:^"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

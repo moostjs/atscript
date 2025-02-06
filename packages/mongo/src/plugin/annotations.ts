@@ -6,7 +6,7 @@ import {
   isRef,
   isPrimitive,
   TMessages,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 
 const analyzers = [
   'lucene.standard',

@@ -1,5 +1,5 @@
 {
-  "name": "@anscript/mongo",
+  "name": "@ts-anscript/mongo",
   "version": "0.0.2",
   "description": "Mongodb plugin for anscript.",
   "type": "module",
@@ -28,8 +28,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@anscript/core": "workspace:^",
-    "@anscript/typescript": "workspace:^",
+    "@ts-anscript/core": "workspace:^",
+    "@ts-anscript/typescript": "workspace:^",
     "mongodb": "^6.13.0"
   },
   "devDependencies": {

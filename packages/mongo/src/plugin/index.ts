@@ -1,4 +1,4 @@
-import { TAnscriptPlugin } from '@anscript/core'
+import { TAnscriptPlugin } from '@ts-anscript/core'
 import { primitives } from './primitives'
 import { annotations } from './annotations'
 

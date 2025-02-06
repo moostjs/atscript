@@ -14,7 +14,7 @@ import {
   SemanticTypeNode,
   TAnnotationTokens,
   TPrimitiveTypeDef,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
@@ -22,7 +22,7 @@ export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
 
   pre() {
-    this.writeln('import { defineAnnotatedType as $ } from "@anscript/typescript"')
+    this.writeln('import { defineAnnotatedType as $ } from "@ts-anscript/typescript"')
   }
 
   post() {

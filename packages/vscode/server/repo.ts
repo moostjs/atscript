@@ -8,7 +8,7 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token } from '@anscript/core'
+import type { SemanticNode, Token } from '@ts-anscript/core'
 import {
   AnscriptDoc,
   AnscriptRepo,
@@ -21,7 +21,7 @@ import {
   isRef,
   isStructure,
   resolveAnscriptFromPath,
-} from '@anscript/core'
+} from '@ts-anscript/core'
 import type {
   CompletionItem,
   createConnection,
