@@ -118,15 +118,15 @@ export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[
     type: TSearchIndex['type'],
     name: string,
     fieldName: string,
-    analyzer?: string,
-    boost?: number
+    analyzer?: string
   ) {
     const index = this._indexes.get(indexKey(type, name)) as TSearchIndex | undefined
     if (index) {
       index.definition.mappings!.fields![fieldName] = {
         type: 'string',
-        analyzer,
-        score: { boost: { value: boost || 1 } },
+      }
+      if (analyzer) {
+        index.definition.mappings!.fields![fieldName].analyzer = analyzer
       }
     }
   }
@@ -202,7 +202,7 @@ export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[
       this._addIndexField('text', '', fieldName, textWeight === true ? 1 : textWeight)
     }
     for (const index of metadata.get('mongo.useTextSearch') || []) {
-      this._addFieldToSearchIndex('search_text', index.indexName, fieldName, '', index.boost)
+      this._addFieldToSearchIndex('search_text', index.indexName, fieldName, index.analyzer)
     }
     const vectorIndex = metadata.get('mongo.vectorIndex')
     if (vectorIndex) {
@@ -373,9 +373,6 @@ type TMongoSearchIndexDefinition = {
       {
         type: 'string' | 'number' | 'boolean' | 'date' | 'object' | 'array'
         analyzer?: string // Optional analyzer for text fields
-        searchAnalyzer?: string // Alternative analyzer for searches
-        index?: boolean // Enable/disable indexing for this field
-        score?: { boost: { value: number } }
       }
     >
   }
@@ -447,13 +444,7 @@ function fieldsMatch(
     const leftField = left[key]
     const rightField = right[key]
 
-    return (
-      leftField.type === rightField.type &&
-      leftField.analyzer === rightField.analyzer &&
-      leftField.searchAnalyzer === rightField.searchAnalyzer &&
-      leftField.index === rightField.index &&
-      JSON.stringify(leftField.score) === JSON.stringify(rightField.score) // Deep compare score object
-    )
+    return leftField.type === rightField.type && leftField.analyzer === rightField.analyzer
   })
 }
 

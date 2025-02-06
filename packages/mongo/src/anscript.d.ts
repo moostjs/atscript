@@ -15,7 +15,7 @@ declare global {
     'mongo.index.text': number | true
     'mongo.dynamicTextSearch': { analyzer?: string; fuzzy?: number; indexName?: string }
     'mongo.defineTextSearch': { indexName: string; analyzer?: string; fuzzy?: number }[]
-    'mongo.useTextSearch': { indexName: string; boost?: number }[]
+    'mongo.useTextSearch': { indexName: string; analyzer?: string }[]
     'mongo.vectorIndex': { dimensions: number; similarity?: string; indexName?: string }
     'mongo.vectorFilter': { indexName: string }[]
   }

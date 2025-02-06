@@ -234,7 +234,7 @@ export const annotations: TAnnotationsTree = {
           description:
             'The text analyzer for tokenization. Defaults to `"lucene.standard"`.\n\n' +
             '**Available options:** `"lucene.standard"`, `"lucene.english"`, `"lucene.spanish"`, `"lucene.german"`, etc.',
-          values: analyzers, // Your predefined analyzer list
+          values: analyzers,
         },
         {
           optional: true,
@@ -252,8 +252,7 @@ export const annotations: TAnnotationsTree = {
     useTextSearch: new AnnotationSpec({
       description:
         'Marks a field to be **included in a MongoDB Atlas Search Index** defined by `@mongo.defineTextSearch`.\n\n' +
-        '- **The field must reference an existing search index name**.\n' +
-        '- **Boost values control relevance scoring** (higher values increase importance in search results).\n\n' +
+        '- **The field must reference an existing search index name**.\n\n' +
         '**Example:**\n' +
         '```anscript\n' +
         '@mongo.useTextSearch "mySearchIndex", 5\n' +
@@ -270,14 +269,12 @@ export const annotations: TAnnotationsTree = {
         },
         {
           optional: true,
-          name: 'boost',
-          type: 'number',
+          name: 'analyzer',
+          type: 'string',
           description:
-            'Search importance (**higher values increase relevance** in search results). Defaults to `1`.\n\n' +
-            '**Example Boost Values:**\n' +
-            '- `1` → Normal weight (default behavior).\n' +
-            '- `5` → **High importance** (e.g., names in a people search).\n' +
-            '- `10` → **Critical importance** (e.g., product titles in an e-commerce search).',
+            'The text analyzer for tokenization. Defaults to `"lucene.standard"`.\n\n' +
+            '**Available options:** `"lucene.standard"`, `"lucene.english"`, `"lucene.spanish"`, `"lucene.german"`, etc.',
+          values: analyzers,
         },
       ],
     }),
