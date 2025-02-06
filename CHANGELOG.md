@@ -1,3 +1,12 @@
+## [0.0.10](https://github.com/intertation/intertation/compare/v0.0.6...v0.0.10) (2025-02-06)
+
+
+### Bug Fixes
+
+* **config:** fix resolving config ([371f649](https://github.com/intertation/intertation/commit/371f6493d5f35da0df6d2ad8befb1157d75a48ac))
+
+
+
 ## [0.0.6](https://github.com/intertation/intertation/compare/v0.0.5...v0.0.6) (2025-02-06)
 
 
