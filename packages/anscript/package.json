@@ -1,6 +1,6 @@
 {
   "name": "anscript",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Anscript: Configuration and build plugins.",
   "type": "module",
   "main": "dist/index.mjs",

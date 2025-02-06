@@ -1,6 +1,6 @@
 {
   "name": "@ts-anscript/core",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Core library for Anscript parsing and file generation.",
   "type": "module",
   "main": "dist/index.mjs",
