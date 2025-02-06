@@ -14,7 +14,7 @@ Anscript is a type-centric language designed to extend TypeScript with annotatio
 ## Installation
 
 ```sh
-npm install -g anscript
+npm install anscript
 ```
 
 ## Usage
