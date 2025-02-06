@@ -2,7 +2,7 @@
   "name": "@anscript/vscode",
   "displayName": "Anscript: Annotate things",
   "description": "Provides syntax highlighting and language support for Anscript (.as), a language for describing data and interfaces with extensible annotations.",
-  "version": "0.0.6",
+  "version": "0.0.9",
   "private": true,
   "main": "./dist/extension.cjs",
   "icon": "./icons/as-logo.png",
@@ -15,8 +15,6 @@
       "external": [
         "fs",
         "path",
-        "vscode-languageclient",
-        "vscode-languageclient/node",
         "vscode"
       ],
       "dts": false
@@ -29,9 +27,6 @@
       "external": [
         "fs",
         "path",
-        "vscode-languageserver",
-        "vscode-languageserver/node",
-        "vscode-languageserver-textdocument",
         "@ts-anscript/core"
       ],
       "dts": false
@@ -78,14 +73,14 @@
   },
   "publisher": "mav-rik",
   "dependencies": {
-    "vscode-languageclient": "^8.1.0",
-    "vscode-languageserver": "^8.1.0",
-    "vscode-languageserver-textdocument": "^1.0.12",
     "@ts-anscript/core": "^0.0.5"
   },
   "author": "Artem Maltsev",
   "license": "ISC",
   "devDependencies": {
+    "vscode-languageclient": "^8.1.0",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.12",
     "@types/node": "^22.10.5",
     "@types/vscode": "^1.80.0",
     "vitest": "^3.0.0"
@@ -94,18 +89,9 @@
     "type": "git",
     "url": "git+https://github.com/ts-anscript/anscript.git"
   },
-  "files": [
-    "dist",
-    "icons",
-    "syntaxes",
-    "language-configuration.json",
-    "demo.png",
-    "package.json",
-    "README.md"
-  ],
   "scripts": {
-    "package": "pnpm vsce package --no-dependencies",
-    "publish": "pnpm vsce publish --no-dependencies",
+    "package": "pnpm vsce package --no-dependencies --pre-release",
+    "publish": "pnpm vsce publish --no-dependencies --pre-release",
     "test": "vitest"
   }
 }

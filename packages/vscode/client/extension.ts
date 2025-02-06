@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-// client/extension.ts
+import { exec } from 'child_process'
 import type { ExtensionContext } from 'vscode'
 import { Uri, workspace, window } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
@@ -9,47 +9,40 @@ import * as path from 'path'
 
 let client: LanguageClient | undefined
 
-export function activate(context: ExtensionContext) {
-  const extensionPath = context.extensionUri.fsPath
-  const coreModulePath = path.join(extensionPath, 'node_modules', '@ts-anscript/core')
-
-  function isCoreInstalled(): boolean {
-    return fs.existsSync(coreModulePath)
+async function ensureDependenciesInstalled(extensionPath: string) {
+  const nodeModulesPath = path.join(extensionPath, 'node_modules')
+  if (fs.existsSync(nodeModulesPath)) {
+    console.log('✔ Dependencies already installed.')
+    return true
   }
 
-  async function waitForCoreInstallation() {
-    if (isCoreInstalled()) {
-      startLanguageServer()
+  window.showInformationMessage('Installing dependencies for Anscript extension...')
+
+  return new Promise(resolve => {
+    exec('npm install --omit=dev', { cwd: extensionPath }, error => {
+      if (error) {
+        window.showErrorMessage(
+          'Failed to install dependencies. Try running `npm install` manually.'
+        )
+        resolve(false)
+      } else {
+        window.showInformationMessage('Dependencies installed successfully.')
+        resolve(true)
+      }
+    })
+  })
+}
+
+export function activate(context: ExtensionContext) {
+  const extensionPath = context.extensionUri.fsPath
+  // const coreModulePath = path.join(extensionPath, 'node_modules', '@ts-anscript/core')
+
+  async function startLanguageServer() {
+    const installed = await ensureDependenciesInstalled(extensionPath)
+    if (!installed) {
       return
     }
 
-    window.showInformationMessage(
-      'Waiting for @ts-anscript/core to be installed... ' + coreModulePath
-    )
-
-    // Watch for changes in `node_modules`
-    const watcher = fs.watch(
-      path.join(extensionPath, 'node_modules'),
-      { recursive: true },
-      (_, filename) => {
-        if (filename?.includes('@ts-anscript/core')) {
-          watcher.close()
-          startLanguageServer()
-        }
-      }
-    )
-
-    // Fallback: Periodically check every 5 seconds
-    const interval = setInterval(() => {
-      if (isCoreInstalled()) {
-        clearInterval(interval)
-        watcher.close()
-        startLanguageServer()
-      }
-    }, 5000)
-  }
-
-  function startLanguageServer() {
     // The server is implemented in server/server.js (transpiled from server/server.ts).
     const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.cjs').fsPath
 
@@ -101,8 +94,7 @@ export function activate(context: ExtensionContext) {
     context.subscriptions.push(client)
   }
 
-  // Ensure core is installed before starting
-  waitForCoreInstallation()
+  startLanguageServer()
 }
 
 export function deactivate(): Thenable<void> | undefined {

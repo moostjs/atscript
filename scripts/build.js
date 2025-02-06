@@ -142,7 +142,6 @@ async function generateBundles() {
 async function rolldownPackages(ws) {
   const builds = getBuildOptions(ws)
   for (const { entries, formats, external } of builds) {
-    console.log({ entries, formats, external })
     for (const entry of entries) {
       const inputOptions = {
         input: path.join(`packages/${ws}`, entry),
@@ -152,7 +151,6 @@ async function rolldownPackages(ws) {
         },
         plugins: [_dye, swc],
       }
-      console.log(inputOptions)
       const fileName = entry
         .split('/')
         .pop()

@@ -77,6 +77,8 @@ export async function resolveConfigFile(
   const root = _root || startDir
   let currentDir = startDir
 
+  const rootId = 'file://' + root
+
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
   while (true) {
     const candidate = await findConfigFileName(currentDir)
@@ -85,7 +87,7 @@ export async function resolveConfigFile(
     }
     // Stop if we've hit workspace root or actual filesystem root
     const parentDir = path.dirname(currentDir)
-    if (currentDir === root || parentDir === currentDir) {
+    if (currentDir === rootId || parentDir === currentDir) {
       break
     }
     currentDir = parentDir
