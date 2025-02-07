@@ -15,7 +15,8 @@
       "external": [
         "fs",
         "path",
-        "vscode"
+        "vscode",
+        "child_process"
       ],
       "dts": false
     },
