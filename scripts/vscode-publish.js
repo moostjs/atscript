@@ -7,14 +7,14 @@ $.verbose = true
 async function run() {
   const pkgPath = getWorkspacePath(`packages/vscode/package.json`)
   const pkg = JSON.parse(readFileSync(pkgPath))
-  pkg.name = 'anscript'
-  pkg.dependencies['@ts-anscript/core'] = `^${pkg.version}`
+  pkg.name = 'atscript'
+  pkg.dependencies['@atscript/core'] = `^${pkg.version}`
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
 
   await $`cd ./packages/vscode && pnpm run publish`
 
-  pkg.name = '@ts-anscript/vscode'
-  pkg.dependencies['@ts-anscript/core'] = `workspace:^`
+  pkg.name = '@atscript/vscode'
+  pkg.dependencies['@atscript/core'] = `workspace:^`
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
 }
 

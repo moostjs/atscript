@@ -3,14 +3,14 @@ export {
   AnnotationSpec,
   SemanticPrimitiveNode,
   Token,
-  AnscriptDoc,
+  AtscriptDoc,
   build,
   BuildRepo,
   type TOutput,
   type TPluginOutput,
   type TOutputWithSource,
-  type TAnscriptConfig,
+  type TAtscriptConfig,
   type TAnnotationSpecConfig,
   type TPrimitiveConfig,
-  type TAnscriptPlugin,
-} from '@ts-anscript/core'
+  type TAtscriptPlugin,
+} from '@atscript/core'

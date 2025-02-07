@@ -1,38 +1,38 @@
 import { TOutput } from '../build'
-import { TAnscriptConfig } from '../config'
-import { AnscriptDoc } from '../document'
-import { AnscriptRepo } from '../repo'
+import { TAtscriptConfig } from '../config'
+import { AtscriptDoc } from '../document'
+import { AtscriptRepo } from '../repo'
 
 export interface TPluginOutput {
   fileName: string
   content: string
 }
 
-export type TAnscriptRenderFormat = string
+export type TAtscriptRenderFormat = string
 
-export interface TAnscriptPlugin {
+export interface TAtscriptPlugin {
   name: string
 
   config?: (
-    config: TAnscriptConfig
-  ) => Promise<TAnscriptConfig | undefined> | TAnscriptConfig | undefined
+    config: TAtscriptConfig
+  ) => Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
 
   resolve?: (id: string) => Promise<string | undefined> | string | undefined
 
   load?: (id: string) => Promise<string | undefined> | string | undefined
 
-  onDocumnet?: (doc: AnscriptDoc) => Promise<void> | void
+  onDocumnet?: (doc: AtscriptDoc) => Promise<void> | void
 
   render?: (
-    doc: AnscriptDoc,
-    format: TAnscriptRenderFormat
+    doc: AtscriptDoc,
+    format: TAtscriptRenderFormat
   ) => Promise<TPluginOutput[]> | TPluginOutput[]
 
   buildEnd?: (
     output: TOutput[],
-    format: TAnscriptRenderFormat,
-    repo: AnscriptRepo
+    format: TAtscriptRenderFormat,
+    repo: AtscriptRepo
   ) => Promise<void> | void
 }
 
-export const createAnscriptPlugin = (plugin: TAnscriptPlugin) => plugin
+export const createAnscriptPlugin = (plugin: TAtscriptPlugin) => plugin

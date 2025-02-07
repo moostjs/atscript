@@ -2,10 +2,10 @@
 // eslint-disable max-params
 import {
   isAnnotatedType,
-  TAnscriptAnnotatedType,
-  TAnscriptTypeObject,
+  TAtscriptAnnotatedType,
+  TAtscriptTypeObject,
   TMetadataMap,
-} from '@ts-anscript/typescript'
+} from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
 import { Collection } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
@@ -34,7 +34,7 @@ function indexKey(type: TIndex['type'], name: string) {
   return `${INDEX_PREFIX}${type}__${cleanName}`
 }
 
-export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[]) => any)> {
+export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[]) => any)> {
   public readonly name: string
   public readonly collection: Collection<InstanceType<T>>
   constructor(
@@ -43,7 +43,7 @@ export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[
     protected readonly logger: TGenericLogger = NoopLogger
   ) {
     if (!isAnnotatedType(_type)) {
-      throw new Error('Anscript Annotated Type expected')
+      throw new Error('Atscript Annotated Type expected')
     }
     const name = _type.metadata.get('mongo.collection') as string
     if (!name) {
@@ -64,13 +64,13 @@ export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[
     const exists = await this.exists()
     if (!exists) {
       await this.asMongo.db.createCollection(this.name, {
-        comment: 'Created by Anscript Mongo Collection',
+        comment: 'Created by Atscript Mongo Collection',
       })
     }
   }
 
   get type() {
-    return this._type as TAnscriptAnnotatedType<TAnscriptTypeObject>
+    return this._type as TAtscriptAnnotatedType<TAtscriptTypeObject>
   }
 
   protected _indexes = new Map<string, TIndex>()
@@ -131,9 +131,9 @@ export class AsCollection<T extends TAnscriptAnnotatedType & (new (...args: any[
     }
   }
 
-  protected _flatMap?: Map<string, TAnscriptAnnotatedType>
+  protected _flatMap?: Map<string, TAtscriptAnnotatedType>
 
-  protected _flattenType(type: TAnscriptAnnotatedType, prefix?: string) {
+  protected _flattenType(type: TAtscriptAnnotatedType, prefix?: string) {
     switch (type.type.kind) {
       case 'object':
         const items = Array.from(type.type.props.entries())

@@ -8,10 +8,10 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token } from '@ts-anscript/core'
+import type { SemanticNode, Token } from '@atscript/core'
 import {
-  AnscriptDoc,
-  AnscriptRepo,
+  AtscriptDoc,
+  AtscriptRepo,
   BuildRepo,
   getRelPath,
   isAnnotationSpec,
@@ -21,7 +21,7 @@ import {
   isRef,
   isStructure,
   resolveAnscriptFromPath,
-} from '@ts-anscript/core'
+} from '@atscript/core'
 import type {
   CompletionItem,
   createConnection,
@@ -44,7 +44,7 @@ import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } fr
 
 const CHECKS_DELAY = 100
 
-export class VscodeAnscriptRepo extends AnscriptRepo {
+export class VscodeAtscriptRepo extends AtscriptRepo {
   private readonly changeQueue = [] as string[]
 
   private readonly revalidateQueue = [] as string[]
@@ -74,7 +74,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
 
     connection.onDidChangeWatchedFiles(async params => {
       for (const change of params.changes) {
-        if (/anscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
+        if (/atscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
           this.onConfigChanged(change.uri)
         }
       }
@@ -84,10 +84,10 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
-      const anscript = await this.openDocument(params.textDocument.uri)
-      const { manager } = await this.resolveConfig(anscript.id)
+      const atscript = await this.openDocument(params.textDocument.uri)
+      const { manager } = await this.resolveConfig(atscript.id)
       const config = await manager.config()
-      const bld = new BuildRepo(config.rootDir!, this, [anscript])
+      const bld = new BuildRepo(config.rootDir!, this, [atscript])
       await bld.write({ format: 'dts', outDir: config.outDir })
     })
 
@@ -107,16 +107,16 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
-      const anscript = await this.openDocument(params.textDocument.uri)
-      return anscript.getToDefinitionAt(params.position.line, params.position.character)
+      const atscript = await this.openDocument(params.textDocument.uri)
+      return atscript.getToDefinitionAt(params.position.line, params.position.character)
     })
 
     connection.onReferences(async params => {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
-      const anscript = await this.openDocument(params.textDocument.uri)
-      return anscript.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
+      const atscript = await this.openDocument(params.textDocument.uri)
+      return atscript.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
         uri: r.uri,
         range: r.range,
       }))
@@ -129,23 +129,23 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       const { textDocument, position, newName } = params
 
       // Open the document and find the token at the cursor
-      const anscript = await this.openDocument(textDocument.uri)
+      const atscript = await this.openDocument(textDocument.uri)
       if (this.currentCheck) {
         await this.currentCheck
       }
-      const token = anscript.tokensIndex.at(position.line, position.character)
+      const token = atscript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return null // No token found at the cursor
       }
-      const references = anscript.usageListFor(token)
+      const references = atscript.usageListFor(token)
 
       if (!references || references.length === 0) {
         return null // No references found
       }
 
       const def = token.isDefinition
-        ? { uri: anscript.id, token }
-        : anscript.getDefinitionFor(token)
+        ? { uri: atscript.id, token }
+        : atscript.getDefinitionFor(token)
 
       if (def?.token) {
         references.push({
@@ -185,28 +185,28 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       }
       const text = document.getText()
       const offset = document.offsetAt(position)
-      const anscript = await this.openDocument(textDocument.uri)
+      const atscript = await this.openDocument(textDocument.uri)
       await this.currentCheck
 
-      const block = anscript.blocksIndex.at(position.line, position.character)
+      const block = atscript.blocksIndex.at(position.line, position.character)
 
       // import { here } from '...'
       if (block?.blockType === 'import' && block.fromPath) {
-        return this.getImportBlockCompletions(anscript, block, text, offset, context?.triggerKind)
+        return this.getImportBlockCompletions(atscript, block, text, offset, context?.triggerKind)
       }
 
-      const token = anscript.tokensIndex.at(position.line, position.character)
+      const token = atscript.tokensIndex.at(position.line, position.character)
       // import { ... } from 'here'
       if (typeof token?.fromPath === 'string') {
-        return this.getImportPathCompletions(anscript, token, position)
+        return this.getImportPathCompletions(atscript, token, position)
       }
 
       // autocomplete for annotations
-      if (anscript.config.annotations) {
+      if (atscript.config.annotations) {
         // eslint-disable-next-line unicorn/no-lonely-if
-        if (token?.isAnnotation && anscript.config.annotations) {
+        if (token?.isAnnotation && atscript.config.annotations) {
           const prev = token.text.slice(1).split('.').slice(0, -1)
-          let a = anscript.config.annotations
+          let a = atscript.config.annotations
           for (const item of prev) {
             if (a[item] && !isAnnotationSpec(a[item])) {
               a = a[item]
@@ -292,10 +292,10 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       // declared (imported) types or exported from other documents
       const before = charBefore(text, offset, [/[\s\w]/u])
       if (block?.blockType === 'structure' && before && [':', '|', '&'].includes(before)) {
-        return this.getDeclarationsCompletions(anscript, text)
+        return this.getDeclarationsCompletions(atscript, text)
       }
       if (block?.blockType === undefined && before && ['=', '|', '&'].includes(before)) {
-        return this.getDeclarationsCompletions(anscript, text)
+        return this.getDeclarationsCompletions(atscript, text)
       }
 
       // autocomplete for defined nodes
@@ -306,9 +306,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         }
         const chain =
           token.text === '.' ? token.parentNode.chain : token.parentNode.chain.slice(0, -1)
-        const unwound = anscript.unwindType(id.text, chain)
+        const unwound = atscript.unwindType(id.text, chain)
         if (unwound?.def) {
-          const def = anscript.mergeIntersection(unwound.def)
+          const def = atscript.mergeIntersection(unwound.def)
           let options: SemanticNode[] | undefined
           if (isInterface(def) || isStructure(def)) {
             options = Array.from(def.props.values())
@@ -382,13 +382,13 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       if (!document) {
         return
       }
-      const anscript = await this.openDocument(document.uri)
-      const token = anscript.tokensIndex.at(position.line, position.character)
+      const atscript = await this.openDocument(document.uri)
+      const token = atscript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return
       }
       if (isRef(token.parentNode)) {
-        const unwound = anscript.unwindType(token.parentNode.id!, token.parentNode.chain)
+        const unwound = atscript.unwindType(token.parentNode.id!, token.parentNode.chain)
         const def = unwound?.def
         const node = unwound?.node
         const docs = [] as string[]
@@ -448,7 +448,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       const { file } = await cache
       if (file === configFile) {
         this.configs.delete(id)
-        this.anscripts.delete(id)
+        this.atscripts.delete(id)
         this.addToRevalidateQueue(id)
       }
     }
@@ -460,15 +460,15 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
   //     return { data: [] } as SemanticTokens
   //   }
 
-  //   const anscript = await this.openDocument(document.uri)
-  //   if (!anscript || anscript.resolvedAnnotations.length === 0) {
+  //   const atscript = await this.openDocument(document.uri)
+  //   if (!atscript || atscript.resolvedAnnotations.length === 0) {
   //     return { data: [] } as SemanticTokens
   //   }
   //   // await this.currentCheck
 
   //   const builder = new SemanticTokensBuilder()
-  //   anscript.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
-  //   anscript.resolvedAnnotations.forEach(token => {
+  //   atscript.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
+  //   atscript.resolvedAnnotations.forEach(token => {
   //     if (
   //       range &&
   //       range.start.line <= token.range.start.line &&
@@ -495,12 +495,12 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       return
     }
     // await this.currentCheck
-    const anscript = await this.openDocument(document.uri)
-    const annotationToken = anscript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
+    const atscript = await this.openDocument(document.uri)
+    const annotationToken = atscript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
     if (!annotationToken?.parentNode) {
       return
     }
-    let argToken = anscript.tokensIndex.at(position.line, position.character)
+    let argToken = atscript.tokensIndex.at(position.line, position.character)
     const currentAnnotation = annotationToken.parentNode.annotations?.find(
       a => a.name === annotationMatch[1] && a.token.range.start.line === position.line
     )
@@ -513,9 +513,9 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         }
       }
     }
-    const annotationSpec = anscript.resolveAnnotation(annotationToken.text.slice(1))
+    const annotationSpec = atscript.resolveAnnotation(annotationToken.text.slice(1))
     return {
-      anscript,
+      atscript,
       annotationToken,
       argToken,
       currentIndex: argToken?.index ?? (currentAnnotation?.args.length || 0),
@@ -525,19 +525,19 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   async getDeclarationsCompletions(
-    anscript: AnscriptDoc,
+    atscript: AtscriptDoc,
     text: string
   ): Promise<CompletionItem[] | undefined> {
-    const defs = Array.from(anscript.registry.definitions.entries())
+    const defs = Array.from(atscript.registry.definitions.entries())
     const items = [] as CompletionItem[]
-    const exporters = new Map<string, AnscriptDoc>()
+    const exporters = new Map<string, AtscriptDoc>()
     const importSet = new Set<string>()
     for (const [key, token] of defs) {
       let t = token
       if (token.fromPath) {
         let exporter = exporters.get(token.fromPath)
         if (!exporter) {
-          exporter = await this.openDocument(resolveAnscriptFromPath(token.fromPath, anscript.id))
+          exporter = await this.openDocument(resolveAnscriptFromPath(token.fromPath, atscript.id))
           exporters.set(token.fromPath, exporter)
         }
         t = exporter.registry.definitions.get(token.text)!
@@ -552,13 +552,13 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         detail: token.fromPath ? `imported from '${token.fromPath}'` : undefined,
       })
     }
-    for (const docPromise of this.anscripts.values()) {
+    for (const docPromise of this.atscripts.values()) {
       const doc = await docPromise
-      if (doc !== anscript) {
+      if (doc !== atscript) {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
           if (token && !importSet.has(token.text)) {
-            const fromPath = getRelPath(anscript.id, doc.id)
+            const fromPath = getRelPath(atscript.id, doc.id)
             const importEdit = addImport(text, token.text, fromPath)
             items.push({
               label: token.text,
@@ -576,7 +576,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         }
       }
     }
-    const primitives = anscript.primitives
+    const primitives = atscript.primitives
     items.push(
       ...primitives.map(
         p =>
@@ -602,16 +602,16 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   async getImportBlockCompletions(
-    anscript: AnscriptDoc,
+    atscript: AtscriptDoc,
     block: Token,
     text: string,
     offset: number,
     triggerKind?: 1 | 2 | 3
   ): Promise<CompletionItem[] | undefined> {
     const rule = createInsertTextRule(text, offset, triggerKind ?? 1)
-    const target = await this.openDocument(resolveAnscriptFromPath(block.fromPath!, anscript.id))
+    const target = await this.openDocument(resolveAnscriptFromPath(block.fromPath!, atscript.id))
     if (target) {
-      const imports = anscript.imports.get(target.id)?.imports || []
+      const imports = atscript.imports.get(target.id)?.imports || []
       const importsSet = new Set(imports.map(i => i.text))
       return Array.from(target.exports.values())
         .filter(n => !importsSet.has(n.id!) && rule.test(n.id!))
@@ -629,12 +629,12 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   async getImportPathCompletions(
-    anscript: AnscriptDoc,
+    atscript: AtscriptDoc,
     token: Token,
     position: Position
   ): Promise<CompletionItem[] | undefined> {
     const dif = position.character - token.range.start.character - 1
-    const paths = await getItnFileCompletions(anscript.id, token.fromPath!.slice(0, dif))
+    const paths = await getItnFileCompletions(atscript.id, token.fromPath!.slice(0, dif))
     return paths.map(({ path, isDirectory }) => ({
       label: path,
       kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
@@ -682,7 +682,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
         ids.push(id)
         this.pendingCheck.delete(id)
         const doc = await this.openDocument(id)
-        if (this.changedSet.has(id) && this.anscripts.has(id)) {
+        if (this.changedSet.has(id) && this.atscripts.has(id)) {
           const text = this.documents.get(id)?.getText()
           if (typeof text === 'string') {
             doc.update(text)
@@ -718,32 +718,32 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
     this.triggerChecks()
   }
 
-  protected async _openDocument(id: string, text?: string): Promise<AnscriptDoc> {
+  protected async _openDocument(id: string, text?: string): Promise<AtscriptDoc> {
     const td = this.documents.get(id)
     if (td) {
       const { manager } = await this.resolveConfig(id)
       const config = await manager.getDocConfig()
-      const anscript = new AnscriptDoc(id, config, manager)
-      anscript.update(td.getText())
-      await manager.onDocumnet(anscript)
-      return anscript
+      const atscript = new AtscriptDoc(id, config, manager)
+      atscript.update(td.getText())
+      await manager.onDocumnet(atscript)
+      return atscript
     }
     return super._openDocument(id, text)
   }
 
-  revalidateDependants(anscript: AnscriptDoc) {
-    anscript.dependants.forEach(d => {
+  revalidateDependants(atscript: AtscriptDoc) {
+    atscript.dependants.forEach(d => {
       d.clearMessages()
       this.addToRevalidateQueue(d.id)
     })
   }
 
-  async checkDoc(anscript: AnscriptDoc, changed = false) {
-    await this.checkImports(anscript)
-    const unused = anscript.getUnusedTokens()
-    const messages = anscript.getDiagMessages()
+  async checkDoc(atscript: AtscriptDoc, changed = false) {
+    await this.checkImports(atscript)
+    const unused = atscript.getUnusedTokens()
+    const messages = atscript.getDiagMessages()
     this.connection.sendDiagnostics({
-      uri: anscript.id,
+      uri: atscript.id,
       diagnostics: messages.concat(
         ...unused.map(t => ({
           severity: DiagnosticSeverity.Hint,
@@ -754,7 +754,7 @@ export class VscodeAnscriptRepo extends AnscriptRepo {
       ),
     })
     if (changed) {
-      this.revalidateDependants(anscript)
+      this.revalidateDependants(atscript)
     }
   }
 }

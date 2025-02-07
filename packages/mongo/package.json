@@ -1,7 +1,7 @@
 {
-  "name": "@ts-anscript/mongo",
-  "version": "0.0.11",
-  "description": "Mongodb plugin for anscript.",
+  "name": "@atscript/mongo",
+  "version": "0.0.0",
+  "description": "Mongodb plugin for atscript.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,15 +22,24 @@
     "test": "vitest"
   },
   "keywords": [
-    "anscript",
+    "atscript",
     "plugin",
     "mongodb"
   ],
-  "author": "",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/mongo"
+  },
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/mongo#readme",
   "license": "ISC",
   "dependencies": {
-    "@ts-anscript/core": "workspace:^",
-    "@ts-anscript/typescript": "workspace:^",
+    "@atscript/core": "workspace:^",
+    "@atscript/typescript": "workspace:^",
     "mongodb": "^6.13.0"
   },
   "devDependencies": {

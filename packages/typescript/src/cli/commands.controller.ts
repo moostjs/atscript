@@ -5,9 +5,9 @@ import {
   build,
   loadConfig,
   resolveConfigFile,
-  TAnscriptConfig,
-  TAnscriptConfigOutput,
-} from '@ts-anscript/core'
+  TAtscriptConfig,
+  TAtscriptConfigOutput,
+} from '@atscript/core'
 import { existsSync } from 'fs'
 import { tsPlugin } from '../plugin'
 
@@ -17,7 +17,7 @@ export class Commands {
 
   @Cli('')
   @Description('Builds .as files using --config and --format')
-  @CliExample('-c anscript.config.js', 'Build .as files using anscript.config.js')
+  @CliExample('-c atscript.config.js', 'Build .as files using atscript.config.js')
   @CliExample('-f dts', 'Build "d.ts" files for ".as" files')
   async default(
     @CliOption('c', 'config')
@@ -36,13 +36,13 @@ export class Commands {
     }
     this.logger.log(`Format: ${__DYE_CYAN__}${config.format}${__DYE_COLOR_OFF__}`)
     const builder = await build(config)
-    const out = await builder.write(config as TAnscriptConfigOutput)
+    const out = await builder.write(config as TAtscriptConfigOutput)
     for (const { target } of out) {
       this.logger.log(`✅ created ${__DYE_GREEN__}${target}${__DYE_COLOR_OFF__}`)
     }
   }
 
-  async getConfig(configFile?: string): Promise<TAnscriptConfig> {
+  async getConfig(configFile?: string): Promise<TAtscriptConfig> {
     const root = process.cwd()
     if (configFile) {
       const c = path.join(root, configFile)
@@ -60,7 +60,7 @@ export class Commands {
         this.logger.log(`Using config file ${__DYE_CYAN__}${resolved}${__DYE_COLOR_OFF__}`)
         return loadConfig(resolved)
       }
-      this.logger.log(`No anscript config file found`)
+      this.logger.log(`No atscript config file found`)
       return {
         format: 'dts',
         plugins: [tsPlugin()],

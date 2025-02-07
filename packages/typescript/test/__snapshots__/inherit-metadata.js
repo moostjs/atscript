@@ -1,4 +1,4 @@
-import { defineAnnotatedType as $ } from "@ts-anscript/typescript"
+import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class ISource {
   static __is_anscript_annotated_type = true

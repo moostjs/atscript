@@ -1,6 +1,6 @@
 {
-  "fileTypes": ["anscript", "as"],
-  "scopeName": "source.anscript",
+  "fileTypes": ["atscript", "as"],
+  "scopeName": "source.atscript",
   "name": "AS",
   "patterns": [
     { "include": "#annotation-with-args" },
@@ -19,18 +19,18 @@
     "comments": {
       "patterns": [
         {
-          "name": "comment.line.double-slash.anscript",
+          "name": "comment.line.double-slash.atscript",
           "match": "//.*$"
         },
 
         {
-          "name": "comment.block.anscript",
+          "name": "comment.block.atscript",
           "begin": "/\\*",
           "end": "\\*/",
           "patterns": [
             {
               "match": "\\*\\/",
-              "name": "invalid.illegal.stray.end-of-comment.anscript"
+              "name": "invalid.illegal.stray.end-of-comment.atscript"
             }
           ]
         }
@@ -41,7 +41,7 @@
       "patterns": [
         {
           "match": "'([^']*)'|\"([^\"]*)\"",
-          "name": "variable.other.constant.anscript"
+          "name": "variable.other.constant.atscript"
         }
       ]
     },
@@ -53,14 +53,14 @@
           "begin": "(?<![A-Za-z0-9_$])\\bimport\\b(?!\\s*[:=])",
           "beginCaptures": {
             "0": {
-              "name": "keyword.control.import.anscript"
+              "name": "keyword.control.import.atscript"
             }
           },
           "end": "(?=;|$)",
           "patterns": [
             {
               "match": "\\bfrom\\b",
-              "name": "keyword.control.from.anscript"
+              "name": "keyword.control.from.atscript"
             },
             {
               "begin": "\\{",
@@ -77,14 +77,14 @@
               },
               "patterns": [
                 {
-                  "name": "entity.name.type.anscript",
+                  "name": "entity.name.type.atscript",
                   "match": "\\b[A-Za-z_$][A-Za-z0-9_$]*\\b"
                 }
               ]
             },
             {
               "match": "'([^']*)'|\"([^\"]*)\"",
-              "name": "string.quoted.import.anscript"
+              "name": "string.quoted.import.atscript"
             }
           ]
         }
@@ -95,7 +95,7 @@
       "patterns": [
         {
           "match": "(?<![A-Za-z0-9_$])\\bexport\\b(?!\\s*[:=])",
-          "name": "keyword.control.export.anscript"
+          "name": "keyword.control.export.atscript"
         },
         {
           "match": "(\\b(?:type|interface)\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)",
@@ -114,7 +114,7 @@
     "numbers": {
       "patterns": [
         {
-          "name": "variable.other.constant.anscript",
+          "name": "variable.other.constant.atscript",
           "match": "\\b\\d+(\\.\\d+)?\\b"
         }
       ]
@@ -123,7 +123,7 @@
     "operators": {
       "patterns": [
         {
-          "name": "keyword.operator.anscript",
+          "name": "keyword.operator.atscript",
           "match": "[|&=]"
         }
       ]
@@ -132,7 +132,7 @@
     "annotations": {
       "patterns": [
         {
-          "name": "variable.other.constant.anscript",
+          "name": "variable.other.constant.atscript",
           "match": "@[A-Za-z0-9_.]+"
         }
       ]
@@ -141,44 +141,44 @@
     "annotation-with-args": {
       "patterns": [
         {
-          "name": "variable.other.constant.anscript",
+          "name": "variable.other.constant.atscript",
           "begin": "(@[A-Za-z0-9_.]+)",
           "beginCaptures": {
             "1": {
-              "name": "variable.other.constant.anscript"
+              "name": "variable.other.constant.atscript"
             }
           },
           "end": "(?=$|\\n|\\r|;)",
           "patterns": [
             {
-              "name": "constant.numeric.anscript",
+              "name": "constant.numeric.atscript",
               "match": "\\b\\d+(\\.\\d+)?\\b"
             },
             {
-              "name": "string.quoted.single.anscript",
+              "name": "string.quoted.single.atscript",
               "begin": "'",
               "end": "(?:'|\\n)",
               "patterns": [
                 {
                   "match": "\\\\.",
-                  "name": "constant.character.escape.anscript"
+                  "name": "constant.character.escape.atscript"
                 }
               ]
             },
 
             {
-              "name": "string.quoted.double.anscript",
+              "name": "string.quoted.double.atscript",
               "begin": "\"",
               "end": "(?:\"|\\n)",
               "patterns": [
                 {
                   "match": "\\\\.",
-                  "name": "constant.character.escape.anscript"
+                  "name": "constant.character.escape.atscript"
                 }
               ]
             },
             {
-              "name": "constant.language.boolean.anscript",
+              "name": "constant.language.boolean.atscript",
               "match": "\\b(?:true|false|undefined|null)\\b"
             }
           ]
@@ -189,39 +189,39 @@
     "punctuation": {
       "patterns": [
         {
-          "name": "punctuation.separator.comma.anscript",
+          "name": "punctuation.separator.comma.atscript",
           "match": ","
         },
         {
-          "name": "punctuation.terminator.statement.anscript",
+          "name": "punctuation.terminator.statement.atscript",
           "match": ";"
         },
         {
-          "name": "punctuation.separator.key-value.anscript",
+          "name": "punctuation.separator.key-value.atscript",
           "match": ":"
         },
         {
-          "name": "punctuation.section.parens.begin.anscript",
+          "name": "punctuation.section.parens.begin.atscript",
           "match": "\\("
         },
         {
-          "name": "punctuation.section.parens.end.anscript",
+          "name": "punctuation.section.parens.end.atscript",
           "match": "\\)"
         },
         {
-          "name": "punctuation.section.braces.begin.anscript",
+          "name": "punctuation.section.braces.begin.atscript",
           "match": "\\{"
         },
         {
-          "name": "punctuation.section.braces.end.anscript",
+          "name": "punctuation.section.braces.end.atscript",
           "match": "\\}"
         },
         {
-          "name": "punctuation.section.brackets.begin.anscript",
+          "name": "punctuation.section.brackets.begin.atscript",
           "match": "\\["
         },
         {
-          "name": "punctuation.section.brackets.end.anscript",
+          "name": "punctuation.section.brackets.end.atscript",
           "match": "\\]"
         }
       ]
@@ -230,11 +230,11 @@
     "global-types": {
       "patterns": [
         {
-          "name": "support.type.primitive.anscript",
+          "name": "support.type.primitive.atscript",
           "match": "\\b\\w+\\b(?!\\s*:)"
         },
         {
-          "name": "support.type.primitive.anscript",
+          "name": "support.type.primitive.atscript",
           "match": "\\b(?:number|string|boolean|void|undefined|null|never|any|unknown|bigint|symbol|true|false)\\b(?!\\s*:)"
         }
       ]
@@ -243,15 +243,15 @@
     "property-names": {
       "patterns": [
         {
-          "name": "variable.object.property.required.anscript",
+          "name": "variable.object.property.required.atscript",
           "match": "\\b([A-Za-z_$][A-Za-z0-9_$]*)\\b(?=\\s*:)"
         },
         {
-          "name": "variable.object.property.optional.anscript",
+          "name": "variable.object.property.optional.atscript",
           "match": "\\b([A-Za-z_$][A-Za-z0-9_$]*)\\b(?=\\?\\s*:)"
         }
       ]
     }
   },
-  "injectionSelector": "L:source.anscript"
+  "injectionSelector": "L:source.atscript"
 }

@@ -1,7 +1,7 @@
 {
-  "name": "@ts-anscript/core",
-  "version": "0.0.11",
-  "description": "Core library for Anscript parsing and file generation.",
+  "name": "@atscript/core",
+  "version": "0.0.0",
+  "description": "Core library for Atscript parsing and file generation.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -21,13 +21,22 @@
     "test": "vitest"
   },
   "keywords": [
-    "anscript",
+    "atscript",
     "annotations",
     "interfaces",
     "runtime",
     "code-generation"
   ],
-  "author": "",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/core#readme",
   "license": "ISC",
   "dependencies": {
     "@prostojs/parser": "^0.5.11",

@@ -3,14 +3,13 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import path from 'node:path'
-import { TAnscriptConfigInput, TAnscriptConfigOutput } from './config'
+import { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
-import { AnscriptDoc } from './document'
+import { AtscriptDoc } from './document'
 import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
-import { resolveAnnotation } from './annotations'
 import { SemanticPrimitiveNode } from './parser/nodes'
 
 interface TPluginManagers {
@@ -19,10 +18,10 @@ interface TPluginManagers {
   dependants: Set<string>
 }
 
-export class AnscriptRepo {
+export class AtscriptRepo {
   constructor(
     public readonly root = process.cwd(),
-    public readonly sharedConfig?: TAnscriptConfigInput
+    public readonly sharedConfig?: TAtscriptConfigInput
   ) {}
 
   protected configFormat?: 'esm' | 'cjs'
@@ -35,7 +34,7 @@ export class AnscriptRepo {
   /**
    * .as Documents cache
    */
-  protected readonly anscripts = new Map<string, Promise<AnscriptDoc>>()
+  protected readonly atscripts = new Map<string, Promise<AtscriptDoc>>()
 
   public sharedPluginManager: TPluginManagers | undefined
 
@@ -44,7 +43,7 @@ export class AnscriptRepo {
    */
   protected configFiles = new Map<
     string,
-    Promise<Partial<TAnscriptConfigInput & TAnscriptConfigOutput>>
+    Promise<Partial<TAtscriptConfigInput & TAtscriptConfigOutput>>
   >()
 
   getSharedPluginManager() {
@@ -115,7 +114,7 @@ export class AnscriptRepo {
       })
     }
 
-    for (const doc of Array.from(this.anscripts.values())) {
+    for (const doc of Array.from(this.atscripts.values())) {
       const awaited = await doc
       for (const { name, token, args } of awaited.annotations) {
         if (annotations[name]?.fromSpec) {
@@ -217,26 +216,26 @@ export class AnscriptRepo {
     return config
   }
 
-  async openDocument(id: string, text?: string): Promise<AnscriptDoc> {
-    let anscript = this.anscripts.get(id)
-    if (anscript) {
+  async openDocument(id: string, text?: string): Promise<AtscriptDoc> {
+    let atscript = this.atscripts.get(id)
+    if (atscript) {
       if (text) {
-        anscript.then(d => {
+        atscript.then(d => {
           d.update(text)
           return d
         })
       }
     } else {
-      anscript = this._openDocument(id, text)
-      anscript.catch(() => {
-        this.anscripts.delete(id)
+      atscript = this._openDocument(id, text)
+      atscript.catch(() => {
+        this.atscripts.delete(id)
       })
-      this.anscripts.set(id, anscript)
+      this.atscripts.set(id, atscript)
     }
-    return anscript
+    return atscript
   }
 
-  protected async _openDocument(id: string, text?: string): Promise<AnscriptDoc> {
+  protected async _openDocument(id: string, text?: string): Promise<AtscriptDoc> {
     const { manager } = await this.resolveConfig(id)
     const newId = await manager.resolve(id)
     if (!newId) {
@@ -246,34 +245,34 @@ export class AnscriptRepo {
     if (typeof content !== 'string') {
       throw new Error(`Document not found: ${newId}`)
     }
-    const anscript = new AnscriptDoc(id, await manager.getDocConfig(), manager)
-    anscript.update(content)
-    await manager.onDocumnet(anscript)
-    return anscript
+    const atscript = new AtscriptDoc(id, await manager.getDocConfig(), manager)
+    atscript.update(content)
+    await manager.onDocumnet(atscript)
+    return atscript
   }
 
-  async checkDoc(anscript: AnscriptDoc) {
-    await this.checkImports(anscript)
+  async checkDoc(atscript: AtscriptDoc) {
+    await this.checkImports(atscript)
   }
 
-  async checkImports(anscript: AnscriptDoc) {
+  async checkImports(atscript: AtscriptDoc) {
     const promise = Promise.all(
-      Array.from(anscript.imports.values(), async ({ from, imports }) =>
-        this.checkImport(anscript, from, imports)
+      Array.from(atscript.imports.values(), async ({ from, imports }) =>
+        this.checkImport(atscript, from, imports)
       )
     )
     const results = await promise
-    anscript.updateDependencies(results.filter(Boolean) as AnscriptDoc[])
+    atscript.updateDependencies(results.filter(Boolean) as AtscriptDoc[])
   }
 
   async checkImport(
-    anscript: AnscriptDoc,
+    atscript: AtscriptDoc,
     from: Token,
     imports: Token[]
-  ): Promise<AnscriptDoc | undefined> {
-    const forId = resolveAnscriptFromPath(from.text, anscript.id)
-    if (forId === anscript.id) {
-      const messages = anscript.getDiagMessages()
+  ): Promise<AtscriptDoc | undefined> {
+    const forId = resolveAnscriptFromPath(from.text, atscript.id)
+    if (forId === atscript.id) {
+      const messages = atscript.getDiagMessages()
       messages.push({
         severity: 1,
         message: '"import" cannot import itself',
@@ -282,7 +281,7 @@ export class AnscriptRepo {
       return
     }
     const errors = [] as TMessages
-    let external: AnscriptDoc | undefined
+    let external: AtscriptDoc | undefined
     try {
       external = await this.openDocument(forId)
       for (const token of imports) {
@@ -302,7 +301,7 @@ export class AnscriptRepo {
       })
     }
     if (errors.length > 0) {
-      const messages = anscript.getDiagMessages()
+      const messages = atscript.getDiagMessages()
       messages.push(...errors)
     }
     return external

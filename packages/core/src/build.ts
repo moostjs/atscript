@@ -1,8 +1,8 @@
 import path from 'path'
 import { glob } from 'glob' // or any other glob library
-import { TAnscriptConfigInput, TAnscriptConfigOutput } from './config'
-import { AnscriptRepo } from './repo'
-import { AnscriptDoc } from './document'
+import { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
+import { AtscriptRepo } from './repo'
+import { AtscriptDoc } from './document'
 import { TOutputWithSource } from './plugin'
 import { TMessages } from './parser/types'
 import { mkdir, writeFile } from 'fs/promises'
@@ -11,7 +11,7 @@ export interface TOutput extends TOutputWithSource {
   target: string
 }
 
-export async function build(config: Partial<TAnscriptConfigInput>) {
+export async function build(config: Partial<TAtscriptConfigInput>) {
   const rootDir = config.rootDir
     ? config.rootDir.startsWith('/')
       ? config.rootDir
@@ -19,7 +19,7 @@ export async function build(config: Partial<TAnscriptConfigInput>) {
     : process.cwd()
   config.rootDir = rootDir
 
-  const repo = new AnscriptRepo(rootDir, config as TAnscriptConfigInput)
+  const repo = new AtscriptRepo(rootDir, config as TAtscriptConfigInput)
 
   // Gather a list of .as file entries from either user-provided `entries` or by globbing.
   const entries: string[] = []
@@ -44,19 +44,19 @@ export async function build(config: Partial<TAnscriptConfigInput>) {
   }
 
   // Open each document
-  const documents: (AnscriptDoc | undefined)[] = []
+  const documents: (AtscriptDoc | undefined)[] = []
   for (const entry of entries) {
     documents.push(await repo.openDocument('file://' + entry))
   }
 
-  return new BuildRepo(rootDir, repo, documents.filter(Boolean) as AnscriptDoc[])
+  return new BuildRepo(rootDir, repo, documents.filter(Boolean) as AtscriptDoc[])
 }
 
 export class BuildRepo {
   constructor(
     private readonly rootDir: string,
-    private readonly repo: AnscriptRepo,
-    private readonly docs: AnscriptDoc[]
+    private readonly repo: AtscriptRepo,
+    private readonly docs: AtscriptDoc[]
   ) {}
 
   async diagnostics() {
@@ -68,7 +68,7 @@ export class BuildRepo {
     return docMessages
   }
 
-  async generate(config: TAnscriptConfigOutput, docs = this.docs) {
+  async generate(config: TAtscriptConfigOutput, docs = this.docs) {
     const outFiles: TOutput[] = []
     // Collect build outputs from each document
     for (const document of docs) {
@@ -99,7 +99,7 @@ export class BuildRepo {
     return outFiles
   }
 
-  async write(config: TAnscriptConfigOutput, docs = this.docs) {
+  async write(config: TAtscriptConfigOutput, docs = this.docs) {
     const outFiles = await this.generate(config, docs)
     for (const o of outFiles) {
       if (o.target) {

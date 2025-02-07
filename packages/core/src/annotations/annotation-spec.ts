@@ -1,7 +1,7 @@
 /* eslint-disable complexity */
 /* eslint-disable sonarjs/cognitive-complexity */
 import type { TAnnotationsTree } from '../config'
-import { AnscriptDoc } from '../document'
+import { AtscriptDoc } from '../document'
 import type { TNodeEntity } from '../parser/nodes'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
@@ -21,8 +21,8 @@ export interface TAnnotationSpecConfig {
   description?: string
   nodeType?: TNodeEntity[]
   argument?: TAnnotationArgument[] | TAnnotationArgument
-  validate?: (mainToken: Token, args: Token[], doc: AnscriptDoc) => TMessages | undefined
-  modify?: (mainToken: Token, args: Token[], doc: AnscriptDoc) => void
+  validate?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => TMessages | undefined
+  modify?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => void
 }
 
 export class AnnotationSpec {
@@ -78,13 +78,13 @@ export class AnnotationSpec {
     }
   }
 
-  modify(mainToken: Token, args: Token[], doc: AnscriptDoc): void {
+  modify(mainToken: Token, args: Token[], doc: AtscriptDoc): void {
     if (this.config.modify) {
       this.config.modify(mainToken, args, doc)
     }
   }
 
-  validate(mainToken: Token, args: Token[], doc: AnscriptDoc): TMessages | undefined {
+  validate(mainToken: Token, args: Token[], doc: AtscriptDoc): TMessages | undefined {
     const messages: TMessages = []
     const specArgs = this.arguments
 

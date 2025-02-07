@@ -1,9 +1,9 @@
-# Anscript VS Code Extension 🚀
+# Atscript VS Code Extension 🚀
 
-Anscript is a **type-safe annotation language** designed to enhance type definitions with structured metadata.
+Atscript is a **type-safe annotation language** designed to enhance type definitions with structured metadata.
 This extension provides **syntax highlighting, autocompletions, hover tooltips, and diagnostics** for `.as` files in VS Code.
 
-![Preview](./demo.png)
+![Preview](https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/demo.png)
 
 ## Features
 
@@ -17,17 +17,15 @@ This extension provides **syntax highlighting, autocompletions, hover tooltips, 
 
 1. Open **VS Code**
 2. Go to **Extensions** (`Ctrl+Shift+X`)
-3. Search for `"Anscript"` and install
+3. Search for `"Atscript"` and install
 
 Or install via CLI:
 
-```sh
-code --install-extension mav-rik.anscript
-```
+code --install-extension mav-rik.atscript
 
 ## Usage
 
-- Open a `.as` file to enable Anscript support
+- Open a `.as` file to enable Atscript support
 - Use `@annotations` within interfaces and types
 - Check diagnostics for invalid annotations
 
@@ -37,4 +35,4 @@ todo
 
 ## Feedback & Contributions
 
-Report issues or contribute on [GitHub](https://github.com/ts-anscript/anscript).
+Report issues or contribute on [GitHub](https://github.com/moostjs/atscript).

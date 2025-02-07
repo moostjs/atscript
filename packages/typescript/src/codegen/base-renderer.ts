@@ -1,5 +1,5 @@
 import {
-  AnscriptDoc,
+  AtscriptDoc,
   isGroup,
   isRef,
   SemanticImportNode,
@@ -7,13 +7,13 @@ import {
   SemanticNode,
   SemanticRefNode,
   SemanticTypeNode,
-} from '@ts-anscript/core'
+} from '@atscript/core'
 import { CodePrinter } from './code-printer'
 
 export class BaseRenderer extends CodePrinter {
   unused: Set<string>
 
-  constructor(protected readonly doc: AnscriptDoc) {
+  constructor(protected readonly doc: AtscriptDoc) {
     super()
     this.unused = new Set(this.doc.getUnusedTokens().map(t => t.text))
   }

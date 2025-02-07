@@ -1,11 +1,11 @@
 // eslint-disable max-lines
 import {
   isAnnotatedType,
-  TAnscriptAnnotatedType,
-  TAnscriptTypeArray,
-  TAnscriptTypeComplex,
-  TAnscriptTypeFinal,
-  TAnscriptTypeObject,
+  TAtscriptAnnotatedType,
+  TAtscriptTypeArray,
+  TAtscriptTypeComplex,
+  TAtscriptTypeFinal,
+  TAtscriptTypeObject,
 } from './annotated-type'
 
 interface TError {
@@ -24,7 +24,7 @@ export class Validator {
   protected opts: TValidatorOptions
 
   constructor(
-    protected readonly def: TAnscriptAnnotatedType,
+    protected readonly def: TAtscriptAnnotatedType,
     opts?: Partial<TValidatorOptions>
   ) {
     this.opts = {
@@ -97,7 +97,7 @@ export class Validator {
     return true
   }
 
-  protected _validate(def: TAnscriptAnnotatedType, value: any): boolean {
+  protected _validate(def: TAtscriptAnnotatedType, value: any): boolean {
     if (this.isLimitExceeded()) {
       return false
     }
@@ -109,23 +109,23 @@ export class Validator {
     }
     switch (def.type.kind) {
       case 'object':
-        return this.validateObject(def as TAnscriptAnnotatedType<TAnscriptTypeObject>, value)
+        return this.validateObject(def as TAtscriptAnnotatedType<TAtscriptTypeObject>, value)
       case 'union':
-        return this.validateUnion(def as TAnscriptAnnotatedType<TAnscriptTypeComplex>, value)
+        return this.validateUnion(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
       case 'intersection':
-        return this.validateIntersection(def as TAnscriptAnnotatedType<TAnscriptTypeComplex>, value)
+        return this.validateIntersection(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
       case 'tuple':
-        return this.validateTuple(def as TAnscriptAnnotatedType<TAnscriptTypeComplex>, value)
+        return this.validateTuple(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
       case 'array':
-        return this.validateArray(def as TAnscriptAnnotatedType<TAnscriptTypeArray>, value)
+        return this.validateArray(def as TAtscriptAnnotatedType<TAtscriptTypeArray>, value)
       case '':
-        return this.validatePrimitive(def as TAnscriptAnnotatedType<TAnscriptTypeFinal>, value)
+        return this.validatePrimitive(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>, value)
       default:
         throw new Error(`Unknown type "${(def.type as { kind: string }).kind}"`)
     }
   }
 
-  protected validateUnion(def: TAnscriptAnnotatedType<TAnscriptTypeComplex>, value: any): boolean {
+  protected validateUnion(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
     let i = 0
     const popped = [] as TError[]
     for (const item of def.type.items) {
@@ -149,7 +149,7 @@ export class Validator {
   }
 
   protected validateIntersection(
-    def: TAnscriptAnnotatedType<TAnscriptTypeComplex>,
+    def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
     value: any
   ): boolean {
     for (const item of def.type.items) {
@@ -160,7 +160,7 @@ export class Validator {
     return true
   }
 
-  protected validateTuple(def: TAnscriptAnnotatedType<TAnscriptTypeComplex>, value: any): boolean {
+  protected validateTuple(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
     if (!Array.isArray(value) || value.length !== def.type.items.length) {
       this.error('Expected array of length ' + def.type.items.length)
       return false
@@ -178,7 +178,7 @@ export class Validator {
     return true
   }
 
-  protected validateArray(def: TAnscriptAnnotatedType<TAnscriptTypeArray>, value: any): boolean {
+  protected validateArray(def: TAtscriptAnnotatedType<TAtscriptTypeArray>, value: any): boolean {
     if (!Array.isArray(value)) {
       this.error('Expected array')
       return false
@@ -201,7 +201,7 @@ export class Validator {
     return passed
   }
 
-  protected validateObject(def: TAnscriptAnnotatedType<TAnscriptTypeObject>, value: any): boolean {
+  protected validateObject(def: TAtscriptAnnotatedType<TAtscriptTypeObject>, value: any): boolean {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       this.error('Expected object')
       return false
@@ -251,7 +251,7 @@ export class Validator {
   }
 
   protected validatePrimitive(
-    def: TAnscriptAnnotatedType<TAnscriptTypeFinal>,
+    def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: any
   ): boolean {
     if (typeof def.type.value !== 'undefined') {

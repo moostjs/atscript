@@ -1,7 +1,7 @@
 {
-  "name": "anscript",
-  "version": "0.0.11",
-  "description": "Anscript: Configuration and build plugins.",
+  "name": "unplugin-asc",
+  "version": "0.0.0",
+  "description": "Atscript: Configuration and build plugins.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,17 +22,26 @@
     "test": "vitest"
   },
   "keywords": [
-    "anscript",
+    "atscript",
     "annotations",
     "vite-plugin",
     "rolldown-plugin",
     "config",
     "runtime"
   ],
-  "author": "",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/unplugin"
+  },
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/unplugin#readme",
   "license": "ISC",
   "dependencies": {
-    "@ts-anscript/core": "workspace:^"
+    "@atscript/core": "workspace:^"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

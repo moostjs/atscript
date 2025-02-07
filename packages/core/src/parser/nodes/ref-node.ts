@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import type { Token } from '../token'
 import { SemanticNode } from './node'
 
@@ -16,7 +16,7 @@ export class SemanticRefNode extends SemanticNode {
 
   protected _dots = [] as Token[]
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
     this.token('identifier')!.index = 0
     this._chain.forEach(c => {

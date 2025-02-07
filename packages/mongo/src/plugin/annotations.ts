@@ -6,7 +6,7 @@ import {
   isRef,
   isPrimitive,
   TMessages,
-} from '@ts-anscript/core'
+} from '@atscript/core'
 
 const analyzers = [
   'lucene.standard',
@@ -34,7 +34,7 @@ export const annotations: TAnnotationsTree = {
         '- `_id` must be of type **`string`**, **`number`**, or **`mongo.objectId`**.\n' +
         '- Ensures that `_id` is included if not explicitly defined.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.collection "users"\n' +
         'export interface User {\n' +
         '    _id: mongo.objectId\n' +
@@ -105,7 +105,7 @@ export const annotations: TAnnotationsTree = {
           '- Improves query performance on indexed fields.\n' +
           '- Can be used for **single-field** or **compound** indexes.\n\n' +
           '**Example:**\n' +
-          '```anscript\n' +
+          '```atscript\n' +
           '@mongo.index.plain "departmentIndex"\n' +
           'department: string\n' +
           '```\n',
@@ -127,7 +127,7 @@ export const annotations: TAnnotationsTree = {
           '- Automatically prevents duplicate entries.\n' +
           '- Typically used for **emails, usernames, and IDs**.\n\n' +
           '**Example:**\n' +
-          '```anscript\n' +
+          '```atscript\n' +
           '@mongo.index.unique "uniqueEmailIndex"\n' +
           'email: string.email\n' +
           '```\n',
@@ -150,7 +150,7 @@ export const annotations: TAnnotationsTree = {
           '- Does **not support fuzzy matching or ranking**.\n' +
           '- **Replaced by MongoDB Atlas Search Indexes (`@mongo.searchIndex.text`).**\n\n' +
           '**Example:**\n' +
-          '```anscript\n' +
+          '```atscript\n' +
           '@mongo.index.text 5\n' +
           'bio: string\n' +
           '```\n',
@@ -172,7 +172,7 @@ export const annotations: TAnnotationsTree = {
         '- Supports **language analyzers** for text tokenization.\n' +
         '- Enables **fuzzy search** (typo tolerance) if needed.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.dynamicTextSearch "globalSearch", "lucene.english", 1\n' +
         'export interface MongoCollection {}\n' +
         '```\n',
@@ -214,7 +214,7 @@ export const annotations: TAnnotationsTree = {
         '- **Specify analyzers and fuzzy search** behavior at the index level.\n' +
         '- **Fields must explicitly use `@mongo.useTextSearch`** to be included in this search index.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.defineTextSearch "mySearchIndex", "lucene.english", 1\n' +
         'export interface MongoCollection {}\n' +
         '```\n',
@@ -254,7 +254,7 @@ export const annotations: TAnnotationsTree = {
         'Marks a field to be **included in a MongoDB Atlas Search Index** defined by `@mongo.defineTextSearch`.\n\n' +
         '- **The field must reference an existing search index name**.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.useTextSearch "mySearchIndex", 5\n' +
         'firstName: string\n' +
         '```\n',
@@ -286,7 +286,7 @@ export const annotations: TAnnotationsTree = {
         '- Supports **cosine similarity, Euclidean distance, and dot product similarity**.\n' +
         '- Vector fields must be an **array of numbers**.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.vectorIndex 512, "cosine"\n' +
         'embedding: mongo.vector\n' +
         '```\n',
@@ -327,7 +327,7 @@ export const annotations: TAnnotationsTree = {
         '- Filters allow vector search queries to return results **only within a specific category, user group, or tag**.\n' +
         '- The vector index must be defined using `@mongo.vectorIndex`.\n\n' +
         '**Example:**\n' +
-        '```anscript\n' +
+        '```atscript\n' +
         '@mongo.vectorIndex 512, "cosine"\n' +
         'embedding: number[]\n\n' +
         '@mongo.vectorFilter "embedding"\n' +

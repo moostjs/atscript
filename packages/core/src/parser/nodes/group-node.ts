@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-confusing-void-expression */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { Token } from '../token'
 import { isGroup } from '.'
@@ -15,7 +15,7 @@ export class SemanticGroup extends SemanticNode {
     super('group')
   }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     if (this.nodes.length > 0) {
       this.unwrap().forEach(n => n.registerAtDocument(doc))
     }

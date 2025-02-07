@@ -1,24 +1,24 @@
 import type { AnnotationSpec } from '../annotations/annotation-spec'
 import type { TPrimitiveConfig } from '../parser/nodes'
-import { TAnscriptPlugin, TAnscriptRenderFormat } from '../plugin/types'
+import { TAtscriptPlugin, TAtscriptRenderFormat } from '../plugin/types'
 
-export interface TAnscriptConfigInput {
+export interface TAtscriptConfigInput {
   rootDir: string
   entries?: string[]
   primitives?: Record<string, TPrimitiveConfig>
   annotations?: TAnnotationsTree
   unknownAnnotation?: 'allow' | 'warn' | 'error'
-  plugins?: TAnscriptPlugin[]
+  plugins?: TAtscriptPlugin[]
   include?: string[]
   exclude?: string[]
 }
 
-export interface TAnscriptConfigOutput {
-  format: TAnscriptRenderFormat
+export interface TAtscriptConfigOutput {
+  format: TAtscriptRenderFormat
   outDir?: string
 }
 
-export type TAnscriptConfig = Partial<TAnscriptConfigInput & TAnscriptConfigOutput>
+export type TAtscriptConfig = Partial<TAtscriptConfigInput & TAtscriptConfigOutput>
 
 export interface TAnnotationsTree {
   [key: string]: AnnotationSpec | TAnnotationsTree

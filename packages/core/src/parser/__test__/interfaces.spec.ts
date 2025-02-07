@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest'
 
-import { AnscriptDoc } from '../../document'
+import { AtscriptDoc } from '../../document'
 import { parseAnscript } from '..'
 import type { SemanticInterfaceNode } from '../nodes/interface-node'
 
@@ -93,7 +93,7 @@ describe('referred identifiers in interfaces', () => {
     it('must return nested props', () => {
       const { nodes } = parseAnscript(`interface IName {prop: { nested: string }}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AnscriptDoc('1', {}))
+      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!
       expect(prop).toBeDefined()
       expect(prop.nestedProps).toBeDefined()
@@ -102,7 +102,7 @@ describe('referred identifiers in interfaces', () => {
     it('must return deeply nested props', () => {
       const { nodes } = parseAnscript(`interface IName {prop: { nested: { nested2: string } }}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AnscriptDoc('1', {}))
+      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!
       expect(prop).toBeDefined()
       expect(prop.nestedProps).toBeDefined()
@@ -112,7 +112,7 @@ describe('referred identifiers in interfaces', () => {
     it('must return nested type', () => {
       const { nodes } = parseAnscript(`interface IName {prop: SomeType}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AnscriptDoc('1', {}))
+      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!
       expect(prop).toBeDefined()
       expect(prop.nestedType).toBeDefined()

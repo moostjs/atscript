@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/class-methods-use-this */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import { isStructure } from '.'
 import { SemanticNode } from './node'
 import type { SemanticPropNode } from './prop-node'
@@ -9,7 +9,7 @@ export class SemanticInterfaceNode extends SemanticNode {
     super('interface')
   }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
     const token = this.token('identifier')
     doc.registerDefinition(token)

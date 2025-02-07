@@ -34,24 +34,24 @@ import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
 import { resolveAnscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
-import { TAnscriptPlugin, TAnscriptRenderFormat } from './plugin/types'
+import { TAtscriptPlugin, TAtscriptRenderFormat } from './plugin/types'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
 import { mergeAnnotations } from './utils'
 
-export interface TAnscriptDocConfig {
+export interface TAtscriptDocConfig {
   primitives?: Map<string, SemanticPrimitiveNode>
   annotations?: TAnnotationsTree
   unknownAnnotation?: 'allow' | 'warn' | 'error'
-  plugins?: TAnscriptPlugin[]
+  plugins?: TAtscriptPlugin[]
 }
 
-export class AnscriptDoc {
+export class AtscriptDoc {
   constructor(
     public readonly id: string,
-    public readonly config: TAnscriptDocConfig,
+    public readonly config: TAtscriptDocConfig,
     private readonly manager?: PluginManager
   ) {
     this.registry = new IdRegistry(Array.from(config.primitives?.keys() || []))
@@ -95,12 +95,12 @@ export class AnscriptDoc {
   /**
    * Set of documents that this document depend on
    */
-  public readonly dependencies = new Set<AnscriptDoc>()
+  public readonly dependencies = new Set<AtscriptDoc>()
 
   /**
    * Set of documents that depend on this document
    */
-  public readonly dependants = new Set<AnscriptDoc>()
+  public readonly dependants = new Set<AtscriptDoc>()
 
   /**
    * List of tokens that refer to some type or interface
@@ -110,13 +110,13 @@ export class AnscriptDoc {
   /**
    * Map of dependencies (documents) by URI
    */
-  public readonly dependenciesMap = new Map<string, AnscriptDoc>()
+  public readonly dependenciesMap = new Map<string, AtscriptDoc>()
 
   get primitives() {
     return Array.from(this.config.primitives?.values() ?? [])
   }
 
-  async render(format: TAnscriptRenderFormat) {
+  async render(format: TAtscriptRenderFormat) {
     return this.manager?.render(this, format)
   }
 
@@ -124,7 +124,7 @@ export class AnscriptDoc {
     return resolveAnnotation(name, this.config.annotations)
   }
 
-  updateDependencies(docs: AnscriptDoc[]) {
+  updateDependencies(docs: AtscriptDoc[]) {
     const newDependencies = new Set(docs)
 
     this.dependencies.forEach(d => {
@@ -237,7 +237,7 @@ export class AnscriptDoc {
    * @param {Array<string | Token>} [chain=[]] - An optional chain of properties or tokens, each of which
    *  refines the path to the final type (e.g., for `SomeType.prop1.prop2`, `chain` might be `[ "prop1", "prop2" ]`).
    * @returns {Object | undefined} An object containing:
-   *   - `doc`: The `AnscriptDoc` where the final definition is located.
+   *   - `doc`: The `AtscriptDoc` where the final definition is located.
    *   - `node`: The last encountered `SemanticNode` before reaching the final underlying definition (often a `Prop` node).
    *   - `def`: The final resolved `SemanticNode`.
    *
@@ -248,7 +248,7 @@ export class AnscriptDoc {
     chain: string[] | Token[] = []
   ):
     | {
-        doc: AnscriptDoc
+        doc: AtscriptDoc
         node?: SemanticNode
         def: SemanticNode
       }
@@ -368,12 +368,12 @@ export class AnscriptDoc {
    * @param {Token} token - The token for which to locate the definition.
    * @returns {Object | undefined} An object containing:
    *   - `uri`: The file path (URI) of the document where the definition is found.
-   *   - `doc`: The `AnscriptDoc` instance that owns the definition (if found).
+   *   - `doc`: The `AtscriptDoc` instance that owns the definition (if found).
    *   - `token`: The defining token itself (if found).
    *
    * If no definition is found, returns `undefined`.
    */
-  getDefinitionFor(token: Token): { uri: string; doc?: AnscriptDoc; token?: Token } | undefined {
+  getDefinitionFor(token: Token): { uri: string; doc?: AtscriptDoc; token?: Token } | undefined {
     if (token.isDefinition && !token.imported) {
       return { uri: this.id, doc: this, token }
     }
@@ -479,14 +479,14 @@ export class AnscriptDoc {
    * This method checks:
    * 1. Whether the identifier is a known primitive (from this document’s config).
    * 2. If there's a local definition in this document's registry.
-   *    - If the definition is imported, it resolves the `fromPath`, locates the correct `AnscriptDoc`
+   *    - If the definition is imported, it resolves the `fromPath`, locates the correct `AtscriptDoc`
    *      in the dependency map, and recursively tries to get the declaration owner there.
    *    - If the definition is local (not imported), it returns the current document (`this`) along with
    *      the parent node that owns the definition and the token itself.
    *
    * @param {string} identifier - The name/identifier whose declaring node should be found.
-   * @returns {{ doc: AnscriptDoc; node?: SemanticNode; token?: Token } | undefined} An object containing:
-   *  - `doc`: The `AnscriptDoc` in which the identifier was ultimately declared.
+   * @returns {{ doc: AtscriptDoc; node?: SemanticNode; token?: Token } | undefined} An object containing:
+   *  - `doc`: The `AtscriptDoc` in which the identifier was ultimately declared.
    *  - `node`: The parent `SemanticNode` that defines or owns the declaration (if applicable).
    *  - `token`: The specific token for the declaration (if applicable).
    *
@@ -494,7 +494,7 @@ export class AnscriptDoc {
    */
   getDeclarationOwnerNode(identifier: string):
     | {
-        doc: AnscriptDoc
+        doc: AtscriptDoc
         node?: SemanticNode
         token?: Token
       }

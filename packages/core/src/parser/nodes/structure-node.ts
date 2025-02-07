@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import { isProp, SemanticNode, SemanticRefNode } from '.'
 import { SemanticGroup } from './group-node'
 import { SemanticPropNode } from './prop-node'
@@ -23,7 +23,7 @@ export class SemanticStructureNode extends SemanticGroup {
     }
   }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
     const block = this.token('identifier')!
     block.blockType = 'structure'

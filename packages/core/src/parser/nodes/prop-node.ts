@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import { isRef, isStructure } from '.'
 import { SemanticNode } from './node'
 
@@ -8,7 +8,7 @@ export class SemanticPropNode extends SemanticNode {
     super('prop')
   }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
     const token = this.token('identifier')
     if (token && token.type === 'text' && token.multiline) {

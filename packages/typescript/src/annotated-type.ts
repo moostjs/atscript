@@ -1,29 +1,29 @@
 import { Validator, type TValidatorOptions } from './validator'
 
 // eslint-disable max-lines
-export interface TAnscriptTypeComplex {
+export interface TAtscriptTypeComplex {
   kind: 'union' | 'intersection' | 'tuple'
-  items: TAnscriptAnnotatedType[]
+  items: TAtscriptAnnotatedType[]
 
   flags: Set<AnscriptPrimitiveFlags>
 }
 
-export interface TAnscriptTypeArray {
+export interface TAtscriptTypeArray {
   kind: 'array'
-  of: TAnscriptAnnotatedType
+  of: TAtscriptAnnotatedType
 
   flags: Set<AnscriptPrimitiveFlags>
 }
 
-export interface TAnscriptTypeObject<K extends string = string> {
+export interface TAtscriptTypeObject<K extends string = string> {
   kind: 'object'
 
-  props: Map<K, TAnscriptAnnotatedType>
+  props: Map<K, TAtscriptAnnotatedType>
 
   flags: Set<AnscriptPrimitiveFlags>
 }
 
-export interface TAnscriptTypeFinal {
+export interface TAtscriptTypeFinal {
   kind: ''
 
   /**
@@ -40,13 +40,13 @@ export interface TAnscriptTypeFinal {
 }
 // AnscriptMetadata
 // AnscriptPrimitiveFlags
-export type TAnscriptTypeDef =
-  | TAnscriptTypeComplex
-  | TAnscriptTypeFinal
-  | TAnscriptTypeArray
-  | TAnscriptTypeObject<string>
+export type TAtscriptTypeDef =
+  | TAtscriptTypeComplex
+  | TAtscriptTypeFinal
+  | TAtscriptTypeArray
+  | TAtscriptTypeObject<string>
 
-export interface TAnscriptAnnotatedType<T = TAnscriptTypeDef> {
+export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
   validator: (opts?: TValidatorOptions) => Validator
@@ -55,9 +55,9 @@ export interface TAnscriptAnnotatedType<T = TAnscriptTypeDef> {
 }
 
 /**
- * Type Guard to check if a type is anscript-annotated
+ * Type Guard to check if a type is atscript-annotated
  */
-export function isAnnotatedType(type: any): type is TAnscriptAnnotatedType {
+export function isAnnotatedType(type: any): type is TAtscriptAnnotatedType {
   return type && type.__is_anscript_annotated_type
 }
 
@@ -65,10 +65,10 @@ type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
 
 export function defineAnnotatedType(_kind?: TKind, base?: any) {
   const kind = _kind || ''
-  const type = (base?.type || {}) as { kind: TKind } & Omit<TAnscriptTypeComplex, 'kind'> &
-    Omit<TAnscriptTypeFinal, 'kind'> &
-    Omit<TAnscriptTypeArray, 'kind'> &
-    Omit<TAnscriptTypeObject, 'kind'>
+  const type = (base?.type || {}) as { kind: TKind } & Omit<TAtscriptTypeComplex, 'kind'> &
+    Omit<TAtscriptTypeFinal, 'kind'> &
+    Omit<TAtscriptTypeArray, 'kind'> &
+    Omit<TAtscriptTypeObject, 'kind'>
   type.kind = kind
   if (['union', 'intersection', 'tuple'].includes(kind)) {
     type.items = []
@@ -84,7 +84,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       metadata,
       type,
       validator(opts?: TValidatorOptions) {
-        return new Validator(this as TAnscriptAnnotatedType, opts)
+        return new Validator(this as TAtscriptAnnotatedType, opts)
       },
     })
   } else {
@@ -101,14 +101,14 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     $type: base,
     $def: type,
     $metadata: metadata,
-    _existingObject: undefined as TAnscriptAnnotatedType | undefined,
+    _existingObject: undefined as TAtscriptAnnotatedType | undefined,
     flags(...flags: string[]) {
       for (const flag of flags) {
         this.$def.flags.add(flag)
       }
       return this
     },
-    designType(value: TAnscriptTypeFinal['designType']) {
+    designType(value: TAtscriptTypeFinal['designType']) {
       this.$def.designType = value
       return this
     },
@@ -116,15 +116,15 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       this.$def.value = value
       return this
     },
-    of(value: TAnscriptAnnotatedType) {
+    of(value: TAtscriptAnnotatedType) {
       this.$def.of = value
       return this
     },
-    item(value: TAnscriptAnnotatedType) {
+    item(value: TAtscriptAnnotatedType) {
       this.$def.items.push(value)
       return this
     },
-    prop(name: string, value: TAnscriptAnnotatedType) {
+    prop(name: string, value: TAtscriptAnnotatedType) {
       this.$def.props.set(name, value)
       return this
     },
@@ -183,7 +183,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
 }
 
 /**
- * Anscript Metadata Map with typed setters/getters
+ * Atscript Metadata Map with typed setters/getters
  */
 export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]> {
   // Get returns O[K] for exactly that key (plus undefined if key not present)

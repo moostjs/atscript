@@ -1,8 +1,8 @@
-import type { TAnscriptConfig } from './types'
+import type { TAtscriptConfig } from './types'
 
 /**
  * Defines the configuration for the Intertation parser
  */
-export function defineConfig(config: TAnscriptConfig): TAnscriptConfig {
+export function defineConfig(config: TAtscriptConfig): TAtscriptConfig {
   return config
 }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import { SemanticNode } from './node'
 
 export class SemanticImportNode extends SemanticNode {
@@ -12,7 +12,7 @@ export class SemanticImportNode extends SemanticNode {
   //   return []
   // }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     const imports = this.definition ? this.getIdentifiersRecursive(this.definition) : []
     doc.registerImport({
       from: this.token('path')!,

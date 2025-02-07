@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-confusing-void-expression */
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import type { Token } from '../token'
 import { isGroup } from '.'
 import type { TAnnotationTokens, TNodeEntity, TSemanticToken } from './types'
@@ -16,7 +16,7 @@ export class SemanticNode {
   public annotations?: TAnnotationTokens[]
   public annotationsCounter?: Map<string, number>
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     if (this.definition) {
       this.definition.registerAtDocument(doc)
     }

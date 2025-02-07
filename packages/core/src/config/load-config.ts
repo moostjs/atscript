@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url'
 import type { OutputChunk } from 'rolldown'
 import { rolldown } from 'rolldown'
 
-import type { TAnscriptConfig } from './types'
+import type { TAtscriptConfig } from './types'
 
 async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
   const dirnameVarName = 'injected_original_dirname'
@@ -51,7 +51,7 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
     format: forceFormat || 'esm',
     sourcemap: 'inline',
     entryFileNames:
-      forceFormat === 'cjs' ? 'anscript.config.[hash].cjs' : 'anscript.config.[hash].mjs',
+      forceFormat === 'cjs' ? 'atscript.config.[hash].cjs' : 'atscript.config.[hash].mjs',
   })
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
   const fileName = result.output.find(
@@ -64,7 +64,7 @@ const SUPPORTED_JS_CONFIG_FORMATS = ['.js', '.mjs', '.cjs']
 const SUPPORTED_TS_CONFIG_FORMATS = ['.ts', '.mts', '.cts']
 const SUPPORTED_CONFIG_FORMATS = [...SUPPORTED_JS_CONFIG_FORMATS, ...SUPPORTED_TS_CONFIG_FORMATS]
 
-const DEFAULT_CONFIG_BASE = 'anscript.config'
+const DEFAULT_CONFIG_BASE = 'atscript.config'
 
 /**
  * Resolves nearest config file
@@ -110,7 +110,7 @@ async function findConfigFileName(d: string): Promise<string | undefined> {
 export async function loadTsConfig(
   configFile: string,
   forceFormat?: 'cjs' | 'esm'
-): Promise<TAnscriptConfig> {
+): Promise<TAtscriptConfig> {
   const file = await bundleTsConfig(configFile, forceFormat)
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
@@ -126,7 +126,7 @@ export async function loadTsConfig(
 export async function loadConfig(
   configPath: string,
   forceFormat?: 'cjs' | 'esm'
-): Promise<TAnscriptConfig> {
+): Promise<TAtscriptConfig> {
   // eslint-disable-next-line no-param-reassign
   const ext = path.extname(configPath)
   try {

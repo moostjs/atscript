@@ -1,6 +1,6 @@
-# Anscript
+# Atscript - Annotate Things
 
-Anscript is a type-centric language designed to extend TypeScript with annotations. It introduces a `.as` file format that supports interfaces, types, and annotations (decorators starting with `@`).
+Atscript is a type-centric language designed to extend TypeScript with annotations. It introduces a `.as` file format that supports interfaces, types, and annotations (decorators starting with `@`).
 
 ## Features
 
@@ -14,7 +14,7 @@ Anscript is a type-centric language designed to extend TypeScript with annotatio
 ## Installation
 
 ```sh
-npm install anscript
+npm install atscript
 ```
 
 ## Usage
@@ -37,7 +37,7 @@ export interface User {
 
 ### Configuration
 
-Anscript allows defining a configuration file (`anscript.config.js`):
+Atscript allows defining a configuration file (`atscript.config.js`):
 
 ## Roadmap
 

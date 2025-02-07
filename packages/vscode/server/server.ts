@@ -7,14 +7,14 @@ import {
 } from 'vscode-languageserver/node'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 
-import { VscodeAnscriptRepo } from './repo'
+import { VscodeAtscriptRepo } from './repo'
 
 // Create connection
 const connection = createConnection(ProposedFeatures.all)
 // Track open documents
 const documents = new TextDocuments<TextDocument>(TextDocument)
 
-new VscodeAnscriptRepo(connection, documents)
+new VscodeAtscriptRepo(connection, documents)
 
 connection.onInitialize(
   (params: InitializeParams): InitializeResult => ({

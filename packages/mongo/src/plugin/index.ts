@@ -1,8 +1,8 @@
-import { TAnscriptPlugin } from '@ts-anscript/core'
+import { TAtscriptPlugin } from '@atscript/core'
 import { primitives } from './primitives'
 import { annotations } from './annotations'
 
-export const MongoPlugin: () => TAnscriptPlugin = () => {
+export const MongoPlugin: () => TAtscriptPlugin = () => {
   //
   return {
     name: 'mongo',

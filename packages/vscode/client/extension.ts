@@ -16,7 +16,7 @@ async function ensureDependenciesInstalled(extensionPath: string) {
     return true
   }
 
-  window.showInformationMessage('Installing dependencies for Anscript extension...')
+  window.showInformationMessage('Installing dependencies for Atscript extension...')
 
   return new Promise(resolve => {
     exec('npm install --omit=dev', { cwd: extensionPath }, error => {
@@ -35,7 +35,7 @@ async function ensureDependenciesInstalled(extensionPath: string) {
 
 export function activate(context: ExtensionContext) {
   const extensionPath = context.extensionUri.fsPath
-  // const coreModulePath = path.join(extensionPath, 'node_modules', '@ts-anscript/core')
+  // const coreModulePath = path.join(extensionPath, 'node_modules', '@atscript/core')
 
   async function startLanguageServer() {
     const installed = await ensureDependenciesInstalled(extensionPath)
@@ -60,14 +60,14 @@ export function activate(context: ExtensionContext) {
 
     // Client options: define how the language client works
     const clientOptions: LanguageClientOptions = {
-      // register server for Anscript language
-      documentSelector: [{ scheme: 'file', language: 'anscript' }],
+      // register server for Atscript language
+      documentSelector: [{ scheme: 'file', language: 'atscript' }],
       synchronize: {
         fileEvents: [
           // watch .as files
           workspace.createFileSystemWatcher('**/*.as'),
-          // watch anscript config files
-          workspace.createFileSystemWatcher('**/anscript.config.{js,ts,mjs,mts,cjs,cts}'),
+          // watch atscript config files
+          workspace.createFileSystemWatcher('**/atscript.config.{js,ts,mjs,mts,cjs,cts}'),
         ],
       },
     }
@@ -75,7 +75,7 @@ export function activate(context: ExtensionContext) {
     // Create the language client and start it
     client = new LanguageClient(
       'anscriptLangServer', // internal ID
-      'Anscript Language Server', // display name
+      'Atscript Language Server', // display name
       serverOptions,
       clientOptions
     )

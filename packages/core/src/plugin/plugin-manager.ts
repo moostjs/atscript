@@ -1,12 +1,12 @@
 import { readFile } from 'node:fs/promises'
-import { TAnnotationsTree, TAnscriptConfig, TAnscriptConfigInput } from '../config'
+import { TAnnotationsTree, TAtscriptConfig } from '../config'
 import { defu } from 'defu'
-import { AnscriptDoc, TAnscriptDocConfig } from '../document'
-import type { TAnscriptRenderFormat, TPluginOutput } from './types'
-import { getDefaultAnscriptConfig } from '../default-anscript-config'
+import { AtscriptDoc, TAtscriptDocConfig } from '../document'
+import type { TAtscriptRenderFormat, TPluginOutput } from './types'
+import { getDefaulTAtscriptConfig } from '../default-atscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
 import { TOutput } from '../build'
-import { AnscriptRepo } from '../repo'
+import { AtscriptRepo } from '../repo'
 import { AnnotationSpec, isAnnotationSpec } from '../annotations'
 
 export interface TOutputWithSource extends TPluginOutput {
@@ -14,22 +14,22 @@ export interface TOutputWithSource extends TPluginOutput {
 }
 
 export class PluginManager {
-  constructor(private readonly cfg: TAnscriptConfig) {}
+  constructor(private readonly cfg: TAtscriptConfig) {}
 
-  private _config!: TAnscriptConfig
+  private _config!: TAtscriptConfig
 
   name = 'plugin-manager'
 
-  protected _docConfig: TAnscriptDocConfig | undefined
+  protected _docConfig: TAtscriptDocConfig | undefined
 
   get plugins() {
     return this.cfg.plugins ?? []
   }
 
-  async getDocConfig(): Promise<TAnscriptDocConfig> {
+  async getDocConfig(): Promise<TAtscriptDocConfig> {
     if (!this._docConfig) {
       const raw = await this.config()
-      this._docConfig = getDefaultAnscriptConfig()
+      this._docConfig = getDefaulTAtscriptConfig()
       if (raw?.primitives) {
         this._docConfig.primitives = this._docConfig.primitives || new Map()
         for (const [key, value] of Object.entries(raw.primitives)) {
@@ -46,9 +46,9 @@ export class PluginManager {
   }
 
   async config(
-    config: TAnscriptConfig = this.cfg,
+    config: TAtscriptConfig = this.cfg,
     processed = new Set<string>()
-  ): Promise<TAnscriptConfig> {
+  ): Promise<TAtscriptConfig> {
     if (!this._config) {
       const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
       for (const plugin of filtered) {
@@ -88,7 +88,7 @@ export class PluginManager {
     return content.toString()
   }
 
-  async onDocumnet(doc: AnscriptDoc) {
+  async onDocumnet(doc: AtscriptDoc) {
     for (const plugin of this.plugins) {
       if (plugin.onDocumnet) {
         await plugin.onDocumnet(doc)
@@ -96,7 +96,7 @@ export class PluginManager {
     }
   }
 
-  async render(doc: AnscriptDoc, format: TAnscriptRenderFormat) {
+  async render(doc: AtscriptDoc, format: TAtscriptRenderFormat) {
     const files: TOutputWithSource[] = []
     for (const plugin of this.plugins) {
       if (plugin.render) {
@@ -114,7 +114,7 @@ export class PluginManager {
     return files
   }
 
-  async buildEnd(output: TOutput[], format: TAnscriptRenderFormat, repo: AnscriptRepo) {
+  async buildEnd(output: TOutput[], format: TAtscriptRenderFormat, repo: AtscriptRepo) {
     for (const plugin of this.plugins) {
       if (plugin.buildEnd) {
         await plugin.buildEnd(output, format, repo)

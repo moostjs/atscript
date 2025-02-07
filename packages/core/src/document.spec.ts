@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { AnnotationSpec } from './annotations'
-import { AnscriptDoc } from './document'
+import { AtscriptDoc } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
 import { isGroup, SemanticGroup } from './parser/nodes'
@@ -15,7 +15,7 @@ primitives.set('number', new SemanticPrimitiveNode('number', { type: 'number' })
 
 describe('document', () => {
   it('should register import', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', {})
+    const doc = new AtscriptDoc('file:///home/test.as', {})
     doc.update(`import { foo } from 'bar'`)
     expect(doc.imports.get('file:///home/bar.as')?.from.text).toBe('bar')
     expect(doc.imports.get('file:///home/bar.as')?.imports[0].text).toBe('foo')
@@ -23,7 +23,7 @@ describe('document', () => {
   })
 
   it('should register multiline error', () => {
-    const doc = new AnscriptDoc('test', {})
+    const doc = new AtscriptDoc('test', {})
     doc.update(`type Type = "text
       end"`)
     const mes = doc.getDiagMessages()
@@ -32,7 +32,7 @@ describe('document', () => {
   })
 
   it('should refer imports', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', {})
+    const doc = new AtscriptDoc('file:///home/test.as', {})
     doc.update(`
       import { foo } from 'bar'
       type Type = foo
@@ -53,7 +53,7 @@ describe('document', () => {
   })
 
   it('should return local definitions 1', () => {
-    const doc = new AnscriptDoc('file-1.as', {})
+    const doc = new AtscriptDoc('file-1.as', {})
     doc.update(
       `type Type = string
       interface IName { prop: Type }`
@@ -78,7 +78,7 @@ describe('document', () => {
   })
 
   it('should return local definitions 2', () => {
-    const doc = new AnscriptDoc('file-1.as', {})
+    const doc = new AtscriptDoc('file-1.as', {})
     doc.update(
       `
       interface IName { prop: Type }
@@ -123,8 +123,8 @@ describe('document', () => {
   })
 
   it('should return imported definitions', () => {
-    const doc1 = new AnscriptDoc('file:///home/file-1.as', {})
-    const doc2 = new AnscriptDoc('file:///home/file-2.as', {})
+    const doc1 = new AtscriptDoc('file:///home/file-1.as', {})
+    const doc2 = new AtscriptDoc('file:///home/file-2.as', {})
     doc1.update(`export type Type = string`)
     doc2.update(`import { Type } from './file-1'
       type Type2 = Type
@@ -150,7 +150,7 @@ describe('document', () => {
   })
 
   it('should not save definitions to referred array', () => {
-    const doc = new AnscriptDoc('file:///home/file-1.as', {})
+    const doc = new AtscriptDoc('file:///home/file-1.as', {})
     doc.update(`
       import {TName1} from './file-2'
       type TName = 'text'
@@ -160,7 +160,7 @@ describe('document', () => {
   })
 
   it('should provide local usage list', () => {
-    const doc = new AnscriptDoc('file:///home/file-1.as', {})
+    const doc = new AtscriptDoc('file:///home/file-1.as', {})
     doc.update(`
       type Type = 'text'
       interface TName { prop: Type }
@@ -171,8 +171,8 @@ describe('document', () => {
   })
 
   it('should provide global usage list', () => {
-    const doc1 = new AnscriptDoc('file:///home/file-1.as', {})
-    const doc2 = new AnscriptDoc('file:///home/file-2.as', {})
+    const doc1 = new AtscriptDoc('file:///home/file-1.as', {})
+    const doc2 = new AtscriptDoc('file:///home/file-2.as', {})
     doc1.update(`export type Type = 'text'`)
     doc2.update(`import {Type} from './file-1'
       type Type2 = Type
@@ -185,7 +185,7 @@ describe('document', () => {
   })
 
   it('should return def token at pos', () => {
-    const doc = new AnscriptDoc('file:///home/file-1.as', {})
+    const doc = new AtscriptDoc('file:///home/file-1.as', {})
     doc.update(`
       type Type = 'text'
       interface TName { prop: Type }
@@ -195,7 +195,7 @@ describe('document', () => {
   })
 
   it('should mark tokens with proper flags', () => {
-    const doc = new AnscriptDoc('file:///home/file-1.as', {})
+    const doc = new AtscriptDoc('file:///home/file-1.as', {})
     doc.update(`
       import { Imported } from './file-2'
       type Type = 'string'
@@ -259,13 +259,13 @@ describe('document', () => {
   })
 
   it('should recognize primitives', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {prop: string}`)
     expect(doc.registry.isDefined('string')).toBeTruthy()
   })
 
   it('should detect duplicate props', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {
         prop: string
         prop: number
@@ -283,7 +283,7 @@ describe('document', () => {
   })
 
   it('should register structure block in map', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {
         prop: string
         prop: number
@@ -294,7 +294,7 @@ describe('document', () => {
   })
 
   it('should unwind primitive types', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {
         prop: { nested1: { nested2: string } }
       }`)
@@ -307,7 +307,7 @@ describe('document', () => {
   })
 
   it('should unwind interfaces props in simple interface', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {
         prop: { nested1: { nested2: string } }
       }`)
@@ -321,7 +321,7 @@ describe('document', () => {
     // expect(nested2).toBeDefined()
   })
   it('should unwind interfaces via type', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace {
         prop: { nested1: { nested2: string } }
       }
@@ -340,7 +340,7 @@ describe('document', () => {
     // expect(nested2).toBeDefined()
   })
   it('should unwind interfaces with nested interfaces', () => {
-    const doc = new AnscriptDoc('file:///home/test.as', { primitives })
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
     doc.update(`interface IFace1 {
         prop: { nested1: { nested2: string } }
       }
@@ -377,7 +377,7 @@ describe('document', () => {
   })
 
   it('should return definition for chained ref level 2', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(
       `
        interface IName { prop: { prop2: string } }
@@ -405,7 +405,7 @@ describe('document', () => {
   })
 
   it('should return definition for chained ref level 1', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(
       `
        interface IName { prop: { prop2: string } }
@@ -433,7 +433,7 @@ describe('document', () => {
   })
 
   it('should resolve annotation spec', () => {
-    const doc = new AnscriptDoc('file-1.as', {
+    const doc = new AtscriptDoc('file-1.as', {
       primitives,
       annotations: {
         level1: {
@@ -449,7 +449,7 @@ describe('document', () => {
 
 describe('document/merging intersections', () => {
   it('must merge two structures', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`type MyType = {a: string} & {b: number}`)
     const def = doc.nodes[0].getDefinition()
     expect(isGroup(def)).toBeTruthy()
@@ -464,7 +464,7 @@ describe('document/merging intersections', () => {
     `)
   })
   it('must merge two intersected structures', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`type MyType = {a: string; c: string} & {b: number, c: string}`)
     const def = doc.nodes[0].getDefinition()
     expect(isGroup(def)).toBeTruthy()
@@ -481,7 +481,7 @@ describe('document/merging intersections', () => {
     `)
   })
   it('must merge two intersected structures with conflicting prop type', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`type MyType = {a: string; c: string} & {b: number, c: number}`)
     const def = doc.nodes[0].getDefinition()
     expect(isGroup(def)).toBeTruthy()
@@ -498,7 +498,7 @@ describe('document/merging intersections', () => {
     `)
   })
   it('must merge two deep objects', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`type MyType = {a: string; b: { c: number }} & {b: { c: number, d: string }}`)
     const def = doc.nodes[0].getDefinition()
     expect(isGroup(def)).toBeTruthy()
@@ -521,7 +521,7 @@ describe('document/merging intersections', () => {
     `)
   })
   it('must merge object and non-object', () => {
-    const doc = new AnscriptDoc('file-1.as', { primitives })
+    const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`type MyType = {a: string } & number`)
     const def = doc.nodes[0].getDefinition()
     expect(isGroup(def)).toBeTruthy()

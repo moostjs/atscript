@@ -1,4 +1,4 @@
-import type { AnscriptDoc } from '../../document'
+import type { AtscriptDoc } from '../../document'
 import { SemanticNode } from './node'
 
 export class SemanticTypeNode extends SemanticNode {
@@ -6,7 +6,7 @@ export class SemanticTypeNode extends SemanticNode {
     super('type')
   }
 
-  registerAtDocument(doc: AnscriptDoc): void {
+  registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
     const token = this.token('identifier')
     doc.registerDefinition(token)

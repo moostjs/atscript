@@ -1,21 +1,21 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import type { TAnscriptDocConfig } from './document'
+import type { TAtscriptDocConfig } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes'
 
-export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
-  const defaultAnscriptConfig: TAnscriptDocConfig = {
+export function getDefaulTAtscriptConfig(): TAtscriptDocConfig {
+  const defaulTAtscriptConfig: TAtscriptDocConfig = {
     primitives: new Map(),
     annotations: {},
   }
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'never',
     new SemanticPrimitiveNode('never', {
       documentation: 'Represents impossible type.',
     })
   )
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'string',
     new SemanticPrimitiveNode('string', {
       type: 'string',
@@ -44,7 +44,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     negative,
   }
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'number',
     new SemanticPrimitiveNode('number', {
       type: 'number',
@@ -67,7 +67,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'boolean',
     new SemanticPrimitiveNode('boolean', {
       type: 'boolean',
@@ -83,7 +83,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'null',
     new SemanticPrimitiveNode('null', {
       type: 'null',
@@ -91,7 +91,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'void',
     new SemanticPrimitiveNode('void', {
       type: 'void',
@@ -99,7 +99,7 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
-  defaultAnscriptConfig.primitives!.set(
+  defaulTAtscriptConfig.primitives!.set(
     'undefined',
     new SemanticPrimitiveNode('undefined', {
       type: 'void',
@@ -107,5 +107,5 @@ export function getDefaultAnscriptConfig(): TAnscriptDocConfig {
     })
   )
 
-  return defaultAnscriptConfig
+  return defaulTAtscriptConfig
 }
