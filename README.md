@@ -32,6 +32,9 @@ export interface User {
 
     @label 'Email'
     email: string
+
+    @expect.min 18
+    age: number.int
 }
 ```
 
@@ -48,8 +51,7 @@ Atscript allows defining a configuration file (`atscript.config.js`):
 - [x] Generate TypeScript classes from interfaces
 - [x] Plugin system
 - [x] Basic Validations
-- [-] MongoDB Integration
-- [ ] Advanced Validations
+- [x] MongoDB Sync Index
 
 ## License
 
