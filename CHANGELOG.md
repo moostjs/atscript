@@ -1,3 +1,12 @@
+## [0.0.1](https://github.com/ts-anscript/anscript/compare/v0.0.11...v0.0.1) (2025-02-08)
+
+
+### Features
+
+* add unplugin; add more primitives; add expect annotations; add meta annotations ([09cdd5a](https://github.com/ts-anscript/anscript/commit/09cdd5ac94b9fdca6a0c0424a8b1f39bf978733b))
+
+
+
 ## [0.0.11](https://github.com/intertation/intertation/compare/v0.0.10...v0.0.11) (2025-02-06)
 
 
