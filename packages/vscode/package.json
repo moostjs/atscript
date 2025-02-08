@@ -1,6 +1,6 @@
 {
   "name": "@atscript/vscode",
-  "displayName": "Atscript",
+  "displayName": "Atscript (.as)",
   "description": "Provides syntax highlighting and language support for Atscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.0.1",
   "private": true,

@@ -7,7 +7,7 @@ $.verbose = true
 async function run() {
   const pkgPath = getWorkspacePath(`packages/vscode/package.json`)
   const pkg = JSON.parse(readFileSync(pkgPath))
-  pkg.name = 'atscript'
+  pkg.name = 'atscript-as'
   pkg.dependencies['@atscript/core'] = `^${pkg.version}`
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
 
