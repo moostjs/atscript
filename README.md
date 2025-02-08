@@ -1,4 +1,4 @@
-# <img src="https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/icons/as-logo.svg" alt="Atscript Demo" width="26"> Atscript - Annotate Things
+# <img src="https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/icons/as-logo.svg" alt="Atscript Demo" width="28"> Atscript - Annotate Things
 
 Atscript is a type-centric language designed to extend TypeScript with annotations. It introduces a `.as` file format that supports interfaces, types, and annotations (decorators starting with `@`).
 
