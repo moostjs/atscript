@@ -11,12 +11,6 @@ Atscript is a type-centric language designed to extend TypeScript with annotatio
 - Plugin support for extended functionalities (e.g., MongoDB integration, validation)
 - Configurable `.as` file processing
 
-## Installation
-
-```sh
-npm install atscript
-```
-
 ## Usage
 
 You can define types and interfaces with annotations in `.as` files:

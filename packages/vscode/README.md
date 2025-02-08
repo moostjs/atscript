@@ -19,10 +19,6 @@ This extension provides **syntax highlighting, autocompletions, hover tooltips, 
 2. Go to **Extensions** (`Ctrl+Shift+X`)
 3. Search for `"Atscript"` and install
 
-Or install via CLI:
-
-code --install-extension mav-rik.atscript
-
 ## Usage
 
 - Open a `.as` file to enable Atscript support
