@@ -17,7 +17,7 @@ $("object", WithMetadata)
   .prop(
     "prop1",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Prop1")
       .$type
   ).prop(
@@ -36,13 +36,13 @@ $("object", WithMetadata)
       .prop(
         "prop3",
         $().designType("string")
-          .flags("string")
+          .tags("string")
           .annotate("label", "Prop3")
           .$type
       ).prop(
         "prop4",
         $().designType("string")
-          .flags("string")
+          .tags("string")
           .annotate("label", "Prop4")
           .$type
       ).prop(
@@ -60,7 +60,7 @@ $("object", WithMetadata)
               ).prop(
                 "b",
                 $().designType("string")
-                  .flags("string")
+                  .tags("string")
                   .annotate("labelOptional", true)
                   .$type
               ).prop(
@@ -72,13 +72,13 @@ $("object", WithMetadata)
               ).prop(
                 "e",
                 $().designType("null")
-                  .flags("null")
+                  .tags("null")
                   .annotate("mulOptional", true, true)
                   .$type
               ).prop(
                 "f",
                 $().designType("undefined")
-                  .flags("undefined")
+                  .tags("undefined")
                   .annotate("obj", { prop1: "123",  })
                   .$type
               )

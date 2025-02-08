@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseAnscript } from '..'
+import { parseAtscript } from '..'
 
 describe('multiline text', () => {
   it('must fail ', () => {
-    const result = parseAnscript(`
+    const result = parseAtscript(`
       type Type = "text
       end"
       `)

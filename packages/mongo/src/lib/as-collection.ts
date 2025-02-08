@@ -11,6 +11,7 @@ import { Collection } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
 
 const INDEX_PREFIX = 'anscript__'
+const DEFAULT_INDEX_NAME = 'DEFAULT'
 
 type TPlainIndex = {
   type: 'plain' | 'unique' | 'text'
@@ -27,8 +28,7 @@ type TIndex = TPlainIndex | TSearchIndex
 
 function indexKey(type: TIndex['type'], name: string) {
   const cleanName = name
-    .toLowerCase()
-    .replace(/[^a-z0-9_.]/g, '_') // Replace spaces & special chars with "_"
+    .replace(/[^a-z0-9_.-]/gi, '_') // Replace spaces & special chars with "_"
     .replace(/_+/g, '_') // Collapse multiple underscores
     .slice(0, 127 - INDEX_PREFIX.length - type.length - 2) // Ensure within limit
   return `${INDEX_PREFIX}${type}__${cleanName}`
@@ -105,10 +105,10 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
 
   protected _setSearchIndex(
     type: TSearchIndex['type'],
-    name: string,
+    name: string | undefined,
     definition: TMongoSearchIndexDefinition
   ) {
-    this._indexes.set(indexKey(type, name), {
+    this._indexes.set(indexKey(type, name || DEFAULT_INDEX_NAME), {
       type,
       definition,
     })
@@ -116,11 +116,19 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
 
   protected _addFieldToSearchIndex(
     type: TSearchIndex['type'],
-    name: string,
+    _name: string | undefined,
     fieldName: string,
     analyzer?: string
   ) {
-    const index = this._indexes.get(indexKey(type, name)) as TSearchIndex | undefined
+    const name = _name || DEFAULT_INDEX_NAME
+    let index = this._indexes.get(indexKey(type, name)) as TSearchIndex | undefined
+    if (!index && type === 'search_text') {
+      this._setSearchIndex(type, name, {
+        mappings: { fields: {} },
+        text: { fuzzy: { maxEdits: 0 } },
+      })
+      index = this._indexes.get(indexKey(type, name)) as TSearchIndex | undefined
+    }
     if (index) {
       index.definition.mappings!.fields![fieldName] = {
         type: 'string',
@@ -161,16 +169,16 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
 
   protected _prepareIndexesForCollection() {
     const typeMeta = this.type.metadata
-    const dynamicText = typeMeta.get('mongo.dynamicTextSearch')
+    const dynamicText = typeMeta.get('mongo.search.dynamic')
     if (dynamicText) {
-      this._setSearchIndex('dynamic_text', dynamicText.indexName || 'default', {
+      this._setSearchIndex('dynamic_text', '_', {
         mappings: { dynamic: true },
         analyzer: dynamicText.analyzer,
         text: { fuzzy: { maxEdits: dynamicText.fuzzy || 0 } },
       })
     }
-    for (const textSearch of typeMeta.get('mongo.defineTextSearch') || []) {
-      this._setSearchIndex('search_text', textSearch.indexName || 'default', {
+    for (const textSearch of typeMeta.get('mongo.search.static') || []) {
+      this._setSearchIndex('search_text', textSearch.indexName, {
         mappings: { fields: {} },
         analyzer: textSearch.analyzer,
         text: { fuzzy: { maxEdits: textSearch.fuzzy || 0 } },
@@ -190,7 +198,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
     }
   }
 
-  protected _prepareIndexesForField(fieldName: string, metadata: TMetadataMap<AnscriptMetadata>) {
+  protected _prepareIndexesForField(fieldName: string, metadata: TMetadataMap<AtscriptMetadata>) {
     for (const index of metadata.get('mongo.index.plain') || []) {
       this._addIndexField('plain', index === true ? fieldName : index, fieldName)
     }
@@ -201,10 +209,10 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
     if (textWeight) {
       this._addIndexField('text', '', fieldName, textWeight === true ? 1 : textWeight)
     }
-    for (const index of metadata.get('mongo.useTextSearch') || []) {
+    for (const index of metadata.get('mongo.search.text') || []) {
       this._addFieldToSearchIndex('search_text', index.indexName, fieldName, index.analyzer)
     }
-    const vectorIndex = metadata.get('mongo.vectorIndex')
+    const vectorIndex = metadata.get('mongo.search.vector')
     if (vectorIndex) {
       this._setSearchIndex('vector', vectorIndex.indexName || fieldName, {
         fields: [
@@ -217,7 +225,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
         ],
       })
     }
-    for (const index of metadata.get('mongo.vectorFilter') || []) {
+    for (const index of metadata.get('mongo.search.filter') || []) {
       this._vectorFilters.set(indexKey('vector', index.indexName), fieldName)
     }
   }
@@ -265,6 +273,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
           default:
         }
       } else {
+        this.logger.debug(`dropping index "${remote.name}"`)
         await this.collection.dropIndex(remote.name)
       }
     }
@@ -303,8 +312,12 @@ export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[
           default:
         }
       } else {
-        this.logger.debug(`dropping search index "${remote.name}"`)
-        await this.collection.dropSearchIndex(remote.name)
+        if (remote.status !== 'DELETING') {
+          this.logger.debug(`dropping search index "${remote.name}"`)
+          await this.collection.dropSearchIndex(remote.name)
+        } else {
+          this.logger.debug(`search index "${remote.name}" is in deleting status`)
+        }
       }
     }
 

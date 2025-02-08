@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { AtscriptDoc } from '../../document'
-import { SemanticNode } from './node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticConstNode extends SemanticNode {
   constructor() {

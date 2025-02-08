@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseAnscript } from '..'
+import { parseAtscript } from '..'
 
 describe('types', () => {
   it('simple type', () => {
-    const result = parseAnscript(`type TypeName = string`)
+    const result = parseAtscript(`type TypeName = string`)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" type: type <identifier>: [ref] "string""`
     )
     expect(result.messages).toHaveLength(0)
   })
   it('export type', () => {
-    const result = parseAnscript(`export type TypeName = string`)
+    const result = parseAtscript(`export type TypeName = string`)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" export: export <identifier> type: type <identifier>: [ref] "string""`
     )
@@ -19,7 +19,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type with text', () => {
-    const result = parseAnscript(`type TypeName = "text"`)
+    const result = parseAtscript(`type TypeName = "text"`)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" type: type <identifier>: [const] "text""`
     )
@@ -27,7 +27,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type conjunction', () => {
-    const result = parseAnscript(`type TypeName = string | number`)
+    const result = parseAtscript(`type TypeName = string | number`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>
         = [group] ""  (
@@ -40,7 +40,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type complex conjunction intersection', () => {
-    const result = parseAnscript(`type TypeName = string | number & 'text' | 123`)
+    const result = parseAtscript(`type TypeName = string | number & 'text' | 123`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>
         = [group] ""  (
@@ -57,7 +57,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type simple array', () => {
-    const result = parseAnscript(`type TypeName = string[]`)
+    const result = parseAtscript(`type TypeName = string[]`)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" type: type <identifier>: [array] "[": [ref] "string""`
     )
@@ -65,14 +65,14 @@ describe('types', () => {
   })
 
   it('type simple array2', () => {
-    const result = parseAnscript(`type TypeName = string[][]`)
+    const result = parseAtscript(`type TypeName = string[][]`)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [type] "TypeName" type: type <identifier>: [array] "[": [array] "[": [ref] "string""`
     )
     expect(result.messages).toHaveLength(0)
   })
   it('type array of group', () => {
-    const result = parseAnscript(`type TypeName = (string | number)[]`)
+    const result = parseAtscript(`type TypeName = (string | number)[]`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>: [array] "["
         = [group] "("  (
@@ -85,7 +85,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type tuple of single type', () => {
-    const result = parseAnscript(`type TypeName = [string]`)
+    const result = parseAtscript(`type TypeName = [string]`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>
         = [tuple] "["  (
@@ -97,7 +97,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type tuple of multiple types', () => {
-    const result = parseAnscript(`type TypeName = [string | number]`)
+    const result = parseAtscript(`type TypeName = [string | number]`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>
         = [tuple] "["  (
@@ -110,7 +110,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type array of tuple', () => {
-    const result = parseAnscript(`type TypeName = [string | number][]`)
+    const result = parseAtscript(`type TypeName = [string | number][]`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>: [array] "["
         = [tuple] "["  (
@@ -123,7 +123,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type structure', () => {
-    const result = parseAnscript(`type TypeName = { a: string, b: number }`)
+    const result = parseAtscript(`type TypeName = { a: string, b: number }`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [type] "TypeName" type: type <identifier>
         = [structure] "{"  (
@@ -136,7 +136,7 @@ describe('types', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('type structure conjunction', () => {
-    const result = parseAnscript(
+    const result = parseAtscript(
       `type TypeName = { a: string, b: number } | {c: boolean; d: string}`
     )
     expect(result.toString()).toMatchInlineSnapshot(`
@@ -158,7 +158,7 @@ describe('types', () => {
   })
 
   it('must contain annotations', () => {
-    const result = parseAnscript(`@label 'My Type'\ntype TypeName = {
+    const result = parseAtscript(`@label 'My Type'\ntype TypeName = {
       @label 'A'
       a: string
       @label 'B'
@@ -180,11 +180,11 @@ describe('types', () => {
 
 describe('referred identifiers in type', () => {
   it('must detect referred identifiers', () => {
-    const { nodes } = parseAnscript(`type TypeName = ReferredType`)
+    const { nodes } = parseAtscript(`type TypeName = ReferredType`)
     expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual(['ReferredType'])
   })
   it('must detect complex referred identifiers', () => {
-    const { nodes } = parseAnscript(
+    const { nodes } = parseAtscript(
       `type TypeName = ReferredType | RefType2 & { prop: string, prop2: "notString" }`
     )
     expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual([

@@ -32,14 +32,13 @@ import { runPipes } from './parser/pipes/core.pipe'
 import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
-import { resolveAnscriptFromPath } from './parser/utils'
+import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { TAtscriptPlugin, TAtscriptRenderFormat } from './plugin/types'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
-import { mergeAnnotations } from './utils'
 
 export interface TAtscriptDocConfig {
   primitives?: Map<string, SemanticPrimitiveNode>
@@ -245,7 +244,9 @@ export class AtscriptDoc {
    */
   unwindType(
     name: string,
-    chain: string[] | Token[] = []
+    chain: string[] | Token[] = [],
+    watchCb?: (def: SemanticNode) => void,
+    _tracked?: Set<SemanticNode>
   ):
     | {
         doc: AtscriptDoc
@@ -253,22 +254,38 @@ export class AtscriptDoc {
         def: SemanticNode
       }
     | undefined {
+    const tracked = _tracked || new Set()
     const decl = this.getDeclarationOwnerNode(name)
     if (!decl) {
       return undefined
     }
+    const callCb = watchCb
+      ? () => {
+          if (
+            def &&
+            !tracked.has(def) &&
+            ['type', 'primitive', 'prop', 'interface'].includes(def.entity)
+          ) {
+            // tracking all the nodes while unwinding
+            // so we can gather annotations to merge
+            tracked.add(def)
+            watchCb(def)
+          }
+        }
+      : () => {}
     let node: SemanticNode | undefined
     let def: SemanticNode | undefined = decl.node
     let doc = decl.doc
     const resolveRef = () => {
       if (isRef(def)) {
-        const d = doc.unwindType(def.token('identifier')!.text, def.chain)
+        const d = doc.unwindType(def.token('identifier')!.text, def.chain, watchCb, tracked)
         doc = d?.doc || doc
         def = d?.def
       }
     }
     const resolveType = () => {
       while (isType(def)) {
+        callCb() // collection type on our way
         def = def.getDefinition()
         node = def
         resolveRef()
@@ -299,6 +316,9 @@ export class AtscriptDoc {
         def = def.props.get(itemText)
       }
     }
+    if (_tracked) {
+      callCb() // collecting one more item in chain
+    }
     while (isProp(def)) {
       node = def
       def = def.getDefinition()
@@ -314,6 +334,26 @@ export class AtscriptDoc {
     if (token) {
       return this.usageListFor(token)
     }
+  }
+
+  evalAnnotationsForNode(givenNode: SemanticNode) {
+    let right = givenNode.annotations
+    let def = givenNode.getDefinition()
+    if (def) {
+      if (isRef(def)) {
+        const unwound = this.unwindType(def.token('identifier')!.text, def.chain, intermediate => {
+          if (intermediate?.annotations) {
+            right = this.mergeNodesAnnotations(intermediate.annotations, right)
+          }
+        })
+        def = unwound?.def || def
+      }
+      if (def) {
+        const merged = this.mergeIntersection(def)
+        right = this.mergeNodesAnnotations(merged.annotations, right)
+      }
+    }
+    return right
   }
 
   usageListFor(
@@ -378,7 +418,7 @@ export class AtscriptDoc {
       return { uri: this.id, doc: this, token }
     }
     if (token.fromPath) {
-      const absolutePath = resolveAnscriptFromPath(token.fromPath, this.id)
+      const absolutePath = resolveAtscriptFromPath(token.fromPath, this.id)
 
       return { uri: absolutePath, doc: this.dependenciesMap.get(absolutePath), token }
     }
@@ -388,7 +428,7 @@ export class AtscriptDoc {
       this.dependenciesMap.size > 0
     ) {
       const from = this.importedDefs.get(token.text)!.text
-      const absolutePath = resolveAnscriptFromPath(from, this.id)
+      const absolutePath = resolveAtscriptFromPath(from, this.id)
       const targetDoc = this.dependenciesMap.get(absolutePath)
       if (targetDoc) {
         const target = targetDoc.registry.definitions.get(token.text)
@@ -446,7 +486,7 @@ export class AtscriptDoc {
   }
 
   registerImport({ from, imports, block }: { from: Token; imports: Token[]; block: Token }) {
-    const importId = resolveAnscriptFromPath(from.text, this.id)
+    const importId = resolveAtscriptFromPath(from.text, this.id)
     this.imports.set(importId, { from, imports })
     this.blocksIndex.add(block)
     block.blockType = 'import'
@@ -507,7 +547,7 @@ export class AtscriptDoc {
     }
     const def = this.registry.definitions.get(identifier)
     if (def?.imported && def.fromPath) {
-      const absolutePath = resolveAnscriptFromPath(def.fromPath, this.id)
+      const absolutePath = resolveAtscriptFromPath(def.fromPath, this.id)
       const doc = this.dependenciesMap.get(absolutePath)
       return doc?.getDeclarationOwnerNode(identifier)
     } else if (!def?.imported) {
@@ -711,7 +751,7 @@ export class AtscriptDoc {
           )
         }
         prop.define(mergedDef)
-        prop.annotations = mergeAnnotations(leftProp?.annotations, rightProp?.annotations)
+        prop.annotations = this.mergeNodesAnnotations(leftProp?.annotations, rightProp?.annotations)
         const oldProps = [leftProp, rightProp].filter(Boolean) as SemanticPropNode[]
         let optionalToken = oldProps[0]?.token('optional')
         for (const oldProp of oldProps) {
@@ -727,7 +767,8 @@ export class AtscriptDoc {
       }
       const mergedStructure = new SemanticStructureNode()
       mergedStructure.setProps(mergedProps)
-      mergedStructure.annotations = mergeAnnotations(left.annotations, right.annotations)
+      this.resolveAnnotation
+      mergedStructure.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
       return [mergedStructure]
     }
     // all other cases are not supported, returning never
@@ -741,6 +782,40 @@ export class AtscriptDoc {
       'identifier'
     )
     return [never]
+  }
+
+  /**
+   * Merges two arrays of annotation tokens, ensuring that annotations from the
+   * `right` array take precedence over those from the `left` array.
+   *
+   * - Annotations from `right` are always included.
+   * - Annotations from `left` are included only if they are not already present in `right`.
+   * - This ensures that if an annotation exists in both arrays, the one from `right` is kept.
+   *
+   * @param left - An optional array of annotation tokens to merge (lower priority).
+   * @param right - An optional array of annotation tokens to merge (higher priority).
+   * @returns A merged array of annotation tokens, preserving order while preventing duplicates.
+   */
+  mergeNodesAnnotations(left?: TAnnotationTokens[], right?: TAnnotationTokens[]) {
+    const annotations = [] as TAnnotationTokens[]
+    const savedAnnotations = new Set<string>()
+
+    // Add annotations from the right array first (higher priority)
+    for (const a of right || []) {
+      annotations.push(a)
+      savedAnnotations.add(a.token.text!)
+    }
+
+    // Add annotations from the left array only if they are not already in the set
+    for (const a of left || []) {
+      const spec = this.resolveAnnotation(a.token.text!)
+      let append = spec && spec.config.multiple && spec.config.mergeStrategy === 'append'
+      if (append || !savedAnnotations.has(a.token.text!)) {
+        annotations.push(a)
+      }
+    }
+
+    return annotations
   }
 }
 

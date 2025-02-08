@@ -35,4 +35,4 @@ export interface TAtscriptPlugin {
   ) => Promise<void> | void
 }
 
-export const createAnscriptPlugin = (plugin: TAtscriptPlugin) => plugin
+export const createAtscriptPlugin = (plugin: TAtscriptPlugin) => plugin

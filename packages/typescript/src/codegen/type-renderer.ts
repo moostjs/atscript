@@ -2,6 +2,7 @@ import {
   isArray,
   isConst,
   isGroup,
+  isInterface,
   isPrimitive,
   isRef,
   isStructure,
@@ -27,7 +28,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAtscriptTypeObject, TMetadataMap, Validator } from "@atscript/typescript"'
+      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator } from "@atscript/typescript"'
     )
   }
 
@@ -104,8 +105,8 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (asClass) {
       this.writeln('static __is_anscript_annotated_type: true')
-      this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}, AnscriptPrimitiveFlags>`)
-      this.writeln(`static metadata: TMetadataMap<AnscriptMetadata>`)
+      this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
+      this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
       this.writeln(`static validator: () => Validator`)
     }
     this.pop()
@@ -134,6 +135,35 @@ export class TypeRenderer extends BaseRenderer {
     this.write(`type ${node.id!} = `)
     this.renderTypeDef(node.getDefinition())
     this.writeln()
+    this.renderTypeNamespace(node)
+  }
+
+  renderTypeNamespace(node: SemanticTypeNode) {
+    this.write(`declare namespace ${node.id!} `)
+    this.blockln('{}')
+    const def = node.getDefinition()
+    let typeDef = 'TAtscriptTypeDef'
+    if (def) {
+      let realDef = def
+      if (isRef(def)) {
+        realDef = this.doc.unwindType(def.id!, def.chain)?.def || realDef
+      }
+      realDef = this.doc.mergeIntersection(realDef)
+      if (isStructure(realDef) || isInterface(realDef)) {
+        typeDef = `TAtscriptTypeObject<keyof ${node.id!}}>`
+      } else if (isGroup(realDef)) {
+        typeDef = 'TAtscriptTypeComplex'
+      } else if (isArray(realDef)) {
+        typeDef = 'TAtscriptTypeArray'
+      } else if (isPrimitive(realDef)) {
+        typeDef = 'TAtscriptTypeFinal'
+      }
+    }
+    this.writeln(`const __is_anscript_annotated_type: true`)
+    this.writeln(`const type: ${typeDef}`)
+    this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
+    this.writeln(`const validator: () => Validator`)
+    this.popln()
   }
 
   renderJsDoc(node: SemanticNode) {

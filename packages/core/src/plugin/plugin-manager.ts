@@ -3,7 +3,7 @@ import { TAnnotationsTree, TAtscriptConfig } from '../config'
 import { defu } from 'defu'
 import { AtscriptDoc, TAtscriptDocConfig } from '../document'
 import type { TAtscriptRenderFormat, TPluginOutput } from './types'
-import { getDefaulTAtscriptConfig } from '../default-atscript-config'
+import { getDefaultAtscriptConfig } from '../default-atscript-config'
 import { SemanticPrimitiveNode } from '../parser/nodes'
 import { TOutput } from '../build'
 import { AtscriptRepo } from '../repo'
@@ -29,7 +29,7 @@ export class PluginManager {
   async getDocConfig(): Promise<TAtscriptDocConfig> {
     if (!this._docConfig) {
       const raw = await this.config()
-      this._docConfig = getDefaulTAtscriptConfig()
+      this._docConfig = {}
       if (raw?.primitives) {
         this._docConfig.primitives = this._docConfig.primitives || new Map()
         for (const [key, value] of Object.entries(raw.primitives)) {
@@ -45,19 +45,22 @@ export class PluginManager {
     return this._docConfig
   }
 
-  async config(
-    config: TAtscriptConfig = this.cfg,
-    processed = new Set<string>()
-  ): Promise<TAtscriptConfig> {
+  async config(config: TAtscriptConfig = this.cfg): Promise<TAtscriptConfig> {
     if (!this._config) {
+      const processed = new Set<string>()
+      config = defu(config, getDefaultAtscriptConfig())
       const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
-      for (const plugin of filtered) {
-        if (processed.has(plugin.name)) continue
-        config = defu(await plugin.config?.(config), config)
-        processed.add(plugin.name)
-      }
-      if (processed.size !== filtered.length) {
-        return this.config(config, processed)
+      let i = 0
+      while (processed.size !== filtered.length) {
+        i++
+        for (const plugin of filtered) {
+          if (processed.has(plugin.name)) continue
+          config = defu(await plugin.config?.(config), config)
+          processed.add(plugin.name)
+        }
+        if (i > 100) {
+          throw new Error(`Too many iterations in config`)
+        }
       }
       this._config = config
     }

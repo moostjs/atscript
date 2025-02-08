@@ -17,19 +17,19 @@ $("object", ISource)
   .prop(
     "firstName",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "First Name")
       .$type
   ).prop(
     "lastName",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Last Name")
       .$type
   ).prop(
     "age",
     $().designType("number")
-      .flags("number")
+      .tags("number")
       .annotate("min", 18)
       .$type
   )
@@ -38,12 +38,12 @@ $("object", ITarget)
   .prop(
     "firstName",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .$type
   ).prop(
     "lastName",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Last Name (optional)")
       .annotate("required", false)
       .optional()
@@ -51,6 +51,6 @@ $("object", ITarget)
   ).prop(
     "age",
     $().designType("number")
-      .flags("number")
+      .tags("number")
       .$type
   )

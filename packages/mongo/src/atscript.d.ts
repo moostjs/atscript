@@ -8,18 +8,18 @@
 export {}
 
 declare global {
-  interface AnscriptMetadata {
+  interface AtscriptMetadata {
     'mongo.collection': string
     'mongo.index.plain': (string | true)[]
     'mongo.index.unique': (string | true)[]
     'mongo.index.text': number | true
-    'mongo.dynamicTextSearch': { analyzer?: string; fuzzy?: number; indexName?: string }
-    'mongo.defineTextSearch': { indexName: string; analyzer?: string; fuzzy?: number }[]
-    'mongo.useTextSearch': { indexName: string; analyzer?: string }[]
-    'mongo.vectorIndex': { dimensions: number; similarity?: string; indexName?: string }
-    'mongo.vectorFilter': { indexName: string }[]
+    'mongo.search.dynamic': { analyzer?: string; fuzzy?: number }
+    'mongo.search.static': { analyzer?: string; fuzzy?: number; indexName?: string }[]
+    'mongo.search.text': { analyzer?: string; indexName?: string }[]
+    'mongo.search.vector': { dimensions: number; similarity?: string; indexName?: string }
+    'mongo.search.filter': { indexName: string }[]
   }
-  type AnscriptPrimitiveFlags =
+  type AtscriptPrimitiveTags =
     | 'never'
     | 'string'
     | 'email'

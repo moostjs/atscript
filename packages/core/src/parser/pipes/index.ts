@@ -6,7 +6,7 @@ import { pipes } from './pipes'
 
 export { pipes } from './pipes'
 
-export function parseAnscript(
+export function parseAtscript(
   source: string,
   _pipes: TPipe[] = [pipes.importPipe, pipes.type, pipes.interfaceType],
   debug = false

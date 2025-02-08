@@ -10,27 +10,29 @@ $("object", PublicInterface)
   .prop(
     "primitive",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .$type
   ).prop(
     "pirmiitiveUn",
     $("union")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .item($().designType("number")
-          .flags("number")
+          .tags("number")
           .$type)
       .$type
   ).prop(
     "email",
     $().designType("string")
-      .flags("email", "string")
+      .tags("email", "string")
+      .annotate("expect.pattern", { pattern: "^[^\s@]+@[^\s@]+\.[^\s@]+$",  flags: "" }, true)
       .$type
   ).prop(
     "interger",
     $().designType("number")
-      .flags("int", "number")
+      .tags("int", "number")
+      .annotate("expect.int", true)
       .$type
   ).prop(
     "literal",
@@ -48,17 +50,17 @@ $("object", PublicInterface)
     "tuple1",
     $("tuple")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .$type
   ).prop(
     "tuple2",
     $("tuple")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .$type
   ).prop(
@@ -66,10 +68,10 @@ $("object", PublicInterface)
     $("array")
       .of($("tuple")
           .item($().designType("string")
-              .flags("string")
+              .tags("string")
               .$type)
           .item($().designType("string")
-              .flags("string")
+              .tags("string")
               .$type)
           .$type)
       .$type
@@ -77,7 +79,7 @@ $("object", PublicInterface)
     "array",
     $("array")
       .of($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .$type
   ).prop(
@@ -85,7 +87,7 @@ $("object", PublicInterface)
     $("array")
       .of($("array")
           .of($().designType("string")
-              .flags("string")
+              .tags("string")
               .$type)
           .$type)
       .$type
@@ -95,7 +97,7 @@ $("object", PublicInterface)
       .of($("array")
           .of($("array")
               .of($().designType("string")
-                  .flags("string")
+                  .tags("string")
                   .$type)
               .$type)
           .$type)
@@ -105,10 +107,10 @@ $("object", PublicInterface)
     $("array")
       .of($("union")
           .item($().designType("string")
-              .flags("string")
+              .tags("string")
               .$type)
           .item($().designType("number")
-              .flags("number")
+              .tags("number")
               .$type)
           .$type)
       .$type
@@ -118,10 +120,10 @@ $("object", PublicInterface)
       .of($("array")
           .of($("union")
               .item($().designType("string")
-                  .flags("string")
+                  .tags("string")
                   .$type)
               .item($().designType("number")
-                  .flags("number")
+                  .tags("number")
                   .$type)
               .$type)
           .$type)
@@ -133,10 +135,10 @@ $("object", PublicInterface)
           .of($("array")
               .of($("union")
                   .item($().designType("string")
-                      .flags("string")
+                      .tags("string")
                       .$type)
                   .item($().designType("number")
-                      .flags("number")
+                      .tags("number")
                       .$type)
                   .$type)
               .$type)
@@ -146,11 +148,11 @@ $("object", PublicInterface)
     "complexArray4",
     $("union")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .item($("array")
           .of($().designType("number")
-              .flags("number")
+              .tags("number")
               .$type)
           .$type)
       .$type
@@ -159,11 +161,11 @@ $("object", PublicInterface)
     $("union")
       .item($("array")
           .of($().designType("string")
-              .flags("string")
+              .tags("string")
               .$type)
           .$type)
       .item($().designType("number")
-          .flags("number")
+          .tags("number")
           .$type)
       .$type
   ).prop(
@@ -172,12 +174,12 @@ $("object", PublicInterface)
       .prop(
         "prop1",
         $().designType("string")
-          .flags("string")
+          .tags("string")
           .$type
       ).prop(
         "prop2",
         $().designType("number")
-          .flags("number")
+          .tags("number")
           .optional()
           .$type
       ).prop(
@@ -186,12 +188,12 @@ $("object", PublicInterface)
           .prop(
             "prop3",
             $().designType("boolean")
-              .flags("boolean")
+              .tags("boolean")
               .$type
           ).prop(
             "prop4",
             $().designType("boolean")
-              .flags("boolean")
+              .tags("boolean")
               .optional()
               .$type
           )
@@ -201,7 +203,7 @@ $("object", PublicInterface)
   ).prop(
     "optional",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .optional()
       .$type
   ).prop(
@@ -217,14 +219,14 @@ $("object", PublicInterface)
           )
           .$type)
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .$type
   ).prop(
     "objectUnion2",
     $("union")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .item($("object")
           .prop(
@@ -257,11 +259,11 @@ $("object", PublicInterface)
     "grouping",
     $("union")
       .item($().designType("string")
-          .flags("string")
+          .tags("string")
           .$type)
       .item($("union")
           .item($().designType("never")
-              .flags("never")
+              .tags("never")
               .$type)
           .item($()
               .designType("string")

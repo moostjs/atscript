@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseAnscript } from '..'
+import { parseAtscript } from '..'
 
 describe('import', () => {
   it('single import', () => {
-    const result = parseAnscript(`import { Type } from './type'`, undefined)
+    const result = parseAtscript(`import { Type } from './type'`, undefined)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [import] "import" inner: { <block> from: from <identifier> path: ./type <text>: [ref] "Type""`
     )
     expect(result.messages).toHaveLength(0)
   })
   it('multiple import', () => {
-    const result = parseAnscript(`import { Type1, Type2 } from './type'`, undefined)
+    const result = parseAtscript(`import { Type1, Type2 } from './type'`, undefined)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [import] "import" inner: { <block> from: from <identifier> path: ./type <text>
         = [group] ""  (
@@ -23,7 +23,7 @@ describe('import', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('multiple imports', () => {
-    const result = parseAnscript(
+    const result = parseAtscript(
       `
       import { Type1, Type2 } from './type1'
       import { Type3, Type4 } from './type2'
@@ -49,7 +49,7 @@ describe('import', () => {
 
   it('should parse empty import', () => {
     // for autocomplete
-    const result = parseAnscript(`import {  } from './type'`, undefined)
+    const result = parseAtscript(`import {  } from './type'`, undefined)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [import] "import" inner: { <block> from: from <identifier> path: ./type <text>
         = [group] ""  (
@@ -62,7 +62,7 @@ describe('import', () => {
 
   it('should parse import with comma', () => {
     // for autocomplete
-    const result = parseAnscript(`import { abc,  } from './type'`, undefined)
+    const result = parseAtscript(`import { abc,  } from './type'`, undefined)
     expect(result.toString()).toMatchInlineSnapshot(
       `"● [import] "import" inner: { <block> from: from <identifier> path: ./type <text>: [ref] "abc""`
     )

@@ -1,8 +1,4 @@
 import type { Token } from '../token'
-import { SemanticArrayNode } from './array-node'
-import { SemanticConstNode } from './const-node'
-import { SemanticStructureNode } from './structure-node'
-import { SemanticTupleNode } from './tuple-node'
 
 export type TSemanticToken =
   | 'type'
@@ -36,7 +32,16 @@ export interface TAnnotationTokens {
 export interface TPrimitiveBaseConfig {
   type?: TPrimitiveTypeDef
   documentation?: string
-  flags?: string[]
+  tags?: string[]
+  expect?: {
+    min?: number // number
+    max?: number // number
+    int?: boolean // number
+    minLength?: number // string | array
+    maxLength?: number // string | array
+    pattern?: string | RegExp | (string | RegExp)[] // string
+    message?: string
+  }
 }
 
 export interface TPrimitiveConfig extends TPrimitiveBaseConfig {

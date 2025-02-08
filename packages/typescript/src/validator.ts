@@ -20,6 +20,8 @@ export interface TValidatorOptions {
   errorLimit: number
 }
 
+const regexCache = new Map<string, RegExp>()
+
 export class Validator {
   protected opts: TValidatorOptions
 
@@ -183,6 +185,16 @@ export class Validator {
       this.error('Expected array')
       return false
     }
+    const minLength = def.metadata.get('expect.minLength')
+    if (typeof minLength === 'number' && value.length < minLength) {
+      this.error(`Expected minimum length of ${minLength} items, got ${value.length} items`)
+      return false
+    }
+    const maxLength = def.metadata.get('expect.maxLength')
+    if (typeof maxLength === 'number' && value.length > maxLength) {
+      this.error(`Expected maximum length of ${maxLength} items, got ${value.length} items`)
+      return false
+    }
     let i = 0
     let passed = true
     for (const item of value) {
@@ -273,13 +285,13 @@ export class Validator {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
-        return this.validateString(def.type.flags, value)
+        return this.validateString(def, value)
       case 'number':
         if (typeOfValue !== def.type.designType) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
-        return this.validateNumber(def.type.flags, value)
+        return this.validateNumber(def, value)
       case 'boolean':
         if (typeOfValue !== def.type.designType) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
@@ -303,66 +315,62 @@ export class Validator {
     }
   }
 
-  protected validateString(flags: Set<string>, value: string): boolean {
-    // We iterate over all string flags in case more than one is supplied.
-    for (const flag of flags) {
-      switch (flag) {
-        case 'email':
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-            this.error(`Expected email, got "${value}"`)
-            return false
-          }
-          break
+  protected validateString(
+    def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
+    value: string
+  ): boolean {
+    const minLength = def.metadata.get('expect.minLength')
+    if (typeof minLength === 'number' && value.length < minLength) {
+      this.error(
+        `Expected minimum length of ${minLength} characters, got ${value.length} characters`
+      )
+      return false
+    }
+    const maxLength = def.metadata.get('expect.maxLength')
+    if (typeof maxLength === 'number' && value.length > maxLength) {
+      this.error(
+        `Expected maximum length of ${maxLength} characters, got ${value.length} characters`
+      )
+      return false
+    }
+    const patterns = def.metadata.get('expect.pattern')
+    for (const { pattern, flags, message } of patterns || []) {
+      if (!pattern) continue
 
-        case 'phone':
-          // E.164-like pattern for phone numbers
-          if (!/^\+?[0-9\s-]{10,15}$/.test(value)) {
-            this.error(`Expected phone number, got "${value}"`)
-            return false
-          }
-          break
+      const cacheKey = `${pattern}//${flags || ''}`
 
-        case 'url':
-          try {
-            new URL(value) // Will throw if invalid
-          } catch {
-            this.error(`Expected valid URL, got "${value}"`)
-            return false
-          }
-          break
-
-        default:
+      let regex = regexCache.get(cacheKey)
+      if (!regex) {
+        regex = new RegExp(pattern, flags)
+        regexCache.set(cacheKey, regex)
+      }
+      if (!regex.test(value)) {
+        this.error(message || `Value is expected to match pattern "${pattern}"`)
+        return false
       }
     }
+
     return true
   }
 
-  protected validateNumber(flags: Set<string>, value: number): boolean {
-    for (const flag of flags) {
-      switch (flag) {
-        case 'int':
-          if (!Number.isInteger(value)) {
-            this.error(`Expected integer, got ${value}`)
-            return false
-          }
-          break
-
-        case 'positive':
-          if (value <= 0) {
-            this.error(`Expected a positive number, got ${value}`)
-            return false
-          }
-          break
-
-        case 'negative':
-          if (value >= 0) {
-            this.error(`Expected a negative number, got ${value}`)
-            return false
-          }
-          break
-
-        default:
-      }
+  protected validateNumber(
+    def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
+    value: number
+  ): boolean {
+    const int = def.metadata.get('expect.int')
+    if (typeof int === 'boolean' && int && value % 1 !== 0) {
+      this.error(`Expected integer, got ${value}`)
+      return false
+    }
+    const min = def.metadata.get('expect.min')
+    if (typeof min === 'number' && value < min) {
+      this.error(`Expected minimum ${min}, got ${value}`)
+      return false
+    }
+    const max = def.metadata.get('expect.max')
+    if (typeof max === 'number' && value > max) {
+      this.error(`Expected maximum ${max}, got ${value}`)
+      return false
     }
     return true
   }

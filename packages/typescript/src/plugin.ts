@@ -29,7 +29,7 @@ export const tsPlugin: () => TAtscriptPlugin = () => {
       if (format === 'dts') {
         // render atscript.d.ts
         const annotations = await repo.getUsedAnnotations()
-        const flags = (await repo.getPrimitivesFlags()) || new Set()
+        const tags = (await repo.getPrimitivesTags()) || new Set()
         let rendered = [] as string[]
         for (const [key, val] of Object.entries(annotations)) {
           const multiple = val!.multiple
@@ -48,7 +48,7 @@ export const tsPlugin: () => TAtscriptPlugin = () => {
             `${wrapProp(key)}: ${multiple ? '(' : ''}${typeLine}${multiple ? ')[]' : ''}`
           )
         }
-        let renderedFlags = Array.from(flags)
+        let renderedTags = Array.from(tags)
           .map(f => `"${escapeQuotes(f)}"`)
           .join(' | ')
         output.push({
@@ -62,11 +62,11 @@ export const tsPlugin: () => TAtscriptPlugin = () => {
             ' */\n' +
             'export {}\n\n' +
             'declare global {\n' +
-            '  interface AnscriptMetadata {\n    ' +
+            '  interface AtscriptMetadata {\n    ' +
             rendered.join('\n    ') +
             '\n  }\n' +
-            '  type AnscriptPrimitiveFlags = ' +
-            renderedFlags +
+            '  type AtscriptPrimitiveTags = ' +
+            renderedTags +
             '\n' +
             '}\n',
           fileName: 'atscript.d.ts',

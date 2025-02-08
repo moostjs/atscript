@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AtscriptDoc } from '../../document'
-import { SemanticNode } from './node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticImportNode extends SemanticNode {
   constructor() {

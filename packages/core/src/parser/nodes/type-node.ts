@@ -1,5 +1,5 @@
 import type { AtscriptDoc } from '../../document'
-import { SemanticNode } from './node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticTypeNode extends SemanticNode {
   constructor() {

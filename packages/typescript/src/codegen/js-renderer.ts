@@ -1,8 +1,5 @@
 import {
-  isGroup,
-  isInterface,
   isPrimitive,
-  mergeAnnotations,
   SemanticArrayNode,
   SemanticConstNode,
   SemanticGroup,
@@ -64,7 +61,7 @@ export class JsRenderer extends BaseRenderer {
 
   annotateType(_node?: SemanticNode, name?: string) {
     if (!_node) {
-      return
+      return this
     }
     const node = this.doc.mergeIntersection(_node)
 
@@ -168,7 +165,7 @@ export class JsRenderer extends BaseRenderer {
   definePrimitive(node: SemanticPrimitiveNode, name?: string) {
     this.renderPrimitiveDef(node.id! === 'never' ? 'never' : node.config.type, name)
     this.writeln(
-      `  .flags(${Array.from(node.flags)
+      `  .tags(${Array.from(node.tags)
         .map(f => `"${escapeQuotes(f)}"`)
         .join(', ')})`
     )
@@ -262,28 +259,23 @@ export class JsRenderer extends BaseRenderer {
   defineGroup(node: SemanticGroup) {
     const items = node.unwrap()
     for (const item of items) {
-      this.write('.item(')
-      this.indent()
-      this.annotateType(item)
-      this.write('  .$type')
-      this.writeln(`)`)
-      this.unindent()
+      this.write('.item(').indent().annotateType(item).write('  .$type').writeln(`)`).unindent()
     }
     return this
   }
   defineArray(node: SemanticArrayNode) {
     this.write('.of(')
-    this.indent()
-    this.annotateType(node.getDefinition())
-    this.write('  .$type')
-    this.writeln(`)`)
-    this.unindent()
+      .indent()
+      .annotateType(node.getDefinition())
+      .write('  .$type')
+      .writeln(`)`)
+      .unindent()
     return this
   }
 
   defineMetadata(node: SemanticNode) {
-    const annotations = mergeAnnotations(node.annotations, node.getDefinition()?.annotations)
-    annotations.forEach(an => {
+    const annotations = this.doc.evalAnnotationsForNode(node)
+    annotations?.forEach(an => {
       this.resolveAnnotationValue(node, an)
     })
     return this

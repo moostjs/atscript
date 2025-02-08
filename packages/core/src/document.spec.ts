@@ -7,11 +7,28 @@ import { AnnotationSpec } from './annotations'
 import { AtscriptDoc } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
-import { isGroup, SemanticGroup } from './parser/nodes'
+import { isGroup, isPrimitive, SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
-primitives.set('string', new SemanticPrimitiveNode('string', { type: 'string' }))
-primitives.set('number', new SemanticPrimitiveNode('number', { type: 'number' }))
+primitives.set(
+  'string',
+  new SemanticPrimitiveNode('string', {
+    type: 'string',
+    extensions: {
+      email: {
+        type: 'string',
+        expect: { pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}$' },
+      },
+    },
+  })
+)
+primitives.set(
+  'number',
+  new SemanticPrimitiveNode('number', {
+    type: 'number',
+    extensions: { int: { type: 'number', expect: { int: true } } },
+  })
+)
 
 describe('document', () => {
   it('should register import', () => {
@@ -301,9 +318,56 @@ describe('document', () => {
     const str = doc.unwindType('string')
     expect(str).toBeDefined()
     expect(str?.def).toBeDefined()
+    expect(str?.def.entity).toEqual('primitive')
     const num = doc.unwindType('number')
     expect(num).toBeDefined()
     expect(num?.def).toBeDefined()
+    expect(num?.def.entity).toEqual('primitive')
+  })
+
+  it('should unwind extended primitive types', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
+    doc.update(`interface IFace {
+        prop: { nested1: { nested2: string } }
+      }`)
+    const str = doc.unwindType('string', ['email'])
+    expect(str).toBeDefined()
+    expect(str?.def).toBeDefined()
+    expect(str?.def.entity).toEqual('primitive')
+    if (isPrimitive(str?.def)) {
+      expect(str.def.config.expect).toHaveProperty('pattern')
+      expect(str.def.annotations).toHaveLength(1)
+      expect(str.def.annotations?.[0]?.name).toBe('expect.pattern')
+    }
+    const num = doc.unwindType('number', ['int'])
+    expect(num).toBeDefined()
+    expect(num?.def).toBeDefined()
+    expect(num?.def.entity).toEqual('primitive')
+    if (isPrimitive(num?.def)) {
+      expect(num.def.config.expect).toHaveProperty('int')
+      expect(num.def.annotations).toHaveLength(1)
+      expect(num.def.annotations?.[0]?.name).toBe('expect.int')
+    }
+  })
+
+  it('must call unwind watch on every intermediate definition', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
+    doc.update(`interface IFace {
+        prop1: {
+          prop2: string.email
+        }
+      }
+      type Type = IFace.prop1.prop2
+      interface IFace2 {
+        prop: Type
+      }  
+      `)
+    const intermediates = [] as string[]
+    const n1 = doc.getDeclarationOwnerNode('Type')!.node!
+    console.log('n1', n1.id)
+    const unwound = doc.unwindType('IFace2', ['prop'], node => intermediates.push(node.id!))
+    expect(unwound?.def?.id).toBe('email')
+    expect(intermediates).toEqual(['Type', 'prop2', 'email'])
   })
 
   it('should unwind interfaces props in simple interface', () => {
@@ -444,6 +508,76 @@ describe('document', () => {
     expect(doc.resolveAnnotation('level1.level2')).toBeDefined()
     expect(doc.resolveAnnotation('level1.level2.config')).toBeUndefined()
     expect(doc.resolveAnnotation('level1')).toBeUndefined()
+  })
+
+  it('should eval annotations for node', () => {
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Contact {
+        label: string
+        type: ContactType
+        value: string
+    }
+
+    @label 'Contact Type'
+    export type ContactType = 'email' | 'phone'
+`)
+    const node = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const typeProp = node.props.get('type')
+    expect(typeProp).toBeDefined()
+    const annotations = doc.evalAnnotationsForNode(typeProp!)
+    expect(annotations).toHaveLength(1)
+    expect(annotations![0].name).toBe('label')
+    expect(annotations![0].args[0]!.text).toBe('Contact Type')
+  })
+  it('should eval annotations for node and overwrite it', () => {
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Contact {
+        label: string
+        @label 'New Contact Type'
+        type: ContactType
+        value: string
+    }
+
+    @label 'Contact Type'
+    export type ContactType = 'email' | 'phone'
+`)
+    const node = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const typeProp = node.props.get('type')
+    expect(typeProp).toBeDefined()
+    const annotations = doc.evalAnnotationsForNode(typeProp!)
+    expect(annotations).toHaveLength(1)
+    expect(annotations![0].name).toBe('label')
+    expect(annotations![0].args[0]!.text).toBe('New Contact Type')
+  })
+  it('should merge annotations from primitives', () => {
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Contact {
+      @expect.maxLength 20
+      str: string.email
+
+      @expect.max 5
+      num: number.int
+    }
+`)
+    const node = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const typeProp = node.props.get('str')
+    expect(typeProp).toBeDefined()
+    const sAnnotations = doc.evalAnnotationsForNode(typeProp!)
+    expect(sAnnotations).toHaveLength(2)
+    expect(sAnnotations![0].name).toBe('expect.maxLength')
+    expect(sAnnotations![0].args[0]!.text).toBe('20')
+    expect(sAnnotations![1].name).toBe('expect.pattern')
+
+    const numProp = node.props.get('num')
+    expect(numProp).toBeDefined()
+    const nAnnotations = doc.evalAnnotationsForNode(numProp!)
+    expect(nAnnotations).toHaveLength(2)
+    expect(nAnnotations![0].name).toBe('expect.max')
+    expect(nAnnotations![0].args[0]!.text).toBe('5')
+    expect(nAnnotations![1].name).toBe('expect.int')
   })
 })
 

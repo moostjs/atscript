@@ -30,7 +30,6 @@ export const root = new BasicNode<TLexicalToken>({
 }).addRecognizes(
   ...tokens.comments,
   tokens.block,
-  tokens.punctuation,
   tokens.aIdentifier,
   tokens.identifier,
   tokens.text,
@@ -43,7 +42,6 @@ tokens.root = root
 BlockToken.addRecognizes(
   ...tokens.comments,
   tokens.block,
-  tokens.punctuation,
   tokens.aIdentifier,
   tokens.identifier,
   tokens.text,

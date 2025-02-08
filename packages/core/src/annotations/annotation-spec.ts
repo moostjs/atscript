@@ -2,7 +2,15 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 import type { TAnnotationsTree } from '../config'
 import { AtscriptDoc } from '../document'
-import type { TNodeEntity } from '../parser/nodes'
+import {
+  isGroup,
+  isInterface,
+  isPrimitive,
+  isRef,
+  isStructure,
+  type SemanticPrimitiveNode,
+  type TNodeEntity,
+} from '../parser/nodes'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
 import type { TLexicalToken } from '../tokenizer/types'
@@ -18,8 +26,10 @@ export interface TAnnotationArgument {
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 export interface TAnnotationSpecConfig {
   multiple?: boolean
+  mergeStrategy?: 'append' | 'replace' // default 'replace'
   description?: string
   nodeType?: TNodeEntity[]
+  defType?: SemanticPrimitiveNode['type'][]
   argument?: TAnnotationArgument[] | TAnnotationArgument
   validate?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => TMessages | undefined
   modify?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => void
@@ -175,6 +185,32 @@ export class AnnotationSpec {
           }") must be one of [${values.join(', ')}]`,
           range: token.range,
         })
+      }
+
+      // 4. Validate type of node def
+      if (this.config.defType?.length) {
+        let def = mainToken.parentNode.getDefinition()
+        if (isRef(def)) {
+          def = doc.unwindType(def.id!, def.chain)?.def || def
+        }
+        let defEntity = def?.entity || 'unknown'
+        if (isInterface(def) || isStructure(def)) {
+          defEntity = 'object'
+        } else if (isGroup(def) && def.entity !== 'tuple') {
+          defEntity = def.op === '&' ? 'intersection' : 'union'
+        }
+        if (
+          (!isPrimitive(def) && !this.config.defType.includes(defEntity as 'array')) ||
+          (isPrimitive(def) && !this.config.defType.includes(def.type))
+        ) {
+          messages.push({
+            message: `Expected type is (${this.config.defType.join(' | ')}), got "${
+              isPrimitive(def) ? def.type : def?.entity || 'unknown'
+            }"`,
+            severity: 1,
+            range: mainToken.range,
+          })
+        }
       }
     }
 

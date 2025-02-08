@@ -31,13 +31,13 @@ $("object", IA)
   .prop(
     "a",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "a from IA")
       .$type
   ).prop(
     "b",
     $().designType("number")
-      .flags("number")
+      .tags("number")
       .annotate("ia", true)
       .annotate("label", "b from IA")
       .optional()
@@ -49,14 +49,14 @@ $("object", IB)
   .prop(
     "b",
     $().designType("number")
-      .flags("number")
+      .tags("number")
       .annotate("ib", true)
       .annotate("label", "b from IB")
       .$type
   ).prop(
     "c",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "c from IB")
       .annotate("ib", true)
       .optional()
@@ -68,13 +68,13 @@ $("object", T)
   .prop(
     "a",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "a from IA")
       .$type
   ).prop(
     "b",
     $().designType("number")
-      .flags("number")
+      .tags("number")
       .annotate("ib", true)
       .annotate("label", "b from IB")
       .annotate("ia", true)
@@ -82,33 +82,42 @@ $("object", T)
   ).prop(
     "c",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "c from IB")
       .annotate("ib", true)
       .optional()
       .$type
   )
   .annotate("Tlabel", "T")
+  .annotate("label", "IB")
 
 $("object", I1)
   .prop(
     "all",
     $()
       .refTo(T)
+      .annotate("Tlabel", "T")
+      .annotate("label", "IB")
       .$type
   ).prop(
     "a",
     $()
       .refTo(T, ["a"])
+      .annotate("Tlabel", "T")
+      .annotate("label", "IB")
       .$type
   ).prop(
     "b",
     $()
       .refTo(T, ["b"])
+      .annotate("Tlabel", "T")
+      .annotate("label", "IB")
       .$type
   ).prop(
     "c",
     $()
       .refTo(T, ["c"])
+      .annotate("Tlabel", "T")
+      .annotate("label", "IB")
       .$type
   )

@@ -5,14 +5,14 @@ export interface TAtscriptTypeComplex {
   kind: 'union' | 'intersection' | 'tuple'
   items: TAtscriptAnnotatedType[]
 
-  flags: Set<AnscriptPrimitiveFlags>
+  tags: Set<AtscriptPrimitiveTags>
 }
 
 export interface TAtscriptTypeArray {
   kind: 'array'
   of: TAtscriptAnnotatedType
 
-  flags: Set<AnscriptPrimitiveFlags>
+  tags: Set<AtscriptPrimitiveTags>
 }
 
 export interface TAtscriptTypeObject<K extends string = string> {
@@ -20,7 +20,7 @@ export interface TAtscriptTypeObject<K extends string = string> {
 
   props: Map<K, TAtscriptAnnotatedType>
 
-  flags: Set<AnscriptPrimitiveFlags>
+  tags: Set<AtscriptPrimitiveTags>
 }
 
 export interface TAtscriptTypeFinal {
@@ -36,10 +36,9 @@ export interface TAtscriptTypeFinal {
    */
   value?: string | number | boolean
 
-  flags: Set<AnscriptPrimitiveFlags>
+  tags: Set<AtscriptPrimitiveTags>
 }
-// AnscriptMetadata
-// AnscriptPrimitiveFlags
+
 export type TAtscriptTypeDef =
   | TAtscriptTypeComplex
   | TAtscriptTypeFinal
@@ -50,7 +49,7 @@ export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
   validator: (opts?: TValidatorOptions) => Validator
-  metadata: TMetadataMap<AnscriptMetadata>
+  metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
 }
 
@@ -76,7 +75,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
   if (kind === 'object') {
     type.props = new Map()
   }
-  type.flags = new Set()
+  type.tags = new Set()
   const metadata = (base?.metadata || new Map<string, unknown>()) as Map<string, unknown>
   if (base) {
     Object.assign(base, {
@@ -102,9 +101,9 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     $def: type,
     $metadata: metadata,
     _existingObject: undefined as TAtscriptAnnotatedType | undefined,
-    flags(...flags: string[]) {
-      for (const flag of flags) {
-        this.$def.flags.add(flag)
+    tags(...tags: string[]) {
+      for (const tag of tags) {
+        this.$def.tags.add(tag)
       }
       return this
     },
@@ -153,9 +152,11 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
         this.$type = {
           __is_anscript_annotated_type: true,
           type: newBase.type,
-          metadata: newBase.metadata ? new Map<string, unknown>(newBase.metadata) : metadata,
+          metadata,
+          validator(opts?: TValidatorOptions) {
+            return new Validator(this as TAtscriptAnnotatedType, opts)
+          },
         }
-        this.$metadata = this.$type.metadata
       } else {
         throw new Error(`${type} is not annotated type`)
       }

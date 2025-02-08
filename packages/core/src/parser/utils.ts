@@ -24,7 +24,7 @@ export function toVsCodeRange(
 
 export type TVsCodeRange = ReturnType<typeof toVsCodeRange>
 
-export function resolveAnscriptFromPath(from: string, id: string) {
+export function resolveAtscriptFromPath(from: string, id: string) {
   return `file://${path.join(id.slice(7).split('/').slice(0, -1).join('/'), from)}.as`
 }
 

@@ -8,7 +8,7 @@
 export {}
 
 declare global {
-  interface AnscriptMetadata {
+  interface AtscriptMetadata {
     label: string
     labelOptional: string | true
     mul: (number)[]
@@ -17,5 +17,5 @@ declare global {
     min: number
     required: boolean
   }
-  type AnscriptPrimitiveFlags = "never" | "string" | "email" | "phone" | "number" | "positive" | "negative" | "single" | "double" | "int" | "boolean" | "true" | "false" | "null" | "void" | "undefined"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined"
 }

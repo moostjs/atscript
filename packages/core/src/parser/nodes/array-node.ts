@@ -1,5 +1,5 @@
 import { isStructure } from '.'
-import { SemanticNode } from './node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticArrayNode extends SemanticNode {
   constructor() {

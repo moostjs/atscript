@@ -4,12 +4,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { AtscriptDoc } from '../../document'
-import { parseAnscript } from '..'
+import { parseAtscript } from '..'
 import type { SemanticInterfaceNode } from '../nodes/interface-node'
 
 describe('interfaces', () => {
   it('simple interface', () => {
-    const result = parseAnscript(`interface IName { a: string; b: number }`)
+    const result = parseAtscript(`interface IName { a: string; b: number }`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [interface] "IName" type: interface <identifier>
         = [structure] "{"  (
@@ -21,7 +21,7 @@ describe('interfaces', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('export interface', () => {
-    const result = parseAnscript(`export interface IName { a: string; b: number }`)
+    const result = parseAtscript(`export interface IName { a: string; b: number }`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [interface] "IName" export: export <identifier> type: interface <identifier>
         = [structure] "{"  (
@@ -33,7 +33,7 @@ describe('interfaces', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('interface with optional prop', () => {
-    const result = parseAnscript(`interface IName { a: string; b?: number }`)
+    const result = parseAtscript(`interface IName { a: string; b?: number }`)
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [interface] "IName" type: interface <identifier>
         = [structure] "{"  (
@@ -45,7 +45,7 @@ describe('interfaces', () => {
     expect(result.messages).toHaveLength(0)
   })
   it('interface with complex prop type', () => {
-    const result = parseAnscript(`interface IName {
+    const result = parseAtscript(`interface IName {
         a: string | number
         b: { c: string, d: number }
         c: [string, number]
@@ -60,7 +60,7 @@ describe('interfaces', () => {
   })
 
   it('interface with chains', () => {
-    const result = parseAnscript(`interface IName {
+    const result = parseAtscript(`interface IName {
         a: ref1.ref2;
         b: ref3["ref4"],
         c: ref5["ref6"]
@@ -73,11 +73,11 @@ describe('interfaces', () => {
 
 describe('referred identifiers in interfaces', () => {
   it('must detect referred identifiers', () => {
-    const { nodes } = parseAnscript(`interface IName {prop: string}`)
+    const { nodes } = parseAtscript(`interface IName {prop: string}`)
     expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual(['string'])
   })
   it('must detect complex referred identifiers', () => {
-    const { nodes } = parseAnscript(
+    const { nodes } = parseAtscript(
       `interface IName {prop: string, prop2: number | string, prop3: { a: Ref1; b: Ref2 }}`
     )
     expect(nodes[0]?.referredIdentifiers.map(t => t.text)).toEqual([
@@ -91,7 +91,7 @@ describe('referred identifiers in interfaces', () => {
 
   describe('nested props and types', () => {
     it('must return nested props', () => {
-      const { nodes } = parseAnscript(`interface IName {prop: { nested: string }}`)
+      const { nodes } = parseAtscript(`interface IName {prop: { nested: string }}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
       interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!
@@ -100,7 +100,7 @@ describe('referred identifiers in interfaces', () => {
       expect(prop.nestedProps?.get('nested')).toBeDefined()
     })
     it('must return deeply nested props', () => {
-      const { nodes } = parseAnscript(`interface IName {prop: { nested: { nested2: string } }}`)
+      const { nodes } = parseAtscript(`interface IName {prop: { nested: { nested2: string } }}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
       interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!
@@ -110,7 +110,7 @@ describe('referred identifiers in interfaces', () => {
       expect((prop.nestedProps?.get('nested'))!.nestedProps?.get('nested2')).toBeDefined()
     })
     it('must return nested type', () => {
-      const { nodes } = parseAnscript(`interface IName {prop: SomeType}`)
+      const { nodes } = parseAtscript(`interface IName {prop: SomeType}`)
       const interfaceNode = nodes[0] as SemanticInterfaceNode
       interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
       const prop = interfaceNode.props.get('prop')!

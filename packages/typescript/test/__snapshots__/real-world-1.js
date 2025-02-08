@@ -24,32 +24,32 @@ $("object", Address)
   .prop(
     "line1",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Address Line 1")
       .$type
   ).prop(
     "line2",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Address Line 2")
       .optional()
       .$type
   ).prop(
     "city",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "City")
       .$type
   ).prop(
     "state",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "State")
       .$type
   ).prop(
     "zip",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Zip")
       .$type
   )
@@ -59,7 +59,7 @@ $("object", Contact)
   .prop(
     "name",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .$type
   ).prop(
     "type",
@@ -76,7 +76,7 @@ $("object", Contact)
   ).prop(
     "value",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .$type
   )
   .annotate("label", "Contact")
@@ -85,19 +85,20 @@ $("object", Entity)
   .prop(
     "id",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Legal ID")
       .$type
   ).prop(
     "name",
     $().designType("string")
-      .flags("string")
+      .tags("string")
       .annotate("label", "Name")
       .$type
   ).prop(
     "address",
     $()
       .refTo(Address)
+      .annotate("label", "Address")
       .$type
   ).prop(
     "contacts",

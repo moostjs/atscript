@@ -8,7 +8,7 @@ import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AtscriptDoc } from './document'
 import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
-import { resolveAnscriptFromPath } from './parser/utils'
+import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { SemanticPrimitiveNode } from './parser/nodes'
 
@@ -50,19 +50,19 @@ export class AtscriptRepo {
     return this.sharedPluginManager?.manager
   }
 
-  async getPrimitivesFlags() {
+  async getPrimitivesTags() {
     const manager = await this.getSharedPluginManager()
     if (!manager) {
       return undefined
     }
     const docConfig = await manager.getDocConfig()
     const primitives = Array.from(docConfig.primitives?.entries() || [])
-    const flags = [] as string[]
+    const tags = [] as string[]
     const processed = new Set<SemanticPrimitiveNode>()
     for (const [, primitive] of primitives) {
-      flags.push(...primitive.getAllFlags(processed))
+      tags.push(...primitive.getAllTags(processed))
     }
-    return new Set(flags)
+    return new Set(tags)
   }
 
   async getUsedAnnotations() {
@@ -270,7 +270,7 @@ export class AtscriptRepo {
     from: Token,
     imports: Token[]
   ): Promise<AtscriptDoc | undefined> {
-    const forId = resolveAnscriptFromPath(from.text, atscript.id)
+    const forId = resolveAtscriptFromPath(from.text, atscript.id)
     if (forId === atscript.id) {
       const messages = atscript.getDiagMessages()
       messages.push({

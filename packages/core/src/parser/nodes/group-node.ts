@@ -3,7 +3,7 @@ import type { AtscriptDoc } from '../../document'
 import type { TPunctuation } from '../../tokenizer/tokens/punctuation.token'
 import type { Token } from '../token'
 import { isGroup } from '.'
-import { SemanticNode } from './node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticGroup extends SemanticNode {
   isGroup = true
