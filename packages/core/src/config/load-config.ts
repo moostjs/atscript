@@ -83,7 +83,7 @@ export async function resolveConfigFile(
   while (true) {
     const candidate = await findConfigFileName(currentDir)
     if (candidate) {
-      return candidate
+      return path.join(currentDir, candidate).replace(/^file:/, '')
     }
     // Stop if we've hit workspace root or actual filesystem root
     const parentDir = path.dirname(currentDir)
@@ -145,6 +145,7 @@ export async function loadConfig(
       )
     }
   } catch (error) {
+    console.error(error)
     throw new Error('Error happened while loading config.')
   }
 }
