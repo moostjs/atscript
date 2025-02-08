@@ -9,6 +9,19 @@ export {}
 
 declare global {
   interface AtscriptMetadata {
+    "meta.label": string
+    "meta.id": string | true
+    "meta.description": string
+    "meta.documentation": (string)[]
+    "meta.placeholder": string
+    "meta.sensitive": boolean
+    "meta.readonly": boolean
+    "expect.minLength": number
+    "expect.maxLength": number
+    "expect.min": number
+    "expect.max": number
+    "expect.int": boolean
+    "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
     label: string
     labelOptional: string | true
     mul: (number)[]

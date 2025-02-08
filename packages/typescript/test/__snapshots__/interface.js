@@ -26,7 +26,7 @@ $("object", PublicInterface)
     "email",
     $().designType("string")
       .tags("email", "string")
-      .annotate("expect.pattern", { pattern: "^[^\s@]+@[^\s@]+\.[^\s@]+$",  flags: "" }, true)
+      .annotate("expect.pattern", { pattern: "^[^\s@]+@[^\s@]+\.[^\s@]+$",  flags: "",  message: "Invalid email format." }, true)
       .$type
   ).prop(
     "interger",
