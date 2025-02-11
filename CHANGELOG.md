@@ -1,3 +1,12 @@
+## [0.0.16](https://github.com/ts-anscript/anscript/compare/v0.0.15...v0.0.16) (2025-02-11)
+
+
+### Features
+
+* add generic type and type guard to Validator ([e29cd9e](https://github.com/ts-anscript/anscript/commit/e29cd9ee15ba66c5f419b8449788f9e1409931a5))
+
+
+
 ## [0.0.15](https://github.com/ts-anscript/anscript/compare/v0.0.1...v0.0.15) (2025-02-08)
 
 
