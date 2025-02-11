@@ -56,6 +56,6 @@ export declare class PublicInterface {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof PublicInterface>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<PublicInterface>
 }
 // prettier-ignore-end

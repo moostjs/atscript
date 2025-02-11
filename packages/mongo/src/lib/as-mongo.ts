@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb'
-import { TAtscriptAnnotatedType } from '@atscript/typescript'
+import { TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript'
 import { AsCollection } from './as-collection'
 import { NoopLogger, TGenericLogger } from './logger'
 
@@ -37,7 +37,7 @@ export class AsMongo {
     return list.has(name)
   }
 
-  getCollection<T extends TAtscriptAnnotatedType & (new (...args: any[]) => any)>(
+  getCollection<T extends TAtscriptAnnotatedTypeConstructor>(
     type: T,
     logger?: TGenericLogger
   ): AsCollection<T> {

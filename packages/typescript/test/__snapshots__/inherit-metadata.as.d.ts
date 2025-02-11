@@ -19,7 +19,7 @@ declare class ISource {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ISource>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<ISource>
 }
 
 /**
@@ -33,6 +33,6 @@ export declare class ITarget {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<ITarget>
 }
 // prettier-ignore-end

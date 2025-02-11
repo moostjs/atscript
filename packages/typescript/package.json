@@ -52,8 +52,8 @@
   "license": "ISC",
   "dependencies": {
     "@atscript/core": "workspace:^",
-    "@moostjs/event-cli": "^0.5.21",
-    "moost": "^0.5.21"
+    "@moostjs/event-cli": "^0.5.26",
+    "moost": "^0.5.26"
   },
   "devDependencies": {
     "vitest": "^3.0.0"

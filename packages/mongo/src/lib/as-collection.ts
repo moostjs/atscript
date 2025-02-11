@@ -3,6 +3,7 @@
 import {
   isAnnotatedType,
   TAtscriptAnnotatedType,
+  TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeObject,
   TMetadataMap,
 } from '@atscript/typescript'
@@ -34,7 +35,7 @@ function indexKey(type: TIndex['type'], name: string) {
   return `${INDEX_PREFIX}${type}__${cleanName}`
 }
 
-export class AsCollection<T extends TAtscriptAnnotatedType & (new (...args: any[]) => any)> {
+export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   public readonly name: string
   public readonly collection: Collection<InstanceType<T>>
   constructor(

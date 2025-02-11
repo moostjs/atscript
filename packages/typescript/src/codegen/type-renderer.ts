@@ -107,7 +107,7 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln('static __is_anscript_annotated_type: true')
       this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
       this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
-      this.writeln(`static validator: () => Validator`)
+      this.writeln(`static validator: () => Validator<${asClass}>`)
     }
     this.pop()
   }
@@ -150,7 +150,7 @@ export class TypeRenderer extends BaseRenderer {
       }
       realDef = this.doc.mergeIntersection(realDef)
       if (isStructure(realDef) || isInterface(realDef)) {
-        typeDef = `TAtscriptTypeObject<keyof ${node.id!}}>`
+        typeDef = `TAtscriptTypeObject<keyof ${node.id!}>`
       } else if (isGroup(realDef)) {
         typeDef = 'TAtscriptTypeComplex'
       } else if (isArray(realDef)) {
@@ -162,7 +162,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(`const __is_anscript_annotated_type: true`)
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
-    this.writeln(`const validator: () => Validator`)
+    this.writeln(`const validator: () => Validator<${node.id!}>`)
     this.popln()
   }
 

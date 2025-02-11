@@ -17,7 +17,7 @@ declare namespace TFirstName {
   const __is_anscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: () => Validator
+  const validator: () => Validator<TFirstName>
 }
 
 /**
@@ -29,7 +29,7 @@ declare namespace TLastName {
   const __is_anscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: () => Validator
+  const validator: () => Validator<TLastName>
 }
 
 /**
@@ -41,7 +41,7 @@ declare namespace TAge {
   const __is_anscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: () => Validator
+  const validator: () => Validator<TAge>
 }
 
 /**
@@ -55,6 +55,6 @@ export declare class ITarget {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<ITarget>
 }
 // prettier-ignore-end

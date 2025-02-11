@@ -31,7 +31,7 @@ export declare class WithMetadata {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof WithMetadata>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<WithMetadata>
 }
 
 /**
@@ -43,8 +43,8 @@ export type SomeType = {
 }
 declare namespace SomeType {
   const __is_anscript_annotated_type: true
-  const type: TAtscriptTypeObject<keyof SomeType}>
+  const type: TAtscriptTypeObject<keyof SomeType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: () => Validator
+  const validator: () => Validator<SomeType>
 }
 // prettier-ignore-end

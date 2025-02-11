@@ -21,7 +21,7 @@ declare class Address {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Address>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<Address>
 }
 
 /**
@@ -35,7 +35,7 @@ declare class Contact {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Contact>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<Contact>
 }
 
 /**
@@ -50,6 +50,6 @@ export declare class Entity {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Entity>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<Entity>
 }
 // prettier-ignore-end

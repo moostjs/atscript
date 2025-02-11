@@ -2,6 +2,7 @@
 import {
   isAnnotatedType,
   TAtscriptAnnotatedType,
+  TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeArray,
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
@@ -22,11 +23,11 @@ export interface TValidatorOptions {
 
 const regexCache = new Map<string, RegExp>()
 
-export class Validator {
+export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
   protected opts: TValidatorOptions
 
   constructor(
-    protected readonly def: TAtscriptAnnotatedType,
+    protected readonly def: T,
     opts?: Partial<TValidatorOptions>
   ) {
     this.opts = {
@@ -84,7 +85,7 @@ export class Validator {
     throw new ValidatorError(this.errors)
   }
 
-  public validate(value: any, safe?: boolean): boolean {
+  public validate<TT = InstanceType<T>>(value: any, safe?: boolean): value is TT {
     this.push('')
     this.errors = []
     this.stackErrors = []

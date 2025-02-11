@@ -18,7 +18,7 @@ declare class IA {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof IA>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<IA>
 }
 
 /**
@@ -31,7 +31,7 @@ declare class IB {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof IB>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<IB>
 }
 
 /**
@@ -41,9 +41,9 @@ declare class IB {
 declare type T = IA & IB
 declare namespace T {
   const __is_anscript_annotated_type: true
-  const type: TAtscriptTypeObject<keyof T}>
+  const type: TAtscriptTypeObject<keyof T>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: () => Validator
+  const validator: () => Validator<T>
 }
 
 /**
@@ -58,6 +58,6 @@ export declare class I1 {
   static __is_anscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof I1>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: () => Validator
+  static validator: () => Validator<I1>
 }
 // prettier-ignore-end

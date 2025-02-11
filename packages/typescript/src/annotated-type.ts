@@ -48,10 +48,13 @@ export type TAtscriptTypeDef =
 export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
-  validator: (opts?: TValidatorOptions) => Validator
+  validator: (opts?: TValidatorOptions) => Validator<any>
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
 }
+
+export type TAtscriptAnnotatedTypeConstructor = TAtscriptAnnotatedType &
+  (new (...args: any[]) => any)
 
 /**
  * Type Guard to check if a type is atscript-annotated
@@ -83,7 +86,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       metadata,
       type,
       validator(opts?: TValidatorOptions) {
-        return new Validator(this as TAtscriptAnnotatedType, opts)
+        return new Validator(this as unknown as TAtscriptAnnotatedTypeConstructor, opts)
       },
     })
   } else {
@@ -154,7 +157,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
           type: newBase.type,
           metadata,
           validator(opts?: TValidatorOptions) {
-            return new Validator(this as TAtscriptAnnotatedType, opts)
+            return new Validator(this as TAtscriptAnnotatedTypeConstructor, opts)
           },
         }
       } else {
