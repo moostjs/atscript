@@ -85,7 +85,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new ValidatorError(this.errors)
   }
 
-  public validate<TT = InstanceType<T>>(value: any, safe?: boolean): value is TT {
+  public validate<TT = T>(value: any, safe?: boolean): value is TT {
     this.push('')
     this.errors = []
     this.stackErrors = []
