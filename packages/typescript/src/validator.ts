@@ -19,6 +19,7 @@ export interface TValidatorOptions {
   partial: boolean | 'deep'
   unknwonProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
+  skipList?: Set<string>
 }
 
 const regexCache = new Map<string, RegExp>()
@@ -222,7 +223,24 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     let passed = true
     const valueKeys = new Set(Object.keys(value))
     const typeKeys = new Set()
+
+    // prepare skipList for this object
+    const skipList = new Set()
+    if (this.opts.skipList) {
+      const path = this.stackPath.length > 1 ? this.stackPath.slice(1).join('.') + '.' : ''
+      this.opts.skipList.forEach(item => {
+        if (item.startsWith(path)) {
+          const key = item.slice(path.length)
+          skipList.add(key)
+          valueKeys.delete(key)
+        }
+      })
+    }
+
     for (const [key, item] of def.type.props.entries()) {
+      if (skipList.has(key)) {
+        continue
+      }
       typeKeys.add(key)
       if (value[key] === undefined) {
         if (

@@ -99,6 +99,21 @@ describe('Validator at objects', () => {
     ).toBe(false)
   })
 
+  it('should validate object with skipList', () => {
+    const t = deepObjectType
+    const validator = new Validator(t.$type, { skipList: new Set(['age', 'address.street']) })
+
+    const result = validator.validate(
+      {
+        name: 'John',
+        address: { city: 'Anytown', state: 'CA', zip: 12345 },
+      },
+      true
+    )
+    console.log(validator.errors)
+    expect(result).toBe(true)
+  })
+
   it('should validate object with partial option', () => {
     const t = deepObjectType
     const validator = new Validator(t.$type, { partial: true })
