@@ -48,7 +48,9 @@ export type TAtscriptTypeDef =
 export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
   __is_anscript_annotated_type: true
   type: T
-  validator: (opts?: TValidatorOptions) => Validator<any>
+  validator: <TT extends TAtscriptAnnotatedTypeConstructor>(
+    opts?: Partial<TValidatorOptions>
+  ) => Validator<TT>
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
 }

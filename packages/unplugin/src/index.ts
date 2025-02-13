@@ -16,7 +16,7 @@ export const anscriptPluginFactory: UnpluginFactory<undefined> = () => {
   const root = process.cwd()
   let anscriptConfig = new Promise<TAtscriptConfig>(resolve => {
     resolveConfigFile(root).then(p => {
-      loadConfig(path.join(root, p!)).then(resolve)
+      loadConfig(p!).then(resolve)
     })
   })
   let repo: AtscriptRepo
