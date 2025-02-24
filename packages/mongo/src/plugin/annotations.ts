@@ -7,6 +7,7 @@ import {
   isRef,
   isPrimitive,
   TMessages,
+  isArray,
 } from '@atscript/core'
 
 const analyzers = [
@@ -342,6 +343,122 @@ export const annotations: TAnnotationsTree = {
               'The **name of the vector search index** this field should be used as a filter for.',
           },
         ],
+      }),
+    },
+
+    patch: {
+      strategy: new AnnotationSpec({
+        description:
+          'Defines the **patching strategy** for updating MongoDB documents.\n\n' +
+          '- **"replace"** → The field or object will be **fully replaced**.\n' +
+          '- **"merge"** → The field or object will be **merged recursively** (applies only to objects, not arrays).\n\n' +
+          '**Example:**\n' +
+          '```atscript\n' +
+          '@mongo.patch.strategy "merge"\n' +
+          'settings: {\n' +
+          '  notifications: boolean\n' +
+          '  preferences: {\n' +
+          '    theme: string\n' +
+          '  }\n' +
+          '}\n' +
+          '```\n',
+        nodeType: ['prop'], // Applies to fields/properties
+        multiple: false, // Only one strategy per field
+        argument: {
+          name: 'strategy',
+          type: 'string',
+          description: 'The **patch strategy** for this field: `"replace"` (default) or `"merge"`.',
+          values: ['replace', 'merge'],
+        },
+        validate(token, args, doc) {
+          const field = token.parentNode!
+          const errors = [] as TMessages
+          const definition = field.getDefinition()
+          if (!definition) {
+            return errors
+          }
+          let wrongType = false
+          if (isRef(definition)) {
+            const def = doc.unwindType(definition.id!, definition.chain)?.def
+            if (!isStructure(def) && !isInterface(def) && !isArray(def)) {
+              wrongType = true
+            }
+          } else if (!isStructure(definition) && !isInterface(definition) && !isArray(definition)) {
+            wrongType = true
+          }
+          if (wrongType) {
+            errors.push({
+              message: `[mongo] type of object or array expected when using @mongo.patch.strategy`,
+              severity: 1,
+              range: token.range,
+            })
+          }
+          return errors
+        },
+      }),
+    },
+
+    array: {
+      key: new AnnotationSpec({
+        description:
+          'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys** when generating MongoDB update queries.\n\n' +
+          '- **Required for dynamic array updates.**\n' +
+          '- Can be applied to **one or more fields** inside an array item.\n' +
+          '- Used for **matching existing array elements** when updating nested arrays.\n\n' +
+          '**Example:**\n' +
+          '```atscript\n' +
+          'export interface User {\n' +
+          '  _id: mongo.objectId\n' +
+          '  profiles: {\n' +
+          '    @mongo.array.key\n' +
+          '    profileId: string\n' +
+          '    name: string\n' +
+          '  }[]\n' +
+          '}\n' +
+          '```\n\n' +
+          '**How It Works in MongoDB Updates:**\n' +
+          '- When updating an array, MongoDB needs a **unique key** to match items.\n' +
+          '- This annotation allows automatic generation of `arrayFilters` using the **key field**.\n\n' +
+          '**Example Generated Condition:**\n' +
+          '```json\n' +
+          '{ "arrayFilters": [{ "profile.profileId": "12345" }] }\n' +
+          '```\n\n' +
+          '✅ **Enables efficient, structured updates for deeply nested arrays.**',
+        nodeType: ['prop'],
+        multiple: false,
+        validate(token, args, doc) {
+          const field = token.parentNode!
+          const errors = [] as TMessages
+          const isOptional = !!field.token('optional')
+          if (isOptional) {
+            errors.push({
+              message: `[mongo] array key can't be optional`,
+              severity: 1,
+              range: field.token('identifier')!.range,
+            })
+          }
+          const definition = field.getDefinition()
+          if (!definition) {
+            return errors
+          }
+          let wrongType = false
+          if (isRef(definition)) {
+            const def = doc.unwindType(definition.id!, definition.chain)?.def
+            if (isPrimitive(def) && !['string', 'number'].includes(def.config.type as string)) {
+              wrongType = true
+            }
+          } else {
+            wrongType = true
+          }
+          if (wrongType) {
+            errors.push({
+              message: `[mongo] array key must be of type string, number or mongo.objectId`,
+              severity: 1,
+              range: token.range,
+            })
+          }
+          return errors
+        },
       }),
     },
   },

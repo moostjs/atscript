@@ -18,6 +18,8 @@ declare global {
     'mongo.search.text': { analyzer?: string; indexName?: string }[]
     'mongo.search.vector': { dimensions: number; similarity?: string; indexName?: string }
     'mongo.search.filter': { indexName: string }[]
+    'mongo.patch.strategy': string
+    'mongo.array.key': boolean
   }
   type AtscriptPrimitiveTags =
     | 'never'

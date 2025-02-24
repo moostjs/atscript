@@ -6,9 +6,10 @@ import {
   TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeObject,
   TMetadataMap,
+  Validator,
 } from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
-import { Collection } from 'mongodb'
+import { Collection, ObjectId, OptionalId, UpdateFilter, WithId } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
 
 const INDEX_PREFIX = 'anscript__'
@@ -27,6 +28,12 @@ type TSearchIndex = {
 
 type TIndex = TPlainIndex | TSearchIndex
 
+/**
+ * Generates a key for mongo index
+ * @param type index type
+ * @param name index name
+ * @returns index key
+ */
 function indexKey(type: TIndex['type'], name: string) {
   const cleanName = name
     .replace(/[^a-z0-9_.-]/gi, '_') // Replace spaces & special chars with "_"
@@ -35,9 +42,21 @@ function indexKey(type: TIndex['type'], name: string) {
   return `${INDEX_PREFIX}${type}__${cleanName}`
 }
 
+type TValidatorPurpose = 'insert' | 'update' | 'patch'
+
 export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   public readonly name: string
+
   public readonly collection: Collection<InstanceType<T>>
+
+  protected readonly validators = new Map<TValidatorPurpose, Validator<T>>()
+
+  protected _indexes = new Map<string, TIndex>()
+
+  protected _vectorFilters: Map<string, string> = new Map()
+
+  protected _flatMap?: Map<string, TAtscriptAnnotatedType>
+
   constructor(
     protected readonly asMongo: AsMongo,
     protected readonly _type: T,
@@ -57,11 +76,11 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     this.collection = asMongo.db.collection<InstanceType<T>>(name)
   }
 
-  async exists() {
+  public async exists() {
     return this.asMongo.collectionExists(this.name)
   }
 
-  async ensureExists() {
+  public async ensureExists() {
     const exists = await this.exists()
     if (!exists) {
       await this.asMongo.db.createCollection(this.name, {
@@ -70,15 +89,80 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  get type() {
+  /**
+   * Returns the a type definition of the "_id" prop.
+   */
+  public get idType(): 'string' | 'number' | 'objectId' {
+    const idProp = this.type.type.props.get('_id')
+    const idTags = idProp?.type.tags
+    if (idTags?.has('objectId') && idTags?.has('mongo')) {
+      return 'objectId'
+    }
+    if (idProp?.type.kind === '') {
+      return idProp.type.designType as 'string' | 'number'
+    }
+    return 'objectId' // fallback to objectId
+  }
+
+  /**
+   * Transforms an "_id" value to the expected type (`ObjectId`, `number`, or `string`).
+   * Assumes input has already been validated.
+   *
+   * @param {string | number | ObjectId} id - The validated ID.
+   * @returns {string | number | ObjectId} - The transformed ID.
+   * @throws {Error} If the `_id` type is unknown.
+   */
+  public prepareId<D = string | number | ObjectId>(id: string | number | ObjectId): D {
+    switch (this.idType) {
+      case 'objectId':
+        return (id instanceof ObjectId ? id : new ObjectId(id)) as D
+      case 'number':
+        return Number(id) as D
+      case 'string':
+        return String(id) as D
+      default:
+        throw new Error('Unknown "_id" type')
+    }
+  }
+
+  /**
+   * Retrieves a validator for a given purpose. If the validator is not already cached,
+   * it creates and stores a new one based on the purpose.
+   *
+   * @param {TValidatorPurpose} purpose - The validation purpose (`input`, `update`, `patch`).
+   * @returns {Validator} The corresponding validator instance.
+   * @throws {Error} If an unknown purpose is provided.
+   */
+  public getValidator(purpose: TValidatorPurpose) {
+    if (!this.validators.has(purpose)) {
+      switch (purpose) {
+        case 'insert': {
+          this.validators.set(
+            purpose,
+            this.type.validator(this.idType === 'objectId' ? { skipList: new Set(['_id']) } : {})
+          )
+          break
+        }
+        case 'update': {
+          this.validators.set(purpose, this.type.validator())
+          break
+        }
+        case 'patch': {
+          this.validators.set(purpose, this.type.validator({ partial: 'deep' }))
+          break
+        }
+        default:
+          throw new Error(`Unknown validator purpose: ${purpose}`)
+      }
+    }
+    return this.validators.get(purpose)
+  }
+
+  public get type() {
     return this._type as TAtscriptAnnotatedType<TAtscriptTypeObject>
   }
 
-  protected _indexes = new Map<string, TIndex>()
-
-  protected _vectorFilters: Map<string, string> = new Map()
-
-  get indexes() {
+  public get indexes() {
     this._flatten()
     return this._indexes
   }
@@ -140,8 +224,6 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  protected _flatMap?: Map<string, TAtscriptAnnotatedType>
-
   protected _flattenType(type: TAtscriptAnnotatedType, prefix?: string) {
     switch (type.type.kind) {
       case 'object':
@@ -151,7 +233,10 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
         }
         break
       case 'array':
-        this._flattenType(type.type.of, prefix)
+        this._flatMap?.set(prefix || '', type)
+        if (type.type.of.type.kind) {
+          this._flattenType(type.type.of, prefix)
+        }
         break
       case 'intersection':
       case 'tuple':
@@ -240,12 +325,12 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  get flatMap() {
+  public get flatMap() {
     this._flatten()
     return this._flatMap
   }
 
-  async syncIndexes() {
+  public async syncIndexes() {
     await this.ensureExists()
     const existingIndexes = (await this.collection.listIndexes().toArray()) as TMongoIndex[]
 
@@ -354,6 +439,38 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
         default:
       }
     }
+  }
+
+  public prepareInsert(payload: any): OptionalId<T> {
+    const v = this.getValidator('insert')!
+    if (v.validate(payload)) {
+      const data = { ...payload } as any & { _id?: string | number | ObjectId }
+      if (data._id) {
+        data._id = this.prepareId(data._id)
+      } else if (this.idType !== 'objectId') {
+        throw new Error('Missing "_id" field')
+      }
+      return data
+    }
+    throw new Error('Invalid payload')
+  }
+
+  public prepareUpdate(payload: any): WithId<T> {
+    const v = this.getValidator('insert')!
+    if (v.validate(payload)) {
+      const data = { ...payload } as any & { _id: string | number | ObjectId }
+      data._id = this.prepareId(data._id)
+      return data
+    }
+    throw new Error('Invalid payload')
+  }
+
+  public preparePatch(payload: any): UpdateFilter<T> {
+    const v = this.getValidator('update')!
+    if (v.validate(payload)) {
+      // flatten
+    }
+    throw new Error('Invalid payload')
   }
 }
 
