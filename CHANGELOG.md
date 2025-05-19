@@ -1,3 +1,19 @@
+## [0.0.17](https://github.com/ts-anscript/anscript/compare/v0.0.16...v0.0.17) (2025-05-19)
+
+
+### Bug Fixes
+
+* fix strings render; fix config load ([c356958](https://github.com/ts-anscript/anscript/commit/c356958cbabdbe16522cac218e074868b98757a5))
+* **typescript:** fix type guard for validate method ([ee0b730](https://github.com/ts-anscript/anscript/commit/ee0b730d043fed50664ec0829c0fb29f1957327c))
+
+
+### Features
+
+* **mongo:** add array.key and patch.strategy annotations ([7f40a84](https://github.com/ts-anscript/anscript/commit/7f40a843499e7628dd452b46e84e58e800bd6c5f))
+* **typescript:** add skipList option to validator ([8bf5a34](https://github.com/ts-anscript/anscript/commit/8bf5a343b28294110b6319eb22e1b729b9b2418b))
+
+
+
 ## [0.0.16](https://github.com/ts-anscript/anscript/compare/v0.0.15...v0.0.16) (2025-02-11)
 
 
