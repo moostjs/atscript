@@ -10,7 +10,7 @@ export interface WithMetadata {
     @mul 3
     @long.nested.name 'Prop-2'
     @long.nested.name2 'Prop-2-2'
-    'prop-2': int
+    'prop-2': number.int
 
     @nested
     obj: {
@@ -24,11 +24,11 @@ export interface WithMetadata {
         nested2: {
             nested3: {
                 @label 'Prop5'
-                a: float
+                a: number.double
                 @labelOptional
                 b: string
                 @mul 3
-                d: true
+                d: boolean.true
                 @mulOptional
                 e: null
                 @obj '123'

@@ -176,7 +176,7 @@ export class AtscriptRepo {
     }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
-      const globalPathToConfig = path.join(this.root, configFile)
+      const globalPathToConfig = configFile
       if (!this.configFiles.has(globalPathToConfig)) {
         const rawConfigPromise = loadConfig(configFile, this.configFormat)
         this.configFiles.set(globalPathToConfig, rawConfigPromise)

@@ -16,7 +16,10 @@ interface TError {
 }
 
 export interface TValidatorOptions {
-  partial: boolean | 'deep'
+  partial:
+    | boolean
+    | 'deep'
+    | ((type: TAtscriptAnnotatedType<TAtscriptTypeObject>, path: string) => boolean)
   unknwonProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
@@ -237,6 +240,11 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
       })
     }
 
+    let partialFunctionMatched = false
+    if (typeof this.opts.partial === 'function') {
+      partialFunctionMatched = this.opts.partial(def, this.stackPath.join('.').slice(1))
+    }
+
     for (const [key, item] of def.type.props.entries()) {
       if (skipList.has(key)) {
         continue
@@ -244,6 +252,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
       typeKeys.add(key)
       if (value[key] === undefined) {
         if (
+          partialFunctionMatched ||
           this.opts.partial === 'deep' ||
           (this.opts.partial === true && this.stackPath.length <= 1)
         ) {

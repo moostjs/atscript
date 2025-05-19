@@ -9,10 +9,10 @@ import {
   Validator,
 } from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
-import { Collection, ObjectId, OptionalId, UpdateFilter, WithId } from 'mongodb'
+import { Collection, MatchKeysAndValues, ObjectId, UpdateFilter, WithId } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
 
-const INDEX_PREFIX = 'anscript__'
+const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
 
 type TPlainIndex = {
@@ -148,7 +148,14 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
           break
         }
         case 'patch': {
-          this.validators.set(purpose, this.type.validator({ partial: 'deep' }))
+          this.validators.set(
+            purpose,
+            this.type.validator({
+              partial: (def, path) => {
+                return path === '' || def.metadata.get('mongo.patch.strategy') === 'merge'
+              },
+            })
+          )
           break
         }
         default:
@@ -227,6 +234,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   protected _flattenType(type: TAtscriptAnnotatedType, prefix?: string) {
     switch (type.type.kind) {
       case 'object':
+        this._flatMap?.set(prefix || '', type)
         const items = Array.from(type.type.props.entries())
         for (const [key, value] of items) {
           this._flattenType(value, prefix ? `${prefix}.${key}` : key)
@@ -327,7 +335,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
 
   public get flatMap() {
     this._flatten()
-    return this._flatMap
+    return this._flatMap!
   }
 
   public async syncIndexes() {
@@ -441,7 +449,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  public prepareInsert(payload: any): OptionalId<T> {
+  public prepareInsert(payload: any): InstanceType<T> {
     const v = this.getValidator('insert')!
     if (v.validate(payload)) {
       const data = { ...payload } as any & { _id?: string | number | ObjectId }
@@ -455,7 +463,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new Error('Invalid payload')
   }
 
-  public prepareUpdate(payload: any): WithId<T> {
+  public prepareUpdate(payload: any): WithId<InstanceType<T>> {
     const v = this.getValidator('insert')!
     if (v.validate(payload)) {
       const data = { ...payload } as any & { _id: string | number | ObjectId }
@@ -465,12 +473,35 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new Error('Invalid payload')
   }
 
-  public preparePatch(payload: any): UpdateFilter<T> {
-    const v = this.getValidator('update')!
+  public preparePatch(payload: any): UpdateFilter<InstanceType<T>> {
+    const v = this.getValidator('patch')!
     if (v.validate(payload)) {
       // flatten
+      return {
+        $set: this._flattenPayload(payload),
+      }
     }
     throw new Error('Invalid payload')
+  }
+
+  protected _flattenPayload(
+    payload: T,
+    prefix = '',
+    obj = {} as MatchKeysAndValues<InstanceType<T>>
+  ): MatchKeysAndValues<InstanceType<T>> {
+    const evalKey = (k: string) => (prefix ? `${prefix}.${k}` : k) as string
+    for (const [_key, value] of Object.entries(payload)) {
+      const key = evalKey(_key)
+      if (
+        typeof value === 'object' &&
+        this.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
+      ) {
+        this._flattenPayload(value, key, obj)
+      } else {
+        obj[key as keyof typeof obj] = value
+      }
+    }
+    return obj
   }
 }
 

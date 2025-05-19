@@ -1,14 +1,14 @@
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class WithMetadata {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
 export class SomeType {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
@@ -22,13 +22,14 @@ $("object", WithMetadata)
       .$type
   ).prop(
     "prop-2",
-    $()
-      .refTo(int)
+    $().designType("number")
+      .tags("int", "number")
       .annotate("mul", 1, true)
       .annotate("mul", 2, true)
       .annotate("mul", 3, true)
       .annotate("long.nested.name", "Prop-2")
       .annotate("long.nested.name2", "Prop-2-2")
+      .annotate("expect.int", true)
       .$type
   ).prop(
     "obj",
@@ -53,8 +54,8 @@ $("object", WithMetadata)
             $("object")
               .prop(
                 "a",
-                $()
-                  .refTo(float)
+                $().designType("number")
+                  .tags("double", "number")
                   .annotate("label", "Prop5")
                   .$type
               ).prop(
@@ -65,8 +66,8 @@ $("object", WithMetadata)
                   .$type
               ).prop(
                 "d",
-                $()
-                  .refTo(true)
+                $().designType("boolean")
+                  .tags("true", "boolean")
                   .annotate("mul", 3, true)
                   .$type
               ).prop(

@@ -1,7 +1,7 @@
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class PublicInterface {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
@@ -26,7 +26,7 @@ $("object", PublicInterface)
     "email",
     $().designType("string")
       .tags("email", "string")
-      .annotate("expect.pattern", { pattern: "^[^\s@]+@[^\s@]+\.[^\s@]+$",  flags: "",  message: "Invalid email format." }, true)
+      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
       .$type
   ).prop(
     "interger",

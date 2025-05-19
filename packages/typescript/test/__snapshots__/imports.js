@@ -3,7 +3,7 @@ import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 
 export class People {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }

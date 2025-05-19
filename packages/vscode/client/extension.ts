@@ -74,7 +74,7 @@ export function activate(context: ExtensionContext) {
 
     // Create the language client and start it
     client = new LanguageClient(
-      'anscriptLangServer', // internal ID
+      'atscriptLangServer', // internal ID
       'Atscript Language Server', // display name
       serverOptions,
       clientOptions

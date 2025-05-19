@@ -1,14 +1,14 @@
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class ISource {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
 export class ITarget {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }

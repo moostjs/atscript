@@ -16,6 +16,7 @@ declare global {
     "meta.placeholder": string
     "meta.sensitive": boolean
     "meta.readonly": boolean
+    "meta.isKey": boolean
     "expect.minLength": number
     "expect.maxLength": number
     "expect.min": number

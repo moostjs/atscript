@@ -1,28 +1,28 @@
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class IA {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
 class IB {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
 class T {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }
 
 
 export class I1 {
-  static __is_anscript_annotated_type = true
+  static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
 }

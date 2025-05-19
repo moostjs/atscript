@@ -12,9 +12,9 @@ import { readFile } from 'fs/promises'
 import type { UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 
-export const anscriptPluginFactory: UnpluginFactory<undefined> = () => {
+export const atscriptPluginFactory: UnpluginFactory<undefined> = () => {
   const root = process.cwd()
-  let anscriptConfig = new Promise<TAtscriptConfig>(resolve => {
+  let atscriptConfig = new Promise<TAtscriptConfig>(resolve => {
     resolveConfigFile(root).then(p => {
       loadConfig(p!).then(resolve)
     })
@@ -32,7 +32,7 @@ export const anscriptPluginFactory: UnpluginFactory<undefined> = () => {
     async load(id) {
       if (id.endsWith('.as')) {
         if (!repo) {
-          const config = await anscriptConfig
+          const config = await atscriptConfig
           if (!config.plugins) {
             config.plugins = [ts()]
           }
@@ -49,6 +49,6 @@ export const anscriptPluginFactory: UnpluginFactory<undefined> = () => {
   }
 }
 
-export const asPlugin = /* #__PURE__ */ createUnplugin(anscriptPluginFactory)
+export const asPlugin = /* #__PURE__ */ createUnplugin(atscriptPluginFactory)
 
 export default asPlugin

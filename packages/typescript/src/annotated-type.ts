@@ -46,7 +46,7 @@ export type TAtscriptTypeDef =
   | TAtscriptTypeObject<string>
 
 export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
-  __is_anscript_annotated_type: true
+  __is_atscript_annotated_type: true
   type: T
   validator: <TT extends TAtscriptAnnotatedTypeConstructor>(
     opts?: Partial<TValidatorOptions>
@@ -62,7 +62,7 @@ export type TAtscriptAnnotatedTypeConstructor = TAtscriptAnnotatedType &
  * Type Guard to check if a type is atscript-annotated
  */
 export function isAnnotatedType(type: any): type is TAtscriptAnnotatedType {
-  return type && type.__is_anscript_annotated_type
+  return type && type.__is_atscript_annotated_type
 }
 
 type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
@@ -84,7 +84,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
   const metadata = (base?.metadata || new Map<string, unknown>()) as Map<string, unknown>
   if (base) {
     Object.assign(base, {
-      __is_anscript_annotated_type: true,
+      __is_atscript_annotated_type: true,
       metadata,
       type,
       validator(opts?: TValidatorOptions) {
@@ -93,7 +93,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     })
   } else {
     base = {
-      __is_anscript_annotated_type: true,
+      __is_atscript_annotated_type: true,
       metadata,
       type,
       validator(opts?: TValidatorOptions) {
@@ -155,7 +155,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
           throw new Error(`"${typeName}" is not annotated type`)
         }
         this.$type = {
-          __is_anscript_annotated_type: true,
+          __is_atscript_annotated_type: true,
           type: newBase.type,
           metadata,
           validator(opts?: TValidatorOptions) {

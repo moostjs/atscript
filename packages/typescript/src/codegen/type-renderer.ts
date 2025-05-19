@@ -28,7 +28,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator } from "@atscript/typescript"'
+      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator, TAtscriptAnnotatedTypeConstructor, TValidatorOptions } from "@atscript/typescript"'
     )
   }
 
@@ -104,10 +104,12 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln()
     }
     if (asClass) {
-      this.writeln('static __is_anscript_annotated_type: true')
+      this.writeln('static __is_atscript_annotated_type: true')
       this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
       this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
-      this.writeln(`static validator: () => Validator<${asClass}>`)
+      this.writeln(
+        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${asClass}>(opts?: TValidatorOptions) => Validator<TT>`
+      )
     }
     this.pop()
   }
@@ -159,10 +161,12 @@ export class TypeRenderer extends BaseRenderer {
         typeDef = 'TAtscriptTypeFinal'
       }
     }
-    this.writeln(`const __is_anscript_annotated_type: true`)
+    this.writeln(`const __is_atscript_annotated_type: true`)
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
-    this.writeln(`const validator: () => Validator<${node.id!}>`)
+    this.writeln(
+      `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: TValidatorOptions) => Validator<TT>`
+    )
     this.popln()
   }
 

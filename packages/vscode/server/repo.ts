@@ -443,6 +443,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
   async onConfigChanged(_configFile: string) {
     const configFile = _configFile.startsWith('file://') ? _configFile.slice(7) : _configFile
+    console.log('Reloading config: ' + configFile)
     this.configFiles.delete(configFile)
     for (const [id, cache] of Array.from(this.configs.entries())) {
       const { file } = await cache
