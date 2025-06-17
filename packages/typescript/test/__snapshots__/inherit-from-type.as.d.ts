@@ -17,7 +17,7 @@ declare namespace TFirstName {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TFirstName>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TFirstName>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -29,7 +29,7 @@ declare namespace TLastName {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLastName>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLastName>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -41,7 +41,7 @@ declare namespace TAge {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TAge>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TAge>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -55,6 +55,6 @@ export declare class ITarget {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ITarget>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ITarget>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end

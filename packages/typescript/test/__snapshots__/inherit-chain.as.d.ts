@@ -17,7 +17,7 @@ declare namespace TType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TType>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -29,7 +29,7 @@ declare class I1 {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof I1>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = I1>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = I1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -41,6 +41,6 @@ export declare class I2 {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof I2>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = I2>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = I2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end

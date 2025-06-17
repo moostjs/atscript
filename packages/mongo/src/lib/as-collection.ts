@@ -593,15 +593,21 @@ function fieldsMatch(
   left: Required<TMongoSearchIndexDefinition>['mappings']['fields'],
   right: Required<TMongoSearchIndexDefinition>['mappings']['fields']
 ): boolean {
-  if (!left || !right) return left === right // Both must be defined or both must be undefined
+  if (!left || !right) {
+    return left === right
+  } // Both must be defined or both must be undefined
 
   const leftKeys = Object.keys(left)
   const rightKeys = Object.keys(right)
 
-  if (leftKeys.length !== rightKeys.length) return false // Ensure same number of fields
+  if (leftKeys.length !== rightKeys.length) {
+    return false
+  } // Ensure same number of fields
 
   return leftKeys.every(key => {
-    if (!(key in right)) return false // Field must exist in both
+    if (!(key in right)) {
+      return false
+    } // Field must exist in both
 
     const leftField = left[key]
     const rightField = right[key]
@@ -619,6 +625,8 @@ function objMatch(
 ): boolean {
   const keys1 = Object.keys(o1)
   const keys2 = Object.keys(o2)
-  if (keys1.length !== keys2.length) return false // Ensure both have the same number of keys
+  if (keys1.length !== keys2.length) {
+    return false
+  } // Ensure both have the same number of keys
   return keys1.every(key => o1[key] === o2[key]) // Ensure all keys match exactly
 }

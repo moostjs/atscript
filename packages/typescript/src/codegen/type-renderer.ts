@@ -108,7 +108,7 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
       this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
       this.writeln(
-        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${asClass}>(opts?: TValidatorOptions) => Validator<TT>`
+        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${asClass}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
       )
     }
     this.pop()
@@ -165,7 +165,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: TValidatorOptions) => Validator<TT>`
+      `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
     )
     this.popln()
   }

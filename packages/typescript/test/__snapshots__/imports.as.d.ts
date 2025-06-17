@@ -21,6 +21,6 @@ export declare class People {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof People>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = People>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = People>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end

@@ -17,7 +17,7 @@ declare namespace TContactType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TContactType>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TContactType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -33,7 +33,7 @@ export declare class Address {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Address>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Address>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Address>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -47,7 +47,7 @@ declare class Contact {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Contact>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Contact>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Contact>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -62,6 +62,6 @@ export declare class User {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof User>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = User>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = User>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end
