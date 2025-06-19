@@ -20,6 +20,7 @@ export interface TValidatorOptions {
     | boolean
     | 'deep'
     | ((type: TAtscriptAnnotatedType<TAtscriptTypeObject>, path: string) => boolean)
+  replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
   unknwonProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
@@ -110,6 +111,9 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     }
     if (!isAnnotatedType(def)) {
       throw new Error('Can not validate not-annotated type')
+    }
+    if (typeof this.opts.replace === 'function') {
+      def = this.opts.replace(def, this.stackPath.join('.').slice(1))
     }
     if (def.optional && value === undefined) {
       return true
@@ -363,7 +367,9 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     }
     const patterns = def.metadata.get('expect.pattern')
     for (const { pattern, flags, message } of patterns || []) {
-      if (!pattern) continue
+      if (!pattern) {
+        continue
+      }
 
       const cacheKey = `${pattern}//${flags || ''}`
 

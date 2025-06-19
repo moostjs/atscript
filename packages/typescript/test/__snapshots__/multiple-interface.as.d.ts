@@ -17,7 +17,7 @@ declare namespace TContactType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TContactType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TContactType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**

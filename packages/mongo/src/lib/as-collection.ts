@@ -7,10 +7,26 @@ import {
   TAtscriptTypeObject,
   TMetadataMap,
   Validator,
+  defineAnnotatedType as $,
+  isAnnotatedTypeOfPrimitive,
+  TAtscriptTypeDef,
+  TAtscriptTypeArray,
 } from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
-import { Collection, MatchKeysAndValues, ObjectId, UpdateFilter, WithId } from 'mongodb'
+import {
+  AddToSetOperators,
+  Collection,
+  Filter,
+  MatchKeysAndValues,
+  ObjectId,
+  PullAllOperator,
+  PushOperator,
+  UpdateFilter,
+  UpdateOptions,
+  WithId,
+} from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
+import { CollectionPatcher } from './collection-patcher'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
@@ -148,14 +164,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
           break
         }
         case 'patch': {
-          this.validators.set(
-            purpose,
-            this.type.validator({
-              partial: (def, path) => {
-                return path === '' || def.metadata.get('mongo.patch.strategy') === 'merge'
-              },
-            })
-          )
+          this.validators.set(purpose, CollectionPatcher.prepareValidator(this))
           break
         }
         default:
@@ -231,26 +240,33 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  protected _flattenType(type: TAtscriptAnnotatedType, prefix?: string) {
+  protected _flattenType(type: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
     switch (type.type.kind) {
       case 'object':
         this._flatMap?.set(prefix || '', type)
         const items = Array.from(type.type.props.entries())
         for (const [key, value] of items) {
-          this._flattenType(value, prefix ? `${prefix}.${key}` : key)
+          this._flattenType(value, prefix ? `${prefix}.${key}` : key, inComplexTypeOrArray)
         }
         break
       case 'array':
-        this._flatMap?.set(prefix || '', type)
-        if (type.type.of.type.kind) {
-          this._flattenType(type.type.of, prefix)
+        let typeArray = type as TAtscriptAnnotatedType<TAtscriptTypeArray>
+        if (!inComplexTypeOrArray) {
+          typeArray = $().refTo(type).copyMetadata(type.metadata)
+            .$type as TAtscriptAnnotatedType<TAtscriptTypeArray>
+          // @ts-expect-error
+          typeArray.metadata.set('mongo.__topLevelArray', true)
         }
+        this._flatMap?.set(prefix || '', typeArray)
+        // if (typeArray.type.of.type.kind === 'object') {
+        //   this._flattenType(typeArray.type.of, prefix, true)
+        // }
         break
       case 'intersection':
       case 'tuple':
       case 'union':
         for (const item of type.type.items) {
-          this._flattenType(item, prefix)
+          this._flattenType(item, prefix, true)
         }
       default:
         this._flatMap?.set(prefix || '', type)
@@ -473,35 +489,12 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new Error('Invalid payload')
   }
 
-  public preparePatch(payload: any): UpdateFilter<InstanceType<T>> {
+  public preparePatch(payload: any) {
     const v = this.getValidator('patch')!
     if (v.validate(payload)) {
-      // flatten
-      return {
-        $set: this._flattenPayload(payload),
-      }
+      return new CollectionPatcher(this, payload).preparePatch()
     }
     throw new Error('Invalid payload')
-  }
-
-  protected _flattenPayload(
-    payload: T,
-    prefix = '',
-    obj = {} as MatchKeysAndValues<InstanceType<T>>
-  ): MatchKeysAndValues<InstanceType<T>> {
-    const evalKey = (k: string) => (prefix ? `${prefix}.${k}` : k) as string
-    for (const [_key, value] of Object.entries(payload)) {
-      const key = evalKey(_key)
-      if (
-        typeof value === 'object' &&
-        this.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
-      ) {
-        this._flattenPayload(value, key, obj)
-      } else {
-        obj[key as keyof typeof obj] = value
-      }
-    }
-    return obj
   }
 }
 

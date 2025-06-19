@@ -29,10 +29,20 @@ export declare class SimpleCollection {
     email: string
     phone: string
   }
+  nested?: {
+    nested1?: {
+      a?: number
+      b?: string
+    }
+    nested2?: {
+      c?: number
+      d?: string
+    }
+  }
   _id: string /* objectId */
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof SimpleCollection>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = SimpleCollection>(opts?: TValidatorOptions) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = SimpleCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end

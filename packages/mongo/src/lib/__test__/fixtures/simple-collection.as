@@ -20,4 +20,13 @@ export interface SimpleCollection {
         email: string
         phone: string
     }
+
+    @mongo.patch.strategy 'merge'
+    nested?: {
+        @mongo.patch.strategy 'replace'
+        nested1?: { a?: number, b?: string }
+
+        @mongo.patch.strategy 'merge'
+        nested2?: { c?: number, d?: string }
+    }
 }

@@ -67,7 +67,7 @@ export function isAnnotatedType(type: any): type is TAtscriptAnnotatedType {
 
 type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
 
-export function defineAnnotatedType(_kind?: TKind, base?: any) {
+export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHandle {
   const kind = _kind || ''
   const type = (base?.type || {}) as { kind: TKind } & Omit<TAtscriptTypeComplex, 'kind'> &
     Omit<TAtscriptTypeFinal, 'kind'> &
@@ -81,7 +81,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     type.props = new Map()
   }
   type.tags = new Set()
-  const metadata = (base?.metadata || new Map<string, unknown>()) as Map<string, unknown>
+  const metadata = (base?.metadata || new Map<string, unknown>()) as TMetadataMap<AtscriptMetadata>
   if (base) {
     Object.assign(base, {
       __is_atscript_annotated_type: true,
@@ -102,7 +102,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
     }
   }
   const handle = {
-    $type: base,
+    $type: base as TAtscriptAnnotatedType,
     $def: type,
     $metadata: metadata,
     _existingObject: undefined as TAtscriptAnnotatedType | undefined,
@@ -132,19 +132,27 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       this.$def.props.set(name, value)
       return this
     },
-    optional() {
-      this.$type.optional = true
+    optional(value = true) {
+      this.$type.optional = value
       return this
     },
-    refTo(type: any, chain?: string[]) {
+    copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>, ignore?: Set<string>) {
+      for (const [key, value] of fromMetadata.entries()) {
+        if (!ignore || !ignore.has(key)) {
+          this.$metadata.set(key, value)
+        }
+      }
+      return this
+    },
+    refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]) {
       let newBase = type
       const typeName = type.name || 'Unknown'
       if (isAnnotatedType(newBase)) {
         let keys = ''
         for (const c of chain || []) {
           keys += `["${c}"]`
-          if (newBase.type.kind === 'object') {
-            newBase = newBase.type.props.get(c)
+          if (newBase.type.kind === 'object' && newBase.type.props.has(c)) {
+            newBase = newBase.type.props.get(c)!
           } else {
             throw new Error(`Can't find prop ${typeName}${keys}`)
           }
@@ -158,8 +166,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
           __is_atscript_annotated_type: true,
           type: newBase.type,
           metadata,
-          validator(opts?: TValidatorOptions) {
-            return new Validator(this as TAtscriptAnnotatedTypeConstructor, opts)
+          validator(opts?: Partial<TValidatorOptions>) {
+            return new Validator(this as TAtscriptAnnotatedTypeConstructor, opts) as Validator<any>
           },
         }
       } else {
@@ -167,7 +175,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any) {
       }
       return this
     },
-    annotate(key: string, value: any, asArray?: boolean) {
+    annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {
       if (asArray) {
         if (this.$metadata.has(key)) {
           const a = this.$metadata.get(key)
@@ -197,4 +205,44 @@ export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]>
 
   // Set enforces that the value must match O[K]
   set<K extends keyof O>(key: K, value: O[K]): this
+}
+
+export interface TAnnotatedTypeHandle {
+  $type: TAtscriptAnnotatedType
+  $def: {
+    kind: TKind
+  } & Omit<TAtscriptTypeComplex, 'kind'> &
+    Omit<TAtscriptTypeFinal, 'kind'> &
+    Omit<TAtscriptTypeArray, 'kind'> &
+    Omit<TAtscriptTypeObject<string>, 'kind'>
+  $metadata: TMetadataMap<AtscriptMetadata>
+  _existingObject: TAtscriptAnnotatedType | undefined
+  tags(...tags: string[]): TAnnotatedTypeHandle
+  designType(value: TAtscriptTypeFinal['designType']): TAnnotatedTypeHandle
+  value(value: string | number | boolean): TAnnotatedTypeHandle
+  of(value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
+  item(value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
+  prop(name: string, value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
+  optional(value?: boolean): TAnnotatedTypeHandle
+  copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>): TAnnotatedTypeHandle
+  refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]): TAnnotatedTypeHandle
+  annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean): TAnnotatedTypeHandle
+}
+
+export function isAnnotatedTypeOfPrimitive(t: TAtscriptAnnotatedType) {
+  if (['array', 'object'].includes(t.type.kind)) {
+    return false
+  }
+  if (!t.type.kind) {
+    return true
+  }
+  if (['union', 'tuple', 'intersection'].includes(t.type.kind)) {
+    for (const item of (t.type as TAtscriptTypeComplex).items) {
+      if (!isAnnotatedTypeOfPrimitive(item)) {
+        return false
+      }
+    }
+    return true
+  }
+  return false
 }

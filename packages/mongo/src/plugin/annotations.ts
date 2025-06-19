@@ -397,5 +397,38 @@ export const annotations: TAnnotationsTree = {
         },
       }),
     },
+
+    array: {
+      actions: new AnnotationSpec({
+        description: 'Enables **Array Actions** on an array.\n\n' + '```\n',
+        nodeType: ['prop'], // Applies to fields/properties
+        multiple: false,
+        validate(token, args, doc) {
+          const field = token.parentNode!
+          const errors = [] as TMessages
+          const definition = field.getDefinition()
+          if (!definition) {
+            return errors
+          }
+          let wrongType = false
+          if (isRef(definition)) {
+            const def = doc.unwindType(definition.id!, definition.chain)?.def
+            if (!isArray(def)) {
+              wrongType = true
+            }
+          } else if (!isArray(definition)) {
+            wrongType = true
+          }
+          if (wrongType) {
+            errors.push({
+              message: `[mongo] type of array expected when using @mongo.array.actions`,
+              severity: 1,
+              range: token.range,
+            })
+          }
+          return errors
+        },
+      }),
+    },
   },
 }

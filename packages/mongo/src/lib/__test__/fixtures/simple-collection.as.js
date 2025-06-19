@@ -85,6 +85,51 @@ $("object", SimpleCollection)
       .annotate("mongo.patch.strategy", "merge")
       .$type
   ).prop(
+    "nested",
+    $("object")
+      .prop(
+        "nested1",
+        $("object")
+          .prop(
+            "a",
+            $().designType("number")
+              .tags("number")
+              .optional()
+              .$type
+          ).prop(
+            "b",
+            $().designType("string")
+              .tags("string")
+              .optional()
+              .$type
+          )
+          .annotate("mongo.patch.strategy", "replace")
+          .optional()
+          .$type
+      ).prop(
+        "nested2",
+        $("object")
+          .prop(
+            "c",
+            $().designType("number")
+              .tags("number")
+              .optional()
+              .$type
+          ).prop(
+            "d",
+            $().designType("string")
+              .tags("string")
+              .optional()
+              .$type
+          )
+          .annotate("mongo.patch.strategy", "merge")
+          .optional()
+          .$type
+      )
+      .annotate("mongo.patch.strategy", "merge")
+      .optional()
+      .$type
+  ).prop(
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")

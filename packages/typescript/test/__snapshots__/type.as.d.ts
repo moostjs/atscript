@@ -17,7 +17,7 @@ declare namespace TPrimitive {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPrimitive>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPrimitive>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -29,7 +29,7 @@ declare namespace TPirmiitiveUn {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPirmiitiveUn>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPirmiitiveUn>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -41,7 +41,7 @@ declare namespace TLiteral {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLiteral>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLiteral>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -53,7 +53,7 @@ declare namespace TNumber {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TNumber>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TNumber>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -65,7 +65,7 @@ declare namespace TTuple1 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -77,7 +77,7 @@ declare namespace TTuple2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -89,7 +89,7 @@ declare namespace TTupleArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTupleArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTupleArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -101,7 +101,7 @@ declare namespace TArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -113,7 +113,7 @@ declare namespace TArray2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -125,7 +125,7 @@ declare namespace TArray3 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -137,7 +137,7 @@ declare namespace TComplexArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -149,7 +149,7 @@ declare namespace TComplexArray2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -161,7 +161,7 @@ declare namespace TComplexArray3 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -173,7 +173,7 @@ declare namespace TComplexArray4 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray4>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray4>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -185,7 +185,7 @@ declare namespace TComplexArray5 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray5>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray5>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -204,7 +204,7 @@ declare namespace TObject {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof TObject>
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObject>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObject>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -218,7 +218,7 @@ declare namespace TObjectUnion1 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -232,7 +232,7 @@ declare namespace TObjectUnion2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
@@ -248,6 +248,6 @@ declare namespace TObjectIntersection {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof TObjectIntersection>
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectIntersection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectIntersection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 // prettier-ignore-end

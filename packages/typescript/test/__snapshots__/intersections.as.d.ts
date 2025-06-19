@@ -43,7 +43,7 @@ declare namespace T {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof T>
   const metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = T>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = T>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
 
 /**
