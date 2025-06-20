@@ -1,3 +1,4 @@
+// oxlint-disable max-lines
 // oxlint-disable max-depth
 import {
   isAnnotatedTypeOfPrimitive,
@@ -5,26 +6,47 @@ import {
   TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeArray,
   defineAnnotatedType as $,
-  TAtscriptTypeObject,
   Validator,
 } from '@atscript/typescript'
 import { AsCollection } from './as-collection'
-import {
-  AddToSetOperators,
-  Filter,
-  MatchKeysAndValues,
-  PullOperator,
-  PushOperator,
-  UpdateFilter,
-  UpdateOptions,
-} from 'mongodb'
+import { Document, Filter, UpdateFilter, UpdateOptions } from 'mongodb'
+import { validateIdHelper } from './validate-id-helper'
 
+/**
+ * CollectionPatcher is a small helper that converts a *patch payload* produced
+ * by Atscript into a shape that the official MongoDB driver understands – a
+ * triple of `(filter, update, options)` to be fed to `collection.updateOne()`.
+ *
+ * Supported high‑level operations for *top‑level arrays* (see the attached
+ * spreadsheet in the chat):
+ *
+ * | Payload field | MongoDB operator        | Purpose                                |
+ * |-------------- |-------------------------|----------------------------------------|
+ * | `$replace`    | full `$set`             | Replace the whole array.               |
+ * | `$insert`     | `$push`                 | Append new items (duplicates allowed). |
+ * | `$upsert`     | custom                  | Insert or update by *key* (see TODO).  |
+ * | `$update`     | `$set` + `arrayFilters` | Update array elements matched by *key* |
+ * | `$remove`     | `$pullAll` / `$pull`    | Remove by value or by *key*.           |
+ *
+ * The class walks through the incoming payload, detects which of the above
+ * operations applies to each top‑level array and builds the corresponding
+ * MongoDB update document. Primitive fields are flattened into a regular
+ * `$set` map.
+ */
 export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
   constructor(
     private collection: AsCollection<T>,
     private payload: any
   ) {}
 
+  /**
+   * Extract a set of *key properties* (annotated with `@meta.isKey`) from an
+   * array‐of‐objects type definition. These keys uniquely identify an element
+   * inside the array and are later used for `$update`, `$remove` and `$upsert`.
+   *
+   * @param def Atscript array type
+   * @returns Set of property names marked as keys; empty set if none
+   */
   static getKeyProps(def: TAtscriptAnnotatedType<TAtscriptTypeArray>) {
     if (def.type.of.type.kind === 'object') {
       const objType = def.type.of.type
@@ -39,11 +61,34 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
     return new Set<string>()
   }
 
+  /**
+   * Build a runtime *Validator* that understands the extended patch payload.
+   *
+   *  * Adds per‑array *patch* wrappers (the `$replace`, `$insert`, … fields).
+   *  * Honors `mongo.patch.strategy === "merge"` metadata.
+   *
+   * @param collection Target collection wrapper
+   * @returns Atscript Validator
+   */
   static prepareValidator<T extends TAtscriptAnnotatedTypeConstructor>(
     collection: AsCollection<T>
   ): Validator<T> {
     return collection.type.validator({
+      validate: validateIdHelper,
       replace: (def, path) => {
+        if (path === '' && def.type.kind === 'object') {
+          const obj = $('object').copyMetadata(def.metadata)
+          for (const [prop, type] of def.type.props.entries()) {
+            obj.prop(
+              prop,
+              $()
+                .refTo(type)
+                .copyMetadata(type.metadata)
+                .optional(prop !== '_id').$type
+            )
+          }
+          return obj.$type
+        }
         if (
           def.type.kind === 'array' &&
           // @ts-expect-error
@@ -104,154 +149,333 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
           return patchType
             ? $('object')
                 .prop('$replace', fullType)
-                .prop('$append', fullType)
-                .prop('$merge', mergeStrategy ? patchType : fullType)
+                .prop('$insert', fullType)
+                .prop('$upsert', fullType)
+                .prop('$update', mergeStrategy ? patchType : fullType)
                 .prop('$remove', patchType)
                 .optional().$type
-            : $('object').prop('$replace', fullType).prop('$append', fullType).optional().$type
+            : $('object').prop('$replace', fullType).prop('$insert', fullType).optional().$type
         }
         return def
       },
       partial: (def, path) => {
-        return path === '' || def.metadata.get('mongo.patch.strategy') === 'merge'
+        return path !== '' && def.metadata.get('mongo.patch.strategy') === 'merge'
       },
     })
   }
 
+  /**
+   * Internal accumulator: filter passed to `updateOne()`.
+   * Filled only with the `_id` field right now.
+   */
   private filterObj = {} as Filter<InstanceType<T>>
-  private updateObj = {} as UpdateFilter<InstanceType<T>>
+
+  /** MongoDB *update* document being built. */
+  private updatePipeline = [] as Document[]
+
+  /** Additional *options* (mainly `arrayFilters`). */
   private optionsObj = {} as UpdateOptions
 
+  /**
+   * Entry point – walk the payload, build `filter`, `update` and `options`.
+   *
+   * @returns Helper object exposing both individual parts and
+   *          a `.toArgs()` convenience callback.
+   */
   public preparePatch() {
     this.filterObj = {
       _id: this.collection.prepareId(this.payload._id),
     }
     this.flattenPayload(this.payload)
+    let updateFilter = this.updatePipeline
     return {
-      toArgs: (): [Filter<InstanceType<T>>, UpdateFilter<InstanceType<T>>, UpdateOptions] => [
-        this.filterObj,
-        this.updateObj,
-        this.optionsObj,
-      ],
+      toArgs: (): [
+        Filter<InstanceType<T>>,
+        UpdateFilter<InstanceType<T>> | Document[],
+        UpdateOptions,
+      ] => [this.filterObj, updateFilter, this.optionsObj],
       filter: this.filterObj,
-      updateFilter: this.updateObj,
+      updateFilter: updateFilter,
       updateOptions: this.optionsObj,
     }
   }
 
-  private arrayKeyCounter = 0
+  // ---------------------------------------------------------------------------
+  //  Internals
+  // ---------------------------------------------------------------------------
 
+  /**
+   * Helper – lazily create `$set` section and assign *key* → *value*.
+   *
+   * @param key Fully‑qualified dotted path
+   * @param val Value to be written
+   * @private
+   */
+  private _set(key: string, val: any) {
+    for (const pipe of this.updatePipeline) {
+      if (!pipe.$set) {
+        pipe.$set = {}
+      }
+      if (!pipe.$set[key]) {
+        pipe.$set[key] = val
+        return
+      }
+    }
+    this.updatePipeline.push({
+      $set: {
+        [key]: val,
+      },
+    })
+  }
+
+  /**
+   * Recursively walk through the patch *payload* and convert it into `$set`/…
+   * statements. Top‑level arrays are delegated to {@link parseArrayPatch}.
+   *
+   * @param payload Current payload chunk
+   * @param prefix  Dotted path accumulated so far
+   * @private
+   */
   private flattenPayload(payload: T, prefix = ''): UpdateFilter<InstanceType<T>> {
     const evalKey = (k: string) => (prefix ? `${prefix}.${k}` : k) as string
-    const _set = (key: string, val: any) => {
-      if (!this.updateObj.$set) {
-        this.updateObj.$set = {} as MatchKeysAndValues<InstanceType<T>>
-      }
-      this.updateObj.$set[key as keyof MatchKeysAndValues<InstanceType<T>>] = val
-    }
-    const _append = (op: '$push' | '$addToSet', key: string, val: any[]) => {
-      if (!this.updateObj[op]) {
-        this.updateObj[op] = {}
-      }
-      this.updateObj[op][
-        key as keyof PushOperator<InstanceType<T>> & keyof AddToSetOperators<InstanceType<T>>
-      ] = {
-        $each: val,
-      }
-    }
-    const _remove = (key: string, val: any[]) => {
-      if (!this.updateObj.$pullAll) {
-        this.updateObj.$pullAll = {}
-      }
-      // @ts-expect-error
-      this.updateObj.$pullAll[key] = val
-    }
     for (const [_key, value] of Object.entries(payload)) {
       const key = evalKey(_key)
       const flatType = this.collection.flatMap.get(key)
       // @ts-expect-error
       const topLevelArray = flatType?.metadata?.get('mongo.__topLevelArray') as boolean | undefined
       if (typeof value === 'object' && topLevelArray) {
-        const toReplace = value.$replace as any[] | undefined
-        const toAppend = value.$append as any[] | undefined
-        const toRemove = value.$remove as any[] | undefined
-        const toMerge = value.$merge as any[] | undefined
-        if ((toReplace && toAppend) || (toReplace && toRemove) || (toReplace && toMerge)) {
-          throw new Error(
-            `[mongo] "${key}" When $replace is used, $append, $remove and $merge cannot be used at the same time`
-          )
-        }
-        if (toReplace) {
-          _set(key, toReplace)
-        } else {
-          if (toAppend?.length) {
-            _append('$push', key, toAppend)
-          }
-          const keyProps =
-            flatType?.type.kind === 'array'
-              ? CollectionPatcher.getKeyProps(
-                  flatType as TAtscriptAnnotatedType<TAtscriptTypeArray>
-                )
-              : new Set<string>()
-          if (toMerge?.length) {
-            if (keyProps.size) {
-              const mergeStrategy =
-                this.collection.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
-              for (const item of toMerge) {
-                const itemWithoutKeys = {} as Record<string, any>
-                for (const [_key, _val] of Object.entries(item)) {
-                  if (!keyProps.has(_key)) {
-                    itemWithoutKeys[_key] = _val
-                  }
-                }
-                const k = `a${this.arrayKeyCounter++}`
-                const arrayKey = `${key}.$[${k}]`
-                if (mergeStrategy) {
-                  this.flattenPayload(itemWithoutKeys as T, arrayKey)
-                } else {
-                  _set(arrayKey, item)
-                }
-                const keys = {} as Record<string, any>
-                for (const keyName of keyProps) {
-                  keys[`${k}.${keyName}`] = item[keyName]
-                }
-                this.optionsObj.arrayFilters = this.optionsObj.arrayFilters || []
-                this.optionsObj.arrayFilters.push(keys)
-              }
-            } else {
-              _append('$addToSet', key, toMerge)
-            }
-          }
-          if (toRemove?.length) {
-            if (keyProps.size) {
-              if (!this.updateObj.$pull) {
-                this.updateObj.$pull = {}
-              }
-              const keysToRemove = [] as any[]
-              for (const item of toRemove) {
-                const keys = {} as Record<string, any>
-                for (const keyName of keyProps) {
-                  keys[`${keyName}`] = item[keyName]
-                }
-                keysToRemove.push(keys)
-              }
-              this.updateObj.$pull[key as keyof PullOperator<InstanceType<T>>] = {
-                $or: keysToRemove,
-              }
-            } else {
-              _remove(key, toRemove)
-            }
-          }
-        }
+        this.parseArrayPatch(key, value)
       } else if (
         typeof value === 'object' &&
         this.collection.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
       ) {
         this.flattenPayload(value, key)
-      } else {
-        _set(key, value)
+      } else if (key !== '_id') {
+        this._set(key, value)
       }
     }
-    return this.updateObj
+    return this.updatePipeline
+  }
+
+  /**
+   * Dispatch a *single* array patch. Exactly one of `$replace`, `$insert`,
+   * `$upsert`, `$update`, `$remove` must be present – otherwise we throw.
+   *
+   * @param key   Dotted path to the array field
+   * @param value Payload slice for that field
+   * @private
+   */
+  private parseArrayPatch(key: string, value: any) {
+    const flatType = this.collection.flatMap.get(key)
+    const toRemove = value.$remove as any[] | undefined
+    const toReplace = value.$replace as any[] | undefined
+    const toInsert = value.$insert as any[] | undefined
+    const toUpsert = value.$upsert as any[] | undefined
+    const toUpdate = value.$update as any[] | undefined
+
+    const keyProps =
+      flatType?.type.kind === 'array'
+        ? CollectionPatcher.getKeyProps(flatType as TAtscriptAnnotatedType<TAtscriptTypeArray>)
+        : new Set<string>()
+
+    this._remove(key, toRemove, keyProps)
+    this._replace(key, toReplace)
+    this._insert(key, toInsert, keyProps)
+    this._upsert(key, toUpsert, keyProps)
+    this._update(key, toUpdate, keyProps)
+  }
+
+  /**
+   * Build an *aggregation‐expression* that checks equality by **all** keys in
+   * `keys`.  Example output for keys `["id", "lang"]` and bases `a`, `b`:
+   * ```json
+   * { "$and": [ { "$eq": ["$$a.id", "$$b.id"] }, { "$eq": ["$$a.lang", "$$b.lang"] } ] }
+   * ```
+   *
+   * @param keys  Ordered list of key property names
+   * @param left  Base token for *left* expression (e.g. `"$$el"`)
+   * @param right Base token for *right* expression (e.g. `"$$this"`)
+   */
+  private _keysEqual(keys: string[], left: string, right: string): any {
+    return (
+      keys
+        .map(k => ({ $eq: [`${left}.${k}`, `${right}.${k}`] }))
+        // @ts-expect-error
+        .reduce((acc, cur) => (acc ? { $and: [acc, cur] } : cur))
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  //  Individual MongoDB operators – each method adds a chunk to `updateObj`.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * `$replace` – overwrite the entire array with `input`.
+   *
+   * @param key   Dotted path to the array
+   * @param input New array value (may be `undefined`)
+   * @private
+   */
+  private _replace(key: string, input: any[] | undefined) {
+    if (input) {
+      this._set(key, input)
+    }
+  }
+
+  /**
+   * `$insert`
+   * - plain append      → $concatArrays
+   * - unique / keyed    → delegate to _upsert (insert-or-update)
+   */
+  private _insert(key: string, input: any[] | undefined, keyProps: Set<string>) {
+    if (!input?.length) {
+      return
+    }
+
+    const uniqueItems = this.collection.flatMap.get(key)?.metadata?.has('mongo.array.uniqueItems')
+
+    if (uniqueItems || keyProps.size > 0) {
+      this._upsert(key, input, keyProps)
+    } else {
+      // classic `$push ... $each`  →  $concatArrays
+      this._set(key, {
+        $concatArrays: [
+          { $ifNull: [`$${key}`, []] },
+          input, // literal items
+        ],
+      })
+    }
+  }
+
+  /**
+   * `$upsert`
+   * - keyed  → remove existing matching by key(s) then append candidate
+   * - unique → $setUnion (deep equality)
+   */
+  private _upsert(key: string, input: any[] | undefined, keyProps: Set<string>) {
+    if (!input?.length) {
+      return
+    }
+
+    // ── keyed upsert ──────────────────────────────────────────────────────────
+    if (keyProps.size) {
+      const keys = [...keyProps]
+      this._set(key, {
+        $reduce: {
+          input, // literal payload
+          initialValue: { $ifNull: [`$${key}`, []] },
+          in: {
+            $let: {
+              vars: { acc: '$$value', cand: '$$this' },
+              in: {
+                $concatArrays: [
+                  {
+                    $filter: {
+                      input: '$$acc',
+                      as: 'el',
+                      cond: { $not: this._keysEqual(keys, '$$el', '$$cand') },
+                    },
+                  },
+                  ['$$cand'],
+                ],
+              },
+            },
+          },
+        },
+      })
+      return
+    }
+
+    // ── no key → behave like $addToSet (deep equality) ────────────
+    this._set(key, {
+      $setUnion: [{ $ifNull: [`$${key}`, []] }, input],
+    })
+  }
+
+  /**
+   * `$update`
+   * - keyed       → map array and merge / replace matching element(s)
+   * - non-keyed   → behave like `$addToSet` (insert only when not present)
+   */
+  private _update(key: string, input: any[] | undefined, keyProps: Set<string>) {
+    if (!input?.length) {
+      return
+    }
+
+    if (keyProps.size) {
+      const mergeStrategy =
+        this.collection.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
+
+      const keys = [...keyProps]
+      // sequentially apply each patch item
+      this._set(key, {
+        $reduce: {
+          input,
+          initialValue: { $ifNull: [`$${key}`, []] },
+          in: {
+            $map: {
+              input: '$$value',
+              as: 'el',
+              in: {
+                $cond: [
+                  this._keysEqual(keys, '$$el', '$$this'),
+                  mergeStrategy
+                    ? { $mergeObjects: ['$$el', '$$this'] } // merge
+                    : '$$this', // replace
+                  '$$el',
+                ],
+              },
+            },
+          },
+        },
+      })
+    } else {
+      // non-keyed “update” means insert-if-missing
+      this._set(key, {
+        $setUnion: [{ $ifNull: [`$${key}`, []] }, input],
+      })
+    }
+  }
+
+  /**
+   * `$remove`
+   * - keyed     → filter out any element whose key set matches a payload item
+   * - non-keyed → deep equality remove (`$setDifference`)
+   */
+  private _remove(key: string, input: any[] | undefined, keyProps: Set<string>) {
+    if (!input?.length) {
+      return
+    }
+
+    if (keyProps.size) {
+      const keys = [...keyProps]
+      this._set(key, {
+        $let: {
+          vars: { rem: input },
+          in: {
+            $filter: {
+              input: { $ifNull: [`$${key}`, []] },
+              as: 'el',
+              cond: {
+                $not: {
+                  $anyElementTrue: {
+                    $map: {
+                      input: '$$rem',
+                      as: 'r',
+                      in: this._keysEqual(keys, '$$el', '$$r'),
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      })
+    } else {
+      // deep-equality removal for primitives / whole objects
+      this._set(key, {
+        $setDifference: [{ $ifNull: [`$${key}`, []] }, input],
+      })
+    }
   }
 }

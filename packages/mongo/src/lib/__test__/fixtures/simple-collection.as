@@ -30,3 +30,14 @@ export interface SimpleCollection {
         nested2?: { c?: number, d?: string }
     }
 }
+
+@mongo.collection 'minimal'
+export interface MinimalCollection {
+    name: string
+}
+
+@mongo.collection 'minimal-string'
+export interface MinimalCollectionString {
+    _id: string
+    name: string
+}

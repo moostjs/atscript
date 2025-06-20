@@ -399,8 +399,28 @@ export const annotations: TAnnotationsTree = {
     },
 
     array: {
-      actions: new AnnotationSpec({
-        description: 'Enables **Array Actions** on an array.\n\n' + '```\n',
+      uniqueItems: new AnnotationSpec({
+        description:
+          'Marks an **array field** as containing *globally unique items* when ' +
+          'handling **patch `$insert` operations**.\n\n' +
+          '- Forces the patcher to use **set-semantics** (`$setUnion`) instead of a ' +
+          'plain append, so duplicates are silently skipped.\n' +
+          '- Has **no effect** on `$replace`, `$update`, or `$remove`.\n' +
+          '- If the array’s element type already defines one or more ' +
+          '`@meta.isKey` properties, *uniqueness is implied* and this annotation ' +
+          'is unnecessary (but harmless).\n\n' +
+          '**Example:**\n' +
+          '```atscript\n' +
+          '@mongo.array.uniqueItems\n' +
+          'tags: string[]\n' +
+          '\n' +
+          '// Later in a patch payload …\n' +
+          '{\n' +
+          '  $insert: {\n' +
+          '    tags: ["mongo", "mongo"] // second "mongo" is ignored\n' +
+          '  }\n' +
+          '}\n' +
+          '```\n',
         nodeType: ['prop'], // Applies to fields/properties
         multiple: false,
         validate(token, args, doc) {
@@ -421,7 +441,7 @@ export const annotations: TAnnotationsTree = {
           }
           if (wrongType) {
             errors.push({
-              message: `[mongo] type of array expected when using @mongo.array.actions`,
+              message: `[mongo] type of array expected when using @mongo.array.uniqueItems`,
               severity: 1,
               range: token.range,
             })

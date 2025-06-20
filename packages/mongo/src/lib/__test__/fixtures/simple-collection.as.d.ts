@@ -45,4 +45,30 @@ export declare class SimpleCollection {
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = SimpleCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
 }
+
+/**
+ * Atscript interface **MinimalCollection**
+ * @see {@link ./simple-collection.as:35:18}
+ */
+export declare class MinimalCollection {
+  name: string
+  _id: string /* objectId */
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MinimalCollection>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = MinimalCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+}
+
+/**
+ * Atscript interface **MinimalCollectionString**
+ * @see {@link ./simple-collection.as:40:18}
+ */
+export declare class MinimalCollectionString {
+  _id: string
+  name: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MinimalCollectionString>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = MinimalCollectionString>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+}
 // prettier-ignore-end

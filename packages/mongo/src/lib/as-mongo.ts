@@ -41,6 +41,6 @@ export class AsMongo {
     type: T,
     logger?: TGenericLogger
   ): AsCollection<T> {
-    return new AsCollection(this, type, logger || this.logger)
+    return new AsCollection<T>(this, type, logger || this.logger)
   }
 }

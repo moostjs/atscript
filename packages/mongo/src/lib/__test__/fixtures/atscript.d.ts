@@ -33,7 +33,7 @@ declare global {
     "mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
     "mongo.search.filter": ({ indexName: string })[]
     "mongo.patch.strategy": string
-    "mongo.array.actions": boolean
+    "mongo.array.uniqueItems": boolean
   }
   type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "mongo" | "objectId" | "vector"
 }

@@ -8,25 +8,23 @@ import {
   TMetadataMap,
   Validator,
   defineAnnotatedType as $,
-  isAnnotatedTypeOfPrimitive,
-  TAtscriptTypeDef,
   TAtscriptTypeArray,
 } from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
 import {
-  AddToSetOperators,
   Collection,
   Filter,
-  MatchKeysAndValues,
+  InsertOneOptions,
   ObjectId,
-  PullAllOperator,
-  PushOperator,
-  UpdateFilter,
+  OptionalUnlessRequiredId,
+  ReplaceOptions,
   UpdateOptions,
   WithId,
+  WithoutId,
 } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
 import { CollectionPatcher } from './collection-patcher'
+import { validateIdHelper } from './validate-id-helper'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
@@ -155,12 +153,28 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
         case 'insert': {
           this.validators.set(
             purpose,
-            this.type.validator(this.idType === 'objectId' ? { skipList: new Set(['_id']) } : {})
+            this.type.validator({
+              validate: validateIdHelper,
+              replace(type, path) {
+                if (path === '_id' && type.type.tags.has('objectId')) {
+                  return {
+                    ...type,
+                    optional: true,
+                  }
+                }
+                return type
+              },
+            })
           )
           break
         }
         case 'update': {
-          this.validators.set(purpose, this.type.validator())
+          this.validators.set(
+            purpose,
+            this.type.validator({
+              validate: validateIdHelper,
+            })
+          )
           break
         }
         case 'patch': {
@@ -465,7 +479,35 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  public prepareInsert(payload: any): InstanceType<T> {
+  public insert(
+    payload: Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId },
+    options?: InsertOneOptions
+  ) {
+    const toInsert = this.prepareInsert(payload)
+    return this.collection.insertOne(toInsert, options)
+  }
+
+  public replace(
+    payload: Omit<InstanceType<T>, '_id'> & { _id: InstanceType<T>['_id'] | ObjectId },
+    options?: ReplaceOptions
+  ) {
+    const [filter, replace, opts] = this.prepareReplace(payload).toArgs()
+    return this.collection.replaceOne(filter, replace, { ...opts, ...options })
+  }
+
+  public update(
+    payload: AsMongoPatch<Omit<InstanceType<T>, '_id'>> & {
+      _id: InstanceType<T>['_id'] | ObjectId
+    },
+    options?: UpdateOptions
+  ) {
+    const [filter, update, opts] = this.prepareUpdate(payload).toArgs()
+    return this.collection.updateOne(filter, update, { ...opts, ...options })
+  }
+
+  public prepareInsert(
+    payload: Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId }
+  ): OptionalUnlessRequiredId<InstanceType<T>> {
     const v = this.getValidator('insert')!
     if (v.validate(payload)) {
       const data = { ...payload } as any & { _id?: string | number | ObjectId }
@@ -479,17 +521,29 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new Error('Invalid payload')
   }
 
-  public prepareUpdate(payload: any): WithId<InstanceType<T>> {
-    const v = this.getValidator('insert')!
+  public prepareReplace(
+    payload: Omit<InstanceType<T>, '_id'> & { _id: InstanceType<T>['_id'] | ObjectId }
+  ) {
+    const v = this.getValidator('update')!
     if (v.validate(payload)) {
       const data = { ...payload } as any & { _id: string | number | ObjectId }
-      data._id = this.prepareId(data._id)
-      return data
+      return {
+        toArgs: (): [Filter<InstanceType<T>>, WithoutId<InstanceType<T>>, ReplaceOptions] => [
+          { _id: this.prepareId(data._id) },
+          data,
+          {},
+        ],
+        filter: { _id: this.prepareId(data._id) } as Filter<InstanceType<T>>,
+        updateFilter: data as WithoutId<InstanceType<T>>,
+        updateOptions: {} as ReplaceOptions,
+      }
     }
     throw new Error('Invalid payload')
   }
 
-  public preparePatch(payload: any) {
+  public prepareUpdate(
+    payload: AsMongoPatch<Omit<InstanceType<T>, '_id'>> & { _id: InstanceType<T>['_id'] | ObjectId }
+  ) {
     const v = this.getValidator('patch')!
     if (v.validate(payload)) {
       return new CollectionPatcher(this, payload).preparePatch()
@@ -622,4 +676,32 @@ function objMatch(
     return false
   } // Ensure both have the same number of keys
   return keys1.every(key => o1[key] === o2[key]) // Ensure all keys match exactly
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// generic building block for one array field
+// ──────────────────────────────────────────────────────────────────────────────
+type TArrayPatch<A extends readonly unknown[]> = {
+  $replace?: A
+  $insert?: A
+  $upsert?: A
+  $update?: Partial<ArrayElement<A>>[]
+  $remove?: Partial<ArrayElement<A>>[]
+}
+
+type ArrayElement<ArrayType extends readonly unknown[]> =
+  ArrayType extends readonly (infer ElementType)[] ? ElementType : never
+
+/**
+ * AsMongoPatch<T>
+ * ─────────────────
+ * - For every key K in T:
+ *     • if T[K] is `X[]`, rewrite it to `TArrayPatch<X[]>`
+ *     • otherwise omit the key (feel free to keep it if you want)
+ *
+ * The result is an *optional* property bag that matches your patch payload
+ * for array fields only.
+ */
+type AsMongoPatch<T> = {
+  [K in keyof T]?: T[K] extends Array<infer _> ? TArrayPatch<T[K]> : Partial<T[K]>
 }

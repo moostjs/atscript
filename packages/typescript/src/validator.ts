@@ -1,3 +1,4 @@
+// oxlint-disable max-depth
 // eslint-disable max-lines
 import {
   isAnnotatedType,
@@ -15,12 +16,13 @@ interface TError {
   details?: TError[]
 }
 
-export interface TValidatorOptions {
+export interface TValidatorOptions<T extends TAtscriptAnnotatedTypeConstructor> {
   partial:
     | boolean
     | 'deep'
     | ((type: TAtscriptAnnotatedType<TAtscriptTypeObject>, path: string) => boolean)
   replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
+  validate: (this: Validator<T>, def: TAtscriptAnnotatedType, value: any) => boolean
   unknwonProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
@@ -29,17 +31,18 @@ export interface TValidatorOptions {
 const regexCache = new Map<string, RegExp>()
 
 export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
-  protected opts: TValidatorOptions
+  protected opts: TValidatorOptions<T>
 
   constructor(
     protected readonly def: T,
-    opts?: Partial<TValidatorOptions>
+    opts?: Partial<TValidatorOptions<T>>
   ) {
     this.opts = {
       partial: false,
       unknwonProps: 'error',
       errorLimit: 10,
       ...opts,
+      validate: (opts?.validate || this.validateAnnotatedType).bind(this),
     }
   }
 
@@ -94,7 +97,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     this.push('')
     this.errors = []
     this.stackErrors = []
-    const passed = this._validate(this.def, value)
+    const passed = this.validateSafe(this.def, value)
     this.pop(!passed)
     if (!passed) {
       if (safe) {
@@ -105,7 +108,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     return true
   }
 
-  protected _validate(def: TAtscriptAnnotatedType, value: any): boolean {
+  protected validateSafe(def: TAtscriptAnnotatedType, value: any): boolean {
     if (this.isLimitExceeded()) {
       return false
     }
@@ -118,6 +121,10 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     if (def.optional && value === undefined) {
       return true
     }
+    return (this.opts.validate as Validator<T>['validateAnnotatedType'])(def, value)
+  }
+
+  protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
     switch (def.type.kind) {
       case 'object':
         return this.validateObject(def as TAtscriptAnnotatedType<TAtscriptTypeObject>, value)
@@ -141,7 +148,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     const popped = [] as TError[]
     for (const item of def.type.items) {
       this.push(`[${item.type.kind || item.type.designType}(${i})]`)
-      if (this._validate(item, value)) {
+      if (this.validateSafe(item, value)) {
         this.pop(false)
         return true
       }
@@ -164,7 +171,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     value: any
   ): boolean {
     for (const item of def.type.items) {
-      if (!this._validate(item, value)) {
+      if (!this.validateSafe(item, value)) {
         return false
       }
     }
@@ -179,7 +186,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     let i = 0
     for (const item of def.type.items) {
       this.push(`[${i}]`)
-      if (!this._validate(item, value[i])) {
+      if (!this.validateSafe(item, value[i])) {
         this.pop(true)
         return false
       }
@@ -208,7 +215,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     let passed = true
     for (const item of value) {
       this.push(`[${i}]`)
-      if (!this._validate(def.type.of, item)) {
+      if (!this.validateSafe(def.type.of, item)) {
         passed = false
         this.pop(true)
         if (this.isLimitExceeded()) {
@@ -264,7 +271,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
         }
       }
       this.push(key)
-      if (this._validate(item, value[key])) {
+      if (this.validateSafe(item, value[key])) {
         this.pop(false)
       } else {
         passed = false
