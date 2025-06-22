@@ -110,7 +110,6 @@ describe('Validator at objects', () => {
       },
       true
     )
-    console.log(validator.errors)
     expect(result).toBe(true)
   })
 

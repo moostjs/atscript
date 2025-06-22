@@ -10,7 +10,7 @@ import {
 } from '@atscript/typescript'
 import { AsCollection } from './as-collection'
 import { Document, Filter, UpdateFilter, UpdateOptions } from 'mongodb'
-import { validateIdHelper } from './validate-id-helper'
+import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
 
 /**
  * CollectionPatcher is a small helper that converts a *patch payload* produced
@@ -74,7 +74,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
     collection: AsCollection<T>
   ): Validator<T> {
     return collection.type.validator({
-      validate: validateIdHelper,
+      plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
       replace: (def, path) => {
         if (path === '' && def.type.kind === 'object') {
           const obj = $('object').copyMetadata(def.metadata)

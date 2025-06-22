@@ -16,13 +16,19 @@ interface TError {
   details?: TError[]
 }
 
-export interface TValidatorOptions<T extends TAtscriptAnnotatedTypeConstructor> {
+export type TValidatorPlugin = (
+  ctx: TValidatorPluginContext,
+  def: TAtscriptAnnotatedType,
+  value: any
+) => boolean | undefined
+
+export interface TValidatorOptions {
   partial:
     | boolean
     | 'deep'
     | ((type: TAtscriptAnnotatedType<TAtscriptTypeObject>, path: string) => boolean)
   replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
-  validate: (this: Validator<T>, def: TAtscriptAnnotatedType, value: any) => boolean
+  plugins: TValidatorPlugin[]
   unknwonProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
@@ -30,19 +36,26 @@ export interface TValidatorOptions<T extends TAtscriptAnnotatedTypeConstructor> 
 
 const regexCache = new Map<string, RegExp>()
 
+export interface TValidatorPluginContext {
+  opts: Validator<any>['opts']
+  validateAnnotatedType: Validator<any>['validateAnnotatedType']
+  error: Validator<any>['error']
+  path: Validator<any>['path']
+}
+
 export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
-  protected opts: TValidatorOptions<T>
+  protected opts: TValidatorOptions
 
   constructor(
-    protected readonly def: T,
-    opts?: Partial<TValidatorOptions<T>>
+    protected readonly def: T | TAtscriptAnnotatedType<any>,
+    opts?: Partial<TValidatorOptions>
   ) {
     this.opts = {
       partial: false,
       unknwonProps: 'error',
       errorLimit: 10,
       ...opts,
-      validate: (opts?.validate || this.validateAnnotatedType).bind(this),
+      plugins: opts?.plugins || [],
     }
   }
 
@@ -80,7 +93,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
   protected error(message: string, path?: string, details?: TError[]) {
     const errors = this.stackErrors[this.stackErrors.length - 1] || this.errors
     const error: TError = {
-      path: path || this.stackPath.join('.').slice(1),
+      path: path || this.path,
       message,
     }
     if (details?.length) {
@@ -116,12 +129,23 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
       throw new Error('Can not validate not-annotated type')
     }
     if (typeof this.opts.replace === 'function') {
-      def = this.opts.replace(def, this.stackPath.join('.').slice(1))
+      def = this.opts.replace(def, this.path)
     }
     if (def.optional && value === undefined) {
       return true
     }
-    return (this.opts.validate as Validator<T>['validateAnnotatedType'])(def, value)
+
+    for (const plugin of this.opts.plugins) {
+      const result = plugin(this as unknown as TValidatorPluginContext, def, value)
+      if (result === false || result === true) {
+        return result
+      }
+    }
+    return this.validateAnnotatedType(def, value)
+  }
+
+  protected get path() {
+    return this.stackPath.slice(1).join('.')
   }
 
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
@@ -241,7 +265,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     // prepare skipList for this object
     const skipList = new Set()
     if (this.opts.skipList) {
-      const path = this.stackPath.length > 1 ? this.stackPath.slice(1).join('.') + '.' : ''
+      const path = this.stackPath.length > 1 ? this.path + '.' : ''
       this.opts.skipList.forEach(item => {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
@@ -253,7 +277,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
 
     let partialFunctionMatched = false
     if (typeof this.opts.partial === 'function') {
-      partialFunctionMatched = this.opts.partial(def, this.stackPath.join('.').slice(1))
+      partialFunctionMatched = this.opts.partial(def, this.path)
     }
 
     for (const [key, item] of def.type.props.entries()) {

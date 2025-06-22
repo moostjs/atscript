@@ -19,12 +19,11 @@ import {
   OptionalUnlessRequiredId,
   ReplaceOptions,
   UpdateOptions,
-  WithId,
   WithoutId,
 } from 'mongodb'
 import { NoopLogger, TGenericLogger } from './logger'
 import { CollectionPatcher } from './collection-patcher'
-import { validateIdHelper } from './validate-id-helper'
+import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
@@ -154,7 +153,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
           this.validators.set(
             purpose,
             this.type.validator({
-              validate: validateIdHelper,
+              plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
               replace(type, path) {
                 if (path === '_id' && type.type.tags.has('objectId')) {
                   return {
@@ -172,7 +171,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
           this.validators.set(
             purpose,
             this.type.validator({
-              validate: validateIdHelper,
+              plugins: [validateMongoIdPlugin],
             })
           )
           break
@@ -685,11 +684,11 @@ type TArrayPatch<A extends readonly unknown[]> = {
   $replace?: A
   $insert?: A
   $upsert?: A
-  $update?: Partial<ArrayElement<A>>[]
-  $remove?: Partial<ArrayElement<A>>[]
+  $update?: Partial<TArrayElement<A>>[]
+  $remove?: Partial<TArrayElement<A>>[]
 }
 
-type ArrayElement<ArrayType extends readonly unknown[]> =
+type TArrayElement<ArrayType extends readonly unknown[]> =
   ArrayType extends readonly (infer ElementType)[] ? ElementType : never
 
 /**
@@ -699,7 +698,7 @@ type ArrayElement<ArrayType extends readonly unknown[]> =
  *     • if T[K] is `X[]`, rewrite it to `TArrayPatch<X[]>`
  *     • otherwise omit the key (feel free to keep it if you want)
  *
- * The result is an *optional* property bag that matches your patch payload
+ * The result is an *optional* property bag that matches a patch payload
  * for array fields only.
  */
 type AsMongoPatch<T> = {
