@@ -1,3 +1,4 @@
+// oxlint-disable max-lines
 /* eslint-disable max-depth */
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable complexity */
@@ -305,4 +306,66 @@ export function unwrap(attr: TSemanticToken) {
       return this
     },
   }
+}
+
+export function propName() {
+  return {
+    handler(ni: NodeIterator, target: TTarget) {
+      switch (ni.$?.type) {
+        case 'identifier':
+        case 'text':
+          target.node.saveToken(new Token(ni.$), 'identifier')
+          ni.accepted()
+          ni.move()
+          ni.skip(['\n'])
+          return true
+        case 'block':
+          const childrenLength = ni.$.children?.length || 0
+          if (
+            // [*] - wildcard
+            (ni.$.text === '[' &&
+              ni.$.children?.[0]?.type === 'unknown' &&
+              childrenLength === 1 &&
+              ni.$.children[0].text === '*') ||
+            // [/abc/ui] - regexp
+            (ni.$.text === '[' && ni.$.children?.[0]?.type === 'regexp' && childrenLength === 1)
+          ) {
+            const t = new Token(ni.$.children![0]!)
+            const p = ni.$.children[0].text
+            try {
+              t.pattern = p === '*' ? /./ : parseRegExpLiteral(p)
+            } catch (e) {
+              ni.unexpected(false, (e as Error).message)
+              return false
+            }
+            target.node.saveToken(t, 'identifier')
+            ni.accepted()
+            ni.move()
+            ni.skip(['\n'])
+            return true
+          }
+          if (ni.$.text === '[' && !childrenLength) {
+            ni.unexpected(false, 'Wildcard "*" or a Regular Expression expected')
+          }
+          if (ni.$.text === '[' && childrenLength > 1) {
+            ni.unexpected(false, 'To many arguments in prop pattern []')
+          } else {
+            ni.unexpected(false, 'Unexpected identifier at property name')
+          }
+          return false
+        default:
+          ni.unexpected(false, 'Unexpected identifier at property name')
+          return false
+      }
+    },
+  }
+}
+
+function parseRegExpLiteral(literal: string): RegExp {
+  const match = literal.match(/^\/(.+)\/([dgimsuy]*)$/)
+  if (!match) {
+    throw new Error(`Invalid regexp literal: ${literal}`)
+  }
+  const [, pattern, flags] = match
+  return new RegExp(pattern.replace(/\\\//g, '/'), flags)
 }

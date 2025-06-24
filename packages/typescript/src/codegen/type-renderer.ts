@@ -9,6 +9,7 @@ import {
   SemanticArrayNode,
   SemanticInterfaceNode,
   SemanticNode,
+  SemanticPropNode,
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
@@ -96,12 +97,38 @@ export class TypeRenderer extends BaseRenderer {
   renderStructure(struct: SemanticStructureNode, asClass?: string) {
     this.blockln('{}')
     // let propsList = ''
+    const patterns = [] as SemanticPropNode[]
+    let hasProp = false
+
     for (const prop of Array.from(struct.props.values())) {
       // propsList += (propsList ? ' | ' : '') + `"${escapeQuotes(prop.id!)}"`
+      if (prop.token('identifier')?.pattern) {
+        patterns.push(prop)
+        continue
+      }
+      hasProp = true
       const optional = !!prop.token('optional')
       this.write(wrapProp(prop.id!), optional ? '?' : '', ': ')
       this.renderTypeDef(prop.getDefinition())
       this.writeln()
+    }
+    if (patterns.length) {
+      this.write(`[key: string]: `)
+      if (hasProp) {
+        this.writeln('any')
+      } else if (patterns.length === 1) {
+        this.renderTypeDef(patterns[0].getDefinition())
+        this.writeln()
+      } else {
+        this.indent()
+        for (const prop of patterns) {
+          this.writeln()
+          this.write('| ')
+          this.renderTypeDef(prop.getDefinition())
+        }
+        this.unindent()
+        this.writeln()
+      }
     }
     if (asClass) {
       this.writeln('static __is_atscript_annotated_type: true')

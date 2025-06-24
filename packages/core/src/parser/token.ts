@@ -67,14 +67,14 @@ export class Token {
   public imported?: boolean
 
   /**
-   * All the props must be marked with this flag
-   */
-  public isProp?: boolean
-
-  /**
    * Refs chained via . or ["propName"] are marked with this flag
    */
   public isChain?: boolean
+
+  /**
+   * Prop patterns ([*] or [regexp]) are storing patterns here
+   */
+  public pattern?: RegExp
 
   public parentNode?: SemanticNode
 

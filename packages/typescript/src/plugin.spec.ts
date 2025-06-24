@@ -264,4 +264,24 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/intersections.as.d.ts')
     )
   })
+  it('must render interfaces with prop patterns', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/prop-patterns.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('prop-patterns.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/prop-patterns.js')
+    )
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('prop-patterns.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/prop-patterns.as.d.ts')
+    )
+  })
 })

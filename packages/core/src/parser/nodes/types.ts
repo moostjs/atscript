@@ -65,6 +65,7 @@ export interface TPrimitiveTypeArray {
 export interface TPrimitiveTypeObject {
   kind: 'object'
   props: Record<string, TPrimitiveTypeDef>
+  propsPatterns: Record<string, TPrimitiveTypeDef>
   optional?: boolean
 }
 

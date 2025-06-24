@@ -24,6 +24,7 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
     saveAs: undefined as TSemanticToken | undefined,
     skip: undefined as string[] | undefined,
     expect: [{ node: name, text }] as TExpect[],
+    contains: undefined as TExpect[] | undefined,
     isGlobal: false,
     empty: false,
     wrapper: undefined as (() => SemanticNode) | undefined,
@@ -64,6 +65,19 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
           if (opts.empty && ni.$.children?.length) {
             ni.unexpected(false, `Expected empty block`)
             return opts.optional
+          }
+          if (opts.contains) {
+            if (!ni.$.children?.length) {
+              ni.unexpected(false, `Expected ${opts.contains.map(v => v.text).join(', ')}`)
+              return opts.optional
+            }
+            if (
+              ni.$.children[0].type !== opts.contains[0].node ||
+              ni.$.children[0].text !== opts.contains[0].text
+            ) {
+              ni.unexpected(false, `Expected ${opts.contains.map(v => v.text).join(', ')}`)
+              return opts.optional
+            }
           }
           if (opts.saveAs) {
             target.node.saveToken(new Token(ni.$), opts.saveAs)
@@ -106,6 +120,10 @@ export function $token(name: TLexicalToken['type'], text?: string[]) {
     },
     empty() {
       opts.empty = true
+      return this
+    },
+    contains(t: { expect: TExpect[] }) {
+      opts.contains = t.expect
       return this
     },
     skip(...p: TPunctuation[]) {

@@ -60,11 +60,6 @@ export class NodeIterator {
     return this
   }
 
-  /** @deprecated */
-  killNextNode(n = 1) {
-    this.nodes.splice(this.i + 1, n)
-  }
-
   next(skip?: string[]) {
     return this.fork().move().skip(skip)
   }

@@ -10,6 +10,7 @@ import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
 import { TextToken } from './text.node'
+import { RegExpToken } from './regexp.token'
 
 export const tokens = {
   aIdentifier: AIdentifierToken,
@@ -21,6 +22,7 @@ export const tokens = {
   identifier: IdentifierToken,
   number: NumberToken,
   text: TextToken,
+  regexp: RegExpToken,
   root: undefined as unknown as BasicNode<TLexicalToken>,
 }
 
@@ -40,6 +42,7 @@ export const root = new BasicNode<TLexicalToken>({
 tokens.root = root
 
 BlockToken.addRecognizes(
+  tokens.regexp,
   ...tokens.comments,
   tokens.block,
   tokens.aIdentifier,

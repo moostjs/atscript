@@ -19,6 +19,7 @@ export interface TAtscriptTypeObject<K extends string = string> {
   kind: 'object'
 
   props: Map<K, TAtscriptAnnotatedType>
+  propsPatterns: Map<RegExp, TAtscriptAnnotatedType>
 
   tags: Set<AtscriptPrimitiveTags>
 }
@@ -79,6 +80,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
   }
   if (kind === 'object') {
     type.props = new Map()
+    type.propsPatterns = new Map()
   }
   type.tags = new Set()
   const metadata = (base?.metadata || new Map<string, unknown>()) as TMetadataMap<AtscriptMetadata>
@@ -130,6 +132,10 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     },
     prop(name: string, value: TAtscriptAnnotatedType) {
       this.$def.props.set(name, value)
+      return this
+    },
+    propPattern(pattern: RegExp, value: TAtscriptAnnotatedType) {
+      this.$def.propsPatterns.set(pattern, value)
       return this
     },
     optional(value = true) {

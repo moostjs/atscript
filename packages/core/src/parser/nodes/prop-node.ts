@@ -16,6 +16,10 @@ export class SemanticPropNode extends SemanticNode {
     }
   }
 
+  get isPattern() {
+    return !!this.token('identifier')?.pattern
+  }
+
   get nestedProps() {
     if (this.definition && isStructure(this.definition)) {
       return this.definition.props

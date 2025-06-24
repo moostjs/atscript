@@ -69,6 +69,64 @@ describe('interfaces', () => {
     expect(result.toString()).toMatchSnapshot()
     expect(result.messages).toHaveLength(0)
   })
+
+  it('interface with *-wildcard key', () => {
+    const result = parseAtscript(`interface IName { [*]: number }`)
+    expect(result.toString()).toMatchInlineSnapshot(`
+      "● [interface] "IName" type: interface <identifier>
+        = [structure] "{"  (
+            ● [prop] "*": [ref] "number"
+          )
+      "
+    `)
+    expect(result.messages).toHaveLength(0)
+  })
+
+  it('interface with number consts', () => {
+    const result = parseAtscript(`interface IName { a: 1 | 2 }`)
+    expect(result.toString()).toMatchInlineSnapshot(`
+      "● [interface] "IName" type: interface <identifier>
+        = [structure] "{"  (
+            ● [prop] "a"
+              = [group] ""  (
+                  ● [const] "1" <|>
+                  ● [const] "2"
+                )
+            
+          )
+      "
+    `)
+    expect(result.messages).toHaveLength(0)
+  })
+
+  it('interface with negative number consts', () => {
+    const result = parseAtscript(`interface IName { a: 1 | -2 }`)
+    expect(result.toString()).toMatchInlineSnapshot(`
+      "● [interface] "IName" type: interface <identifier>
+        = [structure] "{"  (
+            ● [prop] "a"
+              = [group] ""  (
+                  ● [const] "1" <|>
+                  ● [const] "-2"
+                )
+            
+          )
+      "
+    `)
+    expect(result.messages).toHaveLength(0)
+  })
+
+  it('interface with regexp pattern key', () => {
+    const result = parseAtscript(`interface IName { [/^abcd?$/ui]: number }`)
+    expect(result.toString()).toMatchInlineSnapshot(`
+      "● [interface] "IName" type: interface <identifier>
+        = [structure] "{"  (
+            ● [prop] "/^abcd?$/ui": [ref] "number"
+          )
+      "
+    `)
+    expect(result.messages).toHaveLength(0)
+  })
 })
 
 describe('referred identifiers in interfaces', () => {
@@ -88,36 +146,36 @@ describe('referred identifiers in interfaces', () => {
       'Ref2',
     ])
   })
+})
 
-  describe('nested props and types', () => {
-    it('must return nested props', () => {
-      const { nodes } = parseAtscript(`interface IName {prop: { nested: string }}`)
-      const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
-      const prop = interfaceNode.props.get('prop')!
-      expect(prop).toBeDefined()
-      expect(prop.nestedProps).toBeDefined()
-      expect(prop.nestedProps?.get('nested')).toBeDefined()
-    })
-    it('must return deeply nested props', () => {
-      const { nodes } = parseAtscript(`interface IName {prop: { nested: { nested2: string } }}`)
-      const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
-      const prop = interfaceNode.props.get('prop')!
-      expect(prop).toBeDefined()
-      expect(prop.nestedProps).toBeDefined()
-      expect(prop.nestedProps?.get('nested')).toBeDefined()
-      expect((prop.nestedProps?.get('nested'))!.nestedProps?.get('nested2')).toBeDefined()
-    })
-    it('must return nested type', () => {
-      const { nodes } = parseAtscript(`interface IName {prop: SomeType}`)
-      const interfaceNode = nodes[0] as SemanticInterfaceNode
-      interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
-      const prop = interfaceNode.props.get('prop')!
-      expect(prop).toBeDefined()
-      expect(prop.nestedType).toBeDefined()
-      expect(prop.nestedType!.entity).toEqual('ref')
-      expect(prop.nestedType!.token('identifier')!.text).toEqual('SomeType')
-    })
+describe('nested props and types', () => {
+  it('must return nested props', () => {
+    const { nodes } = parseAtscript(`interface IName {prop: { nested: string }}`)
+    const interfaceNode = nodes[0] as SemanticInterfaceNode
+    interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
+    const prop = interfaceNode.props.get('prop')!
+    expect(prop).toBeDefined()
+    expect(prop.nestedProps).toBeDefined()
+    expect(prop.nestedProps?.get('nested')).toBeDefined()
+  })
+  it('must return deeply nested props', () => {
+    const { nodes } = parseAtscript(`interface IName {prop: { nested: { nested2: string } }}`)
+    const interfaceNode = nodes[0] as SemanticInterfaceNode
+    interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
+    const prop = interfaceNode.props.get('prop')!
+    expect(prop).toBeDefined()
+    expect(prop.nestedProps).toBeDefined()
+    expect(prop.nestedProps?.get('nested')).toBeDefined()
+    expect((prop.nestedProps?.get('nested'))!.nestedProps?.get('nested2')).toBeDefined()
+  })
+  it('must return nested type', () => {
+    const { nodes } = parseAtscript(`interface IName {prop: SomeType}`)
+    const interfaceNode = nodes[0] as SemanticInterfaceNode
+    interfaceNode.registerAtDocument(new AtscriptDoc('1', {}))
+    const prop = interfaceNode.props.get('prop')!
+    expect(prop).toBeDefined()
+    expect(prop.nestedType).toBeDefined()
+    expect(prop.nestedType!.entity).toEqual('ref')
+    expect(prop.nestedType!.token('identifier')!.text).toEqual('SomeType')
   })
 })

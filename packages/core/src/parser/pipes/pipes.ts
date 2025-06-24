@@ -4,7 +4,7 @@ import { $n } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
 import type { TPipe } from './core.pipe'
 import { $pipe } from './core.pipe'
-import { annotations, definition, refWithChain, unwrap } from './special.pipe'
+import { annotations, definition, propName, refWithChain, unwrap } from './special.pipe'
 import { $token, block, identifier, pun, text } from './tokens.pipe'
 
 const ref = $pipe('ref', [refWithChain()]) // defineValuePipe('ref', 'identifier', true)
@@ -12,9 +12,9 @@ const constText = defineValuePipe('const', 'text', false)
 const constNumber = defineValuePipe('const', 'number', false)
 
 const allowedValuesPipeArray: TPipe[] = [
+  constNumber,
   ref,
   constText,
-  constNumber,
   // add tuple later
   // add interface later
 ]
@@ -63,7 +63,8 @@ const type = $pipe('type', [
 
 const props = $pipe('prop', [
   annotations(),
-  identifier().or(text()).saveAs('identifier').skip('\n'),
+  // identifier().or(text()).saveAs('identifier').skip('\n').debug(),
+  propName(),
   pun('?').saveAs('optional').optional().skip('\n'),
   pun(':').skip('\n'),
   definition(allowedValuesPipeArray).separatedBy('&', '|').skip('\n').respectPriority(),

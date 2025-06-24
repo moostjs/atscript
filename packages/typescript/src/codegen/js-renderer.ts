@@ -1,3 +1,5 @@
+// oxlint-disable max-lines
+// oxlint-disable max-depth
 import {
   isPrimitive,
   SemanticArrayNode,
@@ -229,6 +231,19 @@ export class JsRenderer extends BaseRenderer {
           this.unindent()
           this.write(`)`)
         }
+        for (const [key, propDef] of Object.entries(def.propsPatterns)) {
+          const optional = typeof propDef === 'object' && propDef.optional
+          this.writeln(`.propPattern(`)
+          this.indent()
+          this.writeln(`${key},`)
+          this.renderPrimitiveDef(propDef)
+          if (optional) {
+            this.writeln('.optional()')
+          }
+          this.writeln('.$type')
+          this.unindent()
+          this.write(`)`)
+        }
         this.unindent()
         return
       default:
@@ -240,10 +255,17 @@ export class JsRenderer extends BaseRenderer {
   defineObject(node: SemanticStructureNode) {
     const props = Array.from(node.props.values())
     for (const prop of props) {
+      const pattern = prop.token('identifier')?.pattern
       const optional = !!prop.token('optional')
-      this.writeln(`.prop(`)
-      this.indent()
-      this.writeln(`"${escapeQuotes(prop.id!)}",`)
+      if (pattern) {
+        this.writeln(`.propPattern(`)
+        this.indent()
+        this.writeln(`/${pattern.source}/${pattern.flags},`)
+      } else {
+        this.writeln(`.prop(`)
+        this.indent()
+        this.writeln(`"${escapeQuotes(prop.id!)}",`)
+      }
       this.annotateType(prop.getDefinition())
       this.indent().defineMetadata(prop).unindent()
       if (optional) {
