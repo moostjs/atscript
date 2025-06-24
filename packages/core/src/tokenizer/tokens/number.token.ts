@@ -14,8 +14,4 @@ export const NumberToken = new BasicNode<TLexicalToken>({
   .mapContent('text', 'join-clear')
   .onMatch(context => {
     context.customData.type = 'number'
-    // if (context.matched[0].startsWith('-')) {
-    //   context.context.content.push('-')
-    //   context.parserContext.jump(1)
-    // }
   })
