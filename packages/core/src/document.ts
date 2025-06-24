@@ -604,6 +604,61 @@ export class AtscriptDoc {
     return tokens
   }
 
+  renderDiagMessage(m: TMessages[number], addSourceLinses = false, colors = false) {
+    const c = {
+      red: colors ? __DYE_RED__ : '',
+      blue: colors ? __DYE_BLUE__ : '',
+      cyan: colors ? __DYE_CYAN__ : '',
+      yellow: colors ? __DYE_YELLOW__ : '',
+      dim: colors ? __DYE_DIM__ : '',
+      reset: colors ? __DYE_RESET__ : '',
+    }
+    let sc = ''
+    let banner = '[atscript]'
+    switch (m.severity) {
+      case TSeverity.Error:
+        sc = c.red
+        banner += '[Error]'
+        break
+      case TSeverity.Warning:
+        sc = c.yellow
+        banner += '[Warning]'
+        break
+      case TSeverity.Info:
+        sc = ''
+        banner += '[Info]'
+        break
+      case TSeverity.Hint:
+        sc = c.dim
+        banner += '[Hint]'
+        break
+      default:
+        sc = ''
+    }
+    const n = m.range.start.line + 1
+    let out =
+      `\n${sc}${banner} ${m.message}${c.reset}` +
+      `\nin ${c.blue}${this.id}:${n}:${m.range.start.character + 1}${c.reset}`
+
+    if (addSourceLinses) {
+      const lines = this.text.split('\n')
+      const renderLines = [
+        { l: lines[n - 3], i: n - 3 },
+        { l: lines[n - 2], i: n - 2 },
+        { l: lines[n - 1], i: n - 1 },
+      ].filter(Boolean)
+      const nl = String(n).length + 1
+      for (const { l, i } of renderLines) {
+        const prefix = `${c.dim + c.cyan}${('0' + i).slice(-nl)} | ${c.reset}`
+        out += `\n${prefix}${l}${c.reset}`
+      }
+      out += `\n${' '.repeat(nl + 3 + m.range.start.character)}${c.red}${'^'.repeat(
+        m.range.end.character - m.range.start.character
+      )}${c.reset}`
+    }
+    return out + '\n'
+  }
+
   getDiagMessages() {
     if (!this._allMessages) {
       this._allMessages = [

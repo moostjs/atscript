@@ -321,6 +321,7 @@ export function propName() {
           return true
         case 'block':
           const childrenLength = ni.$.children?.length || 0
+          const firstText = ni.$.children?.[0]?.text
           if (
             // [*] - wildcard
             (ni.$.text === '[' &&
@@ -331,9 +332,8 @@ export function propName() {
             (ni.$.text === '[' && ni.$.children?.[0]?.type === 'regexp' && childrenLength === 1)
           ) {
             const t = new Token(ni.$.children![0]!)
-            const p = ni.$.children[0].text
             try {
-              t.pattern = p === '*' ? /./ : parseRegExpLiteral(p)
+              t.pattern = firstText === '*' ? /./ : parseRegExpLiteral(firstText!)
             } catch (e) {
               ni.unexpected(false, (e as Error).message)
               return false
@@ -348,7 +348,12 @@ export function propName() {
             ni.unexpected(false, 'Wildcard "*" or a Regular Expression expected')
           }
           if (ni.$.text === '[' && childrenLength > 1) {
-            ni.unexpected(false, 'To many arguments in prop pattern []')
+            ni.unexpected(
+              false,
+              firstText?.startsWith('/')
+                ? 'Invalid Regular Expression'
+                : 'To many arguments in prop pattern []'
+            )
           } else {
             ni.unexpected(false, 'Unexpected identifier at property name')
           }
