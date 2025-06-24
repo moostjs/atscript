@@ -19,7 +19,7 @@ export interface TAtscriptTypeObject<K extends string = string> {
   kind: 'object'
 
   props: Map<K, TAtscriptAnnotatedType>
-  propsPatterns: Map<RegExp, TAtscriptAnnotatedType>
+  propsPatterns: { pattern: RegExp; def: TAtscriptAnnotatedType }[]
 
   tags: Set<AtscriptPrimitiveTags>
 }
@@ -80,7 +80,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
   }
   if (kind === 'object') {
     type.props = new Map()
-    type.propsPatterns = new Map()
+    type.propsPatterns = []
   }
   type.tags = new Set()
   const metadata = (base?.metadata || new Map<string, unknown>()) as TMetadataMap<AtscriptMetadata>
@@ -134,8 +134,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       this.$def.props.set(name, value)
       return this
     },
-    propPattern(pattern: RegExp, value: TAtscriptAnnotatedType) {
-      this.$def.propsPatterns.set(pattern, value)
+    propPattern(pattern: RegExp, def: TAtscriptAnnotatedType) {
+      this.$def.propsPatterns.push({ pattern, def })
       return this
     },
     optional(value = true) {
@@ -229,6 +229,7 @@ export interface TAnnotatedTypeHandle {
   of(value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
   item(value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
   prop(name: string, value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
+  propPattern(pattern: RegExp, value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
   optional(value?: boolean): TAnnotatedTypeHandle
   copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>): TAnnotatedTypeHandle
   refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]): TAnnotatedTypeHandle

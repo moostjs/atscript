@@ -141,6 +141,29 @@ describe('Validator at objects', () => {
     expect(validator.validate(o, true)).toBe(true)
     expect(o.dummy).toBeUndefined()
   })
+
+  it('should validate object with wildcard props', () => {
+    const t = defineAnnotatedType('object').propPattern(
+      /./,
+      defineAnnotatedType().designType('string').$type
+    )
+    const validator = new Validator(t.$type)
+    expect(validator.validate({ name: 'John', age: 30 }, true)).toBe(false)
+    expect(validator.validate({ name: 'John', age: '30' }, true)).toBe(true)
+  })
+
+  it('should validate object with mixed wildcard and static props', () => {
+    const t = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .prop('age', defineAnnotatedType().designType('number').$type)
+      .propPattern(/./, defineAnnotatedType().designType('boolean').$type)
+    const validator = new Validator(t.$type)
+    expect(validator.validate({ name: 'John', age: 30 }, true)).toBe(true)
+    expect(validator.validate({ name: 'John' }, true)).toBe(false)
+    expect(validator.validate({ name: 'John', age: 30, str: 'str' }, true)).toBe(false)
+    expect(validator.validate({ name: 'John', age: 30, bool: true }, true)).toBe(true)
+    expect(validator.validate({ name: 'John', age: 30, bool: false }, true)).toBe(true)
+  })
 })
 
 describe('Validator at tuples', () => {

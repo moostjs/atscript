@@ -306,7 +306,37 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
       }
     }
     for (const key of valueKeys) {
-      if (this.opts.unknwonProps !== 'ignore') {
+      /** matched patterns for unknown keys */
+      const matched: typeof def.type.propsPatterns = []
+      for (const { pattern, def: propDef } of def.type.propsPatterns) {
+        // check if key matches any pattern
+        if (pattern.test(key)) {
+          matched.push({ pattern, def: propDef })
+        }
+      }
+      if (matched.length) {
+        // some patterns matched, we have to make sure that
+        // at least one type validation passes
+        let keyPassed = false
+        for (const { def } of matched) {
+          if (this.validateSafe(def, value[key])) {
+            this.pop(false)
+            keyPassed = true
+            break
+          }
+        }
+        if (!keyPassed) {
+          // no type validations passed, we have to save error
+          this.push(key)
+          this.validateSafe(matched[0].def, value[key])
+          this.pop(true)
+          passed = false
+          if (this.isLimitExceeded()) {
+            return false
+          }
+        }
+      } else if (this.opts.unknwonProps !== 'ignore') {
+        // no keys matched, no patterns matched:
         if (!typeKeys.has(key)) {
           if (this.opts.unknwonProps === 'error') {
             this.push(key)
