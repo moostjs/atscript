@@ -525,14 +525,15 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   ) {
     const v = this.getValidator('update')!
     if (v.validate(payload)) {
-      const data = { ...payload } as any & { _id: string | number | ObjectId }
+      const _id = this.prepareId(payload._id)
+      const data = { ...payload, _id } as any & { _id: string | number | ObjectId }
       return {
         toArgs: (): [Filter<InstanceType<T>>, WithoutId<InstanceType<T>>, ReplaceOptions] => [
-          { _id: this.prepareId(data._id) },
+          { _id } as unknown as Filter<InstanceType<T>>,
           data,
           {},
         ],
-        filter: { _id: this.prepareId(data._id) } as Filter<InstanceType<T>>,
+        filter: { _id } as unknown as Filter<InstanceType<T>>,
         updateFilter: data as WithoutId<InstanceType<T>>,
         updateOptions: {} as ReplaceOptions,
       }

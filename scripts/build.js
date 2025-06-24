@@ -159,7 +159,7 @@ async function rolldownPackages(ws) {
       const created = []
       for (const f of formats) {
         const { ext, format } = FORMATS[f]
-        const { output } = await bundle.generate({ format })
+        const { output } = await bundle.generate({ format, comments: 'preserve-legal' })
         const target = `./packages/${ws}/dist/${fileName}${ext}`
         writeFileSync(target, output[0].code)
         created.push(target)

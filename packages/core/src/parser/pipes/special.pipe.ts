@@ -331,7 +331,10 @@ export function propName() {
             // [/abc/ui] - regexp
             (ni.$.text === '[' && ni.$.children?.[0]?.type === 'regexp' && childrenLength === 1)
           ) {
-            const t = new Token(ni.$.children![0]!)
+            const t = new Token({
+              ...ni.$,
+              ...ni.$.children![0]!,
+            })
             try {
               t.pattern = firstText === '*' ? /./ : parseRegExpLiteral(firstText!)
             } catch (e) {

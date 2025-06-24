@@ -114,7 +114,7 @@ export async function loadTsConfig(
   const file = await bundleTsConfig(configFile, forceFormat)
   try {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
-    return (await import(pathToFileURL(file).href)).default
+    return (await import(/* @vite-ignore */ pathToFileURL(file).href)).default
   } catch (error) {
     console.error('Could not load config file', file, error)
     return {}
@@ -133,7 +133,7 @@ export async function loadConfig(
     if (SUPPORTED_JS_CONFIG_FORMATS.includes(ext)) {
       return forceFormat
         ? await loadTsConfig(path.resolve(configPath), forceFormat)
-        : (await import(pathToFileURL(configPath).href)).default
+        : (await import(/* @vite-ignore */ pathToFileURL(configPath).href)).default
     } else if (SUPPORTED_TS_CONFIG_FORMATS.includes(ext)) {
       const rawConfigPath = path.resolve(configPath)
       return await loadTsConfig(rawConfigPath, forceFormat)

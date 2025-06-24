@@ -70,7 +70,7 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
           throw new Error(error)
         }
         const out = await doc.render('js')
-        return { code: out?.[0]?.content || '', moduleType: 'js' }
+        return { code: out?.[0]?.content || '', moduleType: 'js', map: null }
       }
     },
   }
