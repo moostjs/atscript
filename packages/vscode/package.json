@@ -83,7 +83,7 @@
     "vscode-languageserver-textdocument": "^1.0.12",
     "@types/node": "^22.10.5",
     "@types/vscode": "^1.80.0",
-    "vitest": "^3.0.0"
+    "vitest": "3.2.4"
   },
   "author": "Artem Maltsev",
   "repository": {

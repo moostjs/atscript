@@ -1,7 +1,7 @@
 {
-  "name": "@atscript/mongo",
+  "name": "@atscript/moost-validator",
   "version": "0.0.17",
-  "description": "Mongodb plugin for atscript.",
+  "description": "Validator pipe and utils for Moost.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -22,26 +22,32 @@
   },
   "keywords": [
     "atscript",
-    "plugin",
-    "mongodb"
+    "annotations",
+    "typescript",
+    "moost",
+    "validator"
   ],
   "author": "Artem Maltsev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/mongo"
+    "directory": "packages/moost-validator"
   },
   "bugs": {
     "url": "https://github.com/moostjs/atscript/issues"
   },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/mongo#readme",
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-validator#readme",
   "license": "ISC",
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
-    "mongodb": "^6.13.0"
-  },
-  "devDependencies": {
     "vitest": "3.2.4"
+  },
+  "peerDependencies": {
+    "@atscript/core": "^0.0.17",
+    "@atscript/typescript": "^0.0.17",
+    "@moostjs/event-http": "^0.5.26",
+    "moost": "^0.5.26"
   }
 }

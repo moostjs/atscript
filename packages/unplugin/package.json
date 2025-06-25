@@ -45,6 +45,6 @@
     "unplugin": "^2.1.2"
   },
   "devDependencies": {
-    "vitest": "^3.0.0"
+    "vitest": "3.2.4"
   }
 }
