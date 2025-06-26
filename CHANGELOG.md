@@ -1,3 +1,12 @@
+## [0.0.19](https://github.com/ts-anscript/anscript/compare/v0.0.18...v0.0.19) (2025-06-26)
+
+
+### Features
+
+* **moost-mongo:** add InjectCollection resolver ([19c9778](https://github.com/ts-anscript/anscript/commit/19c9778e2e6d1ccea8a46d4187d2557640391656))
+
+
+
 ## [0.0.18](https://github.com/ts-anscript/anscript/compare/v0.0.17...v0.0.18) (2025-06-26)
 
 
