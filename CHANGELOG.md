@@ -1,3 +1,27 @@
+## [0.0.18](https://github.com/ts-anscript/anscript/compare/v0.0.17...v0.0.18) (2025-06-26)
+
+
+### Bug Fixes
+
+* **core:** fix number token ([dacd830](https://github.com/ts-anscript/anscript/commit/dacd8309051c2d5f3f33d569377dd617d6652064))
+* **core:** fix number token ([bb77a34](https://github.com/ts-anscript/anscript/commit/bb77a347c0e588884f777eab289431b4ad18e040))
+* fix peer deps ([4271aa3](https://github.com/ts-anscript/anscript/commit/4271aa3811e67cfd171a4508576f6c224815315e))
+* minor fixes ([d6882c8](https://github.com/ts-anscript/anscript/commit/d6882c8ea7b93ed49fc398e746a7871698c4ddcc))
+* **ts-gen:** add Partial to TValidatorOptions ([40d460f](https://github.com/ts-anscript/anscript/commit/40d460f357a49f52f06298545272c32504c8dd84))
+
+
+### Features
+
+* add mongo integrations ([24028f7](https://github.com/ts-anscript/anscript/commit/24028f73b594c13943ad4582bdffbb8fa891e69d))
+* add moost validator ([1cb35b4](https://github.com/ts-anscript/anscript/commit/1cb35b4edec94276fc5dd097fb430e925ac0dfb1))
+* **core:** add support for wildcards in props; add support of negative number consts ([ce69739](https://github.com/ts-anscript/anscript/commit/ce69739e76b42c7b6fd55d23255fad49c2228673))
+* **mongo:** add duplicates validation for unique items arrays ([4b392cf](https://github.com/ts-anscript/anscript/commit/4b392cf052f235ba7d292f29c16a6504051e49d9))
+* **mongo:** add patch arrays support ([2b2e383](https://github.com/ts-anscript/anscript/commit/2b2e383fa76a21c0abbe3f2cc5caa8830dcd205a))
+* **ts:** add key wildcards validation support ([7607e91](https://github.com/ts-anscript/anscript/commit/7607e918c284d21158b7bcb24ea113cfc656e56c))
+* **unplugin:** add error rendering and strict mode by default ([d49ee43](https://github.com/ts-anscript/anscript/commit/d49ee4302be70b9c00acfb0351c56859c3c73d4c))
+
+
+
 ## [0.0.17](https://github.com/ts-anscript/anscript/compare/v0.0.16...v0.0.17) (2025-05-19)
 
 
