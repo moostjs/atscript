@@ -50,8 +50,10 @@
   },
   "homepage": "https://github.com/moostjs/atscript/tree/main/packages/typescript#readme",
   "license": "ISC",
+  "peerDependencies": {
+    "@atscript/core": "workspace:^"
+  },
   "dependencies": {
-    "@atscript/core": "workspace:^",
     "@moostjs/event-cli": "^0.5.30",
     "moost": "^0.5.30"
   },

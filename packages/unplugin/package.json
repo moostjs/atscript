@@ -40,11 +40,13 @@
   "homepage": "https://github.com/moostjs/atscript/tree/main/packages/unplugin#readme",
   "license": "ISC",
   "dependencies": {
-    "@atscript/core": "workspace:^",
-    "@atscript/typescript": "workspace:^",
     "unplugin": "^2.1.2"
   },
   "devDependencies": {
     "vitest": "3.2.4"
+  },
+  "peerDependencies": {
+    "@atscript/core": "workspace:^",
+    "@atscript/typescript": "workspace:^"
   }
 }
