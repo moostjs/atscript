@@ -1,5 +1,14 @@
-import { Controller, Provide, ApplyDecorators, Inherit } from "moost";
-import { type TAtscriptAnnotatedTypeConstructor } from "@atscript/typescript"
+import {
+  Controller,
+  Provide,
+  ApplyDecorators,
+  Inherit,
+  Inject,
+  useControllerContext,
+  Resolve,
+} from 'moost'
+import { type TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript'
+import { AsMongo } from '@atscript/mongo'
 
 /**
  * DI token under which the AtScript-annotated collection definition
@@ -30,5 +39,36 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
  * ```
  */
 export const CollectionController = (type: TAtscriptAnnotatedTypeConstructor, prefix?: string) => {
-    return ApplyDecorators(Provide(COLLECTION_DEF, () => type), Controller(prefix || type.metadata.get('mongo.collection') || type.name), Inherit())
+  return ApplyDecorators(
+    Provide(COLLECTION_DEF, () => type),
+    Controller(prefix || type.metadata.get('mongo.collection') || type.name),
+    Inherit()
+  )
 }
+
+/**
+ * Parameter decorator that injects the lazily-resolved {@link AsCollection}
+ * instance for a given AtScript model.
+ *
+ * > `AsMongo` **must** be provided in the current DI scope
+ * > (e.g. `@Provide(AsMongo, () => new AsMongo(url))`).
+ *
+ * @param type AtScript-annotated constructor produced by
+ *             `@mongo.collection`.
+ *
+ * @example
+ * ```ts
+ * ‎@Injectable()
+ * export class SomeProvider {
+ *   constructor(
+ *     ‎@InjectCollection(User)
+ *     private users: AsCollection<typeof User>
+ *   ) {}
+ * }
+ * ```
+ */
+export const InjectCollection = (type: TAtscriptAnnotatedTypeConstructor) =>
+  Resolve(async ({ instantiate }) => {
+    const asMongo = await instantiate(AsMongo)
+    return asMongo.getCollection(type)
+  })

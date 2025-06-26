@@ -54,8 +54,8 @@
     "@atscript/core": "workspace:^"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.5.30",
-    "moost": "^0.5.30"
+    "@moostjs/event-cli": "^0.5.31",
+    "moost": "^0.5.31"
   },
   "devDependencies": {
     "vitest": "3.2.4"

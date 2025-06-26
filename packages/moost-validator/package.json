@@ -45,7 +45,7 @@
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
-    "@moostjs/event-http": "^0.5.30",
-    "moost": "^0.5.30"
+    "@moostjs/event-http": "^0.5.31",
+    "moost": "^0.5.31"
   }
 }

@@ -41,6 +41,19 @@ export class AsMongo {
     type: T,
     logger?: TGenericLogger
   ): AsCollection<T> {
-    return new AsCollection<T>(this, type, logger || this.logger)
+    let collection = this._collections.get(type)
+    if (!collection) {
+      collection = new AsCollection<T>(this, type, logger || this.logger)
+      this._collections.set(type, collection)
+    }
+    return collection
   }
+
+  private _collections = new WeakMap() as TWeakMapOfCollections
+}
+
+type TWeakMapOfCollections = {
+  has(key: TAtscriptAnnotatedTypeConstructor): boolean
+  get<T extends TAtscriptAnnotatedTypeConstructor>(key: T): AsCollection<T>
+  set<T extends TAtscriptAnnotatedTypeConstructor>(key: T, value: AsCollection<T>): void
 }

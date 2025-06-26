@@ -104,6 +104,28 @@ Decorator that glues your subclass to Moost:
 export class UsersController extends AsMongoController<typeof User> {}
 ```
 
+### Injecting the collection in services
+
+When you need raw collection access outside the generated controller,
+use `@InjectCollection`:
+
+```ts
+@Injectable()
+export class AuditService {
+  constructor(
+    @InjectCollection(User)
+    private users: AsCollection<typeof User>
+  ) {}
+
+  async purgeSoftDeleted() {
+    await this.users.collection.deleteMany({ deleted: true })
+  }
+}
+```
+
+AsMongo is resolved automatically from DI, so make sure it is provided
+globally (see Quick start).
+
 ---
 
 ## Route reference
