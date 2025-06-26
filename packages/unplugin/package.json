@@ -1,6 +1,6 @@
 {
   "name": "unplugin-atscript",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "description": "Atscript: Configuration and build plugins.",
   "type": "module",
   "main": "dist/index.mjs",
