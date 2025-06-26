@@ -1,7 +1,7 @@
 {
-  "name": "@atscript/mongo",
+  "name": "@atscript/moost-mongo",
   "version": "0.0.17",
-  "description": "Mongodb plugin for atscript.",
+  "description": "Atscript Mongo for Moost.",
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -18,30 +18,38 @@
   ],
   "scripts": {
     "pub": "pnpm publish --access public",
+    "before-build": "node ../typescript/cli.cjs -f js",
     "test": "vitest"
   },
   "keywords": [
     "atscript",
-    "plugin",
-    "mongodb"
+    "annotations",
+    "typescript",
+    "moost",
+    "mongo"
   ],
   "author": "Artem Maltsev",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/mongo"
+    "directory": "packages/moost-mongo"
   },
   "bugs": {
     "url": "https://github.com/moostjs/atscript/issues"
   },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/mongo#readme",
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-mongo#readme",
   "license": "ISC",
-  "peerDependencies": {
-    "@atscript/core": "workspace:^",
-    "@atscript/typescript": "workspace:^",
-    "mongodb": "^6.17.0"
+  "dependencies": {
+    "urlql": "^0.0.4"
   },
   "devDependencies": {
     "vitest": "3.2.4"
+  },
+  "peerDependencies": {
+    "@atscript/mongo": "workspace:^",
+    "@atscript/typescript": "workspace:^",
+    "@moostjs/event-http": "^0.5.30",
+    "mongodb": "^6.17.0",
+    "moost": "^0.5.30"
   }
 }

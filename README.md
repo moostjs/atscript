@@ -46,6 +46,8 @@ Atscript allows defining a configuration file (`atscript.config.js`):
 - [x] Plugin system
 - [x] Basic Validations
 - [x] MongoDB Sync Index
+- [x] Moost integration for Mongo
+- [x] Moost integration for Validator
 
 ## License
 

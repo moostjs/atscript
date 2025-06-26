@@ -6,7 +6,7 @@
   "main": "index.js",
   "scripts": {
     "lint": "oxlint -c .oxlintrc.json && eslint --ext .ts packages/**/src/**/**.ts",
-    "build": "node ./scripts/build.js",
+    "build": "pnpm -r before-build && node ./scripts/build.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",

@@ -53,7 +53,7 @@ describe('import', () => {
     expect(result.toString()).toMatchInlineSnapshot(`
       "● [import] "import" inner: { <block> from: from <identifier> path: ./type <text>
         = [group] ""  (
-  
+        
           )
       "
     `)

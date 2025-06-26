@@ -100,6 +100,17 @@ export const annotations: TAnnotationsTree = {
       },
     }),
 
+    autoIndexes: new AnnotationSpec({
+      description:
+        'Switch on/off the automatic index creation. Works with as-mongo moost controller.\n\nDefault: true',
+      nodeType: ['interface'],
+      argument: {
+        name: 'type',
+        type: 'boolean',
+        description: 'On/Off the automatic index creation',
+      },
+    }),
+
     index: {
       plain: new AnnotationSpec({
         description:

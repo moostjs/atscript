@@ -309,6 +309,12 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
+  protected _uniqueProps = new Set<string>()
+
+  get uniqueProps() {
+    return this._uniqueProps
+  }
+
   protected _finalizeIndexesForCollection() {
     for (const [key, value] of Array.from(this._vectorFilters.entries())) {
       const index = this._indexes.get(key)
@@ -317,6 +323,14 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
           type: 'filter',
           path: value,
         })
+      }
+    }
+    for (const [, value] of Array.from(this._indexes.entries())) {
+      if (value.type === 'unique') {
+        const keys = Object.keys(value.fields)
+        if (keys.length === 1) {
+          this._uniqueProps.add(keys[0])
+        }
       }
     }
   }
@@ -479,11 +493,15 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   }
 
   public insert(
-    payload: Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId },
+    payload:
+      | (Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId })
+      | (Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId })[],
     options?: InsertOneOptions
   ) {
     const toInsert = this.prepareInsert(payload)
-    return this.collection.insertOne(toInsert, options)
+    return Array.isArray(toInsert)
+      ? this.collection.insertMany(toInsert, options)
+      : this.collection.insertOne(toInsert, options)
   }
 
   public replace(
@@ -505,19 +523,27 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
   }
 
   public prepareInsert(
-    payload: Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId }
-  ): OptionalUnlessRequiredId<InstanceType<T>> {
+    payload:
+      | (Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId })
+      | (Omit<InstanceType<T>, '_id'> & { _id?: InstanceType<T>['_id'] | ObjectId })[]
+  ): OptionalUnlessRequiredId<InstanceType<T>> | OptionalUnlessRequiredId<InstanceType<T>>[] {
     const v = this.getValidator('insert')!
-    if (v.validate(payload)) {
-      const data = { ...payload } as any & { _id?: string | number | ObjectId }
-      if (data._id) {
-        data._id = this.prepareId(data._id)
-      } else if (this.idType !== 'objectId') {
-        throw new Error('Missing "_id" field')
+    const arr = Array.isArray(payload) ? payload : [payload]
+    const prepared = [] as OptionalUnlessRequiredId<InstanceType<T>>
+    for (const item of arr) {
+      if (v.validate(item)) {
+        const data = { ...item } as any & { _id?: string | number | ObjectId }
+        if (data._id) {
+          data._id = this.prepareId(data._id)
+        } else if (this.idType !== 'objectId') {
+          throw new Error('Missing "_id" field')
+        }
+        prepared.push(data)
+      } else {
+        throw new Error('Invalid payload')
       }
-      return data
     }
-    throw new Error('Invalid payload')
+    return prepared.length === 1 ? prepared[0] : prepared
   }
 
   public prepareReplace(

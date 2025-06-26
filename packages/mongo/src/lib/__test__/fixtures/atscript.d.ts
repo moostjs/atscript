@@ -24,6 +24,7 @@ declare global {
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
     "mongo.collection": string
+    "mongo.autoIndexes": boolean
     "mongo.index.plain": (string | true)[]
     "mongo.index.unique": (string | true)[]
     "mongo.index.text": number | true

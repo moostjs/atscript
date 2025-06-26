@@ -40,14 +40,12 @@
   "license": "ISC",
   "dependencies": {},
   "devDependencies": {
-    "@atscript/core": "workspace:^",
-    "@atscript/typescript": "workspace:^",
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@atscript/core": "^0.0.17",
-    "@atscript/typescript": "^0.0.17",
-    "@moostjs/event-http": "^0.5.26",
-    "moost": "^0.5.26"
+    "@atscript/core": "workspace:^",
+    "@atscript/typescript": "workspace:^",
+    "@moostjs/event-http": "^0.5.30",
+    "moost": "^0.5.30"
   }
 }
