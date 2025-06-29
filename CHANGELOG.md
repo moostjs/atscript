@@ -1,3 +1,12 @@
+## [0.0.20](https://github.com/ts-anscript/anscript/compare/v0.0.19...v0.0.20) (2025-06-29)
+
+
+### Bug Fixes
+
+* **moost-mongo:** improve types ([ed87067](https://github.com/ts-anscript/anscript/commit/ed87067f9de3623650fa0bb773404a7b548dc916))
+
+
+
 ## [0.0.19](https://github.com/ts-anscript/anscript/compare/v0.0.18...v0.0.19) (2025-06-26)
 
 
