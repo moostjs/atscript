@@ -438,7 +438,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param payload - Raw request body to be inserted.
    */
   @Post('')
-  async insert(@Body() payload: any): Promise<HttpError | InsertOneResult | InsertManyResult> {
+  async insert(
+    @Body() payload: Parameters<AsCollection<T>['prepareInsert']>[0]
+  ): Promise<HttpError | InsertOneResult | InsertManyResult> {
     const data = this.asCollection.prepareInsert(payload) as
       | ReturnType<AsMongoController<T>['asCollection']['prepareInsert']>
       | undefined
@@ -468,7 +470,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param payload - Object containing `_id` plus full replacement document.
    */
   @Put('')
-  async replace(@Body() payload: any): Promise<HttpError | UpdateResult<InstanceType<T>>> {
+  async replace(
+    @Body() payload: Parameters<AsCollection<T>['prepareReplace']>[0]
+  ): Promise<HttpError | UpdateResult<InstanceType<T>>> {
     const args = this.asCollection.prepareReplace(payload).toArgs()
     const newData = await this.onWrite('replace', args[1], args[2])
     if (newData) {
@@ -485,7 +489,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param payload - Update payload produced by `asCollection.prepareUpdate`.
    */
   @Patch('')
-  async update(@Body() payload: any): Promise<HttpError | UpdateResult> {
+  async update(
+    @Body() payload: Parameters<AsCollection<T>['prepareUpdate']>[0]
+  ): Promise<HttpError | UpdateResult> {
     const args = this.asCollection.prepareUpdate(payload).toArgs()
     const newData = await this.onWrite('update', args[1], args[2])
     if (newData) {
