@@ -18,6 +18,8 @@ export declare class QueryControlsDto {
   $count?: boolean
   $sort?: SortControlDto
   $select?: SelectControlDto
+  $search?: string
+  $index?: string
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof QueryControlsDto>
   static metadata: TMetadataMap<AtscriptMetadata>
@@ -26,13 +28,15 @@ export declare class QueryControlsDto {
 
 /**
  * Atscript interface **PagesControlsDto**
- * @see {@link ./controls.dto.as:9:18}
+ * @see {@link ./controls.dto.as:11:18}
  */
 export declare class PagesControlsDto {
   $page?: string
   $size?: string
   $sort?: SortControlDto
   $select?: SelectControlDto
+  $search?: string
+  $index?: string
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof PagesControlsDto>
   static metadata: TMetadataMap<AtscriptMetadata>
@@ -41,7 +45,7 @@ export declare class PagesControlsDto {
 
 /**
  * Atscript interface **GetOneControlsDto**
- * @see {@link ./controls.dto.as:18:18}
+ * @see {@link ./controls.dto.as:22:18}
  */
 export declare class GetOneControlsDto {
   $select?: SelectControlDto
@@ -53,7 +57,7 @@ export declare class GetOneControlsDto {
 
 /**
  * Atscript interface **SortControlDto**
- * @see {@link ./controls.dto.as:22:11}
+ * @see {@link ./controls.dto.as:26:11}
  */
 declare class SortControlDto {
   [key: string]: 1 | -1
@@ -65,7 +69,7 @@ declare class SortControlDto {
 
 /**
  * Atscript interface **SelectControlDto**
- * @see {@link ./controls.dto.as:26:11}
+ * @see {@link ./controls.dto.as:30:11}
  */
 declare class SelectControlDto {
   [key: string]: 1 | 0

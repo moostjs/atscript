@@ -4,6 +4,8 @@ export interface QueryControlsDto {
     $count?: boolean
     $sort?: SortControlDto
     $select?: SelectControlDto
+    $search?: string
+    $index?: string
 }
 
 export interface PagesControlsDto {
@@ -13,6 +15,8 @@ export interface PagesControlsDto {
     $size?: string
     $sort?: SortControlDto
     $select?: SelectControlDto
+    $search?: string
+    $index?: string
 }
 
 export interface GetOneControlsDto {

@@ -69,6 +69,18 @@ $("object", QueryControlsDto)
       .refTo(SelectControlDto)
       .optional()
       .$type
+  ).prop(
+    "$search",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
+    "$index",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
   )
 
 $("object", PagesControlsDto)
@@ -96,6 +108,18 @@ $("object", PagesControlsDto)
     "$select",
     $()
       .refTo(SelectControlDto)
+      .optional()
+      .$type
+  ).prop(
+    "$search",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
+    "$index",
+    $().designType("string")
+      .tags("string")
       .optional()
       .$type
   )

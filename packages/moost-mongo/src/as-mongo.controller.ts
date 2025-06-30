@@ -11,6 +11,7 @@ import {
   type TAtscriptAnnotatedTypeConstructor,
 } from '@atscript/typescript'
 import type {
+  Document,
   BulkWriteOptions,
   DeleteOptions,
   Filter,
@@ -252,6 +253,16 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   }
 
   /**
+   * Allows subclasses to transform or modify the filter before querying.
+   *
+   * @param filter - The original filter object.
+   * @returns The transformed filter object (may return `Promise`).
+   */
+  protected transformFilter(filter: Document): Document {
+    return filter
+  }
+
+  /**
    * Builds MongoDB `FindOptions` object out of URLQL controls.
    *
    * @param controls - Parsed `controls` object.
@@ -262,6 +273,35 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       sort: controls.$sort,
       limit: controls.$limit,
       skip: controls.$skip,
+    }
+  }
+
+  /**
+   * Prepares a MongoDB $search stage for text-based searching.
+   *
+   * @param searchTerm - The text string to search for. If not provided, no search is performed.
+   * @param indexName - The name of the Atlas Search index to use. If not provided, the default index is used.
+   * @returns A $search pipeline stage or an error string if the index is not found. Returns undefined if no searchTerm is provided.
+   */
+  protected prepareSearch(searchTerm?: string, indexName?: string): string | undefined | Document {
+    if (!searchTerm) {
+      return undefined
+    }
+    const index = this.asCollection.getSearchIndex(indexName)
+    if (!index) {
+      return indexName ? `Search index "${indexName}" does not exist` : 'No search index found'
+    }
+
+    // Ensure index.key is defined.  If not, return an error (or throw an exception).
+    if (!index.key) {
+      return `Invalid index definition: missing index key`
+    }
+
+    return {
+      $search: {
+        index: index.key,
+        text: { query: searchTerm, path: { wildcard: '*' } }, // Wildcard search on all fields
+      },
     }
   }
 
@@ -285,11 +325,37 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       return error
     }
 
-    return parsed.controls.$count
-      ? this.asCollection.collection.countDocuments(parsed.filter as any)
-      : (this.asCollection.collection
-          .find(parsed.filter as any, this.prepareQueryOptions(parsed.controls))
-          .toArray() as Promise<InstanceType<T>[]>)
+    if (parsed.controls.$count) {
+      return this.asCollection.collection.countDocuments(parsed.filter as any)
+    }
+
+    const search = this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
+    if (typeof search === 'string') {
+      return new HttpError(400, search)
+    }
+
+    const { projection, sort, limit, skip } = this.prepareQueryOptions(parsed.controls)
+    const pipeline: Document[] = []
+    if (search) {
+      pipeline.push(search)
+    }
+    pipeline.push({ $match: this.transformFilter(parsed.filter) })
+    if (sort) {
+      pipeline.push({ $sort: sort })
+    }
+    if (skip) {
+      pipeline.push({ $skip: skip })
+    }
+    if (limit) {
+      pipeline.push({ $limit: limit })
+    } else {
+      pipeline.push({ $limit: 1000 })
+    }
+    if (projection) {
+      pipeline.push({ $project: projection })
+    }
+
+    return this.asCollection.collection.aggregate(pipeline).toArray() as Promise<InstanceType<T>[]>
   }
 
   /**
@@ -316,27 +382,37 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     if (error) {
       return error
     }
+    const search = this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
+    if (typeof search === 'string') {
+      return new HttpError(400, search)
+    }
 
     const controls = parsed.controls as PagesControlsDto
     const page = Math.max(Number(controls.$page || 1), 1)
     const size = Math.max(Number(controls.$size || 10), 1)
     const skip = (page - 1) * size
-    const result = await this.asCollection.collection
-      .aggregate([
-        { $match: parsed.filter },
-        {
-          $facet: {
-            documents: [
-              controls.$sort ? { $sort: controls.$sort } : undefined,
-              { $skip: skip },
-              { $limit: size },
-              controls.$select ? { $project: controls.$select } : undefined,
-            ].filter(Boolean),
-            meta: [{ $count: 'count' }],
-          },
+
+    const pipeline: Document[] = []
+    if (search) {
+      pipeline.push(search)
+    }
+
+    pipeline.push(
+      { $match: this.transformFilter(parsed.filter) },
+      {
+        $facet: {
+          documents: [
+            controls.$sort ? { $sort: controls.$sort } : undefined,
+            { $skip: skip },
+            { $limit: size },
+            controls.$select ? { $project: this.transformProjection(controls.$select) } : undefined,
+          ].filter(Boolean),
+          meta: [{ $count: 'count' }],
         },
-      ])
-      .toArray()
+      }
+    )
+
+    const result = await this.asCollection.collection.aggregate(pipeline).toArray()
     const totalDocuments = result[0].meta[0].count
     return {
       documents: result[0].documents as InstanceType<T>[],

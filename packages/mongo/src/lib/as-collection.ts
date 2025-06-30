@@ -29,12 +29,16 @@ const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
 
 type TPlainIndex = {
+  key: string
+  name: string
   type: 'plain' | 'unique' | 'text'
   fields: Record<string, 1 | 'text'>
   weights: Record<string, number>
 }
 
 type TSearchIndex = {
+  key: string
+  name: string
   type: 'dynamic_text' | 'search_text' | 'vector'
   definition: TMongoSearchIndexDefinition
 }
@@ -209,7 +213,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
       index.fields[field] = value
     } else {
       const weights = {} as TPlainIndex['weights']
-      index = { type, fields: { [field]: value }, weights }
+      index = { key, name, type, fields: { [field]: value }, weights }
       this._indexes.set(key, index)
     }
     if (weight) {
@@ -222,7 +226,10 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     name: string | undefined,
     definition: TMongoSearchIndexDefinition
   ) {
-    this._indexes.set(indexKey(type, name || DEFAULT_INDEX_NAME), {
+    const key = indexKey(type, name || DEFAULT_INDEX_NAME)
+    this._indexes.set(key, {
+      key,
+      name: name || DEFAULT_INDEX_NAME,
       type,
       definition,
     })
@@ -374,6 +381,35 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
       this._flattenType(this.type)
       this._finalizeIndexesForCollection()
     }
+  }
+
+  protected _searchIndexesMap?: Map<string, TIndex>
+
+  public getSearchIndex(name = DEFAULT_INDEX_NAME) {
+    if (!this._searchIndexesMap) {
+      this._searchIndexesMap = new Map()
+      let deafultIndex: TIndex | undefined
+      for (const index of this.indexes.values()) {
+        switch (index.type) {
+          case 'text':
+            if (!deafultIndex) {
+              deafultIndex = index
+            }
+          case 'dynamic_text':
+            deafultIndex = index
+          case 'search_text':
+            if (!deafultIndex || deafultIndex?.type === 'text') {
+              deafultIndex = index
+            }
+            this._searchIndexesMap!.set(index.name, index)
+          default:
+        }
+      }
+      if (deafultIndex && !this._searchIndexesMap.has(DEFAULT_INDEX_NAME)) {
+        this._searchIndexesMap!.set(DEFAULT_INDEX_NAME, deafultIndex)
+      }
+    }
+    return this._searchIndexesMap.get(name)
   }
 
   public get flatMap() {
