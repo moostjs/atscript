@@ -1,3 +1,12 @@
+## [0.0.21](https://github.com/ts-anscript/anscript/compare/v0.0.20...v0.0.21) (2025-06-30)
+
+
+### Features
+
+* **moost-mongo:** add $search support ([577586b](https://github.com/ts-anscript/anscript/commit/577586b262bb1f25c273d342d85d035e53f24c4b))
+
+
+
 ## [0.0.20](https://github.com/ts-anscript/anscript/compare/v0.0.19...v0.0.20) (2025-06-29)
 
 
