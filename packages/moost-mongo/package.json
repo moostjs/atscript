@@ -1,6 +1,6 @@
 {
   "name": "@atscript/moost-mongo",
-  "version": "0.0.21",
+  "version": "0.0.22",
   "description": "Atscript Mongo for Moost.",
   "type": "module",
   "main": "dist/index.mjs",
