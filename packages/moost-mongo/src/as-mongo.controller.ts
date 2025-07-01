@@ -258,8 +258,8 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param filter - The original filter object.
    * @returns The transformed filter object (may return `Promise`).
    */
-  protected transformFilter(filter: Document): Document {
-    return filter
+  protected transformFilter(filter: Document): Filter<InstanceType<T>> {
+    return filter as Filter<InstanceType<T>>
   }
 
   /**
@@ -455,9 +455,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       return this.returnOne(
         this.asCollection.collection
           .find(
-            {
+            this.transformFilter({
               _id: this.asCollection.prepareId(id),
-            },
+            }),
             this.prepareQueryOptions(parsed.controls)
           )
           .toArray()
@@ -471,9 +471,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       return this.returnOne(
         this.asCollection.collection
           .find(
-            {
+            this.transformFilter({
               $or: filter,
-            } as Filter<InstanceType<T>>,
+            }),
             this.prepareQueryOptions(parsed.controls)
           )
           .toArray()
@@ -552,9 +552,11 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     const args = this.asCollection.prepareReplace(payload).toArgs()
     const newData = await this.onWrite('replace', args[1], args[2])
     if (newData) {
-      return this.asCollection.collection.replaceOne(args[0], newData, args[2]) as Promise<
-        UpdateResult<InstanceType<T>>
-      >
+      return this.asCollection.collection.replaceOne(
+        this.transformFilter(args[0]),
+        newData,
+        args[2]
+      ) as Promise<UpdateResult<InstanceType<T>>>
     }
     return new HttpError(500, 'Not saved')
   }
@@ -571,7 +573,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     const args = this.asCollection.prepareUpdate(payload).toArgs()
     const newData = await this.onWrite('update', args[1], args[2])
     if (newData) {
-      return this.asCollection.collection.updateOne(args[0], newData, args[2])
+      return this.asCollection.collection.updateOne(this.transformFilter(args[0]), newData, args[2])
     }
     return new HttpError(500, 'Not saved')
   }
@@ -587,7 +589,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     id = (await this.onRemove(id, opts)) as string
     if (id !== undefined) {
       const result = await this.asCollection.collection.deleteOne(
-        { _id: this.asCollection.prepareId(id) },
+        this.transformFilter({ _id: this.asCollection.prepareId(id) }),
         opts
       )
       if (result.deletedCount < 1) {
