@@ -1,3 +1,12 @@
+## [0.0.22](https://github.com/ts-anscript/anscript/compare/v0.0.21...v0.0.22) (2025-07-01)
+
+
+### Bug Fixes
+
+* **moost-mongo:** add transfromFilter calls to every relevant method ([98f11ee](https://github.com/ts-anscript/anscript/commit/98f11ee63e7f0cffeb039b5925801fc9ce69292f))
+
+
+
 ## [0.0.21](https://github.com/ts-anscript/anscript/compare/v0.0.20...v0.0.21) (2025-06-30)
 
 
