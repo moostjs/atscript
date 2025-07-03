@@ -413,9 +413,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     )
 
     const result = await this.asCollection.collection.aggregate(pipeline).toArray()
-    const totalDocuments = result[0].meta[0].count
+    const totalDocuments = result[0]?.meta[0]?.count || 0
     return {
-      documents: result[0].documents as InstanceType<T>[],
+      documents: (result[0]?.documents || []) as InstanceType<T>[],
       page,
       size: size,
       totalPages: Math.ceil(totalDocuments / size),

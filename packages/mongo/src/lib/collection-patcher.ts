@@ -158,9 +158,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
         }
         return def
       },
-      partial: (def, path) => {
-        return path !== '' && def.metadata.get('mongo.patch.strategy') === 'merge'
-      },
+      partial: (def, path) => path !== '' && def.metadata.get('mongo.patch.strategy') === 'merge',
     })
   }
 
