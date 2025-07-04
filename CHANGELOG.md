@@ -1,3 +1,12 @@
+## [0.0.23](https://github.com/ts-anscript/anscript/compare/v0.0.22...v0.0.23) (2025-07-04)
+
+
+### Bug Fixes
+
+* **mongo:** flatten arrays in asCollection ([153fcc3](https://github.com/ts-anscript/anscript/commit/153fcc3ca696ab6825e0596eb294799b1efee42f))
+
+
+
 ## [0.0.22](https://github.com/ts-anscript/anscript/compare/v0.0.21...v0.0.22) (2025-07-01)
 
 
