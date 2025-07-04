@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class QueryControlsDto {
@@ -162,3 +164,5 @@ $("object", SelectControlDto)
           .$type)
       .$type
   )
+
+// prettier-ignore-end
