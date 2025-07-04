@@ -1,3 +1,12 @@
+## [0.0.25](https://github.com/ts-anscript/anscript/compare/v0.0.24...v0.0.25) (2025-07-04)
+
+
+### Bug Fixes
+
+* add new lines ([f610b66](https://github.com/ts-anscript/anscript/commit/f610b6664fad71d0ac74d07558b6580c9aeeb8c5))
+
+
+
 ## [0.0.24](https://github.com/ts-anscript/anscript/compare/v0.0.23...v0.0.24) (2025-07-04)
 
 
