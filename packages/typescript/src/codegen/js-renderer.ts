@@ -21,6 +21,8 @@ export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
 
   pre() {
+    this.writeln('// prettier-ignore-start')
+    this.writeln('/* eslint-disable */')
     this.writeln('import { defineAnnotatedType as $ } from "@atscript/typescript"')
   }
 
@@ -30,6 +32,7 @@ export class JsRenderer extends BaseRenderer {
       this.indent().defineMetadata(node).unindent()
       this.writeln()
     }
+    this.writeln('// prettier-ignore-end')
     super.post()
   }
 
