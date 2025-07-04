@@ -2,13 +2,16 @@
 // eslint-disable max-params
 import {
   isAnnotatedType,
-  TAtscriptAnnotatedType,
-  TAtscriptAnnotatedTypeConstructor,
-  TAtscriptTypeObject,
-  TMetadataMap,
+  type TAtscriptAnnotatedType,
+  type TAtscriptAnnotatedTypeConstructor,
+  type TAtscriptTypeObject,
+  type TMetadataMap,
   Validator,
   defineAnnotatedType as $,
-  TAtscriptTypeArray,
+  type TAtscriptTypeArray,
+  isAnnotatedTypeOfPrimitive,
+  type TAtscriptTypeComplex,
+  type TAnnotatedTypeHandle,
 } from '@atscript/typescript'
 import { AsMongo } from './as-mongo'
 import {
@@ -260,40 +263,86 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
     }
   }
 
-  protected _flattenType(type: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
-    switch (type.type.kind) {
+  protected _addFieldToFlatMap(name: string, def: TAtscriptAnnotatedType) {
+    if (this._flatMap) {
+      const existing = this._flatMap.get(name) as
+        | (TAtscriptAnnotatedType & { __flat_union?: boolean })
+        | undefined
+      if (existing) {
+        const flatUnion = $('union').copyMetadata(existing.metadata).copyMetadata(def.metadata)
+        if (existing.__flat_union) {
+          ;(existing as TAtscriptAnnotatedType<TAtscriptTypeComplex>).type.items.forEach(item =>
+            flatUnion.item(item)
+          )
+        } else {
+          flatUnion.item(existing)
+        }
+        flatUnion.item(def)
+        const type = flatUnion.$type as TAtscriptAnnotatedType & { __flat_union?: boolean }
+        type.__flat_union = true
+        this._flatMap.set(name, flatUnion.$type)
+      } else {
+        this._flatMap.set(name, def)
+      }
+    }
+  }
+
+  protected _flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
+    switch (def.type.kind) {
       case 'object':
-        this._flatMap?.set(prefix || '', type)
-        const items = Array.from(type.type.props.entries())
+        this._addFieldToFlatMap(prefix || '', def)
+        const items = Array.from(def.type.props.entries())
         for (const [key, value] of items) {
           this._flattenType(value, prefix ? `${prefix}.${key}` : key, inComplexTypeOrArray)
         }
         break
       case 'array':
-        let typeArray = type as TAtscriptAnnotatedType<TAtscriptTypeArray>
+        let typeArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
         if (!inComplexTypeOrArray) {
-          typeArray = $().refTo(type).copyMetadata(type.metadata)
+          typeArray = $().refTo(def).copyMetadata(def.metadata)
             .$type as TAtscriptAnnotatedType<TAtscriptTypeArray>
           // @ts-expect-error
           typeArray.metadata.set('mongo.__topLevelArray', true)
         }
-        this._flatMap?.set(prefix || '', typeArray)
-        // if (typeArray.type.of.type.kind === 'object') {
-        //   this._flattenType(typeArray.type.of, prefix, true)
-        // }
+        this._addFieldToFlatMap(prefix || '', typeArray)
+        if (!isAnnotatedTypeOfPrimitive(typeArray.type.of)) {
+          this._flattenArray(typeArray.type.of, prefix)
+        }
         break
       case 'intersection':
       case 'tuple':
       case 'union':
-        for (const item of type.type.items) {
+        for (const item of def.type.items) {
           this._flattenType(item, prefix, true)
         }
       default:
-        this._flatMap?.set(prefix || '', type)
+        this._addFieldToFlatMap(prefix || '', def)
         break
     }
     if (prefix) {
-      this._prepareIndexesForField(prefix, type.metadata)
+      this._prepareIndexesForField(prefix, def.metadata)
+    }
+  }
+
+  _flattenArray(def: TAtscriptAnnotatedType, name: string) {
+    switch (def.type.kind) {
+      case 'object':
+        const items = Array.from(def.type.props.entries())
+        for (const [key, value] of items) {
+          this._flattenType(value, name ? `${name}.${key}` : key, true)
+        }
+        break
+      case 'union':
+      case 'intersection':
+      case 'tuple':
+        for (const item of def.type.items) {
+          this._flattenArray(item, name)
+        }
+        break
+      case 'array':
+        this._flattenArray((def as TAtscriptAnnotatedType<TAtscriptTypeArray>).type.of, name)
+        break
+      default:
     }
   }
 
