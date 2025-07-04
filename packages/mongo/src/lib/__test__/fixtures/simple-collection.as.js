@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class SimpleCollection {
@@ -180,3 +182,5 @@ $("object", MinimalCollectionString)
       .$type
   )
   .annotate("mongo.collection", "minimal-string")
+
+// prettier-ignore-end

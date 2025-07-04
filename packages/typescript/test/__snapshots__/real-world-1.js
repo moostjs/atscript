@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class Address {
@@ -109,3 +111,5 @@ $("object", Entity)
       .annotate("label", "Contacts")
       .$type
   )
+
+// prettier-ignore-end

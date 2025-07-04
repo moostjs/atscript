@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class IdPlugin {
@@ -106,3 +108,5 @@ $("object", UniqueItems)
       .$type
   )
   .annotate("mongo.collection", "UniqueItems")
+
+// prettier-ignore-end

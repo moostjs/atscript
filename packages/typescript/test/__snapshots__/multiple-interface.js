@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class TContactType {
@@ -108,3 +110,5 @@ $("object", User)
           .$type)
       .$type
   )
+
+// prettier-ignore-end

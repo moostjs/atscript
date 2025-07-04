@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class ArraysCollection {
@@ -139,3 +141,5 @@ $("object", ArraysCollection)
       .$type
   )
   .annotate("mongo.collection", "arrays")
+
+// prettier-ignore-end

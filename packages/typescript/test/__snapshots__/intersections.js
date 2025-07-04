@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class IA {
@@ -121,3 +123,5 @@ $("object", I1)
       .annotate("label", "IB")
       .$type
   )
+
+// prettier-ignore-end

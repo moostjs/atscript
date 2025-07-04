@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class WithPatterns {
@@ -53,3 +55,5 @@ $("object", WithPatterns2)
       .tags("boolean")
       .$type
   )
+
+// prettier-ignore-end

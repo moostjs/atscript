@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class FlattenTest {
@@ -93,3 +95,5 @@ $("object", FlattenTest)
       .$type
   )
   .annotate("mongo.collection", "flatten-test")
+
+// prettier-ignore-end

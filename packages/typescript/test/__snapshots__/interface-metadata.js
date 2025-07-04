@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class WithMetadata {
@@ -106,3 +108,5 @@ $("object", SomeType)
       .$type
   )
   .annotate("id", "Some type")
+
+// prettier-ignore-end

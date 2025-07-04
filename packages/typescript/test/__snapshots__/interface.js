@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class PublicInterface {
@@ -272,3 +274,5 @@ $("object", PublicInterface)
           .$type)
       .$type
   )
+
+// prettier-ignore-end

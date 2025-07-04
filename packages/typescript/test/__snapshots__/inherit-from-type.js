@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class TFirstName {
@@ -61,3 +63,5 @@ $("object", ITarget)
       .annotate("min", 18)
       .$type
   )
+
+// prettier-ignore-end

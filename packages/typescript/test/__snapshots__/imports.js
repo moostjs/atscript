@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
@@ -27,3 +29,5 @@ $("object", People)
           .$type)
       .$type
   )
+
+// prettier-ignore-end

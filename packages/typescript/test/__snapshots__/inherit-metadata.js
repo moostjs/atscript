@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class ISource {
@@ -54,3 +56,5 @@ $("object", ITarget)
       .tags("number")
       .$type
   )
+
+// prettier-ignore-end

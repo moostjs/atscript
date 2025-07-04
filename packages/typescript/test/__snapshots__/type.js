@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 export class TPrimitive {
@@ -323,3 +325,5 @@ $("object", TObjectIntersection)
       .value("b")
       .$type
   )
+
+// prettier-ignore-end

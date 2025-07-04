@@ -1,3 +1,5 @@
+// prettier-ignore-start
+/* eslint-disable */
 import { defineAnnotatedType as $ } from "@atscript/typescript"
 
 class TType {
@@ -57,3 +59,5 @@ $("object", I2)
       .optional()
       .$type
   )
+
+// prettier-ignore-end
