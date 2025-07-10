@@ -434,7 +434,7 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
 
   protected _searchIndexesMap?: Map<string, TIndex>
 
-  public getSearchIndex(name = DEFAULT_INDEX_NAME) {
+  public getSearchIndexes() {
     if (!this._searchIndexesMap) {
       this._searchIndexesMap = new Map()
       let deafultIndex: TIndex | undefined
@@ -444,13 +444,19 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
             if (!deafultIndex) {
               deafultIndex = index
             }
+            break
           case 'dynamic_text':
             deafultIndex = index
+            break
           case 'search_text':
             if (!deafultIndex || deafultIndex?.type === 'text') {
               deafultIndex = index
             }
             this._searchIndexesMap!.set(index.name, index)
+            break
+          case 'vector':
+            this._searchIndexesMap!.set(index.name, index)
+            break
           default:
         }
       }
@@ -458,7 +464,11 @@ export class AsCollection<T extends TAtscriptAnnotatedTypeConstructor> {
         this._searchIndexesMap!.set(DEFAULT_INDEX_NAME, deafultIndex)
       }
     }
-    return this._searchIndexesMap.get(name)
+    return this._searchIndexesMap
+  }
+
+  public getSearchIndex(name = DEFAULT_INDEX_NAME) {
+    return this.getSearchIndexes().get(name)
   }
 
   public get flatMap() {

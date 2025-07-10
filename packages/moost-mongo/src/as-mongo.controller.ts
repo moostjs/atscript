@@ -277,13 +277,41 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   }
 
   /**
+   * Prepares a MongoDB $search stage for vector-based searching.
+   *
+   * @param searchTerm - The text string to search for. If not provided, no search is performed.
+   * @param indexName - The name of the Atlas Search index to use. If not provided, the default index is used.
+   */
+  protected async prepareVectorSearch(
+    searchTerm: string,
+    indexName?: string
+  ): Promise<string | undefined | Document> {
+    return `Embeddings for ${indexName} are not supported`
+  }
+
+  /**
+   * Prepares a MongoDB $search stage for text-based searching.
+   *
+   * @param searchTerm - The text string to search for. If not provided, no search is performed.
+   * @param index - The Atlas Search index definition.
+   * @returns A $search pipeline stage.
+   */
+  protected prepareTextSearch(searchTerm: string, index: { key: string }): Document {
+    return {
+      $search: { index: index.key, text: { query: searchTerm, path: { wildcard: '*' } } },
+    }
+  }
+  /**
    * Prepares a MongoDB $search stage for text-based searching.
    *
    * @param searchTerm - The text string to search for. If not provided, no search is performed.
    * @param indexName - The name of the Atlas Search index to use. If not provided, the default index is used.
    * @returns A $search pipeline stage or an error string if the index is not found. Returns undefined if no searchTerm is provided.
    */
-  protected prepareSearch(searchTerm?: string, indexName?: string): string | undefined | Document {
+  protected async prepareSearch(
+    searchTerm?: string,
+    indexName?: string
+  ): Promise<string | undefined | Document> {
     if (!searchTerm) {
       return undefined
     }
@@ -297,12 +325,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       return `Invalid index definition: missing index key`
     }
 
-    return {
-      $search: {
-        index: index.key,
-        text: { query: searchTerm, path: { wildcard: '*' } }, // Wildcard search on all fields
-      },
-    }
+    return index.type === 'vector'
+      ? await this.prepareVectorSearch(searchTerm, indexName)
+      : this.prepareTextSearch(searchTerm, index)
   }
 
   // ---------------------------------------------------------------------
@@ -329,7 +354,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       return this.asCollection.collection.countDocuments(parsed.filter as any)
     }
 
-    const search = this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
+    const search = await this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
     if (typeof search === 'string') {
       return new HttpError(400, search)
     }
