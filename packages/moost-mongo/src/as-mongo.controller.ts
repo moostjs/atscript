@@ -407,7 +407,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     if (error) {
       return error
     }
-    const search = this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
+    const search = await this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
     if (typeof search === 'string') {
       return new HttpError(400, search)
     }
