@@ -1,3 +1,12 @@
+## [0.0.27](https://github.com/ts-anscript/anscript/compare/v0.0.26...v0.0.27) (2025-07-10)
+
+
+### Bug Fixes
+
+* **moost-mongo:** fix pages endpoing ([0eefba1](https://github.com/ts-anscript/anscript/commit/0eefba112cc1b72face7f73681cab86347290511))
+
+
+
 ## [0.0.26](https://github.com/ts-anscript/anscript/compare/v0.0.25...v0.0.26) (2025-07-10)
 
 
