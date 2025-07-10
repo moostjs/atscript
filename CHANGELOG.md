@@ -1,3 +1,12 @@
+## [0.0.26](https://github.com/ts-anscript/anscript/compare/v0.0.25...v0.0.26) (2025-07-10)
+
+
+### Features
+
+* **moost-mongo:** Add text search capabilities to AsMongoController ([436dda9](https://github.com/ts-anscript/anscript/commit/436dda9e9f8e25dc10c415324effee173cb8c58b))
+
+
+
 ## [0.0.25](https://github.com/ts-anscript/anscript/compare/v0.0.24...v0.0.25) (2025-07-04)
 
 
