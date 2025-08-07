@@ -1,4 +1,5 @@
 import {
+  AtscriptDoc,
   isArray,
   isConst,
   isGroup,
@@ -17,8 +18,13 @@ import {
 } from '@atscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
+import type { TTsPluginOptions } from '../plugin'
 
 export class TypeRenderer extends BaseRenderer {
+  constructor(doc: AtscriptDoc, private opts?: TTsPluginOptions) {
+    super(doc)
+  }
+
   pre() {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
@@ -137,6 +143,9 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln(
         `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${asClass}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
       )
+      if (this.opts?.jsonSchema) {
+        this.writeln('static toJsonSchema: () => any')
+      }
     }
     this.pop()
   }
@@ -194,6 +203,9 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(
       `const validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
     )
+    if (this.opts?.jsonSchema) {
+      this.writeln('const toJsonSchema: () => any')
+    }
     this.popln()
   }
 

@@ -284,4 +284,36 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/prop-patterns.as.d.ts')
     )
   })
+
+  it('must render json schema method', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: true })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out[0].content).toContain('static toJsonSchema()')
+    expect(out[0].content).toContain('buildJsonSchema as $$')
+  })
+
+  it('must pre-render json schema', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: { preRender: true } })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out[0].content).toContain('static _jsonSchema = {')
+    expect(out[0].content).toContain('static toJsonSchema()')
+    expect(out[0].content).not.toContain('buildJsonSchema')
+    expect(out[0].content).toContain('"minLength":3')
+    expect(out[0].content).toContain('"maxLength":20')
+    expect(out[0].content).toContain('"pattern":"^[a-z]+$"')
+    expect(out[0].content).toContain('"minimum":18')
+    expect(out[0].content).toContain('"maximum":99')
+    expect(out[0].content).toContain('"minItems":1')
+    expect(out[0].content).toContain('"maxItems":5')
+  })
 })
