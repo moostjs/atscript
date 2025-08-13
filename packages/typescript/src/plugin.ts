@@ -4,7 +4,11 @@ import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
-export const tsPlugin: () => TAtscriptPlugin = () => {
+export interface TTsPluginOptions {
+  jsonSchema?: boolean | { preRender?: boolean }
+}
+
+export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
   return {
     name: 'typesccript',
     render(doc, format) {
@@ -12,7 +16,7 @@ export const tsPlugin: () => TAtscriptPlugin = () => {
         return [
           {
             fileName: `${doc.name}.d.ts`,
-            content: new TypeRenderer(doc).render(),
+            content: new TypeRenderer(doc, opts).render(),
           },
         ]
       }
@@ -20,7 +24,7 @@ export const tsPlugin: () => TAtscriptPlugin = () => {
         return [
           {
             fileName: `${doc.name}.js`,
-            content: new JsRenderer(doc).render(),
+            content: new JsRenderer(doc, opts).render(),
           },
         ]
       }

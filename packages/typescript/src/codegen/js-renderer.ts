@@ -1,6 +1,7 @@
 // oxlint-disable max-lines
 // oxlint-disable max-depth
 import {
+  AtscriptDoc,
   isPrimitive,
   SemanticArrayNode,
   SemanticConstNode,
@@ -8,6 +9,7 @@ import {
   SemanticInterfaceNode,
   SemanticNode,
   SemanticPrimitiveNode,
+  SemanticPropNode,
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
@@ -16,14 +18,32 @@ import {
 } from '@atscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
+import type { TTsPluginOptions } from '../plugin'
+import {
+  defineAnnotatedType,
+  type TAtscriptAnnotatedType,
+  type TAnnotatedTypeHandle,
+} from '../annotated-type'
+import { buildJsonSchema } from '../json-schema'
 
 export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
 
+  constructor(doc: AtscriptDoc, private opts?: TTsPluginOptions) {
+    super(doc)
+  }
+
   pre() {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
-    this.writeln('import { defineAnnotatedType as $ } from "@atscript/typescript"')
+    const imports = ['defineAnnotatedType as $']
+    if (
+      this.opts?.jsonSchema &&
+      !(typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender)
+    ) {
+      imports.push('buildJsonSchema as $$')
+    }
+    this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript"`)
   }
 
   post() {
@@ -45,6 +65,22 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static __is_atscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
+    if (this.opts?.jsonSchema) {
+      if (typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender) {
+        const schema = JSON.stringify(
+          buildJsonSchema(this.toAnnotatedType(node))
+        )
+        this.writeln(`static _jsonSchema = ${schema}`)
+        this.writeln('static toJsonSchema() {')
+        this.indent().writeln('return this._jsonSchema').unindent()
+        this.writeln('}')
+      } else {
+        this.writeln('static _jsonSchema')
+        this.writeln('static toJsonSchema() {')
+        this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
+        this.writeln('}')
+      }
+    }
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
@@ -59,9 +95,173 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static __is_atscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
+    if (this.opts?.jsonSchema) {
+      if (typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender) {
+        const schema = JSON.stringify(
+          buildJsonSchema(this.toAnnotatedType(node))
+        )
+        this.writeln(`static _jsonSchema = ${schema}`)
+        this.writeln('static toJsonSchema() {')
+        this.indent().writeln('return this._jsonSchema').unindent()
+        this.writeln('}')
+      } else {
+        this.writeln('static _jsonSchema')
+        this.writeln('static toJsonSchema() {')
+        this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
+        this.writeln('}')
+      }
+    }
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
+  }
+
+  private toAnnotatedType(node?: SemanticNode): TAtscriptAnnotatedType {
+    return this.toAnnotatedHandle(node).$type
+  }
+
+  private toAnnotatedHandle(
+    node?: SemanticNode,
+    skipAnnotations = false
+  ): TAnnotatedTypeHandle {
+    if (!node) {
+      return defineAnnotatedType()
+    }
+
+    switch (node.entity) {
+      case 'interface':
+      case 'type': {
+        const def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
+        const handle = this.toAnnotatedHandle(def, true)
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'prop': {
+        const prop = node as SemanticPropNode
+        const def = prop.getDefinition()
+        const handle = this.toAnnotatedHandle(def, true)
+        if (!skipAnnotations) {
+          this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(prop))
+          if (prop.token('optional')) {
+            handle.optional()
+          }
+        }
+        return handle
+      }
+      case 'ref': {
+        const ref = node as SemanticRefNode
+        const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
+        const handle = this.toAnnotatedHandle(decl!, true)
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'primitive': {
+        const prim = node as SemanticPrimitiveNode
+        const handle = defineAnnotatedType()
+        handle.designType(prim.id! === 'never' ? 'never' : prim.config.type)
+        if (!skipAnnotations) {
+          this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+        }
+        return handle
+      }
+      case 'const': {
+        const c = node as SemanticConstNode
+        const handle = defineAnnotatedType()
+        const t = c.token('identifier')?.type
+        handle.designType(t === 'number' ? 'number' : 'string')
+        handle.value(t === 'number' ? Number(c.id!) : c.id!)
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'structure': {
+        const struct = node as SemanticStructureNode
+        const handle = defineAnnotatedType('object')
+        for (const prop of Array.from(struct.props.values()) as SemanticPropNode[]) {
+          const propHandle = this.toAnnotatedHandle(prop)
+          const pattern = prop.token('identifier')?.pattern
+          if (pattern) {
+            handle.propPattern(pattern, propHandle.$type)
+          } else {
+            handle.prop(prop.id!, propHandle.$type)
+          }
+        }
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'group': {
+        const group = node as SemanticGroup
+        const kind = group.op === '|' ? 'union' : 'intersection'
+        const handle = defineAnnotatedType(kind as any)
+        for (const item of group.unwrap()) {
+          handle.item(this.toAnnotatedHandle(item).$type)
+        }
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'tuple': {
+        const group = node as SemanticGroup
+        const handle = defineAnnotatedType('tuple')
+        for (const item of group.unwrap()) {
+          handle.item(this.toAnnotatedHandle(item).$type)
+        }
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      case 'array': {
+        const arr = node as SemanticArrayNode
+        const handle = defineAnnotatedType('array')
+        handle.of(this.toAnnotatedHandle(arr.getDefinition()).$type)
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+      default: {
+        const handle = defineAnnotatedType()
+        return skipAnnotations
+          ? handle
+          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+      }
+    }
+  }
+
+  private applyExpectAnnotations(
+    handle: TAnnotatedTypeHandle,
+    annotations?: TAnnotationTokens[]
+  ): TAnnotatedTypeHandle {
+    annotations?.forEach(a => {
+      switch (a.name) {
+        case 'expect.minLength':
+        case 'expect.maxLength':
+        case 'expect.min':
+        case 'expect.max':
+          if (a.args[0]) {
+            handle.annotate(a.name as any, Number(a.args[0].text))
+          }
+          break
+        case 'expect.pattern':
+          handle.annotate(
+            a.name as any,
+            {
+              pattern: a.args[0]?.text || '',
+              flags: a.args[1]?.text,
+              message: a.args[2]?.text,
+            },
+            true
+          )
+          break
+        case 'expect.int':
+          handle.annotate(a.name as any, true)
+          break
+        default:
+      }
+    })
+    return handle
   }
 
   annotateType(_node?: SemanticNode, name?: string) {
