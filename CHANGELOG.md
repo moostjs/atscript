@@ -1,3 +1,12 @@
+## [0.0.28](https://github.com/ts-anscript/anscript/compare/v0.0.27...v0.0.28) (2025-08-13)
+
+
+### Features
+
+* add json schema generator ([4ee167f](https://github.com/ts-anscript/anscript/commit/4ee167f28f1169bfcd607297ca7d21a66dc10cfc))
+
+
+
 ## [0.0.27](https://github.com/ts-anscript/anscript/compare/v0.0.26...v0.0.27) (2025-07-10)
 
 
