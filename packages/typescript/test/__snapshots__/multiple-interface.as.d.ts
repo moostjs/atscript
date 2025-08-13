@@ -34,6 +34,7 @@ export declare class Address {
   static type: TAtscriptTypeObject<keyof Address>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Address>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
@@ -48,6 +49,7 @@ declare class Contact {
   static type: TAtscriptTypeObject<keyof Contact>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = Contact>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
@@ -63,5 +65,6 @@ export declare class User {
   static type: TAtscriptTypeObject<keyof User>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = User>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 // prettier-ignore-end

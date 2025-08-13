@@ -24,6 +24,7 @@ export declare class WithPatterns {
   static type: TAtscriptTypeObject<keyof WithPatterns>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithPatterns>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
@@ -36,5 +37,6 @@ declare class WithPatterns2 {
   static type: TAtscriptTypeObject<keyof WithPatterns2>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithPatterns2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 // prettier-ignore-end

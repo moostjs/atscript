@@ -20,6 +20,7 @@ declare class ISource {
   static type: TAtscriptTypeObject<keyof ISource>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ISource>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
@@ -34,5 +35,6 @@ export declare class ITarget {
   static type: TAtscriptTypeObject<keyof ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ITarget>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 // prettier-ignore-end

@@ -29,7 +29,10 @@ import { buildJsonSchema } from '../json-schema'
 export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
 
-  constructor(doc: AtscriptDoc, private opts?: TTsPluginOptions) {
+  constructor(
+    doc: AtscriptDoc,
+    private opts?: TTsPluginOptions
+  ) {
     super(doc)
   }
 
@@ -37,10 +40,7 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
     const imports = ['defineAnnotatedType as $']
-    if (
-      this.opts?.jsonSchema &&
-      !(typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender)
-    ) {
+    if (!this.opts?.preRenderJsonSchema) {
       imports.push('buildJsonSchema as $$')
     }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript"`)
@@ -65,21 +65,17 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static __is_atscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
-    if (this.opts?.jsonSchema) {
-      if (typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender) {
-        const schema = JSON.stringify(
-          buildJsonSchema(this.toAnnotatedType(node))
-        )
-        this.writeln(`static _jsonSchema = ${schema}`)
-        this.writeln('static toJsonSchema() {')
-        this.indent().writeln('return this._jsonSchema').unindent()
-        this.writeln('}')
-      } else {
-        this.writeln('static _jsonSchema')
-        this.writeln('static toJsonSchema() {')
-        this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
-        this.writeln('}')
-      }
+    if (this.opts?.preRenderJsonSchema) {
+      const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
+      this.writeln(`static _jsonSchema = ${schema}`)
+      this.writeln('static toJsonSchema() {')
+      this.indent().writeln('return this._jsonSchema').unindent()
+      this.writeln('}')
+    } else {
+      this.writeln('static _jsonSchema')
+      this.writeln('static toJsonSchema() {')
+      this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
+      this.writeln('}')
     }
     this.popln()
     this.postAnnotate.push(node)
@@ -97,9 +93,7 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static metadata = new Map()')
     if (this.opts?.jsonSchema) {
       if (typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender) {
-        const schema = JSON.stringify(
-          buildJsonSchema(this.toAnnotatedType(node))
-        )
+        const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
         this.writeln(`static _jsonSchema = ${schema}`)
         this.writeln('static toJsonSchema() {')
         this.indent().writeln('return this._jsonSchema').unindent()
@@ -120,10 +114,7 @@ export class JsRenderer extends BaseRenderer {
     return this.toAnnotatedHandle(node).$type
   }
 
-  private toAnnotatedHandle(
-    node?: SemanticNode,
-    skipAnnotations = false
-  ): TAnnotatedTypeHandle {
+  private toAnnotatedHandle(node?: SemanticNode, skipAnnotations = false): TAnnotatedTypeHandle {
     if (!node) {
       return defineAnnotatedType()
     }
@@ -160,7 +151,7 @@ export class JsRenderer extends BaseRenderer {
       case 'primitive': {
         const prim = node as SemanticPrimitiveNode
         const handle = defineAnnotatedType()
-        handle.designType(prim.id! === 'never' ? 'never' : prim.config.type)
+        handle.designType(prim.id! === 'never' ? 'never' : (prim.config.type as 'string'))
         if (!skipAnnotations) {
           this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
         }
@@ -343,7 +334,7 @@ export class JsRenderer extends BaseRenderer {
   defineConst(node: SemanticConstNode) {
     const t = node.token('identifier')?.type
     const designType = t === 'text' ? 'string' : t === 'number' ? 'number' : 'unknown'
-    const type = t === 'text' ? 'String' : t === 'number' ? 'Number' : 'undefined'
+    // const type = t === 'text' ? 'String' : t === 'number' ? 'Number' : 'undefined'
     this.writeln(`.designType("${escapeQuotes(designType)}")`)
     this.writeln(`.value(${t === 'text' ? `"${escapeQuotes(node.id!)}"` : node.id!})`)
     return this

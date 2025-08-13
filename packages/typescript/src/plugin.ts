@@ -5,7 +5,10 @@ import path from 'path'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export interface TTsPluginOptions {
-  jsonSchema?: boolean | { preRender?: boolean }
+  /**
+   * Render JSON schemas at build-time
+   */
+  preRenderJsonSchema?: boolean
 }
 
 export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {

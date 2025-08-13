@@ -289,7 +289,7 @@ describe('ts-plugin', () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema.as'],
-      plugins: [tsPlugin({ jsonSchema: true })],
+      plugins: [tsPlugin()],
       annotations,
     })
     const out = await repo.generate({ format: 'js' })
@@ -301,7 +301,7 @@ describe('ts-plugin', () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema.as'],
-      plugins: [tsPlugin({ jsonSchema: { preRender: true } })],
+      plugins: [tsPlugin({ preRenderJsonSchema: true })],
       annotations,
     })
     const out = await repo.generate({ format: 'js' })

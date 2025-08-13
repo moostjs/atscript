@@ -32,6 +32,7 @@ export declare class WithMetadata {
   static type: TAtscriptTypeObject<keyof WithMetadata>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithMetadata>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
