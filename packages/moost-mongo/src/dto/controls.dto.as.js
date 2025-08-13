@@ -1,11 +1,15 @@
 // prettier-ignore-start
 /* eslint-disable */
-import { defineAnnotatedType as $ } from "@atscript/typescript"
+import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript"
 
 export class QueryControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static _jsonSchema
+  static toJsonSchema() {
+    return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
 }
 
 
@@ -13,6 +17,10 @@ export class PagesControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static _jsonSchema
+  static toJsonSchema() {
+    return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
 }
 
 
@@ -20,6 +28,10 @@ export class GetOneControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static _jsonSchema
+  static toJsonSchema() {
+    return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
 }
 
 
@@ -27,6 +39,10 @@ class SortControlDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static _jsonSchema
+  static toJsonSchema() {
+    return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
 }
 
 
@@ -34,6 +50,10 @@ class SelectControlDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static _jsonSchema
+  static toJsonSchema() {
+    return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
 }
 
 $("object", QueryControlsDto)
