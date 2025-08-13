@@ -18,6 +18,7 @@ export declare class IdPlugin {
   static type: TAtscriptTypeObject<keyof IdPlugin>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = IdPlugin>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 
 /**
@@ -44,5 +45,6 @@ export declare class UniqueItems {
   static type: TAtscriptTypeObject<keyof UniqueItems>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = UniqueItems>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 // prettier-ignore-end

@@ -42,5 +42,6 @@ export declare class ArraysCollection {
   static type: TAtscriptTypeObject<keyof ArraysCollection>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ArraysCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static toJsonSchema: () => any
 }
 // prettier-ignore-end
