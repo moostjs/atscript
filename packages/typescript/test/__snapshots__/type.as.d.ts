@@ -18,6 +18,7 @@ declare namespace TPrimitive {
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPrimitive>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -30,6 +31,7 @@ declare namespace TPirmiitiveUn {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TPirmiitiveUn>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -42,6 +44,7 @@ declare namespace TLiteral {
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLiteral>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -54,6 +57,7 @@ declare namespace TNumber {
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TNumber>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -66,6 +70,7 @@ declare namespace TTuple1 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -78,6 +83,7 @@ declare namespace TTuple2 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTuple2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -90,6 +96,7 @@ declare namespace TTupleArray {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TTupleArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -102,6 +109,7 @@ declare namespace TArray {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -114,6 +122,7 @@ declare namespace TArray2 {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -126,6 +135,7 @@ declare namespace TArray3 {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -138,6 +148,7 @@ declare namespace TComplexArray {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -150,6 +161,7 @@ declare namespace TComplexArray2 {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -162,6 +174,7 @@ declare namespace TComplexArray3 {
   const type: TAtscriptTypeArray
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray3>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -174,6 +187,7 @@ declare namespace TComplexArray4 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray4>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -186,6 +200,7 @@ declare namespace TComplexArray5 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TComplexArray5>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -205,6 +220,7 @@ declare namespace TObject {
   const type: TAtscriptTypeObject<keyof TObject>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObject>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -219,6 +235,7 @@ declare namespace TObjectUnion1 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -233,6 +250,7 @@ declare namespace TObjectUnion2 {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectUnion2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -249,5 +267,6 @@ declare namespace TObjectIntersection {
   const type: TAtscriptTypeObject<keyof TObjectIntersection>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TObjectIntersection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 // prettier-ignore-end

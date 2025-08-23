@@ -19,7 +19,11 @@ export declare class WithPatterns {
       | number
       | string
   } & WithPatterns2
-  [key: string]: any
+  [key: string]: 
+    | string
+    | {[key: string]:| number| string} & WithPatterns2
+    | number
+    | boolean
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof WithPatterns>
   static metadata: TMetadataMap<AtscriptMetadata>

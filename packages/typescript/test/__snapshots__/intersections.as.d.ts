@@ -46,6 +46,7 @@ declare namespace T {
   const type: TAtscriptTypeObject<keyof T>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = T>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**

@@ -18,6 +18,7 @@ declare namespace TContactType {
   const type: TAtscriptTypeComplex
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TContactType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**

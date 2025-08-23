@@ -37,7 +37,7 @@ export class BaseRenderer extends CodePrinter {
   renderType(node: SemanticTypeNode) {}
 
   transformFromPath(path: string): string {
-    return path + '.as'
+    return `${path}.as`
   }
 
   renderImport(node: SemanticImportNode) {

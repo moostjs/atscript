@@ -46,6 +46,12 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln('// prettier-ignore-end')
   }
 
+  renderTypeDefString(def?: SemanticNode) {
+    const newThis = new TypeRenderer(this.doc, this.opts)
+    newThis.renderTypeDef(def)
+    return newThis.toString()
+  }
+
   renderTypeDef(def?: SemanticNode) {
     if (!def) {
       this.write('unknown')
@@ -107,7 +113,7 @@ export class TypeRenderer extends BaseRenderer {
     this.blockln('{}')
     // let propsList = ''
     const patterns = [] as SemanticPropNode[]
-    let hasProp = false
+    const propsDefs = new Set<string>()
 
     for (const prop of Array.from(struct.props.values())) {
       // propsList += (propsList ? ' | ' : '') + `"${escapeQuotes(prop.id!)}"`
@@ -115,28 +121,31 @@ export class TypeRenderer extends BaseRenderer {
         patterns.push(prop)
         continue
       }
-      hasProp = true
       const optional = !!prop.token('optional')
       this.write(wrapProp(prop.id!), optional ? '?' : '', ': ')
-      this.renderTypeDef(prop.getDefinition())
-      this.writeln()
+      const renderedDef = this.renderTypeDefString(prop.getDefinition())
+      propsDefs.add(renderedDef)
+      renderedDef.split('\n').forEach(l => this.writeln(l))
     }
     if (patterns.length) {
       this.write(`[key: string]: `)
-      if (hasProp) {
-        this.writeln('any')
-      } else if (patterns.length === 1) {
-        this.renderTypeDef(patterns[0].getDefinition())
-        this.writeln()
-      } else {
-        this.indent()
+      if (patterns.length > 0) {
         for (const prop of patterns) {
-          this.writeln()
-          this.write('| ')
-          this.renderTypeDef(prop.getDefinition())
+          propsDefs.add(this.renderTypeDefString(prop.getDefinition()))
         }
-        this.unindent()
-        this.writeln()
+        const defs = Array.from(propsDefs)
+        if (defs.length > 1) {
+          this.indent()
+          for (const def of defs) {
+            this.writeln()
+            this.write('| ')
+            def.split('\n').forEach(l => this.write(l.trim()))
+          }
+          this.unindent()
+          this.writeln()
+        } else {
+          defs[0].split('\n').forEach(l => this.writeln(l))
+        }
       }
     }
     if (asClass) {
@@ -204,9 +213,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(
       `const validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
     )
-    if (this.opts?.jsonSchema) {
-      this.writeln('const toJsonSchema: () => any')
-    }
+    this.writeln('const toJsonSchema: () => any')
     this.popln()
   }
 

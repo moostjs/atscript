@@ -1,5 +1,5 @@
 export class CodePrinter {
-  private lines: string[] = []
+  protected lines: string[] = []
   private currentLine = '' // holds text for the line we are building
   private indentLevel = 0
   private readonly indentSize = 2

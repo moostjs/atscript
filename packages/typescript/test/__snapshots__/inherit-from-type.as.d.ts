@@ -18,6 +18,7 @@ declare namespace TFirstName {
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TFirstName>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -30,6 +31,7 @@ declare namespace TLastName {
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TLastName>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
@@ -42,6 +44,7 @@ declare namespace TAge {
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TAge>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**

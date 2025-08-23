@@ -47,5 +47,6 @@ declare namespace SomeType {
   const type: TAtscriptTypeObject<keyof SomeType>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = SomeType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 // prettier-ignore-end

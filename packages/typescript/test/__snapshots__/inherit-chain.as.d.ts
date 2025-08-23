@@ -18,6 +18,7 @@ declare namespace TType {
   const type: TAtscriptTypeFinal
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: <TT extends TAtscriptAnnotatedTypeConstructor = TType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const toJsonSchema: () => any
 }
 
 /**
