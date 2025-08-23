@@ -1,3 +1,12 @@
+## [0.0.29](https://github.com/ts-anscript/anscript/compare/v0.0.28...v0.0.29) (2025-08-23)
+
+
+### Bug Fixes
+
+* improve type def for wildcard props ([202e0f1](https://github.com/ts-anscript/anscript/commit/202e0f15250ca66282d1f748322055d5a10c7e01))
+
+
+
 ## [0.0.28](https://github.com/ts-anscript/anscript/compare/v0.0.27...v0.0.28) (2025-08-13)
 
 
