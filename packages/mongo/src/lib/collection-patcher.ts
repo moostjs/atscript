@@ -7,7 +7,7 @@ import {
   TAtscriptTypeArray,
   defineAnnotatedType as $,
   Validator,
-} from '@atscript/typescript'
+} from '@atscript/typescript/utils'
 import { AsCollection } from './as-collection'
 import { Document, Filter, UpdateFilter, UpdateOptions } from 'mongodb'
 import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'

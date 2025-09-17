@@ -115,7 +115,9 @@ export class SemanticPrimitiveNode extends SemanticNode {
     const processed = _processed || new Set<SemanticPrimitiveNode>()
     processed.add(this)
     for (const [, node] of this.props) {
-      if (processed.has(node)) continue
+      if (processed.has(node)) {
+        continue
+      }
       processed.add(node)
       allTags.push(...node.getAllTags(processed))
     }

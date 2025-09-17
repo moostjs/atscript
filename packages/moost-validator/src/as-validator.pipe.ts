@@ -2,7 +2,7 @@ import {
   isAnnotatedType,
   type TValidatorOptions,
   type TAtscriptAnnotatedType,
-} from '@atscript/typescript'
+} from '@atscript/typescript/utils'
 import { definePipeFn, Pipe, TPipePriority } from 'moost'
 
 /**

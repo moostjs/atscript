@@ -9,9 +9,26 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.mjs"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.cjs",
+      "default": "./dist/utils.mjs"
     },
     "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "utils": [
+        "dist/utils.d.ts"
+      ],
+      "": [
+        "dist/index.d.ts"
+      ]
+    }
   },
   "files": [
     "dist",
@@ -22,6 +39,12 @@
   },
   "build": [
     {},
+    {
+      "entries": [
+        "src/utils.ts"
+      ],
+      "dts": true
+    },
     {
       "format": "cjs",
       "entries": [

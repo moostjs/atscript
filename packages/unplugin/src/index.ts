@@ -48,7 +48,7 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
           repo = new AtscriptRepo(root, config as TAtscriptConfigInput)
         }
         const code = (await readFile(id, 'utf8')).toString()
-        const doc = await repo.openDocument('file://' + id, code)
+        const doc = await repo.openDocument(`file://${id}`, code)
         await repo.checkDoc(doc)
         const messages = doc.getDiagMessages().reverse()
         let error = ''

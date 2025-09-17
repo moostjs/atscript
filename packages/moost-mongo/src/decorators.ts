@@ -1,13 +1,5 @@
-import {
-  Controller,
-  Provide,
-  ApplyDecorators,
-  Inherit,
-  Inject,
-  useControllerContext,
-  Resolve,
-} from 'moost'
-import { type TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript'
+import { Controller, Provide, ApplyDecorators, Inherit, Resolve } from 'moost'
+import { type TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript/utils'
 import { AsMongo } from '@atscript/mongo'
 
 /**
@@ -38,13 +30,12 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
  * export class UsersController extends AsMongoController<typeof UserModel> {}
  * ```
  */
-export const CollectionController = (type: TAtscriptAnnotatedTypeConstructor, prefix?: string) => {
-  return ApplyDecorators(
+export const CollectionController = (type: TAtscriptAnnotatedTypeConstructor, prefix?: string) =>
+  ApplyDecorators(
     Provide(COLLECTION_DEF, () => type),
     Controller(prefix || type.metadata.get('mongo.collection') || type.name),
     Inherit()
   )
-}
 
 /**
  * Parameter decorator that injects the lazily-resolved {@link AsCollection}

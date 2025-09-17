@@ -145,9 +145,14 @@ async function rolldownPackages(ws) {
     for (const entry of entries) {
       const inputOptions = {
         input: path.join(`packages/${ws}`, entry),
-        external: external || externals.get(ws),
+        external: [...(external || externals.get(ws)), '@atscript/typescript/utils'],
         define: {
           __VERSION__: JSON.stringify(pkg.version),
+        },
+        resolve: {
+          preserveSymlinks: false,
+          conditions: ['import', 'module', 'default'],
+          extensions: ['.ts', '.mjs', '.js', '.json'],
         },
         plugins: [_dye, swc],
       }

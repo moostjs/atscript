@@ -1,5 +1,5 @@
 import { MongoClient } from 'mongodb'
-import { TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript'
+import { TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript/utils'
 import { AsCollection } from './as-collection'
 import { NoopLogger, TGenericLogger } from './logger'
 

@@ -1,6 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
-import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript"
+import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 
 class ISource {
   static __is_atscript_annotated_type = true

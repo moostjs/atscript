@@ -9,7 +9,7 @@ import {
   Validator,
   ValidatorError,
   type TAtscriptAnnotatedTypeConstructor,
-} from '@atscript/typescript'
+} from '@atscript/typescript/utils'
 import type {
   Document,
   BulkWriteOptions,
@@ -150,7 +150,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   protected validateQueryControls(
     controls: UrlqlQuery['controls']
   ): Promise<string | undefined> | string | undefined {
-    this.queryControlsValidator.validate(controls)
+    this.queryControlsValidator?.validate(controls)
     return undefined
   }
 
@@ -163,7 +163,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   protected validatePagesControls(
     controls: UrlqlQuery['controls']
   ): Promise<string | undefined> | string | undefined {
-    this.pagesControlsValidator.validate(controls)
+    this.pagesControlsValidator?.validate(controls)
     return undefined
   }
 
@@ -176,7 +176,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   protected validateGetOneControls(
     controls: UrlqlQuery['controls']
   ): Promise<string | undefined> | string | undefined {
-    this.getOneControlsValidator.validate(controls)
+    this.getOneControlsValidator?.validate(controls)
     return undefined
   }
 

@@ -1,6 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
-import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript"
+import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 

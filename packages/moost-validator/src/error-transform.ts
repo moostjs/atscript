@@ -1,6 +1,6 @@
 import { defineInterceptorFn, Intercept, TInterceptorPriority } from 'moost'
 import { HttpError } from '@moostjs/event-http'
-import { ValidatorError } from '@atscript/typescript'
+import { ValidatorError } from '@atscript/typescript/utils'
 
 /**
  * **validationErrorTransform** ─ Moost interceptor that catches

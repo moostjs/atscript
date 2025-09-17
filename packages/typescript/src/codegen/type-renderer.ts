@@ -38,7 +38,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator, TAtscriptAnnotatedTypeConstructor, TValidatorOptions } from "@atscript/typescript"'
+      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator, TAtscriptAnnotatedTypeConstructor, TValidatorOptions } from "@atscript/typescript/utils"'
     )
   }
 

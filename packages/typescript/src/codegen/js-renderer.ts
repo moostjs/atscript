@@ -43,7 +43,7 @@ export class JsRenderer extends BaseRenderer {
     if (!this.opts?.preRenderJsonSchema) {
       imports.push('buildJsonSchema as $$')
     }
-    this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript"`)
+    this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
   }
 
   post() {
@@ -91,19 +91,17 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static __is_atscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
-    if (this.opts?.jsonSchema) {
-      if (typeof this.opts.jsonSchema === 'object' && this.opts.jsonSchema.preRender) {
-        const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
-        this.writeln(`static _jsonSchema = ${schema}`)
-        this.writeln('static toJsonSchema() {')
-        this.indent().writeln('return this._jsonSchema').unindent()
-        this.writeln('}')
-      } else {
-        this.writeln('static _jsonSchema')
-        this.writeln('static toJsonSchema() {')
-        this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
-        this.writeln('}')
-      }
+    if (this.opts?.preRenderJsonSchema) {
+      const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
+      this.writeln(`static _jsonSchema = ${schema}`)
+      this.writeln('static toJsonSchema() {')
+      this.indent().writeln('return this._jsonSchema').unindent()
+      this.writeln('}')
+    } else {
+      this.writeln('static _jsonSchema')
+      this.writeln('static toJsonSchema() {')
+      this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
+      this.writeln('}')
     }
     this.popln()
     this.postAnnotate.push(node)
@@ -491,7 +489,7 @@ export class JsRenderer extends BaseRenderer {
 
   defineMetadata(node: SemanticNode) {
     const annotations = this.doc.evalAnnotationsForNode(node)
-    annotations?.forEach(an => {
+    annotations?.forEach((an: TAnnotationTokens) => {
       this.resolveAnnotationValue(node, an)
     })
     return this

@@ -1,6 +1,10 @@
 // oxlint-disable max-depth
 import { ObjectId } from 'mongodb'
-import { TAtscriptAnnotatedType, TAtscriptTypeArray, TValidatorPlugin } from '@atscript/typescript'
+import {
+  TAtscriptAnnotatedType,
+  TAtscriptTypeArray,
+  TValidatorPlugin,
+} from '@atscript/typescript/utils'
 import { CollectionPatcher } from './collection-patcher'
 
 export const validateMongoIdPlugin: TValidatorPlugin = (ctx, def, value) => {

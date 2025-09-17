@@ -204,7 +204,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
 
   protected validateTuple(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
     if (!Array.isArray(value) || value.length !== def.type.items.length) {
-      this.error('Expected array of length ' + def.type.items.length)
+      this.error(`Expected array of length ${def.type.items.length}`)
       return false
     }
     let i = 0
@@ -265,7 +265,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     // prepare skipList for this object
     const skipList = new Set()
     if (this.opts.skipList) {
-      const path = this.stackPath.length > 1 ? this.path + '.' : ''
+      const path = this.stackPath.length > 1 ? `${this.path}'.'` : ''
       this.opts.skipList.forEach(item => {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
@@ -474,6 +474,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
 export class ValidatorError extends Error {
   name = 'Validation Error'
   constructor(public readonly errors: TError[]) {
+    // oxlint-disable-next-line prefer-template
     super(`${errors[0].path ? errors[0].path + ': ' : ''}${errors[0].message}`)
   }
 }

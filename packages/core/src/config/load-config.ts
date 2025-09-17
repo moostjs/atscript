@@ -77,7 +77,7 @@ export async function resolveConfigFile(
   const root = _root || startDir
   let currentDir = startDir
 
-  const rootId = 'file://' + root
+  const rootId = `file://${root}`
 
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
   while (true) {

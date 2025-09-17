@@ -54,7 +54,9 @@ export class PluginManager {
       while (processed.size !== filtered.length) {
         i++
         for (const plugin of filtered) {
-          if (processed.has(plugin.name)) continue
+          if (processed.has(plugin.name)) {
+            continue
+          }
           config = defu(await plugin.config?.(config), config)
           processed.add(plugin.name)
         }

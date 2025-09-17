@@ -12,7 +12,7 @@ import {
   isAnnotatedTypeOfPrimitive,
   type TAtscriptTypeComplex,
   type TAnnotatedTypeHandle,
-} from '@atscript/typescript'
+} from '@atscript/typescript/utils'
 import { AsMongo } from './as-mongo'
 import {
   Collection,
