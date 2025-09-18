@@ -265,7 +265,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     // prepare skipList for this object
     const skipList = new Set()
     if (this.opts.skipList) {
-      const path = this.stackPath.length > 1 ? `${this.path}'.'` : ''
+      const path = this.stackPath.length > 1 ? `${this.path}.` : ''
       this.opts.skipList.forEach(item => {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
