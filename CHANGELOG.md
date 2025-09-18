@@ -1,3 +1,12 @@
+## [0.0.30](https://github.com/ts-anscript/anscript/compare/v0.0.29...v0.0.30) (2025-09-18)
+
+
+### Bug Fixes
+
+* fix typo ([e3906ae](https://github.com/ts-anscript/anscript/commit/e3906ae1b41434969146fb64c5ab83594f2f9bc8))
+
+
+
 ## [0.0.29](https://github.com/ts-anscript/anscript/compare/v0.0.28...v0.0.29) (2025-08-23)
 
 
