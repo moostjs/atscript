@@ -11,6 +11,7 @@
     "@shikijs/transformers": "^3.12.2",
     "shiki": "^3.12.2",
     "vitepress": "^1.6.4",
+    "vitepress-plugin-llmstxt": "^0.4.2",
     "vue": "3.5.21"
   },
   "pnpm": {
