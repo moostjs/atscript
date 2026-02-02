@@ -1,6 +1,6 @@
 {
   "name": "@atscript/core",
-  "version": "0.0.31",
+  "version": "0.0.32",
   "description": "Core library for Atscript parsing and file generation.",
   "type": "module",
   "main": "dist/index.mjs",
