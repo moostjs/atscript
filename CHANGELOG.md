@@ -1,3 +1,7 @@
+## [0.0.32](https://github.com/moostjs/atscript/compare/v0.0.31...v0.0.32) (2026-02-02)
+
+
+
 ## [0.0.31](https://github.com/ts-anscript/anscript/compare/v0.0.30...v0.0.31) (2025-09-18)
 
 
