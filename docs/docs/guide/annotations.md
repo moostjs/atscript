@@ -133,7 +133,14 @@ export interface User {
 
 Plugins can also provide custom annotations through their configuration.
 
+## Ad-hoc Annotations
+
+You can attach annotations to an existing type without modifying its definition using the `annotate` keyword. This supports both mutating (in-place) and non-mutating (alias) forms, including cross-file usage.
+
+See [Ad-hoc Annotations](/guide/ad-hoc-annotations) for full details.
+
 ## Next Steps
 
+- [Ad-hoc Annotations](/guide/ad-hoc-annotations) - Annotate existing types
 - [Configuration](/guide/configuration) - Configure Atscript
 - [Build Setup](/guide/build-setup) - Integrate with build tools

@@ -44,6 +44,8 @@ export function $pipe(entity: TNodeEntity, pipe: TPipe['pipe'] = []) {
           return new $n.SemanticTupleNode()
         case 'import':
           return new $n.SemanticImportNode()
+        case 'annotate':
+          return new $n.SemanticAnnotateNode()
         case 'primitive':
           throw new Error("Can't create pipe for primitive node")
         default:

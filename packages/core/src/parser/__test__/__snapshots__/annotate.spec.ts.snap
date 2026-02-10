@@ -1,0 +1,12 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`annotate > toString renders annotate node 1`] = `
+"● [annotate] "MyInterface2" type: annotate <identifier> target: MyInterface <identifier> inner: { <block>
+  = [group] ""  (
+      @meta.label "prop1"
+      ● [ref] "prop1" <>
+      @meta.label "nested"
+      ● [ref] "obj".["prop2"]
+    )
+"
+`;

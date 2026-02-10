@@ -110,6 +110,23 @@ const atscriptGrammar = {
             },
           },
         },
+        {
+          match: '(\\bannotate\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?',
+          captures: {
+            '1': {
+              name: 'storage.type.atscript',
+            },
+            '2': {
+              name: 'entity.name.type.atscript',
+            },
+            '3': {
+              name: 'keyword.control.as.atscript',
+            },
+            '4': {
+              name: 'entity.name.type.atscript',
+            },
+          },
+        },
       ],
     },
 
@@ -341,6 +358,7 @@ export default defineConfig({
             { text: 'Imports & Exports', link: '/guide/imports-exports' },
             { text: 'Primitives', link: '/guide/primitives' },
             { text: 'Annotations', link: '/guide/annotations' },
+            { text: 'Ad-hoc Annotations', link: '/guide/ad-hoc-annotations' },
           ],
         },
         {

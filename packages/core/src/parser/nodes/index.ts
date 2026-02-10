@@ -1,3 +1,4 @@
+import { SemanticAnnotateNode } from './annotate-node'
 import { SemanticArrayNode } from './array-node'
 import { SemanticConstNode } from './const-node'
 import { SemanticGroup } from './group-node'
@@ -12,6 +13,7 @@ import { SemanticTupleNode } from './tuple-node'
 import { SemanticTypeNode } from './type-node'
 
 export const $n = {
+  SemanticAnnotateNode,
   SemanticGroup,
   SemanticInterfaceNode,
   SemanticTypeNode,
@@ -25,6 +27,7 @@ export const $n = {
   SemanticPrimitiveNode,
 }
 
+export { SemanticAnnotateNode } from './annotate-node'
 export { SemanticArrayNode } from './array-node'
 export { SemanticConstNode } from './const-node'
 export { SemanticGroup } from './group-node'
@@ -81,4 +84,8 @@ export function isImport(node?: SemanticNode): node is SemanticImportNode {
 
 export function isPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode {
   return node?.entity === 'primitive'
+}
+
+export function isAnnotate(node?: SemanticNode): node is SemanticAnnotateNode {
+  return node?.entity === 'annotate'
 }

@@ -1,6 +1,7 @@
 import path from 'path'
 import {
   AtscriptRepo,
+  isAnnotate,
   loadConfig,
   resolveConfigFile,
   TAtscriptConfig,
@@ -70,7 +71,8 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
           throw new Error(error)
         }
         const out = await doc.render('js')
-        return { code: out?.[0]?.content || '', moduleType: 'js', map: null }
+        const hasMutatingAnnotates = doc.nodes.some(n => isAnnotate(n) && n.isMutating)
+        return { code: out?.[0]?.content || '', moduleType: 'js', map: null, moduleSideEffects: hasMutatingAnnotates ? undefined : false }
       }
     },
   }

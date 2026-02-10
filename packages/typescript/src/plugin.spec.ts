@@ -285,6 +285,118 @@ describe('ts-plugin', () => {
     )
   })
 
+  it('must render non-mutating annotate', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-nonmutating.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-nonmutating.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-nonmutating.js')
+    )
+    // Top-level annotation on original interface
+    expect(out[0].content).toContain('.annotate("meta.description", "Original")')
+    // Top-level annotation on non-mutating annotate replaces the original in alias
+    expect(out[0].content).toContain('.annotate("meta.description", "Annotated")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('annotate-nonmutating.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-nonmutating.as.d.ts')
+    )
+  })
+
+  it('must render mutating annotate with deep chains and multiple annotations', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-mutating.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-mutating.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-mutating.js')
+    )
+    // Deep chain mutation navigates via .type.props.get()
+    expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
+    // Multiple annotation uses array push pattern
+    expect(out[0].content).toContain('Array.isArray')
+    // Top-level annotation on mutating annotate generates mutation on target's metadata
+    expect(out[0].content).toContain('MyInterface.metadata.set("meta.description", "Mutated Interface")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('annotate-mutating.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-mutating.as.d.ts')
+    )
+  })
+
+  it('must render cross-file non-mutating annotate', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-import.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    await repo.diagnostics()
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-import.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-import.js')
+    )
+    // Import is present — bundler handles tree-shaking via moduleSideEffects: false
+    // Should inline the full type definition with overridden annotations
+    expect(out[0].content).toContain('ImportedAnnotated')
+    expect(out[0].content).toContain('"Imported Name"')
+    expect(out[0].content).toContain('"Imported City"')
+    // Cross-file non-mutating annotate carries over target's type-level annotation
+    expect(out[0].content).toContain('.annotate("meta.description", "Original")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('annotate-import.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-import.as.d.ts')
+    )
+  })
+
+  it('must render cross-file mutating annotate', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-import-mutating.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    await repo.diagnostics()
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-import-mutating.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-import-mutating.js')
+    )
+    // Mutating annotate MUST import the target (needed at runtime)
+    expect(out[0].content).toContain('import { MyInterface }')
+    // Should generate mutation code
+    expect(out[0].content).toContain('MyInterface.type.props.get("name")')
+    expect(out[0].content).toContain('.metadata.set("label"')
+    // Deep chain mutation for address.city
+    expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
+    // Top-level annotation on cross-file mutating annotate
+    expect(out[0].content).toContain('MyInterface.metadata.set("meta.description", "Cross-File Mutated")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('annotate-import-mutating.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-import-mutating.as.d.ts')
+    )
+  })
+
   it('must render json schema method', async () => {
     const repo = await build({
       rootDir: wd,
@@ -305,8 +417,8 @@ describe('ts-plugin', () => {
       annotations,
     })
     const out = await repo.generate({ format: 'js' })
-    expect(out[0].content).toContain('static _jsonSchema = {')
     expect(out[0].content).toContain('static toJsonSchema()')
+    expect(out[0].content).toContain('return {')
     expect(out[0].content).not.toContain('buildJsonSchema')
     expect(out[0].content).toContain('"minLength":3')
     expect(out[0].content).toContain('"maxLength":20')

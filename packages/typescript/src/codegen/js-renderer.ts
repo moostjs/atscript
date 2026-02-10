@@ -2,7 +2,10 @@
 // oxlint-disable max-depth
 import {
   AtscriptDoc,
+  isInterface,
   isPrimitive,
+  isStructure,
+  SemanticAnnotateNode,
   SemanticArrayNode,
   SemanticConstNode,
   SemanticGroup,
@@ -28,6 +31,9 @@ import { buildJsonSchema } from '../json-schema'
 
 export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
+  mutatingAnnotates = [] as SemanticAnnotateNode[]
+  private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
+  private _propPath: string[] = []
 
   constructor(
     doc: AtscriptDoc,
@@ -46,12 +52,53 @@ export class JsRenderer extends BaseRenderer {
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
   }
 
+  private buildAdHocMap(annotateNodes: SemanticAnnotateNode[]) {
+    const map = new Map<string, TAnnotationTokens[]>()
+    for (const annotateNode of annotateNodes) {
+      for (const entry of annotateNode.entries) {
+        const path = entry.hasChain
+          ? [entry.id!, ...entry.chain.map(c => c.text)].join('.')
+          : entry.id!
+        const anns = entry.annotations || []
+        if (anns.length > 0) {
+          const existing = map.get(path)
+          map.set(path, existing ? [...existing, ...anns] : anns)
+        }
+      }
+    }
+    return map.size > 0 ? map : null
+  }
+
   post() {
     for (const node of this.postAnnotate) {
-      this.annotateType(node.getDefinition(), node.id)
-      this.indent().defineMetadata(node).unindent()
-      this.writeln()
+      if (node.entity === 'annotate') {
+        const annotateNode = node as SemanticAnnotateNode
+        const unwound = this.doc.unwindType(annotateNode.targetName)
+        if (unwound?.def) {
+          let def = this.doc.mergeIntersection(unwound.def)
+          if (isInterface(def)) {
+            def = def.getDefinition() || def
+          }
+          this._adHocAnnotations = this.buildAdHocMap([annotateNode])
+          this.annotateType(def, node.id)
+          this._adHocAnnotations = null
+          this.indent()
+          this.defineMetadataForAnnotateAlias(annotateNode)
+          this.unindent()
+          this.writeln()
+        }
+      } else {
+        // For interface/type nodes, apply mutating annotate blocks
+        const mutatingNodes = this.doc.getAnnotateNodesFor(node.id!)
+          .filter(n => n.isMutating)
+        this._adHocAnnotations = this.buildAdHocMap(mutatingNodes)
+        this.annotateType(node.getDefinition(), node.id)
+        this._adHocAnnotations = null
+        this.indent().defineMetadata(node).unindent()
+        this.writeln()
+      }
     }
+    this.renderMutatingAnnotates()
     this.writeln('// prettier-ignore-end')
     super.post()
   }
@@ -62,21 +109,7 @@ export class JsRenderer extends BaseRenderer {
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
-    this.writeln('static __is_atscript_annotated_type = true')
-    this.writeln('static type = {}')
-    this.writeln('static metadata = new Map()')
-    if (this.opts?.preRenderJsonSchema) {
-      const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
-      this.writeln(`static _jsonSchema = ${schema}`)
-      this.writeln('static toJsonSchema() {')
-      this.indent().writeln('return this._jsonSchema').unindent()
-      this.writeln('}')
-    } else {
-      this.writeln('static _jsonSchema')
-      this.writeln('static toJsonSchema() {')
-      this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
-      this.writeln('}')
-    }
+    this.renderJsonSchemaMethod(node)
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
@@ -88,24 +121,44 @@ export class JsRenderer extends BaseRenderer {
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
-    this.writeln('static __is_atscript_annotated_type = true')
-    this.writeln('static type = {}')
-    this.writeln('static metadata = new Map()')
+    this.renderJsonSchemaMethod(node)
+    this.popln()
+    this.postAnnotate.push(node)
+    this.writeln()
+  }
+
+  renderAnnotate(node: SemanticAnnotateNode): void {
+    if (node.isMutating) {
+      this.mutatingAnnotates.push(node)
+      return
+    }
+    const targetName = node.targetName
+    const unwound = this.doc.unwindType(targetName)
+    if (!unwound?.def) {
+      return
+    }
+    this.writeln()
+    const exported = node.token('export')?.text === 'export'
+    this.write(exported ? 'export ' : '')
+    this.write(`class ${node.id!} `)
+    this.blockln('{}')
+    this.renderJsonSchemaMethod(node)
+    this.popln()
+    this.postAnnotate.push(node)
+    this.writeln()
+  }
+
+  private renderJsonSchemaMethod(node: SemanticNode) {
     if (this.opts?.preRenderJsonSchema) {
       const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
-      this.writeln(`static _jsonSchema = ${schema}`)
       this.writeln('static toJsonSchema() {')
-      this.indent().writeln('return this._jsonSchema').unindent()
+      this.indent().writeln(`return ${schema}`).unindent()
       this.writeln('}')
     } else {
-      this.writeln('static _jsonSchema')
       this.writeln('static toJsonSchema() {')
       this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
       this.writeln('}')
     }
-    this.popln()
-    this.postAnnotate.push(node)
-    this.writeln()
   }
 
   private toAnnotatedType(node?: SemanticNode): TAtscriptAnnotatedType {
@@ -449,6 +502,7 @@ export class JsRenderer extends BaseRenderer {
     for (const prop of props) {
       const pattern = prop.token('identifier')?.pattern
       const optional = !!prop.token('optional')
+      this._propPath.push(prop.id!)
       if (pattern) {
         this.writeln(`.propPattern(`)
         this.indent()
@@ -466,6 +520,7 @@ export class JsRenderer extends BaseRenderer {
       this.writeln('  .$type')
       this.unindent()
       this.write(`)`)
+      this._propPath.pop()
     }
     this.writeln()
     return this
@@ -489,23 +544,75 @@ export class JsRenderer extends BaseRenderer {
 
   defineMetadata(node: SemanticNode) {
     const annotations = this.doc.evalAnnotationsForNode(node)
+    // Collect ad-hoc annotation names to overwrite originals
+    let adHocNames: Set<string> | undefined
+    let adHoc: TAnnotationTokens[] | undefined
+    if (this._adHocAnnotations && this._propPath.length > 0) {
+      const path = this._propPath.join('.')
+      adHoc = this._adHocAnnotations.get(path)
+      if (adHoc) {
+        adHocNames = new Set(adHoc.map(a => a.name))
+      }
+    }
+    // Emit original annotations, skipping those overwritten by ad-hoc
     annotations?.forEach((an: TAnnotationTokens) => {
+      if (!adHocNames || !adHocNames.has(an.name)) {
+        this.resolveAnnotationValue(node, an)
+      }
+    })
+    // Emit ad-hoc annotations
+    adHoc?.forEach((an: TAnnotationTokens) => {
       this.resolveAnnotationValue(node, an)
     })
     return this
   }
 
+  /**
+   * For non-mutating annotate aliases: merge the target's type-level annotations
+   * with the annotate block's own annotations (annotate's take priority).
+   */
+  defineMetadataForAnnotateAlias(annotateNode: SemanticAnnotateNode) {
+    const annotateAnnotations = this.doc.evalAnnotationsForNode(annotateNode)
+    // Get the target's type-level annotations
+    const targetDecl = this.doc.getDeclarationOwnerNode(annotateNode.targetName)
+    const targetAnnotations = targetDecl?.node
+      ? targetDecl.doc.evalAnnotationsForNode(targetDecl.node)
+      : undefined
+    const overriddenNames = new Set(annotateAnnotations?.map(a => a.name))
+    // Emit target's annotations that aren't overridden
+    targetAnnotations?.forEach((an: TAnnotationTokens) => {
+      if (!overriddenNames.has(an.name)) {
+        this.resolveAnnotationValue(annotateNode, an)
+      }
+    })
+    // Emit annotate's own annotations
+    annotateAnnotations?.forEach((an: TAnnotationTokens) => {
+      this.resolveAnnotationValue(annotateNode, an)
+    })
+    return this
+  }
+
   resolveAnnotationValue(node: SemanticNode, an: TAnnotationTokens) {
+    const { value, multiple } = this.computeAnnotationValue(node, an)
+    if (multiple) {
+      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${value}, true)`)
+    } else {
+      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${value})`)
+    }
+  }
+
+  private computeAnnotationValue(
+    node: SemanticNode,
+    an: TAnnotationTokens
+  ): { value: string; multiple: boolean } {
     const spec = this.doc.resolveAnnotation(an.name)
     let targetValue = 'true'
     let multiple: boolean | undefined = false
     if (spec) {
-      // resolve according spec
       multiple = spec.config.multiple
       const length = spec.arguments.length
       if (length !== 0) {
         if (Array.isArray(spec.config.argument)) {
-          // as object
           targetValue = '{ '
           let i = 0
           for (const aSpec of spec.arguments) {
@@ -513,14 +620,11 @@ export class JsRenderer extends BaseRenderer {
               targetValue += `${wrapProp(aSpec.name)}: ${
                 aSpec.type === 'string' ? `"${escapeQuotes(an.args[i]?.text)}"` : an.args[i]?.text
               }${i === length - 1 ? '' : ', '} `
-            } else {
-              // targetValue += `${wrapProp(aSpec.name)}: undefined${i === length - 1 ? '' : ', '} `
             }
             i++
           }
           targetValue += '}'
         } else {
-          // as constant
           const aSpec = spec.arguments[0]
           if (an.args[0]) {
             targetValue =
@@ -531,17 +635,67 @@ export class JsRenderer extends BaseRenderer {
         }
       }
     } else {
-      // generic resolve
       multiple = node.countAnnotations(an.name) > 1 || an.args.length > 1
       if (an.args.length) {
         targetValue =
           an.args[0].type === 'text' ? `"${escapeQuotes(an.args[0].text)}"` : an.args[0].text
       }
     }
-    if (multiple) {
-      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${targetValue}, true)`)
-    } else {
-      this.writeln(`.annotate("${escapeQuotes(an.name)}", ${targetValue})`)
+    return { value: targetValue, multiple: !!multiple }
+  }
+
+  private renderMutatingAnnotates() {
+    for (const node of this.mutatingAnnotates) {
+      const targetName = node.targetName
+      for (const entry of node.entries) {
+        const anns = entry.annotations
+        if (!anns || anns.length === 0) continue
+
+        // Build the navigation chain: Target.type.props.get('a')?.type.props.get('b')...
+        const parts = entry.hasChain
+          ? [entry.id!, ...entry.chain.map(c => c.text)]
+          : [entry.id!]
+        let accessor = targetName
+        for (const part of parts) {
+          accessor += `.type.props.get("${escapeQuotes(part)}")?`
+        }
+
+        for (const an of anns) {
+          const { value, multiple } = this.computeAnnotationValue(entry, an)
+          if (multiple) {
+            // For array-type annotations, push to existing array or create one
+            this.writeln(`{`)
+            this.indent()
+            this.writeln(`const __t = ${accessor}.metadata`)
+            this.writeln(`const __k = "${escapeQuotes(an.name)}"`)
+            this.writeln(`const __v = ${value}`)
+            this.writeln(`if (__t) { const __e = __t.get(__k); __t.set(__k, Array.isArray(__e) ? [...__e, __v] : __e !== undefined ? [__e, __v] : [__v]) }`)
+            this.unindent()
+            this.writeln(`}`)
+          } else {
+            this.writeln(`${accessor}.metadata.set("${escapeQuotes(an.name)}", ${value})`)
+          }
+        }
+      }
+      // Top-level annotations on the annotate block mutate the target's metadata
+      const topAnnotations = node.annotations
+      if (topAnnotations && topAnnotations.length > 0) {
+        for (const an of topAnnotations) {
+          const { value, multiple } = this.computeAnnotationValue(node, an)
+          if (multiple) {
+            this.writeln(`{`)
+            this.indent()
+            this.writeln(`const __t = ${targetName}.metadata`)
+            this.writeln(`const __k = "${escapeQuotes(an.name)}"`)
+            this.writeln(`const __v = ${value}`)
+            this.writeln(`if (__t) { const __e = __t.get(__k); __t.set(__k, Array.isArray(__e) ? [...__e, __v] : __e !== undefined ? [__e, __v] : [__v]) }`)
+            this.unindent()
+            this.writeln(`}`)
+          } else {
+            this.writeln(`${targetName}.metadata.set("${escapeQuotes(an.name)}", ${value})`)
+          }
+        }
+      }
     }
   }
 }

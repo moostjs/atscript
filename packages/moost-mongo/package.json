@@ -43,6 +43,7 @@
     "urlql": "^0.0.5"
   },
   "devDependencies": {
+    "@atscript/core": "workspace:^",
     "vitest": "3.2.4"
   },
   "peerDependencies": {

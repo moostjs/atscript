@@ -18,6 +18,7 @@ import {
   TAnnotationTokens,
 } from './parser/nodes'
 import {
+  isAnnotate,
   isGroup,
   isInterface,
   isPrimitive,
@@ -26,6 +27,7 @@ import {
   isStructure,
   isType,
 } from './parser/nodes'
+import type { SemanticAnnotateNode } from './parser/nodes/annotate-node'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
@@ -151,7 +153,7 @@ export class AtscriptDoc {
     this.cleanup()
     const rawTokens = tokenize(text, debug)
     const ni = new NodeIterator(rawTokens, []).move()
-    this.nodes = runPipes([pipes.importPipe, pipes.type, pipes.interfaceType], ni)
+    this.nodes = runPipes([pipes.importPipe, pipes.type, pipes.interfaceType, pipes.annotatePipe], ni)
     if (debug) {
       console.log(this.nodes.map(n => n.toString()).join('\n'))
     }
@@ -295,6 +297,10 @@ export class AtscriptDoc {
     if (!def) {
       return undefined
     }
+    // Non-mutating annotate is an alias for the target interface
+    if (isAnnotate(def)) {
+      return doc.unwindType(def.targetName, chain, watchCb, tracked)
+    }
     for (const item of chain) {
       const itemText = typeof item === 'string' ? item : item.text
       // const token = item instanceof Token ? item : undefined
@@ -354,6 +360,21 @@ export class AtscriptDoc {
       }
     }
     return right
+  }
+
+  /**
+   * Collects ad-hoc annotations from all `annotate` blocks targeting a given type/interface.
+   * Returns a map of property path (dot-joined) → annotations array.
+   * For entries without a chain (root-level), the key is the entry identifier.
+   */
+  getAnnotateNodesFor(targetName: string): SemanticAnnotateNode[] {
+    const result: SemanticAnnotateNode[] = []
+    for (const node of this.nodes) {
+      if (isAnnotate(node) && node.targetName === targetName) {
+        result.push(node)
+      }
+    }
+    return result
   }
 
   usageListFor(
@@ -456,6 +477,28 @@ export class AtscriptDoc {
   getToDefinitionAt(line: number, character: number) {
     const token = this.tokensIndex.at(line, character)
     if (token) {
+      // Annotate entry refs resolve through the target interface
+      const block = this.blocksIndex.at(line, character)
+      if (block?.blockType === 'annotate' && isAnnotate(block.parentNode) && isRef(token.parentNode)) {
+        const targetName = block.parentNode.targetName
+        const entryRef = token.parentNode
+        // Build chain: [entryId, ...chainUpToToken] for chains, or [tokenText] for identifiers
+        const chain: string[] = token.isChain && typeof token.index === 'number'
+          ? [entryRef.id!, ...entryRef.chain.slice(0, token.index).map(c => c.text)]
+          : [token.text]
+        const unwound = this.unwindType(targetName, chain)
+        if (unwound?.node) {
+          return [
+            {
+              targetUri: unwound.doc.id,
+              targetRange: unwound.node.token('identifier')?.range ?? zeroRange,
+              targetSelectionRange: unwound.node.token('identifier')?.range ?? zeroRange,
+              originSelectionRange: token.range,
+            },
+          ]
+        }
+        return undefined
+      }
       if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
         const id = token.parentNode.id!
         const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
@@ -667,6 +710,45 @@ export class AtscriptDoc {
         ...this.messages,
       ] as TMessages
       for (const t of this.referred) {
+        // Annotate entry refs resolve through the target interface
+        // e.g. `annotate User { firstName }` → validates firstName as User.firstName
+        const block = this.blocksIndex.at(t.range.start.line, t.range.start.character)
+        if (block?.blockType === 'annotate' && isAnnotate(block.parentNode)) {
+          const targetName = block.parentNode.targetName
+          if (!this.registry.isDefined(targetName)) {
+            continue // target itself is unknown, already reported separately
+          }
+          const chain = isRef(t.parentNode) && t.parentNode.hasChain
+            ? [t.text, ...t.parentNode.chain.map(c => c.text)]
+            : [t.text]
+          const unwound = this.unwindType(targetName, chain)
+          if (!unwound?.def) {
+            const lastToken = chain.length > 1 && isRef(t.parentNode)
+              ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
+              : t
+            this._allMessages.push({
+              severity: 1,
+              message: `Unknown property "${chain.join('.')}" in "${targetName}"`,
+              range: lastToken.range,
+            })
+          } else if (isRef(t.parentNode) && t.parentNode.hasChain) {
+            // Also validate intermediate chain members
+            const length = t.parentNode.chain.length - 1
+            for (let i = length; i >= 0; i--) {
+              const token = t.parentNode.chain[i]
+              const memberChain = [t.text, ...t.parentNode.chain.slice(0, i + 1).map(c => c.text)]
+              const decl = this.unwindType(targetName, memberChain)
+              if (!decl?.def) {
+                this._allMessages.push({
+                  severity: 1,
+                  message: `Unknown property "${memberChain.join('.')}" in "${targetName}"`,
+                  range: token.range,
+                })
+              }
+            }
+          }
+          continue
+        }
         if (!this.registry.isDefined(t)) {
           this._allMessages.push({
             severity: 1,

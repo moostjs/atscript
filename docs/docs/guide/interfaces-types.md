@@ -149,3 +149,4 @@ export type UserStatus = User['status']  // Derived type
 - [Imports & Exports](/guide/imports-exports) - Module system
 - [Primitives](/guide/primitives) - Semantic types
 - [Annotations](/guide/annotations) - Metadata system
+- [Ad-hoc Annotations](/guide/ad-hoc-annotations) - Annotate existing types without modification

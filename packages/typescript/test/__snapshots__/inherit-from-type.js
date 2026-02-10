@@ -3,10 +3,6 @@
 import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 
 class TFirstName {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static _jsonSchema
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -14,10 +10,6 @@ class TFirstName {
 
 
 class TLastName {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static _jsonSchema
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -25,10 +17,6 @@ class TLastName {
 
 
 class TAge {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static _jsonSchema
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -36,10 +24,6 @@ class TAge {
 
 
 export class ITarget {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static _jsonSchema
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }

@@ -59,6 +59,10 @@ export class BuildRepo {
     private readonly docs: AtscriptDoc[]
   ) {}
 
+  getDoc(id: string) {
+    return this.docs.find(d => d.id === id)
+  }
+
   async diagnostics() {
     const docMessages = new Map<string, TMessages>()
     for (const document of this.docs) {

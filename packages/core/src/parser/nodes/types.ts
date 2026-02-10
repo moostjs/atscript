@@ -9,6 +9,7 @@ export type TSemanticToken =
   | 'inner'
   | 'path'
   | 'from'
+  | 'target'
 
 export type TNodeEntity =
   | 'interface' //
@@ -22,6 +23,7 @@ export type TNodeEntity =
   | 'array' //
   | 'import'
   | 'primitive'
+  | 'annotate'
 
 export interface TAnnotationTokens {
   name: string

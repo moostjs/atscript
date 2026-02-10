@@ -8,7 +8,7 @@ export { pipes } from './pipes'
 
 export function parseAtscript(
   source: string,
-  _pipes: TPipe[] = [pipes.importPipe, pipes.type, pipes.interfaceType],
+  _pipes: TPipe[] = [pipes.importPipe, pipes.type, pipes.interfaceType, pipes.annotatePipe],
   debug = false
 ) {
   const rawTokens = tokenize(source, debug)

@@ -255,10 +255,13 @@ export class AtscriptRepo {
     await this.checkImports(atscript)
   }
 
-  async checkImports(atscript: AtscriptDoc) {
+  async checkImports(atscript: AtscriptDoc, checked?: Set<string>) {
+    const _checked = checked || new Set<string>()
+    if (_checked.has(atscript.id)) return
+    _checked.add(atscript.id)
     const promise = Promise.all(
       Array.from(atscript.imports.values(), async ({ from, imports }) =>
-        this.checkImport(atscript, from, imports)
+        this.checkImport(atscript, from, imports, _checked)
       )
     )
     const results = await promise
@@ -268,7 +271,8 @@ export class AtscriptRepo {
   async checkImport(
     atscript: AtscriptDoc,
     from: Token,
-    imports: Token[]
+    imports: Token[],
+    checked?: Set<string>
   ): Promise<AtscriptDoc | undefined> {
     const forId = resolveAtscriptFromPath(from.text, atscript.id)
     if (forId === atscript.id) {
@@ -284,6 +288,8 @@ export class AtscriptRepo {
     let external: AtscriptDoc | undefined
     try {
       external = await this.openDocument(forId)
+      // Recursively load transitive dependencies
+      await this.checkImports(external, checked)
       for (const token of imports) {
         if (!external.exports.has(token.text)) {
           errors.push({

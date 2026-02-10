@@ -14,6 +14,7 @@ import {
   AtscriptRepo,
   BuildRepo,
   getRelPath,
+  isAnnotate,
   isAnnotationSpec,
   isInterface,
   isPrimitive,
@@ -21,6 +22,7 @@ import {
   isRef,
   isStructure,
   resolveAtscriptFromPath,
+  SemanticAnnotateNode,
 } from '@atscript/core'
 import type {
   CompletionItem,
@@ -287,6 +289,53 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             },
           ]
         }
+      }
+
+      // property completions inside annotate blocks
+      if (block?.blockType === 'annotate' && isAnnotate(block.parentNode)) {
+        const annotateNode = block.parentNode as SemanticAnnotateNode
+        const unwound = atscript.unwindType(annotateNode.targetName)
+        if (unwound?.def) {
+          let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
+          if (isInterface(targetDef)) {
+            targetDef = targetDef.getDefinition() || targetDef
+          }
+          // chain completion (e.g., address.city)
+          if (token?.parentNode && isRef(token.parentNode)) {
+            const id = token.parentNode.token('identifier')
+            if (id && (token.parentNode.hasChain || token.text === '.')) {
+              const chain =
+                token.text === '.'
+                  ? [id.text, ...token.parentNode.chain.map(c => c.text)]
+                  : [id.text, ...token.parentNode.chain.slice(0, -1).map(c => c.text)]
+              const chainUnwound = atscript.unwindType(annotateNode.targetName, chain)
+              if (chainUnwound?.def) {
+                const chainDef = atscript.mergeIntersection(chainUnwound.def)
+                let options: SemanticNode[] | undefined
+                if (isInterface(chainDef) || isStructure(chainDef)) {
+                  options = Array.from(chainDef.props.values())
+                } else if (isProp(chainDef) && chainDef.nestedProps) {
+                  options = Array.from(chainDef.nestedProps.values())
+                }
+                return options?.map(t => ({
+                  label: t.id,
+                  kind: CompletionItemKind.Property,
+                  documentation: { kind: 'markdown', value: t.documentation },
+                })) as CompletionItem[]
+              }
+              return undefined
+            }
+          }
+          // first-level: suggest top-level properties of target
+          if (isStructure(targetDef) || isInterface(targetDef)) {
+            return Array.from(targetDef.props.values()).map(t => ({
+              label: t.id,
+              kind: CompletionItemKind.Property,
+              documentation: { kind: 'markdown', value: t.documentation },
+            })) as CompletionItem[]
+          }
+        }
+        return undefined
       }
 
       // declared (imported) types or exported from other documents

@@ -92,5 +92,5 @@ export class Token {
   /**
    * Block type
    */
-  public blockType?: 'structure' | 'type' | 'import'
+  public blockType?: 'structure' | 'type' | 'import' | 'annotate'
 }

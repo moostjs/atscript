@@ -196,8 +196,8 @@ describe('json-schema', () => {
     const out = await repo.generate({ format: 'js' })
     const content = out[0].content
       .split('\n')
-      .filter(s => s.trim().startsWith('static _jsonSchema = {'))?.[0]
-    const schema = content.trim().slice('static _jsonSchema = '.length)
+      .filter(s => s.trim().startsWith('return {'))?.[0]
+    const schema = content.trim().slice('return '.length)
     expect(JSON.parse(schema)).toEqual(expectedSchema)
   })
 })

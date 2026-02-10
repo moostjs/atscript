@@ -2,6 +2,7 @@ import {
   AtscriptDoc,
   isGroup,
   isRef,
+  SemanticAnnotateNode,
   SemanticImportNode,
   SemanticInterfaceNode,
   SemanticNode,
@@ -35,6 +36,7 @@ export class BaseRenderer extends CodePrinter {
 
   renderInterface(node: SemanticInterfaceNode) {}
   renderType(node: SemanticTypeNode) {}
+  renderAnnotate(node: SemanticAnnotateNode) {}
 
   transformFromPath(path: string): string {
     return `${path}.as`
@@ -74,6 +76,10 @@ export class BaseRenderer extends CodePrinter {
       }
       case 'import': {
         this.renderImport(node as SemanticImportNode)
+        break
+      }
+      case 'annotate': {
+        this.renderAnnotate(node as SemanticAnnotateNode)
         break
       }
       default: {

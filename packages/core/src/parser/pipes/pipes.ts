@@ -1,4 +1,5 @@
 import type { TLexicalToken } from '../../tokenizer/types'
+import type { NodeIterator } from '../iterator'
 import type { TNodeEntity } from '../nodes'
 import { $n } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
@@ -132,10 +133,36 @@ const importPipe = $pipe('import', [
     .respectPriority(),
 ]).skip('\n', ';')
 
+const skipComments = {
+  handler(ni: NodeIterator) {
+    ni.skip()
+    return true
+  },
+}
+
+const annotateEntry = $pipe('ref', [
+  annotations(),
+  refWithChain(),
+  skipComments,
+  pun(';', ',', '\n').orEob().lookBehind(),
+]).skip('\n', ';', ',') as TPipe
+
+const annotatePipe = $pipe('annotate', [
+  annotations(),
+  identifier('export').saveAs('export').optional().skip('\n'),
+  identifier('annotate').saveAs('type').skip('\n').suppressEobError(),
+  identifier().saveAs('target').skip('\n'),
+  identifier('as').optional().skip('\n'),
+  identifier().saveAs('identifier').optional().skip('\n'),
+  block('{}').saveAs('inner'),
+  unwrap('inner').with([annotateEntry]),
+]).skip('\n', ';')
+
 export const pipes = {
   type,
   props,
   interfaceType,
   importPipe,
+  annotatePipe,
   tuple,
 }
