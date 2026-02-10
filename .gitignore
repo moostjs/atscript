@@ -4,3 +4,4 @@ node_modules
 temp
 *.local.md
 explorations
+.DS_Store
