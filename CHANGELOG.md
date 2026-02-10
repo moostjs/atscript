@@ -1,3 +1,12 @@
+## [0.1.1](https://github.com/moostjs/atscript/compare/v0.1.0...v0.1.1) (2026-02-10)
+
+
+### Bug Fixes
+
+* **typescript:** restore static class properties removed during ad-hoc refactor ([1962552](https://github.com/moostjs/atscript/commit/1962552847c9c3b80511c9ef47e85efde24c5b20))
+
+
+
 # [0.1.0](https://github.com/moostjs/atscript/compare/v0.0.32...v0.1.0) (2026-02-10)
 
 
