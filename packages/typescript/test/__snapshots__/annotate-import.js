@@ -4,6 +4,9 @@ import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/types
 import { MyInterface } from "./annotate-nonmutating.as"
 
 export class ImportedAnnotated {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }

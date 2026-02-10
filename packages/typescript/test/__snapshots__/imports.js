@@ -5,6 +5,9 @@ import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 
 export class People {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }

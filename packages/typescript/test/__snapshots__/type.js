@@ -3,6 +3,9 @@
 import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 
 export class TPrimitive {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -10,6 +13,9 @@ export class TPrimitive {
 
 
 export class TPirmiitiveUn {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -17,6 +23,9 @@ export class TPirmiitiveUn {
 
 
 export class TLiteral {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -24,6 +33,9 @@ export class TLiteral {
 
 
 export class TNumber {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -31,6 +43,9 @@ export class TNumber {
 
 
 export class TTuple1 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -38,6 +53,9 @@ export class TTuple1 {
 
 
 export class TTuple2 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -45,6 +63,9 @@ export class TTuple2 {
 
 
 export class TTupleArray {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -52,6 +73,9 @@ export class TTupleArray {
 
 
 export class TArray {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -59,6 +83,9 @@ export class TArray {
 
 
 export class TArray2 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -66,6 +93,9 @@ export class TArray2 {
 
 
 export class TArray3 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -73,6 +103,9 @@ export class TArray3 {
 
 
 export class TComplexArray {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -80,6 +113,9 @@ export class TComplexArray {
 
 
 export class TComplexArray2 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -87,6 +123,9 @@ export class TComplexArray2 {
 
 
 export class TComplexArray3 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -94,6 +133,9 @@ export class TComplexArray3 {
 
 
 export class TComplexArray4 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -101,6 +143,9 @@ export class TComplexArray4 {
 
 
 export class TComplexArray5 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -108,6 +153,9 @@ export class TComplexArray5 {
 
 
 export class TObject {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -115,6 +163,9 @@ export class TObject {
 
 
 export class TObjectUnion1 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -122,6 +173,9 @@ export class TObjectUnion1 {
 
 
 export class TObjectUnion2 {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -129,6 +183,9 @@ export class TObjectUnion2 {
 
 
 export class TObjectIntersection {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }

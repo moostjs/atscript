@@ -3,6 +3,9 @@
 import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 
 export class WithMetadata {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
@@ -10,6 +13,9 @@ export class WithMetadata {
 
 
 export class SomeType {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }

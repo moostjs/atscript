@@ -103,13 +103,20 @@ export class JsRenderer extends BaseRenderer {
     super.post()
   }
 
+  private renderClassStatics(node: SemanticNode) {
+    this.writeln('static __is_atscript_annotated_type = true')
+    this.writeln('static type = {}')
+    this.writeln('static metadata = new Map()')
+    this.renderJsonSchemaMethod(node)
+  }
+
   renderInterface(node: SemanticInterfaceNode): void {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
-    this.renderJsonSchemaMethod(node)
+    this.renderClassStatics(node)
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
@@ -121,7 +128,7 @@ export class JsRenderer extends BaseRenderer {
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
-    this.renderJsonSchemaMethod(node)
+    this.renderClassStatics(node)
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
@@ -142,7 +149,7 @@ export class JsRenderer extends BaseRenderer {
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
-    this.renderJsonSchemaMethod(node)
+    this.renderClassStatics(node)
     this.popln()
     this.postAnnotate.push(node)
     this.writeln()
