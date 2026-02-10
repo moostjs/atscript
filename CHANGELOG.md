@@ -1,3 +1,12 @@
+# [0.1.0](https://github.com/moostjs/atscript/compare/v0.0.32...v0.1.0) (2026-02-10)
+
+
+### Features
+
+* add ad-hoc annotations ([8b74759](https://github.com/moostjs/atscript/commit/8b74759b0ebc344bd5f321086ddb97f8a91f6307))
+
+
+
 ## [0.0.32](https://github.com/moostjs/atscript/compare/v0.0.31...v0.0.32) (2026-02-02)
 
 
