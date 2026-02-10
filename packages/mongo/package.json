@@ -1,6 +1,6 @@
 {
   "name": "@atscript/mongo",
-  "version": "0.0.32",
+  "version": "0.1.0",
   "description": "Mongodb plugin for atscript.",
   "type": "module",
   "main": "dist/index.mjs",
