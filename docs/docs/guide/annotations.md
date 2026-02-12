@@ -48,6 +48,54 @@ When a property references another property, annotations merge in order:
 2. Referenced property annotations
 3. Current property annotations (highest priority)
 
+### Merge Strategies
+
+When annotations are merged (from type inheritance, property references, or [ad-hoc annotations](/guide/ad-hoc-annotations)), the **merge strategy** determines how same-named annotations combine:
+
+**Replace** (default) — Higher-priority annotations replace lower-priority ones entirely:
+
+```atscript
+@expect.min 3
+export type PositiveInt = number
+
+export interface Config {
+    @expect.min 10          // Replaces type's @expect.min 3
+    threshold: PositiveInt   // Result: @expect.min is 10
+}
+```
+
+**Append** — Both values are kept, accumulating into an array:
+
+```atscript
+@expect.pattern '^[a-z]+$', '', 'Must be lowercase'
+export type SafeString = string
+
+export interface Form {
+    @expect.pattern '^\S+$', '', 'No spaces'
+    code: SafeString
+    // Result: both patterns are validated
+}
+```
+
+The strategy is configured per annotation via [`AnnotationSpec`](/guide/configuration#annotations). Most annotations use replace. The built-in `@expect.pattern` uses append.
+
+### Repeatable Annotations
+
+Annotations marked with `multiple: true` can appear more than once on the same node. Their values are stored as arrays:
+
+```atscript
+export interface User {
+    @expect.pattern '^[A-Z]', '', 'Must start with uppercase'
+    @expect.pattern '.{3,}', '', 'Must be at least 3 characters'
+    name: string
+}
+```
+
+When merged, how repeated annotations combine depends on the merge strategy:
+
+- **`multiple: true` + replace** (default) — The higher-priority set replaces the entire array
+- **`multiple: true` + append** — Values from both sides are concatenated into a single array
+
 ## Annotation Syntax
 
 ```atscript
@@ -113,6 +161,15 @@ export default defineConfig({
         argument: {
           name: 'width',
           type: 'number'
+        }
+      }),
+      tag: new AnnotationSpec({
+        description: 'UI display tag',
+        multiple: true,             // Can be repeated
+        mergeStrategy: 'append',    // Accumulates across merges
+        argument: {
+          name: 'value',
+          type: 'string'
         }
       })
     }

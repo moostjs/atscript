@@ -128,6 +128,20 @@ annotations: {
 }
 ```
 
+`AnnotationSpec` accepts the following options:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `description` | `string` | — | Documentation shown in IntelliSense |
+| `argument` | `object \| object[]` | — | Argument definition(s) with `name`, `type`, optional `values` |
+| `nodeType` | `string[]` | — | Restrict to node types (e.g., `['prop']`, `['interface']`) |
+| `multiple` | `boolean` | `false` | Allow the annotation to appear more than once on the same node. Values are stored as arrays |
+| `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How same-named annotations combine during [merging](/guide/annotations#merge-strategies). Only relevant when `multiple: true` |
+
+::: tip
+When `multiple: true` and `mergeStrategy: 'replace'` (the default), the higher-priority set of values replaces the lower-priority set entirely. With `mergeStrategy: 'append'`, values from both sides are concatenated.
+:::
+
 #### `plugins`
 - **Type:** `Plugin[]`
 - **Description:** Active plugins for code generation

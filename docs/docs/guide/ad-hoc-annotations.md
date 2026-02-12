@@ -97,6 +97,80 @@ This sets `User.metadata.get("meta.description")` to `"Admin user"` at runtime.
 
 For non-mutating annotate, top-level annotations on the alias replace the original's. Annotations from the original that are not overridden are carried over to the alias.
 
+## Annotation Merging
+
+When ad-hoc annotations target properties that already have annotations, the [merge strategy](/guide/annotations#merge-strategies) determines how values combine.
+
+### Replace Strategy (default)
+
+For annotations with the default replace strategy, the ad-hoc annotation **replaces** the original:
+
+```atscript
+export interface User {
+    @meta.label 'Original Name'
+    name: string
+}
+
+annotate User {
+    @meta.label 'Admin Name'    // Replaces 'Original Name'
+    name
+}
+// Result: name's label is 'Admin Name'
+```
+
+For repeatable annotations (`multiple: true`) with replace strategy, the **entire set** is replaced:
+
+```atscript
+export interface Config {
+    @tag 'alpha'
+    @tag 'beta'
+    feature: string
+}
+
+annotate Config {
+    @tag 'production'           // Replaces both 'alpha' and 'beta'
+    feature
+}
+// Result: feature's tags are ['production'], not ['alpha', 'beta', 'production']
+```
+
+### Append Strategy
+
+For annotations configured with `mergeStrategy: 'append'`, ad-hoc values are **added** to the existing ones:
+
+```atscript
+export interface User {
+    @expect.pattern '^[A-Z]', '', 'Must start uppercase'
+    name: string
+}
+
+annotate User {
+    @expect.pattern '.{3,}', '', 'Min 3 chars'   // Added, not replaced
+    name
+}
+// Result: both patterns are validated
+```
+
+### Non-mutating Aliases
+
+Non-mutating annotate creates a new type with annotations merged from the original. The original is not affected:
+
+```atscript
+@meta.description 'Base user'
+export interface User {
+    @meta.label 'Name'
+    @tag 'core'
+    name: string
+}
+
+export annotate User as AdminUser {
+    @meta.label 'Admin Name'   // Replaces 'Name'
+    @tag 'admin'               // Appends to ['core'] → ['admin', 'core']
+    name
+}
+// User is unchanged. AdminUser has merged annotations.
+```
+
 ## Annotating Types
 
 The examples above use `interface` targets, but ad-hoc annotations work equally well with `type` definitions.
@@ -227,12 +301,7 @@ annotate User {
 }
 ```
 
-The generated JS imports `User` and sets metadata on its properties:
-
-```javascript
-User.type.props.get("name")?.metadata.set("meta.label", "Admin Name")
-User.type.props.get("address")?.type.props.get("city")?.metadata.set("meta.label", "Admin City")
-```
+The generated code imports `User` and mutates metadata on its `name` and `address.city` properties at runtime, applying the annotation merge strategy (replace or append) for each annotation.
 
 ## Next Steps
 
