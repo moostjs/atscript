@@ -21,7 +21,9 @@ import {
   isProp,
   isRef,
   isStructure,
+  PluginManager,
   resolveAtscriptFromPath,
+  resolveConfigFile,
   SemanticAnnotateNode,
 } from '@atscript/core'
 import type {
@@ -519,6 +521,22 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     // connection.languages.semanticTokens.onRange(async params =>
     //   this.provideSemanticTokens(params.textDocument.uri, params.range)
     // )
+  }
+
+  async loadPluginManagerFor(id: string): ReturnType<AtscriptRepo['loadPluginManagerFor']> {
+    try {
+      return await super.loadPluginManagerFor(id)
+    } catch (error) {
+      console.error('Failed to load config for', id, error)
+      // Remove failed config from cache so it retries after the user fixes it
+      const configFile = await resolveConfigFile(id, this.root)
+      if (configFile) {
+        this.configFiles.delete(configFile)
+      }
+      const manager = new PluginManager({ rootDir: this.root })
+      await manager.getDocConfig()
+      return { file: configFile, manager, dependants: new Set<string>() }
+    }
   }
 
   async onConfigChanged(_configFile: string) {

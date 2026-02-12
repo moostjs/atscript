@@ -12,7 +12,7 @@ import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { SemanticPrimitiveNode } from './parser/nodes'
 
-interface TPluginManagers {
+export interface TPluginManagers {
   manager: PluginManager
   file?: string
   dependants: Set<string>
