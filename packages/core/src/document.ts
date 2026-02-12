@@ -722,7 +722,7 @@ export class AtscriptDoc {
             ? [t.text, ...t.parentNode.chain.map(c => c.text)]
             : [t.text]
           const unwound = this.unwindType(targetName, chain)
-          if (!unwound?.def) {
+          if (!unwound?.def && !this.resolveChainWithMerge(targetName, chain)) {
             const lastToken = chain.length > 1 && isRef(t.parentNode)
               ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
               : t
@@ -738,7 +738,7 @@ export class AtscriptDoc {
               const token = t.parentNode.chain[i]
               const memberChain = [t.text, ...t.parentNode.chain.slice(0, i + 1).map(c => c.text)]
               const decl = this.unwindType(targetName, memberChain)
-              if (!decl?.def) {
+              if (!decl?.def && !this.resolveChainWithMerge(targetName, memberChain)) {
                 this._allMessages.push({
                   severity: 1,
                   message: `Unknown property "${memberChain.join('.')}" in "${targetName}"`,
@@ -787,6 +787,31 @@ export class AtscriptDoc {
       }
     }
     return this._allMessages
+  }
+
+  /**
+   * Walks a property chain step-by-step, applying mergeIntersection at each
+   * level. Mirrors the completion logic in the LSP server so that intersection
+   * types like `{ a: string } & { b: number }` are handled correctly.
+   */
+  private resolveChainWithMerge(targetName: string, chain: string[]): boolean {
+    let def: SemanticNode | undefined = this.unwindType(targetName)?.def
+    if (!def) return false
+    for (const prop of chain) {
+      def = this.mergeIntersection(def)
+      if (isProp(def)) {
+        const inner = def.getDefinition()
+        if (inner) def = this.mergeIntersection(inner)
+      }
+      if (isStructure(def) || isInterface(def)) {
+        const next = def.props.get(prop)
+        if (!next) return false
+        def = next.getDefinition() || next
+      } else {
+        return false
+      }
+    }
+    return true
   }
 
   mergeIntersection(node: SemanticNode): SemanticNode {

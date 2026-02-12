@@ -9,6 +9,7 @@ import { SemanticPrimitiveNode } from '../nodes/primitive-node'
 const primitives = new Map<string, SemanticPrimitiveNode>()
 primitives.set('string', new SemanticPrimitiveNode('string', { type: 'string' }))
 primitives.set('number', new SemanticPrimitiveNode('number', { type: 'number' }))
+primitives.set('boolean', new SemanticPrimitiveNode('boolean', { type: 'boolean' }))
 
 describe('annotate', () => {
   it('basic mutating annotate', () => {
@@ -285,6 +286,30 @@ annotate User {
   firstName
   address.city
   address.zip
+}
+`)
+    const messages = doc.getDiagMessages()
+    const entryErrors = messages.filter(
+      m => m.message.includes('Unknown property') || m.message.includes('Unknown identifier')
+    )
+    expect(entryErrors).toHaveLength(0)
+  })
+
+  it('should not report errors for entries in merged intersection properties', () => {
+    const doc = new AtscriptDoc('test', { primitives })
+    doc.update(`
+interface User {
+  contact: {
+    type: 'phone' | 'fax' | 'email'
+    value: string
+  } & {
+    isMobile?: boolean
+  }
+}
+annotate User {
+  contact.type
+  contact.value
+  contact.isMobile
 }
 `)
     const messages = doc.getDiagMessages()

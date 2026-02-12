@@ -193,23 +193,11 @@ export class TypeRenderer extends BaseRenderer {
       return
     }
     const targetName = node.targetName
-    const unwound = this.doc.unwindType(targetName)
-    if (!unwound?.def) {
-      return
-    }
-    const def = this.doc.mergeIntersection(unwound.def)
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.renderJsDoc(node)
-    if (isStructure(def) || isInterface(def)) {
-      this.write(exported ? 'export declare ' : 'declare ')
-      this.write(`class ${node.id!} `)
-      this.renderStructure(def as SemanticStructureNode, node.id!)
-    } else {
-      this.write(exported ? 'export ' : 'declare ')
-      this.write(`type ${node.id!} = `)
-      this.renderTypeDef(def)
-    }
+    this.write(exported ? 'export declare ' : 'declare ')
+    this.writeln(`class ${node.id!} extends ${targetName} {}`)
     this.writeln()
   }
 

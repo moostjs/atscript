@@ -13,18 +13,6 @@ import { MyInterface } from "./annotate-nonmutating.as"
  * Atscript annotate **ImportedAnnotated**
  * @see {@link ./annotate-import.as:3:32}
  */
-export declare class ImportedAnnotated {
-  name: string
-  age: number
-  email: string /* email */
-  address: {
-    street: string
-    city: string
-  }
-  static __is_atscript_annotated_type: true
-  static type: TAtscriptTypeObject<keyof ImportedAnnotated>
-  static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof ImportedAnnotated>(opts?: Partial<TValidatorOptions>) => Validator<TT>
-  static toJsonSchema: () => any
-}
+export declare class ImportedAnnotated extends MyInterface {}
+
 // prettier-ignore-end
