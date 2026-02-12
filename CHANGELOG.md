@@ -1,3 +1,16 @@
+## <small>0.1.2 (2026-02-12)</small>
+
+* docs: update ([521b26d](https://github.com/moostjs/atscript/commit/521b26d))
+* docs: update vscode docs ([2b2b09b](https://github.com/moostjs/atscript/commit/2b2b09b))
+* fix(core): fix annotate with intersection types ([2e06e7c](https://github.com/moostjs/atscript/commit/2e06e7c))
+* fix(js): fix merging annotations logic ([a866bcc](https://github.com/moostjs/atscript/commit/a866bcc))
+* fix(js): fix order of ad-hoc annotations ([6280e29](https://github.com/moostjs/atscript/commit/6280e29))
+* fix(validator): fix generic generated types and typeguards ([f7abda8](https://github.com/moostjs/atscript/commit/f7abda8))
+* fix(vscode): fix crashing LSP when config file is broken ([8a1d8f8](https://github.com/moostjs/atscript/commit/8a1d8f8))
+* chore: update deps ([f284b06](https://github.com/moostjs/atscript/commit/f284b06))
+
+
+
 ## [0.1.1](https://github.com/moostjs/atscript/compare/v0.1.0...v0.1.1) (2026-02-10)
 
 
