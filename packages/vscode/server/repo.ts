@@ -347,6 +347,37 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         return this.getDeclarationsCompletions(atscript, text)
       }
 
+      // top-level keyword completions (not in any block)
+      if (block?.blockType === undefined) {
+        const lineStartOffset = document.offsetAt({ line: position.line, character: 0 })
+        const lineText = text.slice(lineStartOffset, offset)
+
+        // After "annotate" keyword → suggest annotatable targets
+        if (/^\s*(?:export\s+)?annotate\s+\w*$/u.test(lineText)) {
+          return this.getDeclarationsCompletions(atscript, text, false)
+        }
+
+        // After "export" keyword → suggest annotate, interface, type
+        if (/^\s*export\s+\w*$/u.test(lineText)) {
+          return [
+            { label: 'annotate', kind: CompletionItemKind.Keyword },
+            { label: 'interface', kind: CompletionItemKind.Keyword },
+            { label: 'type', kind: CompletionItemKind.Keyword },
+          ]
+        }
+
+        // At line start → suggest top-level keywords
+        if (/^\s*\w*$/u.test(lineText)) {
+          return [
+            { label: 'import', kind: CompletionItemKind.Keyword },
+            { label: 'export', kind: CompletionItemKind.Keyword },
+            { label: 'annotate', kind: CompletionItemKind.Keyword },
+            { label: 'interface', kind: CompletionItemKind.Keyword },
+            { label: 'type', kind: CompletionItemKind.Keyword },
+          ]
+        }
+      }
+
       // autocomplete for defined nodes
       if (token?.parentNode && isRef(token.parentNode)) {
         const id = token.parentNode.token('identifier')
@@ -576,7 +607,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   async getDeclarationsCompletions(
     atscript: AtscriptDoc,
-    text: string
+    text: string,
+    includePrimitives = true
   ): Promise<CompletionItem[] | undefined> {
     const defs = Array.from(atscript.registry.definitions.entries())
     const items = [] as CompletionItem[]
@@ -626,27 +658,29 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         }
       }
     }
-    const primitives = atscript.primitives
-    items.push(
-      ...primitives.map(
-        p =>
-          ({
-            label: p.id,
-            kind: CompletionItemKind.Keyword,
-            detail: `primitive "${p.id}"`,
-            documentation: {
-              kind: 'markdown',
-              // todo: better format for primitive documentation
-              value:
-                p.config.documentation ||
-                'Contains:\n\n' +
-                  Object.keys(p.config.extensions || {})
-                    .map(k => `- **${k}** ${p.config.extensions![k].documentation || ''}`)
-                    .join('\n'),
-            },
-          }) as CompletionItem
+    if (includePrimitives) {
+      const primitives = atscript.primitives
+      items.push(
+        ...primitives.map(
+          p =>
+            ({
+              label: p.id,
+              kind: CompletionItemKind.Keyword,
+              detail: `primitive "${p.id}"`,
+              documentation: {
+                kind: 'markdown',
+                // todo: better format for primitive documentation
+                value:
+                  p.config.documentation ||
+                  'Contains:\n\n' +
+                    Object.keys(p.config.extensions || {})
+                      .map(k => `- **${k}** ${p.config.extensions![k].documentation || ''}`)
+                      .join('\n'),
+              },
+            }) as CompletionItem
+        )
       )
-    )
+    }
     return items
   }
 

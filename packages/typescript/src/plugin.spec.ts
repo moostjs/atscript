@@ -34,6 +34,14 @@ const annotations = {
       type: 'number',
     },
   }),
+  mulAppend: new AnnotationSpec({
+    multiple: true,
+    mergeStrategy: 'append',
+    argument: {
+      name: 'value',
+      type: 'string',
+    },
+  }),
   obj: new AnnotationSpec({
     argument: [
       {
@@ -325,10 +333,11 @@ describe('ts-plugin', () => {
     )
     // Deep chain mutation navigates via .type.props.get()
     expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
-    // Multiple annotation uses array push pattern
-    expect(out[0].content).toContain('Array.isArray')
+    // Multiple+replace annotation clears before appending
+    expect(out[0].content).toContain('metadata.delete("mul")')
+    expect(out[0].content).toContain('$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)')
     // Top-level annotation on mutating annotate generates mutation on target's metadata
-    expect(out[0].content).toContain('MyInterface.metadata.set("meta.description", "Mutated Interface")')
+    expect(out[0].content).toContain('$a(MyInterface.metadata, "meta.description", "Mutated Interface")')
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-mutating.as.d.ts')
@@ -384,17 +393,108 @@ describe('ts-plugin', () => {
     expect(out[0].content).toContain('import { MyInterface }')
     // Should generate mutation code
     expect(out[0].content).toContain('MyInterface.type.props.get("name")')
-    expect(out[0].content).toContain('.metadata.set("label"')
+    expect(out[0].content).toContain('$a(MyInterface.type.props.get("name")?.metadata, "label"')
     // Deep chain mutation for address.city
     expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
     // Top-level annotation on cross-file mutating annotate
-    expect(out[0].content).toContain('MyInterface.metadata.set("meta.description", "Cross-File Mutated")')
+    expect(out[0].content).toContain('$a(MyInterface.metadata, "meta.description", "Cross-File Mutated")')
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-import-mutating.as.d.ts')
     await expect(outDts[0].content).toMatchFileSnapshot(
       path.join(wd, 'test/__snapshots__/annotate-import-mutating.as.d.ts')
     )
+  })
+
+  it('must render annotate on type (non-interface)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-type.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-type.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-type.js')
+    )
+    // Mutating annotate on union type uses items[N] path, not direct .props
+    expect(out[0].content).toContain('.items[')
+    expect(out[0].content).not.toContain('TO.type.props.get(')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('annotate-type.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-type.as.d.ts')
+    )
+    // Non-mutating annotate on type renders as type alias + namespace, not class extends
+    expect(outDts[0].content).toContain('export type TString2 = TString')
+    expect(outDts[0].content).toContain('declare namespace TString2')
+    expect(outDts[0].content).toContain('export type TO2 = TO')
+    expect(outDts[0].content).toContain('declare namespace TO2')
+    expect(outDts[0].content).not.toContain('extends TString')
+    expect(outDts[0].content).not.toContain('extends TO')
+  })
+
+  it('must respect merge strategy (replace vs append) in annotate blocks', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-merge-strategy.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-merge-strategy.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-merge-strategy.js')
+    )
+    const js = out[0].content
+
+    // Split output into User and User2 sections for targeted assertions
+    const userSection = js.slice(js.indexOf('$("object", User)'), js.indexOf('$("object", User2)'))
+    const user2Section = js.slice(js.indexOf('$("object", User2)'))
+
+    // --- User inline definition (original annotations only, no ad-hoc merge) ---
+    expect(userSection).toContain('.annotate("label", "Original Name")')
+    expect(userSection).toContain('.annotate("mulAppend", "prop-original", true)')
+    expect(userSection).toContain('.annotate("mul", 1, true)')
+    expect(userSection).toContain('.annotate("mul", 2, true)')
+    // Ad-hoc annotations are NOT in the inline definition
+    expect(userSection).not.toContain('"Mutated Name"')
+    expect(userSection).not.toContain('"prop-mutated"')
+    expect(userSection).not.toContain('.annotate("mul", 99')
+    // Top-level: only original
+    expect(userSection).toContain('\n  .annotate("mulAppend", "top-original", true)')
+
+    // --- User2 inline definition (non-mutating annotate alias — merged) ---
+    // Replace: label replaced to "Aliased Name"
+    expect(user2Section).toContain('.annotate("label", "Aliased Name")')
+    expect(user2Section).not.toContain('"Original Name"')
+    // Replace: mul replaced to 77 (originals 1,2 gone)
+    expect(user2Section).toContain('.annotate("mul", 77, true)')
+    expect(user2Section).not.toContain('.annotate("mul", 1')
+    expect(user2Section).not.toContain('.annotate("mul", 2')
+    // Append: both prop-level mulAppend values present
+    expect(user2Section).toContain('.annotate("mulAppend", "prop-aliased", true)')
+    expect(user2Section).toContain('.annotate("mulAppend", "prop-original", true)')
+    // Top-level: both aliased and original present (append)
+    expect(user2Section).toContain('.annotate("mulAppend", "top-aliased", true)')
+    expect(user2Section).toContain('.annotate("mulAppend", "top-original", true)')
+
+    // --- Mutation statements (mutating annotate) ---
+    const mutationSection = js.slice(js.indexOf('$a('))
+    // Replace (single): label mutation does NOT use asArray
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")')
+    expect(mutationSection).not.toContain('"label", "Mutated Name", true)')
+    // Replace (multiple): mul clears existing before appending
+    expect(mutationSection).toContain('metadata.delete("mul")')
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mul", 99, true)')
+    // Append: mulAppend does NOT clear, just appends
+    expect(mutationSection).not.toContain('metadata.delete("mulAppend")')
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)')
+    expect(mutationSection).toContain('$a(User.metadata, "mulAppend", "top-mutated", true)')
   })
 
   it('must render json schema method', async () => {

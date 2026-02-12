@@ -7,7 +7,17 @@ import { AnnotationSpec } from './annotations'
 import { AtscriptDoc } from './document'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
-import { isGroup, isPrimitive, SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
+import {
+  isAnnotate,
+  isGroup,
+  isRef,
+  isPrimitive,
+  SemanticGroup,
+  SemanticInterfaceNode,
+  type TAnnotationTokens,
+} from './parser/nodes'
+import { expectAnnotations } from './defaults/expect-annotations'
+import { Token } from './parser/token'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
 primitives.set(
@@ -26,7 +36,10 @@ primitives.set(
   'number',
   new SemanticPrimitiveNode('number', {
     type: 'number',
-    extensions: { int: { type: 'number', expect: { int: true } } },
+    extensions: {
+      int: { type: 'number', expect: { int: true } },
+      positive: { type: 'number', expect: { min: 0 } },
+    },
   })
 )
 
@@ -578,6 +591,367 @@ describe('document', () => {
     expect(nAnnotations![0].name).toBe('expect.max')
     expect(nAnnotations![0].args[0]!.text).toBe('5')
     expect(nAnnotations![1].name).toBe('expect.int')
+  })
+
+  it('should let explicit annotation override primitive annotation (replace strategy)', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { expect: expectAnnotations },
+    })
+    doc.update(`
+    export interface Data {
+      @expect.min 5
+      n: number.positive
+    }
+`)
+    const node = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const prop = node.props.get('n')
+    expect(prop).toBeDefined()
+    const annotations = doc.evalAnnotationsForNode(prop!)
+    // expect.min 5 (explicit) should replace expect.min 0 (from number.positive)
+    const minAnnotations = annotations!.filter(a => a.name === 'expect.min')
+    expect(minAnnotations).toHaveLength(1)
+    expect(minAnnotations[0].args[0]!.text).toBe('5')
+  })
+
+  it('should append primitive pattern when explicit pattern also present (append strategy)', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { expect: expectAnnotations },
+    })
+    doc.update(`
+    export interface Data {
+      @expect.pattern '[A-Z]+'
+      email: string.email
+    }
+`)
+    const node = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const prop = node.props.get('email')
+    expect(prop).toBeDefined()
+    const annotations = doc.evalAnnotationsForNode(prop!)
+    // Both patterns should be present (append strategy)
+    const patternAnnotations = annotations!.filter(a => a.name === 'expect.pattern')
+    expect(patternAnnotations).toHaveLength(2)
+  })
+
+  it('should replace via mergeNodesAnnotations when annotations share a name (replace strategy)', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { expect: expectAnnotations },
+    })
+    doc.update('export type T = string') // just to initialize
+    const mkAnnotation = (name: string, value: string): TAnnotationTokens => ({
+      name,
+      token: new Token({
+        text: name,
+        type: 'identifier',
+        getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+      }),
+      args: [
+        new Token({
+          text: value,
+          type: 'number',
+          getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+        }),
+      ],
+    })
+    const left = [mkAnnotation('expect.min', '0')]
+    const right = [mkAnnotation('expect.min', '5')]
+    const merged = doc.mergeNodesAnnotations(left, right)
+    expect(merged).toHaveLength(1)
+    expect(merged[0].args[0]!.text).toBe('5')
+  })
+
+  it('should replace via mergeNodesAnnotations for multiple:true + replace strategy', () => {
+    const mul = new AnnotationSpec({
+      multiple: true,
+      argument: { name: 'value', type: 'number' },
+    })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { mul },
+    })
+    doc.update('export type T = string')
+    const mkAnnotation = (name: string, value: string): TAnnotationTokens => ({
+      name,
+      token: new Token({
+        text: name,
+        type: 'identifier',
+        getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+      }),
+      args: [
+        new Token({
+          text: value,
+          type: 'number',
+          getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+        }),
+      ],
+    })
+    const left = [mkAnnotation('mul', '1'), mkAnnotation('mul', '2')]
+    const right = [mkAnnotation('mul', '99')]
+    const merged = doc.mergeNodesAnnotations(left, right)
+    // Replace strategy: only right's value should survive, left's [1, 2] are dropped
+    expect(merged).toHaveLength(1)
+    expect(merged[0].args[0]!.text).toBe('99')
+  })
+
+  it('should append via mergeNodesAnnotations when strategy is append', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { expect: expectAnnotations },
+    })
+    doc.update('export type T = string') // just to initialize
+    const mkAnnotation = (name: string, value: string): TAnnotationTokens => ({
+      name,
+      token: new Token({
+        text: name,
+        type: 'identifier',
+        getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+      }),
+      args: [
+        new Token({
+          text: value,
+          type: 'text',
+          getRange: () => ({ start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }),
+        }),
+      ],
+    })
+    const left = [mkAnnotation('expect.pattern', '[a-z]+')]
+    const right = [mkAnnotation('expect.pattern', '[A-Z]+')]
+    const merged = doc.mergeNodesAnnotations(left, right)
+    // Both patterns should survive (append strategy)
+    expect(merged).toHaveLength(2)
+    expect(merged[0].args[0]!.text).toBe('[A-Z]+')
+    expect(merged[1].args[0]!.text).toBe('[a-z]+')
+  })
+
+  it('should respect append strategy when merging mutating annotate annotations', () => {
+    const mulAppend = new AnnotationSpec({
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { mulAppend },
+    })
+    doc.update(`
+    export interface User {
+      @mulAppend 'abc'
+      name: string
+    }
+
+    annotate User {
+      @mulAppend 'abc2'
+      name
+    }
+`)
+    const iface = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const prop = iface.props.get('name')!
+    const originalAnnotations = doc.evalAnnotationsForNode(prop)
+
+    // Get mutating annotate entry annotations
+    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    expect(annotateNodes).toHaveLength(1)
+    const entry = annotateNodes[0].entries.find(e => e.id === 'name')!
+    const adHocAnnotations = entry.annotations!
+
+    // Merge: original is left (lower priority), ad-hoc is right (higher priority)
+    const merged = doc.mergeNodesAnnotations(originalAnnotations, adHocAnnotations)
+
+    // With append strategy, both values should survive
+    const mulAnnotations = merged.filter(a => a.name === 'mulAppend')
+    expect(mulAnnotations).toHaveLength(2)
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('abc')
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('abc2')
+  })
+
+  it('should respect append strategy when merging non-mutating annotate annotations', () => {
+    const mulAppend = new AnnotationSpec({
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { mulAppend },
+    })
+    doc.update(`
+    export interface User {
+      @mulAppend 'abc'
+      name: string
+    }
+
+    annotate User {
+      @mulAppend 'abc2'
+      name
+    }
+
+    export annotate User as User2 {
+      @mulAppend 'abc3'
+      name
+    }
+`)
+    const iface = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const prop = iface.props.get('name')!
+    const originalAnnotations = doc.evalAnnotationsForNode(prop)
+
+    // First: merge mutating annotate (abc2) with original (abc)
+    const mutatingNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const mutatingEntry = mutatingNodes[0].entries.find(e => e.id === 'name')!
+    const afterMutating = doc.mergeNodesAnnotations(originalAnnotations, mutatingEntry.annotations!)
+
+    // Then: merge non-mutating annotate (abc3) on top
+    const nonMutatingNodes = doc.getAnnotateNodesFor('User').filter(n => !n.isMutating)
+    expect(nonMutatingNodes).toHaveLength(1)
+    const nonMutatingEntry = nonMutatingNodes[0].entries.find(e => e.id === 'name')!
+    const afterAll = doc.mergeNodesAnnotations(afterMutating, nonMutatingEntry.annotations!)
+
+    // With append strategy, all three values should survive
+    const mulAnnotations = afterAll.filter(a => a.name === 'mulAppend')
+    expect(mulAnnotations).toHaveLength(3)
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('abc')
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('abc2')
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('abc3')
+  })
+
+  it('should respect append strategy when merging top-level annotate annotations', () => {
+    const mulAppend = new AnnotationSpec({
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { mulAppend },
+    })
+    doc.update(`
+    @mulAppend 'original'
+    export interface User {
+      name: string
+    }
+
+    @mulAppend 'mutated'
+    annotate User {
+    }
+`)
+    const iface = doc.nodes[0]
+    const originalAnnotations = doc.evalAnnotationsForNode(iface)
+
+    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    expect(annotateNodes).toHaveLength(1)
+    const adHocAnnotations = annotateNodes[0].annotations!
+
+    const merged = doc.mergeNodesAnnotations(originalAnnotations, adHocAnnotations)
+
+    // With append strategy, both top-level values should survive
+    const mulAnnotations = merged.filter(a => a.name === 'mulAppend')
+    expect(mulAnnotations).toHaveLength(2)
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('original')
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('mutated')
+  })
+
+  it('should replace when merging top-level annotate annotations with replace strategy', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: {
+        label: new AnnotationSpec({
+          argument: { name: 'value', type: 'string' },
+        }),
+      },
+    })
+    doc.update(`
+    @label 'original'
+    export interface User {
+      name: string
+    }
+
+    @label 'mutated'
+    annotate User {
+    }
+`)
+    const iface = doc.nodes[0]
+    const originalAnnotations = doc.evalAnnotationsForNode(iface)
+
+    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const adHocAnnotations = annotateNodes[0].annotations!
+
+    const merged = doc.mergeNodesAnnotations(originalAnnotations, adHocAnnotations)
+
+    // Replace strategy: only the mutated value should survive
+    const labelAnnotations = merged.filter(a => a.name === 'label')
+    expect(labelAnnotations).toHaveLength(1)
+    expect(labelAnnotations[0].args[0]!.text).toBe('mutated')
+  })
+
+  it('should respect append strategy when merging top-level non-mutating annotate annotations', () => {
+    const mulAppend = new AnnotationSpec({
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: { mulAppend },
+    })
+    doc.update(`
+    @mulAppend 'original'
+    export interface User {
+      name: string
+    }
+
+    @mulAppend 'aliased'
+    export annotate User as User2 {
+    }
+`)
+    const iface = doc.nodes[0]
+    const originalAnnotations = doc.evalAnnotationsForNode(iface)
+
+    const nonMutatingNodes = doc.getAnnotateNodesFor('User').filter(n => !n.isMutating)
+    expect(nonMutatingNodes).toHaveLength(1)
+    const annotateAnnotations = nonMutatingNodes[0].annotations!
+
+    const merged = doc.mergeNodesAnnotations(originalAnnotations, annotateAnnotations)
+
+    // With append strategy, both top-level values should survive
+    const mulAnnotations = merged.filter(a => a.name === 'mulAppend')
+    expect(mulAnnotations).toHaveLength(2)
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('original')
+    expect(mulAnnotations.map(a => a.args[0]!.text)).toContain('aliased')
+  })
+
+  it('should replace when merging annotate annotations with replace strategy', () => {
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: {
+        label: new AnnotationSpec({
+          argument: { name: 'value', type: 'string' },
+        }),
+      },
+    })
+    doc.update(`
+    export interface User {
+      @label 'original'
+      name: string
+    }
+
+    annotate User {
+      @label 'mutated'
+      name
+    }
+`)
+    const iface = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const prop = iface.props.get('name')!
+    const originalAnnotations = doc.evalAnnotationsForNode(prop)
+
+    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const entry = annotateNodes[0].entries.find(e => e.id === 'name')!
+    const merged = doc.mergeNodesAnnotations(originalAnnotations, entry.annotations!)
+
+    // Replace strategy: only the ad-hoc value should survive
+    const labelAnnotations = merged.filter(a => a.name === 'label')
+    expect(labelAnnotations).toHaveLength(1)
+    expect(labelAnnotations[0].args[0]!.text).toBe('mutated')
   })
 })
 

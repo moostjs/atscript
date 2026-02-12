@@ -2,8 +2,10 @@
 // oxlint-disable max-depth
 import {
   AtscriptDoc,
+  isGroup,
   isInterface,
   isPrimitive,
+  isRef,
   isStructure,
   SemanticAnnotateNode,
   SemanticArrayNode,
@@ -45,7 +47,7 @@ export class JsRenderer extends BaseRenderer {
   pre() {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
-    const imports = ['defineAnnotatedType as $']
+    const imports = ['defineAnnotatedType as $', 'annotate as $a']
     if (!this.opts?.preRenderJsonSchema) {
       imports.push('buildJsonSchema as $$')
     }
@@ -88,12 +90,9 @@ export class JsRenderer extends BaseRenderer {
           this.writeln()
         }
       } else {
-        // For interface/type nodes, apply mutating annotate blocks
-        const mutatingNodes = this.doc.getAnnotateNodesFor(node.id!)
-          .filter(n => n.isMutating)
-        this._adHocAnnotations = this.buildAdHocMap(mutatingNodes)
+        // For interface/type nodes, inline definition uses only original annotations.
+        // Mutating annotate overrides are applied via renderMutatingAnnotates().
         this.annotateType(node.getDefinition(), node.id)
-        this._adHocAnnotations = null
         this.indent().defineMetadata(node).unindent()
         this.writeln()
       }
@@ -550,25 +549,16 @@ export class JsRenderer extends BaseRenderer {
   }
 
   defineMetadata(node: SemanticNode) {
-    const annotations = this.doc.evalAnnotationsForNode(node)
-    // Collect ad-hoc annotation names to overwrite originals
-    let adHocNames: Set<string> | undefined
-    let adHoc: TAnnotationTokens[] | undefined
+    let annotations = this.doc.evalAnnotationsForNode(node)
+    // Merge ad-hoc annotations (from annotate blocks) with original annotations
     if (this._adHocAnnotations && this._propPath.length > 0) {
       const path = this._propPath.join('.')
-      adHoc = this._adHocAnnotations.get(path)
+      const adHoc = this._adHocAnnotations.get(path)
       if (adHoc) {
-        adHocNames = new Set(adHoc.map(a => a.name))
+        annotations = this.doc.mergeNodesAnnotations(annotations, adHoc)
       }
     }
-    // Emit original annotations, skipping those overwritten by ad-hoc
     annotations?.forEach((an: TAnnotationTokens) => {
-      if (!adHocNames || !adHocNames.has(an.name)) {
-        this.resolveAnnotationValue(node, an)
-      }
-    })
-    // Emit ad-hoc annotations
-    adHoc?.forEach((an: TAnnotationTokens) => {
       this.resolveAnnotationValue(node, an)
     })
     return this
@@ -580,20 +570,12 @@ export class JsRenderer extends BaseRenderer {
    */
   defineMetadataForAnnotateAlias(annotateNode: SemanticAnnotateNode) {
     const annotateAnnotations = this.doc.evalAnnotationsForNode(annotateNode)
-    // Get the target's type-level annotations
     const targetDecl = this.doc.getDeclarationOwnerNode(annotateNode.targetName)
     const targetAnnotations = targetDecl?.node
       ? targetDecl.doc.evalAnnotationsForNode(targetDecl.node)
       : undefined
-    const overriddenNames = new Set(annotateAnnotations?.map(a => a.name))
-    // Emit target's annotations that aren't overridden
-    targetAnnotations?.forEach((an: TAnnotationTokens) => {
-      if (!overriddenNames.has(an.name)) {
-        this.resolveAnnotationValue(annotateNode, an)
-      }
-    })
-    // Emit annotate's own annotations
-    annotateAnnotations?.forEach((an: TAnnotationTokens) => {
+    const merged = this.doc.mergeNodesAnnotations(targetAnnotations, annotateAnnotations)
+    merged.forEach((an: TAnnotationTokens) => {
       this.resolveAnnotationValue(annotateNode, an)
     })
     return this
@@ -654,55 +636,162 @@ export class JsRenderer extends BaseRenderer {
   private renderMutatingAnnotates() {
     for (const node of this.mutatingAnnotates) {
       const targetName = node.targetName
+      const targetDef = this.resolveTargetDef(targetName)
+
       for (const entry of node.entries) {
         const anns = entry.annotations
         if (!anns || anns.length === 0) continue
 
-        // Build the navigation chain: Target.type.props.get('a')?.type.props.get('b')...
+        // Build the navigation chain at compile time
         const parts = entry.hasChain
           ? [entry.id!, ...entry.chain.map(c => c.text)]
           : [entry.id!]
-        let accessor = targetName
-        for (const part of parts) {
-          accessor += `.type.props.get("${escapeQuotes(part)}")?`
-        }
+        const accessors = this.buildMutatingAccessors(targetName, targetDef, parts)
 
-        for (const an of anns) {
-          const { value, multiple } = this.computeAnnotationValue(entry, an)
-          if (multiple) {
-            // For array-type annotations, push to existing array or create one
-            this.writeln(`{`)
-            this.indent()
-            this.writeln(`const __t = ${accessor}.metadata`)
-            this.writeln(`const __k = "${escapeQuotes(an.name)}"`)
-            this.writeln(`const __v = ${value}`)
-            this.writeln(`if (__t) { const __e = __t.get(__k); __t.set(__k, Array.isArray(__e) ? [...__e, __v] : __e !== undefined ? [__e, __v] : [__v]) }`)
-            this.unindent()
-            this.writeln(`}`)
-          } else {
-            this.writeln(`${accessor}.metadata.set("${escapeQuotes(an.name)}", ${value})`)
+        for (const accessor of accessors) {
+          const cleared = new Set<string>()
+          for (const an of anns) {
+            const { value, multiple } = this.computeAnnotationValue(entry, an)
+            if (multiple) {
+              // For multiple+replace: clear existing values before first append
+              if (!cleared.has(an.name)) {
+                const spec = this.doc.resolveAnnotation(an.name)
+                if (!spec || spec.config.mergeStrategy !== 'append') {
+                  this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
+                }
+                cleared.add(an.name)
+              }
+              this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
+            } else {
+              this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
+            }
           }
         }
       }
       // Top-level annotations on the annotate block mutate the target's metadata
       const topAnnotations = node.annotations
       if (topAnnotations && topAnnotations.length > 0) {
+        const cleared = new Set<string>()
         for (const an of topAnnotations) {
           const { value, multiple } = this.computeAnnotationValue(node, an)
           if (multiple) {
-            this.writeln(`{`)
-            this.indent()
-            this.writeln(`const __t = ${targetName}.metadata`)
-            this.writeln(`const __k = "${escapeQuotes(an.name)}"`)
-            this.writeln(`const __v = ${value}`)
-            this.writeln(`if (__t) { const __e = __t.get(__k); __t.set(__k, Array.isArray(__e) ? [...__e, __v] : __e !== undefined ? [__e, __v] : [__v]) }`)
-            this.unindent()
-            this.writeln(`}`)
+            if (!cleared.has(an.name)) {
+              const spec = this.doc.resolveAnnotation(an.name)
+              if (!spec || spec.config.mergeStrategy !== 'append') {
+                this.writeln(`${targetName}.metadata.delete("${escapeQuotes(an.name)}")`)
+              }
+              cleared.add(an.name)
+            }
+            this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
           } else {
-            this.writeln(`${targetName}.metadata.set("${escapeQuotes(an.name)}", ${value})`)
+            this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value})`)
           }
         }
       }
     }
+  }
+
+  private resolveTargetDef(targetName: string): SemanticNode | undefined {
+    const unwound = this.doc.unwindType(targetName)
+    if (!unwound?.def) return undefined
+    let def = unwound.def
+    if (isInterface(def)) {
+      def = def.getDefinition() || def
+    }
+    return def
+  }
+
+  /**
+   * Builds the runtime accessor paths for mutating annotate entries.
+   * Computes exact paths at compile time by walking the AST,
+   * so the generated JS accesses props directly without runtime search.
+   * Returns multiple paths when a property appears in multiple union branches.
+   */
+  private buildMutatingAccessors(
+    targetName: string,
+    targetDef: SemanticNode | undefined,
+    parts: string[]
+  ): string[] {
+    let accessors = [{ prefix: targetName + '.type', def: targetDef }]
+
+    for (let i = 0; i < parts.length; i++) {
+      const nextAccessors: { prefix: string; def: SemanticNode | undefined }[] = []
+      for (const { prefix, def } of accessors) {
+        const results = this.buildPropPaths(def, parts[i])
+        if (results.length > 0) {
+          for (const result of results) {
+            if (i < parts.length - 1) {
+              nextAccessors.push({ prefix: prefix + result.path + '?.type', def: result.propDef })
+            } else {
+              nextAccessors.push({ prefix: prefix + result.path + '?', def: result.propDef })
+            }
+          }
+        } else {
+          // Fallback for unresolvable paths
+          const suffix = `.props.get("${escapeQuotes(parts[i])}")` + (i < parts.length - 1 ? '?.type' : '?')
+          nextAccessors.push({ prefix: prefix + suffix, def: undefined })
+        }
+      }
+      accessors = nextAccessors
+    }
+
+    return accessors.map(a => a.prefix)
+  }
+
+  /**
+   * Finds a property in a type tree at compile time, returning all
+   * matching runtime path strings and prop definitions for further chaining.
+   * Returns multiple results when the same property appears in different union branches.
+   */
+  private buildPropPaths(
+    def: SemanticNode | undefined,
+    propName: string
+  ): { path: string; propDef: SemanticNode | undefined }[] {
+    if (!def) return []
+
+    // Merge intersections into structures
+    def = this.doc.mergeIntersection(def)
+
+    // Resolve refs
+    if (isRef(def)) {
+      const ref = def as SemanticRefNode
+      const unwound = this.doc.unwindType(ref.id!, ref.chain)?.def
+      return this.buildPropPaths(unwound, propName)
+    }
+
+    // Interface → get its structure
+    if (isInterface(def)) {
+      return this.buildPropPaths(def.getDefinition(), propName)
+    }
+
+    // Structure → direct prop access
+    if (isStructure(def)) {
+      const prop = def.props.get(propName) as SemanticPropNode | undefined
+      if (prop) {
+        return [{
+          path: `.props.get("${escapeQuotes(propName)}")`,
+          propDef: prop.getDefinition(),
+        }]
+      }
+      return []
+    }
+
+    // Group (union/intersection/tuple) → search all items
+    if (isGroup(def)) {
+      const group = def as SemanticGroup
+      const items = group.unwrap()
+      const results: { path: string; propDef: SemanticNode | undefined }[] = []
+      for (let i = 0; i < items.length; i++) {
+        for (const result of this.buildPropPaths(items[i], propName)) {
+          results.push({
+            path: `.items[${i}].type${result.path}`,
+            propDef: result.propDef,
+          })
+        }
+      }
+      return results
+    }
+
+    return []
   }
 }

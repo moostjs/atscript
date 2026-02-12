@@ -1,6 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
-import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 import { MyInterface } from "./annotate-nonmutating.as"
 
 export class ImportedAnnotated {

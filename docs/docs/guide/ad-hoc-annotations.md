@@ -1,6 +1,6 @@
 # Ad-hoc Annotations
 
-Ad-hoc annotations let you attach metadata to an existing interface or type without modifying its original definition. This is useful when the original type is defined in another file, shared across modules, or when you need context-specific metadata variations.
+Ad-hoc annotations let you attach metadata to an existing interface or type without modifying its original definition. This works with both `interface` and `type` definitions, including primitive-based types and union types. This is useful when the original type is defined in another file, shared across modules, or when you need context-specific metadata variations.
 
 ## Syntax
 
@@ -96,6 +96,58 @@ annotate User {
 This sets `User.metadata.get("meta.description")` to `"Admin user"` at runtime.
 
 For non-mutating annotate, top-level annotations on the alias replace the original's. Annotations from the original that are not overridden are carried over to the alias.
+
+## Annotating Types
+
+The examples above use `interface` targets, but ad-hoc annotations work equally well with `type` definitions.
+
+### Primitive-based Types
+
+For types based on primitives or primitive unions, use top-level annotations with an empty block:
+
+```atscript
+export type Username = string | number
+
+// Mutating: adds a label to Username itself
+@meta.label 'User Name'
+annotate Username {}
+
+// Non-mutating: creates a labeled alias
+@meta.label 'Form Name'
+export annotate Username as FormName {}
+```
+
+Since primitive types have no properties, the block body is empty — only top-level annotations apply.
+
+### Union Types with Properties
+
+For types that are unions of object structures, you can annotate properties by name. The compiler resolves each property across all union branches:
+
+```atscript
+type Response = {
+    status: string
+    data: string
+} | {
+    status: string
+    error: string
+}
+
+annotate Response {
+    @meta.label 'Status'
+    status
+}
+```
+
+When a property like `status` appears in multiple union branches, the annotation is applied to every matching branch at runtime.
+
+Properties that don't exist in any branch are reported as errors:
+
+```atscript
+annotate Response {
+    @meta.label 'Color'
+    color              // Error: unknown property "color" in "Response"
+}
+```
 
 ## Cross-file Usage
 

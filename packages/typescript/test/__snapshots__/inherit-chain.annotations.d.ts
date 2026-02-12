@@ -29,6 +29,7 @@ declare global {
     labelOptional: string | true
     mul: (number)[]
     mulOptional: (number | true)[]
+    mulAppend: (string)[]
     obj: { prop1: string, prop2?: number, prop3?: boolean }
     fromTType: boolean
     from: string

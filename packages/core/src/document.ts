@@ -722,7 +722,10 @@ export class AtscriptDoc {
             ? [t.text, ...t.parentNode.chain.map(c => c.text)]
             : [t.text]
           const unwound = this.unwindType(targetName, chain)
-          if (!unwound?.def && !this.resolveChainWithMerge(targetName, chain)) {
+          // unwindType may return the group node itself when it can't resolve
+          // the chain through a union/intersection — treat that as unresolved
+          const chainResolved = unwound?.def && !isGroup(unwound.def)
+          if (!chainResolved && !this.resolveChainWithMerge(targetName, chain)) {
             const lastToken = chain.length > 1 && isRef(t.parentNode)
               ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
               : t
@@ -738,7 +741,8 @@ export class AtscriptDoc {
               const token = t.parentNode.chain[i]
               const memberChain = [t.text, ...t.parentNode.chain.slice(0, i + 1).map(c => c.text)]
               const decl = this.unwindType(targetName, memberChain)
-              if (!decl?.def && !this.resolveChainWithMerge(targetName, memberChain)) {
+              const memberResolved = decl?.def && !isGroup(decl.def)
+              if (!memberResolved && !this.resolveChainWithMerge(targetName, memberChain)) {
                 this._allMessages.push({
                   severity: 1,
                   message: `Unknown property "${memberChain.join('.')}" in "${targetName}"`,
@@ -807,11 +811,31 @@ export class AtscriptDoc {
         const next = def.props.get(prop)
         if (!next) return false
         def = next.getDefinition() || next
+      } else if (isGroup(def)) {
+        // Search union/intersection items for the prop
+        const found = this.findPropInGroup(def as SemanticGroup, prop)
+        if (!found) return false
+        def = found
       } else {
         return false
       }
     }
     return true
+  }
+
+  private findPropInGroup(group: SemanticGroup, propName: string): SemanticNode | undefined {
+    for (const item of group.unwrap()) {
+      const merged = this.mergeIntersection(item)
+      if (isStructure(merged) || isInterface(merged)) {
+        const prop = merged.props.get(propName)
+        if (prop) return prop.getDefinition() || prop
+      }
+      if (isGroup(merged)) {
+        const found = this.findPropInGroup(merged as SemanticGroup, propName)
+        if (found) return found
+      }
+    }
+    return undefined
   }
 
   mergeIntersection(node: SemanticNode): SemanticNode {
@@ -965,14 +989,14 @@ export class AtscriptDoc {
     // Add annotations from the right array first (higher priority)
     for (const a of right || []) {
       annotations.push(a)
-      savedAnnotations.add(a.token.text!)
+      savedAnnotations.add(a.name)
     }
 
     // Add annotations from the left array only if they are not already in the set
     for (const a of left || []) {
-      const spec = this.resolveAnnotation(a.token.text!)
+      const spec = this.resolveAnnotation(a.name)
       let append = spec && spec.config.multiple && spec.config.mergeStrategy === 'append'
-      if (append || !savedAnnotations.has(a.token.text!)) {
+      if (append || !savedAnnotations.has(a.name)) {
         annotations.push(a)
       }
     }

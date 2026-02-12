@@ -1,4 +1,4 @@
-export { defineAnnotatedType, isAnnotatedType, isAnnotatedTypeOfPrimitive } from './annotated-type'
+export { annotate, defineAnnotatedType, isAnnotatedType, isAnnotatedTypeOfPrimitive } from './annotated-type'
 export type {
   TAnnotatedTypeHandle,
   TAtscriptAnnotatedType,

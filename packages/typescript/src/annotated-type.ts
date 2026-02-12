@@ -66,6 +66,33 @@ export function isAnnotatedType(type: any): type is TAtscriptAnnotatedType {
   return type && type.__is_atscript_annotated_type
 }
 
+/**
+ * Standalone annotate function that handles both replace and append (array) strategies.
+ * Used by the handle's .annotate() method and by generated mutation statements.
+ */
+export function annotate<K extends keyof AtscriptMetadata>(
+  metadata: TMetadataMap<AtscriptMetadata> | undefined,
+  key: K,
+  value: AtscriptMetadata[K] extends (infer E)[] ? E : AtscriptMetadata[K],
+  asArray?: boolean
+): void {
+  if (!metadata) return
+  if (asArray) {
+    if (metadata.has(key)) {
+      const a = metadata.get(key)
+      if (Array.isArray(a)) {
+        a.push(value as any)
+      } else {
+        metadata.set(key, [a, value] as any)
+      }
+    } else {
+      metadata.set(key, [value] as any)
+    }
+  } else {
+    metadata.set(key, value as any)
+  }
+}
+
 type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
 
 export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHandle {
@@ -182,20 +209,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       return this
     },
     annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {
-      if (asArray) {
-        if (this.$metadata.has(key)) {
-          const a = this.$metadata.get(key)
-          if (Array.isArray(a)) {
-            a.push(value)
-          } else {
-            this.$metadata.set(key, [a, value])
-          }
-        } else {
-          this.$metadata.set(key, [value])
-        }
-      } else {
-        this.$metadata.set(key, value)
-      }
+      annotate(this.$metadata, key, value, asArray)
       return this
     },
   }

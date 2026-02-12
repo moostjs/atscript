@@ -196,24 +196,38 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.renderJsDoc(node)
-    this.write(exported ? 'export declare ' : 'declare ')
-    this.writeln(`class ${node.id!} extends ${targetName} {}`)
-    this.writeln()
+
+    if (this.isTypeTarget(targetName)) {
+      // Target is a type — render as type alias + namespace
+      this.write(exported ? 'export ' : 'declare ')
+      this.write(`type ${node.id!} = ${targetName}`)
+      this.writeln()
+      const unwound = this.doc.unwindType(targetName)
+      this.renderTypeNamespaceFor(node.id!, unwound?.def)
+    } else {
+      // Target is an interface — render as class extends
+      this.write(exported ? 'export declare ' : 'declare ')
+      this.writeln(`class ${node.id!} extends ${targetName} {}`)
+      this.writeln()
+    }
   }
 
   renderTypeNamespace(node: SemanticTypeNode) {
-    this.write(`declare namespace ${node.id!} `)
+    this.renderTypeNamespaceFor(node.id!, node.getDefinition())
+  }
+
+  private renderTypeNamespaceFor(name: string, inputDef?: SemanticNode) {
+    this.write(`declare namespace ${name} `)
     this.blockln('{}')
-    const def = node.getDefinition()
     let typeDef = 'TAtscriptTypeDef'
-    if (def) {
-      let realDef = def
-      if (isRef(def)) {
-        realDef = this.doc.unwindType(def.id!, def.chain)?.def || realDef
+    if (inputDef) {
+      let realDef = inputDef
+      if (isRef(inputDef)) {
+        realDef = this.doc.unwindType(inputDef.id!, inputDef.chain)?.def || realDef
       }
       realDef = this.doc.mergeIntersection(realDef)
       if (isStructure(realDef) || isInterface(realDef)) {
-        typeDef = `TAtscriptTypeObject<keyof ${node.id!}>`
+        typeDef = `TAtscriptTypeObject<keyof ${name}>`
       } else if (isGroup(realDef)) {
         typeDef = 'TAtscriptTypeComplex'
       } else if (isArray(realDef)) {
@@ -226,10 +240,22 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, ${node.id!}>`
+      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, ${name}>`
     )
     this.writeln('const toJsonSchema: () => any')
     this.popln()
+  }
+
+  private isTypeTarget(name: string, doc?: AtscriptDoc): boolean {
+    const d = doc || this.doc
+    const decl = d.getDeclarationOwnerNode(name)
+    if (!decl?.node) return false
+    if (decl.node.entity === 'type') return true
+    if (decl.node.entity === 'interface') return false
+    if (decl.node.entity === 'annotate') {
+      return this.isTypeTarget((decl.node as SemanticAnnotateNode).targetName, decl.doc)
+    }
+    return false
   }
 
   renderJsDoc(node: SemanticNode) {

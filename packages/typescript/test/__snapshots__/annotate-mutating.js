@@ -1,6 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
-import { defineAnnotatedType as $, buildJsonSchema as $$ } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, buildJsonSchema as $$ } from "@atscript/typescript/utils"
 
 export class MyInterface {
   static __is_atscript_annotated_type = true
@@ -16,14 +16,12 @@ $("object", MyInterface)
     "name",
     $().designType("string")
       .tags("string")
-      .annotate("label", "Mutated Name")
-      .annotate("mul", 42, true)
+      .annotate("label", "Original Name")
       .$type
   ).prop(
     "age",
     $().designType("number")
       .tags("number")
-      .annotate("label", "Mutated Age")
       .$type
   ).prop(
     "email",
@@ -43,20 +41,15 @@ $("object", MyInterface)
         "city",
         $().designType("string")
           .tags("string")
-          .annotate("label", "Mutated City")
           .$type
       )
       .$type
   )
 
-MyInterface.type.props.get("name")?.metadata.set("label", "Mutated Name")
-{
-  const __t = MyInterface.type.props.get("name")?.metadata
-  const __k = "mul"
-  const __v = 42
-  if (__t) { const __e = __t.get(__k); __t.set(__k, Array.isArray(__e) ? [...__e, __v] : __e !== undefined ? [__e, __v] : [__v]) }
-}
-MyInterface.type.props.get("age")?.metadata.set("label", "Mutated Age")
-MyInterface.type.props.get("address")?.type.props.get("city")?.metadata.set("label", "Mutated City")
-MyInterface.metadata.set("meta.description", "Mutated Interface")
+$a(MyInterface.type.props.get("name")?.metadata, "label", "Mutated Name")
+MyInterface.type.props.get("name")?.metadata.delete("mul")
+$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)
+$a(MyInterface.type.props.get("age")?.metadata, "label", "Mutated Age")
+$a(MyInterface.type.props.get("address")?.type.props.get("city")?.metadata, "label", "Mutated City")
+$a(MyInterface.metadata, "meta.description", "Mutated Interface")
 // prettier-ignore-end

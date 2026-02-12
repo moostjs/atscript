@@ -319,6 +319,67 @@ annotate User {
     expect(entryErrors).toHaveLength(0)
   })
 
+  it('should report unknown property on primitive/combined type', () => {
+    const doc = new AtscriptDoc('test', { primitives })
+    doc.update(`
+type TString = string | number
+annotate TString {
+  unknownProp
+}
+`)
+    const messages = doc.getDiagMessages()
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        severity: 1,
+        message: 'Unknown property "unknownProp" in "TString"',
+      })
+    )
+  })
+
+  it('should report unknown property on union-of-objects type', () => {
+    const doc = new AtscriptDoc('test', { primitives })
+    doc.update(`
+type TO = {
+  name: string
+  age: number
+} | {
+  kind: string
+}
+annotate TO {
+  unknownProp
+}
+`)
+    const messages = doc.getDiagMessages()
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        severity: 1,
+        message: 'Unknown property "unknownProp" in "TO"',
+      })
+    )
+  })
+
+  it('should not report errors for valid entries on union-of-objects type', () => {
+    const doc = new AtscriptDoc('test', { primitives })
+    doc.update(`
+type TO = {
+  name: string
+  age: number
+} | {
+  kind: string
+}
+annotate TO {
+  name
+  age
+  kind
+}
+`)
+    const messages = doc.getDiagMessages()
+    const entryErrors = messages.filter(
+      m => m.message.includes('Unknown property') || m.message.includes('Unknown identifier')
+    )
+    expect(entryErrors).toHaveLength(0)
+  })
+
   it('should allow comments after entries', () => {
     const doc = new AtscriptDoc('test', { primitives })
     doc.update(`
