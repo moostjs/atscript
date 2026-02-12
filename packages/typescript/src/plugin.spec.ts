@@ -452,21 +452,34 @@ describe('ts-plugin', () => {
     )
     const js = out[0].content
 
-    // Split output into User and User2 sections for targeted assertions
-    const userSection = js.slice(js.indexOf('$("object", User)'), js.indexOf('$("object", User2)'))
+    // Split output into sections for targeted assertions
+    const userInline = js.slice(js.indexOf('$("object", User)'), js.indexOf('\n$a('))
+    const mutationSection = js.slice(js.indexOf('\n$a('), js.indexOf('$("object", User2)'))
     const user2Section = js.slice(js.indexOf('$("object", User2)'))
 
     // --- User inline definition (original annotations only, no ad-hoc merge) ---
-    expect(userSection).toContain('.annotate("label", "Original Name")')
-    expect(userSection).toContain('.annotate("mulAppend", "prop-original", true)')
-    expect(userSection).toContain('.annotate("mul", 1, true)')
-    expect(userSection).toContain('.annotate("mul", 2, true)')
+    expect(userInline).toContain('.annotate("label", "Original Name")')
+    expect(userInline).toContain('.annotate("mulAppend", "prop-original", true)')
+    expect(userInline).toContain('.annotate("mul", 1, true)')
+    expect(userInline).toContain('.annotate("mul", 2, true)')
     // Ad-hoc annotations are NOT in the inline definition
-    expect(userSection).not.toContain('"Mutated Name"')
-    expect(userSection).not.toContain('"prop-mutated"')
-    expect(userSection).not.toContain('.annotate("mul", 99')
+    expect(userInline).not.toContain('"Mutated Name"')
+    expect(userInline).not.toContain('"prop-mutated"')
+    expect(userInline).not.toContain('.annotate("mul", 99')
     // Top-level: only original
-    expect(userSection).toContain('\n  .annotate("mulAppend", "top-original", true)')
+    expect(userInline).toContain('\n  .annotate("mulAppend", "top-original", true)')
+
+    // --- Mutation statements (right after User, before User2) ---
+    // Replace (single): label mutation does NOT use asArray
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")')
+    expect(mutationSection).not.toContain('"label", "Mutated Name", true)')
+    // Replace (multiple): mul clears existing before appending
+    expect(mutationSection).toContain('metadata.delete("mul")')
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mul", 99, true)')
+    // Append: mulAppend does NOT clear, just appends
+    expect(mutationSection).not.toContain('metadata.delete("mulAppend")')
+    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)')
+    expect(mutationSection).toContain('$a(User.metadata, "mulAppend", "top-mutated", true)')
 
     // --- User2 inline definition (non-mutating annotate alias — merged) ---
     // Replace: label replaced to "Aliased Name"
@@ -482,19 +495,6 @@ describe('ts-plugin', () => {
     // Top-level: both aliased and original present (append)
     expect(user2Section).toContain('.annotate("mulAppend", "top-aliased", true)')
     expect(user2Section).toContain('.annotate("mulAppend", "top-original", true)')
-
-    // --- Mutation statements (mutating annotate) ---
-    const mutationSection = js.slice(js.indexOf('$a('))
-    // Replace (single): label mutation does NOT use asArray
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")')
-    expect(mutationSection).not.toContain('"label", "Mutated Name", true)')
-    // Replace (multiple): mul clears existing before appending
-    expect(mutationSection).toContain('metadata.delete("mul")')
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mul", 99, true)')
-    // Append: mulAppend does NOT clear, just appends
-    expect(mutationSection).not.toContain('metadata.delete("mulAppend")')
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)')
-    expect(mutationSection).toContain('$a(User.metadata, "mulAppend", "top-mutated", true)')
   })
 
   it('must render json schema method', async () => {

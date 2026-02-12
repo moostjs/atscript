@@ -46,10 +46,12 @@ $("object", MyInterface)
       .$type
   )
 
+// Ad-hoc annotations for MyInterface
 $a(MyInterface.type.props.get("name")?.metadata, "label", "Mutated Name")
 MyInterface.type.props.get("name")?.metadata.delete("mul")
 $a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)
 $a(MyInterface.type.props.get("age")?.metadata, "label", "Mutated Age")
 $a(MyInterface.type.props.get("address")?.type.props.get("city")?.metadata, "label", "Mutated City")
 $a(MyInterface.metadata, "meta.description", "Mutated Interface")
+
 // prettier-ignore-end

@@ -33,7 +33,6 @@ import { buildJsonSchema } from '../json-schema'
 
 export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
-  mutatingAnnotates = [] as SemanticAnnotateNode[]
   private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
   private _propPath: string[] = []
 
@@ -75,29 +74,31 @@ export class JsRenderer extends BaseRenderer {
     for (const node of this.postAnnotate) {
       if (node.entity === 'annotate') {
         const annotateNode = node as SemanticAnnotateNode
-        const unwound = this.doc.unwindType(annotateNode.targetName)
-        if (unwound?.def) {
-          let def = this.doc.mergeIntersection(unwound.def)
-          if (isInterface(def)) {
-            def = def.getDefinition() || def
+        if (annotateNode.isMutating) {
+          this.renderMutatingAnnotateNode(annotateNode)
+        } else {
+          const unwound = this.doc.unwindType(annotateNode.targetName)
+          if (unwound?.def) {
+            let def = this.doc.mergeIntersection(unwound.def)
+            if (isInterface(def)) {
+              def = def.getDefinition() || def
+            }
+            this._adHocAnnotations = this.buildAdHocMap([annotateNode])
+            this.annotateType(def, node.id)
+            this._adHocAnnotations = null
+            this.indent()
+            this.defineMetadataForAnnotateAlias(annotateNode)
+            this.unindent()
+            this.writeln()
           }
-          this._adHocAnnotations = this.buildAdHocMap([annotateNode])
-          this.annotateType(def, node.id)
-          this._adHocAnnotations = null
-          this.indent()
-          this.defineMetadataForAnnotateAlias(annotateNode)
-          this.unindent()
-          this.writeln()
         }
       } else {
         // For interface/type nodes, inline definition uses only original annotations.
-        // Mutating annotate overrides are applied via renderMutatingAnnotates().
         this.annotateType(node.getDefinition(), node.id)
         this.indent().defineMetadata(node).unindent()
         this.writeln()
       }
     }
-    this.renderMutatingAnnotates()
     this.writeln('// prettier-ignore-end')
     super.post()
   }
@@ -135,7 +136,7 @@ export class JsRenderer extends BaseRenderer {
 
   renderAnnotate(node: SemanticAnnotateNode): void {
     if (node.isMutating) {
-      this.mutatingAnnotates.push(node)
+      this.postAnnotate.push(node)
       return
     }
     const targetName = node.targetName
@@ -633,62 +634,62 @@ export class JsRenderer extends BaseRenderer {
     return { value: targetValue, multiple: !!multiple }
   }
 
-  private renderMutatingAnnotates() {
-    for (const node of this.mutatingAnnotates) {
-      const targetName = node.targetName
-      const targetDef = this.resolveTargetDef(targetName)
+  private renderMutatingAnnotateNode(node: SemanticAnnotateNode) {
+    const targetName = node.targetName
+    const targetDef = this.resolveTargetDef(targetName)
+    this.writeln('// Ad-hoc annotations for ', targetName)
+    for (const entry of node.entries) {
+      const anns = entry.annotations
+      if (!anns || anns.length === 0) continue
 
-      for (const entry of node.entries) {
-        const anns = entry.annotations
-        if (!anns || anns.length === 0) continue
+      // Build the navigation chain at compile time
+      const parts = entry.hasChain
+        ? [entry.id!, ...entry.chain.map(c => c.text)]
+        : [entry.id!]
+      const accessors = this.buildMutatingAccessors(targetName, targetDef, parts)
 
-        // Build the navigation chain at compile time
-        const parts = entry.hasChain
-          ? [entry.id!, ...entry.chain.map(c => c.text)]
-          : [entry.id!]
-        const accessors = this.buildMutatingAccessors(targetName, targetDef, parts)
-
-        for (const accessor of accessors) {
-          const cleared = new Set<string>()
-          for (const an of anns) {
-            const { value, multiple } = this.computeAnnotationValue(entry, an)
-            if (multiple) {
-              // For multiple+replace: clear existing values before first append
-              if (!cleared.has(an.name)) {
-                const spec = this.doc.resolveAnnotation(an.name)
-                if (!spec || spec.config.mergeStrategy !== 'append') {
-                  this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
-                }
-                cleared.add(an.name)
-              }
-              this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
-            } else {
-              this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
-            }
-          }
-        }
-      }
-      // Top-level annotations on the annotate block mutate the target's metadata
-      const topAnnotations = node.annotations
-      if (topAnnotations && topAnnotations.length > 0) {
+      for (const accessor of accessors) {
         const cleared = new Set<string>()
-        for (const an of topAnnotations) {
-          const { value, multiple } = this.computeAnnotationValue(node, an)
+        for (const an of anns) {
+          const { value, multiple } = this.computeAnnotationValue(entry, an)
           if (multiple) {
+            // For multiple+replace: clear existing values before first append
             if (!cleared.has(an.name)) {
               const spec = this.doc.resolveAnnotation(an.name)
               if (!spec || spec.config.mergeStrategy !== 'append') {
-                this.writeln(`${targetName}.metadata.delete("${escapeQuotes(an.name)}")`)
+                this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
               }
               cleared.add(an.name)
             }
-            this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
+            this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
           } else {
-            this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value})`)
+            this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
           }
         }
       }
     }
+    // Top-level annotations on the annotate block mutate the target's metadata
+    const topAnnotations = node.annotations
+    if (topAnnotations && topAnnotations.length > 0) {
+      const cleared = new Set<string>()
+      for (const an of topAnnotations) {
+        const { value, multiple } = this.computeAnnotationValue(node, an)
+        if (multiple) {
+          if (!cleared.has(an.name)) {
+            const spec = this.doc.resolveAnnotation(an.name)
+            if (!spec || spec.config.mergeStrategy !== 'append') {
+              this.writeln(`${targetName}.metadata.delete("${escapeQuotes(an.name)}")`)
+            }
+            cleared.add(an.name)
+          }
+          this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
+        } else {
+          this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value})`)
+        }
+      }
+    }
+
+    this.writeln()
   }
 
   private resolveTargetDef(targetName: string): SemanticNode | undefined {

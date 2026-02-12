@@ -49,6 +49,9 @@ $("union", TString)
       .tags("number")
       .$type)
 
+// Ad-hoc annotations for TString
+$a(TString.metadata, "meta.label", "Labeled String")
+
 $("union", TString2)
   .item($().designType("string")
       .tags("string")
@@ -88,6 +91,11 @@ $("union", TO)
       )
       .$type)
 
+// Ad-hoc annotations for TO
+$a(TO.type.items[0].type.props.get("age")?.metadata, "meta.description", "Mutated Descr Age")
+$a(TO.type.items[1].type.props.get("kind")?.metadata, "meta.description", "Mutated Descr Kind")
+$a(TO.metadata, "meta.description", "Mutated Descr")
+
 $("union", TO2)
   .item($("object")
       .prop(
@@ -120,8 +128,4 @@ $("union", TO2)
       )
       .$type)
 
-$a(TString.metadata, "meta.label", "Labeled String")
-$a(TO.type.items[0].type.props.get("age")?.metadata, "meta.description", "Mutated Descr Age")
-$a(TO.type.items[1].type.props.get("kind")?.metadata, "meta.description", "Mutated Descr Kind")
-$a(TO.metadata, "meta.description", "Mutated Descr")
 // prettier-ignore-end

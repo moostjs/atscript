@@ -34,6 +34,13 @@ $("object", User)
   )
   .annotate("mulAppend", "top-original", true)
 
+// Ad-hoc annotations for User
+$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")
+$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)
+User.type.props.get("name")?.metadata.delete("mul")
+$a(User.type.props.get("name")?.metadata, "mul", 99, true)
+$a(User.metadata, "mulAppend", "top-mutated", true)
+
 $("object", User2)
   .prop(
     "name",
@@ -48,9 +55,4 @@ $("object", User2)
   .annotate("mulAppend", "top-aliased", true)
   .annotate("mulAppend", "top-original", true)
 
-$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")
-$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)
-User.type.props.get("name")?.metadata.delete("mul")
-$a(User.type.props.get("name")?.metadata, "mul", 99, true)
-$a(User.metadata, "mulAppend", "top-mutated", true)
 // prettier-ignore-end
