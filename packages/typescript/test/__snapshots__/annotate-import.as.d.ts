@@ -24,7 +24,7 @@ export declare class ImportedAnnotated {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ImportedAnnotated>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ImportedAnnotated>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof ImportedAnnotated>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

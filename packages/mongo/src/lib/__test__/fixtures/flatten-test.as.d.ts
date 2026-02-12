@@ -36,7 +36,7 @@ export declare class FlattenTest {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof FlattenTest>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = FlattenTest>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof FlattenTest>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

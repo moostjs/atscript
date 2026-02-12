@@ -18,7 +18,7 @@ declare class IA {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof IA>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = IA>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof IA>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -32,7 +32,7 @@ declare class IB {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof IB>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = IB>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof IB>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -45,7 +45,7 @@ declare namespace T {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof T>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = T>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, T>
   const toJsonSchema: () => any
 }
 
@@ -61,7 +61,7 @@ export declare class I1 {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof I1>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = I1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof I1>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

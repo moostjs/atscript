@@ -154,7 +154,7 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
       this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
       this.writeln(
-        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${asClass}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
+        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof ${asClass}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
       )
       this.writeln('static toJsonSchema: () => any')
     }
@@ -238,7 +238,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `const validator: <TT extends TAtscriptAnnotatedTypeConstructor = ${node.id!}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
+      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, ${node.id!}>`
     )
     this.writeln('const toJsonSchema: () => any')
     this.popln()

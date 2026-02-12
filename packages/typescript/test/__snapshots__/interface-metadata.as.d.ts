@@ -31,7 +31,7 @@ export declare class WithMetadata {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof WithMetadata>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithMetadata>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof WithMetadata>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -46,7 +46,7 @@ declare namespace SomeType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof SomeType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: <TT extends TAtscriptAnnotatedTypeConstructor = SomeType>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, SomeType>
   const toJsonSchema: () => any
 }
 // prettier-ignore-end

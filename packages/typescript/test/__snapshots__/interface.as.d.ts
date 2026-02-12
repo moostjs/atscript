@@ -56,7 +56,7 @@ export declare class PublicInterface {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof PublicInterface>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = PublicInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof PublicInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

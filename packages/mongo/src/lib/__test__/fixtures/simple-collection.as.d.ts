@@ -43,7 +43,7 @@ export declare class SimpleCollection {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof SimpleCollection>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = SimpleCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof SimpleCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -57,7 +57,7 @@ export declare class MinimalCollection {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof MinimalCollection>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = MinimalCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof MinimalCollection>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -71,7 +71,7 @@ export declare class MinimalCollectionString {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof MinimalCollectionString>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = MinimalCollectionString>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof MinimalCollectionString>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

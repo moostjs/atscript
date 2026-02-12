@@ -27,7 +27,7 @@ export declare class WithPatterns {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof WithPatterns>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithPatterns>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof WithPatterns>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -40,7 +40,7 @@ declare class WithPatterns2 {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof WithPatterns2>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = WithPatterns2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof WithPatterns2>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end

@@ -43,11 +43,11 @@ export interface TValidatorPluginContext {
   path: Validator<any>['path']
 }
 
-export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
+export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = InstanceType<T>> {
   protected opts: TValidatorOptions
 
   constructor(
-    protected readonly def: T | TAtscriptAnnotatedType<any>,
+    protected readonly def: T,
     opts?: Partial<TValidatorOptions>
   ) {
     this.opts = {
@@ -106,7 +106,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor> {
     throw new ValidatorError(this.errors)
   }
 
-  public validate<TT = T>(value: any, safe?: boolean): value is TT {
+  public validate<TT = IT>(value: any, safe?: boolean): value is TT {
     this.push('')
     this.errors = []
     this.stackErrors = []

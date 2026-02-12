@@ -23,7 +23,7 @@ export declare class MyInterface {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof MyInterface>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = MyInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof MyInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 
@@ -42,7 +42,7 @@ export declare class AnnotatedInterface {
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof AnnotatedInterface>
   static metadata: TMetadataMap<AtscriptMetadata>
-  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = AnnotatedInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
+  static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof AnnotatedInterface>(opts?: Partial<TValidatorOptions>) => Validator<TT>
   static toJsonSchema: () => any
 }
 // prettier-ignore-end
