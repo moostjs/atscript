@@ -39,7 +39,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TMetadataMap, Validator, TAtscriptAnnotatedTypeConstructor, TValidatorOptions } from "@atscript/typescript/utils"'
+      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TAtscriptAnnotatedType, TMetadataMap, Validator, TValidatorOptions } from "@atscript/typescript/utils"'
     )
   }
 
@@ -151,10 +151,10 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (asClass) {
       this.writeln('static __is_atscript_annotated_type: true')
-      this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}>`)
+      this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}, ${asClass}>`)
       this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
       this.writeln(
-        `static validator: <TT extends TAtscriptAnnotatedTypeConstructor = typeof ${asClass}>(opts?: Partial<TValidatorOptions>) => Validator<TT>`
+        `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
       )
       this.writeln('static toJsonSchema: () => any')
     }
@@ -173,6 +173,12 @@ export class TypeRenderer extends BaseRenderer {
     } else {
       this.writeln('{}')
     }
+    this.writeln()
+    const nsPrefix = exported ? 'export declare' : 'declare'
+    this.write(`${nsPrefix} namespace ${node.id!} `)
+    this.blockln('{}')
+    this.writeln(`type DataType = ${node.id!}`)
+    this.popln()
     this.writeln()
   }
 
@@ -208,6 +214,11 @@ export class TypeRenderer extends BaseRenderer {
       // Target is an interface — render as class extends
       this.write(exported ? 'export declare ' : 'declare ')
       this.writeln(`class ${node.id!} extends ${targetName} {}`)
+      const nsPrefix = exported ? 'export declare' : 'declare'
+      this.write(`${nsPrefix} namespace ${node.id!} `)
+      this.blockln('{}')
+      this.writeln(`type DataType = ${node.id!}`)
+      this.popln()
       this.writeln()
     }
   }
@@ -227,20 +238,21 @@ export class TypeRenderer extends BaseRenderer {
       }
       realDef = this.doc.mergeIntersection(realDef)
       if (isStructure(realDef) || isInterface(realDef)) {
-        typeDef = `TAtscriptTypeObject<keyof ${name}>`
+        typeDef = `TAtscriptTypeObject<keyof ${name}, ${name}>`
       } else if (isGroup(realDef)) {
-        typeDef = 'TAtscriptTypeComplex'
+        typeDef = `TAtscriptTypeComplex<${name}>`
       } else if (isArray(realDef)) {
-        typeDef = 'TAtscriptTypeArray'
+        typeDef = `TAtscriptTypeArray<${name}>`
       } else if (isPrimitive(realDef)) {
-        typeDef = 'TAtscriptTypeFinal'
+        typeDef = `TAtscriptTypeFinal<${name}>`
       }
     }
+    this.writeln(`type DataType = ${name}`)
     this.writeln(`const __is_atscript_annotated_type: true`)
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedTypeConstructor, ${name}>`
+      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, ${name}>`
     )
     this.writeln('const toJsonSchema: () => any')
     this.popln()

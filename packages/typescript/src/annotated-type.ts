@@ -1,30 +1,44 @@
 import { Validator, type TValidatorOptions } from './validator'
 
 // eslint-disable max-lines
-export interface TAtscriptTypeComplex {
+
+/** Type definition for union, intersection, or tuple types. */
+export interface TAtscriptTypeComplex<DataType = unknown> {
   kind: 'union' | 'intersection' | 'tuple'
   items: TAtscriptAnnotatedType[]
 
   tags: Set<AtscriptPrimitiveTags>
+
+  /** @internal phantom — carries the DataType at the type level, never set at runtime */
+  __dataType?: DataType
 }
 
-export interface TAtscriptTypeArray {
+/** Type definition for array types. */
+export interface TAtscriptTypeArray<DataType = unknown[]> {
   kind: 'array'
   of: TAtscriptAnnotatedType
 
   tags: Set<AtscriptPrimitiveTags>
+
+  /** @internal phantom — carries the DataType at the type level, never set at runtime */
+  __dataType?: DataType
 }
 
-export interface TAtscriptTypeObject<K extends string = string> {
+/** Type definition for object types with named and pattern-matched properties. */
+export interface TAtscriptTypeObject<K extends string = string, DataType = Record<K, unknown>> {
   kind: 'object'
 
   props: Map<K, TAtscriptAnnotatedType>
   propsPatterns: { pattern: RegExp; def: TAtscriptAnnotatedType }[]
 
   tags: Set<AtscriptPrimitiveTags>
+
+  /** @internal phantom — carries the DataType at the type level, never set at runtime */
+  __dataType?: DataType
 }
 
-export interface TAtscriptTypeFinal {
+/** Type definition for primitive/literal types (string, number, boolean, null, etc.). */
+export interface TAtscriptTypeFinal<DataType = unknown> {
   kind: ''
 
   /**
@@ -38,24 +52,41 @@ export interface TAtscriptTypeFinal {
   value?: string | number | boolean
 
   tags: Set<AtscriptPrimitiveTags>
+
+  /** @internal phantom — carries the DataType at the type level, never set at runtime */
+  __dataType?: DataType
 }
 
-export type TAtscriptTypeDef =
-  | TAtscriptTypeComplex
-  | TAtscriptTypeFinal
-  | TAtscriptTypeArray
-  | TAtscriptTypeObject<string>
+/**
+ * Extract DataType from a type def's phantom generic
+ */
+export type InferDataType<T> = T extends { __dataType?: infer D } ? D : unknown
 
-export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef> {
+/** Union of all possible type definition shapes. */
+export type TAtscriptTypeDef<DataType = unknown> =
+  | TAtscriptTypeComplex<DataType>
+  | TAtscriptTypeFinal<DataType>
+  | TAtscriptTypeArray<DataType>
+  | TAtscriptTypeObject<string, DataType>
+
+/**
+ * Core annotated type — wraps a type definition with metadata and a validator factory.
+ *
+ * Generated `.as` files produce classes/namespaces that conform to this interface.
+ * The `DataType` phantom generic carries the TypeScript data shape for type-safe validation.
+ *
+ * @typeParam T - The underlying type definition (e.g. {@link TAtscriptTypeObject}).
+ * @typeParam DataType - The TypeScript type the validated data narrows to (auto-inferred from `T`).
+ */
+export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<T>> {
   __is_atscript_annotated_type: true
   type: T
-  validator: <TT extends TAtscriptAnnotatedTypeConstructor>(
-    opts?: Partial<TValidatorOptions>
-  ) => Validator<TT>
+  validator: (opts?: Partial<TValidatorOptions>) => Validator
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
 }
 
+/** An annotated type that is also a class constructor (i.e. a generated interface class). */
 export type TAtscriptAnnotatedTypeConstructor = TAtscriptAnnotatedType &
   (new (...args: any[]) => any)
 
@@ -95,6 +126,25 @@ export function annotate<K extends keyof AtscriptMetadata>(
 
 type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
 
+/**
+ * Creates a builder handle for constructing a {@link TAtscriptAnnotatedType} at runtime.
+ *
+ * This is primarily used by generated `.as.js` code. The returned handle provides
+ * a fluent API for setting the type definition, metadata, and properties.
+ *
+ * @example
+ * ```ts
+ * const handle = defineAnnotatedType('object')
+ *   .prop('name', defineAnnotatedType().designType('string').$type)
+ *   .prop('age', defineAnnotatedType().designType('number').$type)
+ *
+ * handle.$type // the resulting TAtscriptAnnotatedType
+ * ```
+ *
+ * @param _kind - The kind of type to create (e.g. `'object'`, `'array'`, `'union'`). Defaults to `''` (primitive/final).
+ * @param base - Optional existing object to augment with annotated type fields.
+ * @returns A builder handle for fluent type construction.
+ */
 export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHandle {
   const kind = _kind || ''
   const type = (base?.type || {}) as { kind: TKind } & Omit<TAtscriptTypeComplex, 'kind'> &
@@ -116,8 +166,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       __is_atscript_annotated_type: true,
       metadata,
       type,
-      validator(opts?: TValidatorOptions) {
-        return new Validator(this as unknown as TAtscriptAnnotatedTypeConstructor, opts)
+      validator(opts?: Partial<TValidatorOptions>) {
+        return new Validator(this as TAtscriptAnnotatedType, opts)
       },
     })
   } else {
@@ -125,8 +175,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       __is_atscript_annotated_type: true,
       metadata,
       type,
-      validator(opts?: TValidatorOptions) {
-        return new Validator(this, opts)
+      validator(opts?: Partial<TValidatorOptions>) {
+        return new Validator(this as TAtscriptAnnotatedType, opts)
       },
     }
   }
@@ -200,7 +250,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
           type: newBase.type,
           metadata,
           validator(opts?: Partial<TValidatorOptions>) {
-            return new Validator(this as TAtscriptAnnotatedTypeConstructor, opts) as Validator<any>
+            return new Validator(this as TAtscriptAnnotatedType, opts)
           },
         }
       } else {
@@ -227,6 +277,7 @@ export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]>
   set<K extends keyof O>(key: K, value: O[K]): this
 }
 
+/** Fluent builder handle returned by {@link defineAnnotatedType}. */
 export interface TAnnotatedTypeHandle {
   $type: TAtscriptAnnotatedType
   $def: {
@@ -250,6 +301,12 @@ export interface TAnnotatedTypeHandle {
   annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean): TAnnotatedTypeHandle
 }
 
+/**
+ * Checks whether an annotated type resolves to a primitive (non-object, non-array) shape.
+ *
+ * Returns `true` for final types and for unions/intersections/tuples
+ * whose members are all primitives.
+ */
 export function isAnnotatedTypeOfPrimitive(t: TAtscriptAnnotatedType) {
   if (['array', 'object'].includes(t.type.kind)) {
     return false

@@ -1,23 +1,34 @@
-import {
-  TAtscriptAnnotatedType,
-  TAtscriptTypeArray,
-  TAtscriptTypeComplex,
-  TAtscriptTypeFinal,
-  TAtscriptTypeObject,
-} from './annotated-type'
+import type { TAtscriptAnnotatedType } from './annotated-type'
+import { forAnnotatedType } from './traverse'
 
+/** A JSON Schema object (draft-compatible). */
 export type TJsonSchema = Record<string, any>
 
+/**
+ * Builds a JSON Schema from an {@link TAtscriptAnnotatedType}.
+ *
+ * Translates the atscript type structure and validation metadata
+ * (min/max, patterns, integer constraints, etc.) into a standard JSON Schema.
+ *
+ * @example
+ * ```ts
+ * import { buildJsonSchema } from '@atscript/typescript'
+ *
+ * const schema = buildJsonSchema(MyInterface)
+ * // { type: 'object', properties: { ... }, required: [...] }
+ * ```
+ *
+ * @param type - The annotated type to convert.
+ * @returns A JSON Schema object.
+ */
 export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
   const build = (def: TAtscriptAnnotatedType): TJsonSchema => {
-    const t = def.type as any
     const meta = def.metadata
-    switch (t.kind) {
-      case 'object': {
-        const obj = t as TAtscriptTypeObject<string>
+    return forAnnotatedType(def, {
+      object(d) {
         const properties: Record<string, TJsonSchema> = {}
         const required: string[] = []
-        for (const [key, val] of obj.props.entries()) {
+        for (const [key, val] of d.type.props.entries()) {
           properties[key] = build(val)
           if (!val.optional) {
             required.push(key)
@@ -28,10 +39,9 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           schema.required = required
         }
         return schema
-      }
-      case 'array': {
-        const arr = t as TAtscriptTypeArray
-        const schema: TJsonSchema = { type: 'array', items: build(arr.of) }
+      },
+      array(d) {
+        const schema: TJsonSchema = { type: 'array', items: build(d.type.of) }
         const minLength = meta.get('expect.minLength')
         if (typeof minLength === 'number') {
           schema.minItems = minLength
@@ -41,27 +51,23 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           schema.maxItems = maxLength
         }
         return schema
-      }
-      case 'union': {
-        const grp = t as TAtscriptTypeComplex
-        return { anyOf: grp.items.map(build) }
-      }
-      case 'intersection': {
-        const grp = t as TAtscriptTypeComplex
-        return { allOf: grp.items.map(build) }
-      }
-      case 'tuple': {
-        const grp = t as TAtscriptTypeComplex
-        return { type: 'array', items: grp.items.map(build), additionalItems: false }
-      }
-      case '': {
-        const fin = t as TAtscriptTypeFinal
+      },
+      union(d) {
+        return { anyOf: d.type.items.map(build) }
+      },
+      intersection(d) {
+        return { allOf: d.type.items.map(build) }
+      },
+      tuple(d) {
+        return { type: 'array', items: d.type.items.map(build), additionalItems: false }
+      },
+      final(d) {
         const schema: TJsonSchema = {}
-        if (fin.value !== undefined) {
-          schema.const = fin.value
+        if (d.type.value !== undefined) {
+          schema.const = d.type.value
         }
-        if (fin.designType && fin.designType !== 'any') {
-          schema.type = fin.designType === 'undefined' ? 'null' : fin.designType
+        if (d.type.designType && d.type.designType !== 'any') {
+          schema.type = d.type.designType === 'undefined' ? 'null' : d.type.designType
           if (schema.type === 'number' && meta.get('expect.int')) {
             schema.type = 'integer'
           }
@@ -95,10 +101,8 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           }
         }
         return schema
-      }
-      default:
-        return {}
-    }
+      },
+    })
   }
   return build(type)
 }

@@ -3,12 +3,12 @@
 import {
   isAnnotatedType,
   TAtscriptAnnotatedType,
-  TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeArray,
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
+import { forAnnotatedType } from './traverse'
 
 interface TError {
   path: string
@@ -16,12 +16,19 @@ interface TError {
   details?: TError[]
 }
 
+/**
+ * A plugin function that can intercept validation.
+ *
+ * Return `true` to accept the value, `false` to reject it,
+ * or `undefined` to fall through to the default validation.
+ */
 export type TValidatorPlugin = (
   ctx: TValidatorPluginContext,
   def: TAtscriptAnnotatedType,
   value: any
 ) => boolean | undefined
 
+/** Options for configuring {@link Validator} behavior. */
 export interface TValidatorOptions {
   partial:
     | boolean
@@ -36,6 +43,7 @@ export interface TValidatorOptions {
 
 const regexCache = new Map<string, RegExp>()
 
+/** Context exposed to {@link TValidatorPlugin} functions. */
 export interface TValidatorPluginContext {
   opts: Validator<any>['opts']
   validateAnnotatedType: Validator<any>['validateAnnotatedType']
@@ -43,7 +51,28 @@ export interface TValidatorPluginContext {
   path: Validator<any>['path']
 }
 
-export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = InstanceType<T>> {
+/**
+ * Validates values against an {@link TAtscriptAnnotatedType} definition.
+ *
+ * `DataType` is automatically inferred from the type definition's phantom generic,
+ * enabling the {@link validate} method to act as a type guard.
+ *
+ * @example
+ * ```ts
+ * // From a generated interface class:
+ * const validator = new Validator(MyInterface)
+ * if (validator.validate(data, true)) {
+ *   data // narrowed to MyInterface
+ * }
+ *
+ * // Or use the built-in factory:
+ * MyInterface.validator().validate(data)
+ * ```
+ *
+ * @typeParam T - The annotated type definition.
+ * @typeParam DataType - The TypeScript type that `validate` narrows to (auto-inferred).
+ */
+export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
   protected opts: TValidatorOptions
 
   constructor(
@@ -59,6 +88,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = Instanc
     }
   }
 
+  /** Validation errors collected during the last {@link validate} call. */
   public errors: TError[] = []
   protected stackErrors: TError[][] = []
   protected stackPath: string[] = []
@@ -106,7 +136,18 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = Instanc
     throw new ValidatorError(this.errors)
   }
 
-  public validate<TT = IT>(value: any, safe?: boolean): value is TT {
+  /**
+   * Validates a value against the type definition.
+   *
+   * Acts as a TypeScript type guard — when it returns `true`, the value
+   * is narrowed to `DataType`.
+   *
+   * @param value - The value to validate.
+   * @param safe - If `true`, returns `false` on failure instead of throwing.
+   * @returns `true` if the value matches the type definition.
+   * @throws {ValidatorError} When validation fails and `safe` is not `true`.
+   */
+  public validate<TT = DataType>(value: any, safe?: boolean): value is TT {
     this.push('')
     this.errors = []
     this.stackErrors = []
@@ -149,22 +190,14 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = Instanc
   }
 
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
-    switch (def.type.kind) {
-      case 'object':
-        return this.validateObject(def as TAtscriptAnnotatedType<TAtscriptTypeObject>, value)
-      case 'union':
-        return this.validateUnion(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      case 'intersection':
-        return this.validateIntersection(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      case 'tuple':
-        return this.validateTuple(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      case 'array':
-        return this.validateArray(def as TAtscriptAnnotatedType<TAtscriptTypeArray>, value)
-      case '':
-        return this.validatePrimitive(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>, value)
-      default:
-        throw new Error(`Unknown type "${(def.type as { kind: string }).kind}"`)
-    }
+    return forAnnotatedType(def, {
+      final: d => this.validatePrimitive(d, value),
+      object: d => this.validateObject(d, value),
+      array: d => this.validateArray(d, value),
+      union: d => this.validateUnion(d, value),
+      intersection: d => this.validateIntersection(d, value),
+      tuple: d => this.validateTuple(d, value),
+    })
   }
 
   protected validateUnion(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
@@ -471,6 +504,7 @@ export class Validator<T extends TAtscriptAnnotatedTypeConstructor, IT = Instanc
   }
 }
 
+/** Error thrown by {@link Validator.validate} when validation fails. Contains structured error details. */
 export class ValidatorError extends Error {
   name = 'Validation Error'
   constructor(public readonly errors: TError[]) {

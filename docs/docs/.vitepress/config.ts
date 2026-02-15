@@ -424,6 +424,8 @@ export default defineConfig({
             { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
             { text: 'Metadata Export', link: '/packages/typescript/metadata-export' },
             { text: 'Validation', link: '/packages/typescript/validation' },
+            { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
+            { text: 'Serialization', link: '/packages/typescript/serialization' },
             { text: 'CLI', link: '/packages/typescript/cli' },
           ],
         },
