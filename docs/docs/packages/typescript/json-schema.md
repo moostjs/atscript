@@ -93,6 +93,51 @@ export interface Product {
 }
 ```
 
+## Converting from JSON Schema
+
+You can also convert a JSON Schema object back into an Atscript annotated type using `fromJsonSchema`:
+
+```typescript
+import { fromJsonSchema, buildJsonSchema } from '@atscript/typescript/utils'
+
+const schema = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', minLength: 3 },
+    age: { type: 'number', minimum: 0 }
+  },
+  required: ['name', 'age']
+}
+
+const type = fromJsonSchema(schema)
+
+// The result is a fully functional annotated type
+type.validator().validate({ name: 'Alice', age: 30 }) // passes
+
+// Round-trip: buildJsonSchema(fromJsonSchema(schema)) preserves the schema
+const roundTripped = buildJsonSchema(type)
+```
+
+`fromJsonSchema` supports the full subset of JSON Schema produced by `buildJsonSchema`, including:
+
+- Object types with `properties` and `required`
+- Arrays with `items`, `minItems`, `maxItems`
+- Tuples (array with `items` as an array and `additionalItems: false`)
+- Unions (`anyOf`, `oneOf`)
+- Intersections (`allOf`)
+- Primitives (`string`, `number`, `integer`, `boolean`, `null`)
+- Literals (`const`)
+- Enums (`enum` — converted to union of literals)
+- Constraints: `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`
+
+::: tip Use case: external schemas
+`fromJsonSchema` is useful for importing type definitions from external JSON Schema sources (OpenAPI specs, form generators, etc.) and using them with Atscript's validator at runtime.
+:::
+
+::: warning Unsupported features
+`$ref` is not supported — dereference your schema before passing it to `fromJsonSchema`. Features like `not`, `if/then/else`, `patternProperties`, and `additionalProperties` have no Atscript equivalent and are silently ignored.
+:::
+
 ## Next Steps
 
 - [Validation](/packages/typescript/validation) — runtime validation with type guards

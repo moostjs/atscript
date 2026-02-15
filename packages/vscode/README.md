@@ -30,7 +30,8 @@ This extension provides first-class editor support for Atscript in VS Code.
 
 ## Documentation
 
-Full documentation is available at [atscript.moost.org](https://atscript.moost.org).
+- [Atscript Documentation](https://atscript.moost.org) — full language and tooling docs
+- [VSCode Extension Docs](https://atscript.moost.org/packages/vscode/) — installation, features, and configuration for this extension
 
 ## Feedback & Contributions
 

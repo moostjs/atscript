@@ -14,7 +14,7 @@ export type {
 
 export * from './validator'
 
-export { buildJsonSchema } from './json-schema'
+export { buildJsonSchema, fromJsonSchema } from './json-schema'
 
 export { forAnnotatedType } from './traverse'
 
