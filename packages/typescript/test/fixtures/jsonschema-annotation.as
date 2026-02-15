@@ -1,4 +1,4 @@
-@ts.buildJsonSchema
+@emit.jsonSchema
 export interface User {
   @expect.minLength 3
   @expect.maxLength 20

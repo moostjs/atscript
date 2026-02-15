@@ -25,7 +25,7 @@ declare global {
     "expect.max": number
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
-    "ts.buildJsonSchema": boolean
+    "emit.jsonSchema": boolean
     "mongo.collection": string
     "mongo.autoIndexes": boolean
     "mongo.index.plain": (string | true)[]

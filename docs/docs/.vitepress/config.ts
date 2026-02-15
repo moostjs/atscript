@@ -327,15 +327,13 @@ export default defineConfig({
         text: 'TypeScript',
         items: [
           { text: 'Guide', link: '/packages/typescript/' },
-          { text: 'MongoDB', link: '/packages/mongo/' },
-          { text: 'Moost', items: [
-            { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
-            { text: 'Moost Validator', link: '/packages/moost-validator/' },
-          ]},
+          // { text: 'MongoDB', link: '/packages/mongo/' },
+          // { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
+          { text: 'Moost Validator', link: '/packages/moost-validator/' },
         ],
       },
       { text: 'VSCode', link: '/packages/vscode/' },
-      { text: 'Plugin Development', link: '/plugin-development/' },
+      // { text: 'Plugin Development', link: '/plugin-development/' },
     ],
 
     sidebar: {
@@ -345,6 +343,7 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/packages/typescript/' },
             { text: 'Why Atscript?', link: '/packages/typescript/why-atscript' },
+            { text: 'Atscript Validation vs Others', link: '/packages/typescript/validation-comparison' },
             { text: 'Quick Start', link: '/packages/typescript/quick-start' },
           ],
         },
@@ -429,11 +428,9 @@ export default defineConfig({
           text: '@atscript/moost-validator',
           items: [
             { text: 'Overview', link: '/packages/moost-validator/' },
-            { text: 'Installation', link: '/packages/moost-validator/installation' },
-            { text: 'Configuration', link: '/packages/moost-validator/configuration' },
+            { text: 'Atscript vs Others', link: '/packages/moost-validator/why-atscript-validation' },
             { text: 'Validation Pipe', link: '/packages/moost-validator/validation-pipe' },
             { text: 'Error Handling', link: '/packages/moost-validator/error-handling' },
-            { text: 'Custom Validators', link: '/packages/moost-validator/custom-validators' },
           ],
         },
       ],

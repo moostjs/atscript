@@ -1,5 +1,5 @@
 // oxlint-disable arrow-body-style
-import { AnnotationSpec, TAtscriptPlugin } from '@atscript/core'
+import { TAtscriptPlugin } from '@atscript/core'
 import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
 import { escapeQuotes, wrapProp } from './codegen/utils'
@@ -11,7 +11,7 @@ export interface TTsPluginOptions {
    * - `'lazy'` — Import `buildJsonSchema`, compute on demand, cache in type object.
    * - `'bundle'` — Pre-compute at build time, embed static JSON in output. No import.
    *
-   * Individual interfaces can override this with `@ts.buildJsonSchema` annotation
+   * Individual interfaces can override this with `@emit.jsonSchema` annotation
    * to force build-time embedding regardless of this setting.
    */
   jsonSchema?: false | 'lazy' | 'bundle'
@@ -30,20 +30,6 @@ export function resolveJsonSchemaMode(opts?: TTsPluginOptions): false | 'lazy' |
 export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
   return {
     name: 'typesccript',
-
-    config() {
-      return {
-        annotations: {
-          ts: {
-            buildJsonSchema: new AnnotationSpec({
-              nodeType: ['interface'],
-              description:
-                'Pre-compute and embed JSON Schema at build time for this interface, regardless of the global jsonSchema plugin option.',
-            }),
-          },
-        },
-      }
-    },
 
     render(doc, format) {
       if (format === 'dts') {

@@ -21,7 +21,7 @@ const schema = Product.toJsonSchema()
 const schema = buildJsonSchema(Product)
 ```
 
-The `.toJsonSchema()` method on generated types requires the `jsonSchema` plugin option to be set to `'lazy'` or `'bundle'` — otherwise it throws a runtime error. Alternatively, add the [`@ts.buildJsonSchema`](#per-interface-override-ts-buildjsonschema) annotation to individual interfaces.
+The `.toJsonSchema()` method on generated types requires the `jsonSchema` plugin option to be set to `'lazy'` or `'bundle'` — otherwise it throws a runtime error. Alternatively, add the [`@emit.jsonSchema`](#per-interface-override-emit-jsonschema) annotation to individual interfaces.
 
 ::: tip Manual use is always available
 Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/typescript/utils` and call it directly. The config option only affects the *generated* `.toJsonSchema()` method — the standalone function always works.
@@ -34,12 +34,12 @@ const schema = buildJsonSchema(Product) // works regardless of config
 ```
 :::
 
-## Per-Interface Override: `@ts.buildJsonSchema`
+## Per-Interface Override: `@emit.jsonSchema`
 
-The `@ts.buildJsonSchema` annotation forces build-time JSON Schema embedding for a specific interface, regardless of the global `jsonSchema` setting. This is useful when you've disabled JSON Schema globally but need it for select types:
+The `@emit.jsonSchema` annotation forces build-time JSON Schema embedding for a specific interface, regardless of the global `jsonSchema` setting. This is useful when you've disabled JSON Schema globally but need it for select types:
 
 ```atscript
-@ts.buildJsonSchema
+@emit.jsonSchema
 export interface ApiResponse {
     status: string
     @expect.minLength 1

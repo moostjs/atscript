@@ -157,7 +157,7 @@ export class TypeRenderer extends BaseRenderer {
         `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
       )
       if (resolveJsonSchemaMode(this.opts) === false) {
-        this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */")
+        this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")
       }
       this.writeln('static toJsonSchema: () => any')
     }
@@ -258,7 +258,7 @@ export class TypeRenderer extends BaseRenderer {
       `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, ${name}>`
     )
     if (resolveJsonSchemaMode(this.opts) === false) {
-      this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */")
+      this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")
     }
     this.writeln('const toJsonSchema: () => any')
     this.popln()

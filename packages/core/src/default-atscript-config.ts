@@ -2,6 +2,7 @@
 import { metaAnnotations } from './defaults/meta-annotations'
 import { primitives } from './defaults/primitives'
 import { expectAnnotations } from './defaults/expect-annotations'
+import { emitAnnotations } from './defaults/emit-annotations'
 import { TAtscriptConfig } from './config'
 
 export function getDefaultAtscriptConfig(): TAtscriptConfig {
@@ -10,6 +11,7 @@ export function getDefaultAtscriptConfig(): TAtscriptConfig {
     annotations: {
       meta: { ...metaAnnotations },
       expect: { ...expectAnnotations },
+      emit: { ...emitAnnotations },
     },
   }
 

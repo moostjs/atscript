@@ -157,7 +157,7 @@ export class JsRenderer extends BaseRenderer {
 
   private renderJsonSchemaMethod(node: SemanticNode) {
     const mode = resolveJsonSchemaMode(this.opts)
-    const hasAnnotation = node.countAnnotations('ts.buildJsonSchema') > 0
+    const hasAnnotation = node.countAnnotations('emit.jsonSchema') > 0
 
     if (hasAnnotation || mode === 'bundle') {
       const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
@@ -170,7 +170,7 @@ export class JsRenderer extends BaseRenderer {
       this.writeln('}')
     } else {
       this.writeln('static toJsonSchema() {')
-      this.indent().writeln("throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @ts.buildJsonSchema annotation to individual interfaces.\")").unindent()
+      this.indent().writeln("throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.\")").unindent()
       this.writeln('}')
     }
   }

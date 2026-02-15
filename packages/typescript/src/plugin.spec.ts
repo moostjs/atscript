@@ -557,7 +557,7 @@ describe('ts-plugin', () => {
     expect(out[0].content).not.toContain('this._jsonSchema')
   })
 
-  it('must embed json schema for @ts.buildJsonSchema annotated interface even when disabled', async () => {
+  it('must embed json schema for @emit.jsonSchema annotated interface even when disabled', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema-annotation.as'],
@@ -568,7 +568,7 @@ describe('ts-plugin', () => {
     const content = out[0].content
     // No $$ import since global mode is false
     expect(content).not.toContain('buildJsonSchema as $$')
-    // User interface has @ts.buildJsonSchema — should have embedded schema
+    // User interface has @emit.jsonSchema — should have embedded schema
     expect(content).toContain('"minLength":3')
     expect(content).toContain('"maxLength":20')
     expect(content).toContain('"minimum":18')
@@ -583,7 +583,7 @@ describe('ts-plugin', () => {
     expect(noAnnotationSection).not.toContain('return {')
   })
 
-  it('must embed json schema for @ts.buildJsonSchema annotated interface in lazy mode', async () => {
+  it('must embed json schema for @emit.jsonSchema annotated interface in lazy mode', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema-annotation.as'],
@@ -594,7 +594,7 @@ describe('ts-plugin', () => {
     const content = out[0].content
     // $$ import present for lazy mode (for non-annotated interfaces)
     expect(content).toContain('buildJsonSchema as $$')
-    // User interface has @ts.buildJsonSchema — should have embedded schema (not lazy)
+    // User interface has @emit.jsonSchema — should have embedded schema (not lazy)
     const userSection = content.slice(content.indexOf('class User'), content.indexOf('class NoAnnotation'))
     expect(userSection).toContain('return {')
     expect(userSection).not.toContain('$$(this)')
@@ -656,7 +656,7 @@ describe('ts-plugin', () => {
     expect(outDts[0].content).toContain('static toJsonSchema: () => any')
   })
 
-  it('must render dts for @ts.buildJsonSchema annotation with json schema disabled', async () => {
+  it('must render dts for @emit.jsonSchema annotation with json schema disabled', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema-annotation.as'],

@@ -79,4 +79,4 @@ vitest run -u                            # Update snapshots
 - **Mutating vs non-mutating annotate**: mutating modifies in-place via `$a()` calls; non-mutating creates new class/type with merged annotations.
 - **`CodePrinter`**: all renderers use indentation tracking. Never construct output strings manually.
 - **Global `AtscriptMetadata` interface**: generated `atscript.d.ts` provides typed metadata keys.
-- **`jsonSchema` option**: `false` (default, no support), `'lazy'` (runtime compute + cache), or `'bundle'` (build-time embed). `@ts.buildJsonSchema` annotation overrides per interface.
+- **`jsonSchema` option**: `false` (default, no support), `'lazy'` (runtime compute + cache), or `'bundle'` (build-time embed). `@emit.jsonSchema` annotation overrides per interface.

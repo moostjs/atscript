@@ -6,6 +6,7 @@ The complete guide to using Atscript with TypeScript. This section is self-conta
 
 **Introduction:**
 - [Why Atscript?](/packages/typescript/why-atscript) — the problem Atscript solves
+- [Atscript Validation vs Others](/packages/typescript/validation-comparison) — side-by-side comparison with Zod and class-validator
 - [Quick Start](/packages/typescript/quick-start) — create your first `.as` file
 
 **Atscript Syntax:**

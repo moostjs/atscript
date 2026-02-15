@@ -54,7 +54,7 @@ plugins: [ts({ jsonSchema: 'lazy' })]
 plugins: [ts({ jsonSchema: 'bundle' })]
 ```
 
-Individual interfaces can also opt into build-time embedding via the `@ts.buildJsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
+Individual interfaces can also opt into build-time embedding via the `@emit.jsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
 
 ## The `atscript.d.ts` File
 
