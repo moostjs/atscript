@@ -1,19 +1,50 @@
 // oxlint-disable arrow-body-style
-import { TAtscriptPlugin } from '@atscript/core'
+import { AnnotationSpec, TAtscriptPlugin } from '@atscript/core'
 import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export interface TTsPluginOptions {
   /**
-   * Render JSON schemas at build-time
+   * JSON Schema support mode:
+   * - `false` — No support. `toJsonSchema()` throws at runtime. No `buildJsonSchema` import. *(default)*
+   * - `'lazy'` — Import `buildJsonSchema`, compute on demand, cache in type object.
+   * - `'bundle'` — Pre-compute at build time, embed static JSON in output. No import.
+   *
+   * Individual interfaces can override this with `@ts.buildJsonSchema` annotation
+   * to force build-time embedding regardless of this setting.
    */
-  preRenderJsonSchema?: boolean
+  jsonSchema?: false | 'lazy' | 'bundle'
+}
+
+/**
+ * Resolves the effective JSON schema mode from plugin options.
+ */
+export function resolveJsonSchemaMode(opts?: TTsPluginOptions): false | 'lazy' | 'bundle' {
+  if (opts?.jsonSchema !== undefined) {
+    return opts.jsonSchema
+  }
+  return false
 }
 
 export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
   return {
     name: 'typesccript',
+
+    config() {
+      return {
+        annotations: {
+          ts: {
+            buildJsonSchema: new AnnotationSpec({
+              nodeType: ['interface'],
+              description:
+                'Pre-compute and embed JSON Schema at build time for this interface, regardless of the global jsonSchema plugin option.',
+            }),
+          },
+        },
+      }
+    },
+
     render(doc, format) {
       if (format === 'dts') {
         return [

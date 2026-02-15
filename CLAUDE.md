@@ -64,9 +64,10 @@ explorations/     - Sandbox/playground for testing features
 
 - **Site**: VitePress at `docs/`
 - **Published**: https://atscript.moost.org
-- **Style**: Progressive complexity — beginner-friendly for guides, increasingly technical for advanced/plugin topics
-- **Structure**: guide/ (complete), packages/ concepts/ examples/ integrations/ advanced/ api/ (mostly stubs needing content)
-- **Multi-language architecture**: Docs are split into shared/language-agnostic content (guide/, concepts/) and language-specific "worlds" (packages/typescript/, future: packages/python/, etc.). Each language extension should have a self-contained docs section. Never merge language-specific content into the shared guide.
+- **Style**: Progressive complexity — beginner-friendly in language guides, increasingly technical for plugin development
+- **Navigation**: TypeScript dropdown (Guide, MongoDB, Moost) | VSCode | Plugin Development
+- **Structure**: packages/typescript/ (complete, 18 pages), plugin-development/ (16 stubs), other package sections (stubs)
+- **Multi-language architecture**: Each language extension gets a self-contained docs section using shared `_fragments/` for common content. The TypeScript guide is the reference implementation. Future languages (Python, Java) follow the same pattern.
 
 ## Agents
 

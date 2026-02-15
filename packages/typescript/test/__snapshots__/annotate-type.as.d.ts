@@ -19,6 +19,7 @@ declare namespace TString {
   const type: TAtscriptTypeComplex<TString>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TString>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -33,6 +34,7 @@ declare namespace TString2 {
   const type: TAtscriptTypeComplex<TString2>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TString2>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -52,6 +54,7 @@ declare namespace TO {
   const type: TAtscriptTypeComplex<TO>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TO>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -66,6 +69,7 @@ declare namespace TO2 {
   const type: TAtscriptTypeComplex<TO2>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TO2>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 // prettier-ignore-end

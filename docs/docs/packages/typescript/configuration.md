@@ -20,24 +20,45 @@ export default defineConfig({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `rootDir` | `string` | `'.'` | Directory containing your `.as` files |
-| `format` | `'dts' \| 'js'` | `'dts'` | Default output format (see [Code Generation](/packages/typescript/code-generation)) |
+| `format` | `'dts' \| 'js'` | `'dts'` | Default output format for [CLI](/packages/typescript/cli) (`dts` for type declarations, `js` for runtime code) |
 | `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config |
 | `plugins` | `TAtscriptPlugin[]` | `[]` | Active plugins |
-| `annotations` | `object` | — | Custom annotation definitions (see [Annotations](/guide/annotations)) |
+| `annotations` | `object` | — | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations)) |
 
 ## Plugin Options
 
-The TypeScript plugin accepts one option:
+The TypeScript plugin accepts options via `ts({ ... })`:
 
 ```javascript
-plugins: [ts({ preRenderJsonSchema: true })]
+plugins: [ts({ jsonSchema: 'lazy' })]
 ```
 
-- **`preRenderJsonSchema`** — when `true`, JSON schemas are computed at build time and embedded in the generated `.js` output. By default, `.toJsonSchema()` is lazy-computed at runtime on first call.
+### `jsonSchema`
+
+Controls how JSON Schema support is handled in generated code. On the frontend, pulling in the `buildJsonSchema` function adds unnecessary weight when you don't need it — so Atscript lets you choose the right trade-off for your use case.
+
+| Value | Import added | `toJsonSchema()` behavior |
+|-------|-------------|--------------------------|
+| `false` *(default)* | None | Throws a runtime error |
+| `'lazy'` | `buildJsonSchema` imported | Computed on first call, cached |
+| `'bundle'` | None | Pre-computed at build time, embedded as static JSON |
+
+```javascript
+// Default — no JSON schema overhead (best for frontend)
+plugins: [ts()]
+
+// Backend — lazy compute on demand
+plugins: [ts({ jsonSchema: 'lazy' })]
+
+// Backend — pre-compute at build time for fastest runtime
+plugins: [ts({ jsonSchema: 'bundle' })]
+```
+
+Individual interfaces can also opt into build-time embedding via the `@ts.buildJsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
 
 ## The `atscript.d.ts` File
 
-When you run `asc -f dts` (or save in VSCode with the extension), an `atscript.d.ts` file is generated alongside your output. It declares the global `AtscriptMetadata` interface and `AtscriptPrimitiveTags` type — these provide TypeScript IntelliSense for all annotations and semantic type tags used in your project.
+When you run `asc -f dts`, an `atscript.d.ts` file is generated alongside your output. It declares the global `AtscriptMetadata` interface and `AtscriptPrimitiveTags` type — these provide TypeScript IntelliSense for all annotations and semantic type tags used in your project.
 
 Add it to your `tsconfig.json`:
 
@@ -50,11 +71,13 @@ Add it to your `tsconfig.json`:
 }
 ```
 
-::: tip
-Re-run `asc -f dts` whenever you add new annotation types to your config. The `atscript.d.ts` file will update with the new type definitions.
+::: warning Re-generate after config changes
+Run `npx asc -f dts` whenever you change your `atscript.config` — for example, after adding plugins, custom annotations, or new primitives. This regenerates `atscript.d.ts` so that your IDE picks up the updated annotation types and semantic tags. Without this step, you may see incorrect IntelliSense or missing type information when working with `.metadata` and `.type.tags`.
 :::
 
 ## Next Steps
 
-- [Code Generation](/packages/typescript/code-generation) — understand the two output formats
 - [CLI](/packages/typescript/cli) — build from the command line
+- [Build Setup](/packages/typescript/build-setup) — bundler integration
+- [Custom Annotations](/packages/typescript/custom-annotations) — define your own annotation types
+- [Custom Primitives](/packages/typescript/custom-primitives) — define your own primitive extensions

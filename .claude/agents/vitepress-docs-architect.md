@@ -40,6 +40,8 @@ When working on documentation tasks, you will:
    - Write scannable content with headers, lists, and emphasis
    - Include prerequisites and assumptions
    - Provide troubleshooting sections where appropriate
+   - **Avoid content duplication**: Each topic should have ONE authoritative page. Other pages that reference the topic should provide a brief mention and link to the dedicated page for details (e.g., "See [JSON Schema](/packages/typescript/json-schema) for full usage details"). When editing a page, check related pages for duplicated content and consolidate.
+   - **Use shared fragments for cross-section content**: When common Atscript knowledge (syntax, annotations, primitives, etc.) needs to appear across language-specific sections, extract it into a fragment in `docs/docs/_fragments/` and include it via `<!--@include: ../../_fragments/fragment-name.md-->`. This keeps language-specific sections self-contained (readers don't need to leave the section) while maintaining a single source of truth. Language-specific pages can add their own context around the included fragment.
 
 5. **Maintain Documentation Quality**:
    - Ensure consistency in terminology and style

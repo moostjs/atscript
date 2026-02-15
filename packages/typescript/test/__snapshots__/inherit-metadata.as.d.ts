@@ -20,6 +20,7 @@ declare class ISource {
   static type: TAtscriptTypeObject<keyof ISource, ISource>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ISource>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 declare namespace ISource {
@@ -39,6 +40,7 @@ export declare class ITarget {
   static type: TAtscriptTypeObject<keyof ITarget, ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ITarget>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace ITarget {

@@ -19,7 +19,7 @@ import {
 } from '@atscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
-import type { TTsPluginOptions } from '../plugin'
+import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 
 export class TypeRenderer extends BaseRenderer {
   constructor(
@@ -156,6 +156,9 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln(
         `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
       )
+      if (resolveJsonSchemaMode(this.opts) === false) {
+        this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */")
+      }
       this.writeln('static toJsonSchema: () => any')
     }
     this.pop()
@@ -254,6 +257,9 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(
       `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, ${name}>`
     )
+    if (resolveJsonSchemaMode(this.opts) === false) {
+      this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */")
+    }
     this.writeln('const toJsonSchema: () => any')
     this.popln()
   }

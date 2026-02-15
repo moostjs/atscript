@@ -37,6 +37,7 @@ export declare class FlattenTest {
   static type: TAtscriptTypeObject<keyof FlattenTest, FlattenTest>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof FlattenTest>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace FlattenTest {

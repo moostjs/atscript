@@ -57,6 +57,7 @@ export declare class PublicInterface {
   static type: TAtscriptTypeObject<keyof PublicInterface, PublicInterface>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof PublicInterface>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace PublicInterface {

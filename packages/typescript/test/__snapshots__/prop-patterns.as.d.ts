@@ -28,6 +28,7 @@ export declare class WithPatterns {
   static type: TAtscriptTypeObject<keyof WithPatterns, WithPatterns>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof WithPatterns>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace WithPatterns {
@@ -45,6 +46,7 @@ declare class WithPatterns2 {
   static type: TAtscriptTypeObject<keyof WithPatterns2, WithPatterns2>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof WithPatterns2>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 declare namespace WithPatterns2 {

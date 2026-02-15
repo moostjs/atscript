@@ -15,14 +15,13 @@ You are tasked with analyzing recent code changes and updating the corresponding
 2. **Map changes to docs**: Use this mapping to find affected documentation:
    | Source | Documentation |
    |--------|--------------|
-   | `packages/core/src/` | `docs/docs/packages/core/`, `docs/docs/concepts/` |
+   | `packages/core/src/` | `docs/docs/plugin-development/` |
    | `packages/typescript/src/` | `docs/docs/packages/typescript/` |
    | `packages/mongo/src/` | `docs/docs/packages/mongo/` |
    | `packages/moost-mongo/src/` | `docs/docs/packages/moost-mongo/` |
    | `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/` |
-   | `packages/unplugin/src/` | `docs/docs/packages/unplugin/` |
+   | `packages/unplugin/src/` | `docs/docs/packages/typescript/build-setup.md` |
    | `packages/vscode/` | `docs/docs/packages/vscode/` |
-   | `docs/docs/guide/` | Only if guide content needs updating |
 
 3. **Identify what changed**: For each changed source file, use the appropriate domain expert agent to understand the nature of the change:
    - `atscript-core-expert` for core changes
@@ -47,3 +46,5 @@ You are tasked with analyzing recent code changes and updating the corresponding
 - Use `atscript` language tag for `.as` code examples
 - Keep each documentation page focused on a single concept
 - Don't modify the VitePress config unless the navigation structure needs to change
+- **Avoid content duplication**: When a topic has a dedicated page, other pages should provide a brief mention and link to it for details rather than repeating the same explanation. When updating a page, check related pages for duplicated content and consolidate — keep the detailed content on the authoritative page and replace duplicates with cross-reference links.
+- **Use shared fragments for cross-section content**: When common Atscript knowledge needs to appear across language-specific sections, use fragments from `docs/docs/_fragments/` included via `<!--@include: ../../_fragments/fragment-name.md-->`. When updating common concepts, check if a fragment exists and update it there so all including pages stay in sync. If common content is duplicated inline across sections, consider extracting it into a fragment.

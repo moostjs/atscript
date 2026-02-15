@@ -497,7 +497,7 @@ describe('ts-plugin', () => {
     expect(user2Section).toContain('.annotate("mulAppend", "top-original", true)')
   })
 
-  it('must render json schema method', async () => {
+  it('must disable json schema by default (no options)', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema.as'],
@@ -506,14 +506,28 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     expect(out[0].content).toContain('static toJsonSchema()')
-    expect(out[0].content).toContain('buildJsonSchema as $$')
+    expect(out[0].content).toContain('throw new Error')
+    expect(out[0].content).not.toContain('buildJsonSchema as $$')
+    expect(out[0].content).not.toContain('this._jsonSchema')
   })
 
-  it('must pre-render json schema', async () => {
+  it('must render json schema method (explicit lazy)', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema.as'],
-      plugins: [tsPlugin({ preRenderJsonSchema: true })],
+      plugins: [tsPlugin({ jsonSchema: 'lazy' })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out[0].content).toContain('buildJsonSchema as $$')
+    expect(out[0].content).toContain('this._jsonSchema ?? (this._jsonSchema = $$(this))')
+  })
+
+  it('must pre-render json schema (bundle mode)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
       annotations,
     })
     const out = await repo.generate({ format: 'js' })
@@ -527,5 +541,133 @@ describe('ts-plugin', () => {
     expect(out[0].content).toContain('"maximum":99')
     expect(out[0].content).toContain('"minItems":1')
     expect(out[0].content).toContain('"maxItems":5')
+  })
+
+  it('must disable json schema (false mode)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: false })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out[0].content).toContain('static toJsonSchema()')
+    expect(out[0].content).toContain('throw new Error')
+    expect(out[0].content).not.toContain('buildJsonSchema as $$')
+    expect(out[0].content).not.toContain('this._jsonSchema')
+  })
+
+  it('must embed json schema for @ts.buildJsonSchema annotated interface even when disabled', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-annotation.as'],
+      plugins: [tsPlugin({ jsonSchema: false })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const content = out[0].content
+    // No $$ import since global mode is false
+    expect(content).not.toContain('buildJsonSchema as $$')
+    // User interface has @ts.buildJsonSchema — should have embedded schema
+    expect(content).toContain('"minLength":3')
+    expect(content).toContain('"maxLength":20')
+    expect(content).toContain('"minimum":18')
+    expect(content).toContain('"maximum":99')
+    // NoAnnotation interface should throw since it lacks the annotation
+    // Split by class to check each independently
+    const userSection = content.slice(content.indexOf('class User'), content.indexOf('class NoAnnotation'))
+    const noAnnotationSection = content.slice(content.indexOf('class NoAnnotation'))
+    expect(userSection).toContain('return {')
+    expect(userSection).not.toContain('throw new Error')
+    expect(noAnnotationSection).toContain('throw new Error')
+    expect(noAnnotationSection).not.toContain('return {')
+  })
+
+  it('must embed json schema for @ts.buildJsonSchema annotated interface in lazy mode', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-annotation.as'],
+      plugins: [tsPlugin({ jsonSchema: 'lazy' })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const content = out[0].content
+    // $$ import present for lazy mode (for non-annotated interfaces)
+    expect(content).toContain('buildJsonSchema as $$')
+    // User interface has @ts.buildJsonSchema — should have embedded schema (not lazy)
+    const userSection = content.slice(content.indexOf('class User'), content.indexOf('class NoAnnotation'))
+    expect(userSection).toContain('return {')
+    expect(userSection).not.toContain('$$(this)')
+    // NoAnnotation should use lazy mode
+    const noAnnotationSection = content.slice(content.indexOf('class NoAnnotation'))
+    expect(noAnnotationSection).toContain('this._jsonSchema ?? (this._jsonSchema = $$(this))')
+  })
+
+  // --- DTS output tests for jsonSchema modes ---
+
+  it('must render dts without deprecation in lazy mode', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: 'lazy' })],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].content).toContain('static toJsonSchema: () => any')
+    expect(outDts[0].content).not.toContain('@deprecated')
+  })
+
+  it('must render dts without deprecation in bundle mode', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].content).toContain('static toJsonSchema: () => any')
+    expect(outDts[0].content).not.toContain('@deprecated')
+  })
+
+  it('must render dts with deprecation jsdoc when json schema disabled', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin({ jsonSchema: false })],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].content).toContain('@deprecated')
+    expect(outDts[0].content).toContain('JSON Schema support is disabled')
+    expect(outDts[0].content).toContain("jsonSchema: 'lazy'")
+    expect(outDts[0].content).toContain("jsonSchema: 'bundle'")
+    expect(outDts[0].content).toContain('static toJsonSchema: () => any')
+  })
+
+  it('must render dts with deprecation jsdoc by default (no options)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].content).toContain('@deprecated')
+    expect(outDts[0].content).toContain('static toJsonSchema: () => any')
+  })
+
+  it('must render dts for @ts.buildJsonSchema annotation with json schema disabled', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-annotation.as'],
+      plugins: [tsPlugin({ jsonSchema: false })],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    const content = outDts[0].content
+    // Both interfaces get the deprecation since it's at the global config level
+    // (the annotation only affects .js output, not .d.ts declarations)
+    expect(content).toContain('@deprecated')
+    expect(content).toContain('static toJsonSchema: () => any')
   })
 })

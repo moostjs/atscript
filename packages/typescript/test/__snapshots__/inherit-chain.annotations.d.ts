@@ -31,6 +31,7 @@ declare global {
     mulOptional: (number | true)[]
     mulAppend: (string)[]
     obj: { prop1: string, prop2?: number, prop3?: boolean }
+    "ts.buildJsonSchema": boolean
     fromTType: boolean
     from: string
     pass1: string

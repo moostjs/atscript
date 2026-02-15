@@ -19,6 +19,7 @@ declare namespace TFirstName {
   const type: TAtscriptTypeFinal<TFirstName>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TFirstName>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -33,6 +34,7 @@ declare namespace TLastName {
   const type: TAtscriptTypeFinal<TLastName>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TLastName>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -47,6 +49,7 @@ declare namespace TAge {
   const type: TAtscriptTypeFinal<TAge>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TAge>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 
@@ -62,6 +65,7 @@ export declare class ITarget {
   static type: TAtscriptTypeObject<keyof ITarget, ITarget>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ITarget>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace ITarget {

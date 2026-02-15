@@ -11,18 +11,7 @@ import {
 
 ## Purpose
 
-A common pattern is to serialize type definitions on the server and send them to the client. The client can then deserialize them and use them for validation, form generation, or schema-driven UI — without bundling the original `.as` files.
-
-```
-Server                         Client
-  │                              │
-  │  serializeAnnotatedType()    │
-  │  ─────── JSON ──────────►    │
-  │                    deserializeAnnotatedType()
-  │                              │
-  │                    type.validator().validate(input)
-  │                    buildJsonSchema(type)
-```
+Serialize type definitions on the server and send them to the client. The client deserializes them and uses them for validation, form generation, or schema-driven UI — without bundling the original `.as` files.
 
 ## Basic Usage
 
@@ -93,15 +82,64 @@ The `processAnnotation` callback receives:
 - `path` — property path to the current node (e.g. `['address', 'city']`)
 - `kind` — type kind at this node (`''`, `'object'`, `'array'`, etc.)
 
-## Use Cases
+## Example: Server-Driven Form Rendering
 
-- **Dynamic form rendering** — send type definitions to the client to generate forms with labels, validation rules, and field types
-- **Server-driven validation** — share validation rules between backend and frontend without code duplication
-- **Microservice type contracts** — store serialized types in a registry for cross-service validation
-- **Caching** — serialize compiled types to avoid re-parsing `.as` files on startup
+A practical use case — the server serializes a type definition and the client uses it to render a form with labels and validation.
+
+**Server** (Express endpoint):
+
+```typescript
+import { User } from './user.as'
+import { serializeAnnotatedType } from '@atscript/typescript/utils'
+
+app.get('/api/form/user', (req, res) => {
+  const schema = serializeAnnotatedType(User, {
+    ignoreAnnotations: ['mongo.collection'],  // strip server-only metadata
+  })
+  res.json(schema)
+})
+```
+
+**Client** (Vue component):
+
+```vue
+<script setup>
+import { ref, onMounted } from 'vue'
+import { deserializeAnnotatedType } from '@atscript/typescript/utils'
+
+const fields = ref([])
+const formData = ref({})
+
+onMounted(async () => {
+  const res = await fetch('/api/form/user')
+  const type = deserializeAnnotatedType(await res.json())
+
+  // Build form fields from type metadata
+  for (const [name, prop] of type.props) {
+    fields.value.push({
+      name,
+      label: prop.metadata.get('meta.label') || name,
+      placeholder: prop.metadata.get('meta.placeholder') || '',
+    })
+    formData.value[name] = ''
+  }
+})
+</script>
+
+<template>
+  <form>
+    <div v-for="field in fields" :key="field.name">
+      <label>{{ field.label }}</label>
+      <input v-model="formData[field.name]" :placeholder="field.placeholder" />
+    </div>
+  </form>
+</template>
+```
+
+The form fields, labels, and placeholders are all driven by annotations defined in the `.as` file — no duplication between server and client.
 
 ## Next Steps
 
-- [Type Definitions](/packages/typescript/type-definitions) — understand the annotated type system
+- [Type Definitions](/packages/typescript/type-definitions) — the annotated type system
 - [Validation](/packages/typescript/validation) — validate data against types
-- [JSON Schema](/packages/typescript/json-schema) — generate JSON Schema from types
+- [Metadata](/packages/typescript/metadata-export) — access annotations at runtime

@@ -32,6 +32,7 @@ export declare class WithMetadata {
   static type: TAtscriptTypeObject<keyof WithMetadata, WithMetadata>
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof WithMetadata>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
 export declare namespace WithMetadata {
@@ -52,6 +53,7 @@ declare namespace SomeType {
   const type: TAtscriptTypeObject<keyof SomeType, SomeType>
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, SomeType>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@ts.buildJsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
 // prettier-ignore-end

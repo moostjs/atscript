@@ -12,15 +12,23 @@ You are the documentation update orchestrator for the Atscript project. Your job
 3. Delegating to the vitepress-docs-architect agent to write/update documentation
 4. Ensuring consistency across the documentation site
 
-## Multi-Language Documentation Architecture
+## Documentation Architecture
 
 Atscript is language-agnostic. The docs have three content layers:
 
-1. **Shared / language-agnostic** (guide/, concepts/): `.as` syntax, annotations, primitives, core concepts. Applies to ALL users regardless of target language.
-2. **Language-specific "worlds"** (packages/typescript/, future packages/python/): Self-contained sections for each language extension. A TypeScript user reads guide/ + packages/typescript/ for everything they need.
-3. **Plugin-specific** (packages/mongo/, packages/moost-*/): Framework/database integrations.
+1. **Language-specific "worlds"** (packages/typescript/, future packages/python/): **Self-contained** sections covering the full journey from "why Atscript" to advanced runtime features. A TypeScript user reads packages/typescript/ and has everything they need. Common .as concepts are included via shared fragments.
+2. **Plugin-specific** (packages/mongo/, packages/moost-*/): Framework/database integrations nested under their language dropdown in navigation.
+3. **Plugin Development** (plugin-development/): For plugin/language extension creators. Covers core architecture, AST, plugin hooks, code generation, LSP development.
 
-**Never merge language-specific content into shared sections.**
+**Navigation**: TypeScript dropdown (Guide, MongoDB, Moost) | VSCode | Plugin Development
+
+### Shared Fragments
+
+To keep language-specific sections self-contained without duplicating content, common Atscript knowledge is extracted into **shared markdown fragments** in `docs/docs/_fragments/`. These are included via VitePress `<!--@include: ../../_fragments/fragment-name.md-->` syntax.
+
+- Language-specific pages include fragments for common .as concepts (syntax, annotations, primitives)
+- When updating common Atscript concepts, check if a fragment exists and update it there — all pages that include it update automatically
+- If common content is duplicated inline across sections, consider extracting it into a fragment
 
 ## Available Domain Expert Agents
 
@@ -37,12 +45,12 @@ Atscript is language-agnostic. The docs have three content layers:
 
 | Source Changes | Documentation to Update |
 |---------------|------------------------|
-| `packages/core/src/` | `docs/docs/packages/core/`, `docs/docs/concepts/`, possibly `docs/docs/guide/` |
+| `packages/core/src/` | `docs/docs/plugin-development/` |
 | `packages/typescript/src/` | `docs/docs/packages/typescript/` |
 | `packages/mongo/src/` | `docs/docs/packages/mongo/` |
 | `packages/moost-mongo/src/` | `docs/docs/packages/moost-mongo/` |
 | `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/` |
-| `packages/unplugin/src/` | `docs/docs/packages/unplugin/` |
+| `packages/unplugin/src/` | `docs/docs/packages/typescript/build-setup.md` |
 | `packages/vscode/` | `docs/docs/packages/vscode/` |
 
 ## Workflow
@@ -65,3 +73,6 @@ When asked to update documentation:
 - [ ] Progressive complexity is maintained (beginner → advanced)
 - [ ] Language-specific content is in language-specific sections, not shared sections
 - [ ] VitePress sidebar entries exist for all documented pages
+- [ ] No content duplication across pages — each topic has ONE authoritative page; other pages link to it for details rather than repeating the same content
+- [ ] Common Atscript knowledge shared across language-specific sections uses fragments from `_fragments/` rather than inline duplication
+- [ ] Language-specific sections are self-contained — readers don't need to leave the section to understand common concepts

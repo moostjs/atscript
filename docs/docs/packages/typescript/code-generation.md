@@ -89,6 +89,10 @@ $("object", Product)
 
 The `defineAnnotatedType()` calls build the type structure and attach all annotations as runtime metadata. Semantic types (like `string.email`) automatically add validation rules and tags.
 
+::: info JSON Schema import depends on config
+The `buildJsonSchema as $$` import and the lazy `toJsonSchema()` method shown above require `jsonSchema: 'lazy'` in your plugin options. By default, JSON Schema is disabled (`jsonSchema: false`) — `toJsonSchema()` will throw a runtime error and the `buildJsonSchema` import is omitted to keep your bundle lighter. With `jsonSchema: 'bundle'`, the schema is pre-computed and embedded as a static return value (no import needed). See [Configuration — `jsonSchema`](/packages/typescript/configuration#jsonschema) for details.
+:::
+
 ## When to Use Which
 
 | | `.d.ts` | `.js` |

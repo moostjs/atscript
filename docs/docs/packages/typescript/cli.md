@@ -46,4 +46,4 @@ If no config file is found, the CLI defaults to `format: 'dts'` with the TypeScr
 ## Next Steps
 
 - [Configuration](/packages/typescript/configuration) — config file options
-- [Code Generation](/packages/typescript/code-generation) — understand `.d.ts` vs `.js` output
+- [Build Setup](/packages/typescript/build-setup) — bundler integration

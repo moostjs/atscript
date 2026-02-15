@@ -35,23 +35,31 @@ You are tasked with generating a comprehensive documentation coverage report.
    ### By Section
    | Section | Complete | Stub | Missing | Stale? |
    |---------|----------|------|---------|--------|
-   | guide/ | X/X | ... | ... | ... |
-   | packages/core/ | ... | ... | ... | ... |
-   ...
+   | packages/typescript/ | X/X | ... | ... | ... |
+   | packages/mongo/ | ... | ... | ... | ... |
+   | packages/moost-mongo/ | ... | ... | ... | ... |
+   | packages/moost-validator/ | ... | ... | ... | ... |
+   | packages/vscode/ | ... | ... | ... | ... |
+   | plugin-development/ | ... | ... | ... | ... |
 
    ### Language-Specific Worlds
-   | Language | Section | Coverage | Self-Contained? |
-   |----------|---------|----------|-----------------|
-   | TypeScript | packages/typescript/ | X% | Yes/No |
-   | (future) Python | packages/python/ | N/A | N/A |
+   | Language | Section | Coverage | Self-Contained? | Uses Fragments? |
+   |----------|---------|----------|-----------------|-----------------|
+   | TypeScript | packages/typescript/ | X% | Yes/No | Yes/No |
+   | (future) Python | packages/python/ | N/A | N/A | N/A |
 
    ### Recommended Actions
-   1. [Priority] Fill stubs in packages/core/ (9 files)
-   2. [Priority] Update packages/typescript/code-generation.md (source changed)
+   1. [Priority] Fill stubs in plugin-development/ (16 files)
+   2. [Priority] Fill stubs in packages/mongo/ (9 files)
    ...
    ```
 
-5. **Check VitePress nav**: Report which nav items in `.vitepress/config.ts` are commented out and what's needed to enable them.
+5. **Check shared fragments**: Scan `docs/docs/_fragments/` for existing fragments and check:
+   - Which guide pages and language-specific pages include them
+   - Whether common content is duplicated inline across sections instead of using fragments
+   - Flag opportunities to extract inline content into shared fragments
+
+6. **Check VitePress nav**: Report the current navigation structure from `.vitepress/config.ts` and verify all sidebar sections have corresponding content.
 
 ## Output
 

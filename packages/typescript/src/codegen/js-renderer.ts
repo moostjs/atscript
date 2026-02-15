@@ -23,7 +23,7 @@ import {
 } from '@atscript/core'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
-import type { TTsPluginOptions } from '../plugin'
+import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import {
   defineAnnotatedType,
   type TAtscriptAnnotatedType,
@@ -47,7 +47,7 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
     const imports = ['defineAnnotatedType as $', 'annotate as $a']
-    if (!this.opts?.preRenderJsonSchema) {
+    if (resolveJsonSchemaMode(this.opts) === 'lazy') {
       imports.push('buildJsonSchema as $$')
     }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
@@ -156,14 +156,21 @@ export class JsRenderer extends BaseRenderer {
   }
 
   private renderJsonSchemaMethod(node: SemanticNode) {
-    if (this.opts?.preRenderJsonSchema) {
+    const mode = resolveJsonSchemaMode(this.opts)
+    const hasAnnotation = node.countAnnotations('ts.buildJsonSchema') > 0
+
+    if (hasAnnotation || mode === 'bundle') {
       const schema = JSON.stringify(buildJsonSchema(this.toAnnotatedType(node)))
       this.writeln('static toJsonSchema() {')
       this.indent().writeln(`return ${schema}`).unindent()
       this.writeln('}')
-    } else {
+    } else if (mode === 'lazy') {
       this.writeln('static toJsonSchema() {')
       this.indent().writeln('return this._jsonSchema ?? (this._jsonSchema = $$(this))').unindent()
+      this.writeln('}')
+    } else {
+      this.writeln('static toJsonSchema() {')
+      this.indent().writeln("throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @ts.buildJsonSchema annotation to individual interfaces.\")").unindent()
       this.writeln('}')
     }
   }

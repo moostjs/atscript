@@ -323,109 +323,64 @@ export default defineConfig({
     siteTitle: 'Atscript',
 
     nav: [
-      { text: 'Guide', link: '/guide/installation' },
-      // { text: 'Concepts', link: '/concepts/what-is-atscript' },
       {
-        text: 'Packages',
+        text: 'TypeScript',
         items: [
-          { text: 'TypeScript', link: '/packages/typescript/' },
+          { text: 'Guide', link: '/packages/typescript/' },
+          { text: 'MongoDB', link: '/packages/mongo/' },
+          { text: 'Moost', items: [
+            { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
+            { text: 'Moost Validator', link: '/packages/moost-validator/' },
+          ]},
         ],
       },
-      // { text: 'API', link: '/api/' },
-      // { text: 'Examples', link: '/examples/' }
+      { text: 'VSCode', link: '/packages/vscode/' },
+      { text: 'Plugin Development', link: '/plugin-development/' },
     ],
 
     sidebar: {
-      '/guide/': [
+      '/packages/typescript/': [
         {
           text: 'Introduction',
           items: [
-            { text: 'Why Atscript?', link: '/guide/why-atscript' },
-            { text: 'Installation', link: '/guide/installation' },
-            { text: 'Quick Start', link: '/guide/quick-start' },
-          ],
-        },
-        {
-          text: 'Language',
-          items: [
-            { text: 'Interfaces & Types', link: '/guide/interfaces-types' },
-            { text: 'Imports & Exports', link: '/guide/imports-exports' },
-            { text: 'Primitives', link: '/guide/primitives' },
-            { text: 'Annotations', link: '/guide/annotations' },
-            { text: 'Ad-hoc Annotations', link: '/guide/ad-hoc-annotations' },
-          ],
-        },
-        {
-          text: 'Configuration',
-          items: [
-            { text: 'Configuration File', link: '/guide/configuration' },
-            { text: 'Build Setup', link: '/guide/build-setup' },
-          ],
-        },
-      ],
-
-      '/concepts/': [
-        {
-          text: 'Core Concepts',
-          items: [
-            { text: 'What is Atscript?', link: '/concepts/what-is-atscript' },
-            { text: 'Philosophy', link: '/concepts/philosophy' },
-            { text: 'Architecture', link: '/concepts/architecture' },
-            { text: 'Type System', link: '/concepts/type-system' },
-            { text: 'Annotation System', link: '/concepts/annotation-system' },
-            { text: 'Parser & AST', link: '/concepts/parser-ast' },
-            { text: 'Plugin System', link: '/concepts/plugin-system' },
-            { text: 'Code Generation', link: '/concepts/code-generation' },
-          ],
-        },
-      ],
-
-      '/packages/core/': [
-        {
-          text: '@atscript/core',
-          items: [
-            { text: 'Overview', link: '/packages/core/' },
-            { text: 'Installation', link: '/packages/core/installation' },
-            { text: 'Configuration', link: '/packages/core/configuration' },
-          ],
-        },
-        {
-          text: 'API',
-          items: [
-            { text: 'Parser API', link: '/packages/core/parser-api' },
-            { text: 'AST Nodes', link: '/packages/core/ast-nodes' },
-            { text: 'Document API', link: '/packages/core/document-api' },
-            { text: 'Plugin API', link: '/packages/core/plugin-api' },
-            { text: 'Annotation Spec', link: '/packages/core/annotation-spec' },
-            { text: 'Default Annotations', link: '/packages/core/default-annotations' },
-          ],
-        },
-      ],
-
-      '/packages/typescript/': [
-        {
-          text: '@atscript/typescript',
-          items: [
             { text: 'Overview', link: '/packages/typescript/' },
-            { text: 'Installation', link: '/packages/typescript/installation' },
-            { text: 'Configuration', link: '/packages/typescript/configuration' },
+            { text: 'Why Atscript?', link: '/packages/typescript/why-atscript' },
+            { text: 'Quick Start', link: '/packages/typescript/quick-start' },
           ],
         },
         {
-          text: 'Getting Started',
+          text: 'Atscript Syntax',
           items: [
-            { text: 'Code Generation', link: '/packages/typescript/code-generation' },
-            { text: 'CLI', link: '/packages/typescript/cli' },
+            { text: 'Interfaces & Types', link: '/packages/typescript/interfaces-types' },
+            { text: 'Imports & Exports', link: '/packages/typescript/imports-exports' },
+            { text: 'Primitives', link: '/packages/typescript/primitives' },
+            { text: 'Annotations', link: '/packages/typescript/annotations' },
+            { text: 'Ad-hoc Annotations', link: '/packages/typescript/ad-hoc-annotations' },
           ],
         },
         {
           text: 'Runtime API',
           items: [
-            { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
             { text: 'Metadata', link: '/packages/typescript/metadata-export' },
             { text: 'Validation', link: '/packages/typescript/validation' },
             { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
             { text: 'Serialization', link: '/packages/typescript/serialization' },
+            { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
+          ],
+        },
+        {
+          text: 'Setup & Tooling',
+          items: [
+            { text: 'Configuration', link: '/packages/typescript/configuration' },
+            { text: 'CLI', link: '/packages/typescript/cli' },
+            { text: 'Build Setup', link: '/packages/typescript/build-setup' },
+          ],
+        },
+        {
+          text: 'Advanced',
+          items: [
+            { text: 'Custom Primitives', link: '/packages/typescript/custom-primitives' },
+            { text: 'Custom Annotations', link: '/packages/typescript/custom-annotations' },
           ],
         },
       ],
@@ -483,27 +438,6 @@ export default defineConfig({
         },
       ],
 
-      '/packages/unplugin/': [
-        {
-          text: 'unplugin-atscript',
-          items: [
-            { text: 'Overview', link: '/packages/unplugin/' },
-            { text: 'Installation', link: '/packages/unplugin/installation' },
-            { text: 'Configuration', link: '/packages/unplugin/configuration' },
-          ],
-        },
-        {
-          text: 'Build Tools',
-          items: [
-            { text: 'Vite', link: '/packages/unplugin/vite' },
-            { text: 'Webpack', link: '/packages/unplugin/webpack' },
-            { text: 'Rollup', link: '/packages/unplugin/rollup' },
-            { text: 'esbuild', link: '/packages/unplugin/esbuild' },
-            { text: 'Rspack', link: '/packages/unplugin/rspack' },
-          ],
-        },
-      ],
-
       '/packages/vscode/': [
         {
           text: 'VSCode Extension',
@@ -519,62 +453,46 @@ export default defineConfig({
         },
       ],
 
-      '/api/': [
+      '/plugin-development/': [
         {
-          text: 'API Reference',
+          text: 'Getting Started',
           items: [
-            { text: 'Overview', link: '/api/' },
-            { text: 'Core API', link: '/api/core' },
-            { text: 'TypeScript API', link: '/api/typescript' },
-            { text: 'MongoDB API', link: '/api/mongo' },
-            { text: 'Annotations', link: '/api/annotations' },
-            { text: 'Types', link: '/api/types' },
+            { text: 'Overview', link: '/plugin-development/' },
           ],
         },
-      ],
-
-      '/examples/': [
         {
-          text: 'Examples',
+          text: 'Core Concepts',
           items: [
-            { text: 'Overview', link: '/examples/' },
-            { text: 'Basic Usage', link: '/examples/basic-usage' },
-            { text: 'MongoDB Models', link: '/examples/mongodb-models' },
-            { text: 'Validation', link: '/examples/validation' },
-            { text: 'Custom Plugin', link: '/examples/custom-plugin' },
-            { text: 'Microservices', link: '/examples/microservices' },
-            { text: 'Full Stack App', link: '/examples/full-stack-app' },
+            { text: 'Architecture', link: '/plugin-development/architecture' },
+            { text: 'Parser & AST', link: '/plugin-development/parser-ast' },
+            { text: 'Semantic Nodes', link: '/plugin-development/semantic-nodes' },
+            { text: 'Plugin System', link: '/plugin-development/plugin-system' },
+            { text: 'Annotation System', link: '/plugin-development/annotation-system' },
+            { text: 'Type System', link: '/plugin-development/type-system' },
           ],
         },
-      ],
-
-      '/integrations/': [
         {
-          text: 'Integrations',
+          text: 'Language Extensions',
           items: [
-            { text: 'Overview', link: '/integrations/' },
-            { text: 'Moost Framework', link: '/integrations/moost-framework' },
-            { text: 'NestJS', link: '/integrations/nestjs' },
-            { text: 'Express', link: '/integrations/express' },
-            { text: 'Fastify', link: '/integrations/fastify' },
-            { text: 'GraphQL', link: '/integrations/graphql' },
-            { text: 'OpenAPI', link: '/integrations/openapi' },
+            { text: 'Plugin Hooks', link: '/plugin-development/plugin-hooks' },
+            { text: 'Code Generation', link: '/plugin-development/code-generation' },
+            { text: 'Primitives & Type Tags', link: '/plugin-development/primitives-type-tags' },
+            { text: 'Testing Plugins', link: '/plugin-development/testing-plugins' },
           ],
         },
-      ],
-
-      '/advanced/': [
         {
-          text: 'Advanced Topics',
+          text: 'LSP Development',
           items: [
-            { text: 'Overview', link: '/advanced/' },
-            { text: 'Plugin Development', link: '/advanced/plugin-development' },
-            { text: 'Custom Annotations', link: '/advanced/custom-annotations' },
-            { text: 'Type Extensions', link: '/advanced/type-extensions' },
-            { text: 'AST Manipulation', link: '/advanced/ast-manipulation' },
-            { text: 'Performance', link: '/advanced/performance' },
-            { text: 'Best Practices', link: '/advanced/best-practices' },
-            { text: 'Migration Guide', link: '/advanced/migration-guide' },
+            { text: 'LSP Overview', link: '/plugin-development/lsp-overview' },
+            { text: 'Diagnostics', link: '/plugin-development/diagnostics' },
+            { text: 'Completions & Navigation', link: '/plugin-development/completions-navigation' },
+          ],
+        },
+        {
+          text: 'Reference',
+          items: [
+            { text: 'Core API', link: '/plugin-development/core-api' },
+            { text: 'Plugin API', link: '/plugin-development/plugin-api' },
           ],
         },
       ],

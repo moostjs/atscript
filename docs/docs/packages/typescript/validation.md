@@ -107,7 +107,7 @@ Product.validator({
 
 ## Annotation-Driven Rules
 
-Annotations from `.as` files are enforced automatically during validation. See the [Annotations guide](/guide/annotations) for the full list.
+Annotations from `.as` files are enforced automatically during validation. See the [Annotations](/packages/typescript/annotations) page for the full list.
 
 | Annotation | Applies to | Validates |
 |------------|-----------|-----------|

@@ -2,6 +2,10 @@
 
 Atscript types can be converted to [JSON Schema](https://json-schema.org/) for use with API documentation tools, form generators, or any system that consumes JSON Schema.
 
+## Enabling JSON Schema
+
+By default, JSON Schema support is disabled (`jsonSchema: false`) to keep generated output lightweight. To enable it, set the `jsonSchema` plugin option — see [Configuration — `jsonSchema`](/packages/typescript/configuration#jsonschema) for the available modes and examples.
+
 ## Usage
 
 Two ways to get a JSON Schema from an Atscript type:
@@ -10,14 +14,40 @@ Two ways to get a JSON Schema from an Atscript type:
 import { Product } from './product.as'
 import { buildJsonSchema } from '@atscript/typescript/utils'
 
-// Option 1: from the generated type directly
+// Option 1: from the generated type directly (requires jsonSchema: 'lazy' or 'bundle')
 const schema = Product.toJsonSchema()
 
-// Option 2: using the standalone function
+// Option 2: using the standalone function (always available)
 const schema = buildJsonSchema(Product)
 ```
 
-The `.toJsonSchema()` method on generated types is lazy-computed and cached on first call.
+The `.toJsonSchema()` method on generated types requires the `jsonSchema` plugin option to be set to `'lazy'` or `'bundle'` — otherwise it throws a runtime error. Alternatively, add the [`@ts.buildJsonSchema`](#per-interface-override-ts-buildjsonschema) annotation to individual interfaces.
+
+::: tip Manual use is always available
+Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/typescript/utils` and call it directly. The config option only affects the *generated* `.toJsonSchema()` method — the standalone function always works.
+
+```typescript
+import { buildJsonSchema } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+const schema = buildJsonSchema(Product) // works regardless of config
+```
+:::
+
+## Per-Interface Override: `@ts.buildJsonSchema`
+
+The `@ts.buildJsonSchema` annotation forces build-time JSON Schema embedding for a specific interface, regardless of the global `jsonSchema` setting. This is useful when you've disabled JSON Schema globally but need it for select types:
+
+```atscript
+@ts.buildJsonSchema
+export interface ApiResponse {
+    status: string
+    @expect.minLength 1
+    message: string
+}
+```
+
+`ApiResponse.toJsonSchema()` will return the pre-computed schema even if `jsonSchema: false` is set in the plugin config. The annotation can only be applied to interfaces (top-level).
 
 ## Annotation Constraints
 

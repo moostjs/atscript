@@ -191,7 +191,7 @@ describe('json-schema', () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/jsonschema-deep.as'],
-      plugins: [tsPlugin({ preRenderJsonSchema: true })],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
     })
     const out = await repo.generate({ format: 'js' })
     const content = out[0].content
