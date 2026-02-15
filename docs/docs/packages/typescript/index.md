@@ -2,36 +2,36 @@
 
 The TypeScript plugin for Atscript. It generates TypeScript declarations (`.d.ts`) and JavaScript modules (`.js`) from `.as` files, and provides runtime utilities for validation, JSON Schema generation, serialization, and type traversal.
 
-## Entry Points
+## Two Entry Points
 
-The package exposes two entry points:
+- **`@atscript/typescript`** — the code generation plugin (used in `atscript.config.js`)
+- **`@atscript/typescript/utils`** — runtime utilities for working with generated types
 
-- **`@atscript/typescript`** — the code generation plugin, used in `atscript.config.js`:
+```typescript
+import {
+  Validator,
+  buildJsonSchema,
+  serializeAnnotatedType,
+  deserializeAnnotatedType,
+  forAnnotatedType,
+} from '@atscript/typescript/utils'
+```
 
-  ```javascript
-  import { defineConfig } from '@atscript/core'
-  import ts from '@atscript/typescript'
+## What's in This Section
 
-  export default defineConfig({
-    plugins: [ts()],
-  })
-  ```
+**Getting Started:**
+- [Installation](/packages/typescript/installation) — install the package
+- [Configuration](/packages/typescript/configuration) — set up the plugin and config file
+- [Code Generation](/packages/typescript/code-generation) — understand `.d.ts` and `.js` output formats
+- [CLI](/packages/typescript/cli) — build `.as` files from the command line
 
-- **`@atscript/typescript/utils`** — runtime utilities for working with generated types:
+**Runtime API:**
+- [Type Definitions](/packages/typescript/type-definitions) — the annotated type system, DataType inferring, and type traversal
+- [Metadata](/packages/typescript/metadata-export) — access annotations at runtime
+- [Validation](/packages/typescript/validation) — validate data with type guard support
+- [JSON Schema](/packages/typescript/json-schema) — generate JSON Schema from types
+- [Serialization](/packages/typescript/serialization) — serialize types for backend-to-frontend transfer
 
-  ```typescript
-  import {
-    Validator,
-    buildJsonSchema,
-    serializeAnnotatedType,
-    deserializeAnnotatedType,
-    forAnnotatedType,
-  } from '@atscript/typescript/utils'
-  ```
-
-## Features
-
-- **[Type Definitions](/packages/typescript/type-definitions)** — runtime annotated type system with automatic DataType inferring and type-safe traversal
-- **[Validation](/packages/typescript/validation)** — `Validator` class with type guard support, configurable options, and plugin system
-- **[JSON Schema](/packages/typescript/json-schema)** — generate JSON Schema from annotated types, with annotation-driven constraints
-- **[Serialization](/packages/typescript/serialization)** — serialize types to JSON for backend-to-frontend transfer, database storage, and caching
+::: tip New to Atscript?
+Start with the [Quick Start](/guide/quick-start) guide for a hands-on introduction to the `.as` language and TypeScript integration.
+:::

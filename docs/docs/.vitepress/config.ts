@@ -325,18 +325,12 @@ export default defineConfig({
     nav: [
       { text: 'Guide', link: '/guide/installation' },
       // { text: 'Concepts', link: '/concepts/what-is-atscript' },
-      // {
-      //   text: 'Packages',
-      //   items: [
-      //     { text: 'Core', link: '/packages/core/' },
-      //     { text: 'TypeScript', link: '/packages/typescript/' },
-      //     { text: 'MongoDB', link: '/packages/mongo/' },
-      //     { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
-      //     { text: 'Moost Validator', link: '/packages/moost-validator/' },
-      //     { text: 'Unplugin', link: '/packages/unplugin/' },
-      //     { text: 'VSCode', link: '/packages/vscode/' }
-      //   ]
-      // },
+      {
+        text: 'Packages',
+        items: [
+          { text: 'TypeScript', link: '/packages/typescript/' },
+        ],
+      },
       // { text: 'API', link: '/api/' },
       // { text: 'Examples', link: '/examples/' }
     ],
@@ -418,15 +412,20 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Features',
+          text: 'Getting Started',
           items: [
             { text: 'Code Generation', link: '/packages/typescript/code-generation' },
+            { text: 'CLI', link: '/packages/typescript/cli' },
+          ],
+        },
+        {
+          text: 'Runtime API',
+          items: [
             { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
-            { text: 'Metadata Export', link: '/packages/typescript/metadata-export' },
+            { text: 'Metadata', link: '/packages/typescript/metadata-export' },
             { text: 'Validation', link: '/packages/typescript/validation' },
             { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
             { text: 'Serialization', link: '/packages/typescript/serialization' },
-            { text: 'CLI', link: '/packages/typescript/cli' },
           ],
         },
       ],
