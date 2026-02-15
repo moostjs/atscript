@@ -1,3 +1,13 @@
+## <small>0.1.3 (2026-02-15)</small>
+
+* docs: update ([2cfab8b](https://github.com/moostjs/atscript/commit/2cfab8b))
+* docs: update ([4158753](https://github.com/moostjs/atscript/commit/4158753))
+* docs: update docs ([b3e108f](https://github.com/moostjs/atscript/commit/b3e108f))
+* feat: add fromJsonSchema ([23751a9](https://github.com/moostjs/atscript/commit/23751a9))
+* feat: add serializer ([01c168d](https://github.com/moostjs/atscript/commit/01c168d))
+
+
+
 ## <small>0.1.2 (2026-02-12)</small>
 
 * docs: update ([521b26d](https://github.com/moostjs/atscript/commit/521b26d))
