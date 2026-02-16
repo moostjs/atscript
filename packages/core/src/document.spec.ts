@@ -42,6 +42,23 @@ primitives.set(
     },
   })
 )
+primitives.set(
+  'phantom',
+  new SemanticPrimitiveNode('phantom', {
+    type: 'phantom',
+  })
+)
+primitives.set(
+  'ui',
+  new SemanticPrimitiveNode('ui', {
+    type: 'phantom',
+    isContainer: true,
+    extensions: {
+      action: {},
+      divider: {},
+    },
+  })
+)
 
 describe('document', () => {
   it('should register import', () => {
@@ -1035,6 +1052,37 @@ describe('document/merging intersections', () => {
     expect(isGroup(def)).toBeTruthy()
     expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(
       `"● [ref] "never""`
+    )
+  })
+  it('should error when container primitive is used without extension', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
+    doc.update(`interface IFace { prop: ui }`)
+    const messages = doc.getDiagMessages()
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        severity: 1,
+        message: expect.stringContaining('container type'),
+      })
+    )
+  })
+  it('should allow container primitive with extension', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
+    doc.update(`interface IFace { prop: ui.action }`)
+    const messages = doc.getDiagMessages()
+    expect(messages).not.toContainEqual(
+      expect.objectContaining({
+        message: expect.stringContaining('container type'),
+      })
+    )
+  })
+  it('should allow non-container primitive without extension', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', { primitives })
+    doc.update(`interface IFace { prop: phantom }`)
+    const messages = doc.getDiagMessages()
+    expect(messages).not.toContainEqual(
+      expect.objectContaining({
+        message: expect.stringContaining('container type'),
+      })
     )
   })
 })

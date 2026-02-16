@@ -35,6 +35,7 @@ export interface TPrimitiveBaseConfig {
   type?: TPrimitiveTypeDef
   documentation?: string
   tags?: string[]
+  isContainer?: boolean
   expect?: {
     min?: number // number
     max?: number // number
@@ -71,7 +72,7 @@ export interface TPrimitiveTypeObject {
   optional?: boolean
 }
 
-export type TPrimitiveTypeFinal = 'string' | 'number' | 'boolean' | 'void' | 'null'
+export type TPrimitiveTypeFinal = 'string' | 'number' | 'boolean' | 'void' | 'null' | 'phantom'
 export type TPrimitiveTypeFinalOptional = {
   kind: 'final'
   value: TPrimitiveTypeFinal

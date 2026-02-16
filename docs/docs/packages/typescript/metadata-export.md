@@ -67,12 +67,14 @@ if (addressProp?.type.kind === 'object') {
 }
 ```
 
-Use [`forAnnotatedType()`](/packages/typescript/type-definitions#type-traversal) to traverse nested types generically.
+Use [`forAnnotatedType()`](/packages/typescript/type-definitions#forAnnotatedType) to traverse nested types generically — see [Type Traversal](/packages/typescript/type-definitions#type-traversal) for recursive walking patterns and practical examples.
 
 ## Practical Example: Form Generation
 
 ```typescript
 import { Product } from './product.as'
+import { isPhantomType } from '@atscript/typescript/utils'
+import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
 function buildFormFields(type: TAtscriptAnnotatedType) {
   if (type.type.kind !== 'object') return []
@@ -84,12 +86,15 @@ function buildFormFields(type: TAtscriptAnnotatedType) {
     placeholder: prop.metadata.get('meta.placeholder'),
     sensitive: prop.metadata.get('meta.sensitive') || false,
     readonly: prop.metadata.get('meta.readonly') || false,
+    phantom: isPhantomType(prop),  // non-data UI elements
   }))
 }
 
 const fields = buildFormFields(Product)
-// [{ name: 'name', label: 'Product Name', required: true, ... }, ...]
+// [{ name: 'name', label: 'Product Name', required: true, phantom: false, ... }, ...]
 ```
+
+For more advanced traversal patterns — recursive walking, flattening nested types, collecting metadata across the type tree — see [Type Traversal](/packages/typescript/type-definitions#type-traversal).
 
 ## Next Steps
 

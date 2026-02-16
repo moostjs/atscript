@@ -120,6 +120,8 @@ Annotations from `.as` files are enforced automatically during validation. See t
 
 Semantic types like `string.email` and `number.positive` automatically add validation rules through their annotation definitions.
 
+[Phantom](/packages/typescript/primitives#phantom-type) props are automatically skipped during validation — they are non-data elements and any data with a phantom-named key is treated as an unexpected property.
+
 ## Error Handling
 
 `ValidatorError` extends `Error` and includes structured details:

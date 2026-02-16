@@ -128,6 +128,7 @@ export const primitives: Record<string, TPrimitiveConfig> = {
   },
 
   phantom: {
+    type: 'phantom',
     documentation:
       'Phantom type. Does not affect the data type, validation, or schema. Discoverable via runtime type traversal.',
   },

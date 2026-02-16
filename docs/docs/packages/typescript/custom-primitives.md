@@ -52,9 +52,78 @@ Each extension object supports:
 
 | Field | Description |
 |-------|-------------|
-| `type` | The base TypeScript type (`'string'`, `'number'`, `'boolean'`) |
-| `documentation` | Description shown in IntelliSense |
-| `expect` | Implicit validation constraints — same keys as `@expect.*` annotations |
+| `type` | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, etc.) — **inherited** from parent if omitted |
+| `documentation` | Description shown in IntelliSense — inherited from parent if omitted |
+| `expect` | Implicit validation constraints — merged with parent's `expect` |
+| `extensions` | Nested sub-extensions (e.g., `number.int.positive`) |
+| `isContainer` | If `true`, the primitive cannot be used directly — one of its extensions must be chosen |
+
+::: tip Inheritance
+Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own `expect` constraints.
+:::
+
+## Custom Phantom Namespaces
+
+You can define entirely new primitive namespaces with `type: 'phantom'` to create families of non-data UI elements. These are omitted from TypeScript types and skipped by validation, but discoverable at runtime — perfect for form renderers that need different kinds of decorative or interactive elements.
+
+```javascript
+import { defineConfig } from '@atscript/core'
+import ts from '@atscript/typescript'
+
+export default defineConfig({
+  rootDir: 'src',
+  plugins: [ts()],
+  primitives: {
+    ui: {
+      type: 'phantom',
+      isContainer: true,
+      documentation: 'Non-data UI elements for form rendering',
+      extensions: {
+        action: {
+          documentation: 'An action element (button, link)',
+        },
+        divider: {
+          documentation: 'A visual divider between form sections',
+        },
+        paragraph: {
+          documentation: 'A block of informational text',
+        },
+      },
+    },
+  },
+})
+```
+
+Since extensions inherit `type` from their parent, all `ui.*` subtypes are automatically phantom — no need to repeat `type: 'phantom'` on each one. The `isContainer: true` flag prevents using `ui` directly — the compiler will report an error and require a specific extension like `ui.action` or `ui.divider`.
+
+Then use them in `.as` files:
+
+```atscript
+export interface CheckoutForm {
+    @label "Email"
+    email: string.email
+
+    @label "Shipping Address"
+    @component "section-header"
+    shippingHeader: ui.divider
+
+    @label "Street"
+    street: string
+
+    @label "City"
+    city: string
+
+    @label "Please review your order before proceeding."
+    termsNote: ui.paragraph
+
+    @label "Apply coupon"
+    @component "button"
+    @action "apply-coupon"
+    applyCoupon: ui.action
+}
+```
+
+The `ui`, `ui.action`, `ui.divider`, and `ui.paragraph` types all behave like [phantom](/packages/typescript/primitives#phantom-type) — they are excluded from the generated TypeScript class and skipped by validation — but they carry distinct tags (`'action'`, `'divider'`, `'paragraph'`) that your form renderer can use to choose the right component.
 
 ## Using Custom Primitives
 

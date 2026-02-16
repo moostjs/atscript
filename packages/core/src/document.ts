@@ -763,13 +763,21 @@ export class AtscriptDoc {
         }
         if (isRef(t.parentNode)) {
           const def = this.unwindType(t.parentNode.id!, t.parentNode.chain)?.def
-          if (isPrimitive(def) && !def.config.type && def.id !== 'phantom') {
+          if (isPrimitive(def) && !def.config.type) {
             // disallow using primitives with undefined type
             const token = t.parentNode.chain[t.parentNode.chain.length - 1] || t
             this._allMessages.push({
               severity: 1,
               message: 'Invalid type',
               range: token.range,
+            })
+          }
+          if (isPrimitive(def) && def.config.isContainer) {
+            // container primitives must be used with an extension (e.g. ui.action, not ui)
+            this._allMessages.push({
+              severity: 1,
+              message: `"${t.parentNode.id!}${t.parentNode.hasChain ? '.' + t.parentNode.chain.map(c => c.text).join('.') : ''}" is a container type — use one of its extensions`,
+              range: t.range,
             })
           }
           if (t.parentNode.hasChain) {
