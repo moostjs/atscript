@@ -1,6 +1,6 @@
 {
   "name": "@atscript/moost-validator",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Validator pipe and utils for Moost.",
   "type": "module",
   "main": "dist/index.mjs",
