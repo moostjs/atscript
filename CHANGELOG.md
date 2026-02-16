@@ -1,3 +1,11 @@
+## <small>0.1.6 (2026-02-16)</small>
+
+* chore: update snapshots ([e1d853e](https://github.com/moostjs/atscript/commit/e1d853e))
+* fix: improve dts, remove DataType ([8f128ae](https://github.com/moostjs/atscript/commit/8f128ae))
+* fix: phantom type d.ts render ([ec30f53](https://github.com/moostjs/atscript/commit/ec30f53))
+
+
+
 ## <small>0.1.5 (2026-02-16)</small>
 
 * feat(vscode): add semantic token to phantom types ([51c03ba](https://github.com/moostjs/atscript/commit/51c03ba))
