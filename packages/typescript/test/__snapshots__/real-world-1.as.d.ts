@@ -25,10 +25,6 @@ declare class Address {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-declare namespace Address {
-  type DataType = Address
-}
-
 
 /**
  * Atscript interface **Contact**
@@ -45,10 +41,6 @@ declare class Contact {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-declare namespace Contact {
-  type DataType = Contact
-}
-
 
 /**
  * Atscript interface **Entity**
@@ -66,8 +58,4 @@ export declare class Entity {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace Entity {
-  type DataType = Entity
-}
-
 // prettier-ignore-end

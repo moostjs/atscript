@@ -14,8 +14,4 @@ import { MyInterface } from "./annotate-nonmutating.as"
  * @see {@link ./annotate-import.as:3:32}
  */
 export declare class ImportedAnnotated extends MyInterface {}
-export declare namespace ImportedAnnotated {
-  type DataType = ImportedAnnotated
-}
-
 // prettier-ignore-end

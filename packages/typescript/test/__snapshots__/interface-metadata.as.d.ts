@@ -35,10 +35,6 @@ export declare class WithMetadata {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace WithMetadata {
-  type DataType = WithMetadata
-}
-
 
 /**
  * Atscript type **SomeType**
@@ -48,11 +44,10 @@ export type SomeType = {
   a: "b"
 }
 declare namespace SomeType {
-  type DataType = SomeType
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof SomeType, SomeType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof SomeType, SomeType>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof SomeType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }

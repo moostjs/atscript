@@ -14,11 +14,10 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
  */
 declare type TContactType = "phone" | "email"
 declare namespace TContactType {
-  type DataType = TContactType
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TContactType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TContactType, TContactType>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TContactType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -40,10 +39,6 @@ export declare class Address {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace Address {
-  type DataType = Address
-}
-
 
 /**
  * Atscript interface **Contact**
@@ -60,10 +55,6 @@ declare class Contact {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-declare namespace Contact {
-  type DataType = Contact
-}
-
 
 /**
  * Atscript interface **User**
@@ -81,8 +72,4 @@ export declare class User {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace User {
-  type DataType = User
-}
-
 // prettier-ignore-end

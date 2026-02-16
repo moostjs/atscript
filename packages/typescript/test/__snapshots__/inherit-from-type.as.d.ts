@@ -14,11 +14,10 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
  */
 declare type TFirstName = string
 declare namespace TFirstName {
-  type DataType = TFirstName
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal<TFirstName>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TFirstName, TFirstName>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TFirstName>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -29,11 +28,10 @@ declare namespace TFirstName {
  */
 declare type TLastName = string
 declare namespace TLastName {
-  type DataType = TLastName
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal<TLastName>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TLastName, TLastName>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TLastName>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -44,11 +42,10 @@ declare namespace TLastName {
  */
 declare type TAge = number
 declare namespace TAge {
-  type DataType = TAge
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal<TAge>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TAge, TAge>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TAge>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -68,8 +65,4 @@ export declare class ITarget {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace ITarget {
-  type DataType = ITarget
-}
-
 // prettier-ignore-end

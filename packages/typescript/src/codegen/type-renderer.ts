@@ -182,12 +182,6 @@ export class TypeRenderer extends BaseRenderer {
       this.writeln('{}')
     }
     this.writeln()
-    const nsPrefix = exported ? 'export declare' : 'declare'
-    this.write(`${nsPrefix} namespace ${node.id!} `)
-    this.blockln('{}')
-    this.writeln(`type DataType = ${node.id!}`)
-    this.popln()
-    this.writeln()
   }
 
   renderType(node: SemanticTypeNode) {
@@ -222,12 +216,6 @@ export class TypeRenderer extends BaseRenderer {
       // Target is an interface — render as class extends
       this.write(exported ? 'export declare ' : 'declare ')
       this.writeln(`class ${node.id!} extends ${targetName} {}`)
-      const nsPrefix = exported ? 'export declare' : 'declare'
-      this.write(`${nsPrefix} namespace ${node.id!} `)
-      this.blockln('{}')
-      this.writeln(`type DataType = ${node.id!}`)
-      this.popln()
-      this.writeln()
     }
   }
 
@@ -255,12 +243,11 @@ export class TypeRenderer extends BaseRenderer {
         typeDef = `TAtscriptTypeFinal<${name}>`
       }
     }
-    this.writeln(`type DataType = ${name}`)
     this.writeln(`const __is_atscript_annotated_type: true`)
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${name}, ${name}>`
+      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${name}>`
     )
     if (resolveJsonSchemaMode(this.opts) === false) {
       this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")

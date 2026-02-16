@@ -31,10 +31,6 @@ export declare class WithPatterns {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace WithPatterns {
-  type DataType = WithPatterns
-}
-
 
 /**
  * Atscript interface **WithPatterns2**
@@ -49,8 +45,4 @@ declare class WithPatterns2 {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-declare namespace WithPatterns2 {
-  type DataType = WithPatterns2
-}
-
 // prettier-ignore-end
