@@ -40,8 +40,10 @@ import {
   DiagnosticSeverity,
   DiagnosticTag,
   ParameterInformation,
+  SemanticTokensBuilder,
   SignatureInformation,
 } from 'vscode-languageserver/node'
+import type { Range, SemanticTokens } from 'vscode-languageserver/node'
 import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
@@ -474,6 +476,12 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         const def = unwound?.def
         const node = unwound?.node
         const docs = [] as string[]
+        if (isPrimitive(def) && def.config.type === 'phantom') {
+          docs.push('*(phantom — excluded from types, validation, and schema)*')
+        }
+        if (isPrimitive(def) && def.config.isContainer) {
+          docs.push('*(container — must use an extension)*')
+        }
         if (node && node.documentation) {
           docs.push(node.documentation)
         }
@@ -518,9 +526,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       }
     })
 
-    // connection.languages.semanticTokens.onRange(async params =>
-    //   this.provideSemanticTokens(params.textDocument.uri, params.range)
-    // )
+    connection.languages.semanticTokens.onRange(async params =>
+      this.provideSemanticTokens(params.textDocument.uri, params.range)
+    )
   }
 
   async loadPluginManagerFor(id: string): ReturnType<AtscriptRepo['loadPluginManagerFor']> {
@@ -553,32 +561,106 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
   }
 
-  // async provideSemanticTokens(uri: string, range?: Range) {
-  //   const document = this.documents.get(uri)
-  //   if (!document) {
-  //     return { data: [] } as SemanticTokens
-  //   }
+  async provideSemanticTokens(uri: string, range?: Range) {
+    const document = this.documents.get(uri)
+    if (!document) {
+      return { data: [] } as SemanticTokens
+    }
 
-  //   const atscript = await this.openDocument(document.uri)
-  //   if (!atscript || atscript.resolvedAnnotations.length === 0) {
-  //     return { data: [] } as SemanticTokens
-  //   }
-  //   // await this.currentCheck
+    const atscript = await this.openDocument(document.uri)
+    if (!atscript) {
+      return { data: [] } as SemanticTokens
+    }
 
-  //   const builder = new SemanticTokensBuilder()
-  //   atscript.resolvedAnnotations.sort((a, b) => a.range.start.line - b.range.start.line)
-  //   atscript.resolvedAnnotations.forEach(token => {
-  //     if (
-  //       range &&
-  //       range.start.line <= token.range.start.line &&
-  //       range.end.line >= token.range.end.line
-  //     ) {
-  //       builder.push(token.range.start.line, token.range.start.character, token.text.length, 0, 1)
-  //     }
-  //   })
+    const builder = new SemanticTokensBuilder()
+    // Collect all phantom-related tokens: type references + prop names
+    const phantomTokens: { line: number; char: number; length: number }[] = []
+    // 1. Mark phantom type reference tokens
+    for (const token of atscript.referred) {
+      if (!isRef(token.parentNode)) continue
+      const ref = token.parentNode
+      const unwound = atscript.unwindType(ref.id!, ref.chain)
+      if (!unwound?.def) continue
+      if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') continue
+      phantomTokens.push({
+        line: token.range.start.line,
+        char: token.range.start.character,
+        length: token.text.length,
+      })
+      for (const c of ref.chain) {
+        phantomTokens.push({
+          line: c.range.start.line,
+          char: c.range.start.character,
+          length: c.text.length,
+        })
+      }
+    }
+    // 2. Mark prop name tokens whose type resolves to phantom
+    for (const node of atscript.nodes) {
+      if (!isInterface(node)) continue
+      for (const [, prop] of node.props) {
+        const def = prop.getDefinition()
+        if (!isRef(def)) continue
+        const unwound = atscript.unwindType(def.id!, def.chain)
+        if (!unwound?.def) continue
+        if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') continue
+        const propToken = prop.token('identifier')
+        if (propToken) {
+          phantomTokens.push({
+            line: propToken.range.start.line,
+            char: propToken.range.start.character,
+            length: propToken.text.length,
+          })
+        }
+      }
+    }
+    // 3. Mark annotate block entry tokens that refer to phantom-typed props
+    for (const node of atscript.nodes) {
+      if (!isAnnotate(node)) continue
+      const unwound = atscript.unwindType(node.targetName)
+      if (!unwound?.def) continue
+      let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
+      if (isInterface(targetDef)) {
+        targetDef = targetDef.getDefinition() || targetDef
+      }
+      if (!isStructure(targetDef) && !isInterface(targetDef)) continue
+      for (const entry of node.entries) {
+        const propName = entry.id!
+        const prop = targetDef.props.get(propName)
+        if (!prop) continue
+        const propDef = prop.getDefinition()
+        if (!isRef(propDef)) continue
+        const propUnwound = atscript.unwindType(propDef.id!, propDef.chain)
+        if (!propUnwound?.def) continue
+        if (!isPrimitive(propUnwound.def) || propUnwound.def.config.type !== 'phantom') continue
+        const entryToken = entry.token('identifier')
+        if (entryToken) {
+          phantomTokens.push({
+            line: entryToken.range.start.line,
+            char: entryToken.range.start.character,
+            length: entryToken.text.length,
+          })
+        }
+        if (entry.hasChain) {
+          for (const c of entry.chain) {
+            phantomTokens.push({
+              line: c.range.start.line,
+              char: c.range.start.character,
+              length: c.text.length,
+            })
+          }
+        }
+      }
+    }
+    // Sort by position (required by semantic tokens protocol)
+    phantomTokens.sort((a, b) => a.line - b.line || a.char - b.char)
+    for (const t of phantomTokens) {
+      if (range && (t.line < range.start.line || t.line > range.end.line)) continue
+      builder.push(t.line, t.char, t.length, 0, 1) // tokenType=0 (type), modifier=1 (documentation)
+    }
 
-  //   return builder.build()
-  // }
+    return builder.build()
+  }
 
   async getAnnotationContextAt(document: TextDocument, position: Position) {
     const text = document.getText()

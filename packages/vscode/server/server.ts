@@ -33,14 +33,13 @@ connection.onInitialize(
         triggerCharacters: [',', ' '],
         retriggerCharacters: [',', ' '],
       },
-      // semanticTokensProvider: {
-      //   legend: {
-      //     tokenTypes: ['property'],
-      //     tokenModifiers: ['readonly'],
-      //   },
-      //   range: true,
-      //   // full: true,
-      // },
+      semanticTokensProvider: {
+        legend: {
+          tokenTypes: ['type'],
+          tokenModifiers: ['documentation'],
+        },
+        range: true,
+      },
     },
   })
 )

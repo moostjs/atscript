@@ -65,10 +65,31 @@
         "path": "./syntaxes/atscript.tmLanguage.json"
       }
     ],
+    "semanticTokenScopes": [
+      {
+        "language": "atscript",
+        "scopes": {
+          "type.documentation": [
+            "support.type.phantom.atscript"
+          ]
+        }
+      }
+    ],
     "configurationDefaults": {
       "explorer.fileNesting.enabled": true,
       "explorer.fileNesting.patterns": {
         "*.as": "${capture}.as.d.ts"
+      },
+      "[atscript]": {
+        "editor.semanticHighlighting.enabled": true
+      },
+      "editor.semanticTokenColorCustomizations": {
+        "rules": {
+          "type.documentation:atscript": {
+            "fontStyle": "italic",
+            "foreground": "#7c7c7c"
+          }
+        }
       }
     }
   },
