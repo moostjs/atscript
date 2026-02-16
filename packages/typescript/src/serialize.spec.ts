@@ -14,6 +14,7 @@ import {
   deserializeAnnotatedType,
   SERIALIZE_VERSION,
   type TSerializedTypeObject,
+  type TSerializedTypeFinal,
 } from './serialize'
 
 // ---------------------------------------------------------------------------
@@ -535,5 +536,120 @@ describe('JSON safety', () => {
     // Validator works after JSON round-trip
     const validator = new Validator(restored)
     expect(validator.validate({ name: 'test', items: [1, 2] }, true)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Phantom type handling
+// ---------------------------------------------------------------------------
+
+describe('phantom type serialization', () => {
+  it('should preserve phantom props when serializing objects', () => {
+    const original = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .prop('info', defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type)
+      .prop('age', defineAnnotatedType().designType('number').$type)
+      .$type
+
+    const serialized = serializeAnnotatedType(original)
+    const serializedObj = serialized.type as TSerializedTypeObject
+
+    // Phantom prop should be present in serialized props
+    expect(serializedObj.props.info).toBeDefined()
+    expect((serializedObj.props.info.type as TSerializedTypeFinal).designType).toBe('phantom')
+    // Regular props should also be present
+    expect(serializedObj.props.name).toBeDefined()
+    expect(serializedObj.props.age).toBeDefined()
+  })
+
+  it('should restore phantom props correctly', () => {
+    const original = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .prop('action', defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type)
+      .prop('age', defineAnnotatedType().designType('number').$type)
+      .$type
+
+    const restored = roundTrip(original)
+    const restoredObj = asObject(restored)
+
+    // Phantom props should be restored
+    expect(restoredObj.props.has('action')).toBe(true)
+    const actionProp = restoredObj.props.get('action')!
+    expect(asFinal(actionProp).designType).toBe('phantom')
+    expect(asFinal(actionProp).tags.has('phantom')).toBe(true)
+    expect(asFinal(actionProp).tags.has('ui')).toBe(true)
+
+    // Regular props should also be present
+    expect(restoredObj.props.has('name')).toBe(true)
+    expect(restoredObj.props.has('age')).toBe(true)
+    expect(restoredObj.props.size).toBe(3)
+  })
+
+  it('should serialize phantom type when encountered directly', () => {
+    const original = defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type
+
+    const serialized = serializeAnnotatedType(original)
+    const serializedFinal = serialized.type as TSerializedTypeFinal
+
+    expect(serializedFinal.kind).toBe('')
+    expect(serializedFinal.designType).toBe('phantom')
+    expect(serializedFinal.tags).toContain('phantom')
+    expect(serializedFinal.tags).toContain('ui')
+  })
+
+  it('should restore phantom type when encountered directly', () => {
+    const original = defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type
+    const restored = roundTrip(original)
+
+    expect(restored.type.kind).toBe('')
+    expect(asFinal(restored).designType).toBe('phantom')
+    expect(asFinal(restored).tags.has('phantom')).toBe(true)
+    expect(asFinal(restored).tags.has('ui')).toBe(true)
+  })
+
+  it('should preserve nested phantom props in complex structures', () => {
+    const original = defineAnnotatedType('object')
+      .prop('user', defineAnnotatedType('object')
+        .prop('name', defineAnnotatedType().designType('string').$type)
+        .prop('resetPassword', defineAnnotatedType().designType('phantom').tags('ui', 'action').$type)
+        .$type)
+      .prop('metadata', defineAnnotatedType('object')
+        .prop('created', defineAnnotatedType().designType('string').$type)
+        .prop('deleteButton', defineAnnotatedType().designType('phantom').tags('ui', 'button').$type)
+        .$type)
+      .$type
+
+    const restored = roundTrip(original)
+    const user = asObject(asObject(restored).props.get('user')!)
+    const metadata = asObject(asObject(restored).props.get('metadata')!)
+
+    // Phantom props should be preserved at all nesting levels
+    expect(user.props.has('resetPassword')).toBe(true)
+    expect(asFinal(user.props.get('resetPassword')!).designType).toBe('phantom')
+    expect(metadata.props.has('deleteButton')).toBe(true)
+    expect(asFinal(metadata.props.get('deleteButton')!).designType).toBe('phantom')
+
+    // Regular props should also be present
+    expect(user.props.has('name')).toBe(true)
+    expect(metadata.props.has('created')).toBe(true)
+  })
+
+  it('should preserve phantom props with metadata', () => {
+    const original = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .prop('info', defineAnnotatedType().designType('phantom')
+        .annotate('meta.label', 'Info Paragraph')
+        .annotate('meta.description', 'Informational text')
+        .tags('phantom', 'ui')
+        .$type)
+      .$type
+
+    const restored = roundTrip(original)
+    const info = asObject(restored).props.get('info')!
+
+    expect(asFinal(info).designType).toBe('phantom')
+    expect(info.metadata.get('meta.label')).toBe('Info Paragraph')
+    expect(info.metadata.get('meta.description')).toBe('Informational text')
+    expect(asFinal(info).tags.has('ui')).toBe(true)
   })
 })

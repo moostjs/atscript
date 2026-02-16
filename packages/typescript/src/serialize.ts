@@ -1,5 +1,4 @@
 import {
-  isPhantomType,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeDef,
   type TAtscriptTypeFinal,
@@ -164,7 +163,6 @@ function serializeTypeDef(
     object(d) {
       const props: Record<string, TSerializedAnnotatedTypeInner> = {}
       for (const [key, val] of d.type.props.entries()) {
-        if (isPhantomType(val)) continue
         props[key] = serializeNode(val, [...path, key], options)
       }
       const propsPatterns = d.type.propsPatterns.map(pp => ({
