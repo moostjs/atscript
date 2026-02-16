@@ -531,6 +531,51 @@ describe('ts-plugin', () => {
     expect(outDts[0].content).toContain('email: string')
   })
 
+  it('must render custom phantom primitives as comments in dts and as runtime props in js', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/phantom-custom.as'],
+      plugins: [tsPlugin()],
+      annotations,
+      primitives: {
+        ui: {
+          type: 'phantom',
+          isContainer: true,
+          documentation: 'UI-only phantom type',
+          extensions: {
+            paragraph: { documentation: 'A paragraph element' },
+            action: { documentation: 'An action element' },
+          },
+        },
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('phantom-custom.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/phantom-custom.js')
+    )
+    // Custom phantom props should appear in JS runtime output
+    expect(out[0].content).toContain('.prop(')
+    expect(out[0].content).toContain('"info"')
+    expect(out[0].content).toContain('"resetPassword"')
+    expect(out[0].content).toContain('.designType("phantom")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('phantom-custom.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/phantom-custom.as.d.ts')
+    )
+    // Custom phantom props should be comments in .d.ts with full type chain
+    expect(outDts[0].content).toContain('// info: ui.paragraph')
+    expect(outDts[0].content).toContain('// resetPassword: ui.action')
+    expect(outDts[0].content).not.toMatch(/^\s+info[?]?\s*:/m)
+    expect(outDts[0].content).not.toMatch(/^\s+resetPassword[?]?\s*:/m)
+    // Real props should still be present
+    expect(outDts[0].content).toContain('name: string')
+    expect(outDts[0].content).toContain('email: string')
+  })
+
   it('must disable json schema by default (no options)', async () => {
     const repo = await build({
       rootDir: wd,

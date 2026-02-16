@@ -122,8 +122,9 @@ export class TypeRenderer extends BaseRenderer {
         patterns.push(prop)
         continue
       }
-      if (this.isPhantomProp(prop.getDefinition())) {
-        this.writeln(`// ${prop.id!}: phantom`)
+      const phantomType = this.phantomPropType(prop.getDefinition())
+      if (phantomType) {
+        this.writeln(`// ${prop.id!}: ${phantomType}`)
         continue
       }
       const optional = !!prop.token('optional')
@@ -268,14 +269,17 @@ export class TypeRenderer extends BaseRenderer {
     this.popln()
   }
 
-  private isPhantomProp(def?: SemanticNode): boolean {
-    if (!def) return false
-    if (isPrimitive(def) && def.id === 'phantom') return true
+  private phantomPropType(def?: SemanticNode): string | undefined {
+    if (!def) return undefined
+    if (isPrimitive(def) && def.config.type === 'phantom') return def.id!
     if (isRef(def)) {
-      const unwound = this.doc.unwindType(def.id!, (def as SemanticRefNode).chain)?.def
-      return isPrimitive(unwound) && unwound.id === 'phantom'
+      const ref = def as SemanticRefNode
+      const unwound = this.doc.unwindType(ref.id!, ref.chain)?.def
+      if (isPrimitive(unwound) && unwound.config.type === 'phantom') {
+        return ref.hasChain ? `${ref.id!}.${ref.chain.map(c => c.text).join('.')}` : ref.id!
+      }
     }
-    return false
+    return undefined
   }
 
   private isTypeTarget(name: string, doc?: AtscriptDoc): boolean {
