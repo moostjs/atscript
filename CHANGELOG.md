@@ -1,3 +1,9 @@
+## <small>0.1.4 (2026-02-16)</small>
+
+* feat: add phantom primitive ([f5ea27a](https://github.com/moostjs/atscript/commit/f5ea27a))
+
+
+
 ## <small>0.1.3 (2026-02-15)</small>
 
 * docs: update ([2cfab8b](https://github.com/moostjs/atscript/commit/2cfab8b))
