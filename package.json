@@ -1,6 +1,6 @@
 {
   "name": "atscript",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Atscript is a language for describing data and interfaces with extensible annotations, enabling the generation of files at runtime for streamlined workflows.",
   "type": "module",
   "main": "index.js",
