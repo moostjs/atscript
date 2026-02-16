@@ -47,10 +47,6 @@ export declare class SimpleCollection {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace SimpleCollection {
-  type DataType = SimpleCollection
-}
-
 
 /**
  * Atscript interface **MinimalCollection**
@@ -66,10 +62,6 @@ export declare class MinimalCollection {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace MinimalCollection {
-  type DataType = MinimalCollection
-}
-
 
 /**
  * Atscript interface **MinimalCollectionString**
@@ -85,8 +77,4 @@ export declare class MinimalCollectionString {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace MinimalCollectionString {
-  type DataType = MinimalCollectionString
-}
-
 // prettier-ignore-end

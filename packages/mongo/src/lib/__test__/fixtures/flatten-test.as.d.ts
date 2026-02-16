@@ -40,8 +40,4 @@ export declare class FlattenTest {
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
 }
-export declare namespace FlattenTest {
-  type DataType = FlattenTest
-}
-
 // prettier-ignore-end
