@@ -356,8 +356,8 @@ describe('fromJsonSchema', () => {
   describe('constraints', () => {
     it('should convert string minLength/maxLength', () => {
       const type = fromJsonSchema({ type: 'string', minLength: 3, maxLength: 100 })
-      expect(type.metadata.get('expect.minLength')).toBe(3)
-      expect(type.metadata.get('expect.maxLength')).toBe(100)
+      expect(type.metadata.get('expect.minLength')).toEqual({ length: 3 })
+      expect(type.metadata.get('expect.maxLength')).toEqual({ length: 100 })
     })
 
     it('should convert string pattern', () => {
@@ -378,21 +378,21 @@ describe('fromJsonSchema', () => {
 
     it('should convert number minimum/maximum', () => {
       const type = fromJsonSchema({ type: 'number', minimum: 0, maximum: 100 })
-      expect(type.metadata.get('expect.min')).toBe(0)
-      expect(type.metadata.get('expect.max')).toBe(100)
+      expect(type.metadata.get('expect.min')).toEqual({ minValue: 0 })
+      expect(type.metadata.get('expect.max')).toEqual({ maxValue: 100 })
     })
 
     it('should convert integer with constraints', () => {
       const type = fromJsonSchema({ type: 'integer', minimum: 1, maximum: 10 })
       expect(type.metadata.get('expect.int')).toBe(true)
-      expect(type.metadata.get('expect.min')).toBe(1)
-      expect(type.metadata.get('expect.max')).toBe(10)
+      expect(type.metadata.get('expect.min')).toEqual({ minValue: 1 })
+      expect(type.metadata.get('expect.max')).toEqual({ maxValue: 10 })
     })
 
     it('should convert array minItems/maxItems', () => {
       const type = fromJsonSchema({ type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 5 })
-      expect(type.metadata.get('expect.minLength')).toBe(1)
-      expect(type.metadata.get('expect.maxLength')).toBe(5)
+      expect(type.metadata.get('expect.minLength')).toEqual({ length: 1 })
+      expect(type.metadata.get('expect.maxLength')).toEqual({ length: 5 })
     })
   })
 

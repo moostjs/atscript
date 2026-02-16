@@ -118,6 +118,25 @@ Annotations from `.as` files are enforced automatically during validation. See t
 | `@expect.int` | number | Must be integer |
 | `@expect.pattern` | string | Regex match (multiple patterns supported) |
 
+All validation annotations (except `@expect.int`) support an optional custom error message as the last argument:
+
+```atscript
+interface User {
+  @expect.minLength 3, "Username must be at least 3 characters"
+  @expect.maxLength 20, "Username cannot exceed 20 characters"
+  username: string
+
+  @expect.min 18, "You must be at least 18 years old"
+  @expect.max 120, "Age cannot exceed 120"
+  age: number
+
+  @expect.pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", "u", "Invalid email format"
+  email: string
+}
+```
+
+When validation fails, the custom message (if provided) is used instead of the default error message.
+
 Semantic types like `string.email` and `number.positive` automatically add validation rules through their annotation definitions.
 
 [Phantom](/packages/typescript/primitives#phantom-type) props are automatically skipped during validation — they are non-data elements and any data with a phantom-named key is treated as an unexpected property.

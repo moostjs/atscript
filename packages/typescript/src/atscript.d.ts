@@ -9,11 +9,11 @@ declare global {
     'meta.placeholder': string
     'meta.sensitive': boolean
     'meta.readonly': boolean
-    'expect.minLength': number
-    'expect.maxLength': number
-    'expect.min': number
-    'expect.max': number
-    'expect.int': boolean
+    'expect.minLength': { length: number; message?: string }
+    'expect.maxLength': { length: number; message?: string }
+    'expect.min': { minValue: number; message?: string }
+    'expect.max': { maxValue: number; message?: string }
+    'expect.int': { message?: string } | true
     'expect.pattern': { pattern: string; flags?: string; message?: string }[]
     'mongo.collection': string
     'mongo.index.plain': (string | true)[]

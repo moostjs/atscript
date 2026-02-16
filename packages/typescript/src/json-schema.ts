@@ -47,12 +47,12 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       array(d) {
         const schema: TJsonSchema = { type: 'array', items: build(d.type.of) }
         const minLength = meta.get('expect.minLength')
-        if (typeof minLength === 'number') {
-          schema.minItems = minLength
+        if (minLength) {
+          schema.minItems = typeof minLength === 'number' ? minLength : minLength.length
         }
         const maxLength = meta.get('expect.maxLength')
-        if (typeof maxLength === 'number') {
-          schema.maxItems = maxLength
+        if (maxLength) {
+          schema.maxItems = typeof maxLength === 'number' ? maxLength : maxLength.length
         }
         return schema
       },
@@ -78,12 +78,12 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         }
         if (schema.type === 'string') {
           const minLength = meta.get('expect.minLength')
-          if (typeof minLength === 'number') {
-            schema.minLength = minLength
+          if (minLength) {
+            schema.minLength = typeof minLength === 'number' ? minLength : minLength.length
           }
           const maxLength = meta.get('expect.maxLength')
-          if (typeof maxLength === 'number') {
-            schema.maxLength = maxLength
+          if (maxLength) {
+            schema.maxLength = typeof maxLength === 'number' ? maxLength : maxLength.length
           }
           const patterns = meta.get('expect.pattern') as Array<{ pattern: string }> | undefined
           if (patterns?.length) {
@@ -96,12 +96,12 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         }
         if (schema.type === 'number' || schema.type === 'integer') {
           const min = meta.get('expect.min')
-          if (typeof min === 'number') {
-            schema.minimum = min
+          if (min) {
+            schema.minimum = typeof min === 'number' ? min : min.minValue
           }
           const max = meta.get('expect.max')
-          if (typeof max === 'number') {
-            schema.maximum = max
+          if (max) {
+            schema.maximum = typeof max === 'number' ? max : max.maxValue
           }
         }
         return schema
@@ -213,15 +213,15 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
       }
       const itemType = s.items ? convert(s.items) : defineAnnotatedType().designType('any').$type
       const handle = defineAnnotatedType('array').of(itemType)
-      if (typeof s.minItems === 'number') handle.annotate('expect.minLength', s.minItems)
-      if (typeof s.maxItems === 'number') handle.annotate('expect.maxLength', s.maxItems)
+      if (typeof s.minItems === 'number') handle.annotate('expect.minLength', { length: s.minItems })
+      if (typeof s.maxItems === 'number') handle.annotate('expect.maxLength', { length: s.maxItems })
       return handle.$type
     }
 
     if (s.type === 'string') {
       const handle = defineAnnotatedType().designType('string').tags('string')
-      if (typeof s.minLength === 'number') handle.annotate('expect.minLength', s.minLength)
-      if (typeof s.maxLength === 'number') handle.annotate('expect.maxLength', s.maxLength)
+      if (typeof s.minLength === 'number') handle.annotate('expect.minLength', { length: s.minLength })
+      if (typeof s.maxLength === 'number') handle.annotate('expect.maxLength', { length: s.maxLength })
       if (s.pattern) {
         handle.annotate('expect.pattern', { pattern: s.pattern }, true)
       }
@@ -238,15 +238,15 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
     if (s.type === 'integer') {
       const handle = defineAnnotatedType().designType('number').tags('number')
       handle.annotate('expect.int', true)
-      if (typeof s.minimum === 'number') handle.annotate('expect.min', s.minimum)
-      if (typeof s.maximum === 'number') handle.annotate('expect.max', s.maximum)
+      if (typeof s.minimum === 'number') handle.annotate('expect.min', { minValue: s.minimum })
+      if (typeof s.maximum === 'number') handle.annotate('expect.max', { maxValue: s.maximum })
       return handle.$type
     }
 
     if (s.type === 'number') {
       const handle = defineAnnotatedType().designType('number').tags('number')
-      if (typeof s.minimum === 'number') handle.annotate('expect.min', s.minimum)
-      if (typeof s.maximum === 'number') handle.annotate('expect.max', s.maximum)
+      if (typeof s.minimum === 'number') handle.annotate('expect.min', { minValue: s.minimum })
+      if (typeof s.maximum === 'number') handle.annotate('expect.max', { maxValue: s.maximum })
       return handle.$type
     }
 

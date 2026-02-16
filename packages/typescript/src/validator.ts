@@ -261,14 +261,26 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
       return false
     }
     const minLength = def.metadata.get('expect.minLength')
-    if (typeof minLength === 'number' && value.length < minLength) {
-      this.error(`Expected minimum length of ${minLength} items, got ${value.length} items`)
-      return false
+    if (minLength) {
+      const length = typeof minLength === 'number' ? minLength : minLength.length
+      if (value.length < length) {
+        const message = typeof minLength === 'object' && minLength.message
+          ? minLength.message
+          : `Expected minimum length of ${length} items, got ${value.length} items`
+        this.error(message)
+        return false
+      }
     }
     const maxLength = def.metadata.get('expect.maxLength')
-    if (typeof maxLength === 'number' && value.length > maxLength) {
-      this.error(`Expected maximum length of ${maxLength} items, got ${value.length} items`)
-      return false
+    if (maxLength) {
+      const length = typeof maxLength === 'number' ? maxLength : maxLength.length
+      if (value.length > length) {
+        const message = typeof maxLength === 'object' && maxLength.message
+          ? maxLength.message
+          : `Expected maximum length of ${length} items, got ${value.length} items`
+        this.error(message)
+        return false
+      }
     }
     let i = 0
     let passed = true
@@ -448,18 +460,26 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     value: string
   ): boolean {
     const minLength = def.metadata.get('expect.minLength')
-    if (typeof minLength === 'number' && value.length < minLength) {
-      this.error(
-        `Expected minimum length of ${minLength} characters, got ${value.length} characters`
-      )
-      return false
+    if (minLength) {
+      const length = typeof minLength === 'number' ? minLength : minLength.length
+      if (value.length < length) {
+        const message = typeof minLength === 'object' && minLength.message
+          ? minLength.message
+          : `Expected minimum length of ${length} characters, got ${value.length} characters`
+        this.error(message)
+        return false
+      }
     }
     const maxLength = def.metadata.get('expect.maxLength')
-    if (typeof maxLength === 'number' && value.length > maxLength) {
-      this.error(
-        `Expected maximum length of ${maxLength} characters, got ${value.length} characters`
-      )
-      return false
+    if (maxLength) {
+      const length = typeof maxLength === 'number' ? maxLength : maxLength.length
+      if (value.length > length) {
+        const message = typeof maxLength === 'object' && maxLength.message
+          ? maxLength.message
+          : `Expected maximum length of ${length} characters, got ${value.length} characters`
+        this.error(message)
+        return false
+      }
     }
     const patterns = def.metadata.get('expect.pattern')
     for (const { pattern, flags, message } of patterns || []) {
@@ -488,19 +508,34 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     value: number
   ): boolean {
     const int = def.metadata.get('expect.int')
-    if (typeof int === 'boolean' && int && value % 1 !== 0) {
-      this.error(`Expected integer, got ${value}`)
+    if (int && value % 1 !== 0) {
+      const message = typeof int === 'object' && int.message
+        ? int.message
+        : `Expected integer, got ${value}`
+      this.error(message)
       return false
     }
     const min = def.metadata.get('expect.min')
-    if (typeof min === 'number' && value < min) {
-      this.error(`Expected minimum ${min}, got ${value}`)
-      return false
+    if (min) {
+      const minValue = typeof min === 'number' ? min : min.minValue
+      if (value < minValue) {
+        const message = typeof min === 'object' && min.message
+          ? min.message
+          : `Expected minimum ${minValue}, got ${value}`
+        this.error(message)
+        return false
+      }
     }
     const max = def.metadata.get('expect.max')
-    if (typeof max === 'number' && value > max) {
-      this.error(`Expected maximum ${max}, got ${value}`)
-      return false
+    if (max) {
+      const maxValue = typeof max === 'number' ? max : max.maxValue
+      if (value > maxValue) {
+        const message = typeof max === 'object' && max.message
+          ? max.message
+          : `Expected maximum ${maxValue}, got ${value}`
+        this.error(message)
+        return false
+      }
     }
     return true
   }

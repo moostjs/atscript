@@ -11,11 +11,19 @@ export const expectAnnotations: TAnnotationsTree = {
       'name: string' +
       '```',
     defType: ['array', 'string'],
-    argument: {
-      name: 'length',
-      type: 'number',
-      description: 'The minimum length of the string or array.',
-    },
+    argument: [
+      {
+        name: 'length',
+        type: 'number',
+        description: 'The minimum length of the string or array.',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
   }),
 
   maxLength: new AnnotationSpec({
@@ -27,11 +35,19 @@ export const expectAnnotations: TAnnotationsTree = {
       'name: string' +
       '```',
     defType: ['array', 'string'],
-    argument: {
-      name: 'length',
-      type: 'number',
-      description: 'The maximum length of the string or array.',
-    },
+    argument: [
+      {
+        name: 'length',
+        type: 'number',
+        description: 'The maximum length of the string or array.',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
   }),
 
   min: new AnnotationSpec({
@@ -43,11 +59,19 @@ export const expectAnnotations: TAnnotationsTree = {
       'age: number' +
       '```',
     defType: ['number'],
-    argument: {
-      name: 'minValue',
-      type: 'number',
-      description: 'The minimum value.',
-    },
+    argument: [
+      {
+        name: 'minValue',
+        type: 'number',
+        description: 'The minimum value.',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
   }),
 
   max: new AnnotationSpec({
@@ -59,11 +83,19 @@ export const expectAnnotations: TAnnotationsTree = {
       'count: number' +
       '```',
     defType: ['number'],
-    argument: {
-      name: 'maxValue',
-      type: 'number',
-      description: 'The maximum value.',
-    },
+    argument: [
+      {
+        name: 'maxValue',
+        type: 'number',
+        description: 'The maximum value.',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
   }),
 
   int: new AnnotationSpec({

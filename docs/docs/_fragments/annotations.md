@@ -121,10 +121,12 @@ Atscript provides common-purpose annotations:
 - `@meta.isKey` - Key field in arrays for lookups
 
 ### Validation Annotations (@expect.*)
-- `@expect.minLength 5` - Minimum string/array length
-- `@expect.maxLength 100` - Maximum string/array length
-- `@expect.min 0` - Minimum number value
-- `@expect.max 100` - Maximum number value
+- `@expect.minLength 5, "Custom error message"` - Minimum string/array length (optional message)
+- `@expect.maxLength 100, "Custom error message"` - Maximum string/array length (optional message)
+- `@expect.min 0, "Custom error message"` - Minimum number value (optional message)
+- `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
 - `@expect.int` - Must be integer
-- `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable)
+- `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
+
+All validation annotations (except `@expect.int`) accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
 

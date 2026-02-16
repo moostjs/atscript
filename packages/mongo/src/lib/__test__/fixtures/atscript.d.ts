@@ -19,10 +19,10 @@ declare global {
     "meta.sensitive": boolean
     "meta.readonly": boolean
     "meta.isKey": boolean
-    "expect.minLength": number
-    "expect.maxLength": number
-    "expect.min": number
-    "expect.max": number
+    "expect.minLength": { length: number, message?: string }
+    "expect.maxLength": { length: number, message?: string }
+    "expect.min": { minValue: number, message?: string }
+    "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
     "emit.jsonSchema": boolean

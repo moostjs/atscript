@@ -294,10 +294,27 @@ export class JsRenderer extends BaseRenderer {
       switch (a.name) {
         case 'expect.minLength':
         case 'expect.maxLength':
+          if (a.args[0]) {
+            handle.annotate(a.name as any, {
+              length: Number(a.args[0].text),
+              message: a.args[1]?.text,
+            })
+          }
+          break
         case 'expect.min':
+          if (a.args[0]) {
+            handle.annotate(a.name as any, {
+              minValue: Number(a.args[0].text),
+              message: a.args[1]?.text,
+            })
+          }
+          break
         case 'expect.max':
           if (a.args[0]) {
-            handle.annotate(a.name as any, Number(a.args[0].text))
+            handle.annotate(a.name as any, {
+              maxValue: Number(a.args[0].text),
+              message: a.args[1]?.text,
+            })
           }
           break
         case 'expect.pattern':
