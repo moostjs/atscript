@@ -39,6 +39,6 @@ declare global {
     "mongo.patch.strategy": string
     "mongo.array.uniqueItems": boolean
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "mongo" | "objectId" | "vector"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
 }
 // prettier-ignore-end

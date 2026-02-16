@@ -2,6 +2,7 @@
 // eslint-disable max-lines
 import {
   isAnnotatedType,
+  isPhantomType,
   TAtscriptAnnotatedType,
   TAtscriptTypeArray,
   TAtscriptTypeComplex,
@@ -192,6 +193,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
     return forAnnotatedType(def, {
       final: d => this.validatePrimitive(d, value),
+      phantom: () => true,
       object: d => this.validateObject(d, value),
       array: d => this.validateArray(d, value),
       union: d => this.validateUnion(d, value),
@@ -314,7 +316,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     }
 
     for (const [key, item] of def.type.props.entries()) {
-      if (skipList.has(key)) {
+      if (skipList.has(key) || isPhantomType(item)) {
         continue
       }
       typeKeys.add(key)

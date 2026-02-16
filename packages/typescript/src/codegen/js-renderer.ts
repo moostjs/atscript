@@ -216,7 +216,7 @@ export class JsRenderer extends BaseRenderer {
       case 'primitive': {
         const prim = node as SemanticPrimitiveNode
         const handle = defineAnnotatedType()
-        handle.designType(prim.id! === 'never' ? 'never' : (prim.config.type as 'string'))
+        handle.designType(prim.id! === 'never' ? 'never' : prim.id! === 'phantom' ? 'phantom' : (prim.config.type as 'string'))
         if (!skipAnnotations) {
           this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
         }
@@ -424,7 +424,7 @@ export class JsRenderer extends BaseRenderer {
   //     return this
   //   }
   definePrimitive(node: SemanticPrimitiveNode, name?: string) {
-    this.renderPrimitiveDef(node.id! === 'never' ? 'never' : node.config.type, name)
+    this.renderPrimitiveDef(node.id! === 'never' ? 'never' : node.id! === 'phantom' ? 'phantom' : node.config.type, name)
     this.writeln(
       `  .tags(${Array.from(node.tags)
         .map(f => `"${escapeQuotes(f)}"`)
@@ -433,7 +433,7 @@ export class JsRenderer extends BaseRenderer {
     return this
   }
 
-  renderPrimitiveDef(def?: TPrimitiveTypeDef | 'never', name?: string) {
+  renderPrimitiveDef(def?: TPrimitiveTypeDef | 'never' | 'phantom', name?: string) {
     const d = (t?: string) => [`"${t || ''}"`, name].filter(Boolean).join(', ').replace(/^""$/, '')
     if (!def) {
       return this.writeln(`$(${d()}).designType("any")`)

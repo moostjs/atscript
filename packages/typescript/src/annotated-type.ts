@@ -44,7 +44,7 @@ export interface TAtscriptTypeFinal<DataType = unknown> {
   /**
    * design type
    */
-  designType: 'string' | 'number' | 'boolean' | 'undefined' | 'null' | 'object' | 'any' | 'never'
+  designType: 'string' | 'number' | 'boolean' | 'undefined' | 'null' | 'object' | 'any' | 'never' | 'phantom'
 
   /**
    * value for literals
@@ -78,10 +78,10 @@ export type TAtscriptTypeDef<DataType = unknown> =
  * @typeParam T - The underlying type definition (e.g. {@link TAtscriptTypeObject}).
  * @typeParam DataType - The TypeScript type the validated data narrows to (auto-inferred from `T`).
  */
-export interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<T>> {
+export interface TAtscriptAnnotatedType<T extends TAtscriptTypeDef = TAtscriptTypeDef, DataType = InferDataType<T>> {
   __is_atscript_annotated_type: true
   type: T
-  validator: (opts?: Partial<TValidatorOptions>) => Validator
+  validator(opts?: Partial<TValidatorOptions>): Validator<this, DataType>
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
 }
@@ -299,6 +299,16 @@ export interface TAnnotatedTypeHandle {
   copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>): TAnnotatedTypeHandle
   refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]): TAnnotatedTypeHandle
   annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean): TAnnotatedTypeHandle
+}
+
+/**
+ * Checks whether an annotated type is a phantom type.
+ *
+ * Phantom types do not affect the data type, validation, or schema,
+ * but are discoverable via runtime type traversal.
+ */
+export function isPhantomType(def: TAtscriptAnnotatedType): boolean {
+  return def.type.kind === '' && (def.type as TAtscriptTypeFinal).designType === 'phantom'
 }
 
 /**

@@ -1,4 +1,4 @@
-import { defineAnnotatedType, type TAtscriptAnnotatedType, type TAtscriptTypeFinal } from './annotated-type'
+import { defineAnnotatedType, isPhantomType, type TAtscriptAnnotatedType, type TAtscriptTypeFinal } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 
 /** A JSON Schema object (draft-compatible). */
@@ -25,10 +25,14 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
   const build = (def: TAtscriptAnnotatedType): TJsonSchema => {
     const meta = def.metadata
     return forAnnotatedType(def, {
+      phantom() {
+        return {}
+      },
       object(d) {
         const properties: Record<string, TJsonSchema> = {}
         const required: string[] = []
         for (const [key, val] of d.type.props.entries()) {
+          if (isPhantomType(val)) continue
           properties[key] = build(val)
           if (!val.optional) {
             required.push(key)

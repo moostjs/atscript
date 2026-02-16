@@ -134,6 +134,40 @@ export interface Settings {
 }
 ```
 
+## Phantom Type
+
+The `phantom` primitive is a special type for non-data elements that should be discoverable via runtime type traversal but should not affect the actual data type, validation, or schema.
+
+This is useful when designing forms or UI components from `.as` interfaces — you may want to place paragraphs of text, alternative action buttons (like "reset password" or "resend OTP"), or other UI elements between the fields. `phantom` props carry their annotations (like `@label`, `@component`) but are invisible to TypeScript types, validators, and JSON schema.
+
+```atscript
+export interface LoginForm {
+    @label "Email"
+    email: string.email
+
+    @label "Password"
+    password: string
+
+    @label "Forgot password?"
+    @component "link"
+    @href "/reset-password"
+    forgotPassword: phantom
+
+    @label "Don't have an account? Sign up"
+    @component "link"
+    @href "/signup"
+    signUp: phantom
+}
+```
+
+**Behavior:**
+
+- **TypeScript type** — phantom props are emitted as comments (`// forgotPassword: phantom`) and do not appear in the generated class
+- **Runtime** — phantom props are present in `type.props` Map with `designType: 'phantom'`, so form renderers can discover them and read their annotations
+- **Validation** — phantom props are skipped; data with a phantom prop name is treated as an unexpected property
+- **JSON Schema / Serialization** — phantom props are excluded
+- **MongoDB** — phantom props are ignored during index and schema traversal
+
 ## Best Practices
 
 1. **Use semantic types** instead of plain primitives when the data has a specific format

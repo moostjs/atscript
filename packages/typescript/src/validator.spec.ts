@@ -165,6 +165,25 @@ describe('Validator at objects', () => {
     expect(validator.validate({ name: 'John', age: 30, bool: true }, true)).toBe(true)
     expect(validator.validate({ name: 'John', age: 30, bool: false }, true)).toBe(true)
   })
+
+  it('should skip phantom props during validation and treat them as unknown keys', () => {
+    const t = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .prop('info', defineAnnotatedType().designType('phantom').$type)
+      .prop('age', defineAnnotatedType().designType('number').$type)
+    const validator = new Validator(t.$type)
+    // Phantom props are not recognized — object with only real fields passes
+    expect(validator.validate({ name: 'John', age: 30 }, true)).toBe(true)
+    // Data with a phantom prop name is treated as unexpected property
+    expect(validator.validate({ name: 'John', age: 30, info: 'text' }, true)).toBe(false)
+  })
+
+  it('should validate phantom designType as always passing', () => {
+    const validator = new Validator(defineAnnotatedType().designType('phantom').$type)
+    expect(validator.validate(undefined, true)).toBe(true)
+    expect(validator.validate('anything', true)).toBe(true)
+    expect(validator.validate(42, true)).toBe(true)
+  })
 })
 
 describe('Validator at tuples', () => {

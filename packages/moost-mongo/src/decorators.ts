@@ -1,5 +1,5 @@
 import { Controller, Provide, ApplyDecorators, Inherit, Resolve } from 'moost'
-import { type TAtscriptAnnotatedTypeConstructor } from '@atscript/typescript/utils'
+import { type TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { AsMongo } from '@atscript/mongo'
 
 /**
@@ -30,7 +30,7 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
  * export class UsersController extends AsMongoController<typeof UserModel> {}
  * ```
  */
-export const CollectionController = (type: TAtscriptAnnotatedTypeConstructor, prefix?: string) =>
+export const CollectionController = (type: TAtscriptAnnotatedType & { name?: string }, prefix?: string) =>
   ApplyDecorators(
     Provide(COLLECTION_DEF, () => type),
     Controller(prefix || type.metadata.get('mongo.collection') || type.name),
@@ -58,7 +58,7 @@ export const CollectionController = (type: TAtscriptAnnotatedTypeConstructor, pr
  * }
  * ```
  */
-export const InjectCollection = (type: TAtscriptAnnotatedTypeConstructor) =>
+export const InjectCollection = (type: TAtscriptAnnotatedType) =>
   Resolve(async ({ instantiate }) => {
     const asMongo = await instantiate(AsMongo)
     return asMongo.getCollection(type)

@@ -202,6 +202,26 @@ describe('json-schema', () => {
   })
 })
 
+describe('json-schema phantom', () => {
+  it('should exclude phantom props from JSON schema', () => {
+    const t = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+      .prop('info', $().designType('phantom').$type)
+      .prop('age', $().designType('number').tags('number').$type)
+    const schema = $$(t.$type)
+    expect(schema).toEqual({
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        age: { type: 'number' },
+      },
+      required: ['name', 'age'],
+    })
+    // Phantom prop should not appear in properties
+    expect(schema.properties).not.toHaveProperty('info')
+  })
+})
+
 describe('fromJsonSchema', () => {
   describe('basic types', () => {
     it('should convert string type', () => {

@@ -497,6 +497,40 @@ describe('ts-plugin', () => {
     expect(user2Section).toContain('.annotate("mulAppend", "top-original", true)')
   })
 
+  it('must render phantom props as comments in dts and as runtime props in js', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/phantom.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('phantom.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/phantom.js')
+    )
+    // Phantom props should appear in JS runtime output
+    expect(out[0].content).toContain('.prop(')
+    expect(out[0].content).toContain('"info"')
+    expect(out[0].content).toContain('"resetPassword"')
+    expect(out[0].content).toContain('.designType("phantom")')
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('phantom.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/phantom.as.d.ts')
+    )
+    // Phantom props should be comments in .d.ts, not real fields
+    expect(outDts[0].content).toContain('// info: phantom')
+    expect(outDts[0].content).toContain('// resetPassword: phantom')
+    expect(outDts[0].content).not.toMatch(/^\s+info[?]?\s*:/m)
+    expect(outDts[0].content).not.toMatch(/^\s+resetPassword[?]?\s*:/m)
+    // Real props should still be present
+    expect(outDts[0].content).toContain('name: string')
+    expect(outDts[0].content).toContain('email: string')
+  })
+
   it('must disable json schema by default (no options)', async () => {
     const repo = await build({
       rootDir: wd,

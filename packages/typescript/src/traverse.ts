@@ -12,6 +12,10 @@ import type {
  * Provides the common `switch (def.type.kind)` pattern used by
  * the validator, JSON-schema builder, and serializer.
  * Each caller supplies its own handlers that control recursion.
+ *
+ * When a `phantom` handler is provided, phantom types (`designType === 'phantom'`)
+ * are dispatched to it instead of `final`. This allows consumers to skip or
+ * handle phantom props without polluting their `final` handler.
  */
 export function forAnnotatedType<R>(
   def: TAtscriptAnnotatedType,
@@ -22,11 +26,17 @@ export function forAnnotatedType<R>(
     union: (def: TAtscriptAnnotatedType<TAtscriptTypeComplex>) => R
     intersection: (def: TAtscriptAnnotatedType<TAtscriptTypeComplex>) => R
     tuple: (def: TAtscriptAnnotatedType<TAtscriptTypeComplex>) => R
+    phantom?: (def: TAtscriptAnnotatedType<TAtscriptTypeFinal>) => R
   }
 ): R {
   switch (def.type.kind) {
-    case '':
-      return handlers.final(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>)
+    case '': {
+      const typed = def as TAtscriptAnnotatedType<TAtscriptTypeFinal>
+      if (handlers.phantom && typed.type.designType === 'phantom') {
+        return handlers.phantom(typed)
+      }
+      return handlers.final(typed)
+    }
     case 'object':
       return handlers.object(def as TAtscriptAnnotatedType<TAtscriptTypeObject<string>>)
     case 'array':

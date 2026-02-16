@@ -1,8 +1,9 @@
-import type {
-  TAtscriptAnnotatedType,
-  TAtscriptTypeDef,
-  TAtscriptTypeFinal,
-  TMetadataMap,
+import {
+  isPhantomType,
+  type TAtscriptAnnotatedType,
+  type TAtscriptTypeDef,
+  type TAtscriptTypeFinal,
+  type TMetadataMap,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 import { Validator, type TValidatorOptions } from './validator'
@@ -142,6 +143,13 @@ function serializeTypeDef(
   options: TSerializeOptions | undefined
 ): TSerializedTypeDef {
   return forAnnotatedType<TSerializedTypeDef>(def, {
+    phantom(d) {
+      return {
+        kind: '' as const,
+        designType: d.type.designType,
+        tags: Array.from(d.type.tags),
+      }
+    },
     final(d) {
       const result: TSerializedTypeFinal = {
         kind: '',
@@ -156,6 +164,7 @@ function serializeTypeDef(
     object(d) {
       const props: Record<string, TSerializedAnnotatedTypeInner> = {}
       for (const [key, val] of d.type.props.entries()) {
+        if (isPhantomType(val)) continue
         props[key] = serializeNode(val, [...path, key], options)
       }
       const propsPatterns = d.type.propsPatterns.map(pp => ({

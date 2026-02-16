@@ -122,6 +122,10 @@ export class TypeRenderer extends BaseRenderer {
         patterns.push(prop)
         continue
       }
+      if (this.isPhantomProp(prop.getDefinition())) {
+        this.writeln(`// ${prop.id!}: phantom`)
+        continue
+      }
       const optional = !!prop.token('optional')
       this.write(wrapProp(prop.id!), optional ? '?' : '', ': ')
       const renderedDef = this.renderTypeDefString(prop.getDefinition())
@@ -255,13 +259,23 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(`const type: ${typeDef}`)
     this.writeln(`const metadata: TMetadataMap<AtscriptMetadata>`)
     this.writeln(
-      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, ${name}>`
+      `const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${name}, ${name}>`
     )
     if (resolveJsonSchemaMode(this.opts) === false) {
       this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")
     }
     this.writeln('const toJsonSchema: () => any')
     this.popln()
+  }
+
+  private isPhantomProp(def?: SemanticNode): boolean {
+    if (!def) return false
+    if (isPrimitive(def) && def.id === 'phantom') return true
+    if (isRef(def)) {
+      const unwound = this.doc.unwindType(def.id!, (def as SemanticRefNode).chain)?.def
+      return isPrimitive(unwound) && unwound.id === 'phantom'
+    }
+    return false
   }
 
   private isTypeTarget(name: string, doc?: AtscriptDoc): boolean {

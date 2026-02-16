@@ -3,13 +3,11 @@
 import {
   isAnnotatedTypeOfPrimitive,
   TAtscriptAnnotatedType,
-  TAtscriptAnnotatedTypeConstructor,
   TAtscriptTypeArray,
   defineAnnotatedType as $,
-  Validator,
 } from '@atscript/typescript/utils'
 import { AsCollection } from './as-collection'
-import { Document, Filter, UpdateFilter, UpdateOptions } from 'mongodb'
+import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
 
 /**
@@ -33,7 +31,7 @@ import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './va
  * MongoDB update document. Primitive fields are flattened into a regular
  * `$set` map.
  */
-export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
+export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
   constructor(
     private collection: AsCollection<T>,
     private payload: any
@@ -70,10 +68,10 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param collection Target collection wrapper
    * @returns Atscript Validator
    */
-  static prepareValidator<T extends TAtscriptAnnotatedTypeConstructor>(
-    collection: AsCollection<T>
-  ): Validator<T> {
-    return collection.type.validator({
+  static prepareValidator<T extends TAtscriptAnnotatedType>(
+    collection: AsCollection<T, any>
+  ) {
+    return collection.createValidator({
       plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
       replace: (def, path) => {
         if (path === '' && def.type.kind === 'object') {
@@ -166,7 +164,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
    * Internal accumulator: filter passed to `updateOne()`.
    * Filled only with the `_id` field right now.
    */
-  private filterObj = {} as Filter<InstanceType<T>>
+  private filterObj = {} as Filter<any>
 
   /** MongoDB *update* document being built. */
   private updatePipeline = [] as Document[]
@@ -188,8 +186,8 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
     let updateFilter = this.updatePipeline
     return {
       toArgs: (): [
-        Filter<InstanceType<T>>,
-        UpdateFilter<InstanceType<T>> | Document[],
+        Filter<any>,
+        UpdateFilter<any> | Document[],
         UpdateOptions,
       ] => [this.filterObj, updateFilter, this.optionsObj],
       filter: this.filterObj,
@@ -234,7 +232,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param prefix  Dotted path accumulated so far
    * @private
    */
-  private flattenPayload(payload: T, prefix = ''): UpdateFilter<InstanceType<T>> {
+  private flattenPayload(payload: any, prefix = ''): UpdateFilter<any> {
     const evalKey = (k: string) => (prefix ? `${prefix}.${k}` : k) as string
     for (const [_key, value] of Object.entries(payload)) {
       const key = evalKey(_key)

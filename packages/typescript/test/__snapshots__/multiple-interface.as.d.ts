@@ -18,7 +18,7 @@ declare namespace TContactType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TContactType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TContactType>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TContactType, TContactType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }

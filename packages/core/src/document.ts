@@ -763,7 +763,7 @@ export class AtscriptDoc {
         }
         if (isRef(t.parentNode)) {
           const def = this.unwindType(t.parentNode.id!, t.parentNode.chain)?.def
-          if (isPrimitive(def) && !def.config.type) {
+          if (isPrimitive(def) && !def.config.type && def.id !== 'phantom') {
             // disallow using primitives with undefined type
             const token = t.parentNode.chain[t.parentNode.chain.length - 1] || t
             this._allMessages.push({

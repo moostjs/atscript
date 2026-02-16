@@ -8,7 +8,7 @@ import { COLLECTION_DEF } from './decorators'
 import {
   Validator,
   ValidatorError,
-  type TAtscriptAnnotatedTypeConstructor,
+  type TAtscriptAnnotatedType,
 } from '@atscript/typescript/utils'
 import type {
   Document,
@@ -19,13 +19,11 @@ import type {
   InsertOneOptions,
   InsertOneResult,
   ObjectId,
-  OptionalUnlessRequiredId,
   ReplaceOptions,
   UpdateFilter,
   UpdateOptions,
   UpdateResult,
   WithId,
-  WithoutId,
   DeleteResult,
 } from 'mongodb'
 
@@ -47,7 +45,7 @@ import type {
  * @typeParam T - The **atscript** annotated class (constructor) representing the
  *               collection schema. Must be decorated with `@AsCollection`.
  */
-export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
+export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
   /** Reference to the lazily created {@link AsCollection}. */
   protected asCollection: AsCollection<T>
 
@@ -258,8 +256,8 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @param filter - The original filter object.
    * @returns The transformed filter object (may return `Promise`).
    */
-  protected transformFilter(filter: Document): Filter<InstanceType<T>> {
-    return filter as Filter<InstanceType<T>>
+  protected transformFilter(filter: Document): Filter<any> {
+    return filter as Filter<any>
   }
 
   /**
@@ -341,7 +339,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @returns Documents array **or** document count number.
    */
   @Get('query')
-  async query(@Url() url: string): Promise<InstanceType<T>[] | number | HttpError> {
+  async query(@Url() url: string): Promise<DataType[] | number | HttpError> {
     const query = url.split('?').slice(1).join('?')
     const parsed = parseUrlql(query)
 
@@ -380,7 +378,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       pipeline.push({ $project: projection })
     }
 
-    return this.asCollection.collection.aggregate(pipeline).toArray() as Promise<InstanceType<T>[]>
+    return this.asCollection.collection.aggregate(pipeline).toArray() as Promise<DataType[]>
   }
 
   /**
@@ -392,7 +390,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   @Get('pages')
   async pages(@Url() url: string): Promise<
     | {
-        documents: InstanceType<T>[]
+        documents: DataType[]
         page: number
         size: number
         totalPages: number
@@ -440,7 +438,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
     const result = await this.asCollection.collection.aggregate(pipeline).toArray()
     const totalDocuments = result[0]?.meta[0]?.count || 0
     return {
-      documents: (result[0]?.documents || []) as InstanceType<T>[],
+      documents: (result[0]?.documents || []) as DataType[],
       page,
       size: size,
       totalPages: Math.ceil(totalDocuments / size),
@@ -462,7 +460,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   async getOne(
     @Param('id') id: string,
     @Url() url: string
-  ): Promise<InstanceType<T> | HttpError | ValidatorError> {
+  ): Promise<DataType | HttpError | ValidatorError> {
     const idValidator = this.asCollection.flatMap.get('_id')?.validator()
     const query = url.split('?').slice(1).join('?')
     const parsed = parseUrlql(query)
@@ -489,9 +487,9 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
       )
     } else if (this.asCollection.uniqueProps.size > 0) {
       // not ObjectId passed, trying unique indexes
-      const filter = [] as Filter<InstanceType<T>>[]
+      const filter = [] as Filter<any>[]
       for (const prop of this.asCollection.uniqueProps) {
-        filter.push({ [prop]: id } as Filter<InstanceType<T>>)
+        filter.push({ [prop]: id } as Filter<any>)
       }
       return this.returnOne(
         this.asCollection.collection
@@ -518,15 +516,15 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    * @returns Document, 400 or 404 { @link HttpError }.
    */
   protected async returnOne(
-    result: Promise<WithId<InstanceType<T>>[]>
-  ): Promise<InstanceType<T> | HttpError> {
+    result: Promise<WithId<DataType>[]>
+  ): Promise<DataType | HttpError> {
     const items = await result
     if (items.length > 1) {
       return new HttpError(400, 'Found more than one record')
     } else if (items.length === 0) {
       return new HttpError(404)
     } else {
-      return items[0] as InstanceType<T>
+      return items[0] as DataType
     }
   }
 
@@ -542,22 +540,20 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   async insert(
     @Body() payload: Parameters<AsCollection<T>['prepareInsert']>[0]
   ): Promise<HttpError | InsertOneResult | InsertManyResult> {
-    const data = this.asCollection.prepareInsert(payload) as
-      | ReturnType<AsMongoController<T>['asCollection']['prepareInsert']>
-      | undefined
+    const data = this.asCollection.prepareInsert(payload)
     const opts = {} as InsertOneOptions
     if (Array.isArray(data)) {
-      const newData = await this.onWrite('insertMany', data, opts)
+      const newData = await this.onWrite('insertMany', data as DataType[], opts as BulkWriteOptions)
       if (newData) {
-        return this.asCollection.collection.insertMany(newData, opts)
+        return this.asCollection.collection.insertMany(newData as any[], opts)
       } else {
         return new HttpError(500, 'Not saved')
       }
     }
     if (data) {
-      const newData = await this.onWrite('insert', data, opts)
+      const newData = await this.onWrite('insert', data as DataType, opts)
       if (newData) {
-        return this.asCollection.collection.insertOne(newData, opts)
+        return this.asCollection.collection.insertOne(newData as any, opts)
       } else {
         return new HttpError(500, 'Not saved')
       }
@@ -573,7 +569,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
   @Put('')
   async replace(
     @Body() payload: Parameters<AsCollection<T>['prepareReplace']>[0]
-  ): Promise<HttpError | UpdateResult<InstanceType<T>>> {
+  ): Promise<HttpError | UpdateResult> {
     const args = this.asCollection.prepareReplace(payload).toArgs()
     const newData = await this.onWrite('replace', args[1], args[2])
     if (newData) {
@@ -581,7 +577,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
         this.transformFilter(args[0]),
         newData,
         args[2]
-      ) as Promise<UpdateResult<InstanceType<T>>>
+      )
     }
     return new HttpError(500, 'Not saved')
   }
@@ -656,48 +652,42 @@ export class AsMongoController<T extends TAtscriptAnnotatedTypeConstructor> {
    */
   protected onWrite(
     action: 'insert',
-    data: OptionalUnlessRequiredId<InstanceType<T>>,
+    data: DataType,
     opts: InsertOneOptions
   ):
-    | OptionalUnlessRequiredId<InstanceType<T>>
-    | Promise<OptionalUnlessRequiredId<InstanceType<T>> | undefined>
+    | DataType
+    | Promise<DataType | undefined>
     | undefined
   protected onWrite(
     action: 'insertMany',
-    data: OptionalUnlessRequiredId<InstanceType<T>>[],
+    data: DataType[],
     opts: BulkWriteOptions
   ):
-    | OptionalUnlessRequiredId<InstanceType<T>>[]
-    | Promise<OptionalUnlessRequiredId<InstanceType<T>>[] | undefined>
+    | DataType[]
+    | Promise<DataType[] | undefined>
     | undefined
   protected onWrite(
     action: 'replace',
-    data: WithoutId<InstanceType<T>>,
+    data: DataType,
     opts: ReplaceOptions
-  ): WithoutId<InstanceType<T>> | Promise<WithoutId<InstanceType<T>> | undefined> | undefined
+  ): DataType | Promise<DataType | undefined> | undefined
   protected onWrite(
     action: 'update',
-    data: UpdateFilter<InstanceType<T>>,
+    data: UpdateFilter<any>,
     opts: UpdateOptions
-  ): UpdateFilter<InstanceType<T>> | Promise<UpdateFilter<InstanceType<T>> | undefined> | undefined
+  ): UpdateFilter<any> | Promise<UpdateFilter<any> | undefined> | undefined
   // eslint-disable-next-line max-params
   protected onWrite(
     action: 'insert' | 'insertMany' | 'replace' | 'update',
-    data:
-      | WithoutId<InstanceType<T>>
-      | OptionalUnlessRequiredId<InstanceType<T>>
-      | OptionalUnlessRequiredId<InstanceType<T>>[]
-      | UpdateFilter<InstanceType<T>>,
+    data: DataType | DataType[] | UpdateFilter<any>,
     opts: InsertOneOptions | ReplaceOptions | UpdateOptions | BulkWriteOptions
   ):
-    | WithoutId<InstanceType<T>>
-    | OptionalUnlessRequiredId<InstanceType<T>>
-    | OptionalUnlessRequiredId<InstanceType<T>>[]
-    | UpdateFilter<InstanceType<T>>
-    | Promise<WithoutId<InstanceType<T>> | undefined>
-    | Promise<OptionalUnlessRequiredId<InstanceType<T>> | undefined>
-    | Promise<OptionalUnlessRequiredId<InstanceType<T>>[] | undefined>
-    | Promise<UpdateFilter<InstanceType<T>> | undefined>
+    | DataType
+    | DataType[]
+    | UpdateFilter<any>
+    | Promise<DataType | undefined>
+    | Promise<DataType[] | undefined>
+    | Promise<UpdateFilter<any> | undefined>
     | undefined {
     // Default passthrough implementation.
     return data

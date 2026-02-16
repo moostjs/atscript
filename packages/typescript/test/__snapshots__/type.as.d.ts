@@ -18,7 +18,7 @@ declare namespace TPrimitive {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal<TPrimitive>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TPrimitive>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TPrimitive, TPrimitive>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -33,7 +33,7 @@ declare namespace TPirmiitiveUn {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TPirmiitiveUn>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TPirmiitiveUn>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TPirmiitiveUn, TPirmiitiveUn>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -48,7 +48,7 @@ declare namespace TLiteral {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TLiteral>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TLiteral, TLiteral>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -63,7 +63,7 @@ declare namespace TNumber {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeDef
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TNumber>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TNumber, TNumber>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -78,7 +78,7 @@ declare namespace TTuple1 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TTuple1>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TTuple1>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTuple1, TTuple1>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -93,7 +93,7 @@ declare namespace TTuple2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TTuple2>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TTuple2>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTuple2, TTuple2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -108,7 +108,7 @@ declare namespace TTupleArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TTupleArray>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TTupleArray>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTupleArray, TTupleArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -123,7 +123,7 @@ declare namespace TArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TArray>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TArray>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray, TArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -138,7 +138,7 @@ declare namespace TArray2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TArray2>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TArray2>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray2, TArray2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -153,7 +153,7 @@ declare namespace TArray3 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TArray3>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TArray3>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray3, TArray3>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -168,7 +168,7 @@ declare namespace TComplexArray {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TComplexArray>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TComplexArray>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray, TComplexArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -183,7 +183,7 @@ declare namespace TComplexArray2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TComplexArray2>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TComplexArray2>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray2, TComplexArray2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -198,7 +198,7 @@ declare namespace TComplexArray3 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeArray<TComplexArray3>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TComplexArray3>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray3, TComplexArray3>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -213,7 +213,7 @@ declare namespace TComplexArray4 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TComplexArray4>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TComplexArray4>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray4, TComplexArray4>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -228,7 +228,7 @@ declare namespace TComplexArray5 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TComplexArray5>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TComplexArray5>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray5, TComplexArray5>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -250,7 +250,7 @@ declare namespace TObject {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof TObject, TObject>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TObject>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObject, TObject>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -267,7 +267,7 @@ declare namespace TObjectUnion1 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TObjectUnion1>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TObjectUnion1>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectUnion1, TObjectUnion1>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -284,7 +284,7 @@ declare namespace TObjectUnion2 {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeComplex<TObjectUnion2>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TObjectUnion2>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectUnion2, TObjectUnion2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
@@ -303,7 +303,7 @@ declare namespace TObjectIntersection {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeObject<keyof TObjectIntersection, TObjectIntersection>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TObjectIntersection>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectIntersection, TObjectIntersection>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }

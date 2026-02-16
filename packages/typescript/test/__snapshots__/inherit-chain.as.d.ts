@@ -18,7 +18,7 @@ declare namespace TType {
   const __is_atscript_annotated_type: true
   const type: TAtscriptTypeFinal<TType>
   const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, TType>
+  const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TType, TType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
 }
