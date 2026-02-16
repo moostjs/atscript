@@ -1,3 +1,9 @@
+## <small>0.1.8 (2026-02-16)</small>
+
+* fix: include phantom props in serialization ([60bb4d7](https://github.com/moostjs/atscript/commit/60bb4d7))
+
+
+
 ## <small>0.1.7 (2026-02-16)</small>
 
 * feat: add custom error messages ([395fb31](https://github.com/moostjs/atscript/commit/395fb31))
