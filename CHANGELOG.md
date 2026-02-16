@@ -1,3 +1,9 @@
+## <small>0.1.7 (2026-02-16)</small>
+
+* feat: add custom error messages ([395fb31](https://github.com/moostjs/atscript/commit/395fb31))
+
+
+
 ## <small>0.1.6 (2026-02-16)</small>
 
 * chore: update snapshots ([e1d853e](https://github.com/moostjs/atscript/commit/e1d853e))
