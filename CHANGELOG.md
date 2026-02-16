@@ -1,3 +1,10 @@
+## <small>0.1.5 (2026-02-16)</small>
+
+* feat(vscode): add semantic token to phantom types ([51c03ba](https://github.com/moostjs/atscript/commit/51c03ba))
+* fix: add phantom to base types ([45b11c8](https://github.com/moostjs/atscript/commit/45b11c8))
+
+
+
 ## <small>0.1.4 (2026-02-16)</small>
 
 * feat: add phantom primitive ([f5ea27a](https://github.com/moostjs/atscript/commit/f5ea27a))
