@@ -1,3 +1,9 @@
+## <small>0.1.9 (2026-02-17)</small>
+
+* feat: extract flattenAnnotatedType to typescript module ([89fb70f](https://github.com/moostjs/atscript/commit/89fb70f))
+
+
+
 ## <small>0.1.8 (2026-02-16)</small>
 
 * fix: include phantom props in serialization ([60bb4d7](https://github.com/moostjs/atscript/commit/60bb4d7))
