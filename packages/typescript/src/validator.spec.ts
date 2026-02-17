@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { defineAnnotatedType } from './annotated-type'
-import { Validator } from './validator'
+import { Validator, type TValidatorPlugin, type TValidatorPluginContext } from './validator'
 
 describe('Validator at primitives', () => {
   it('should validate primitive string', () => {
@@ -217,5 +217,39 @@ describe('Validator at union', () => {
     expect(validator.validate('hello', true)).toBe(true)
     expect(validator.validate(123, true)).toBe(true)
     expect(validator.validate(true, true)).toBe(false)
+  })
+})
+
+describe('Validator external context', () => {
+  it('should pass context to plugin and clean up after validation', () => {
+    const captured: unknown[] = []
+    const plugin: TValidatorPlugin = (ctx: TValidatorPluginContext) => {
+      captured.push(ctx.context)
+      return true
+    }
+    const def = defineAnnotatedType().designType('string').$type
+    const validator = new Validator(def, { plugins: [plugin] })
+
+    validator.validate('a', true, { role: 'admin' })
+    expect(captured).toEqual([{ role: 'admin' }])
+
+    validator.validate('b', true, 42)
+    expect(captured).toEqual([{ role: 'admin' }, 42])
+
+    validator.validate('c', true)
+    expect(captured).toEqual([{ role: 'admin' }, 42, undefined])
+  })
+
+  it('should have context undefined when not provided', () => {
+    let seen: unknown = 'NOT_SET'
+    const plugin: TValidatorPlugin = (ctx: TValidatorPluginContext) => {
+      seen = ctx.context
+      return undefined // fall through to default validation
+    }
+    const def = defineAnnotatedType().designType('string').$type
+    const validator = new Validator(def, { plugins: [plugin] })
+
+    validator.validate('hello', true)
+    expect(seen).toBeUndefined()
   })
 })

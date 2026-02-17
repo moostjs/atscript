@@ -38,7 +38,7 @@ if (validator.validate(data, true)) {
 The `validate()` method signature is:
 
 ```typescript
-validate<TT = DataType>(value: any, safe?: boolean): value is TT
+validate<TT = DataType>(value: any, safe?: boolean, context?: unknown): value is TT
 ```
 
 `DataType` is automatically inferred from the type definition's phantom generic — no manual type parameters needed. This works for generated interfaces, types, and even [deserialized](/packages/typescript/serialization) types:
@@ -190,7 +190,26 @@ const requireNonEmpty: TValidatorPlugin = (ctx, def, value) => {
 const validator = Product.validator({ plugins: [requireNonEmpty] })
 ```
 
-The plugin context (`TValidatorPluginContext`) exposes `opts`, `validateAnnotatedType`, `error`, and `path`.
+### External Context
+
+Plugins can receive external context passed as the third argument to `validate()`. This is useful when validation rules depend on runtime state (e.g., user roles, request metadata, feature flags):
+
+```typescript
+const roleAware: TValidatorPlugin = (ctx, def, value) => {
+  const { context } = ctx
+  if (context && (context as { role: string }).role === 'admin') {
+    return true // admins bypass validation
+  }
+  return undefined // fall through to default
+}
+
+const validator = Product.validator({ plugins: [roleAware] })
+validator.validate(data, true, { role: 'admin' })
+```
+
+The context type is `unknown` — plugin developers are responsible for validating and casting it internally, since multiple plugins may expect different context formats.
+
+The plugin context (`TValidatorPluginContext`) exposes `opts`, `validateAnnotatedType`, `error`, `path`, and `context`.
 
 ## Creating Validators Manually
 

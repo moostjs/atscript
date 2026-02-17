@@ -50,6 +50,7 @@ export interface TValidatorPluginContext {
   validateAnnotatedType: Validator<any>['validateAnnotatedType']
   error: Validator<any>['error']
   path: Validator<any>['path']
+  context: unknown
 }
 
 /**
@@ -93,6 +94,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
   public errors: TError[] = []
   protected stackErrors: TError[][] = []
   protected stackPath: string[] = []
+  protected context: unknown
 
   protected isLimitExceeded() {
     if (this.stackErrors.length > 0) {
@@ -148,12 +150,14 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
    * @returns `true` if the value matches the type definition.
    * @throws {ValidatorError} When validation fails and `safe` is not `true`.
    */
-  public validate<TT = DataType>(value: any, safe?: boolean): value is TT {
+  public validate<TT = DataType>(value: any, safe?: boolean, context?: unknown): value is TT {
     this.push('')
     this.errors = []
     this.stackErrors = []
+    this.context = context
     const passed = this.validateSafe(this.def, value)
     this.pop(!passed)
+    this.context = undefined
     if (!passed) {
       if (safe) {
         return false
