@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { exec, execSync } from 'child_process'
 import type { ExtensionContext } from 'vscode'
-import { Uri, workspace, window, env } from 'vscode'
+import { Uri, workspace, window, env, commands } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node'
 import * as fs from 'fs'
@@ -256,6 +256,19 @@ export function activate(context: ExtensionContext) {
   }
 
   init()
+
+  context.subscriptions.push(
+    commands.registerCommand('atscript.restartServer', async () => {
+      window.showInformationMessage('Atscript: Restarting language server...')
+      if (client) {
+        await client.stop()
+        client = undefined
+      }
+      if (!tryStart()) {
+        await init()
+      }
+    })
+  )
 
   context.subscriptions.push({
     dispose() {
