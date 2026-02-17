@@ -1,3 +1,11 @@
+## <small>0.1.11 (2026-02-17)</small>
+
+* chore: add oxc-disable to generated files ([9802ec2](https://github.com/moostjs/atscript/commit/9802ec2))
+* chore: add oxc-disable to generated files ([c488f3a](https://github.com/moostjs/atscript/commit/c488f3a))
+* chore: add oxc-disable to generated files ([53b88ad](https://github.com/moostjs/atscript/commit/53b88ad))
+
+
+
 ## <small>0.1.10 (2026-02-17)</small>
 
 * feat: add external context to validator ([5663c23](https://github.com/moostjs/atscript/commit/5663c23))
