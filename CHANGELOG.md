@@ -1,3 +1,9 @@
+## <small>0.1.12 (2026-02-17)</small>
+
+* feat(vscode): add restart command ([e976794](https://github.com/moostjs/atscript/commit/e976794))
+
+
+
 ## <small>0.1.11 (2026-02-17)</small>
 
 * chore: add oxc-disable to generated files ([9802ec2](https://github.com/moostjs/atscript/commit/9802ec2))
