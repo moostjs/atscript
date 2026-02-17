@@ -1,3 +1,9 @@
+## <small>0.1.10 (2026-02-17)</small>
+
+* feat: add external context to validator ([5663c23](https://github.com/moostjs/atscript/commit/5663c23))
+
+
+
 ## <small>0.1.9 (2026-02-17)</small>
 
 * feat: extract flattenAnnotatedType to typescript module ([89fb70f](https://github.com/moostjs/atscript/commit/89fb70f))
