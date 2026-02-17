@@ -18,6 +18,9 @@ export { buildJsonSchema, fromJsonSchema } from './json-schema'
 
 export { forAnnotatedType } from './traverse'
 
+export { flattenAnnotatedType } from './flatten'
+export type { TFlattenOptions } from './flatten'
+
 export {
   serializeAnnotatedType,
   deserializeAnnotatedType,

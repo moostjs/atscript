@@ -2,16 +2,12 @@
 // eslint-disable max-params
 import {
   isAnnotatedType,
-  isPhantomType,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeObject,
   type TMetadataMap,
   type TValidatorOptions,
   Validator,
-  defineAnnotatedType as $,
-  type TAtscriptTypeArray,
-  isAnnotatedTypeOfPrimitive,
-  type TAtscriptTypeComplex,
+  flattenAnnotatedType,
 } from '@atscript/typescript/utils'
 import { AsMongo } from './as-mongo'
 import {
@@ -265,91 +261,6 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
     }
   }
 
-  protected _addFieldToFlatMap(name: string, def: TAtscriptAnnotatedType) {
-    if (this._flatMap) {
-      const existing = this._flatMap.get(name) as
-        | (TAtscriptAnnotatedType & { __flat_union?: boolean })
-        | undefined
-      if (existing) {
-        const flatUnion = $('union').copyMetadata(existing.metadata).copyMetadata(def.metadata)
-        if (existing.__flat_union) {
-          ;(existing as TAtscriptAnnotatedType<TAtscriptTypeComplex>).type.items.forEach(item =>
-            flatUnion.item(item)
-          )
-        } else {
-          flatUnion.item(existing)
-        }
-        flatUnion.item(def)
-        const type = flatUnion.$type as TAtscriptAnnotatedType & { __flat_union?: boolean }
-        type.__flat_union = true
-        this._flatMap.set(name, flatUnion.$type)
-      } else {
-        this._flatMap.set(name, def)
-      }
-    }
-  }
-
-  protected _flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
-    switch (def.type.kind) {
-      case 'object':
-        this._addFieldToFlatMap(prefix || '', def)
-        const items = Array.from(def.type.props.entries())
-        for (const [key, value] of items) {
-          if (isPhantomType(value)) continue
-          this._flattenType(value, prefix ? `${prefix}.${key}` : key, inComplexTypeOrArray)
-        }
-        break
-      case 'array':
-        let typeArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
-        if (!inComplexTypeOrArray) {
-          typeArray = $().refTo(def).copyMetadata(def.metadata)
-            .$type as TAtscriptAnnotatedType<TAtscriptTypeArray>
-          // @ts-expect-error
-          typeArray.metadata.set('mongo.__topLevelArray', true)
-        }
-        this._addFieldToFlatMap(prefix || '', typeArray)
-        if (!isAnnotatedTypeOfPrimitive(typeArray.type.of)) {
-          this._flattenArray(typeArray.type.of, prefix)
-        }
-        break
-      case 'intersection':
-      case 'tuple':
-      case 'union':
-        for (const item of def.type.items) {
-          this._flattenType(item, prefix, true)
-        }
-      default:
-        this._addFieldToFlatMap(prefix || '', def)
-        break
-    }
-    if (prefix) {
-      this._prepareIndexesForField(prefix, def.metadata)
-    }
-  }
-
-  _flattenArray(def: TAtscriptAnnotatedType, name: string) {
-    switch (def.type.kind) {
-      case 'object':
-        const items = Array.from(def.type.props.entries())
-        for (const [key, value] of items) {
-          if (isPhantomType(value)) continue
-          this._flattenType(value, name ? `${name}.${key}` : key, true)
-        }
-        break
-      case 'union':
-      case 'intersection':
-      case 'tuple':
-        for (const item of def.type.items) {
-          this._flattenArray(item, name)
-        }
-        break
-      case 'array':
-        this._flattenArray((def as TAtscriptAnnotatedType<TAtscriptTypeArray>).type.of, name)
-        break
-      default:
-    }
-  }
-
   protected _prepareIndexesForCollection() {
     const typeMeta = this.type.metadata
     const dynamicText = typeMeta.get('mongo.search.dynamic')
@@ -429,9 +340,12 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
 
   protected _flatten() {
     if (!this._flatMap) {
-      this._flatMap = new Map()
       this._prepareIndexesForCollection()
-      this._flattenType(this.type)
+      this._flatMap = flattenAnnotatedType(this.type, {
+        topLevelArrayTag: 'mongo.__topLevelArray',
+        excludePhantomTypes: true,
+        onField: (path, _type, metadata) => this._prepareIndexesForField(path, metadata),
+      })
       this._finalizeIndexesForCollection()
     }
   }

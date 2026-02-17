@@ -287,7 +287,70 @@ function flattenType(def: TAtscriptAnnotatedType, prefix = ''): Record<string, s
 // flattenType(Product) → { 'name': 'string', 'price': 'number', 'tags[]': 'string', ... }
 ```
 
-This is the same pattern used internally by the [Validator](/packages/typescript/validation), [JSON Schema builder](/packages/typescript/json-schema), [serializer](/packages/typescript/serialization), and [MongoDB collection](/packages/mongo/) flat-map builder.
+This manual pattern gives full control over path formatting and what to collect. The [Validator](/packages/typescript/validation), [JSON Schema builder](/packages/typescript/json-schema), and [serializer](/packages/typescript/serialization) all use similar recursive walks internally.
+
+For the common case of producing a flat `Map` of dot-separated paths to their annotated types, use the built-in `flattenAnnotatedType()` described below.
+
+### `flattenAnnotatedType()`
+
+Tools built on Atscript — form builders, query builders, index managers, schema generators — often need to iterate over every concrete field in a complex, deeply nested type. Manually walking objects, arrays, unions, intersections, and tuples is repetitive and error-prone. `flattenAnnotatedType()` handles this in one call:
+
+```typescript
+import { flattenAnnotatedType } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+const flatMap = flattenAnnotatedType(Product)
+// Map {
+//   ''                → root object type,
+//   'name'            → string type,
+//   'price'           → number type,
+//   'address'         → nested object type,
+//   'address.street'  → string type,
+//   'address.city'    → string type,
+//   'tags'            → array type,
+//   'items'           → array type,
+//   'items.label'     → string type,
+//   'items.count'     → number type,
+// }
+```
+
+Each entry in the map is a full `TAtscriptAnnotatedType` — with metadata, tags, and validator support — so downstream tools can inspect annotations at any depth without re-walking the tree.
+
+**Union merging:** When multiple union branches contribute different types at the same path, `flattenAnnotatedType` merges them into a synthetic union type. For example, `{ a: string } | { a: number, b: string }` produces `a → union(string, number)` and `b → string`.
+
+**Arrays:** The function recurses into array element types using the same path prefix (no `[]` suffix), so `items: { label: string }[]` produces `items.label → string`.
+
+#### Options
+
+```typescript
+interface TFlattenOptions {
+  /** Called for each field with a non-empty path. */
+  onField?: (path: string, type: TAtscriptAnnotatedType, metadata: TMetadataMap) => void
+
+  /** Metadata key to tag top-level array fields (e.g. 'mongo.__topLevelArray'). */
+  topLevelArrayTag?: string
+
+  /** When true, phantom-typed properties are skipped. Included by default. */
+  excludePhantomTypes?: boolean
+}
+```
+
+**`onField`** is called for every field after it is added to the flat map. This is the hook point for domain-specific logic — for example, `@atscript/mongo` uses it to extract index definitions from field metadata:
+
+```typescript
+const flatMap = flattenAnnotatedType(collectionType, {
+  topLevelArrayTag: 'mongo.__topLevelArray',
+  excludePhantomTypes: true,
+  onField: (path, _type, metadata) => {
+    // read @index, @unique, @textSearch etc. from metadata
+    prepareIndexesForField(path, metadata)
+  },
+})
+```
+
+**`topLevelArrayTag`** marks array fields that are direct properties of the root object (not arrays nested inside other arrays or unions). This is useful for systems like MongoDB that treat top-level arrays differently.
+
+**`excludePhantomTypes`** controls whether [phantom](/packages/typescript/primitives#phantom-type) properties appear in the result. By default phantom types are included — form builders may want to render them as non-data UI elements (links, headings). Set to `true` when only data-bearing fields matter (e.g. database schemas).
 
 ## Building Types at Runtime
 
