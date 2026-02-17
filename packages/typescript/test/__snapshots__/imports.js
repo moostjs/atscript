@@ -1,5 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
+/* oxlint-disable */
 import { defineAnnotatedType as $, annotate as $a } from "@atscript/typescript/utils"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"

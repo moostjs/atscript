@@ -46,6 +46,7 @@ export class JsRenderer extends BaseRenderer {
   pre() {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
+    this.writeln('/* oxlint-disable */')
     const imports = ['defineAnnotatedType as $', 'annotate as $a']
     if (resolveJsonSchemaMode(this.opts) === 'lazy') {
       imports.push('buildJsonSchema as $$')

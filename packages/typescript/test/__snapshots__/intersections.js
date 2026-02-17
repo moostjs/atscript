@@ -1,5 +1,6 @@
 // prettier-ignore-start
 /* eslint-disable */
+/* oxlint-disable */
 import { defineAnnotatedType as $, annotate as $a } from "@atscript/typescript/utils"
 
 class IA {
