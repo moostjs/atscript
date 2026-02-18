@@ -38,6 +38,7 @@ export interface User {
     id: string.uuid           // UUID format
     email: string.email        // Email address
     phone: string.phone        // Phone number
+    name: string.filled        // Non-empty, non-blank
     birthDate: string.date     // Date string
     createdAt: string.isoDate  // ISO 8601 date
 }
@@ -74,6 +75,12 @@ export interface User {
 - Validates UUID format
 - Pattern: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
 - Example: `123e4567-e89b-12d3-a456-426614174000`
+
+**`string.filled`**
+
+- Must contain at least one non-whitespace character
+- Implicitly adds `@expect.filled`
+- Useful for form fields where an empty or whitespace-only value should not pass validation
 
 ### Number Extensions
 

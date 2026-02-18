@@ -463,6 +463,16 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: string
   ): boolean {
+    const filled = def.metadata.get('expect.filled')
+    if (filled) {
+      if (value.trim().length === 0) {
+        const message = typeof filled === 'object' && filled.message
+          ? filled.message
+          : `Must not be empty`
+        this.error(message)
+        return false
+      }
+    }
     const minLength = def.metadata.get('expect.minLength')
     if (minLength) {
       const length = typeof minLength === 'number' ? minLength : minLength.length

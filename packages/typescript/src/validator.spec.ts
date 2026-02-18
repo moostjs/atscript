@@ -220,6 +220,36 @@ describe('Validator at union', () => {
   })
 })
 
+describe('Validator @expect.filled', () => {
+  it('should reject empty string', () => {
+    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const validator = new Validator(t.$type)
+    expect(validator.validate('', true)).toBe(false)
+    expect(validator.errors[0].message).toBe('Must not be empty')
+  })
+
+  it('should reject whitespace-only string', () => {
+    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const validator = new Validator(t.$type)
+    expect(validator.validate('   ', true)).toBe(false)
+    expect(validator.validate(' \t\n ', true)).toBe(false)
+  })
+
+  it('should accept non-empty string', () => {
+    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const validator = new Validator(t.$type)
+    expect(validator.validate('hello', true)).toBe(true)
+    expect(validator.validate(' a', true)).toBe(true)
+  })
+
+  it('should use custom error message', () => {
+    const t = defineAnnotatedType().designType('string').annotate('expect.filled', { message: 'Name is required' })
+    const validator = new Validator(t.$type)
+    expect(validator.validate('', true)).toBe(false)
+    expect(validator.errors[0].message).toBe('Name is required')
+  })
+})
+
 describe('Validator external context', () => {
   it('should pass context to plugin and clean up after validation', () => {
     const captured: unknown[] = []

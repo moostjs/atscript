@@ -125,8 +125,13 @@ Atscript provides common-purpose annotations:
 - `@expect.maxLength 100, "Custom error message"` - Maximum string/array length (optional message)
 - `@expect.min 0, "Custom error message"` - Minimum number value (optional message)
 - `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
+- `@expect.filled` or `@expect.filled "Custom error message"` - Must contain at least one non-whitespace character (optional message)
 - `@expect.int` - Must be integer
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
 
 All validation annotations (except `@expect.int`) accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
+
+::: tip Form Validation
+For form fields, use `string.filled` or `@expect.filled` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@expect.filled` catches this common form validation gap.
+:::
 

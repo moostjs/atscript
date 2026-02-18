@@ -71,6 +71,12 @@ export const primitives: Record<string, TPrimitiveConfig> = {
           message: 'Invalid UUID format.',
         },
       },
+      filled: {
+        documentation: 'Non-empty string that contains at least one non-whitespace character.',
+        expect: {
+          filled: true,
+        },
+      },
     },
   },
 

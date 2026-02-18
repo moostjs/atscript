@@ -52,6 +52,13 @@ export class SemanticPrimitiveNode extends SemanticNode {
       }
     }
     if (this.type === 'string') {
+      if (this.config.expect?.filled === true) {
+        this.annotations.push({
+          name: 'expect.filled',
+          token: dummyToken,
+          args: [],
+        })
+      }
       if (typeof this.config.expect?.pattern !== 'undefined') {
         const patterns = Array.isArray(this.config.expect.pattern)
           ? this.config.expect.pattern

@@ -20,12 +20,14 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
     resolve: {
       mainFields: ['main'],
     },
-    define: {
-      '__dirname': dirnameVarName,
-      '__filename': filenameVarName,
-      'import.meta.url': importMetaUrlVarName,
-      'import.meta.dirname': dirnameVarName,
-      'import.meta.filename': filenameVarName,
+    transform: {
+      define: {
+        '__dirname': dirnameVarName,
+        '__filename': filenameVarName,
+        'import.meta.url': importMetaUrlVarName,
+        'import.meta.dirname': dirnameVarName,
+        'import.meta.filename': filenameVarName,
+      },
     },
     treeshake: false,
     external: [/^[\w@][^:]/u],

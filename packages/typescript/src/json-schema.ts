@@ -77,6 +77,9 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           }
         }
         if (schema.type === 'string') {
+          if (meta.get('expect.filled')) {
+            schema.minLength = 1
+          }
           const minLength = meta.get('expect.minLength')
           if (minLength) {
             schema.minLength = typeof minLength === 'number' ? minLength : minLength.length

@@ -43,6 +43,7 @@ export interface TPrimitiveBaseConfig {
     minLength?: number // string | array
     maxLength?: number // string | array
     pattern?: string | RegExp | (string | RegExp)[] // string
+    filled?: boolean // string
     message?: string
   }
 }

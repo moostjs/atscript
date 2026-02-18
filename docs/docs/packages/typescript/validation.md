@@ -111,6 +111,7 @@ Annotations from `.as` files are enforced automatically during validation. See t
 
 | Annotation | Applies to | Validates |
 |------------|-----------|-----------|
+| `@expect.filled` | string | Must contain at least one non-whitespace character |
 | `@expect.minLength` | string, array | Minimum length |
 | `@expect.maxLength` | string, array | Maximum length |
 | `@expect.min` | number | Minimum value |
@@ -122,6 +123,7 @@ All validation annotations (except `@expect.int`) support an optional custom err
 
 ```atscript
 interface User {
+  @expect.filled "Name is required"
   @expect.minLength 3, "Username must be at least 3 characters"
   @expect.maxLength 20, "Username cannot exceed 20 characters"
   username: string
@@ -137,7 +139,7 @@ interface User {
 
 When validation fails, the custom message (if provided) is used instead of the default error message.
 
-Semantic types like `string.email` and `number.positive` automatically add validation rules through their annotation definitions.
+Semantic types like `string.email`, `string.filled`, and `number.positive` automatically add validation rules through their annotation definitions.
 
 [Phantom](/packages/typescript/primitives#phantom-type) props are automatically skipped during validation — they are non-data elements and any data with a phantom-named key is treated as an unexpected property.
 
@@ -176,18 +178,16 @@ Plugins intercept validation to add custom logic. A plugin is a function that re
 ```typescript
 import type { TValidatorPlugin } from '@atscript/typescript/utils'
 
-const requireNonEmpty: TValidatorPlugin = (ctx, def, value) => {
-  if (def.type.kind === '' && def.type.designType === 'string') {
-    if (typeof value === 'string' && value.trim() === '') {
-      ctx.error('String must not be empty')
-      return false
+const coerceNumbers: TValidatorPlugin = (ctx, def, value) => {
+  if (def.type.kind === '' && def.type.designType === 'number') {
+    if (typeof value === 'string' && !isNaN(Number(value))) {
+      return undefined // allow default validation to handle coerced value
     }
   }
-  // fall through to default validation
-  return undefined
+  return undefined // fall through to default validation
 }
 
-const validator = Product.validator({ plugins: [requireNonEmpty] })
+const validator = Product.validator({ plugins: [coerceNumbers] })
 ```
 
 ### External Context
