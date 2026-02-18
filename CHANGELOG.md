@@ -1,3 +1,9 @@
+## <small>0.1.15 (2026-02-18)</small>
+
+* refactor: expect.filled -> meta.required ([52a1f7d](https://github.com/moostjs/atscript/commit/52a1f7d))
+
+
+
 ## <small>0.1.14 (2026-02-18)</small>
 
 * feat: add expect.filled annotation ([bb7f1fe](https://github.com/moostjs/atscript/commit/bb7f1fe))
