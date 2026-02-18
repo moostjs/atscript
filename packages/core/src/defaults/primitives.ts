@@ -71,10 +71,10 @@ export const primitives: Record<string, TPrimitiveConfig> = {
           message: 'Invalid UUID format.',
         },
       },
-      filled: {
+      required: {
         documentation: 'Non-empty string that contains at least one non-whitespace character.',
         expect: {
-          filled: true,
+          required: true,
         },
       },
     },
@@ -109,6 +109,12 @@ export const primitives: Record<string, TPrimitiveConfig> = {
     type: 'boolean',
     documentation: 'Represents true/false values.',
     extensions: {
+      required: {
+        documentation: 'Boolean that must be true. Useful for checkboxes like "accept terms".',
+        expect: {
+          required: true,
+        },
+      },
       true: {
         documentation: 'Represents a true value.',
       },

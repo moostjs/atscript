@@ -38,7 +38,7 @@ export interface User {
     id: string.uuid           // UUID format
     email: string.email        // Email address
     phone: string.phone        // Phone number
-    name: string.filled        // Non-empty, non-blank
+    name: string.required        // Non-empty, non-blank
     birthDate: string.date     // Date string
     createdAt: string.isoDate  // ISO 8601 date
 }
@@ -76,10 +76,10 @@ export interface User {
 - Pattern: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
 - Example: `123e4567-e89b-12d3-a456-426614174000`
 
-**`string.filled`**
+**`string.required`**
 
 - Must contain at least one non-whitespace character
-- Implicitly adds `@expect.filled`
+- Implicitly adds `@meta.required`
 - Useful for form fields where an empty or whitespace-only value should not pass validation
 
 ### Number Extensions
@@ -135,11 +135,18 @@ Boolean types can be extended for specific use cases:
 
 ```atscript
 export interface Settings {
-    alwaysOn: boolean.true      // Must be true
+    agreed: boolean.required     // Must be true (e.g., accept terms)
+    alwaysOn: boolean.true       // Must be true
     disabled: boolean.false      // Must be false
     toggle: boolean              // Can be true or false
 }
 ```
+
+**`boolean.required`**
+
+- Must be `true`
+- Implicitly adds `@meta.required`
+- Useful for checkboxes like "accept terms" where the value must be checked
 
 ## Phantom Type
 

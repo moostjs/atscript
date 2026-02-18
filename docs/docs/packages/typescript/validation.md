@@ -111,7 +111,7 @@ Annotations from `.as` files are enforced automatically during validation. See t
 
 | Annotation | Applies to | Validates |
 |------------|-----------|-----------|
-| `@expect.filled` | string | Must contain at least one non-whitespace character |
+| `@meta.required` | string, boolean | String: at least one non-whitespace character. Boolean: must be `true` |
 | `@expect.minLength` | string, array | Minimum length |
 | `@expect.maxLength` | string, array | Maximum length |
 | `@expect.min` | number | Minimum value |
@@ -123,7 +123,7 @@ All validation annotations (except `@expect.int`) support an optional custom err
 
 ```atscript
 interface User {
-  @expect.filled "Name is required"
+  @meta.required "Name is required"
   @expect.minLength 3, "Username must be at least 3 characters"
   @expect.maxLength 20, "Username cannot exceed 20 characters"
   username: string
@@ -139,7 +139,7 @@ interface User {
 
 When validation fails, the custom message (if provided) is used instead of the default error message.
 
-Semantic types like `string.email`, `string.filled`, and `number.positive` automatically add validation rules through their annotation definitions.
+Semantic types like `string.email`, `string.required`, and `number.positive` automatically add validation rules through their annotation definitions. The `string.required` primitive implicitly adds `@meta.required`.
 
 [Phantom](/packages/typescript/primitives#phantom-type) props are automatically skipped during validation — they are non-data elements and any data with a phantom-named key is treated as an unexpected property.
 

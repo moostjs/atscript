@@ -441,7 +441,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
-        return true
+        return this.validateBoolean(def, value)
       case 'undefined':
         if (value !== undefined) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
@@ -463,7 +463,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: string
   ): boolean {
-    const filled = def.metadata.get('expect.filled')
+    const filled = def.metadata.get('meta.required')
     if (filled) {
       if (value.trim().length === 0) {
         const message = typeof filled === 'object' && filled.message
@@ -547,6 +547,23 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
         const message = typeof max === 'object' && max.message
           ? max.message
           : `Expected maximum ${maxValue}, got ${value}`
+        this.error(message)
+        return false
+      }
+    }
+    return true
+  }
+
+  protected validateBoolean(
+    def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
+    value: boolean
+  ): boolean {
+    const filled = def.metadata.get('meta.required')
+    if (filled) {
+      if (value !== true) {
+        const message = typeof filled === 'object' && filled.message
+          ? filled.message
+          : `Must be checked`
         this.error(message)
         return false
       }

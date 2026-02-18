@@ -13,7 +13,7 @@ declare global {
     'expect.maxLength': { length: number; message?: string }
     'expect.min': { minValue: number; message?: string }
     'expect.max': { maxValue: number; message?: string }
-    'expect.filled': { message?: string } | true
+    'meta.required': { message?: string } | true
     'expect.int': { message?: string } | true
     'expect.pattern': { pattern: string; flags?: string; message?: string }[]
     'mongo.collection': string

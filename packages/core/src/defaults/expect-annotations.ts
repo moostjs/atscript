@@ -109,25 +109,6 @@ export const expectAnnotations: TAnnotationsTree = {
     defType: ['number'],
   }),
 
-  filled: new AnnotationSpec({
-    description:
-      'Validates that a string is not empty and contains at least one non-whitespace character.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@expect.filled' +
-      'name: string' +
-      '```',
-    defType: ['string'],
-    argument: [
-      {
-        name: 'message',
-        optional: true,
-        type: 'string',
-        description: 'Optional error message to display if the validation fails.',
-      },
-    ],
-  }),
-
   pattern: new AnnotationSpec({
     description:
       'Validates that a string matches a specific pattern.' +

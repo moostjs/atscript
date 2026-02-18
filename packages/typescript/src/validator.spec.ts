@@ -220,33 +220,53 @@ describe('Validator at union', () => {
   })
 })
 
-describe('Validator @expect.filled', () => {
+describe('Validator @meta.required', () => {
   it('should reject empty string', () => {
-    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const t = defineAnnotatedType().designType('string').annotate('meta.required', true)
     const validator = new Validator(t.$type)
     expect(validator.validate('', true)).toBe(false)
     expect(validator.errors[0].message).toBe('Must not be empty')
   })
 
   it('should reject whitespace-only string', () => {
-    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const t = defineAnnotatedType().designType('string').annotate('meta.required', true)
     const validator = new Validator(t.$type)
     expect(validator.validate('   ', true)).toBe(false)
     expect(validator.validate(' \t\n ', true)).toBe(false)
   })
 
   it('should accept non-empty string', () => {
-    const t = defineAnnotatedType().designType('string').annotate('expect.filled', true)
+    const t = defineAnnotatedType().designType('string').annotate('meta.required', true)
     const validator = new Validator(t.$type)
     expect(validator.validate('hello', true)).toBe(true)
     expect(validator.validate(' a', true)).toBe(true)
   })
 
   it('should use custom error message', () => {
-    const t = defineAnnotatedType().designType('string').annotate('expect.filled', { message: 'Name is required' })
+    const t = defineAnnotatedType().designType('string').annotate('meta.required', { message: 'Name is required' })
     const validator = new Validator(t.$type)
     expect(validator.validate('', true)).toBe(false)
     expect(validator.errors[0].message).toBe('Name is required')
+  })
+
+  it('should reject false for boolean', () => {
+    const t = defineAnnotatedType().designType('boolean').annotate('meta.required', true)
+    const validator = new Validator(t.$type)
+    expect(validator.validate(false, true)).toBe(false)
+    expect(validator.errors[0].message).toBe('Must be checked')
+  })
+
+  it('should accept true for boolean', () => {
+    const t = defineAnnotatedType().designType('boolean').annotate('meta.required', true)
+    const validator = new Validator(t.$type)
+    expect(validator.validate(true, true)).toBe(true)
+  })
+
+  it('should use custom error message for boolean', () => {
+    const t = defineAnnotatedType().designType('boolean').annotate('meta.required', { message: 'You must accept the terms' })
+    const validator = new Validator(t.$type)
+    expect(validator.validate(false, true)).toBe(false)
+    expect(validator.errors[0].message).toBe('You must accept the terms')
   })
 })
 

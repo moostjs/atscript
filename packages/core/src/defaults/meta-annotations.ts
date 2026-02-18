@@ -109,6 +109,30 @@ export const metaAnnotations: TAnnotationsTree = {
     multiple: false,
   }),
 
+  required: new AnnotationSpec({
+    description:
+      'Marks a field as required for form validation. ' +
+      'For strings: must contain at least one non-whitespace character. ' +
+      'For booleans: must be true.' +
+      '\n\n**Example:**' +
+      '```atscript' +
+      '@meta.required' +
+      'name: string' +
+      '\n' +
+      '@meta.required "You must accept the terms"' +
+      'agreed: boolean' +
+      '```',
+    defType: ['string', 'boolean'],
+    argument: [
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
+  }),
+
   isKey: new AnnotationSpec({
     description:
       'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +

@@ -19,13 +19,13 @@ declare global {
     "meta.placeholder": string
     "meta.sensitive": boolean
     "meta.readonly": boolean
+    "meta.required": { message?: string }
     "meta.isKey": boolean
     "expect.minLength": { length: number, message?: string }
     "expect.maxLength": { length: number, message?: string }
     "expect.min": { minValue: number, message?: string }
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
-    "expect.filled": { message?: string }
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
     "emit.jsonSchema": boolean
     label: string
@@ -42,6 +42,6 @@ declare global {
     fromI1: boolean
     fromI2: boolean
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "filled" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
 }
 // prettier-ignore-end

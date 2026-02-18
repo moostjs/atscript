@@ -52,9 +52,9 @@ export class SemanticPrimitiveNode extends SemanticNode {
       }
     }
     if (this.type === 'string') {
-      if (this.config.expect?.filled === true) {
+      if (this.config.expect?.required === true) {
         this.annotations.push({
-          name: 'expect.filled',
+          name: 'meta.required',
           token: dummyToken,
           args: [],
         })
@@ -94,6 +94,15 @@ export class SemanticPrimitiveNode extends SemanticNode {
       if (this.config.expect?.int === true) {
         this.annotations.push({
           name: 'expect.int',
+          token: dummyToken,
+          args: [],
+        })
+      }
+    }
+    if (this.type === 'boolean') {
+      if (this.config.expect?.required === true) {
+        this.annotations.push({
+          name: 'meta.required',
           token: dummyToken,
           args: [],
         })
