@@ -252,6 +252,26 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/real-world-1.as.d.ts')
     )
   })
+  it('must propagate type-level metadata through array element references', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/nested-type-metadata.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('nested-type-metadata.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/nested-type-metadata.js')
+    )
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('nested-type-metadata.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/nested-type-metadata.as.d.ts')
+    )
+  })
   it('must render interfaces/types with intersections', async () => {
     const repo = await build({
       rootDir: wd,

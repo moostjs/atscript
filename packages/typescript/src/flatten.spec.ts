@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineAnnotatedType as $, type TAtscriptAnnotatedType, type TAtscriptTypeObject } from './annotated-type'
+import { defineAnnotatedType as $, type TAtscriptAnnotatedType, type TAtscriptTypeObject, type TAtscriptTypeArray } from './annotated-type'
 import { flattenAnnotatedType } from './flatten'
 
 function buildObject() {
@@ -181,5 +181,61 @@ describe('flattenAnnotatedType', () => {
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.has('matrix')).toBe(true)
     expect(flatMap.has('matrix.value')).toBe(true)
+  })
+})
+
+describe('refTo metadata propagation', () => {
+  it('should propagate type-level metadata through refTo for array elements', () => {
+    // Simulate: @label "Address" interface TAddress { @label "Street" street: string; @label "City" city: string }
+    const TAddress = $('object')
+      .prop('street', $().designType('string').tags('string').annotate('label' as any, 'Street').$type)
+      .prop('city', $().designType('string').tags('string').annotate('label' as any, 'City').$type)
+      .annotate('label' as any, 'Address')
+      .$type
+
+    // Simulate: export interface ExplorationForm { @label "Name" name: string; @label "Addresses" addresses: TAddress[] }
+    const ExplorationForm = $('object')
+      .prop('name', $().designType('string').tags('string').annotate('label' as any, 'Name').$type)
+      .prop('addresses',
+        $('array')
+          .of($().refTo(TAddress).$type)
+          .annotate('label' as any, 'Addresses')
+          .$type)
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    // Property-level metadata
+    const addressesProp = ExplorationForm.type.props.get('addresses')!
+    expect(addressesProp.metadata.get('label' as any)).toBe('Addresses')
+
+    // Element type should carry TAddress's type-level metadata
+    const elementType = (addressesProp.type as TAtscriptTypeArray).of
+    expect(elementType.metadata.get('label' as any)).toBe('Address')
+
+    // Props inside the element should retain their metadata (shared via type reference)
+    expect((elementType.type as TAtscriptTypeObject).props.get('street')!.metadata.get('label' as any)).toBe('Street')
+    expect((elementType.type as TAtscriptTypeObject).props.get('city')!.metadata.get('label' as any)).toBe('City')
+  })
+
+  it('should allow property annotations to override type-level metadata from refTo', () => {
+    const Inner = $('object')
+      .prop('x', $().designType('string').$type)
+      .annotate('label' as any, 'Inner Label')
+      .$type
+
+    // When refTo copies metadata AND then .annotate() overrides
+    const ref = $().refTo(Inner).annotate('label' as any, 'Overridden').$type
+    expect(ref.metadata.get('label' as any)).toBe('Overridden')
+  })
+
+  it('should not mutate the original type metadata when annotating after refTo', () => {
+    const Original = $('object')
+      .prop('x', $().designType('string').$type)
+      .annotate('label' as any, 'Original')
+      .$type
+
+    $().refTo(Original).annotate('label' as any, 'Changed').$type
+
+    // Original should be unaffected
+    expect(Original.metadata.get('label' as any)).toBe('Original')
   })
 })
