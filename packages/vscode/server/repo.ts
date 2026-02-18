@@ -237,7 +237,13 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
               const nodeType = a[key].config.nodeType
               if (nodeType?.length && parent) {
                 // filter out annotations not suitable for the parent node
-                if (!nodeType.includes(parent.entity)) {
+                // Annotate block entries are ref nodes referencing props,
+                // so treat 'ref' as equivalent to 'prop'
+                const effectiveEntity =
+                  parent.entity === 'ref' && nodeType.includes('prop')
+                    ? 'prop'
+                    : parent.entity
+                if (!nodeType.includes(effectiveEntity)) {
                   return []
                 }
               }

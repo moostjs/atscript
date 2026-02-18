@@ -29,8 +29,8 @@ src/
 
 ## IntelliSense
 
-::: info Requires Dependencies
-IntelliSense and all features below require `@atscript/core` to be installed. See [Installation](/packages/vscode/installation).
+::: info Requires `@atscript/core`
+IntelliSense and all features below require `@atscript/core` to be installed in your project root. See [Installation](/packages/vscode/installation).
 :::
 
 The extension provides context-aware completions triggered by typing or by specific characters (`@`, `.`, `,`, `{`, `'`, `"`).

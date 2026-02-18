@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest'
 
+import { AnnotationSpec } from '../../annotations'
 import { AtscriptDoc } from '../../document'
 import { parseAtscript } from '..'
 import type { SemanticAnnotateNode } from '../nodes/annotate-node'
@@ -462,6 +463,35 @@ annotate User {
     expect(def![0].targetUri).toBe('test')
     // Should point to the firstName prop definition in User (line 2)
     expect(def![0].targetRange.start.line).toBe(2)
+  })
+
+  it('should allow prop-only annotations on annotate block entries', () => {
+    const propOnlyAnnotation = new AnnotationSpec({
+      nodeType: ['prop'],
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('test', {
+      primitives,
+      annotations: {
+        deep: {
+          nested: {
+            leaf: propOnlyAnnotation,
+          },
+        },
+      },
+    })
+    doc.update(`
+interface User {
+  name: string
+}
+annotate User {
+  @deep.nested.leaf 'test'
+  name
+}
+`)
+    const messages = doc.getDiagMessages()
+    const nodeTypeErrors = messages.filter(m => m.message.includes('applies only to'))
+    expect(nodeTypeErrors).toHaveLength(0)
   })
 
   it('go-to-definition works for annotate entry chain tokens', () => {

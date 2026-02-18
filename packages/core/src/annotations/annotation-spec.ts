@@ -115,10 +115,16 @@ export class AnnotationSpec {
     }
 
     // 1. Check node type
+    // Annotate block entries are ref nodes that reference props,
+    // so treat 'ref' as equivalent to 'prop' for nodeType checking
+    const effectiveEntity =
+      mainToken.parentNode.entity === 'ref' && this.config.nodeType?.includes('prop')
+        ? 'prop'
+        : mainToken.parentNode.entity
     if (
       this.config.nodeType &&
       this.config.nodeType.length > 0 &&
-      !this.config.nodeType.includes(mainToken.parentNode.entity)
+      !this.config.nodeType.includes(effectiveEntity)
     ) {
       messages.push({
         severity: 1,

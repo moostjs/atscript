@@ -2,13 +2,13 @@
 
 The Atscript VSCode extension provides first-class editor support for `.as` files — syntax highlighting, IntelliSense, real-time diagnostics, navigation, and automatic `.d.ts` generation on save.
 
-::: warning Dependencies Required After Installation
-The extension requires `@atscript/core` to be installed separately for full functionality (IntelliSense, diagnostics, etc.). The extension will attempt to install it automatically on first launch, but if that fails you'll need to install it manually. See [Installation](/packages/vscode/installation) for details.
+::: info LSP Requirement
+The extension provides syntax highlighting out of the box. For IntelliSense, diagnostics, and other LSP features, `@atscript/core` must be installed in your project. See [Installation](/packages/vscode/installation) for details.
 :::
 
 ## What's in This Section
 
-- [Installation](/packages/vscode/installation) — install the extension and its required dependencies
+- [Installation](/packages/vscode/installation) — install the extension and set up your project
 - [Features](/packages/vscode/features) — syntax highlighting, IntelliSense, diagnostics, navigation, and more
 - [Configuration](/packages/vscode/configuration) — project configuration and editor settings
 
@@ -30,4 +30,4 @@ The extension requires `@atscript/core` to be installed separately for full func
 ## Requirements
 
 - VSCode 1.80.0 or higher
-- `@atscript/core` — installed automatically on first launch (see [Installation](/packages/vscode/installation))
+- `@atscript/core` — installed in your project root for LSP features (see [Installation](/packages/vscode/installation))
