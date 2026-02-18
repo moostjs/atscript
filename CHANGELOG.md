@@ -1,3 +1,9 @@
+## <small>0.1.16 (2026-02-18)</small>
+
+* fix: fix suggestions for annotate block ([80ba558](https://github.com/moostjs/atscript/commit/80ba558))
+
+
+
 ## <small>0.1.15 (2026-02-18)</small>
 
 * refactor: expect.filled -> meta.required ([52a1f7d](https://github.com/moostjs/atscript/commit/52a1f7d))
