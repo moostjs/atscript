@@ -1,3 +1,9 @@
+## <small>0.1.14 (2026-02-18)</small>
+
+* feat: add expect.filled annotation ([bb7f1fe](https://github.com/moostjs/atscript/commit/bb7f1fe))
+
+
+
 ## <small>0.1.13 (2026-02-18)</small>
 
 * fix: propagate type metadata to array typed props ([587b89e](https://github.com/moostjs/atscript/commit/587b89e))
