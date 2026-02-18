@@ -1,3 +1,10 @@
+## <small>0.1.13 (2026-02-18)</small>
+
+* fix: propagate type metadata to array typed props ([587b89e](https://github.com/moostjs/atscript/commit/587b89e))
+* docs: update ([4a219d5](https://github.com/moostjs/atscript/commit/4a219d5))
+
+
+
 ## <small>0.1.12 (2026-02-17)</small>
 
 * feat(vscode): add restart command ([e976794](https://github.com/moostjs/atscript/commit/e976794))
