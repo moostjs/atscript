@@ -117,6 +117,7 @@ $("object", Entity)
     $("array")
       .of($()
           .refTo(Contact)
+          .annotate("label", "Contact")
           .$type)
       .annotate("label", "Contacts")
       .$type

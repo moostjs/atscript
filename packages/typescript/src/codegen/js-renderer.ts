@@ -360,7 +360,18 @@ export class JsRenderer extends BaseRenderer {
         this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
           .writeln(`.refTo(${ref.id!}${chain})`)
-          .unindent()
+        // Emit the referenced type's annotations at build time so that
+        // metadata is available regardless of declaration order.
+        if (!ref.hasChain) {
+          const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
+          if (ownerDecl?.node) {
+            const typeAnnotations = ownerDecl.doc.evalAnnotationsForNode(ownerDecl.node)
+            typeAnnotations?.forEach((an: TAnnotationTokens) => {
+              this.resolveAnnotationValue(ownerDecl.node!, an)
+            })
+          }
+        }
+        this.unindent()
         return this
       }
       case 'primitive': {
@@ -575,7 +586,26 @@ export class JsRenderer extends BaseRenderer {
   }
 
   defineMetadata(node: SemanticNode) {
-    let annotations = this.doc.evalAnnotationsForNode(node)
+    // When the node's definition is a non-primitive ref, use only the node's
+    // own annotations. The referenced type's annotations are emitted at build
+    // time by annotateType, so using evalAnnotationsForNode here would duplicate them.
+    let annotations: TAnnotationTokens[] | undefined
+    const nodeDef = node.getDefinition?.()
+    if (nodeDef && isRef(nodeDef)) {
+      const refNode = nodeDef as SemanticRefNode
+      // Only skip evalAnnotationsForNode for simple refs (no chain).
+      // Chain refs still use evalAnnotationsForNode since annotateType
+      // only emits build-time annotations for simple refs.
+      if (!refNode.hasChain) {
+        const resolved = this.doc.unwindType(refNode.id!, refNode.chain)?.def
+        if (resolved && !isPrimitive(resolved)) {
+          annotations = node.annotations ?? []
+        }
+      }
+    }
+    if (annotations === undefined) {
+      annotations = this.doc.evalAnnotationsForNode(node)
+    }
     // Merge ad-hoc annotations (from annotate blocks) with original annotations
     if (this._adHocAnnotations && this._propPath.length > 0) {
       const path = this._propPath.join('.')

@@ -245,13 +245,9 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
         } else if (!newBase) {
           throw new Error(`"${typeName}" is not annotated type`)
         }
-        // Copy metadata from the referenced type to preserve type-level annotations.
-        // Array values are shallow-cloned to avoid shared mutation.
-        for (const [k, v] of newBase.metadata.entries()) {
-          if (!metadata.has(k)) {
-            metadata.set(k, Array.isArray(v) ? [...v] : v)
-          }
-        }
+        // Metadata is NOT copied from the referenced type at runtime.
+        // Type-level annotations are emitted at build time by the code generator,
+        // making metadata resolution independent of declaration order.
         this.$type = {
           __is_atscript_annotated_type: true,
           type: newBase.type,
