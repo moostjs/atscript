@@ -1,3 +1,9 @@
+## <small>0.1.17 (2026-02-19)</small>
+
+* fix: merge metadata and declaration order fix ([56e9f13](https://github.com/moostjs/atscript/commit/56e9f13))
+
+
+
 ## <small>0.1.16 (2026-02-18)</small>
 
 * fix: fix suggestions for annotate block ([80ba558](https://github.com/moostjs/atscript/commit/80ba558))
