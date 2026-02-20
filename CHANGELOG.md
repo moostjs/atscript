@@ -1,3 +1,13 @@
+## [0.1.18](https://github.com/moostjs/atscript/compare/v0.1.17...v0.1.18) (2026-02-20)
+
+
+### Bug Fixes
+
+* fix flatten optional flag lost ([cdcb827](https://github.com/moostjs/atscript/commit/cdcb8274b19d34ecb42999e03ebc8a86dc5ccbfb))
+* fix primitive annotations in props complex types ([8d3932f](https://github.com/moostjs/atscript/commit/8d3932fc21298ad40424beb924106d44a6697183))
+
+
+
 ## <small>0.1.17 (2026-02-19)</small>
 
 - fix: merge metadata and declaration order fix ([56e9f13](https://github.com/moostjs/atscript/commit/56e9f13))
