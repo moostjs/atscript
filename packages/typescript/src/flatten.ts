@@ -118,6 +118,9 @@ export function flattenAnnotatedType(
         if (!inComplexTypeOrArray) {
           typeArray = $().refTo(def).copyMetadata(def.metadata)
             .$type as TAtscriptAnnotatedType<TAtscriptTypeArray>
+          if (def.optional) {
+            typeArray.optional = def.optional
+          }
           if (options?.topLevelArrayTag) {
             // @ts-expect-error dynamic metadata key
             typeArray.metadata.set(options.topLevelArrayTag, true)
@@ -135,7 +138,12 @@ export function flattenAnnotatedType(
         for (const item of def.type.items) {
           flattenType(item, prefix, true)
         }
-      // falls through
+        addFieldToFlatMap(prefix || '', def)
+        if (def.optional) {
+          const entry = flatMap.get(prefix || '')
+          if (entry) entry.optional = def.optional
+        }
+        break
       default:
         addFieldToFlatMap(prefix || '', def)
         break

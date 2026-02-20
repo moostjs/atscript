@@ -184,6 +184,87 @@ describe('flattenAnnotatedType', () => {
   })
 })
 
+describe('flattenAnnotatedType optional preservation', () => {
+  it('should preserve optional on primitive fields', () => {
+    const type = $('object')
+      .prop('name', $().designType('string').tags('string').optional().$type)
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('name')!.optional).toBe(true)
+  })
+
+  it('should preserve optional on array fields', () => {
+    const type = $('object')
+      .prop('tags', $('array').of($().designType('string').tags('string').$type).optional().$type)
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('tags')!.optional).toBe(true)
+  })
+
+  it('should preserve optional on union fields', () => {
+    const type = $('object')
+      .prop('field',
+        $('union')
+          .item($().designType('string').tags('string').$type)
+          .item($().designType('number').tags('number').$type)
+          .optional()
+          .$type
+      )
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('field')!.optional).toBe(true)
+  })
+
+  it('should preserve optional on tuple fields', () => {
+    const type = $('object')
+      .prop('coords',
+        $('tuple')
+          .item($().designType('number').tags('number').$type)
+          .item($().designType('number').tags('number').$type)
+          .optional()
+          .$type
+      )
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('coords')!.optional).toBe(true)
+  })
+
+  it('should preserve optional on array fields with object elements', () => {
+    const type = $('object')
+      .prop('items',
+        $('array').of(
+          $('object')
+            .prop('label', $().designType('string').tags('string').$type)
+            .$type
+        ).optional().$type
+      )
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('items')!.optional).toBe(true)
+  })
+
+  it('should not set optional when field is required', () => {
+    const type = $('object')
+      .prop('tags', $('array').of($().designType('string').tags('string').$type).$type)
+      .prop('field',
+        $('union')
+          .item($().designType('string').$type)
+          .item($().designType('number').$type)
+          .$type
+      )
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+
+    const flatMap = flattenAnnotatedType(type)
+    expect(flatMap.get('tags')!.optional).toBeUndefined()
+    expect(flatMap.get('field')!.optional).toBeUndefined()
+  })
+})
+
 describe('refTo metadata propagation', () => {
   it('should share type structure through refTo for array elements', () => {
     // refTo no longer copies metadata at runtime — metadata is emitted at build time
