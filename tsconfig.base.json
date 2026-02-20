@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "target": "es2020",
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM", "WebWorker", "DOM.Iterable"],
+    "noUnusedLocals": true,
+    "types": ["node", "@prostojs/dye/global"],
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": false,
+    "resolveJsonModule": true,
+    "downlevelIteration": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "removeComments": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@atscript/core": ["packages/core/src/index.ts"],
+      "@atscript/core/*": ["packages/core/src/*"],
+      "@atscript/typescript": ["packages/typescript/src/index.ts"],
+      "@atscript/typescript/utils": ["packages/typescript/src/utils.ts"],
+      "@atscript/typescript/*": ["packages/typescript/src/*"],
+      "@atscript/mongo": ["packages/mongo/src/index.ts"],
+      "@atscript/mongo/*": ["packages/mongo/src/*"],
+      "@atscript/moost-mongo": ["packages/moost-mongo/src/index.ts"],
+      "@atscript/moost-mongo/*": ["packages/moost-mongo/src/*"],
+      "@atscript/moost-validator": ["packages/moost-validator/src/index.ts"],
+      "@atscript/moost-validator/*": ["packages/moost-validator/src/*"],
+      "unplugin-atscript": ["packages/unplugin/src/index.ts"],
+      "unplugin-atscript/*": ["packages/unplugin/src/*"]
+    }
+  }
+}
