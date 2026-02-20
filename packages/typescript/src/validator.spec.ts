@@ -130,14 +130,14 @@ describe('Validator at objects', () => {
 
   it('should validate object ignoring unknown props', () => {
     const t = simpleObj
-    const validator = new Validator(t.$type, { unknwonProps: 'ignore' })
+    const validator = new Validator(t.$type, { unknownProps: 'ignore' })
     expect(validator.validate({ name: 'John', age: 25 }, true)).toBe(true)
     expect(validator.validate({ name: 'John', age: 25, dummy: true }, true)).toBe(true)
   })
 
   it('should validate object stripping unknown props', () => {
     const t = simpleObj
-    const validator = new Validator(t.$type, { unknwonProps: 'strip' })
+    const validator = new Validator(t.$type, { unknownProps: 'strip' })
     const o = { name: 'John', age: 25, dummy: true }
     expect(validator.validate(o, true)).toBe(true)
     expect(o.dummy).toBeUndefined()

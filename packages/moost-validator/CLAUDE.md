@@ -28,7 +28,7 @@ This is a very small, focused package (3 source files). All validation logic liv
 ### Options (`Partial<TValidatorOptions>`)
 
 - `partial` -- `boolean | 'deep' | function` -- makes properties optional (useful for PATCH)
-- `unknwonProps` -- `'strip' | 'ignore' | 'error'` -- unknown property handling
+- `unknownProps` -- `'strip' | 'ignore' | 'error'` -- unknown property handling
 - `errorLimit` -- max errors before stopping
 - `plugins` -- array of `TValidatorPlugin` functions
 

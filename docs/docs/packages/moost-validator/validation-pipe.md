@@ -97,7 +97,7 @@ For deeply nested partial updates:
 @UseValidatorPipe({ partial: 'deep' })
 ```
 
-### `unknwonProps`
+### `unknownProps`
 
 How to handle properties not defined in the Atscript type:
 
@@ -108,7 +108,7 @@ How to handle properties not defined in the Atscript type:
 | `'strip'`           | Delete unknown properties from the value |
 
 ```typescript
-app.applyGlobalPipes(validatorPipe({ unknwonProps: 'strip' }))
+app.applyGlobalPipes(validatorPipe({ unknownProps: 'strip' }))
 ```
 
 ### `errorLimit`

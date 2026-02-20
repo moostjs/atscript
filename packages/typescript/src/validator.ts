@@ -36,7 +36,7 @@ export interface TValidatorOptions {
     | ((type: TAtscriptAnnotatedType<TAtscriptTypeObject>, path: string) => boolean)
   replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
   plugins: TValidatorPlugin[]
-  unknwonProps: 'strip' | 'ignore' | 'error'
+  unknownProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
 }
@@ -91,7 +91,7 @@ export class Validator<
   ) {
     this.opts = {
       partial: false,
-      unknwonProps: 'error',
+      unknownProps: 'error',
       errorLimit: 10,
       ...opts,
       plugins: opts?.plugins || [],
@@ -397,9 +397,9 @@ export class Validator<
               return false
             }
           }
-        } else if (this.opts.unknwonProps !== 'ignore') {
+        } else if (this.opts.unknownProps !== 'ignore') {
           // no keys matched, no patterns matched:
-          if (this.opts.unknwonProps === 'error') {
+          if (this.opts.unknownProps === 'error') {
             this.push(key)
             this.error(`Unexpected property`)
             this.pop(true)
@@ -407,7 +407,7 @@ export class Validator<
               return false
             }
             passed = false
-          } else if (this.opts.unknwonProps === 'strip') {
+          } else if (this.opts.unknownProps === 'strip') {
             delete value[key]
           }
         }

@@ -61,7 +61,7 @@ Pass options to `.validator()` or `new Validator(type, opts)`:
 ```typescript
 const validator = Product.validator({
   partial: true,
-  unknwonProps: 'strip',
+  unknownProps: 'strip',
   errorLimit: 5,
 })
 ```
@@ -75,7 +75,7 @@ Controls whether missing required properties are errors:
 - `'deep'` — missing properties allowed at all levels (useful for patch operations)
 - `(type, path) => boolean` — custom function for fine-grained control
 
-### `unknwonProps`
+### `unknownProps`
 
 How to handle properties not defined in the type:
 

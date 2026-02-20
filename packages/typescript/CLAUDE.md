@@ -50,7 +50,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 
 ## Runtime utilities
 
-- **Validator**: Validates values against annotated types. Reads `expect.*` metadata for constraints. Options: `partial`, `unknwonProps`, `errorLimit`, `plugins`.
+- **Validator**: Validates values against annotated types. Reads `expect.*` metadata for constraints. Options: `partial`, `unknownProps`, `errorLimit`, `plugins`.
 - **Serializer**: `serializeAnnotatedType()` / `deserializeAnnotatedType()` for JSON-safe round-trip.
 - **JSON Schema**: `buildJsonSchema()` converts annotated types to JSON Schema draft-compatible objects.
 
