@@ -356,8 +356,13 @@ export class JsRenderer extends BaseRenderer {
         const ref = node as SemanticRefNode
         const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
         if (isPrimitive(decl)) {
-          this.annotateType(decl, name)
-          return this
+          // Only inline as primitive if the ref directly targets a built-in primitive,
+          // not a named type alias that resolves to a primitive (e.g. `type MyString = string`).
+          const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
+          if (!ownerDecl?.node || (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')) {
+            this.annotateType(decl, name)
+            return this
+          }
         }
         // must be something imported or defined locally
         const chain = ref.hasChain
@@ -611,6 +616,14 @@ export class JsRenderer extends BaseRenderer {
         const resolved = this.doc.unwindType(refNode.id!, refNode.chain)?.def
         if (resolved && !isPrimitive(resolved)) {
           annotations = node.annotations ?? []
+        } else if (resolved && isPrimitive(resolved)) {
+          // Also use own annotations when the ref targets a named type alias
+          // that resolves to a primitive — annotateType emits refTo + type-level
+          // annotations for these, so evalAnnotationsForNode would duplicate them.
+          const ownerDecl = this.doc.getDeclarationOwnerNode(refNode.id!)
+          if (ownerDecl?.node && (ownerDecl.node.entity === 'type' || ownerDecl.node.entity === 'interface')) {
+            annotations = node.annotations ?? []
+          }
         }
       }
     }

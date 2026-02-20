@@ -1,8 +1,8 @@
 # Custom Primitives
 
-You can extend the built-in primitive types with your own semantic extensions via `atscript.config.js`. Custom primitives work exactly like built-in ones — they appear in IntelliSense, carry validation constraints, and generate appropriate type tags.
+You can extend the built-in primitive types with your own semantic extensions via `atscript.config.ts`. Custom primitives work exactly like built-in ones — they appear in IntelliSense, carry validation constraints, and generate appropriate type tags.
 
-## Defining Custom Extensions
+## Quick Example
 
 Add custom extensions under the `primitives` key in your config:
 
@@ -48,7 +48,21 @@ export default defineConfig({
 })
 ```
 
-Each extension object supports:
+Then use them in `.as` files with dot notation:
+
+```atscript
+export interface Page {
+    url: string.url
+    slug: string.slug
+    completeness: number.percentage
+}
+```
+
+The validator will automatically enforce the constraints — no `@expect.*` annotations needed.
+
+## What You Can Define
+
+Each primitive extension supports:
 
 | Field           | Description                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -59,44 +73,27 @@ Each extension object supports:
 | `isContainer`   | If `true`, the primitive cannot be used directly — one of its extensions must be chosen                       |
 
 ::: tip Inheritance
-Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own `expect` constraints.
+Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own constraints.
 :::
 
-## Custom Phantom Namespaces
+## Phantom Namespaces
 
-You can define entirely new primitive namespaces with `type: 'phantom'` to create families of non-data UI elements. These are omitted from TypeScript types and skipped by validation, but discoverable at runtime — perfect for form renderers that need different kinds of decorative or interactive elements.
+You can define entirely new primitive namespaces with `type: 'phantom'` to create families of non-data UI elements. These are omitted from TypeScript types and skipped by validation, but discoverable at runtime — perfect for form renderers.
 
 ```javascript
-import { defineConfig } from '@atscript/core'
-import ts from '@atscript/typescript'
-
-export default defineConfig({
-  rootDir: 'src',
-  plugins: [ts()],
-  primitives: {
-    ui: {
-      type: 'phantom',
-      isContainer: true,
-      documentation: 'Non-data UI elements for form rendering',
-      extensions: {
-        action: {
-          documentation: 'An action element (button, link)',
-        },
-        divider: {
-          documentation: 'A visual divider between form sections',
-        },
-        paragraph: {
-          documentation: 'A block of informational text',
-        },
-      },
+primitives: {
+  ui: {
+    type: 'phantom',
+    isContainer: true,
+    documentation: 'Non-data UI elements for form rendering',
+    extensions: {
+      action:    { documentation: 'An action element (button, link)' },
+      divider:   { documentation: 'A visual divider between form sections' },
+      paragraph: { documentation: 'A block of informational text' },
     },
   },
-})
+}
 ```
-
-Since extensions inherit `type` from their parent, all `ui.*` subtypes are automatically phantom — no need to repeat `type: 'phantom'` on each one. The `isContainer: true` flag prevents using `ui` directly — the compiler will report an error and require a specific extension like `ui.action` or `ui.divider`.
-
-Then use them in `.as` files:
 
 ```atscript
 export interface CheckoutForm {
@@ -109,38 +106,17 @@ export interface CheckoutForm {
 
     @label "Street"
     street: string
-
-    @label "City"
-    city: string
-
-    @label "Please review your order before proceeding."
-    termsNote: ui.paragraph
-
-    @label "Apply coupon"
-    @component "button"
-    @action "apply-coupon"
-    applyCoupon: ui.action
 }
 ```
 
-The `ui`, `ui.action`, `ui.divider`, and `ui.paragraph` types all behave like [phantom](/packages/typescript/primitives#phantom-type) — they are excluded from the generated TypeScript class and skipped by validation — but they carry distinct tags (`'action'`, `'divider'`, `'paragraph'`) that your form renderer can use to choose the right component.
+## Full Reference
 
-## Using Custom Primitives
+The primitives system is covered in depth in the plugin development guide:
 
-Once defined, use them in `.as` files with dot notation:
-
-```atscript
-export interface Page {
-    url: string.url
-    slug: string.slug
-    completeness: number.percentage
-}
-```
-
-The validator will automatically enforce the constraints defined in your config — no `@expect.*` annotations needed.
+- **[Custom Primitives — Plugin Development](/plugin-development/primitives-type-tags)** — the complete `TPrimitiveConfig` interface, complex type definitions (arrays, tuples, unions, objects), semantic tags, container primitives, inheritance rules, and phantom type design.
 
 ::: tip Re-generate after config changes
-Run `npx asc -f dts` after adding custom primitives to regenerate `atscript.d.ts`. This updates IntelliSense with your new type tags. See [Configuration](/packages/typescript/configuration) for details.
+Run `npx asc` after adding custom primitives to regenerate output files. This updates IntelliSense with your new type tags. See [Configuration](/packages/typescript/configuration) for details.
 :::
 
 ## Next Steps

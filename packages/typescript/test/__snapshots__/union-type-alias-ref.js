@@ -3,7 +3,7 @@
 /* oxlint-disable */
 import { defineAnnotatedType as $, annotate as $a } from "@atscript/typescript/utils"
 
-class TFirstName {
+export class PlaygroundForm {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -13,7 +13,7 @@ class TFirstName {
 }
 
 
-class TLastName {
+class Address {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -23,7 +23,7 @@ class TLastName {
 }
 
 
-class TAge {
+class Contact {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -33,7 +33,7 @@ class TAge {
 }
 
 
-export class ITarget {
+class MyString {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
@@ -42,40 +42,71 @@ export class ITarget {
   }
 }
 
-$("", TFirstName).designType("string")
-  .tags("string")
-  .annotate("label", "First Name")
-
-$("", TLastName).designType("string")
-  .tags("string")
-  .annotate("label", "Last Name")
-
-$("", TAge).designType("number")
-  .tags("number")
-  .annotate("min", 18)
-
-$("object", ITarget)
+$("object", PlaygroundForm)
   .prop(
-    "firstName",
-    $()
-      .refTo(TFirstName)
-      .annotate("label", "First Name")
-      .$type
-  ).prop(
-    "lastName",
-    $()
-      .refTo(TLastName)
-      .annotate("label", "Last Name")
-      .annotate("label", "Last Name (optional)")
-      .annotate("required", false)
-      .optional()
-      .$type
-  ).prop(
-    "age",
-    $()
-      .refTo(TAge)
-      .annotate("min", 18)
+    "addresses",
+    $("array")
+      .of($("union")
+          .item($()
+              .refTo(Address)
+              .annotate("label", "Address")
+              .$type)
+          .item($()
+              .refTo(Contact)
+              .annotate("label", "Contact")
+              .$type)
+          .item($()
+              .refTo(MyString)
+              .annotate("label", "My String Label")
+              .$type)
+          .$type)
+      .annotate("label", "Addresses /Contacts")
       .$type
   )
+  .annotate("label", "Playground Form")
+
+$("object", Address)
+  .prop(
+    "type",
+    $()
+      .designType("string")
+      .value("address")
+      .$type
+  ).prop(
+    "street",
+    $().designType("string")
+      .tags("string")
+      .$type
+  ).prop(
+    "city",
+    $().designType("string")
+      .tags("string")
+      .$type
+  )
+  .annotate("label", "Address")
+
+$("object", Contact)
+  .prop(
+    "type",
+    $()
+      .designType("string")
+      .value("phone")
+      .$type
+  ).prop(
+    "email",
+    $().designType("string")
+      .tags("string")
+      .$type
+  ).prop(
+    "phone",
+    $().designType("string")
+      .tags("string")
+      .$type
+  )
+  .annotate("label", "Contact")
+
+$("", MyString).designType("string")
+  .tags("string")
+  .annotate("label", "My String Label")
 
 // prettier-ignore-end

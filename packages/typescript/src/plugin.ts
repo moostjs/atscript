@@ -2,6 +2,7 @@ import path from 'path'
 
 // oxlint-disable arrow-body-style
 import type { TAtscriptPlugin } from '@atscript/core'
+import { DEFAULT_FORMAT } from '@atscript/core'
 
 import { TypeRenderer, JsRenderer } from './codegen'
 import { escapeQuotes, wrapProp } from './codegen/utils'
@@ -34,7 +35,7 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
     name: 'typescript',
 
     render(doc, format) {
-      if (format === 'dts') {
+      if (format === 'dts' || format === DEFAULT_FORMAT) {
         return [
           {
             fileName: `${doc.name}.d.ts`,
@@ -53,7 +54,7 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
     },
 
     async buildEnd(output, format, repo) {
-      if (format === 'dts') {
+      if (format === 'dts' || format === DEFAULT_FORMAT) {
         // render atscript.d.ts
         const annotations = await repo.getUsedAnnotations()
         const tags = (await repo.getPrimitivesTags()) || new Set()

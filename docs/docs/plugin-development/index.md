@@ -1,42 +1,101 @@
-# Plugin Development
+# Creating a Plugin
 
-This guide covers how to extend Atscript by building plugins, language extensions, and LSP integrations. It's aimed at developers who want to add support for new languages (Python, Java, etc.), create custom code generators, or build editor tooling on top of the Atscript core.
+Atscript plugins extend the language with custom primitives, annotations, and code generators. A plugin is a plain object that implements the `TAtscriptPlugin` interface — a `name` plus optional hooks that participate in the Atscript processing pipeline.
 
-## Who Is This For?
+## What Plugins Can Do
 
-- **Language extension authors** — creating a new language target (like `@atscript/typescript` does for TypeScript)
-- **Plugin authors** — adding custom annotations, primitives, or metadata processing
-- **Tool authors** — building LSPs, linters, or other developer tools that consume Atscript
+| Capability | Hook | Example |
+| --- | --- | --- |
+| Add semantic types (primitives) | `config()` | `mongo.objectId`, `mongo.vector` |
+| Define annotation specs | `config()` | `@mongo.collection`, `@mongo.index.unique` |
+| Remap or virtualize module paths | `resolve()` | Path aliases, virtual modules |
+| Provide virtual file content | `load()` | Synthetic `.as` modules |
+| Post-process parsed documents | `onDocument()` | Inject virtual props, run custom checks |
+| Generate output files | `render()` | `.d.ts`, `.js`, `.py`, `.json` — any format |
+| Aggregate across all documents | `buildEnd()` | Global type declarations, indexes |
 
-## What You'll Learn
+## Your First Plugin
 
-**Core Concepts:**
+Here's a minimal plugin that adds a `@ui.hidden` annotation:
 
-- [Architecture](/plugin-development/architecture) — how the core is structured
-- [Parser & AST](/plugin-development/parser-ast) — parsing `.as` files and navigating the AST
-- [Semantic Nodes](/plugin-development/semantic-nodes) — the resolved type graph
-- [Plugin System](/plugin-development/plugin-system) — hooks, lifecycle, and configuration
-- [Annotation System](/plugin-development/annotation-system) — defining and processing annotations
-- [Type System](/plugin-development/type-system) — primitives, type resolution, and unwinding
+```typescript
+import { createAtscriptPlugin, AnnotationSpec } from '@atscript/core'
 
-**Building a Language Extension:**
+export const uiPlugin = () => createAtscriptPlugin({
+  name: 'ui',
+  config() {
+    return {
+      annotations: {
+        ui: {
+          hidden: new AnnotationSpec({
+            description: 'Hide this field in the UI',
+            nodeType: ['prop'],
+          }),
+        },
+      },
+    }
+  },
+})
+```
 
-- [Plugin Hooks](/plugin-development/plugin-hooks) — the full hook API
-- [Code Generation](/plugin-development/code-generation) — emitting output from the AST
-- [Primitives & Type Tags](/plugin-development/primitives-type-tags) — adding semantic types
-- [Testing Plugins](/plugin-development/testing-plugins) — test harness and snapshot testing
+`createAtscriptPlugin` is a type-safe identity function — it returns the object you pass in, but gives you full TypeScript IntelliSense on the hook signatures.
 
-**Building an LSP:**
+## Registering Your Plugin
 
-- [LSP Overview](/plugin-development/lsp-overview) — how the Atscript LSP works
-- [Diagnostics](/plugin-development/diagnostics) — error reporting and validation
-- [Completions & Navigation](/plugin-development/completions-navigation) — IntelliSense features
+Add the plugin to your `atscript.config.ts`:
 
-**Reference:**
+```typescript
+import { defineConfig } from '@atscript/core'
+import { tsPlugin } from '@atscript/typescript'
+import { uiPlugin } from './plugins/ui-plugin'
 
-- [Core API](/plugin-development/core-api) — `@atscript/core` public API
-- [Plugin API](/plugin-development/plugin-api) — plugin interface and hook signatures
+export default defineConfig({
+  rootDir: 'src',
+  plugins: [tsPlugin(), uiPlugin()],
+})
+```
+
+Plugins execute in array order. Each plugin's `config()` output is merged with the accumulated config using deep defaults (`defu`), so multiple plugins can contribute primitives and annotations without conflicts.
+
+## The TAtscriptPlugin Interface
+
+```typescript
+interface TAtscriptPlugin {
+  name: string
+
+  config?(config: TAtscriptConfig): TAtscriptConfig | undefined
+  resolve?(id: string): string | undefined
+  load?(id: string): string | undefined
+  onDocument?(doc: AtscriptDoc): void
+  render?(doc: AtscriptDoc, format: string): TPluginOutput[]
+  buildEnd?(output: TOutput[], format: string, repo: AtscriptRepo): void
+}
+```
+
+All hooks except `name` are optional. A plugin can implement any combination — from a simple annotation-only plugin (just `config()`) to a full language extension with code generation (`config()` + `render()` + `buildEnd()`).
+
+## Guide Roadmap
+
+This guide walks you through plugin development from simple to complex:
+
+1. **[Plugin Architecture](/plugin-development/architecture)** — The processing pipeline, AST node types, plugin lifecycle, and the document API you'll use throughout.
+
+2. **[Custom Primitives](/plugin-development/primitives-type-tags)** — Adding semantic types with validation constraints, complex type definitions, and inheritance.
+
+3. **[Custom Annotations](/plugin-development/annotation-system)** — Defining annotation specs with typed arguments, custom validation, merge strategies, and AST modification.
+
+4. **[Building a Code Generator](/plugin-development/code-generation)** — Writing a `render()` hook to generate output files, walking the AST, resolving types, and building a complete code generator from scratch.
+
+5. **[Plugin Hooks Reference](/plugin-development/plugin-hooks)** — Complete reference for all six hooks with signatures, execution order, and examples.
+
+6. **[Validation Specification](/plugin-development/validation-spec)** — Language-agnostic spec for implementing data validation: type dispatch, constraint annotations, optional vs required, error reporting.
+
+7. **[Testing Plugins](/plugin-development/testing-plugins)** — Test setup with Vitest, snapshot testing generated output, and testing diagnostics.
+
+8. **[VSCode & Build Integration](/plugin-development/tooling-integration)** — How plugins integrate with the CLI, build tools, and VSCode on-save generation.
 
 ## Prerequisites
 
-Familiarity with `@atscript/core` and at least one existing language extension (like `@atscript/typescript`) is recommended. The TypeScript plugin source code serves as the reference implementation for many concepts covered here.
+- Familiarity with [Atscript syntax](/packages/typescript/interfaces-types) (interfaces, types, annotations)
+- A working TypeScript development environment
+- `@atscript/core` as a dependency (the only required package for plugin development)

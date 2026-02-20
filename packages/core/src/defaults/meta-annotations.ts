@@ -77,7 +77,7 @@ export const metaAnnotations: TAnnotationsTree = {
       '@meta.placeholder "Enter your name"' +
       'name: string' +
       '```',
-    nodeType: ['prop'],
+    nodeType: ['prop', 'type'],
     argument: {
       name: 'text',
       type: 'string',
@@ -93,7 +93,7 @@ export const metaAnnotations: TAnnotationsTree = {
       '@meta.sensitive' +
       'password: string' +
       '```',
-    nodeType: ['prop'],
+    nodeType: ['prop', 'type'],
     multiple: false,
   }),
 
@@ -105,7 +105,7 @@ export const metaAnnotations: TAnnotationsTree = {
       '@meta.readonly' +
       'createdAt: string.date' +
       '```',
-    nodeType: ['prop'],
+    nodeType: ['prop', 'type'],
     multiple: false,
   }),
 
@@ -147,7 +147,7 @@ export const metaAnnotations: TAnnotationsTree = {
       '  }[]\n' +
       '}\n' +
       '```\n',
-    nodeType: ['prop'],
+    nodeType: ['prop', 'type'],
     multiple: false,
     validate(token, args, doc) {
       const field = token.parentNode!

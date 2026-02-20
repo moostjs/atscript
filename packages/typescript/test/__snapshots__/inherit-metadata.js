@@ -46,21 +46,21 @@ $("object", ISource)
 $("object", ITarget)
   .prop(
     "firstName",
-    $().designType("string")
-      .tags("string")
+    $()
+      .refTo(ISource, ["firstName"])
       .$type
   ).prop(
     "lastName",
-    $().designType("string")
-      .tags("string")
+    $()
+      .refTo(ISource, ["lastName"])
       .annotate("label", "Last Name (optional)")
       .annotate("required", false)
       .optional()
       .$type
   ).prop(
     "age",
-    $().designType("number")
-      .tags("number")
+    $()
+      .refTo(ISource, ["age"])
       .$type
   )
 

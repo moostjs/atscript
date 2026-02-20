@@ -10,6 +10,26 @@ export interface TPluginOutput {
 
 export type TAtscriptRenderFormat = string
 
+/**
+ * Well-known render format for a plugin's primary output.
+ *
+ * When a `.as` file is saved in an editor (VSCode, etc.), the editor
+ * passes this format to `render()` and `buildEnd()`. Plugins should
+ * check for this value alongside their own format strings to produce
+ * output that is essential for the development experience — typically
+ * type declarations for the host language.
+ *
+ * @example
+ * ```ts
+ * render(doc, format) {
+ *   if (format === 'dts' || format === DEFAULT_FORMAT) {
+ *     return [{ fileName: `${doc.name}.d.ts`, content: renderTypes(doc) }]
+ *   }
+ * }
+ * ```
+ */
+export const DEFAULT_FORMAT: TAtscriptRenderFormat = '__default__'
+
 export interface TAtscriptPlugin {
   name: string
 

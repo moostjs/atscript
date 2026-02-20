@@ -2,7 +2,7 @@ import { existsSync } from 'fs'
 import path from 'path'
 
 import type { TAtscriptConfig, TAtscriptConfigOutput } from '@atscript/core'
-import { build, loadConfig, resolveConfigFile } from '@atscript/core'
+import { build, DEFAULT_FORMAT, loadConfig, resolveConfigFile } from '@atscript/core'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
@@ -27,7 +27,7 @@ export class Commands {
 
     @CliOption('f', 'format')
     @Optional()
-    @Description('Output format (js|dts), default: "dts"')
+    @Description('Output format (e.g. js, dts). Omit to run all plugins with their default output.')
     format?: string,
 
     @CliOption('noEmit')
@@ -41,9 +41,7 @@ export class Commands {
     skipDiag?: boolean
   ) {
     const config = await this.getConfig(configFile)
-    if (format) {
-      config.format = format
-    }
+    config.format = format || DEFAULT_FORMAT
     this.logger.log(`Format: ${__DYE_CYAN__}${config.format}${__DYE_COLOR_OFF__}`)
     const builder = await build(config)
 
@@ -114,7 +112,7 @@ export class Commands {
       }
       this.logger.log(`No atscript config file found`)
       return {
-        format: 'dts',
+        format: DEFAULT_FORMAT,
         plugins: [tsPlugin()],
       }
     }

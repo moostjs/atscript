@@ -334,7 +334,12 @@ export default defineConfig({
         ],
       },
       { text: 'VSCode', link: '/packages/vscode/' },
-      // { text: 'Plugin Development', link: '/plugin-development/' },
+      {
+        text: 'Plugins',
+        items: [
+          { text: 'Creating a Plugin', link: '/plugin-development/' },
+        ],
+      },
     ],
 
     sidebar: {
@@ -459,44 +464,42 @@ export default defineConfig({
       '/plugin-development/': [
         {
           text: 'Getting Started',
-          items: [{ text: 'Overview', link: '/plugin-development/' }],
-        },
-        {
-          text: 'Core Concepts',
           items: [
-            { text: 'Architecture', link: '/plugin-development/architecture' },
-            { text: 'Parser & AST', link: '/plugin-development/parser-ast' },
-            { text: 'Semantic Nodes', link: '/plugin-development/semantic-nodes' },
-            { text: 'Plugin System', link: '/plugin-development/plugin-system' },
-            { text: 'Annotation System', link: '/plugin-development/annotation-system' },
-            { text: 'Type System', link: '/plugin-development/type-system' },
+            { text: 'Overview', link: '/plugin-development/' },
+            { text: 'Plugin Architecture', link: '/plugin-development/architecture' },
           ],
         },
         {
-          text: 'Language Extensions',
+          text: 'Extending the Language',
           items: [
-            { text: 'Plugin Hooks', link: '/plugin-development/plugin-hooks' },
-            { text: 'Code Generation', link: '/plugin-development/code-generation' },
-            { text: 'Primitives & Type Tags', link: '/plugin-development/primitives-type-tags' },
-            { text: 'Testing Plugins', link: '/plugin-development/testing-plugins' },
+            { text: 'Custom Primitives', link: '/plugin-development/primitives-type-tags' },
+            { text: 'Custom Annotations', link: '/plugin-development/annotation-system' },
           ],
         },
         {
-          text: 'LSP Development',
+          text: 'Code Generation',
           items: [
-            { text: 'LSP Overview', link: '/plugin-development/lsp-overview' },
-            { text: 'Diagnostics', link: '/plugin-development/diagnostics' },
+            { text: 'Building a Code Generator', link: '/plugin-development/code-generation' },
+            { text: 'Plugin Hooks Reference', link: '/plugin-development/plugin-hooks' },
+          ],
+        },
+        {
+          text: 'Runtime Behavior',
+          items: [
             {
-              text: 'Completions & Navigation',
-              link: '/plugin-development/completions-navigation',
+              text: 'Validation Specification',
+              link: '/plugin-development/validation-spec',
             },
           ],
         },
         {
-          text: 'Reference',
+          text: 'Testing & Tooling',
           items: [
-            { text: 'Core API', link: '/plugin-development/core-api' },
-            { text: 'Plugin API', link: '/plugin-development/plugin-api' },
+            { text: 'Testing Plugins', link: '/plugin-development/testing-plugins' },
+            {
+              text: 'VSCode & Build Integration',
+              link: '/plugin-development/tooling-integration',
+            },
           ],
         },
       ],

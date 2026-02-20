@@ -805,4 +805,29 @@ describe('ts-plugin', () => {
     expect(content).toContain('@deprecated')
     expect(content).toContain('static toJsonSchema: () => any')
   })
+
+  it('must emit refTo and annotations for type alias refs in unions', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/union-type-alias-ref.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('union-type-alias-ref.as.js')
+    // The third union item (MyString) should use refTo, not inline primitive
+    expect(out[0].content).toContain('.refTo(MyString)')
+    // The MyString ref should carry its label annotation
+    expect(out[0].content).toContain('.annotate("label", "My String Label")')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/union-type-alias-ref.js')
+    )
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts).toHaveLength(2)
+    expect(outDts[0].fileName).toBe('union-type-alias-ref.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/union-type-alias-ref.as.d.ts')
+    )
+  })
 })

@@ -21,6 +21,7 @@ import {
   isProp,
   isRef,
   isStructure,
+  DEFAULT_FORMAT,
   PluginManager,
   resolveAtscriptFromPath,
   resolveConfigFile,
@@ -93,7 +94,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const { manager } = await this.resolveConfig(atscript.id)
       const config = await manager.config()
       const bld = new BuildRepo(config.rootDir!, this, [atscript])
-      await bld.write({ format: 'dts', outDir: config.outDir })
+      await bld.write({ format: DEFAULT_FORMAT, outDir: config.outDir })
     })
 
     connection.onNotification('workspace/files', async (fileUris: string[]) => {

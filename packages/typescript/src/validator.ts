@@ -256,7 +256,7 @@ export class Validator<
     }
     let i = 0
     for (const item of def.type.items) {
-      this.push(`[${i}]`)
+      this.push(String(i))
       if (!this.validateSafe(item, value[i])) {
         this.pop(true)
         return false
@@ -299,7 +299,7 @@ export class Validator<
     let i = 0
     let passed = true
     for (const item of value) {
-      this.push(`[${i}]`)
+      this.push(String(i))
       if (!this.validateSafe(def.type.of, item)) {
         passed = false
         this.pop(true)
