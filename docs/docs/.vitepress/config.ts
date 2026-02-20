@@ -111,7 +111,8 @@ const atscriptGrammar = {
           },
         },
         {
-          match: '(\\bannotate\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?',
+          match:
+            '(\\bannotate\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)(?:\\s+(as)\\s+([A-Za-z_][A-Za-z0-9_]*))?',
           captures: {
             '1': {
               name: 'storage.type.atscript',
@@ -343,7 +344,10 @@ export default defineConfig({
           items: [
             { text: 'Overview', link: '/packages/typescript/' },
             { text: 'Why Atscript?', link: '/packages/typescript/why-atscript' },
-            { text: 'Atscript Validation vs Others', link: '/packages/typescript/validation-comparison' },
+            {
+              text: 'Atscript Validation vs Others',
+              link: '/packages/typescript/validation-comparison',
+            },
             { text: 'Quick Start', link: '/packages/typescript/quick-start' },
           ],
         },
@@ -428,7 +432,10 @@ export default defineConfig({
           text: '@atscript/moost-validator',
           items: [
             { text: 'Overview', link: '/packages/moost-validator/' },
-            { text: 'Atscript vs Others', link: '/packages/moost-validator/why-atscript-validation' },
+            {
+              text: 'Atscript vs Others',
+              link: '/packages/moost-validator/why-atscript-validation',
+            },
             { text: 'Validation Pipe', link: '/packages/moost-validator/validation-pipe' },
             { text: 'Error Handling', link: '/packages/moost-validator/error-handling' },
           ],
@@ -450,9 +457,7 @@ export default defineConfig({
       '/plugin-development/': [
         {
           text: 'Getting Started',
-          items: [
-            { text: 'Overview', link: '/plugin-development/' },
-          ],
+          items: [{ text: 'Overview', link: '/plugin-development/' }],
         },
         {
           text: 'Core Concepts',
@@ -479,7 +484,10 @@ export default defineConfig({
           items: [
             { text: 'LSP Overview', link: '/plugin-development/lsp-overview' },
             { text: 'Diagnostics', link: '/plugin-development/diagnostics' },
-            { text: 'Completions & Navigation', link: '/plugin-development/completions-navigation' },
+            {
+              text: 'Completions & Navigation',
+              link: '/plugin-development/completions-navigation',
+            },
           ],
         },
         {

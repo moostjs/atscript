@@ -10,13 +10,13 @@ npx asc [options]
 
 ## Options
 
-| Option | Description |
-|--------|-------------|
-| `-c, --config <path>` | Path to config file. If omitted, auto-detects `atscript.config.js` / `.ts` in the current directory |
-| `-f, --format <format>` | Output format: `dts` or `js` (default: `dts`) |
-| `--noEmit` | Run diagnostics only, don't write files |
-| `--skipDiag` | Skip diagnostics, always emit files |
-| `--help` | Display help |
+| Option                  | Description                                                                                         |
+| ----------------------- | --------------------------------------------------------------------------------------------------- |
+| `-c, --config <path>`   | Path to config file. If omitted, auto-detects `atscript.config.js` / `.ts` in the current directory |
+| `-f, --format <format>` | Output format: `dts` or `js` (default: `dts`)                                                       |
+| `--noEmit`              | Run diagnostics only, don't write files                                                             |
+| `--skipDiag`            | Skip diagnostics, always emit files                                                                 |
+| `--help`                | Display help                                                                                        |
 
 ## Examples
 

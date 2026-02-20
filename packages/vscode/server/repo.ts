@@ -8,7 +8,7 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token } from '@atscript/core'
+import type { SemanticNode, Token, SemanticAnnotateNode } from '@atscript/core'
 import {
   AtscriptDoc,
   AtscriptRepo,
@@ -24,8 +24,8 @@ import {
   PluginManager,
   resolveAtscriptFromPath,
   resolveConfigFile,
-  SemanticAnnotateNode,
 } from '@atscript/core'
+import type { TextDocument } from 'vscode-languageserver-textdocument'
 import type {
   CompletionItem,
   createConnection,
@@ -44,7 +44,6 @@ import {
   SignatureInformation,
 } from 'vscode-languageserver/node'
 import type { Range, SemanticTokens } from 'vscode-languageserver/node'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
 
@@ -240,9 +239,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
                 // Annotate block entries are ref nodes referencing props,
                 // so treat 'ref' as equivalent to 'prop'
                 const effectiveEntity =
-                  parent.entity === 'ref' && nodeType.includes('prop')
-                    ? 'prop'
-                    : parent.entity
+                  parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
                 if (!nodeType.includes(effectiveEntity)) {
                   return []
                 }
@@ -494,7 +491,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         if (def?.documentation) {
           docs.push(def.documentation)
         }
-        if (docs.length) {
+        if (docs.length > 0) {
           return {
             contents: {
               kind: 'markdown',
@@ -555,7 +552,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
   async onConfigChanged(_configFile: string) {
     const configFile = _configFile.startsWith('file://') ? _configFile.slice(7) : _configFile
-    console.log('Reloading config: ' + configFile)
+    console.log(`Reloading config: ${configFile}`)
     this.configFiles.delete(configFile)
     for (const [id, cache] of Array.from(this.configs.entries())) {
       const { file } = await cache
@@ -580,14 +577,20 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
     const builder = new SemanticTokensBuilder()
     // Collect all phantom-related tokens: type references + prop names
-    const phantomTokens: { line: number; char: number; length: number }[] = []
+    const phantomTokens: Array<{ line: number; char: number; length: number }> = []
     // 1. Mark phantom type reference tokens
     for (const token of atscript.referred) {
-      if (!isRef(token.parentNode)) continue
+      if (!isRef(token.parentNode)) {
+        continue
+      }
       const ref = token.parentNode
       const unwound = atscript.unwindType(ref.id!, ref.chain)
-      if (!unwound?.def) continue
-      if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') continue
+      if (!unwound?.def) {
+        continue
+      }
+      if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') {
+        continue
+      }
       phantomTokens.push({
         line: token.range.start.line,
         char: token.range.start.character,
@@ -603,13 +606,21 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
     // 2. Mark prop name tokens whose type resolves to phantom
     for (const node of atscript.nodes) {
-      if (!isInterface(node)) continue
+      if (!isInterface(node)) {
+        continue
+      }
       for (const [, prop] of node.props) {
         const def = prop.getDefinition()
-        if (!isRef(def)) continue
+        if (!isRef(def)) {
+          continue
+        }
         const unwound = atscript.unwindType(def.id!, def.chain)
-        if (!unwound?.def) continue
-        if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') continue
+        if (!unwound?.def) {
+          continue
+        }
+        if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') {
+          continue
+        }
         const propToken = prop.token('identifier')
         if (propToken) {
           phantomTokens.push({
@@ -622,23 +633,37 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
     // 3. Mark annotate block entry tokens that refer to phantom-typed props
     for (const node of atscript.nodes) {
-      if (!isAnnotate(node)) continue
+      if (!isAnnotate(node)) {
+        continue
+      }
       const unwound = atscript.unwindType(node.targetName)
-      if (!unwound?.def) continue
+      if (!unwound?.def) {
+        continue
+      }
       let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
       if (isInterface(targetDef)) {
         targetDef = targetDef.getDefinition() || targetDef
       }
-      if (!isStructure(targetDef) && !isInterface(targetDef)) continue
+      if (!isStructure(targetDef) && !isInterface(targetDef)) {
+        continue
+      }
       for (const entry of node.entries) {
         const propName = entry.id!
         const prop = targetDef.props.get(propName)
-        if (!prop) continue
+        if (!prop) {
+          continue
+        }
         const propDef = prop.getDefinition()
-        if (!isRef(propDef)) continue
+        if (!isRef(propDef)) {
+          continue
+        }
         const propUnwound = atscript.unwindType(propDef.id!, propDef.chain)
-        if (!propUnwound?.def) continue
-        if (!isPrimitive(propUnwound.def) || propUnwound.def.config.type !== 'phantom') continue
+        if (!propUnwound?.def) {
+          continue
+        }
+        if (!isPrimitive(propUnwound.def) || propUnwound.def.config.type !== 'phantom') {
+          continue
+        }
         const entryToken = entry.token('identifier')
         if (entryToken) {
           phantomTokens.push({
@@ -661,7 +686,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     // Sort by position (required by semantic tokens protocol)
     phantomTokens.sort((a, b) => a.line - b.line || a.char - b.char)
     for (const t of phantomTokens) {
-      if (range && (t.line < range.start.line || t.line > range.end.line)) continue
+      if (range && (t.line < range.start.line || t.line > range.end.line)) {
+        continue
+      }
       builder.push(t.line, t.char, t.length, 0, 1) // tokenType=0 (type), modifier=1 (documentation)
     }
 
@@ -778,10 +805,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
                 // todo: better format for primitive documentation
                 value:
                   p.config.documentation ||
-                  'Contains:\n\n' +
-                    Object.keys(p.config.extensions || {})
-                      .map(k => `- **${k}** ${p.config.extensions![k].documentation || ''}`)
-                      .join('\n'),
+                  `Contains:\n\n${Object.keys(p.config.extensions || {})
+                    .map(k => `- **${k}** ${p.config.extensions![k].documentation || ''}`)
+                    .join('\n')}`,
               },
             }) as CompletionItem
         )

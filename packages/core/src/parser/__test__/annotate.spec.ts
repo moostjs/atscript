@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest'
 
+import { parseAtscript } from '..'
 import { AnnotationSpec } from '../../annotations'
 import { AtscriptDoc } from '../../document'
-import { parseAtscript } from '..'
 import type { SemanticAnnotateNode } from '../nodes/annotate-node'
 import { SemanticPrimitiveNode } from '../nodes/primitive-node'
 
@@ -81,7 +81,9 @@ export annotate MyInterface {
     const doc = new AtscriptDoc('test', {})
     doc.update(source)
     const messages = doc.messages
-    expect(messages.some(m => m.message.includes('Cannot export mutating ad-hoc annotations'))).toBe(true)
+    expect(
+      messages.some(m => m.message.includes('Cannot export mutating ad-hoc annotations'))
+    ).toBe(true)
   })
 
   it('entries with dot-chain references', () => {

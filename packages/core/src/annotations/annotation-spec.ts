@@ -1,7 +1,7 @@
 /* eslint-disable complexity */
 /* eslint-disable sonarjs/cognitive-complexity */
 import type { TAnnotationsTree } from '../config'
-import { AtscriptDoc } from '../document'
+import type { AtscriptDoc } from '../document'
 import {
   isGroup,
   isInterface,
@@ -29,7 +29,7 @@ export interface TAnnotationSpecConfig {
   mergeStrategy?: 'append' | 'replace' // default 'replace'
   description?: string
   nodeType?: TNodeEntity[]
-  defType?: SemanticPrimitiveNode['type'][]
+  defType?: Array<SemanticPrimitiveNode['type']>
   argument?: TAnnotationArgument[] | TAnnotationArgument
   validate?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => TMessages | undefined
   modify?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => void

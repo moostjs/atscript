@@ -1,6 +1,6 @@
+import { isGroup, isRef } from '.'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AtscriptDoc } from '../../document'
-import { isGroup, isRef } from '.'
 import type { SemanticRefNode } from './ref-node'
 import { SemanticNode } from './semantic-node'
 
@@ -55,10 +55,7 @@ export class SemanticAnnotateNode extends SemanticNode {
       }
     } else if (this.token('export')) {
       // Mutating with export: syntax error
-      doc.registerMessage(
-        this.token('export')!,
-        'Cannot export mutating ad-hoc annotations block',
-      )
+      doc.registerMessage(this.token('export')!, 'Cannot export mutating ad-hoc annotations block')
     }
 
     const block = this.token('inner')
@@ -75,9 +72,7 @@ export class SemanticAnnotateNode extends SemanticNode {
         : entry.id!
       if (seenEntries.has(entryPath)) {
         const idRange = entry.token('identifier')!.range
-        const endRange = entry.hasChain
-          ? entry.chain[entry.chain.length - 1].range
-          : idRange
+        const endRange = entry.hasChain ? entry.chain[entry.chain.length - 1].range : idRange
         doc.messages.push({
           severity: 1,
           message: 'Duplicate annotate entry',

@@ -1,14 +1,13 @@
 // oxlint-disable max-depth
 // eslint-disable max-lines
-import {
-  isAnnotatedType,
-  isPhantomType,
+import type {
   TAtscriptAnnotatedType,
   TAtscriptTypeArray,
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
+import { isAnnotatedType, isPhantomType } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 
 interface TError {
@@ -74,7 +73,16 @@ export interface TValidatorPluginContext {
  * @typeParam T - The annotated type definition.
  * @typeParam DataType - The TypeScript type that `validate` narrows to (auto-inferred).
  */
-export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
+export class Validator<
+  T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
+  DataType = T extends { type: { __dataType?: infer D } }
+    ? unknown extends D
+      ? T extends new (...args: any[]) => infer I
+        ? I
+        : unknown
+      : D
+    : unknown,
+> {
   protected opts: TValidatorOptions
 
   constructor(
@@ -268,9 +276,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (minLength) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
-        const message = typeof minLength === 'object' && minLength.message
-          ? minLength.message
-          : `Expected minimum length of ${length} items, got ${value.length} items`
+        const message =
+          typeof minLength === 'object' && minLength.message
+            ? minLength.message
+            : `Expected minimum length of ${length} items, got ${value.length} items`
         this.error(message)
         return false
       }
@@ -279,9 +288,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (maxLength) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
-        const message = typeof maxLength === 'object' && maxLength.message
-          ? maxLength.message
-          : `Expected maximum length of ${length} items, got ${value.length} items`
+        const message =
+          typeof maxLength === 'object' && maxLength.message
+            ? maxLength.message
+            : `Expected maximum length of ${length} items, got ${value.length} items`
         this.error(message)
         return false
       }
@@ -366,7 +376,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
             matched.push({ pattern, def: propDef })
           }
         }
-        if (matched.length) {
+        if (matched.length > 0) {
           // some patterns matched, we have to make sure that
           // at least one type validation passes
           let keyPassed = false
@@ -410,7 +420,7 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: any
   ): boolean {
-    if (typeof def.type.value !== 'undefined') {
+    if (def.type.value !== undefined) {
       if (value !== def.type.value) {
         this.error(`Expected ${def.type.value}, got ${value}`)
         return false
@@ -419,43 +429,51 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     }
     const typeOfValue = Array.isArray(value) ? 'array' : typeof value
     switch (def.type.designType) {
-      case 'never':
+      case 'never': {
         this.error(`This type is impossible, must be an internal problem`)
         return false
-      case 'any':
+      }
+      case 'any': {
         return true
-      case 'string':
+      }
+      case 'string': {
         if (typeOfValue !== def.type.designType) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return this.validateString(def, value)
-      case 'number':
+      }
+      case 'number': {
         if (typeOfValue !== def.type.designType) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return this.validateNumber(def, value)
-      case 'boolean':
+      }
+      case 'boolean': {
         if (typeOfValue !== def.type.designType) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return this.validateBoolean(def, value)
-      case 'undefined':
+      }
+      case 'undefined': {
         if (value !== undefined) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return true
-      case 'null':
+      }
+      case 'null': {
         if (value !== null) {
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
         return true
-      default:
+      }
+      default: {
         throw new Error(`Unknown type "${def.type.designType}"`)
+      }
     }
   }
 
@@ -466,9 +484,8 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     const filled = def.metadata.get('meta.required')
     if (filled) {
       if (value.trim().length === 0) {
-        const message = typeof filled === 'object' && filled.message
-          ? filled.message
-          : `Must not be empty`
+        const message =
+          typeof filled === 'object' && filled.message ? filled.message : `Must not be empty`
         this.error(message)
         return false
       }
@@ -477,9 +494,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (minLength) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
-        const message = typeof minLength === 'object' && minLength.message
-          ? minLength.message
-          : `Expected minimum length of ${length} characters, got ${value.length} characters`
+        const message =
+          typeof minLength === 'object' && minLength.message
+            ? minLength.message
+            : `Expected minimum length of ${length} characters, got ${value.length} characters`
         this.error(message)
         return false
       }
@@ -488,9 +506,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (maxLength) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
-        const message = typeof maxLength === 'object' && maxLength.message
-          ? maxLength.message
-          : `Expected maximum length of ${length} characters, got ${value.length} characters`
+        const message =
+          typeof maxLength === 'object' && maxLength.message
+            ? maxLength.message
+            : `Expected maximum length of ${length} characters, got ${value.length} characters`
         this.error(message)
         return false
       }
@@ -523,9 +542,8 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
   ): boolean {
     const int = def.metadata.get('expect.int')
     if (int && value % 1 !== 0) {
-      const message = typeof int === 'object' && int.message
-        ? int.message
-        : `Expected integer, got ${value}`
+      const message =
+        typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`
       this.error(message)
       return false
     }
@@ -533,9 +551,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (min) {
       const minValue = typeof min === 'number' ? min : min.minValue
       if (value < minValue) {
-        const message = typeof min === 'object' && min.message
-          ? min.message
-          : `Expected minimum ${minValue}, got ${value}`
+        const message =
+          typeof min === 'object' && min.message
+            ? min.message
+            : `Expected minimum ${minValue}, got ${value}`
         this.error(message)
         return false
       }
@@ -544,9 +563,10 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     if (max) {
       const maxValue = typeof max === 'number' ? max : max.maxValue
       if (value > maxValue) {
-        const message = typeof max === 'object' && max.message
-          ? max.message
-          : `Expected maximum ${maxValue}, got ${value}`
+        const message =
+          typeof max === 'object' && max.message
+            ? max.message
+            : `Expected maximum ${maxValue}, got ${value}`
         this.error(message)
         return false
       }
@@ -561,9 +581,8 @@ export class Validator<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType
     const filled = def.metadata.get('meta.required')
     if (filled) {
       if (value !== true) {
-        const message = typeof filled === 'object' && filled.message
-          ? filled.message
-          : `Must be checked`
+        const message =
+          typeof filled === 'object' && filled.message ? filled.message : `Must be checked`
         this.error(message)
         return false
       }

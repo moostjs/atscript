@@ -10,6 +10,7 @@ In modern software projects, especially business applications, data structure de
 - **Database indexes** in database-specific DDL scripts
 
 This scattering leads to:
+
 - **Duplication** - The same information repeated in different formats
 - **Inconsistency** - Changes in one place not reflected in others
 - **Maintenance burden** - Multiple files to update for a single change
@@ -49,6 +50,7 @@ export interface User {
 ```
 
 From this single definition, Atscript can generate:
+
 - Types with full type safety in your target language
 - Runtime validators with all constraints
 - Database schemas with indexes
@@ -67,6 +69,7 @@ From this single definition, Atscript can generate:
 ### 2. Annotations for Everything
 
 Atscript uses annotations to attach any kind of metadata:
+
 - `@meta.*` - Human-readable information
 - `@expect.*` - Validation constraints
 - `@mongo.*` - Database-specific configuration
@@ -75,6 +78,7 @@ Atscript uses annotations to attach any kind of metadata:
 ### 3. Language Agnostic
 
 While currently supporting TypeScript/JavaScript, Atscript is designed to be universal:
+
 - Clean, TypeScript-like syntax that's familiar
 - Plugin system allows any language to be targeted
 - Community can contribute plugins for Python, Go, Rust, etc.

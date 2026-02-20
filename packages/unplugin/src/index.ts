@@ -1,15 +1,9 @@
-import path from 'path'
-import {
-  AtscriptRepo,
-  isAnnotate,
-  loadConfig,
-  resolveConfigFile,
-  TAtscriptConfig,
-  TAtscriptConfigInput,
-} from '@atscript/core'
-import ts from '@atscript/typescript'
 import { readFile } from 'fs/promises'
+import path from 'path'
 
+import type { TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
+import { AtscriptRepo, isAnnotate, loadConfig, resolveConfigFile } from '@atscript/core'
+import ts from '@atscript/typescript'
 import type { UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 
@@ -23,7 +17,7 @@ export interface atscriptPluginOptions {
 
 const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
   const root = process.cwd()
-  let atscriptConfig = new Promise<TAtscriptConfig>(resolve => {
+  const atscriptConfig = new Promise<TAtscriptConfig>(resolve => {
     resolveConfigFile(root).then(p => {
       loadConfig(p!).then(resolve)
     })
@@ -72,7 +66,12 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
         }
         const out = await doc.render('js')
         const hasMutatingAnnotates = doc.nodes.some(n => isAnnotate(n) && n.isMutating)
-        return { code: out?.[0]?.content || '', moduleType: 'js', map: null, moduleSideEffects: hasMutatingAnnotates ? undefined : false }
+        return {
+          code: out?.[0]?.content || '',
+          moduleType: 'js',
+          map: null,
+          moduleSideEffects: hasMutatingAnnotates ? undefined : false,
+        }
       }
     },
   }

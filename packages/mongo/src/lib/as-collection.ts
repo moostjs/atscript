@@ -1,31 +1,27 @@
 // eslint-disable max-lines
 // eslint-disable max-params
+import type { Validator } from '@atscript/typescript/utils'
 import {
   isAnnotatedType,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeObject,
   type TMetadataMap,
   type TValidatorOptions,
-  Validator,
   flattenAnnotatedType,
 } from '@atscript/typescript/utils'
-import { AsMongo } from './as-mongo'
-import {
-  Collection,
-  Filter,
-  InsertOneOptions,
-  ObjectId,
-  ReplaceOptions,
-  UpdateOptions,
-} from 'mongodb'
-import { NoopLogger, TGenericLogger } from './logger'
+import type { Collection, Filter, InsertOneOptions, ReplaceOptions, UpdateOptions } from 'mongodb'
+import { ObjectId } from 'mongodb'
+
+import type { AsMongo } from './as-mongo'
 import { CollectionPatcher } from './collection-patcher'
+import type { TGenericLogger } from './logger'
+import { NoopLogger } from './logger'
 import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
 
-type TPlainIndex = {
+interface TPlainIndex {
   key: string
   name: string
   type: 'plain' | 'unique' | 'text'
@@ -33,7 +29,7 @@ type TPlainIndex = {
   weights: Record<string, number>
 }
 
-type TSearchIndex = {
+interface TSearchIndex {
   key: string
   name: string
   type: 'dynamic_text' | 'search_text' | 'vector'
@@ -58,7 +54,16 @@ function indexKey(type: TIndex['type'], name: string) {
 
 type TValidatorPurpose = 'insert' | 'update' | 'patch'
 
-export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
+export class AsCollection<
+  T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
+  DataType = T extends { type: { __dataType?: infer D } }
+    ? unknown extends D
+      ? T extends new (...args: any[]) => infer I
+        ? I
+        : unknown
+      : D
+    : unknown,
+> {
   public readonly name: string
 
   public readonly collection: Collection<any>
@@ -71,7 +76,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
 
   protected _indexes = new Map<string, TIndex>()
 
-  protected _vectorFilters: Map<string, string> = new Map()
+  protected _vectorFilters = new Map<string, string>()
 
   protected _flatMap?: Map<string, TAtscriptAnnotatedType>
 
@@ -132,14 +137,18 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
    */
   public prepareId<D = string | number | ObjectId>(id: string | number | ObjectId): D {
     switch (this.idType) {
-      case 'objectId':
+      case 'objectId': {
         return (id instanceof ObjectId ? id : new ObjectId(id)) as D
-      case 'number':
+      }
+      case 'number': {
         return Number(id) as D
-      case 'string':
+      }
+      case 'string': {
         return String(id) as D
-      default:
+      }
+      default: {
         throw new Error('Unknown "_id" type')
+      }
     }
   }
 
@@ -185,8 +194,9 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
           this.validators.set(purpose, CollectionPatcher.prepareValidator(this))
           break
         }
-        default:
+        default: {
           throw new Error(`Unknown validator purpose: ${purpose}`)
+        }
       }
     }
     return this.validators.get(purpose)
@@ -358,23 +368,27 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
       let deafultIndex: TIndex | undefined
       for (const index of this.indexes.values()) {
         switch (index.type) {
-          case 'text':
+          case 'text': {
             if (!deafultIndex) {
               deafultIndex = index
             }
             break
-          case 'dynamic_text':
+          }
+          case 'dynamic_text': {
             deafultIndex = index
             break
-          case 'search_text':
+          }
+          case 'search_text': {
             if (!deafultIndex || deafultIndex?.type === 'text') {
               deafultIndex = index
             }
             this._searchIndexesMap!.set(index.name, index)
             break
-          case 'vector':
+          }
+          case 'vector': {
             this._searchIndexesMap!.set(index.name, index)
             break
+          }
           default:
         }
       }
@@ -409,7 +423,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
         switch (local.type) {
           case 'plain':
           case 'unique':
-          case 'text':
+          case 'text': {
             if (
               (local.type === 'text' || objMatch(local.fields, remote.key)) &&
               objMatch(local.weights || {}, remote.weights || {})
@@ -420,6 +434,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
               await this.collection.dropIndex(remote.name)
             }
             break
+          }
           default:
         }
       } else {
@@ -441,8 +456,8 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
         const right = remote.latestDefinition
         switch (local.type) {
           case 'dynamic_text':
-          case 'search_text':
-            let left = local.definition
+          case 'search_text': {
+            const left = local.definition
             if (
               left.analyzer === right.analyzer &&
               fieldsMatch(left.mappings!.fields || {}, right.mappings!.fields || {})
@@ -452,13 +467,15 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
               toUpdate.add(remote.name)
             }
             break
-          case 'vector':
+          }
+          case 'vector': {
             if (vectorFieldsMatch(local.definition.fields || [], right.fields || [])) {
               indexesToCreate.delete(remote.name)
             } else {
               toUpdate.add(remote.name)
             }
             break
+          }
           default:
         }
       } else {
@@ -473,21 +490,24 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
 
     for (const [key, value] of Array.from(indexesToCreate.entries())) {
       switch (value.type) {
-        case 'plain':
+        case 'plain': {
           this.logger.debug(`creating index "${key}"`)
           await this.collection.createIndex(value.fields, { name: key })
           break
-        case 'unique':
+        }
+        case 'unique': {
           this.logger.debug(`creating index "${key}"`)
           await this.collection.createIndex(value.fields, { name: key, unique: true })
           break
-        case 'text':
+        }
+        case 'text': {
           this.logger.debug(`creating index "${key}"`)
           await this.collection.createIndex(value.fields, { weights: value.weights, name: key })
           break
+        }
         case 'dynamic_text':
         case 'search_text':
-        case 'vector':
+        case 'vector': {
           if (toUpdate.has(key)) {
             this.logger.debug(`updating search index "${key}"`)
             await this.collection.updateSearchIndex(key, value.definition)
@@ -500,6 +520,7 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
             })
           }
           break
+        }
         default:
       }
     }
@@ -559,19 +580,13 @@ export class AsCollection<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedT
     return prepared.length === 1 ? prepared[0] : prepared
   }
 
-  public prepareReplace(
-    payload: Omit<DataType, '_id'> & { _id: string | number | ObjectId }
-  ) {
+  public prepareReplace(payload: Omit<DataType, '_id'> & { _id: string | number | ObjectId }) {
     const v = this.getValidator('update')!
     if (v.validate(payload)) {
       const _id = this.prepareId(payload._id)
       const data = { ...payload, _id } as any & { _id: string | number | ObjectId }
       return {
-        toArgs: (): [Filter<any>, any, ReplaceOptions] => [
-          { _id } as Filter<any>,
-          data,
-          {},
-        ],
+        toArgs: (): [Filter<any>, any, ReplaceOptions] => [{ _id } as Filter<any>, data, {}],
         filter: { _id } as Filter<any>,
         updateFilter: data,
         updateOptions: {} as ReplaceOptions,
@@ -613,7 +628,7 @@ interface TMongoSearchIndex {
 
 type TVectorSimilarity = 'cosine' | 'euclidean' | 'dotProduct'
 
-type TMongoSearchIndexDefinition = {
+interface TMongoSearchIndexDefinition {
   mappings?: {
     dynamic?: boolean // Enables dynamic indexing (indexes all fields automatically)
     fields?: Record<
@@ -624,12 +639,12 @@ type TMongoSearchIndexDefinition = {
       }
     >
   }
-  fields?: {
+  fields?: Array<{
     path: string
     type: 'filter' | 'vector'
     similarity?: TVectorSimilarity // Only for vector search
     numDimensions?: number // Required for vector search
-  }[]
+  }>
   analyzer?: string // Global text analyzer for the entire index
   text?: {
     fuzzy?: { maxEdits: number } // Fuzzy search (typo tolerance)
@@ -720,16 +735,16 @@ function objMatch(
 // ──────────────────────────────────────────────────────────────────────────────
 // generic building block for one array field
 // ──────────────────────────────────────────────────────────────────────────────
-type TArrayPatch<A extends readonly unknown[]> = {
+interface TArrayPatch<A extends readonly unknown[]> {
   $replace?: A
   $insert?: A
   $upsert?: A
-  $update?: Partial<TArrayElement<A>>[]
-  $remove?: Partial<TArrayElement<A>>[]
+  $update?: Array<Partial<TArrayElement<A>>>
+  $remove?: Array<Partial<TArrayElement<A>>>
 }
 
 type TArrayElement<ArrayType extends readonly unknown[]> =
-  ArrayType extends readonly (infer ElementType)[] ? ElementType : never
+  ArrayType extends ReadonlyArray<infer ElementType> ? ElementType : never
 
 /**
  * AsMongoPatch<T>

@@ -1,16 +1,18 @@
 #!/usr/bin/env
 
 import 'zx/globals'
-import { getBuildOptions, getExternals, getWorkspaceFolders } from './utils.js'
-import { dye } from '@prostojs/dye'
-import { rollup } from 'rollup'
-import { rolldown } from 'rolldown'
-import dyePlugin from '@prostojs/dye/rolldown'
-import dtsPlugin from 'rollup-plugin-dts'
 import { writeFileSync } from 'fs'
-import pkg from '../package.json' with { type: 'json' }
 import path from 'path'
+
+import { dye } from '@prostojs/dye'
+import dyePlugin from '@prostojs/dye/rolldown'
+import { rolldown } from 'rolldown'
+import { rollup } from 'rollup'
+import dtsPlugin from 'rollup-plugin-dts'
 import swcPlugin from 'unplugin-swc'
+
+import pkg from '../package.json' with { type: 'json' }
+import { getBuildOptions, getExternals, getWorkspaceFolders } from './utils.js'
 
 const swc = swcPlugin.rolldown()
 const _dye = dyePlugin()

@@ -1,14 +1,12 @@
-import { Controller, Description, InjectMoostLogger, Optional, TConsoleBase } from 'moost'
-import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
-import path from 'path'
-import {
-  build,
-  loadConfig,
-  resolveConfigFile,
-  TAtscriptConfig,
-  TAtscriptConfigOutput,
-} from '@atscript/core'
 import { existsSync } from 'fs'
+import path from 'path'
+
+import type { TAtscriptConfig, TAtscriptConfigOutput } from '@atscript/core'
+import { build, loadConfig, resolveConfigFile } from '@atscript/core'
+import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
+import type { TConsoleBase } from 'moost'
+import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
+
 import { tsPlugin } from '../plugin'
 
 @Controller()
@@ -79,10 +77,14 @@ export class Commands {
     if (errorCount > 0 || warningCount > 0) {
       const parts = [] as string[]
       if (errorCount > 0) {
-        parts.push(`${__DYE_RED__}${errorCount} error${errorCount > 1 ? 's' : ''}${__DYE_COLOR_OFF__}`)
+        parts.push(
+          `${__DYE_RED__}${errorCount} error${errorCount > 1 ? 's' : ''}${__DYE_COLOR_OFF__}`
+        )
       }
       if (warningCount > 0) {
-        parts.push(`${__DYE_YELLOW__}${warningCount} warning${warningCount > 1 ? 's' : ''}${__DYE_COLOR_OFF__}`)
+        parts.push(
+          `${__DYE_YELLOW__}${warningCount} warning${warningCount > 1 ? 's' : ''}${__DYE_COLOR_OFF__}`
+        )
       }
       this.logger.log(`\nFound ${parts.join(' and ')}`)
     }

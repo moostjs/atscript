@@ -26,28 +26,31 @@ src/
 All annotations live under the `mongo.*` namespace.
 
 ### Collection-level
-| Annotation | Description |
-|---|---|
-| `@mongo.collection "name"` | Marks interface as a MongoDB collection; auto-adds `_id: mongo.objectId` if missing |
-| `@mongo.autoIndexes true/false` | Toggle automatic index creation (default: true) |
-| `@mongo.search.dynamic "analyzer", fuzzy` | Dynamic Atlas Search index |
-| `@mongo.search.static "analyzer", fuzzy, "indexName"` | Named static Atlas Search index |
+
+| Annotation                                            | Description                                                                         |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@mongo.collection "name"`                            | Marks interface as a MongoDB collection; auto-adds `_id: mongo.objectId` if missing |
+| `@mongo.autoIndexes true/false`                       | Toggle automatic index creation (default: true)                                     |
+| `@mongo.search.dynamic "analyzer", fuzzy`             | Dynamic Atlas Search index                                                          |
+| `@mongo.search.static "analyzer", fuzzy, "indexName"` | Named static Atlas Search index                                                     |
 
 ### Field-level indexes
-| Annotation | Description |
-|---|---|
-| `@mongo.index.plain "indexName"` | Standard index (compound when name shared) |
-| `@mongo.index.unique "indexName"` | Unique index |
-| `@mongo.index.text weight` | Legacy text index with optional weight |
-| `@mongo.search.text "analyzer", "indexName"` | Atlas Search text field |
-| `@mongo.search.vector dimensions, "similarity", "indexName"` | Vector search index |
-| `@mongo.search.filter "indexName"` | Pre-filter for vector search |
+
+| Annotation                                                   | Description                                |
+| ------------------------------------------------------------ | ------------------------------------------ |
+| `@mongo.index.plain "indexName"`                             | Standard index (compound when name shared) |
+| `@mongo.index.unique "indexName"`                            | Unique index                               |
+| `@mongo.index.text weight`                                   | Legacy text index with optional weight     |
+| `@mongo.search.text "analyzer", "indexName"`                 | Atlas Search text field                    |
+| `@mongo.search.vector dimensions, "similarity", "indexName"` | Vector search index                        |
+| `@mongo.search.filter "indexName"`                           | Pre-filter for vector search               |
 
 ### Patch and array behavior
-| Annotation | Description |
-|---|---|
-| `@mongo.patch.strategy "replace"\|"merge"` | Controls update behavior |
-| `@mongo.array.uniqueItems` | Enforce set-semantics on `$insert` |
+
+| Annotation                                 | Description                        |
+| ------------------------------------------ | ---------------------------------- |
+| `@mongo.patch.strategy "replace"\|"merge"` | Controls update behavior           |
+| `@mongo.array.uniqueItems`                 | Enforce set-semantics on `$insert` |
 
 ## Primitives
 
@@ -57,6 +60,7 @@ All annotations live under the `mongo.*` namespace.
 ## AsCollection Class
 
 Created via `asMongo.getCollection(AnnotatedType)`. Key methods:
+
 - **`insert(payload)`** -- Validates then `insertOne`/`insertMany`. Auto-generates ObjectId.
 - **`replace(payload)`** -- Validates then `replaceOne` with `_id` filter.
 - **`update(patchPayload)`** -- Validates patch, builds aggregation pipeline via `CollectionPatcher`.

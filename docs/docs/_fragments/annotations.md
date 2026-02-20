@@ -3,6 +3,7 @@ Annotations are metadata declarations that provide additional information about 
 ## Purpose
 
 Annotations serve multiple purposes:
+
 - **UI metadata** - Labels, placeholders, descriptions for form generation
 - **Validation constraints** - Min/max values, patterns, length restrictions
 - **Database metadata** - Collection names, indexes, field strategies
@@ -27,6 +28,7 @@ export type Username = string
 ## Annotation Inheritance
 
 ### Type to Property
+
 When a property uses a type with annotations, annotations merge with property having priority:
 
 ```atscript
@@ -41,7 +43,9 @@ export interface User {
 ```
 
 ### Property References
+
 When a property references another property, annotations merge in order:
+
 1. Final type annotations
 2. Referenced property annotations
 3. Current property annotations (highest priority)
@@ -110,7 +114,8 @@ Arguments can be optional. Annotations without arguments are flag annotations.
 
 Atscript provides common-purpose annotations:
 
-### Meta Annotations (@meta.*)
+### Meta Annotations (@meta.\*)
+
 - `@meta.label 'text'` - Human-readable label
 - `@meta.id` or `@meta.id 'name'` - Marks identifier field
 - `@meta.description 'text'` - Field description
@@ -120,7 +125,8 @@ Atscript provides common-purpose annotations:
 - `@meta.readonly` - Read-only field
 - `@meta.isKey` - Key field in arrays for lookups
 
-### Validation Annotations (@expect.*)
+### Validation Annotations (@expect.\*)
+
 - `@expect.minLength 5, "Custom error message"` - Minimum string/array length (optional message)
 - `@expect.maxLength 100, "Custom error message"` - Maximum string/array length (optional message)
 - `@expect.min 0, "Custom error message"` - Minimum number value (optional message)
@@ -131,9 +137,9 @@ Atscript provides common-purpose annotations:
 All validation annotations (except `@expect.int`) accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
 
 ### Form Validation (@meta.required)
+
 - `@meta.required` or `@meta.required "Custom error message"` - For strings: must contain at least one non-whitespace character. For booleans: must be `true` (optional message)
 
 ::: tip Form Validation
 Use `string.required` or `@meta.required` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@meta.required` catches this common form validation gap. For checkboxes, `@meta.required` on a `boolean` field ensures the value is `true` (e.g., "accept terms").
 :::
-

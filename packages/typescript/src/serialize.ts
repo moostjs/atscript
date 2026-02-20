@@ -37,7 +37,10 @@ export interface TSerializedTypeFinal {
 export interface TSerializedTypeObject {
   kind: 'object'
   props: Record<string, TSerializedAnnotatedTypeInner>
-  propsPatterns: { pattern: { source: string; flags: string }; def: TSerializedAnnotatedTypeInner }[]
+  propsPatterns: Array<{
+    pattern: { source: string; flags: string }
+    def: TSerializedAnnotatedTypeInner
+  }>
   tags: string[]
 }
 
@@ -214,9 +217,7 @@ function serializeMetadata(
   options: TSerializeOptions | undefined
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {}
-  const ignoreSet = options?.ignoreAnnotations
-    ? new Set(options.ignoreAnnotations)
-    : undefined
+  const ignoreSet = options?.ignoreAnnotations ? new Set(options.ignoreAnnotations) : undefined
 
   for (const [key, value] of metadata.entries()) {
     if (ignoreSet?.has(key as string)) {
@@ -265,9 +266,7 @@ function serializeMetadata(
  * @returns A live annotated type with validator support.
  * @throws If the serialized version doesn't match {@link SERIALIZE_VERSION}.
  */
-export function deserializeAnnotatedType(
-  data: TSerializedAnnotatedType
-): TAtscriptAnnotatedType {
+export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscriptAnnotatedType {
   if (data.$v !== SERIALIZE_VERSION) {
     throw new Error(
       `Unsupported serialized type version: ${data.$v} (expected ${SERIALIZE_VERSION})`
@@ -276,9 +275,7 @@ export function deserializeAnnotatedType(
   return deserializeNode(data)
 }
 
-function deserializeNode(
-  data: TSerializedAnnotatedTypeInner
-): TAtscriptAnnotatedType {
+function deserializeNode(data: TSerializedAnnotatedTypeInner): TAtscriptAnnotatedType {
   const metadata = new Map(Object.entries(data.metadata)) as TMetadataMap<AtscriptMetadata>
   const type = deserializeTypeDef(data.type)
 
@@ -336,7 +333,8 @@ function deserializeTypeDef(t: TSerializedTypeDef): TAtscriptTypeDef {
         tags,
       }
     }
-    default:
+    default: {
       throw new Error(`Unknown serialized type kind "${(t as any).kind}"`)
+    }
   }
 }

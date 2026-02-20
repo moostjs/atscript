@@ -2,6 +2,27 @@
   "name": "@atscript/moost-validator",
   "version": "0.1.17",
   "description": "Validator pipe and utils for Moost.",
+  "keywords": [
+    "annotations",
+    "atscript",
+    "moost",
+    "typescript",
+    "validator"
+  ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-validator#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/moost-validator"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -13,31 +34,10 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "pub": "pnpm publish --access public",
     "test": "vitest"
   },
-  "keywords": [
-    "atscript",
-    "annotations",
-    "typescript",
-    "moost",
-    "validator"
-  ],
-  "author": "Artem Maltsev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/moost-validator"
-  },
-  "bugs": {
-    "url": "https://github.com/moostjs/atscript/issues"
-  },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-validator#readme",
-  "license": "ISC",
   "dependencies": {},
   "devDependencies": {
     "vitest": "3.2.4"

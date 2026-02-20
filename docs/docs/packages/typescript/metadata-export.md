@@ -10,11 +10,11 @@ Every generated type has a `metadata` field — a typed `Map` keyed by annotatio
 import { Product } from './product.as'
 
 // Top-level annotations (on the interface itself)
-Product.metadata.get('meta.description')  // 'A product in the catalog'
+Product.metadata.get('meta.description') // 'A product in the catalog'
 
 // Property-level annotations
 const nameProp = Product.type.props.get('name')
-nameProp?.metadata.get('meta.label')       // 'Product Name'
+nameProp?.metadata.get('meta.label') // 'Product Name'
 nameProp?.metadata.get('expect.minLength') // 3
 ```
 
@@ -40,7 +40,7 @@ Semantic types like `string.email` or `number.positive` produce tags that are av
 
 ```typescript
 const emailProp = User.type.props.get('email')
-emailProp?.type.tags  // Set { 'email', 'string' }
+emailProp?.type.tags // Set { 'email', 'string' }
 ```
 
 Tags let you make runtime decisions based on semantic types — for example, rendering an email input vs a plain text input.
@@ -51,7 +51,7 @@ For arrays, unions, and nested objects, metadata lives on each nested `TAtscript
 
 ```typescript
 // Array element type
-const itemsType = OrderList.type.of  // TAtscriptAnnotatedType for array element
+const itemsType = OrderList.type.of // TAtscriptAnnotatedType for array element
 itemsType.metadata.get('meta.label')
 
 // Union members
@@ -86,7 +86,7 @@ function buildFormFields(type: TAtscriptAnnotatedType) {
     placeholder: prop.metadata.get('meta.placeholder'),
     sensitive: prop.metadata.get('meta.sensitive') || false,
     readonly: prop.metadata.get('meta.readonly') || false,
-    phantom: isPhantomType(prop),  // non-data UI elements
+    phantom: isPhantomType(prop), // non-data UI elements
   }))
 }
 

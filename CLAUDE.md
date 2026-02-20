@@ -40,7 +40,9 @@ explorations/     - Sandbox/playground for testing features
 - `pnpm test:watch` — Watch mode
 - `pnpm --filter <package> test` — Test a specific package
 - `pnpm --filter <package> exec vitest run` — Run vitest for a package
-- `pnpm lint` — Run oxlint + eslint
+- `pnpm lint` — Run oxlint
+- `pnpm fmt` — Format with oxfmt
+- `pnpm fmt:check` — Check formatting
 - `pnpm release` — Build, test, version sync, publish all packages
 
 ## Build System
@@ -49,7 +51,8 @@ explorations/     - Sandbox/playground for testing features
 - **Transpiler**: SWC via unplugin-swc
 - **Types**: rollup-plugin-dts for .d.ts generation
 - **Testing**: Vitest with snapshot testing
-- **Linting**: oxlint + eslint
+- **Linting**: oxlint
+- **Formatting**: oxfmt
 - **TypeScript**: 5.9.x, strict mode, experimental decorators
 
 ## Code Conventions
@@ -72,6 +75,7 @@ explorations/     - Sandbox/playground for testing features
 ## Agents
 
 Six domain expert agents exist in `.claude/agents/`:
+
 - `atscript-core-expert` — Core parser, AST, plugin system
 - `atscript-typescript-expert` — TypeScript compilation pipeline
 - `atscript-mongo-expert` — MongoDB plugin and annotations

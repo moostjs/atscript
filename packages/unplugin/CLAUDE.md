@@ -12,6 +12,7 @@ Build tool plugin that integrates `.as` file compilation into modern bundlers vi
 - `atscriptPluginOptions` -- Config interface: `{ strict?: boolean }` (default: `true`, throws on validation errors)
 
 Usage:
+
 ```ts
 // Vite
 plugins: [atscript.vite()]

@@ -13,7 +13,7 @@ import ts from '@atscript/typescript'
 export default defineConfig({
   rootDir: 'src',
   plugins: [ts()],
-  unknownAnnotation: 'allow',  // 'error' (default) | 'warn' | 'allow'
+  unknownAnnotation: 'allow', // 'error' (default) | 'warn' | 'allow'
 })
 ```
 
@@ -59,16 +59,16 @@ export default defineConfig({
 
 ### AnnotationSpec Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `description` | `string` | Shown in IntelliSense hover |
-| `nodeType` | `string[]` | Where annotation can be applied: `'interface'`, `'type'`, `'prop'` |
-| `argument` | `object \| object[]` | Argument definition(s): `{ name, type, optional?, description?, values? }` |
-| `multiple` | `boolean` | Whether the annotation can appear more than once on the same node |
+| Option          | Type                    | Description                                                                                                                       |
+| --------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `description`   | `string`                | Shown in IntelliSense hover                                                                                                       |
+| `nodeType`      | `string[]`              | Where annotation can be applied: `'interface'`, `'type'`, `'prop'`                                                                |
+| `argument`      | `object \| object[]`    | Argument definition(s): `{ name, type, optional?, description?, values? }`                                                        |
+| `multiple`      | `boolean`               | Whether the annotation can appear more than once on the same node                                                                 |
 | `mergeStrategy` | `'replace' \| 'append'` | How values combine during [annotation inheritance](/packages/typescript/annotations#annotation-inheritance). Default: `'replace'` |
-| `defType` | `string[]` | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
-| `validate` | `function` | Custom validation function for complex checks (see [below](#custom-validation)) |
-| `modify` | `function` | Hook to modify the AST after annotation is parsed |
+| `defType`       | `string[]`              | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc.                                |
+| `validate`      | `function`              | Custom validation function for complex checks (see [below](#custom-validation))                                                   |
+| `modify`        | `function`              | Hook to modify the AST after annotation is parsed                                                                                 |
 
 ## Custom Validation {#custom-validation}
 
@@ -80,11 +80,11 @@ For cases where simple type and argument checks aren't enough, you can provide a
 validate(mainToken: Token, args: Token[], doc: AtscriptDoc): TMessages | undefined
 ```
 
-| Parameter | Description |
-|-----------|-------------|
+| Parameter   | Description                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------- |
 | `mainToken` | The annotation token (e.g. `@ui.color`). Access the parent node via `mainToken.parentNode`. |
-| `args` | Array of argument tokens. Each has `.text` (the raw value), `.type`, and `.range`. |
-| `doc` | The `AtscriptDoc` instance — use it to resolve types, unwind references, etc. |
+| `args`      | Array of argument tokens. Each has `.text` (the raw value), `.type`, and `.range`.          |
+| `doc`       | The `AtscriptDoc` instance — use it to resolve types, unwind references, etc.               |
 
 Return an array of diagnostic messages to report errors/warnings, or `undefined` / empty array if validation passes. Each message has:
 
@@ -115,11 +115,13 @@ export default defineConfig({
           if (!args[0]) return
           const value = args[0].text
           if (!/^#[\da-f]{3,8}$/i.test(value)) {
-            return [{
-              severity: 1,
-              message: `Invalid hex color "${value}". Expected format: #RGB, #RRGGBB, or #RRGGBBAA.`,
-              range: args[0].range,
-            }]
+            return [
+              {
+                severity: 1,
+                message: `Invalid hex color "${value}". Expected format: #RGB, #RRGGBB, or #RRGGBBAA.`,
+                range: args[0].range,
+              },
+            ]
           }
         },
       }),
@@ -154,21 +156,17 @@ export default defineConfig({
           let definition = field.getDefinition()
           // Resolve references to their actual types
           if (isRef(definition)) {
-            definition = doc.unwindType(
-              definition.id,
-              definition.chain
-            )?.def || definition
+            definition = doc.unwindType(definition.id, definition.chain)?.def || definition
           }
 
-          if (
-            !isPrimitive(definition) ||
-            !['string', 'number'].includes(definition.type)
-          ) {
-            return [{
-              severity: 1,
-              message: '@ui.sortable can only be applied to string or number fields.',
-              range: mainToken.range,
-            }]
+          if (!isPrimitive(definition) || !['string', 'number'].includes(definition.type)) {
+            return [
+              {
+                severity: 1,
+                message: '@ui.sortable can only be applied to string or number fields.',
+                range: mainToken.range,
+              },
+            ]
           }
         },
       }),
@@ -200,11 +198,13 @@ export default defineConfig({
           const fieldName = args[0].text
           const parent = mainToken.parentNode?.parent
           if (isInterface(parent) && !parent.props.has(fieldName)) {
-            return [{
-              severity: 1,
-              message: `Field "${fieldName}" does not exist in this interface.`,
-              range: args[0].range,
-            }]
+            return [
+              {
+                severity: 1,
+                message: `Field "${fieldName}" does not exist in this interface.`,
+                range: args[0].range,
+              },
+            ]
           }
         },
       }),
@@ -257,8 +257,8 @@ Custom annotations appear in runtime metadata alongside built-in ones:
 import { User } from './user.as'
 
 const nameProp = User.type.props.get('name')
-nameProp?.metadata.get('ui.column')  // 200
-nameProp?.metadata.get('ui.tag')     // ['primary', 'searchable']
+nameProp?.metadata.get('ui.column') // 200
+nameProp?.metadata.get('ui.tag') // ['primary', 'searchable']
 ```
 
 ::: tip Re-generate after config changes

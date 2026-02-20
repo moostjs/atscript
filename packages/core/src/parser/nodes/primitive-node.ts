@@ -59,7 +59,7 @@ export class SemanticPrimitiveNode extends SemanticNode {
           args: [],
         })
       }
-      if (typeof this.config.expect?.pattern !== 'undefined') {
+      if (this.config.expect?.pattern !== undefined) {
         const patterns = Array.isArray(this.config.expect.pattern)
           ? this.config.expect.pattern
           : [this.config.expect.pattern]

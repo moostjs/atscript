@@ -1,7 +1,5 @@
-import {
+import type {
   AtscriptDoc,
-  isGroup,
-  isRef,
   SemanticAnnotateNode,
   SemanticImportNode,
   SemanticInterfaceNode,
@@ -9,6 +7,8 @@ import {
   SemanticRefNode,
   SemanticTypeNode,
 } from '@atscript/core'
+import { isGroup, isRef } from '@atscript/core'
+
 import { CodePrinter } from './code-printer'
 
 export class BaseRenderer extends CodePrinter {

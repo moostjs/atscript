@@ -17,7 +17,11 @@ export interface TFlattenOptions {
    * Called for each field (with a non-empty path prefix) after it has been added to the flat map.
    * Use this to inspect field type and metadata for domain-specific logic (e.g. index extraction).
    */
-  onField?: (path: string, type: TAtscriptAnnotatedType, metadata: TMetadataMap<AtscriptMetadata>) => void
+  onField?: (
+    path: string,
+    type: TAtscriptAnnotatedType,
+    metadata: TMetadataMap<AtscriptMetadata>
+  ) => void
 
   /**
    * When set, top-level array fields get this metadata key set to `true`.
@@ -85,34 +89,41 @@ export function flattenAnnotatedType(
       case 'object': {
         const items = Array.from(def.type.props.entries())
         for (const [key, value] of items) {
-          if (skipPhantom && isPhantomType(value)) continue
+          if (skipPhantom && isPhantomType(value)) {
+            continue
+          }
           flattenType(value, name ? `${name}.${key}` : key, true)
         }
         break
       }
       case 'union':
       case 'intersection':
-      case 'tuple':
+      case 'tuple': {
         for (const item of def.type.items) {
           flattenArray(item, name)
         }
         break
-      case 'array':
+      }
+      case 'array': {
         flattenArray((def as TAtscriptAnnotatedType<TAtscriptTypeArray>).type.of, name)
         break
+      }
       default:
     }
   }
 
   function flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
     switch (def.type.kind) {
-      case 'object':
+      case 'object': {
         addFieldToFlatMap(prefix || '', def)
         for (const [key, value] of def.type.props.entries()) {
-          if (skipPhantom && isPhantomType(value)) continue
+          if (skipPhantom && isPhantomType(value)) {
+            continue
+          }
           flattenType(value, prefix ? `${prefix}.${key}` : key, inComplexTypeOrArray)
         }
         break
+      }
       case 'array': {
         let typeArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
         if (!inComplexTypeOrArray) {
@@ -134,19 +145,23 @@ export function flattenAnnotatedType(
       }
       case 'intersection':
       case 'tuple':
-      case 'union':
+      case 'union': {
         for (const item of def.type.items) {
           flattenType(item, prefix, true)
         }
         addFieldToFlatMap(prefix || '', def)
         if (def.optional) {
           const entry = flatMap.get(prefix || '')
-          if (entry) entry.optional = def.optional
+          if (entry) {
+            entry.optional = def.optional
+          }
         }
         break
-      default:
+      }
+      default: {
         addFieldToFlatMap(prefix || '', def)
         break
+      }
     }
     if (prefix) {
       options?.onField?.(prefix, def, def.metadata)

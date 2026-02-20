@@ -7,9 +7,10 @@
 /* eslint-disable sonarjs/cognitive-complexity */
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
 
-import { getRelPath } from '@atscript/core'
 import fs from 'fs'
 import path from 'path'
+
+import { getRelPath } from '@atscript/core'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function debounce<A>(fn: (a: A) => any, delay: number) {

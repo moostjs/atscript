@@ -3,10 +3,7 @@
 The serialization API converts runtime annotated types to and from a plain JSON format. This enables transferring type definitions between backend and frontend, storing them in databases, or caching compiled types.
 
 ```typescript
-import {
-  serializeAnnotatedType,
-  deserializeAnnotatedType,
-} from '@atscript/typescript/utils'
+import { serializeAnnotatedType, deserializeAnnotatedType } from '@atscript/typescript/utils'
 ```
 
 ## Purpose
@@ -77,6 +74,7 @@ const serialized = serializeAnnotatedType(Product, {
 ```
 
 The `processAnnotation` callback receives:
+
 - `key` — annotation name (e.g. `'meta.label'`)
 - `value` — annotation value
 - `path` — property path to the current node (e.g. `['address', 'city']`)
@@ -94,7 +92,7 @@ import { serializeAnnotatedType } from '@atscript/typescript/utils'
 
 app.get('/api/form/user', (req, res) => {
   const schema = serializeAnnotatedType(User, {
-    ignoreAnnotations: ['mongo.collection'],  // strip server-only metadata
+    ignoreAnnotations: ['mongo.collection'], // strip server-only metadata
   })
   res.json(schema)
 })

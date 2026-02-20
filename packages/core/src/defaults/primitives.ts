@@ -1,4 +1,4 @@
-import { TPrimitiveConfig } from '../parser/nodes'
+import type { TPrimitiveConfig } from '../parser/nodes'
 
 const positive: Partial<TPrimitiveConfig> = {
   documentation: 'Number that greater than or equal to zero.',

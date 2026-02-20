@@ -1,7 +1,9 @@
-// oxlint-disable arrow-body-style
-import { TAtscriptPlugin } from '@atscript/core'
-import { TypeRenderer, JsRenderer } from './codegen'
 import path from 'path'
+
+// oxlint-disable arrow-body-style
+import type { TAtscriptPlugin } from '@atscript/core'
+
+import { TypeRenderer, JsRenderer } from './codegen'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export interface TTsPluginOptions {
@@ -55,10 +57,10 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
         // render atscript.d.ts
         const annotations = await repo.getUsedAnnotations()
         const tags = (await repo.getPrimitivesTags()) || new Set()
-        let rendered = [] as string[]
+        const rendered = [] as string[]
         for (const [key, val] of Object.entries(annotations)) {
           const multiple = val!.multiple
-          let typeLine = Array.from(val!.types)
+          const typeLine = Array.from(val!.types)
             .map(t => {
               if (t.type === 'object') {
                 return `{ ${Object.entries(t.props)
@@ -73,11 +75,12 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
             `${wrapProp(key)}: ${multiple ? '(' : ''}${typeLine}${multiple ? ')[]' : ''}`
           )
         }
-        let renderedTags = Array.from(tags)
+        const renderedTags = Array.from(tags)
           .map(f => `"${escapeQuotes(f)}"`)
           .join(' | ')
         output.push({
           content:
+            // oxlint-disable-next-line prefer-template
             '// prettier-ignore-start\n' +
             '/* eslint-disable */\n' +
             '/* oxlint-disable */\n' +

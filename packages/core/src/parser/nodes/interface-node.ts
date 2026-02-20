@@ -1,8 +1,8 @@
+import { isStructure } from '.'
 /* eslint-disable @typescript-eslint/class-methods-use-this */
 import type { AtscriptDoc } from '../../document'
-import { isStructure } from '.'
-import { SemanticNode } from './semantic-node'
 import type { SemanticPropNode } from './prop-node'
+import { SemanticNode } from './semantic-node'
 
 export class SemanticInterfaceNode extends SemanticNode {
   constructor() {

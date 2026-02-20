@@ -15,7 +15,7 @@ const name: Username = 'john_doe'
 const validator = Username.validator()
 
 if (validator.validate(input, true)) {
-    // input is Username
+  // input is Username
 }
 ```
 

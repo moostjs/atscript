@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+
 import { AsMongo } from '../as-mongo.js'
 import { prepareFixtures } from './test-utils.js'
 
-let mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
+const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
 
 describe('asCollection flatten', () => {
   beforeAll(prepareFixtures)

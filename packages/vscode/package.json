@@ -1,44 +1,41 @@
 {
   "name": "@atscript/vscode",
   "displayName": "Atscript (.as)",
-  "description": "Provides syntax highlighting and language support for Atscript (.as), a language for describing data and interfaces with extensible annotations.",
   "version": "0.1.17",
   "private": true,
-  "main": "./dist/extension.cjs",
-  "icon": "./icons/as-logo.png",
-  "build": [
-    {
-      "format": "cjs",
-      "entries": [
-        "client/extension.ts"
-      ],
-      "external": [
-        "fs",
-        "path",
-        "vscode",
-        "child_process"
-      ],
-      "dts": false
-    },
-    {
-      "format": "cjs",
-      "entries": [
-        "server/server.ts"
-      ],
-      "external": [
-        "fs",
-        "path",
-        "@atscript/core"
-      ],
-      "dts": false
-    }
-  ],
-  "engines": {
-    "vscode": "^1.80.0"
-  },
+  "description": "Provides syntax highlighting and language support for Atscript (.as), a language for describing data and interfaces with extensible annotations.",
   "categories": [
     "Programming Languages"
   ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/vscode#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/vscode"
+  },
+  "publisher": "moost",
+  "main": "./dist/extension.cjs",
+  "scripts": {
+    "package": "pnpm vsce package --no-dependencies",
+    "publish": "pnpm vsce publish --no-dependencies",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@atscript/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/vscode": "^1.80.0",
+    "vitest": "3.2.4",
+    "vscode-languageclient": "^8.1.0",
+    "vscode-languageserver": "^8.1.0",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  },
   "contributes": {
     "languages": [
       {
@@ -99,32 +96,35 @@
       }
     }
   },
-  "publisher": "moost",
-  "dependencies": {
-    "@atscript/core": "workspace:^"
+  "icon": "./icons/as-logo.png",
+  "engines": {
+    "vscode": "^1.80.0"
   },
-  "license": "ISC",
-  "devDependencies": {
-    "vscode-languageclient": "^8.1.0",
-    "vscode-languageserver": "^8.1.0",
-    "vscode-languageserver-textdocument": "^1.0.12",
-    "@types/node": "^22.10.5",
-    "@types/vscode": "^1.80.0",
-    "vitest": "3.2.4"
-  },
-  "author": "Artem Maltsev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/vscode"
-  },
-  "bugs": {
-    "url": "https://github.com/moostjs/atscript/issues"
-  },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/vscode#readme",
-  "scripts": {
-    "package": "pnpm vsce package --no-dependencies",
-    "publish": "pnpm vsce publish --no-dependencies",
-    "test": "vitest"
-  }
+  "build": [
+    {
+      "format": "cjs",
+      "entries": [
+        "client/extension.ts"
+      ],
+      "external": [
+        "fs",
+        "path",
+        "vscode",
+        "child_process"
+      ],
+      "dts": false
+    },
+    {
+      "format": "cjs",
+      "entries": [
+        "server/server.ts"
+      ],
+      "external": [
+        "fs",
+        "path",
+        "@atscript/core"
+      ],
+      "dts": false
+    }
+  ]
 }

@@ -19,15 +19,15 @@ Moost framework extension for Atscript MongoDB. Provides automated REST controll
 
 ## REST Endpoints (automatic)
 
-| Route | Method | Description |
-|---|---|---|
-| `/<prefix>/query` | GET | List with URLQL filtering/sorting |
-| `/<prefix>/pages` | GET | Paginated list |
-| `/<prefix>/one/:id` | GET | Single doc by `_id` or unique field |
-| `/<prefix>` | POST | Insert one or many |
-| `/<prefix>` | PUT | Replace by `_id` |
-| `/<prefix>` | PATCH | Partial update by `_id` |
-| `/<prefix>/:id` | DELETE | Remove by `_id` |
+| Route               | Method | Description                         |
+| ------------------- | ------ | ----------------------------------- |
+| `/<prefix>/query`   | GET    | List with URLQL filtering/sorting   |
+| `/<prefix>/pages`   | GET    | Paginated list                      |
+| `/<prefix>/one/:id` | GET    | Single doc by `_id` or unique field |
+| `/<prefix>`         | POST   | Insert one or many                  |
+| `/<prefix>`         | PUT    | Replace by `_id`                    |
+| `/<prefix>`         | PATCH  | Partial update by `_id`             |
+| `/<prefix>/:id`     | DELETE | Remove by `_id`                     |
 
 ## Overridable Hooks
 

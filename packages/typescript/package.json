@@ -2,9 +2,42 @@
   "name": "@atscript/typescript",
   "version": "0.1.17",
   "description": "Atscript: typescript-gen support.",
+  "keywords": [
+    "annotations",
+    "atscript",
+    "typescript"
+  ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/typescript#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/typescript"
+  },
+  "bin": {
+    "asc": "./cli.cjs"
+  },
+  "files": [
+    "dist",
+    "cli.cjs"
+  ],
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "utils": [
+        "dist/utils.d.ts"
+      ],
+      "": [
+        "dist/index.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -20,22 +53,19 @@
     },
     "./package.json": "./package.json"
   },
-  "typesVersions": {
-    "*": {
-      "utils": [
-        "dist/utils.d.ts"
-      ],
-      "": [
-        "dist/index.d.ts"
-      ]
-    }
+  "scripts": {
+    "pub": "pnpm publish --access public",
+    "test": "vitest"
   },
-  "files": [
-    "dist",
-    "cli.cjs"
-  ],
-  "bin": {
-    "asc": "./cli.cjs"
+  "dependencies": {
+    "@moostjs/event-cli": "^0.5.32",
+    "moost": "^0.5.32"
+  },
+  "devDependencies": {
+    "vitest": "3.2.4"
+  },
+  "peerDependencies": {
+    "@atscript/core": "workspace:^"
   },
   "build": [
     {},
@@ -52,35 +82,5 @@
       ],
       "dts": false
     }
-  ],
-  "scripts": {
-    "pub": "pnpm publish --access public",
-    "test": "vitest"
-  },
-  "keywords": [
-    "atscript",
-    "annotations",
-    "typescript"
-  ],
-  "author": "Artem Maltsev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/typescript"
-  },
-  "bugs": {
-    "url": "https://github.com/moostjs/atscript/issues"
-  },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/typescript#readme",
-  "license": "ISC",
-  "peerDependencies": {
-    "@atscript/core": "workspace:^"
-  },
-  "dependencies": {
-    "@moostjs/event-cli": "^0.5.32",
-    "moost": "^0.5.32"
-  },
-  "devDependencies": {
-    "vitest": "3.2.4"
-  }
+  ]
 }

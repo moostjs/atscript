@@ -1,9 +1,11 @@
 import 'zx/globals'
 import { readFileSync, writeFileSync } from 'fs'
+
+import { dye } from '@prostojs/dye'
+import inquirer from 'inquirer'
+
 import pkg from '../package.json' with { type: 'json' }
 import { getWorkspaceFolders } from './utils.js'
-import inquirer from 'inquirer'
-import { dye } from '@prostojs/dye'
 
 let i = 1
 const info = dye('blue').attachConsole()

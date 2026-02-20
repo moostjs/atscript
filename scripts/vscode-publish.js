@@ -1,5 +1,6 @@
 import 'zx/globals'
 import { readFileSync, writeFileSync } from 'fs'
+
 import { getWorkspacePath } from './utils.js'
 
 $.verbose = true

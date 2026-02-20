@@ -31,16 +31,16 @@ You can also trigger an immediate restart via the Command Palette (`Cmd+Shift+P`
 
 ## What Works Without `@atscript/core`
 
-| Feature | Without `@atscript/core` | With `@atscript/core` |
-|---|---|---|
-| Syntax highlighting | Yes | Yes |
-| File nesting (`.as.d.ts` under `.as`) | Yes | Yes |
-| IntelliSense / completions | No | Yes |
-| Diagnostics | No | Yes |
-| Go to Definition | No | Yes |
-| Find References | No | Yes |
-| Rename Symbol | No | Yes |
-| Hover information | No | Yes |
-| Signature help | No | Yes |
-| Auto `.d.ts` generation | No | Yes |
-| Config watching | No | Yes |
+| Feature                               | Without `@atscript/core` | With `@atscript/core` |
+| ------------------------------------- | ------------------------ | --------------------- |
+| Syntax highlighting                   | Yes                      | Yes                   |
+| File nesting (`.as.d.ts` under `.as`) | Yes                      | Yes                   |
+| IntelliSense / completions            | No                       | Yes                   |
+| Diagnostics                           | No                       | Yes                   |
+| Go to Definition                      | No                       | Yes                   |
+| Find References                       | No                       | Yes                   |
+| Rename Symbol                         | No                       | Yes                   |
+| Hover information                     | No                       | Yes                   |
+| Signature help                        | No                       | Yes                   |
+| Auto `.d.ts` generation               | No                       | Yes                   |
+| Config watching                       | No                       | Yes                   |

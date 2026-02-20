@@ -14,18 +14,18 @@ The extension provides syntax highlighting out of the box. For IntelliSense, dia
 
 ## Quick Overview
 
-| Feature | Description |
-|---|---|
-| **Syntax Highlighting** | Full grammar support for `.as` files — works immediately, no dependencies needed |
-| **IntelliSense** | Context-aware completions for annotations, types, imports, and properties |
-| **Diagnostics** | Real-time error reporting and unused token hints |
-| **Go to Definition** | Navigate to type and interface declarations across files |
-| **Find References** | Locate all usages of a type or interface |
-| **Rename Symbol** | Rename types/interfaces and update all references |
-| **Hover Information** | Inline documentation for annotations and type references |
-| **Signature Help** | Annotation argument signatures as you type |
-| **Auto `.d.ts` Generation** | Generates TypeScript declarations on save |
-| **Config Watching** | Automatically reloads when `atscript.config.*` files change |
+| Feature                     | Description                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| **Syntax Highlighting**     | Full grammar support for `.as` files — works immediately, no dependencies needed |
+| **IntelliSense**            | Context-aware completions for annotations, types, imports, and properties        |
+| **Diagnostics**             | Real-time error reporting and unused token hints                                 |
+| **Go to Definition**        | Navigate to type and interface declarations across files                         |
+| **Find References**         | Locate all usages of a type or interface                                         |
+| **Rename Symbol**           | Rename types/interfaces and update all references                                |
+| **Hover Information**       | Inline documentation for annotations and type references                         |
+| **Signature Help**          | Annotation argument signatures as you type                                       |
+| **Auto `.d.ts` Generation** | Generates TypeScript declarations on save                                        |
+| **Config Watching**         | Automatically reloads when `atscript.config.*` files change                      |
 
 ## Requirements
 

@@ -1,17 +1,15 @@
-import { TAtscriptPlugin } from '@atscript/core'
-import { primitives } from './primitives'
+import type { TAtscriptPlugin } from '@atscript/core'
+
 import { annotations } from './annotations'
+import { primitives } from './primitives'
 
-export const MongoPlugin: () => TAtscriptPlugin = () => {
-  //
-  return {
-    name: 'mongo',
+export const MongoPlugin: () => TAtscriptPlugin = () => ({
+  name: 'mongo',
 
-    config() {
-      return {
-        primitives,
-        annotations,
-      }
-    },
-  }
-}
+  config() {
+    return {
+      primitives,
+      annotations,
+    }
+  },
+})

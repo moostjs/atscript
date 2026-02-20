@@ -1,13 +1,16 @@
 import { readFile } from 'node:fs/promises'
-import { TAnnotationsTree, TAtscriptConfig } from '../config'
+
 import { defu } from 'defu'
-import { AtscriptDoc, TAtscriptDocConfig } from '../document'
-import type { TAtscriptRenderFormat, TPluginOutput } from './types'
+
+import type { AnnotationSpec } from '../annotations'
+import { isAnnotationSpec } from '../annotations'
+import type { TOutput } from '../build'
+import type { TAnnotationsTree, TAtscriptConfig } from '../config'
 import { getDefaultAtscriptConfig } from '../default-atscript-config'
+import type { AtscriptDoc, TAtscriptDocConfig } from '../document'
 import { SemanticPrimitiveNode } from '../parser/nodes'
-import { TOutput } from '../build'
-import { AtscriptRepo } from '../repo'
-import { AnnotationSpec, isAnnotationSpec } from '../annotations'
+import type { AtscriptRepo } from '../repo'
+import type { TAtscriptRenderFormat, TPluginOutput } from './types'
 
 export interface TOutputWithSource extends TPluginOutput {
   source: string

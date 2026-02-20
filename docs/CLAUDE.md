@@ -40,15 +40,15 @@ TypeScript ▾              VSCode        Plugin Development
 
 ## Current Coverage
 
-| Section | Status | Pages |
-|---------|--------|-------|
-| packages/typescript/ | COMPLETE | 18 pages with full content (uses fragments) |
-| packages/mongo/ | STUBS | 9 files, needs content |
-| packages/moost-mongo/ | STUBS | 6 files, needs content |
-| packages/moost-validator/ | STUBS | 6 files, needs content |
-| packages/vscode/ | STUBS | 7 files, needs content |
-| plugin-development/ | STUBS | 16 files, needs content |
-| _fragments/ | COMPLETE | 7 shared fragments |
+| Section                   | Status   | Pages                                       |
+| ------------------------- | -------- | ------------------------------------------- |
+| packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments) |
+| packages/mongo/           | STUBS    | 9 files, needs content                      |
+| packages/moost-mongo/     | STUBS    | 6 files, needs content                      |
+| packages/moost-validator/ | STUBS    | 6 files, needs content                      |
+| packages/vscode/          | STUBS    | 7 files, needs content                      |
+| plugin-development/       | STUBS    | 16 files, needs content                     |
+| \_fragments/              | COMPLETE | 7 shared fragments                          |
 
 ## VitePress Config Key Details
 
@@ -93,6 +93,7 @@ Each language-specific section must be **self-contained** — a reader should NO
 - **Usage pattern**: Both the shared guide pages and each language-specific section include the same fragments, so content stays in sync automatically. Language-specific pages can wrap the include with additional context or examples specific to that language.
 
 Example:
+
 ```
 docs/docs/_fragments/
 ├── annotations-intro.md     — What annotations are, basic syntax
@@ -115,7 +116,7 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 - **Target audience varies by section**:
   - packages/typescript/ — TypeScript developers using Atscript (full journey from intro to advanced)
   - packages/mongo/ — MongoDB users (TypeScript-specific)
-  - packages/moost-*/ — Moost framework users
+  - packages/moost-\*/ — Moost framework users
   - packages/vscode/ — VSCode extension users
   - plugin-development/ — plugin/language extension developers
 - Use code examples liberally, especially `.as` file examples
@@ -126,12 +127,12 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 
 ## Mapping: Source Code → Documentation
 
-| Package Source | Documentation Location |
-|---------------|----------------------|
-| `packages/core/src/` | `docs/docs/plugin-development/` |
-| `packages/typescript/src/` | `docs/docs/packages/typescript/` |
-| `packages/mongo/src/` | `docs/docs/packages/mongo/` |
-| `packages/moost-mongo/src/` | `docs/docs/packages/moost-mongo/` |
-| `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/` |
-| `packages/unplugin/src/` | `docs/docs/packages/typescript/build-setup.md` |
-| `packages/vscode/` | `docs/docs/packages/vscode/` |
+| Package Source                  | Documentation Location                         |
+| ------------------------------- | ---------------------------------------------- |
+| `packages/core/src/`            | `docs/docs/plugin-development/`                |
+| `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
+| `packages/mongo/src/`           | `docs/docs/packages/mongo/`                    |
+| `packages/moost-mongo/src/`     | `docs/docs/packages/moost-mongo/`              |
+| `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
+| `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |
+| `packages/vscode/`              | `docs/docs/packages/vscode/`                   |

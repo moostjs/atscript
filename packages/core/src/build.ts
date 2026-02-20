@@ -1,11 +1,13 @@
-import path from 'path'
-import { glob } from 'glob' // or any other glob library
-import { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
-import { AtscriptRepo } from './repo'
-import { AtscriptDoc } from './document'
-import { TOutputWithSource } from './plugin'
-import { TMessages } from './parser/types'
 import { mkdir, writeFile } from 'fs/promises'
+import path from 'path'
+
+import { glob } from 'glob' // or any other glob library
+
+import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
+import type { AtscriptDoc } from './document'
+import type { TMessages } from './parser/types'
+import type { TOutputWithSource } from './plugin'
+import { AtscriptRepo } from './repo'
 
 export interface TOutput extends TOutputWithSource {
   target: string
@@ -44,9 +46,9 @@ export async function build(config: Partial<TAtscriptConfigInput>) {
   }
 
   // Open each document
-  const documents: (AtscriptDoc | undefined)[] = []
+  const documents: Array<AtscriptDoc | undefined> = []
   for (const entry of entries) {
-    documents.push(await repo.openDocument('file://' + entry))
+    documents.push(await repo.openDocument(`file://${entry}`))
   }
 
   return new BuildRepo(rootDir, repo, documents.filter(Boolean) as AtscriptDoc[])

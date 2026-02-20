@@ -16,14 +16,17 @@ This is a very small, focused package (3 source files). All validation logic liv
 ## Public API
 
 ### Pipe
+
 - `validatorPipe(opts?)` -- Factory returning a pipe that validates at `VALIDATE` priority
 - `UseValidatorPipe(opts?)` -- Decorator sugar for `@Pipe(validatorPipe(opts))`
 
 ### Interceptor
+
 - `validationErrorTransform()` -- Catches `ValidatorError`, wraps into `HttpError(400)`
 - `UseValidationErrorTransform()` -- Decorator sugar for `@Intercept(...)`
 
 ### Options (`Partial<TValidatorOptions>`)
+
 - `partial` -- `boolean | 'deep' | function` -- makes properties optional (useful for PATCH)
 - `unknwonProps` -- `'strip' | 'ignore' | 'error'` -- unknown property handling
 - `errorLimit` -- max errors before stopping

@@ -1,8 +1,10 @@
-import { build } from '@atscript/core'
-import { MongoPlugin } from '../../plugin/index'
-import ts from '@atscript/typescript'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
+
+import { build } from '@atscript/core'
+import ts from '@atscript/typescript'
+
+import { MongoPlugin } from '../../plugin/index'
 
 export async function prepareFixtures() {
   const wd = path.join(path.dirname(import.meta.url.slice(7)), 'fixtures')

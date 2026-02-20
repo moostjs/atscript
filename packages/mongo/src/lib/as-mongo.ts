@@ -1,7 +1,9 @@
+import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { MongoClient } from 'mongodb'
-import { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+
 import { AsCollection } from './as-collection'
-import { NoopLogger, TGenericLogger } from './logger'
+import type { TGenericLogger } from './logger'
+import { NoopLogger } from './logger'
 
 export class AsMongo {
   public readonly client: MongoClient
@@ -52,7 +54,7 @@ export class AsMongo {
   private _collections = new WeakMap() as TWeakMapOfCollections
 }
 
-type TWeakMapOfCollections = {
+interface TWeakMapOfCollections {
   has(key: TAtscriptAnnotatedType): boolean
   get<T extends TAtscriptAnnotatedType>(key: T): AsCollection<T>
   set<T extends TAtscriptAnnotatedType>(key: T, value: AsCollection<T>): void

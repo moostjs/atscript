@@ -13,7 +13,9 @@ export class IdRegistry {
   public readonly forbidden = new Set<Token>()
 
   constructor(globalTypes: string[] = []) {
-    this.reserved = new Set(['interface', 'type', 'import', 'from', 'export', 'annotate', 'as'].concat(globalTypes))
+    this.reserved = new Set(
+      ['interface', 'type', 'import', 'from', 'export', 'annotate', 'as'].concat(globalTypes)
+    )
     this.globalTypes = new Set(globalTypes)
   }
 

@@ -1,10 +1,11 @@
-// oxlint-disable max-depth
-import { ObjectId } from 'mongodb'
-import {
+import type {
   TAtscriptAnnotatedType,
   TAtscriptTypeArray,
   TValidatorPlugin,
 } from '@atscript/typescript/utils'
+// oxlint-disable max-depth
+import { ObjectId } from 'mongodb'
+
 import { CollectionPatcher } from './collection-patcher'
 
 export const validateMongoIdPlugin: TValidatorPlugin = (ctx, def, value) => {
@@ -23,7 +24,7 @@ export const validateMongoUniqueArrayItemsPlugin: TValidatorPlugin = (ctx, def, 
       )
       for (const item of value) {
         let key: string = ''
-        if (keyProps.size) {
+        if (keyProps.size > 0) {
           for (const prop of keyProps) {
             key += JSON.stringify(item[prop]) + separator
           }

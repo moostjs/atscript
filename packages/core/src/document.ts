@@ -9,13 +9,12 @@ import { resolveAnnotation } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
+import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
 import {
   SemanticGroup,
-  SemanticNode,
   SemanticPropNode,
   SemanticRefNode,
   SemanticStructureNode,
-  TAnnotationTokens,
 } from './parser/nodes'
 import {
   isAnnotate,
@@ -35,8 +34,8 @@ import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
 import { resolveAtscriptFromPath } from './parser/utils'
-import { PluginManager } from './plugin/plugin-manager'
-import { TAtscriptPlugin, TAtscriptRenderFormat } from './plugin/types'
+import type { PluginManager } from './plugin/plugin-manager'
+import type { TAtscriptPlugin, TAtscriptRenderFormat } from './plugin/types'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
@@ -153,7 +152,10 @@ export class AtscriptDoc {
     this.cleanup()
     const rawTokens = tokenize(text, debug)
     const ni = new NodeIterator(rawTokens, []).move()
-    this.nodes = runPipes([pipes.importPipe, pipes.type, pipes.interfaceType, pipes.annotatePipe], ni)
+    this.nodes = runPipes(
+      [pipes.importPipe, pipes.type, pipes.interfaceType, pipes.annotatePipe],
+      ni
+    )
     if (debug) {
       console.log(this.nodes.map(n => n.toString()).join('\n'))
     }
@@ -203,12 +205,14 @@ export class AtscriptDoc {
     } else {
       let severity: 0 | 1 | 2 = 0
       switch (this.config.unknownAnnotation) {
-        case 'warn':
+        case 'warn': {
           severity = 2
           break
-        case 'error':
+        }
+        case 'error': {
           severity = 1
           break
+        }
         default:
       }
       if (severity > 0) {
@@ -479,13 +483,18 @@ export class AtscriptDoc {
     if (token) {
       // Annotate entry refs resolve through the target interface
       const block = this.blocksIndex.at(line, character)
-      if (block?.blockType === 'annotate' && isAnnotate(block.parentNode) && isRef(token.parentNode)) {
+      if (
+        block?.blockType === 'annotate' &&
+        isAnnotate(block.parentNode) &&
+        isRef(token.parentNode)
+      ) {
         const targetName = block.parentNode.targetName
         const entryRef = token.parentNode
         // Build chain: [entryId, ...chainUpToToken] for chains, or [tokenText] for identifiers
-        const chain: string[] = token.isChain && typeof token.index === 'number'
-          ? [entryRef.id!, ...entryRef.chain.slice(0, token.index).map(c => c.text)]
-          : [token.text]
+        const chain: string[] =
+          token.isChain && typeof token.index === 'number'
+            ? [entryRef.id!, ...entryRef.chain.slice(0, token.index).map(c => c.text)]
+            : [token.text]
         const unwound = this.unwindType(targetName, chain)
         if (unwound?.node) {
           return [
@@ -659,24 +668,29 @@ export class AtscriptDoc {
     let sc = ''
     let banner = '[atscript]'
     switch (m.severity) {
-      case TSeverity.Error:
+      case TSeverity.Error: {
         sc = c.red
         banner += '[Error]'
         break
-      case TSeverity.Warning:
+      }
+      case TSeverity.Warning: {
         sc = c.yellow
         banner += '[Warning]'
         break
-      case TSeverity.Info:
+      }
+      case TSeverity.Info: {
         sc = ''
         banner += '[Info]'
         break
-      case TSeverity.Hint:
+      }
+      case TSeverity.Hint: {
         sc = c.dim
         banner += '[Hint]'
         break
-      default:
+      }
+      default: {
         sc = ''
+      }
     }
     const n = m.range.start.line + 1
     let out =
@@ -692,14 +706,14 @@ export class AtscriptDoc {
       ].filter(Boolean)
       const nl = String(n).length + 1
       for (const { l, i } of renderLines) {
-        const prefix = `${c.dim + c.cyan}${('0' + i).slice(-nl)} | ${c.reset}`
+        const prefix = `${c.dim + c.cyan}${`0${i}`.slice(-nl)} | ${c.reset}`
         out += `\n${prefix}${l}${c.reset}`
       }
       out += `\n${' '.repeat(nl + 3 + m.range.start.character)}${c.red}${'^'.repeat(
         m.range.end.character - m.range.start.character
       )}${c.reset}`
     }
-    return out + '\n'
+    return `${out}\n`
   }
 
   getDiagMessages() {
@@ -718,17 +732,19 @@ export class AtscriptDoc {
           if (!this.registry.isDefined(targetName)) {
             continue // target itself is unknown, already reported separately
           }
-          const chain = isRef(t.parentNode) && t.parentNode.hasChain
-            ? [t.text, ...t.parentNode.chain.map(c => c.text)]
-            : [t.text]
+          const chain =
+            isRef(t.parentNode) && t.parentNode.hasChain
+              ? [t.text, ...t.parentNode.chain.map(c => c.text)]
+              : [t.text]
           const unwound = this.unwindType(targetName, chain)
           // unwindType may return the group node itself when it can't resolve
           // the chain through a union/intersection — treat that as unresolved
           const chainResolved = unwound?.def && !isGroup(unwound.def)
           if (!chainResolved && !this.resolveChainWithMerge(targetName, chain)) {
-            const lastToken = chain.length > 1 && isRef(t.parentNode)
-              ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
-              : t
+            const lastToken =
+              chain.length > 1 && isRef(t.parentNode)
+                ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
+                : t
             this._allMessages.push({
               severity: 1,
               message: `Unknown property "${chain.join('.')}" in "${targetName}"`,
@@ -776,7 +792,7 @@ export class AtscriptDoc {
             // container primitives must be used with an extension (e.g. ui.action, not ui)
             this._allMessages.push({
               severity: 1,
-              message: `"${t.parentNode.id!}${t.parentNode.hasChain ? '.' + t.parentNode.chain.map(c => c.text).join('.') : ''}" is a container type — use one of its extensions`,
+              message: `"${t.parentNode.id!}${t.parentNode.hasChain ? `.${t.parentNode.chain.map(c => c.text).join('.')}` : ''}" is a container type — use one of its extensions`,
               range: t.range,
             })
           }
@@ -808,21 +824,29 @@ export class AtscriptDoc {
    */
   private resolveChainWithMerge(targetName: string, chain: string[]): boolean {
     let def: SemanticNode | undefined = this.unwindType(targetName)?.def
-    if (!def) return false
+    if (!def) {
+      return false
+    }
     for (const prop of chain) {
       def = this.mergeIntersection(def)
       if (isProp(def)) {
         const inner = def.getDefinition()
-        if (inner) def = this.mergeIntersection(inner)
+        if (inner) {
+          def = this.mergeIntersection(inner)
+        }
       }
       if (isStructure(def) || isInterface(def)) {
         const next = def.props.get(prop)
-        if (!next) return false
+        if (!next) {
+          return false
+        }
         def = next.getDefinition() || next
       } else if (isGroup(def)) {
         // Search union/intersection items for the prop
         const found = this.findPropInGroup(def as SemanticGroup, prop)
-        if (!found) return false
+        if (!found) {
+          return false
+        }
         def = found
       } else {
         return false
@@ -836,11 +860,15 @@ export class AtscriptDoc {
       const merged = this.mergeIntersection(item)
       if (isStructure(merged) || isInterface(merged)) {
         const prop = merged.props.get(propName)
-        if (prop) return prop.getDefinition() || prop
+        if (prop) {
+          return prop.getDefinition() || prop
+        }
       }
       if (isGroup(merged)) {
         const found = this.findPropInGroup(merged as SemanticGroup, propName)
-        if (found) return found
+        if (found) {
+          return found
+        }
       }
     }
     return undefined
@@ -1003,7 +1031,7 @@ export class AtscriptDoc {
     // Add annotations from the left array only if they are not already in the set
     for (const a of left || []) {
       const spec = this.resolveAnnotation(a.name)
-      let append = spec && spec.config.multiple && spec.config.mergeStrategy === 'append'
+      const append = spec && spec.config.multiple && spec.config.mergeStrategy === 'append'
       if (append || !savedAnnotations.has(a.name)) {
         annotations.push(a)
       }

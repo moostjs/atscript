@@ -72,6 +72,7 @@ bunx asc --help
 :::
 
 You should see the available command options:
+
 ```
 Options:
   -c, --config <path>    Path to config file
@@ -89,6 +90,7 @@ For the best development experience, install the [Atscript VSCode extension](htt
 4. Install the extension by Moost
 
 The extension provides:
+
 - Syntax highlighting for `.as` files
 - IntelliSense support
 - Error checking

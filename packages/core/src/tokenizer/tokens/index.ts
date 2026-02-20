@@ -9,8 +9,8 @@ import { commentNodes } from './comment.token'
 import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
-import { TextToken } from './text.node'
 import { RegExpToken } from './regexp.token'
+import { TextToken } from './text.node'
 
 export const tokens = {
   aIdentifier: AIdentifierToken,

@@ -1,4 +1,4 @@
-import { TAtscriptConfig } from '@atscript/core'
+import type { TAtscriptConfig } from '@atscript/core'
 export const primitives: TAtscriptConfig['primitives'] = {
   mongo: {
     extensions: {

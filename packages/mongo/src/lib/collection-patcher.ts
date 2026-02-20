@@ -1,13 +1,10 @@
 // oxlint-disable max-lines
 // oxlint-disable max-depth
-import {
-  isAnnotatedTypeOfPrimitive,
-  TAtscriptAnnotatedType,
-  TAtscriptTypeArray,
-  defineAnnotatedType as $,
-} from '@atscript/typescript/utils'
-import { AsCollection } from './as-collection'
+import type { TAtscriptAnnotatedType, TAtscriptTypeArray } from '@atscript/typescript/utils'
+import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
+
+import type { AsCollection } from './as-collection'
 import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
 
 /**
@@ -31,7 +28,16 @@ import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './va
  * MongoDB update document. Primitive fields are flattened into a regular
  * `$set` map.
  */
-export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
+export class CollectionPatcher<
+  T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
+  DataType = T extends { type: { __dataType?: infer D } }
+    ? unknown extends D
+      ? T extends new (...args: any[]) => infer I
+        ? I
+        : unknown
+      : D
+    : unknown,
+> {
   constructor(
     private collection: AsCollection<T>,
     private payload: any
@@ -68,9 +74,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
    * @param collection Target collection wrapper
    * @returns Atscript Validator
    */
-  static prepareValidator<T extends TAtscriptAnnotatedType>(
-    collection: AsCollection<T, any>
-  ) {
+  static prepareValidator<T extends TAtscriptAnnotatedType>(collection: AsCollection<T, any>) {
     return collection.createValidator({
       plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
       replace: (def, path) => {
@@ -113,7 +117,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
               const t = $('object').copyMetadata(defArray.type.of.metadata)
               const keyProps = CollectionPatcher.getKeyProps(defArray)
               for (const [key, val] of objType.props.entries()) {
-                if (keyProps.size) {
+                if (keyProps.size > 0) {
                   if (keyProps.has(key)) {
                     t.prop(key, $().refTo(val).copyMetadata(def.metadata).$type)
                   } else {
@@ -183,13 +187,13 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       _id: this.collection.prepareId(this.payload._id),
     }
     this.flattenPayload(this.payload)
-    let updateFilter = this.updatePipeline
+    const updateFilter = this.updatePipeline
     return {
-      toArgs: (): [
-        Filter<any>,
-        UpdateFilter<any> | Document[],
-        UpdateOptions,
-      ] => [this.filterObj, updateFilter, this.optionsObj],
+      toArgs: (): [Filter<any>, UpdateFilter<any> | Document[], UpdateOptions] => [
+        this.filterObj,
+        updateFilter,
+        this.optionsObj,
+      ],
       filter: this.filterObj,
       updateFilter: updateFilter,
       updateOptions: this.optionsObj,
@@ -354,7 +358,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
     }
 
     // ── keyed upsert ──────────────────────────────────────────────────────────
-    if (keyProps.size) {
+    if (keyProps.size > 0) {
       const keys = [...keyProps]
       this._set(key, {
         $reduce: {
@@ -398,7 +402,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       return
     }
 
-    if (keyProps.size) {
+    if (keyProps.size > 0) {
       const mergeStrategy =
         this.collection.flatMap.get(key)?.metadata?.get('mongo.patch.strategy') === 'merge'
 
@@ -443,7 +447,7 @@ export class CollectionPatcher<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       return
     }
 
-    if (keyProps.size) {
+    if (keyProps.size > 0) {
       const keys = [...keyProps]
       this._set(key, {
         $let: {

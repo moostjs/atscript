@@ -1,6 +1,6 @@
+import { isRef, isStructure } from '.'
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import type { AtscriptDoc } from '../../document'
-import { isRef, isStructure } from '.'
 import { SemanticNode } from './semantic-node'
 
 export class SemanticPropNode extends SemanticNode {

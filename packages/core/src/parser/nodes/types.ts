@@ -49,9 +49,7 @@ export interface TPrimitiveBaseConfig {
 }
 
 export interface TPrimitiveConfig extends TPrimitiveBaseConfig {
-  extensions?: {
-    [name: string]: Partial<TPrimitiveConfig>
-  }
+  extensions?: Record<string, Partial<TPrimitiveConfig>>
 }
 
 export interface TPrimitiveTypeComplex {
@@ -74,7 +72,7 @@ export interface TPrimitiveTypeObject {
 }
 
 export type TPrimitiveTypeFinal = 'string' | 'number' | 'boolean' | 'void' | 'null' | 'phantom'
-export type TPrimitiveTypeFinalOptional = {
+export interface TPrimitiveTypeFinalOptional {
   kind: 'final'
   value: TPrimitiveTypeFinal
   optional: true

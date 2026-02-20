@@ -9,45 +9,45 @@
 ```typescript
 // types/user.ts
 interface User {
-    email: string
-    name: string
-    age: number
-    isActive: boolean
+  email: string
+  name: string
+  age: number
+  isActive: boolean
 }
 
 // validation/user-schema.ts
 const userSchema = z.object({
-    email: z.string().email(),
-    name: z.string().min(2).max(100),
-    age: z.number().int().min(13).max(150),
-    isActive: z.boolean()
+  email: z.string().email(),
+  name: z.string().min(2).max(100),
+  age: z.number().int().min(13).max(150),
+  isActive: z.boolean(),
 })
 
 // database/user.model.ts
 @Entity()
 class UserEntity {
-    @Column({ unique: true })
-    @Index()
-    email: string
+  @Column({ unique: true })
+  @Index()
+  email: string
 
-    @Column()
-    @Index({ fulltext: true })
-    name: string
+  @Column()
+  @Index({ fulltext: true })
+  name: string
 
-    @Column('integer')
-    age: number
+  @Column('integer')
+  age: number
 
-    @Column()
-    @Index()
-    isActive: boolean
+  @Column()
+  @Index()
+  isActive: boolean
 }
 
 // ui/user-form-config.ts
 const userFormFields = {
-    email: { label: 'User Email', type: 'email' },
-    name: { label: 'Full Name', minLength: 2, maxLength: 100 },
-    age: { label: 'Age', type: 'number', min: 13, max: 150 },
-    isActive: { label: 'Account Status', type: 'checkbox' }
+  email: { label: 'User Email', type: 'email' },
+  name: { label: 'Full Name', minLength: 2, maxLength: 100 },
+  age: { label: 'Age', type: 'number', min: 13, max: 150 },
+  isActive: { label: 'Account Status', type: 'checkbox' },
 }
 ```
 
@@ -80,11 +80,14 @@ export interface User {
 ```
 
 Then use it in TypeScript:
+
 ```typescript
 import { User } from './user.as'
 
 // Type checking
-const user: User = { /* ... */ }
+const user: User = {
+  /* ... */
+}
 
 // Validation
 const validator = User.validator()

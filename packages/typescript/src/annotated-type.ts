@@ -29,7 +29,7 @@ export interface TAtscriptTypeObject<K extends string = string, DataType = Recor
   kind: 'object'
 
   props: Map<K, TAtscriptAnnotatedType>
-  propsPatterns: { pattern: RegExp; def: TAtscriptAnnotatedType }[]
+  propsPatterns: Array<{ pattern: RegExp; def: TAtscriptAnnotatedType }>
 
   tags: Set<AtscriptPrimitiveTags>
 
@@ -44,7 +44,16 @@ export interface TAtscriptTypeFinal<DataType = unknown> {
   /**
    * design type
    */
-  designType: 'string' | 'number' | 'boolean' | 'undefined' | 'null' | 'object' | 'any' | 'never' | 'phantom'
+  designType:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'undefined'
+    | 'null'
+    | 'object'
+    | 'any'
+    | 'never'
+    | 'phantom'
 
   /**
    * value for literals
@@ -78,7 +87,10 @@ export type TAtscriptTypeDef<DataType = unknown> =
  * @typeParam T - The underlying type definition (e.g. {@link TAtscriptTypeObject}).
  * @typeParam DataType - The TypeScript type the validated data narrows to (auto-inferred from `T`).
  */
-export interface TAtscriptAnnotatedType<T extends TAtscriptTypeDef = TAtscriptTypeDef, DataType = InferDataType<T>> {
+export interface TAtscriptAnnotatedType<
+  T extends TAtscriptTypeDef = TAtscriptTypeDef,
+  DataType = InferDataType<T>,
+> {
   __is_atscript_annotated_type: true
   type: T
   validator(opts?: Partial<TValidatorOptions>): Validator<this, DataType>
@@ -104,10 +116,12 @@ export function isAnnotatedType(type: any): type is TAtscriptAnnotatedType {
 export function annotate<K extends keyof AtscriptMetadata>(
   metadata: TMetadataMap<AtscriptMetadata> | undefined,
   key: K,
-  value: AtscriptMetadata[K] extends (infer E)[] ? E : AtscriptMetadata[K],
+  value: AtscriptMetadata[K] extends Array<infer E> ? E : AtscriptMetadata[K],
   asArray?: boolean
 ): void {
-  if (!metadata) return
+  if (!metadata) {
+    return
+  }
   if (asArray) {
     if (metadata.has(key)) {
       const a = metadata.get(key)

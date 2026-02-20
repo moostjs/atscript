@@ -28,6 +28,7 @@ For TypeScript to import `.as` files:
 3. **With Bundler**: Use `unplugin-atscript` for automatic compilation
 
 Example generated structure:
+
 ```
 src/
   user.as          # Source file

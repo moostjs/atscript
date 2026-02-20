@@ -11,9 +11,9 @@ All runtime utilities are imported from `@atscript/typescript/utils`.
 ```typescript
 interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<T>> {
   __is_atscript_annotated_type: true
-  type: T              // the type definition (object, array, union, etc.)
-  metadata: TMetadataMap<AtscriptMetadata>  // annotation values
-  validator: (opts?) => Validator            // creates a validator instance
+  type: T // the type definition (object, array, union, etc.)
+  metadata: TMetadataMap<AtscriptMetadata> // annotation values
+  validator: (opts?) => Validator // creates a validator instance
   optional?: boolean
 }
 ```
@@ -23,23 +23,23 @@ Generated interfaces expose this as static members:
 ```typescript
 import { Product } from './product.as'
 
-Product.type          // TAtscriptTypeObject — the type structure
-Product.metadata      // TMetadataMap — top-level annotations
-Product.validator()   // Validator<typeof Product> — with type guard support
+Product.type // TAtscriptTypeObject — the type structure
+Product.metadata // TMetadataMap — top-level annotations
+Product.validator() // Validator<typeof Product> — with type guard support
 ```
 
 ## Type Kinds
 
 The `type` field is one of these shapes, distinguished by `kind`:
 
-| Kind | Interface | Description |
-|------|-----------|-------------|
-| `''` | `TAtscriptTypeFinal` | Primitives and literals — `designType`, optional `value` |
-| `'object'` | `TAtscriptTypeObject` | Named `props` (Map) and `propsPatterns` (regex-matched keys) |
-| `'array'` | `TAtscriptTypeArray` | Element type in `of` |
-| `'union'` | `TAtscriptTypeComplex` | Alternatives in `items` |
-| `'intersection'` | `TAtscriptTypeComplex` | Combined types in `items` |
-| `'tuple'` | `TAtscriptTypeComplex` | Positional types in `items` |
+| Kind             | Interface              | Description                                                  |
+| ---------------- | ---------------------- | ------------------------------------------------------------ |
+| `''`             | `TAtscriptTypeFinal`   | Primitives and literals — `designType`, optional `value`     |
+| `'object'`       | `TAtscriptTypeObject`  | Named `props` (Map) and `propsPatterns` (regex-matched keys) |
+| `'array'`        | `TAtscriptTypeArray`   | Element type in `of`                                         |
+| `'union'`        | `TAtscriptTypeComplex` | Alternatives in `items`                                      |
+| `'intersection'` | `TAtscriptTypeComplex` | Combined types in `items`                                    |
+| `'tuple'`        | `TAtscriptTypeComplex` | Positional types in `items`                                  |
 
 Each shape also has a `tags` set — semantic type tags like `'email'`, `'uuid'`, `'positive'` that come from primitives like `string.email`.
 
@@ -50,7 +50,7 @@ Each type definition interface carries a phantom `DataType` generic:
 ```typescript
 interface TAtscriptTypeObject<K extends string, DataType = Record<K, unknown>> {
   // ...
-  __dataType?: DataType  // phantom — never set at runtime
+  __dataType?: DataType // phantom — never set at runtime
 }
 ```
 
@@ -90,25 +90,25 @@ Supply a handler for each type kind. Each handler receives the correctly narrowe
 import { forAnnotatedType } from '@atscript/typescript/utils'
 
 const description = forAnnotatedType(someType, {
-  final:        (d) => `primitive: ${d.type.designType}`,
-  object:       (d) => `object with ${d.type.props.size} props`,
-  array:        (d) => `array`,
-  union:        (d) => `union of ${d.type.items.length}`,
-  intersection: (d) => `intersection of ${d.type.items.length}`,
-  tuple:        (d) => `tuple of ${d.type.items.length}`,
-  phantom:      (d) => `phantom element`,  // optional
+  final: d => `primitive: ${d.type.designType}`,
+  object: d => `object with ${d.type.props.size} props`,
+  array: d => `array`,
+  union: d => `union of ${d.type.items.length}`,
+  intersection: d => `intersection of ${d.type.items.length}`,
+  tuple: d => `tuple of ${d.type.items.length}`,
+  phantom: d => `phantom element`, // optional
 })
 ```
 
-| Handler | Receives | Key fields |
-|---------|----------|------------|
-| `final` | `TAtscriptAnnotatedType<TAtscriptTypeFinal>` | `designType`, `value`, `tags` |
-| `object` | `TAtscriptAnnotatedType<TAtscriptTypeObject>` | `props` (Map), `propsPatterns` |
-| `array` | `TAtscriptAnnotatedType<TAtscriptTypeArray>` | `of` (element type) |
-| `union` | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (alternatives) |
-| `intersection` | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (combined types) |
-| `tuple` | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (positional types) |
-| `phantom` _(optional)_ | `TAtscriptAnnotatedType<TAtscriptTypeFinal>` | Same as `final`, `designType === 'phantom'` |
+| Handler                | Receives                                       | Key fields                                  |
+| ---------------------- | ---------------------------------------------- | ------------------------------------------- |
+| `final`                | `TAtscriptAnnotatedType<TAtscriptTypeFinal>`   | `designType`, `value`, `tags`               |
+| `object`               | `TAtscriptAnnotatedType<TAtscriptTypeObject>`  | `props` (Map), `propsPatterns`              |
+| `array`                | `TAtscriptAnnotatedType<TAtscriptTypeArray>`   | `of` (element type)                         |
+| `union`                | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (alternatives)                      |
+| `intersection`         | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (combined types)                    |
+| `tuple`                | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (positional types)                  |
+| `phantom` _(optional)_ | `TAtscriptAnnotatedType<TAtscriptTypeFinal>`   | Same as `final`, `designType === 'phantom'` |
 
 The optional `phantom` handler intercepts [phantom](/packages/typescript/primitives#phantom-type) types before they reach `final`. If omitted, phantom types fall through to `final`.
 
@@ -120,12 +120,16 @@ The optional `phantom` handler intercepts [phantom](/packages/typescript/primiti
 import { forAnnotatedType, isPhantomType } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
-function walkType(def: TAtscriptAnnotatedType, path: string, visit: (path: string, def: TAtscriptAnnotatedType) => void) {
+function walkType(
+  def: TAtscriptAnnotatedType,
+  path: string,
+  visit: (path: string, def: TAtscriptAnnotatedType) => void
+) {
   visit(path, def)
 
   forAnnotatedType(def, {
-    final() {},       // leaf node — nothing to recurse into
-    phantom() {},     // non-data leaf — skip or handle separately
+    final() {}, // leaf node — nothing to recurse into
+    phantom() {}, // non-data leaf — skip or handle separately
 
     object(d) {
       for (const [key, prop] of d.type.props.entries()) {
@@ -243,8 +247,8 @@ import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
 function flattenType(def: TAtscriptAnnotatedType, prefix = ''): Record<string, string> {
   return forAnnotatedType(def, {
-    final: (d) => ({ [prefix || '(root)']: d.type.designType }),
-    phantom: () => ({}),  // skip phantom props
+    final: d => ({ [prefix || '(root)']: d.type.designType }),
+    phantom: () => ({}), // skip phantom props
 
     object(d) {
       let result: Record<string, string> = {}
@@ -256,7 +260,7 @@ function flattenType(def: TAtscriptAnnotatedType, prefix = ''): Record<string, s
       return result
     },
 
-    array: (d) => flattenType(d.type.of, `${prefix}[]`),
+    array: d => flattenType(d.type.of, `${prefix}[]`),
 
     union(d) {
       let result: Record<string, string> = {}
@@ -362,8 +366,7 @@ import { defineAnnotatedType } from '@atscript/typescript/utils'
 const userType = defineAnnotatedType('object')
   .prop('name', defineAnnotatedType().designType('string').$type)
   .prop('age', defineAnnotatedType().designType('number').$type)
-  .annotate('meta.label', 'User')
-  .$type
+  .annotate('meta.label', 'User').$type
 
 // userType is a fully functional TAtscriptAnnotatedType
 userType.validator().validate({ name: 'Alice', age: 30 })

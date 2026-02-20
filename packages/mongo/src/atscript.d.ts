@@ -10,14 +10,14 @@ export {}
 declare global {
   interface AtscriptMetadata {
     'mongo.collection': string
-    'mongo.index.plain': (string | true)[]
-    'mongo.index.unique': (string | true)[]
+    'mongo.index.plain': Array<string | true>
+    'mongo.index.unique': Array<string | true>
     'mongo.index.text': number | true
     'mongo.search.dynamic': { analyzer?: string; fuzzy?: number }
-    'mongo.search.static': { analyzer?: string; fuzzy?: number; indexName?: string }[]
-    'mongo.search.text': { analyzer?: string; indexName?: string }[]
+    'mongo.search.static': Array<{ analyzer?: string; fuzzy?: number; indexName?: string }>
+    'mongo.search.text': Array<{ analyzer?: string; indexName?: string }>
     'mongo.search.vector': { dimensions: number; similarity?: string; indexName?: string }
-    'mongo.search.filter': { indexName: string }[]
+    'mongo.search.filter': Array<{ indexName: string }>
     'mongo.patch.strategy': string
     'mongo.array.key': boolean
   }

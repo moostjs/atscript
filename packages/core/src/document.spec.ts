@@ -4,19 +4,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { AnnotationSpec } from './annotations'
+import { expectAnnotations } from './defaults/expect-annotations'
 import { AtscriptDoc } from './document'
+import type { SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
+import { isGroup, isPrimitive, type TAnnotationTokens } from './parser/nodes'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
-import {
-  isAnnotate,
-  isGroup,
-  isRef,
-  isPrimitive,
-  SemanticGroup,
-  SemanticInterfaceNode,
-  type TAnnotationTokens,
-} from './parser/nodes'
-import { expectAnnotations } from './defaults/expect-annotations'
 import { Token } from './parser/token'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()

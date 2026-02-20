@@ -11,6 +11,7 @@ This guide covers how to extend Atscript by building plugins, language extension
 ## What You'll Learn
 
 **Core Concepts:**
+
 - [Architecture](/plugin-development/architecture) — how the core is structured
 - [Parser & AST](/plugin-development/parser-ast) — parsing `.as` files and navigating the AST
 - [Semantic Nodes](/plugin-development/semantic-nodes) — the resolved type graph
@@ -19,17 +20,20 @@ This guide covers how to extend Atscript by building plugins, language extension
 - [Type System](/plugin-development/type-system) — primitives, type resolution, and unwinding
 
 **Building a Language Extension:**
+
 - [Plugin Hooks](/plugin-development/plugin-hooks) — the full hook API
 - [Code Generation](/plugin-development/code-generation) — emitting output from the AST
 - [Primitives & Type Tags](/plugin-development/primitives-type-tags) — adding semantic types
 - [Testing Plugins](/plugin-development/testing-plugins) — test harness and snapshot testing
 
 **Building an LSP:**
+
 - [LSP Overview](/plugin-development/lsp-overview) — how the Atscript LSP works
 - [Diagnostics](/plugin-development/diagnostics) — error reporting and validation
 - [Completions & Navigation](/plugin-development/completions-navigation) — IntelliSense features
 
 **Reference:**
+
 - [Core API](/plugin-development/core-api) — `@atscript/core` public API
 - [Plugin API](/plugin-development/plugin-api) — plugin interface and hook signatures
 

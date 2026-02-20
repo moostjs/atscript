@@ -5,15 +5,18 @@ VSCode extension providing syntax highlighting, LSP with go-to-definition, compl
 ## Key Source Files
 
 ### Client (extension host process)
+
 - `client/extension.ts` -- Extension entry point. Activates language server, handles dependency resolution, auto-installs missing deps, sets up file watchers.
 
 ### Server (language server process)
+
 - `server/server.ts` -- LSP connection bootstrap. Registers capabilities and instantiates `VscodeAtscriptRepo`.
 - `server/repo.ts` -- Core LSP logic. Extends `AtscriptRepo`. Implements all LSP handlers: completion, hover, go-to-definition, find-references, rename, signature help, diagnostics.
 - `server/utils.ts` -- Helpers: `addImport`, `createInsertTextRule`, `getItnFileCompletions`.
 - `server/utils.spec.ts` -- Unit tests for utils.
 
 ### Syntax & Config
+
 - `syntaxes/atscript.tmLanguage.json` -- TextMate grammar (scope: `source.atscript`).
 - `language-configuration.json` -- Brackets, comments, folding, indentation rules.
 

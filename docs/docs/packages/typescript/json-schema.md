@@ -24,7 +24,7 @@ const schema = buildJsonSchema(Product)
 The `.toJsonSchema()` method on generated types requires the `jsonSchema` plugin option to be set to `'lazy'` or `'bundle'` — otherwise it throws a runtime error. Alternatively, add the [`@emit.jsonSchema`](#per-interface-override-emit-jsonschema) annotation to individual interfaces.
 
 ::: tip Manual use is always available
-Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/typescript/utils` and call it directly. The config option only affects the *generated* `.toJsonSchema()` method — the standalone function always works.
+Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/typescript/utils` and call it directly. The config option only affects the _generated_ `.toJsonSchema()` method — the standalone function always works.
 
 ```typescript
 import { buildJsonSchema } from '@atscript/typescript/utils'
@@ -32,6 +32,7 @@ import { Product } from './product.as'
 
 const schema = buildJsonSchema(Product) // works regardless of config
 ```
+
 :::
 
 ## Per-Interface Override: `@emit.jsonSchema`
@@ -53,14 +54,14 @@ export interface ApiResponse {
 
 Annotations from `.as` files are translated into JSON Schema constraints:
 
-| Annotation | JSON Schema | Notes |
-|------------|------------|-------|
-| `@expect.minLength` | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays |
-| `@expect.maxLength` | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays |
-| `@expect.min` | `minimum` | |
-| `@expect.max` | `maximum` | |
-| `@expect.int` | `type: 'integer'` | Changes `number` to `integer` |
-| `@expect.pattern` | `pattern` / `allOf` | Single pattern uses `pattern`, multiple become `allOf` entries |
+| Annotation          | JSON Schema              | Notes                                                          |
+| ------------------- | ------------------------ | -------------------------------------------------------------- |
+| `@expect.minLength` | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays                 |
+| `@expect.maxLength` | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays                 |
+| `@expect.min`       | `minimum`                |                                                                |
+| `@expect.max`       | `maximum`                |                                                                |
+| `@expect.int`       | `type: 'integer'`        | Changes `number` to `integer`                                  |
+| `@expect.pattern`   | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
 
 ## Example
 
@@ -104,9 +105,9 @@ const schema = {
   type: 'object',
   properties: {
     name: { type: 'string', minLength: 3 },
-    age: { type: 'number', minimum: 0 }
+    age: { type: 'number', minimum: 0 },
   },
-  required: ['name', 'age']
+  required: ['name', 'age'],
 }
 
 const type = fromJsonSchema(schema)

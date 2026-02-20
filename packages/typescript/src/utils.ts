@@ -1,4 +1,10 @@
-export { annotate, defineAnnotatedType, isAnnotatedType, isAnnotatedTypeOfPrimitive, isPhantomType } from './annotated-type'
+export {
+  annotate,
+  defineAnnotatedType,
+  isAnnotatedType,
+  isAnnotatedTypeOfPrimitive,
+  isPhantomType,
+} from './annotated-type'
 export type {
   TAnnotatedTypeHandle,
   TAtscriptAnnotatedType,
@@ -21,11 +27,7 @@ export { forAnnotatedType } from './traverse'
 export { flattenAnnotatedType } from './flatten'
 export type { TFlattenOptions } from './flatten'
 
-export {
-  serializeAnnotatedType,
-  deserializeAnnotatedType,
-  SERIALIZE_VERSION,
-} from './serialize'
+export { serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION } from './serialize'
 export type {
   TSerializedAnnotatedType,
   TSerializedAnnotatedTypeInner,

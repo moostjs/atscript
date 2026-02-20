@@ -1,6 +1,7 @@
-import { h, nextTick } from 'vue'
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
+import { h, nextTick } from 'vue'
+
 import './style.css'
 
 export default {
@@ -22,7 +23,9 @@ export default {
         colorizeAnnotations() {
           nextTick(() => {
             // Only run in browser environment
-            if (typeof window === 'undefined') return
+            if (typeof window === 'undefined') {
+              return
+            }
 
             // Find all atscript code blocks
             const codeBlocks = window.document.querySelectorAll('.language-atscript code .line')

@@ -3,8 +3,8 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest'
 
-import { AtscriptDoc } from '../../document'
 import { parseAtscript } from '..'
+import { AtscriptDoc } from '../../document'
 import type { SemanticInterfaceNode } from '../nodes/interface-node'
 
 describe('interfaces', () => {

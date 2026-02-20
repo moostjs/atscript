@@ -1,7 +1,7 @@
-import { TOutput } from '../build'
-import { TAtscriptConfig } from '../config'
-import { AtscriptDoc } from '../document'
-import { AtscriptRepo } from '../repo'
+import type { TOutput } from '../build'
+import type { TAtscriptConfig } from '../config'
+import type { AtscriptDoc } from '../document'
+import type { AtscriptRepo } from '../repo'
 
 export interface TPluginOutput {
   fileName: string

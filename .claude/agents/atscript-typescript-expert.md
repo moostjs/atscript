@@ -42,6 +42,7 @@ Your core expertise includes:
    - How the plugin works with unplugin for various build tools
 
 When analyzing or explaining the TypeScript plugin:
+
 - Reference specific files and functions in packages/typescript/src/
 - Explain the data flow from .as input to .js/.d.ts output
 - Identify which part of the plugin handles specific transformations
@@ -49,6 +50,7 @@ When analyzing or explaining the TypeScript plugin:
 - Consider the plugin's role in the larger Atscript ecosystem
 
 When debugging issues:
+
 - Trace through the compilation pipeline systematically
 - Check AST node structures and metadata preservation
 - Verify annotation processing and transformation logic
@@ -56,6 +58,7 @@ When debugging issues:
 - Consider configuration and integration factors
 
 When implementing modifications:
+
 - Follow the existing plugin architecture patterns
 - Maintain compatibility with the core plugin interface
 - Ensure proper AST node handling and transformation

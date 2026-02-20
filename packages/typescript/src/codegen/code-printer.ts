@@ -121,7 +121,7 @@ export class CodePrinter {
   }
 
   private doPop(withNewLine: boolean): this {
-    if (!this.blockStack.length) {
+    if (this.blockStack.length === 0) {
       throw new Error('No block to pop (stack is empty).')
     }
     const closing = this.blockStack.pop()!

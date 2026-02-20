@@ -7,24 +7,27 @@ When a handler parameter is typed with an Atscript-generated type (e.g., `@Body(
 ## Installation
 
 ::: code-group
+
 ```bash [pnpm]
 pnpm add @atscript/moost-validator
 ```
+
 ```bash [npm]
 npm install @atscript/moost-validator
 ```
+
 :::
 
 ### Peer Dependencies
 
 This package requires the following peer dependencies:
 
-| Package | Purpose |
-|---------|---------|
-| `@atscript/core` | Core parser and AST |
+| Package                | Purpose                                                    |
+| ---------------------- | ---------------------------------------------------------- |
+| `@atscript/core`       | Core parser and AST                                        |
 | `@atscript/typescript` | Provides `Validator`, `ValidatorError`, and type utilities |
-| `moost` | Framework runtime (pipes, interceptors, DI) |
-| `@moostjs/event-http` | HTTP adapter (for `HttpError` in error transform) |
+| `moost`                | Framework runtime (pipes, interceptors, DI)                |
+| `@moostjs/event-http`  | HTTP adapter (for `HttpError` in error transform)          |
 
 ## Quick Start
 
@@ -110,11 +113,11 @@ If the request body fails validation, the client receives:
 
 ## API at a Glance
 
-| Export | Type | Description |
-|--------|------|-------------|
-| `validatorPipe(opts?)` | Pipe factory | Validates parameters against their Atscript type |
-| `UseValidatorPipe(opts?)` | Decorator | Applies `validatorPipe` to a class or method |
-| `validationErrorTransform()` | Interceptor factory | Converts `ValidatorError` into `HttpError(400)` |
-| `UseValidationErrorTransform()` | Decorator | Applies `validationErrorTransform` to a class or method |
+| Export                          | Type                | Description                                             |
+| ------------------------------- | ------------------- | ------------------------------------------------------- |
+| `validatorPipe(opts?)`          | Pipe factory        | Validates parameters against their Atscript type        |
+| `UseValidatorPipe(opts?)`       | Decorator           | Applies `validatorPipe` to a class or method            |
+| `validationErrorTransform()`    | Interceptor factory | Converts `ValidatorError` into `HttpError(400)`         |
+| `UseValidationErrorTransform()` | Decorator           | Applies `validationErrorTransform` to a class or method |
 
 See [Validation Pipe](./validation-pipe) and [Error Handling](./error-handling) for detailed usage.

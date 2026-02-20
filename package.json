@@ -2,10 +2,15 @@
   "name": "atscript",
   "version": "0.1.17",
   "description": "Atscript is a language for describing data and interfaces with extensible annotations, enabling the generation of files at runtime for streamlined workflows.",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "lint": "oxlint -c .oxlintrc.json && eslint --ext .ts packages/**/src/**/**.ts",
+    "lint": "oxlint",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "build": "pnpm -r before-build && node ./scripts/build.js",
     "build-only": "node ./scripts/build.js",
     "test": "vitest run",
@@ -17,32 +22,17 @@
     "vscode": "node ./scripts/vscode-publish",
     "sync": "node ./scripts/versions"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@prostojs/dye": "^0.4.9",
     "@types/node": "^22.19.11",
-    "@typescript-eslint/eslint-plugin": "6.3.0",
-    "@typescript-eslint/parser": "6.3.0",
     "@vscode/vsce": "^3.7.1",
     "conventional-changelog-cli": "^5.0.0",
-    "eslint": "8.55.0",
-    "eslint-import-resolver-typescript": "3.6.1",
-    "eslint-plugin-array-func": "4.0.0",
-    "eslint-plugin-import": "2.29.0",
-    "eslint-plugin-promise": "6.1.1",
-    "eslint-plugin-regexp": "2.5.0",
-    "eslint-plugin-simple-import-sort": "10.0.0",
-    "eslint-plugin-sonarjs": "0.23.0",
-    "eslint-plugin-unicorn": "49.0.0",
-    "eslint-plugin-yml": "1.10.0",
     "husky": "^9.1.7",
     "inquirer": "^12.11.1",
-    "oxlint": "^0.15.15",
-    "prettier": "3.1.1",
+    "oxfmt": "^0.34.0",
+    "oxlint": "^1.49.0",
     "rolldown": "1.0.0-beta.1",
     "rollup": "^4.57.1",
     "rollup-plugin-dts": "^6.3.0",
@@ -51,5 +41,10 @@
     "vitepress": "^1.6.4",
     "vitest": "3.2.4",
     "zx": "^8.8.5"
+  },
+  "pnpm": {
+    "overrides": {
+      "minimatch@>=10": ">=10.2.1"
+    }
   }
 }

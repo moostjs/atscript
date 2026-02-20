@@ -18,7 +18,7 @@ try {
   // data passed validation
 } catch (error) {
   console.error(error.message) // first error message
-  console.error(error.errors)  // all errors: { path, message }[]
+  console.error(error.errors) // all errors: { path, message }[]
 }
 ```
 
@@ -101,7 +101,7 @@ A function to replace type definitions during validation. Useful for dynamic typ
 
 ```typescript
 Product.validator({
-  replace: (type, path) => path === 'status' ? customStatusType : type
+  replace: (type, path) => (path === 'status' ? customStatusType : type),
 })
 ```
 
@@ -109,15 +109,15 @@ Product.validator({
 
 Annotations from `.as` files are enforced automatically during validation. See the [Annotations](/packages/typescript/annotations) page for the full list.
 
-| Annotation | Applies to | Validates |
-|------------|-----------|-----------|
-| `@meta.required` | string, boolean | String: at least one non-whitespace character. Boolean: must be `true` |
-| `@expect.minLength` | string, array | Minimum length |
-| `@expect.maxLength` | string, array | Maximum length |
-| `@expect.min` | number | Minimum value |
-| `@expect.max` | number | Maximum value |
-| `@expect.int` | number | Must be integer |
-| `@expect.pattern` | string | Regex match (multiple patterns supported) |
+| Annotation          | Applies to      | Validates                                                              |
+| ------------------- | --------------- | ---------------------------------------------------------------------- |
+| `@meta.required`    | string, boolean | String: at least one non-whitespace character. Boolean: must be `true` |
+| `@expect.minLength` | string, array   | Minimum length                                                         |
+| `@expect.maxLength` | string, array   | Maximum length                                                         |
+| `@expect.min`       | number          | Minimum value                                                          |
+| `@expect.max`       | number          | Maximum value                                                          |
+| `@expect.int`       | number          | Must be integer                                                        |
+| `@expect.pattern`   | string          | Regex match (multiple patterns supported)                              |
 
 All validation annotations (except `@expect.int`) support an optional custom error message as the last argument:
 
@@ -155,9 +155,9 @@ try {
 } catch (e) {
   if (e instanceof ValidatorError) {
     for (const err of e.errors) {
-      console.log(err.path)     // e.g. "address.city"
-      console.log(err.message)  // e.g. "Expected string, got number"
-      console.log(err.details)  // nested errors for unions
+      console.log(err.path) // e.g. "address.city"
+      console.log(err.message) // e.g. "Expected string, got number"
+      console.log(err.details) // nested errors for unions
     }
   }
 }

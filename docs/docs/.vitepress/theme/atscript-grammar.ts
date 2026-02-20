@@ -4,55 +4,55 @@ export const atscriptGrammar = {
   fileTypes: ['as'],
   patterns: [
     {
-      include: '#comments'
+      include: '#comments',
     },
     {
-      include: '#annotations'
+      include: '#annotations',
     },
     {
-      include: '#interface'
+      include: '#interface',
     },
     {
-      include: '#type-alias'
+      include: '#type-alias',
     },
     {
-      include: '#imports'
+      include: '#imports',
     },
     {
-      include: 'source.ts'
-    }
+      include: 'source.ts',
+    },
   ],
   repository: {
-    comments: {
+    'comments': {
       patterns: [
         {
           name: 'comment.line.double-slash.atscript',
-          match: '//.*$'
+          match: '//.*$',
         },
         {
           name: 'comment.block.atscript',
           begin: '/\\*',
-          end: '\\*/'
-        }
-      ]
+          end: '\\*/',
+        },
+      ],
     },
-    annotations: {
+    'annotations': {
       patterns: [
         {
           name: 'meta.annotation.atscript',
           begin: '(@)([a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)*)',
           beginCaptures: {
             1: { name: 'punctuation.decorator.atscript' },
-            2: { name: 'entity.name.decorator.atscript' }
+            2: { name: 'entity.name.decorator.atscript' },
           },
           end: '(?=\\s|@|interface|type|export|import|{|}|;|$)',
           patterns: [
             {
-              include: '#annotation-arguments'
-            }
-          ]
-        }
-      ]
+              include: '#annotation-arguments',
+            },
+          ],
+        },
+      ],
     },
     'annotation-arguments': {
       patterns: [
@@ -60,97 +60,97 @@ export const atscriptGrammar = {
           name: 'meta.annotation.arguments.atscript',
           begin: '\\(',
           beginCaptures: {
-            0: { name: 'punctuation.definition.arguments.begin.atscript' }
+            0: { name: 'punctuation.definition.arguments.begin.atscript' },
           },
           end: '\\)',
           endCaptures: {
-            0: { name: 'punctuation.definition.arguments.end.atscript' }
+            0: { name: 'punctuation.definition.arguments.end.atscript' },
           },
           patterns: [
             {
-              include: '#annotation-argument-value'
-            }
-          ]
-        }
-      ]
+              include: '#annotation-argument-value',
+            },
+          ],
+        },
+      ],
     },
     'annotation-argument-value': {
       patterns: [
         {
           name: 'string.quoted.double.atscript',
-          match: '"[^"]*"'
+          match: '"[^"]*"',
         },
         {
           name: 'string.quoted.single.atscript',
-          match: "'[^']*'"
+          match: "'[^']*'",
         },
         {
           name: 'constant.numeric.atscript',
-          match: '\\b\\d+(\\.\\d+)?\\b'
+          match: '\\b\\d+(\\.\\d+)?\\b',
         },
         {
           name: 'constant.language.boolean.atscript',
-          match: '\\b(true|false)\\b'
+          match: '\\b(true|false)\\b',
         },
         {
           name: 'constant.language.null.atscript',
-          match: '\\bnull\\b'
+          match: '\\bnull\\b',
         },
         {
           name: 'variable.other.property.atscript',
-          match: '[a-zA-Z_$][\\w$]*'
+          match: '[a-zA-Z_$][\\w$]*',
         },
         {
           name: 'punctuation.separator.comma.atscript',
-          match: ','
+          match: ',',
         },
         {
           name: 'keyword.operator.assignment.atscript',
-          match: ':'
+          match: ':',
         },
         {
           begin: '\\{',
           end: '\\}',
           patterns: [
             {
-              include: '#annotation-argument-value'
-            }
-          ]
+              include: '#annotation-argument-value',
+            },
+          ],
         },
         {
           begin: '\\[',
           end: '\\]',
           patterns: [
             {
-              include: '#annotation-argument-value'
-            }
-          ]
-        }
-      ]
+              include: '#annotation-argument-value',
+            },
+          ],
+        },
+      ],
     },
-    interface: {
+    'interface': {
       patterns: [
         {
           name: 'meta.interface.atscript',
           begin: '(?:export\\s+)?(interface)\\s+([a-zA-Z_$][\\w$]*)',
           beginCaptures: {
             1: { name: 'keyword.other.interface.atscript' },
-            2: { name: 'entity.name.type.interface.atscript' }
+            2: { name: 'entity.name.type.interface.atscript' },
           },
           end: '(?<=})',
           patterns: [
             {
-              include: '#type-parameters'
+              include: '#type-parameters',
             },
             {
-              include: '#extends-clause'
+              include: '#extends-clause',
             },
             {
-              include: '#interface-body'
-            }
-          ]
-        }
-      ]
+              include: '#interface-body',
+            },
+          ],
+        },
+      ],
     },
     'type-alias': {
       patterns: [
@@ -159,19 +159,19 @@ export const atscriptGrammar = {
           begin: '(?:export\\s+)?(type)\\s+([a-zA-Z_$][\\w$]*)',
           beginCaptures: {
             1: { name: 'keyword.other.type.atscript' },
-            2: { name: 'entity.name.type.alias.atscript' }
+            2: { name: 'entity.name.type.alias.atscript' },
           },
           end: '(?=;|$)',
           patterns: [
             {
-              include: '#type-parameters'
+              include: '#type-parameters',
             },
             {
-              include: '#type-definition'
-            }
-          ]
-        }
-      ]
+              include: '#type-definition',
+            },
+          ],
+        },
+      ],
     },
     'type-parameters': {
       patterns: [
@@ -182,18 +182,18 @@ export const atscriptGrammar = {
           patterns: [
             {
               name: 'entity.name.type.parameter.atscript',
-              match: '[a-zA-Z_$][\\w$]*'
+              match: '[a-zA-Z_$][\\w$]*',
             },
             {
               name: 'keyword.other.extends.atscript',
-              match: '\\bextends\\b'
+              match: '\\bextends\\b',
             },
             {
-              include: '#type-reference'
-            }
-          ]
-        }
-      ]
+              include: '#type-reference',
+            },
+          ],
+        },
+      ],
     },
     'extends-clause': {
       patterns: [
@@ -201,16 +201,16 @@ export const atscriptGrammar = {
           name: 'meta.extends.atscript',
           begin: '\\bextends\\b',
           beginCaptures: {
-            0: { name: 'keyword.other.extends.atscript' }
+            0: { name: 'keyword.other.extends.atscript' },
           },
           end: '(?={)',
           patterns: [
             {
-              include: '#type-reference'
-            }
-          ]
-        }
-      ]
+              include: '#type-reference',
+            },
+          ],
+        },
+      ],
     },
     'interface-body': {
       patterns: [
@@ -220,17 +220,17 @@ export const atscriptGrammar = {
           end: '}',
           patterns: [
             {
-              include: '#comments'
+              include: '#comments',
             },
             {
-              include: '#annotations'
+              include: '#annotations',
             },
             {
-              include: '#property-declaration'
-            }
-          ]
-        }
-      ]
+              include: '#property-declaration',
+            },
+          ],
+        },
+      ],
     },
     'property-declaration': {
       patterns: [
@@ -244,101 +244,102 @@ export const atscriptGrammar = {
             4: {
               patterns: [
                 {
-                  include: '#type-reference'
-                }
-              ]
-            }
-          }
-        }
-      ]
+                  include: '#type-reference',
+                },
+              ],
+            },
+          },
+        },
+      ],
     },
     'type-reference': {
       patterns: [
         {
           name: 'support.type.primitive.extended.atscript',
-          match: '\\b(number\\.int|number\\.float|string\\.email|string\\.url|string\\.uuid|string\\.date|string\\.datetime|string\\.time|string\\.duration|string\\.cron|string\\.base64|string\\.hex|string\\.json|string\\.xml)\\b'
+          match:
+            '\\b(number\\.int|number\\.float|string\\.email|string\\.url|string\\.uuid|string\\.date|string\\.datetime|string\\.time|string\\.duration|string\\.cron|string\\.base64|string\\.hex|string\\.json|string\\.xml)\\b',
         },
         {
           name: 'support.type.primitive.atscript',
-          match: '\\b(string|number|boolean|any|void|never|unknown|object|symbol|bigint)\\b'
+          match: '\\b(string|number|boolean|any|void|never|unknown|object|symbol|bigint)\\b',
         },
         {
           name: 'entity.name.type.atscript',
-          match: '[a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)*'
+          match: '[a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)*',
         },
         {
           name: 'keyword.operator.type.atscript',
-          match: '[|&]'
+          match: '[|&]',
         },
         {
           begin: '\\[',
           end: '\\]',
           patterns: [
             {
-              include: '#type-reference'
-            }
-          ]
+              include: '#type-reference',
+            },
+          ],
         },
         {
           begin: '{',
           end: '}',
           patterns: [
             {
-              include: '#property-declaration'
-            }
-          ]
-        }
-      ]
+              include: '#property-declaration',
+            },
+          ],
+        },
+      ],
     },
     'type-definition': {
       patterns: [
         {
           begin: '=',
           beginCaptures: {
-            0: { name: 'keyword.operator.assignment.atscript' }
+            0: { name: 'keyword.operator.assignment.atscript' },
           },
           end: '(?=;|$)',
           patterns: [
             {
-              include: '#type-reference'
-            }
-          ]
-        }
-      ]
+              include: '#type-reference',
+            },
+          ],
+        },
+      ],
     },
-    imports: {
+    'imports': {
       patterns: [
         {
           name: 'meta.import.atscript',
           begin: '\\b(import)\\b',
           beginCaptures: {
-            1: { name: 'keyword.control.import.atscript' }
+            1: { name: 'keyword.control.import.atscript' },
           },
           end: '(?=;|$)',
           patterns: [
             {
               name: 'keyword.control.type.atscript',
-              match: '\\btype\\b'
+              match: '\\btype\\b',
             },
             {
               name: 'keyword.control.from.atscript',
-              match: '\\bfrom\\b'
+              match: '\\bfrom\\b',
             },
             {
               name: 'string.quoted.single.atscript',
-              match: "'[^']+'"
+              match: "'[^']+'",
             },
             {
               name: 'string.quoted.double.atscript',
-              match: '"[^"]+"'
+              match: '"[^"]+"',
             },
             {
               name: 'variable.other.readwrite.atscript',
-              match: '[a-zA-Z_$][\\w$]*'
-            }
-          ]
-        }
-      ]
-    }
-  }
+              match: '[a-zA-Z_$][\\w$]*',
+            },
+          ],
+        },
+      ],
+    },
+  },
 }

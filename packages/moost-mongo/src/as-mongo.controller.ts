@@ -1,15 +1,8 @@
+import type { AsMongo, AsCollection } from '@atscript/mongo'
+import type { Validator } from '@atscript/typescript/utils'
+import { ValidatorError, type TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 // oxlint-disable max-lines
 import { Body, Delete, Get, HttpError, Patch, Post, Put, Url } from '@moostjs/event-http'
-import { Inject, Moost, Param, type TConsoleBase } from 'moost'
-import { parseUrlql, type UrlqlQuery } from 'urlql'
-import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/controls.dto.as'
-import { AsMongo, AsCollection } from '@atscript/mongo'
-import { COLLECTION_DEF } from './decorators'
-import {
-  Validator,
-  ValidatorError,
-  type TAtscriptAnnotatedType,
-} from '@atscript/typescript/utils'
 import type {
   Document,
   BulkWriteOptions,
@@ -26,6 +19,12 @@ import type {
   WithId,
   DeleteResult,
 } from 'mongodb'
+import type { Moost } from 'moost'
+import { Inject, Param, type TConsoleBase } from 'moost'
+import { parseUrlql, type UrlqlQuery } from 'urlql'
+
+import { COLLECTION_DEF } from './decorators'
+import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/controls.dto.as'
 
 /**
  * Generic **Moost** controller that exposes a full REST‑style CRUD surface over a
@@ -45,7 +44,16 @@ import type {
  * @typeParam T - The **atscript** annotated class (constructor) representing the
  *               collection schema. Must be decorated with `@AsCollection`.
  */
-export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType, DataType = T extends { type: { __dataType?: infer D } } ? unknown extends D ? T extends new (...args: any[]) => infer I ? I : unknown : D : unknown> {
+export class AsMongoController<
+  T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
+  DataType = T extends { type: { __dataType?: infer D } }
+    ? unknown extends D
+      ? T extends new (...args: any[]) => infer I
+        ? I
+        : unknown
+      : D
+    : unknown,
+> {
   /** Reference to the lazily created {@link AsCollection}. */
   protected asCollection: AsCollection<T>
 
@@ -75,13 +83,13 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
     try {
       const p = this.init()
       if (p instanceof Promise) {
-        p.catch(e => {
-          this.logger.error(e)
+        p.catch(error => {
+          this.logger.error(error)
         })
       }
-    } catch (e) {
-      this.logger.error(e)
-      throw e
+    } catch (error) {
+      this.logger.error(error)
+      throw error
     }
   }
 
@@ -217,8 +225,8 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       if (error) {
         return new HttpError(400, error)
       }
-    } catch (e) {
-      return new HttpError(400, (e as Error).message)
+    } catch (error) {
+      return new HttpError(400, (error as Error).message)
     }
 
     try {
@@ -226,8 +234,8 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       if (error) {
         return new HttpError(400, error)
       }
-    } catch (e) {
-      return new HttpError(400, (e as Error).message)
+    } catch (error) {
+      return new HttpError(400, (error as Error).message)
     }
   }
 
@@ -464,7 +472,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
     const idValidator = this.asCollection.flatMap.get('_id')?.validator()
     const query = url.split('?').slice(1).join('?')
     const parsed = parseUrlql(query)
-    if (Object.keys(parsed.filter).length) {
+    if (Object.keys(parsed.filter).length > 0) {
       return new HttpError(400, 'Filtering is not allowed for "one" endpoint')
     }
 
@@ -487,7 +495,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
       )
     } else if (this.asCollection.uniqueProps.size > 0) {
       // not ObjectId passed, trying unique indexes
-      const filter = [] as Filter<any>[]
+      const filter = [] as Array<Filter<any>>
       for (const prop of this.asCollection.uniqueProps) {
         filter.push({ [prop]: id } as Filter<any>)
       }
@@ -516,7 +524,7 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
    * @returns Document, 400 or 404 { @link HttpError }.
    */
   protected async returnOne(
-    result: Promise<WithId<DataType>[]>
+    result: Promise<Array<WithId<DataType>>>
   ): Promise<DataType | HttpError> {
     const items = await result
     if (items.length > 1) {
@@ -654,18 +662,12 @@ export class AsMongoController<T extends TAtscriptAnnotatedType = TAtscriptAnnot
     action: 'insert',
     data: DataType,
     opts: InsertOneOptions
-  ):
-    | DataType
-    | Promise<DataType | undefined>
-    | undefined
+  ): DataType | Promise<DataType | undefined> | undefined
   protected onWrite(
     action: 'insertMany',
     data: DataType[],
     opts: BulkWriteOptions
-  ):
-    | DataType[]
-    | Promise<DataType[] | undefined>
-    | undefined
+  ): DataType[] | Promise<DataType[] | undefined> | undefined
   protected onWrite(
     action: 'replace',
     data: DataType,

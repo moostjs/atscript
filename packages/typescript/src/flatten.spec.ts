@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { defineAnnotatedType as $, type TAtscriptAnnotatedType, type TAtscriptTypeObject, type TAtscriptTypeArray } from './annotated-type'
+
+import {
+  defineAnnotatedType as $,
+  type TAtscriptAnnotatedType,
+  type TAtscriptTypeObject,
+  type TAtscriptTypeArray,
+} from './annotated-type'
 import { flattenAnnotatedType } from './flatten'
 
 function buildObject() {
@@ -18,10 +24,7 @@ function buildObject() {
         .prop('street', $().designType('string').tags('string').$type)
         .prop('city', $().designType('string').tags('string').$type).$type
     )
-    .prop(
-      'tags',
-      $('array').of($().designType('string').tags('string').$type).$type
-    )
+    .prop('tags', $('array').of($().designType('string').tags('string').$type).$type)
     .prop(
       'items',
       $('array').of(
@@ -33,17 +36,13 @@ function buildObject() {
     .prop(
       'complexField',
       $('union')
-        .item(
-          $('object')
-            .prop('a', $().designType('string').tags('string').$type).$type
-        )
+        .item($('object').prop('a', $().designType('string').tags('string').$type).$type)
         .item(
           $('object')
             .prop('a', $().designType('number').tags('number').$type)
             .prop('b', $().designType('string').tags('string').$type).$type
         ).$type
-    )
-    .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 }
 
 describe('flattenAnnotatedType', () => {
@@ -88,7 +87,7 @@ describe('flattenAnnotatedType', () => {
     const fields: string[] = []
 
     flattenAnnotatedType(type, {
-      onField: (path) => fields.push(path),
+      onField: path => fields.push(path),
     })
 
     expect(fields).toContain('name')
@@ -147,17 +146,13 @@ describe('flattenAnnotatedType', () => {
   })
 
   it('should handle deeply nested structures', () => {
-    const type = $('object')
-      .prop(
-        'level1',
-        $('object')
-          .prop(
-            'level2',
-            $('object')
-              .prop('level3', $().designType('string').tags('string').$type).$type
-          ).$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const type = $('object').prop(
+      'level1',
+      $('object').prop(
+        'level2',
+        $('object').prop('level3', $().designType('string').tags('string').$type).$type
+      ).$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.has('level1')).toBe(true)
@@ -166,17 +161,14 @@ describe('flattenAnnotatedType', () => {
   })
 
   it('should handle nested arrays of objects', () => {
-    const type = $('object')
-      .prop(
-        'matrix',
+    const type = $('object').prop(
+      'matrix',
+      $('array').of(
         $('array').of(
-          $('array').of(
-            $('object')
-              .prop('value', $().designType('number').tags('number').$type).$type
-          ).$type
+          $('object').prop('value', $().designType('number').tags('number').$type).$type
         ).$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+      ).$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.has('matrix')).toBe(true)
@@ -186,8 +178,7 @@ describe('flattenAnnotatedType', () => {
 
 describe('flattenAnnotatedType optional preservation', () => {
   it('should preserve optional on primitive fields', () => {
-    const type = $('object')
-      .prop('name', $().designType('string').tags('string').optional().$type)
+    const type = $('object').prop('name', $().designType('string').tags('string').optional().$type)
       .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
@@ -195,54 +186,48 @@ describe('flattenAnnotatedType optional preservation', () => {
   })
 
   it('should preserve optional on array fields', () => {
-    const type = $('object')
-      .prop('tags', $('array').of($().designType('string').tags('string').$type).optional().$type)
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const type = $('object').prop(
+      'tags',
+      $('array').of($().designType('string').tags('string').$type).optional().$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.get('tags')!.optional).toBe(true)
   })
 
   it('should preserve optional on union fields', () => {
-    const type = $('object')
-      .prop('field',
-        $('union')
-          .item($().designType('string').tags('string').$type)
-          .item($().designType('number').tags('number').$type)
-          .optional()
-          .$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const type = $('object').prop(
+      'field',
+      $('union')
+        .item($().designType('string').tags('string').$type)
+        .item($().designType('number').tags('number').$type)
+        .optional().$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.get('field')!.optional).toBe(true)
   })
 
   it('should preserve optional on tuple fields', () => {
-    const type = $('object')
-      .prop('coords',
-        $('tuple')
-          .item($().designType('number').tags('number').$type)
-          .item($().designType('number').tags('number').$type)
-          .optional()
-          .$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const type = $('object').prop(
+      'coords',
+      $('tuple')
+        .item($().designType('number').tags('number').$type)
+        .item($().designType('number').tags('number').$type)
+        .optional().$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.get('coords')!.optional).toBe(true)
   })
 
   it('should preserve optional on array fields with object elements', () => {
-    const type = $('object')
-      .prop('items',
-        $('array').of(
-          $('object')
-            .prop('label', $().designType('string').tags('string').$type)
-            .$type
-        ).optional().$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const type = $('object').prop(
+      'items',
+      $('array')
+        .of($('object').prop('label', $().designType('string').tags('string').$type).$type)
+        .optional().$type
+    ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.get('items')!.optional).toBe(true)
@@ -251,13 +236,10 @@ describe('flattenAnnotatedType optional preservation', () => {
   it('should not set optional when field is required', () => {
     const type = $('object')
       .prop('tags', $('array').of($().designType('string').tags('string').$type).$type)
-      .prop('field',
-        $('union')
-          .item($().designType('string').$type)
-          .item($().designType('number').$type)
-          .$type
-      )
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+      .prop(
+        'field',
+        $('union').item($().designType('string').$type).item($().designType('number').$type).$type
+      ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     const flatMap = flattenAnnotatedType(type)
     expect(flatMap.get('tags')!.optional).toBeUndefined()
@@ -270,19 +252,36 @@ describe('refTo metadata propagation', () => {
     // refTo no longer copies metadata at runtime — metadata is emitted at build time
     // by the code generator. refTo only shares the type structure.
     const TAddress = $('object')
-      .prop('street', $().designType('string').tags('string').annotate('label' as any, 'Street').$type)
-      .prop('city', $().designType('string').tags('string').annotate('label' as any, 'City').$type)
-      .annotate('label' as any, 'Address')
-      .$type
+      .prop(
+        'street',
+        $()
+          .designType('string')
+          .tags('string')
+          .annotate('label' as any, 'Street').$type
+      )
+      .prop(
+        'city',
+        $()
+          .designType('string')
+          .tags('string')
+          .annotate('label' as any, 'City').$type
+      )
+      .annotate('label' as any, 'Address').$type
 
     const ExplorationForm = $('object')
-      .prop('name', $().designType('string').tags('string').annotate('label' as any, 'Name').$type)
-      .prop('addresses',
+      .prop(
+        'name',
+        $()
+          .designType('string')
+          .tags('string')
+          .annotate('label' as any, 'Name').$type
+      )
+      .prop(
+        'addresses',
         $('array')
           .of($().refTo(TAddress).$type)
-          .annotate('label' as any, 'Addresses')
-          .$type)
-      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+          .annotate('label' as any, 'Addresses').$type
+      ).$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
 
     // Property-level metadata (set via .annotate() on the array)
     const addressesProp = ExplorationForm.type.props.get('addresses')!
@@ -290,8 +289,12 @@ describe('refTo metadata propagation', () => {
 
     // refTo shares the type structure — props inside the element retain their metadata
     const elementType = (addressesProp.type as TAtscriptTypeArray).of
-    expect((elementType.type as TAtscriptTypeObject).props.get('street')!.metadata.get('label' as any)).toBe('Street')
-    expect((elementType.type as TAtscriptTypeObject).props.get('city')!.metadata.get('label' as any)).toBe('City')
+    expect(
+      (elementType.type as TAtscriptTypeObject).props.get('street')!.metadata.get('label' as any)
+    ).toBe('Street')
+    expect(
+      (elementType.type as TAtscriptTypeObject).props.get('city')!.metadata.get('label' as any)
+    ).toBe('City')
 
     // Element-level metadata is NOT copied by refTo (it's emitted at build time instead)
     expect(elementType.metadata.get('label' as any)).toBeUndefined()
@@ -300,11 +303,12 @@ describe('refTo metadata propagation', () => {
   it('should allow annotations set after refTo without affecting source', () => {
     const Inner = $('object')
       .prop('x', $().designType('string').$type)
-      .annotate('label' as any, 'Inner Label')
-      .$type
+      .annotate('label' as any, 'Inner Label').$type
 
     // .annotate() after refTo sets metadata on the local handle
-    const ref = $().refTo(Inner).annotate('label' as any, 'Overridden').$type
+    const ref = $()
+      .refTo(Inner)
+      .annotate('label' as any, 'Overridden').$type
     expect(ref.metadata.get('label' as any)).toBe('Overridden')
 
     // Inner is unaffected
@@ -314,10 +318,11 @@ describe('refTo metadata propagation', () => {
   it('should not mutate the original type metadata when annotating after refTo', () => {
     const Original = $('object')
       .prop('x', $().designType('string').$type)
-      .annotate('label' as any, 'Original')
-      .$type
+      .annotate('label' as any, 'Original').$type
 
-    $().refTo(Original).annotate('label' as any, 'Changed').$type
+    $()
+      .refTo(Original)
+      .annotate('label' as any, 'Changed').$type
 
     // Original should be unaffected
     expect(Original.metadata.get('label' as any)).toBe('Original')

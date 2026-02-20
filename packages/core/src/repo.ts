@@ -3,14 +3,15 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import path from 'node:path'
-import { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
+
+import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AtscriptDoc } from './document'
+import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
-import { SemanticPrimitiveNode } from './parser/nodes'
 
 export interface TPluginManagers {
   manager: PluginManager
@@ -75,7 +76,7 @@ export class AtscriptRepo {
       multiple?: boolean
       fromSpec?: boolean
       typeSet: Set<string>
-      types: (TAnnotationValueObj | TAnnotationValue)[]
+      types: Array<TAnnotationValueObj | TAnnotationValue>
     }
     const manager = await this.getSharedPluginManager()
     const annotations = {} as Record<string, TUsedAnnotation | undefined>
@@ -121,8 +122,8 @@ export class AtscriptRepo {
           continue
         }
         if (!annotations[name]) {
-          let types = [] as TUsedAnnotation['types']
-          let multiple = false
+          const types = [] as TUsedAnnotation['types']
+          const multiple = false
           annotations[name] = {
             multiple,
             fromSpec: false,
@@ -243,7 +244,7 @@ export class AtscriptRepo {
     }
     const content = text || (await manager.load(newId))
     if (typeof content !== 'string') {
-      throw new Error(`Document not found: ${newId}`)
+      throw new TypeError(`Document not found: ${newId}`)
     }
     const atscript = new AtscriptDoc(id, await manager.getDocConfig(), manager)
     atscript.update(content)
@@ -257,7 +258,9 @@ export class AtscriptRepo {
 
   async checkImports(atscript: AtscriptDoc, checked?: Set<string>) {
     const _checked = checked || new Set<string>()
-    if (_checked.has(atscript.id)) return
+    if (_checked.has(atscript.id)) {
+      return
+    }
     _checked.add(atscript.id)
     const promise = Promise.all(
       Array.from(atscript.imports.values(), async ({ from, imports }) =>

@@ -313,13 +313,14 @@ export function propName() {
     handler(ni: NodeIterator, target: TTarget) {
       switch (ni.$?.type) {
         case 'identifier':
-        case 'text':
+        case 'text': {
           target.node.saveToken(new Token(ni.$), 'identifier')
           ni.accepted()
           ni.move()
           ni.skip(['\n'])
           return true
-        case 'block':
+        }
+        case 'block': {
           const childrenLength = ni.$.children?.length || 0
           const firstText = ni.$.children?.[0]?.text
           if (
@@ -337,8 +338,8 @@ export function propName() {
             })
             try {
               t.pattern = firstText === '*' ? /./ : parseRegExpLiteral(firstText!)
-            } catch (e) {
-              ni.unexpected(false, (e as Error).message)
+            } catch (error) {
+              ni.unexpected(false, (error as Error).message)
               return false
             }
             target.node.saveToken(t, 'identifier')
@@ -361,9 +362,11 @@ export function propName() {
             ni.unexpected(false, 'Unexpected identifier at property name')
           }
           return false
-        default:
+        }
+        default: {
           ni.unexpected(false, 'Unexpected identifier at property name')
           return false
+        }
       }
     },
   }

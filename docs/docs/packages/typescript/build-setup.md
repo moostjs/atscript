@@ -42,10 +42,7 @@ import vue from '@vitejs/plugin-vue'
 import atscript from 'unplugin-atscript'
 
 export default defineConfig({
-  plugins: [
-    atscript.vite(),
-    vue(),
-  ],
+  plugins: [atscript.vite(), vue()],
 })
 ```
 

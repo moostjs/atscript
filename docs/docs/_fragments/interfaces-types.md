@@ -54,6 +54,7 @@ export interface Config {
 ```
 
 Common patterns:
+
 - `[/^REACT_APP_.*/]` - Environment variables
 - `[/.*_URL$/]` - URL configs
 - `[/^social_.*/]` - Social links

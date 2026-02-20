@@ -1,6 +1,6 @@
 import { defineConfig } from '@atscript/core'
-import ts from '@atscript/typescript'
 import { MongoPlugin } from '@atscript/mongo'
+import ts from '@atscript/typescript'
 
 export default defineConfig({
   rootDir: 'src',

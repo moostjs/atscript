@@ -1,10 +1,11 @@
+import * as fs from 'fs'
+import * as path from 'path'
+
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { ExtensionContext } from 'vscode'
 import { Uri, workspace, window, commands } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node'
-import * as fs from 'fs'
-import * as path from 'path'
 
 let client: LanguageClient | undefined
 let retryTimer: ReturnType<typeof setTimeout> | undefined
@@ -43,11 +44,15 @@ function findDependency(
   // Check workspace node_modules first
   for (const wsPath of workspacePaths) {
     const nodeModulesDir = path.join(wsPath, 'node_modules')
-    if (fs.existsSync(path.join(nodeModulesDir, dep))) return nodeModulesDir
+    if (fs.existsSync(path.join(nodeModulesDir, dep))) {
+      return nodeModulesDir
+    }
   }
   // Check extension's own node_modules
   const extNodeModules = path.join(extensionPath, 'node_modules')
-  if (fs.existsSync(path.join(extNodeModules, dep))) return extNodeModules
+  if (fs.existsSync(path.join(extNodeModules, dep))) {
+    return extNodeModules
+  }
   return undefined
 }
 
@@ -63,9 +68,13 @@ function resolveDependencies(
   let resolvedPath: string | undefined
   for (const dep of deps) {
     const found = findDependency(dep, workspacePaths, extensionPath)
-    if (!found) return undefined
+    if (!found) {
+      return undefined
+    }
     // Use the first resolved path (all deps should ideally come from the same location)
-    if (!resolvedPath) resolvedPath = found
+    if (!resolvedPath) {
+      resolvedPath = found
+    }
   }
   return resolvedPath
 }
@@ -75,7 +84,9 @@ export function activate(context: ExtensionContext) {
   const deps = getRequiredDependencies(extensionPath)
 
   function startLanguageServer(nodeModulesPath: string) {
-    if (client) return
+    if (client) {
+      return
+    }
 
     const serverModule = Uri.joinPath(context.extensionUri, 'dist', 'server.cjs').fsPath
     const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] }
@@ -83,9 +94,7 @@ export function activate(context: ExtensionContext) {
     // Set NODE_PATH so the server process can resolve @atscript/core
     const serverEnv = {
       ...process.env,
-      NODE_PATH: [process.env.NODE_PATH, nodeModulesPath]
-        .filter(Boolean)
-        .join(path.delimiter),
+      NODE_PATH: [process.env.NODE_PATH, nodeModulesPath].filter(Boolean).join(path.delimiter),
     }
 
     const serverOptions: ServerOptions = {
@@ -130,7 +139,9 @@ export function activate(context: ExtensionContext) {
   }
 
   function tryStart(): boolean {
-    if (client) return true
+    if (client) {
+      return true
+    }
     const workspacePaths = getWorkspacePaths()
     const nodeModulesPath = resolveDependencies(deps, workspacePaths, extensionPath)
     if (nodeModulesPath) {
@@ -141,7 +152,9 @@ export function activate(context: ExtensionContext) {
   }
 
   function scheduleRetry() {
-    if (retryTimer) return
+    if (retryTimer) {
+      return
+    }
     retryTimer = setTimeout(() => {
       retryTimer = undefined
       if (!client && tryStart()) {

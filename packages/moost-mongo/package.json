@@ -2,6 +2,27 @@
   "name": "@atscript/moost-mongo",
   "version": "0.1.17",
   "description": "Atscript Mongo for Moost.",
+  "keywords": [
+    "annotations",
+    "atscript",
+    "mongo",
+    "moost",
+    "typescript"
+  ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-mongo#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/moost-mongo"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -13,32 +34,11 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "pub": "pnpm publish --access public",
     "before-build": "node ../typescript/cli.cjs -f js",
     "test": "vitest"
   },
-  "keywords": [
-    "atscript",
-    "annotations",
-    "typescript",
-    "moost",
-    "mongo"
-  ],
-  "author": "Artem Maltsev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/moost-mongo"
-  },
-  "bugs": {
-    "url": "https://github.com/moostjs/atscript/issues"
-  },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-mongo#readme",
-  "license": "ISC",
   "dependencies": {
     "urlql": "^0.0.5"
   },

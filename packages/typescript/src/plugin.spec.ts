@@ -1,7 +1,9 @@
+import path from 'path'
+
 import { AnnotationSpec, build } from '@atscript/core'
 import { describe, expect, it } from 'vitest'
+
 import { tsPlugin } from './plugin'
-import path from 'path'
 
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
@@ -375,9 +377,13 @@ describe('ts-plugin', () => {
     expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
     // Multiple+replace annotation clears before appending
     expect(out[0].content).toContain('metadata.delete("mul")')
-    expect(out[0].content).toContain('$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)')
+    expect(out[0].content).toContain(
+      '$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)'
+    )
     // Top-level annotation on mutating annotate generates mutation on target's metadata
-    expect(out[0].content).toContain('$a(MyInterface.metadata, "meta.description", "Mutated Interface")')
+    expect(out[0].content).toContain(
+      '$a(MyInterface.metadata, "meta.description", "Mutated Interface")'
+    )
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-mutating.as.d.ts')
@@ -437,7 +443,9 @@ describe('ts-plugin', () => {
     // Deep chain mutation for address.city
     expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
     // Top-level annotation on cross-file mutating annotate
-    expect(out[0].content).toContain('$a(MyInterface.metadata, "meta.description", "Cross-File Mutated")')
+    expect(out[0].content).toContain(
+      '$a(MyInterface.metadata, "meta.description", "Cross-File Mutated")'
+    )
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-import-mutating.as.d.ts')
@@ -511,14 +519,18 @@ describe('ts-plugin', () => {
 
     // --- Mutation statements (right after User, before User2) ---
     // Replace (single): label mutation does NOT use asArray
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")')
+    expect(mutationSection).toContain(
+      '$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")'
+    )
     expect(mutationSection).not.toContain('"label", "Mutated Name", true)')
     // Replace (multiple): mul clears existing before appending
     expect(mutationSection).toContain('metadata.delete("mul")')
     expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mul", 99, true)')
     // Append: mulAppend does NOT clear, just appends
     expect(mutationSection).not.toContain('metadata.delete("mulAppend")')
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)')
+    expect(mutationSection).toContain(
+      '$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)'
+    )
     expect(mutationSection).toContain('$a(User.metadata, "mulAppend", "top-mutated", true)')
 
     // --- User2 inline definition (non-mutating annotate alias — merged) ---
@@ -547,9 +559,7 @@ describe('ts-plugin', () => {
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
     expect(out[0].fileName).toBe('phantom.as.js')
-    await expect(out[0].content).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/phantom.js')
-    )
+    await expect(out[0].content).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/phantom.js'))
     // Phantom props should appear in JS runtime output
     expect(out[0].content).toContain('.prop(')
     expect(out[0].content).toContain('"info"')
@@ -694,7 +704,10 @@ describe('ts-plugin', () => {
     expect(content).toContain('"maximum":99')
     // NoAnnotation interface should throw since it lacks the annotation
     // Split by class to check each independently
-    const userSection = content.slice(content.indexOf('class User'), content.indexOf('class NoAnnotation'))
+    const userSection = content.slice(
+      content.indexOf('class User'),
+      content.indexOf('class NoAnnotation')
+    )
     const noAnnotationSection = content.slice(content.indexOf('class NoAnnotation'))
     expect(userSection).toContain('return {')
     expect(userSection).not.toContain('throw new Error')
@@ -714,7 +727,10 @@ describe('ts-plugin', () => {
     // $$ import present for lazy mode (for non-annotated interfaces)
     expect(content).toContain('buildJsonSchema as $$')
     // User interface has @emit.jsonSchema — should have embedded schema (not lazy)
-    const userSection = content.slice(content.indexOf('class User'), content.indexOf('class NoAnnotation'))
+    const userSection = content.slice(
+      content.indexOf('class User'),
+      content.indexOf('class NoAnnotation')
+    )
     expect(userSection).toContain('return {')
     expect(userSection).not.toContain('$$(this)')
     // NoAnnotation should use lazy mode

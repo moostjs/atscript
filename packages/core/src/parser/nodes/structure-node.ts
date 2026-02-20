@@ -1,9 +1,10 @@
+import type { SemanticNode } from '.'
+import { isProp, SemanticRefNode } from '.'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { AtscriptDoc } from '../../document'
-import { isProp, SemanticNode, SemanticRefNode } from '.'
+import type { Token } from '../token'
 import { SemanticGroup } from './group-node'
 import { SemanticPropNode } from './prop-node'
-import { Token } from '../token'
 
 export class SemanticStructureNode extends SemanticGroup {
   constructor() {

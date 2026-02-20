@@ -191,7 +191,8 @@ export interface LoginForm {
 
 ::: tip Combining Extensions
 Some extensions can be combined to create more specific types. For example:
+
 - `number.int.positive` — Positive integers only
 - `number.double.negative` — Negative double-precision numbers
 - `number.single.positive` — Positive single-precision numbers
-:::
+  :::

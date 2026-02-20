@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+
 import {
   defineAnnotatedType,
   isAnnotatedType,
@@ -8,7 +9,6 @@ import {
   type TAtscriptTypeArray,
   type TAtscriptTypeComplex,
 } from './annotated-type'
-import { Validator } from './validator'
 import {
   serializeAnnotatedType,
   deserializeAnnotatedType,
@@ -16,13 +16,17 @@ import {
   type TSerializedTypeObject,
   type TSerializedTypeFinal,
 } from './serialize'
+import { Validator } from './validator'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** Serialize then deserialize, returning the restored type */
-function roundTrip(type: TAtscriptAnnotatedType, options?: Parameters<typeof serializeAnnotatedType>[1]) {
+function roundTrip(
+  type: TAtscriptAnnotatedType,
+  options?: Parameters<typeof serializeAnnotatedType>[1]
+) {
   const serialized = serializeAnnotatedType(type, options)
   return deserializeAnnotatedType(serialized)
 }
@@ -69,8 +73,7 @@ describe('serialize round-trip', () => {
   it('should round-trip an object type', () => {
     const original = defineAnnotatedType('object')
       .prop('name', defineAnnotatedType().designType('string').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
-      .$type
+      .prop('age', defineAnnotatedType().designType('number').$type).$type
     const restored = roundTrip(original)
 
     expect(restored.type.kind).toBe('object')
@@ -82,12 +85,12 @@ describe('serialize round-trip', () => {
   })
 
   it('should round-trip nested objects', () => {
-    const original = defineAnnotatedType('object')
-      .prop('address', defineAnnotatedType('object')
+    const original = defineAnnotatedType('object').prop(
+      'address',
+      defineAnnotatedType('object')
         .prop('city', defineAnnotatedType().designType('string').$type)
-        .prop('zip', defineAnnotatedType().designType('number').$type)
-        .$type)
-      .$type
+        .prop('zip', defineAnnotatedType().designType('number').$type).$type
+    ).$type
     const restored = roundTrip(original)
 
     const address = asObject(restored).props.get('address')!
@@ -97,9 +100,9 @@ describe('serialize round-trip', () => {
   })
 
   it('should round-trip an array type', () => {
-    const original = defineAnnotatedType('array')
-      .of(defineAnnotatedType().designType('string').$type)
-      .$type
+    const original = defineAnnotatedType('array').of(
+      defineAnnotatedType().designType('string').$type
+    ).$type
     const restored = roundTrip(original)
 
     expect(restored.type.kind).toBe('array')
@@ -109,8 +112,7 @@ describe('serialize round-trip', () => {
   it('should round-trip a union type', () => {
     const original = defineAnnotatedType('union')
       .item(defineAnnotatedType().designType('string').$type)
-      .item(defineAnnotatedType().designType('number').$type)
-      .$type
+      .item(defineAnnotatedType().designType('number').$type).$type
     const restored = roundTrip(original)
 
     expect(restored.type.kind).toBe('union')
@@ -122,11 +124,14 @@ describe('serialize round-trip', () => {
 
   it('should round-trip an intersection type', () => {
     const original = defineAnnotatedType('intersection')
-      .item(defineAnnotatedType('object')
-        .prop('a', defineAnnotatedType().designType('string').$type).$type)
-      .item(defineAnnotatedType('object')
-        .prop('b', defineAnnotatedType().designType('number').$type).$type)
-      .$type
+      .item(
+        defineAnnotatedType('object').prop('a', defineAnnotatedType().designType('string').$type)
+          .$type
+      )
+      .item(
+        defineAnnotatedType('object').prop('b', defineAnnotatedType().designType('number').$type)
+          .$type
+      ).$type
     const restored = roundTrip(original)
 
     expect(restored.type.kind).toBe('intersection')
@@ -137,8 +142,7 @@ describe('serialize round-trip', () => {
     const original = defineAnnotatedType('tuple')
       .item(defineAnnotatedType().designType('string').$type)
       .item(defineAnnotatedType().designType('number').$type)
-      .item(defineAnnotatedType().designType('boolean').$type)
-      .$type
+      .item(defineAnnotatedType().designType('boolean').$type).$type
     const restored = roundTrip(original)
 
     expect(restored.type.kind).toBe('tuple')
@@ -160,7 +164,9 @@ describe('serialize round-trip', () => {
   })
 
   it('should round-trip tags through Set→Array→Set', () => {
-    const original = defineAnnotatedType().designType('string').tags('string', 'email', 'uuid').$type
+    const original = defineAnnotatedType()
+      .designType('string')
+      .tags('string', 'email', 'uuid').$type
     const serialized = serializeAnnotatedType(original)
     expect(Array.isArray(serialized.type.tags)).toBe(true)
     expect(serialized.type.tags).toContain('email')
@@ -175,8 +181,7 @@ describe('serialize round-trip', () => {
   it('should round-trip propsPatterns with RegExp', () => {
     const original = defineAnnotatedType('object')
       .prop('id', defineAnnotatedType().designType('string').$type)
-      .propPattern(/^extra_/, defineAnnotatedType().designType('string').$type)
-      .$type
+      .propPattern(/^extra_/, defineAnnotatedType().designType('string').$type).$type
 
     const serialized = serializeAnnotatedType(original)
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -190,12 +195,12 @@ describe('serialize round-trip', () => {
   })
 
   it('should round-trip metadata with various value types', () => {
-    const original = defineAnnotatedType().designType('string')
+    const original = defineAnnotatedType()
+      .designType('string')
       .annotate('meta.label', 'Name')
       .annotate('expect.minLength', 3)
       .annotate('meta.sensitive', true)
-      .annotate('expect.pattern', { pattern: '^[a-z]+$', flags: 'i' }, true)
-      .$type
+      .annotate('expect.pattern', { pattern: '^[a-z]+$', flags: 'i' }, true).$type
 
     const restored = roundTrip(original)
     expect(restored.metadata).toBeInstanceOf(Map)
@@ -222,17 +227,22 @@ describe('serialize round-trip', () => {
   })
 
   it('should handle deeply nested structures', () => {
-    const original = defineAnnotatedType('object')
-      .prop('a', defineAnnotatedType('object')
-        .prop('b', defineAnnotatedType('object')
-          .prop('c', defineAnnotatedType('object')
-            .prop('d', defineAnnotatedType('object')
-              .prop('e', defineAnnotatedType().designType('string').$type)
-              .$type)
-            .$type)
-          .$type)
-        .$type)
-      .$type
+    const original = defineAnnotatedType('object').prop(
+      'a',
+      defineAnnotatedType('object').prop(
+        'b',
+        defineAnnotatedType('object').prop(
+          'c',
+          defineAnnotatedType('object').prop(
+            'd',
+            defineAnnotatedType('object').prop(
+              'e',
+              defineAnnotatedType().designType('string').$type
+            ).$type
+          ).$type
+        ).$type
+      ).$type
+    ).$type
 
     const restored = roundTrip(original)
     const e = asObject(restored).props.get('a')!
@@ -252,8 +262,7 @@ describe('deserialized validator', () => {
   it('should have a working validator on deserialized type', () => {
     const original = defineAnnotatedType('object')
       .prop('name', defineAnnotatedType().designType('string').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
-      .$type
+      .prop('age', defineAnnotatedType().designType('number').$type).$type
 
     const restored = roundTrip(original)
     const validator = new Validator(restored)
@@ -262,9 +271,9 @@ describe('deserialized validator', () => {
   })
 
   it('should validate with metadata constraints after deserialization', () => {
-    const original = defineAnnotatedType().designType('string')
-      .annotate('expect.minLength', 3)
-      .$type
+    const original = defineAnnotatedType()
+      .designType('string')
+      .annotate('expect.minLength', 3).$type
 
     const restored = roundTrip(original)
     const validator = new Validator(restored)
@@ -273,9 +282,10 @@ describe('deserialized validator', () => {
   })
 
   it('should support calling validator via .validator() method', () => {
-    const original = defineAnnotatedType('object')
-      .prop('x', defineAnnotatedType().designType('number').$type)
-      .$type
+    const original = defineAnnotatedType('object').prop(
+      'x',
+      defineAnnotatedType().designType('number').$type
+    ).$type
 
     const restored = roundTrip(original)
     const validator = restored.validator()
@@ -290,11 +300,11 @@ describe('deserialized validator', () => {
 
 describe('serialize options', () => {
   it('should strip annotations listed in ignoreAnnotations', () => {
-    const original = defineAnnotatedType().designType('string')
+    const original = defineAnnotatedType()
+      .designType('string')
       .annotate('meta.label', 'Name')
       .annotate('meta.description', 'User name')
-      .annotate('expect.minLength', 1)
-      .$type
+      .annotate('expect.minLength', 1).$type
 
     const serialized = serializeAnnotatedType(original, {
       ignoreAnnotations: ['meta.description'],
@@ -307,12 +317,12 @@ describe('serialize options', () => {
   })
 
   it('should strip multiple annotations', () => {
-    const original = defineAnnotatedType().designType('string')
+    const original = defineAnnotatedType()
+      .designType('string')
       .annotate('meta.label', 'Name')
       .annotate('meta.description', 'desc')
       .annotate('meta.sensitive', true)
-      .annotate('expect.minLength', 1)
-      .$type
+      .annotate('expect.minLength', 1).$type
 
     const serialized = serializeAnnotatedType(original, {
       ignoreAnnotations: ['meta.description', 'meta.sensitive'],
@@ -326,10 +336,8 @@ describe('serialize options', () => {
 
   it('should not affect type structure when stripping annotations', () => {
     const original = defineAnnotatedType('object')
-      .prop('name', defineAnnotatedType().designType('string')
-        .annotate('meta.label', 'Name').$type)
-      .annotate('meta.label', 'Root')
-      .$type
+      .prop('name', defineAnnotatedType().designType('string').annotate('meta.label', 'Name').$type)
+      .annotate('meta.label', 'Root').$type
 
     const serialized = serializeAnnotatedType(original, {
       ignoreAnnotations: ['meta.label'],
@@ -343,9 +351,7 @@ describe('serialize options', () => {
   })
 
   it('should rename annotations via processAnnotation', () => {
-    const original = defineAnnotatedType().designType('string')
-      .annotate('meta.label', 'Name')
-      .$type
+    const original = defineAnnotatedType().designType('string').annotate('meta.label', 'Name').$type
 
     const serialized = serializeAnnotatedType(original, {
       processAnnotation(ctx) {
@@ -360,9 +366,7 @@ describe('serialize options', () => {
   })
 
   it('should transform annotation values via processAnnotation', () => {
-    const original = defineAnnotatedType().designType('string')
-      .annotate('meta.label', 'Name')
-      .$type
+    const original = defineAnnotatedType().designType('string').annotate('meta.label', 'Name').$type
 
     const serialized = serializeAnnotatedType(original, {
       processAnnotation(ctx) {
@@ -377,10 +381,10 @@ describe('serialize options', () => {
   })
 
   it('should strip annotations when processAnnotation returns undefined', () => {
-    const original = defineAnnotatedType().designType('string')
+    const original = defineAnnotatedType()
+      .designType('string')
       .annotate('meta.label', 'Name')
-      .annotate('meta.description', 'secret')
-      .$type
+      .annotate('meta.description', 'secret').$type
 
     const serialized = serializeAnnotatedType(original, {
       processAnnotation(ctx) {
@@ -395,12 +399,13 @@ describe('serialize options', () => {
   })
 
   it('should provide correct path in processAnnotation context', () => {
-    const original = defineAnnotatedType('object')
-      .prop('address', defineAnnotatedType('object')
-        .prop('city', defineAnnotatedType().designType('string')
-          .annotate('meta.label', 'City').$type)
-        .$type)
-      .$type
+    const original = defineAnnotatedType('object').prop(
+      'address',
+      defineAnnotatedType('object').prop(
+        'city',
+        defineAnnotatedType().designType('string').annotate('meta.label', 'City').$type
+      ).$type
+    ).$type
 
     const calls: Array<{ key: string; path: string[]; kind: string }> = []
     serializeAnnotatedType(original, {
@@ -420,11 +425,12 @@ describe('serialize options', () => {
   it('should provide correct kind in processAnnotation context', () => {
     const original = defineAnnotatedType('object')
       .annotate('meta.label', 'Root')
-      .prop('items', defineAnnotatedType('array')
-        .annotate('meta.label', 'Items')
-        .of(defineAnnotatedType().designType('string').$type)
-        .$type)
-      .$type
+      .prop(
+        'items',
+        defineAnnotatedType('array')
+          .annotate('meta.label', 'Items')
+          .of(defineAnnotatedType().designType('string').$type).$type
+      ).$type
 
     const calls: Array<{ key: string; kind: string }> = []
     serializeAnnotatedType(original, {
@@ -439,11 +445,11 @@ describe('serialize options', () => {
   })
 
   it('should apply ignoreAnnotations before processAnnotation', () => {
-    const original = defineAnnotatedType().designType('string')
+    const original = defineAnnotatedType()
+      .designType('string')
       .annotate('meta.label', 'Name')
       .annotate('meta.description', 'secret')
-      .annotate('expect.minLength', 1)
-      .$type
+      .annotate('expect.minLength', 1).$type
 
     const processed: string[] = []
     serializeAnnotatedType(original, {
@@ -473,9 +479,7 @@ describe('serialize version', () => {
   })
 
   it('should throw on wrong version during deserialization', () => {
-    const serialized = serializeAnnotatedType(
-      defineAnnotatedType().designType('string').$type
-    )
+    const serialized = serializeAnnotatedType(defineAnnotatedType().designType('string').$type)
     ;(serialized as any).$v = 999
 
     expect(() => deserializeAnnotatedType(serialized)).toThrow(
@@ -490,17 +494,19 @@ describe('serialize version', () => {
 
 describe('deserialized type guard', () => {
   it('should pass isAnnotatedType check', () => {
-    const original = defineAnnotatedType('object')
-      .prop('x', defineAnnotatedType().designType('number').$type)
-      .$type
+    const original = defineAnnotatedType('object').prop(
+      'x',
+      defineAnnotatedType().designType('number').$type
+    ).$type
     const restored = roundTrip(original)
     expect(isAnnotatedType(restored)).toBe(true)
   })
 
   it('should pass isAnnotatedType on nested nodes', () => {
-    const original = defineAnnotatedType('object')
-      .prop('x', defineAnnotatedType().designType('number').$type)
-      .$type
+    const original = defineAnnotatedType('object').prop(
+      'x',
+      defineAnnotatedType().designType('number').$type
+    ).$type
     const restored = roundTrip(original)
     expect(isAnnotatedType(asObject(restored).props.get('x')!)).toBe(true)
   })
@@ -513,16 +519,20 @@ describe('deserialized type guard', () => {
 describe('JSON safety', () => {
   it('should produce valid JSON from serialize', () => {
     const original = defineAnnotatedType('object')
-      .prop('name', defineAnnotatedType().designType('string')
-        .tags('string', 'email')
-        .annotate('meta.label', 'Name')
-        .annotate('expect.pattern', { pattern: '^[a-z]+$', flags: 'i' }, true)
-        .$type)
-      .prop('items', defineAnnotatedType('array')
-        .of(defineAnnotatedType().designType('number').$type).$type)
+      .prop(
+        'name',
+        defineAnnotatedType()
+          .designType('string')
+          .tags('string', 'email')
+          .annotate('meta.label', 'Name')
+          .annotate('expect.pattern', { pattern: '^[a-z]+$', flags: 'i' }, true).$type
+      )
+      .prop(
+        'items',
+        defineAnnotatedType('array').of(defineAnnotatedType().designType('number').$type).$type
+      )
       .propPattern(/^meta_/, defineAnnotatedType().designType('string').$type)
-      .annotate('meta.label', 'Root')
-      .$type
+      .annotate('meta.label', 'Root').$type
 
     const serialized = serializeAnnotatedType(original)
     const json = JSON.stringify(serialized)
@@ -548,8 +558,7 @@ describe('phantom type serialization', () => {
     const original = defineAnnotatedType('object')
       .prop('name', defineAnnotatedType().designType('string').$type)
       .prop('info', defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
-      .$type
+      .prop('age', defineAnnotatedType().designType('number').$type).$type
 
     const serialized = serializeAnnotatedType(original)
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -566,8 +575,7 @@ describe('phantom type serialization', () => {
     const original = defineAnnotatedType('object')
       .prop('name', defineAnnotatedType().designType('string').$type)
       .prop('action', defineAnnotatedType().designType('phantom').tags('phantom', 'ui').$type)
-      .prop('age', defineAnnotatedType().designType('number').$type)
-      .$type
+      .prop('age', defineAnnotatedType().designType('number').$type).$type
 
     const restored = roundTrip(original)
     const restoredObj = asObject(restored)
@@ -609,15 +617,24 @@ describe('phantom type serialization', () => {
 
   it('should preserve nested phantom props in complex structures', () => {
     const original = defineAnnotatedType('object')
-      .prop('user', defineAnnotatedType('object')
-        .prop('name', defineAnnotatedType().designType('string').$type)
-        .prop('resetPassword', defineAnnotatedType().designType('phantom').tags('ui', 'action').$type)
-        .$type)
-      .prop('metadata', defineAnnotatedType('object')
-        .prop('created', defineAnnotatedType().designType('string').$type)
-        .prop('deleteButton', defineAnnotatedType().designType('phantom').tags('ui', 'button').$type)
-        .$type)
-      .$type
+      .prop(
+        'user',
+        defineAnnotatedType('object')
+          .prop('name', defineAnnotatedType().designType('string').$type)
+          .prop(
+            'resetPassword',
+            defineAnnotatedType().designType('phantom').tags('ui', 'action').$type
+          ).$type
+      )
+      .prop(
+        'metadata',
+        defineAnnotatedType('object')
+          .prop('created', defineAnnotatedType().designType('string').$type)
+          .prop(
+            'deleteButton',
+            defineAnnotatedType().designType('phantom').tags('ui', 'button').$type
+          ).$type
+      ).$type
 
     const restored = roundTrip(original)
     const user = asObject(asObject(restored).props.get('user')!)
@@ -637,12 +654,14 @@ describe('phantom type serialization', () => {
   it('should preserve phantom props with metadata', () => {
     const original = defineAnnotatedType('object')
       .prop('name', defineAnnotatedType().designType('string').$type)
-      .prop('info', defineAnnotatedType().designType('phantom')
-        .annotate('meta.label', 'Info Paragraph')
-        .annotate('meta.description', 'Informational text')
-        .tags('phantom', 'ui')
-        .$type)
-      .$type
+      .prop(
+        'info',
+        defineAnnotatedType()
+          .designType('phantom')
+          .annotate('meta.label', 'Info Paragraph')
+          .annotate('meta.description', 'Informational text')
+          .tags('phantom', 'ui').$type
+      ).$type
 
     const restored = roundTrip(original)
     const info = asObject(restored).props.get('info')!

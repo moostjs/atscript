@@ -1,5 +1,5 @@
 import { AnnotationSpec } from '../annotations'
-import { TAnnotationsTree } from '../config'
+import type { TAnnotationsTree } from '../config'
 
 export const expectAnnotations: TAnnotationsTree = {
   minLength: new AnnotationSpec({
@@ -209,7 +209,7 @@ export const expectAnnotations: TAnnotationsTree = {
         try {
           new RegExp(args[0].text)
           return []
-        } catch (e) {
+        } catch (error) {
           return [
             {
               message: 'Invalid regular expression',

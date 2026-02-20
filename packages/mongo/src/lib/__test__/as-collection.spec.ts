@@ -1,10 +1,11 @@
+import { ObjectId } from 'mongodb'
 // oxlint-disable max-lines
 import { describe, it, expect, beforeAll } from 'vitest'
+
 import { AsMongo } from '../../lib/as-mongo'
 import { prepareFixtures } from './test-utils'
-import { ObjectId } from 'mongodb'
 
-let mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
+const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
 
 describe('[mongo] AsCollection with structures', () => {
   beforeAll(prepareFixtures)

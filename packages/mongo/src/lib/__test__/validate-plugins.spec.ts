@@ -1,7 +1,8 @@
-import { describe, beforeAll, it, expect } from 'vitest'
-import { prepareFixtures } from './test-utils'
-import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from '../validate-plugins.js'
 import { ObjectId } from 'mongodb'
+import { describe, beforeAll, it, expect } from 'vitest'
+
+import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from '../validate-plugins.js'
+import { prepareFixtures } from './test-utils'
 
 const dummyId = 'a'.repeat(24)
 
@@ -96,8 +97,8 @@ describe('mongo validate plugins', () => {
           { a: '2', b: 'a' },
         ],
       })
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error(error)
     }
 
     expect(() =>

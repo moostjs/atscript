@@ -1,6 +1,6 @@
-import { Controller, Provide, ApplyDecorators, Inherit, Resolve } from 'moost'
-import { type TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { AsMongo } from '@atscript/mongo'
+import { type TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+import { Controller, Provide, ApplyDecorators, Inherit, Resolve } from 'moost'
 
 /**
  * DI token under which the AtScript-annotated collection definition
@@ -30,7 +30,10 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
  * export class UsersController extends AsMongoController<typeof UserModel> {}
  * ```
  */
-export const CollectionController = (type: TAtscriptAnnotatedType & { name?: string }, prefix?: string) =>
+export const CollectionController = (
+  type: TAtscriptAnnotatedType & { name?: string },
+  prefix?: string
+) =>
   ApplyDecorators(
     Provide(COLLECTION_DEF, () => type),
     Controller(prefix || type.metadata.get('mongo.collection') || type.name),

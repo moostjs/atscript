@@ -1,7 +1,7 @@
 import { AnnotationSpec } from '../annotations'
-import { TAnnotationsTree } from '../config'
+import type { TAnnotationsTree } from '../config'
 import { isPrimitive, isRef } from '../parser/nodes'
-import { TMessages } from '../parser/types'
+import type { TMessages } from '../parser/types'
 
 export const metaAnnotations: TAnnotationsTree = {
   label: new AnnotationSpec({

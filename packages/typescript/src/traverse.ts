@@ -37,17 +37,23 @@ export function forAnnotatedType<R>(
       }
       return handlers.final(typed)
     }
-    case 'object':
+    case 'object': {
       return handlers.object(def as TAtscriptAnnotatedType<TAtscriptTypeObject<string>>)
-    case 'array':
+    }
+    case 'array': {
       return handlers.array(def as TAtscriptAnnotatedType<TAtscriptTypeArray>)
-    case 'union':
+    }
+    case 'union': {
       return handlers.union(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>)
-    case 'intersection':
+    }
+    case 'intersection': {
       return handlers.intersection(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>)
-    case 'tuple':
+    }
+    case 'tuple': {
       return handlers.tuple(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>)
-    default:
+    }
+    default: {
       throw new Error(`Unknown type kind "${(def.type as { kind: string }).kind}"`)
+    }
   }
 }

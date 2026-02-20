@@ -74,12 +74,12 @@ async update(@Body() dto: UpdateUserDto) {}
 
 Controls whether missing required properties are errors:
 
-| Value | Behavior |
-|-------|----------|
-| `false` (default) | All required properties must be present |
-| `true` | Missing properties are allowed at the top level |
-| `'deep'` | Missing properties allowed at all nesting levels |
-| `(type, path) => boolean` | Custom function for fine-grained control |
+| Value                     | Behavior                                         |
+| ------------------------- | ------------------------------------------------ |
+| `false` (default)         | All required properties must be present          |
+| `true`                    | Missing properties are allowed at the top level  |
+| `'deep'`                  | Missing properties allowed at all nesting levels |
+| `(type, path) => boolean` | Custom function for fine-grained control         |
 
 This is especially useful for PATCH endpoints:
 
@@ -101,16 +101,14 @@ For deeply nested partial updates:
 
 How to handle properties not defined in the Atscript type:
 
-| Value | Behavior |
-|-------|----------|
-| `'error'` (default) | Report as a validation error |
-| `'ignore'` | Silently accept unknown properties |
-| `'strip'` | Delete unknown properties from the value |
+| Value               | Behavior                                 |
+| ------------------- | ---------------------------------------- |
+| `'error'` (default) | Report as a validation error             |
+| `'ignore'`          | Silently accept unknown properties       |
+| `'strip'`           | Delete unknown properties from the value |
 
 ```typescript
-app.applyGlobalPipes(
-  validatorPipe({ unknwonProps: 'strip' })
-)
+app.applyGlobalPipes(validatorPipe({ unknwonProps: 'strip' }))
 ```
 
 ### `errorLimit`
@@ -135,7 +133,7 @@ A function to dynamically replace type definitions during validation:
 
 ```typescript
 validatorPipe({
-  replace: (type, path) => path === 'status' ? customStatusType : type
+  replace: (type, path) => (path === 'status' ? customStatusType : type),
 })
 ```
 
@@ -156,9 +154,7 @@ const requireNonEmpty: TValidatorPlugin = (ctx, def, value) => {
   return undefined // fall through to default validation
 }
 
-app.applyGlobalPipes(
-  validatorPipe({ plugins: [requireNonEmpty] })
-)
+app.applyGlobalPipes(validatorPipe({ plugins: [requireNonEmpty] }))
 ```
 
 See [Validation — Plugins](/packages/typescript/validation#plugins) for more on writing plugins.
@@ -185,10 +181,7 @@ import { Email, PositiveInt } from './types.as'
 @Controller('notifications')
 export class NotificationsController {
   @Post(':userId')
-  async send(
-    @Param('userId') userId: PositiveInt,
-    @Body() email: Email,
-  ) {
+  async send(@Param('userId') userId: PositiveInt, @Body() email: Email) {
     // userId is validated as a positive integer
     // email is validated against the email pattern
   }

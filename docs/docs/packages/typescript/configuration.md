@@ -17,13 +17,13 @@ export default defineConfig({
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `rootDir` | `string` | `'.'` | Directory containing your `.as` files |
-| `format` | `'dts' \| 'js'` | `'dts'` | Default output format for [CLI](/packages/typescript/cli) (`dts` for type declarations, `js` for runtime code) |
-| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config |
-| `plugins` | `TAtscriptPlugin[]` | `[]` | Active plugins |
-| `annotations` | `object` | — | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations)) |
+| Option              | Type                           | Default   | Description                                                                                                    |
+| ------------------- | ------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `rootDir`           | `string`                       | `'.'`     | Directory containing your `.as` files                                                                          |
+| `format`            | `'dts' \| 'js'`                | `'dts'`   | Default output format for [CLI](/packages/typescript/cli) (`dts` for type declarations, `js` for runtime code) |
+| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config                                                                |
+| `plugins`           | `TAtscriptPlugin[]`            | `[]`      | Active plugins                                                                                                 |
+| `annotations`       | `object`                       | —         | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))              |
 
 ## Plugin Options
 
@@ -37,11 +37,11 @@ plugins: [ts({ jsonSchema: 'lazy' })]
 
 Controls how JSON Schema support is handled in generated code. On the frontend, pulling in the `buildJsonSchema` function adds unnecessary weight when you don't need it — so Atscript lets you choose the right trade-off for your use case.
 
-| Value | Import added | `toJsonSchema()` behavior |
-|-------|-------------|--------------------------|
-| `false` *(default)* | None | Throws a runtime error |
-| `'lazy'` | `buildJsonSchema` imported | Computed on first call, cached |
-| `'bundle'` | None | Pre-computed at build time, embedded as static JSON |
+| Value               | Import added               | `toJsonSchema()` behavior                           |
+| ------------------- | -------------------------- | --------------------------------------------------- |
+| `false` _(default)_ | None                       | Throws a runtime error                              |
+| `'lazy'`            | `buildJsonSchema` imported | Computed on first call, cached                      |
+| `'bundle'`          | None                       | Pre-computed at build time, embedded as static JSON |
 
 ```javascript
 // Default — no JSON schema overhead (best for frontend)
@@ -64,10 +64,7 @@ Add it to your `tsconfig.json`:
 
 ```json
 {
-  "include": [
-    "src/**/*",
-    "atscript.d.ts"
-  ]
+  "include": ["src/**/*", "atscript.d.ts"]
 }
 ```
 

@@ -1,12 +1,5 @@
-import {
+import type {
   AtscriptDoc,
-  isArray,
-  isConst,
-  isGroup,
-  isInterface,
-  isPrimitive,
-  isRef,
-  isStructure,
   SemanticAnnotateNode,
   SemanticArrayNode,
   SemanticInterfaceNode,
@@ -17,9 +10,19 @@ import {
   SemanticTypeNode,
   TPrimitiveTypeDef,
 } from '@atscript/core'
+import {
+  isArray,
+  isConst,
+  isGroup,
+  isInterface,
+  isPrimitive,
+  isRef,
+  isStructure,
+} from '@atscript/core'
+
+import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
-import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 
 export class TypeRenderer extends BaseRenderer {
   constructor(
@@ -134,7 +137,7 @@ export class TypeRenderer extends BaseRenderer {
       propsDefs.add(renderedDef)
       renderedDef.split('\n').forEach(l => this.writeln(l))
     }
-    if (patterns.length) {
+    if (patterns.length > 0) {
       this.write(`[key: string]: `)
       if (patterns.length > 0) {
         for (const prop of patterns) {
@@ -163,7 +166,9 @@ export class TypeRenderer extends BaseRenderer {
         `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
       )
       if (resolveJsonSchemaMode(this.opts) === false) {
-        this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")
+        this.writeln(
+          "/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */"
+        )
       }
       this.writeln('static toJsonSchema: () => any')
     }
@@ -251,15 +256,21 @@ export class TypeRenderer extends BaseRenderer {
       `const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${name}>`
     )
     if (resolveJsonSchemaMode(this.opts) === false) {
-      this.writeln("/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */")
+      this.writeln(
+        "/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */"
+      )
     }
     this.writeln('const toJsonSchema: () => any')
     this.popln()
   }
 
   private phantomPropType(def?: SemanticNode): string | undefined {
-    if (!def) return undefined
-    if (isPrimitive(def) && def.config.type === 'phantom') return def.id!
+    if (!def) {
+      return undefined
+    }
+    if (isPrimitive(def) && def.config.type === 'phantom') {
+      return def.id!
+    }
     if (isRef(def)) {
       const ref = def as SemanticRefNode
       const unwound = this.doc.unwindType(ref.id!, ref.chain)?.def
@@ -273,9 +284,15 @@ export class TypeRenderer extends BaseRenderer {
   private isTypeTarget(name: string, doc?: AtscriptDoc): boolean {
     const d = doc || this.doc
     const decl = d.getDeclarationOwnerNode(name)
-    if (!decl?.node) return false
-    if (decl.node.entity === 'type') return true
-    if (decl.node.entity === 'interface') return false
+    if (!decl?.node) {
+      return false
+    }
+    if (decl.node.entity === 'type') {
+      return true
+    }
+    if (decl.node.entity === 'interface') {
+      return false
+    }
     if (decl.node.entity === 'annotate') {
       return this.isTypeTarget((decl.node as SemanticAnnotateNode).targetName, decl.doc)
     }
@@ -302,16 +319,21 @@ function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
   }
 
   switch (def.kind) {
-    case 'final':
+    case 'final': {
       return def.value === 'void' ? 'undefined' : def.value
-    case 'union':
+    }
+    case 'union': {
       return def.items.map(renderPrimitiveTypeDef).join(' | ')
-    case 'intersection':
+    }
+    case 'intersection': {
       return def.items.map(renderPrimitiveTypeDef).join(' & ')
-    case 'tuple':
+    }
+    case 'tuple': {
       return `[${def.items.map(renderPrimitiveTypeDef).join(', ')}]`
-    case 'array':
+    }
+    case 'array': {
       return `${renderPrimitiveTypeDef(def.of)}[]`
+    }
     case 'object': {
       const props = Object.entries(def.props)
         .map(
@@ -323,8 +345,9 @@ function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
         .join('; ')
       return `{ ${props} }`
     }
-    default:
+    default: {
       // Fallback in case of unexpected input
       return 'unknown'
+    }
   }
 }

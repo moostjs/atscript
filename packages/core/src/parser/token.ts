@@ -31,7 +31,7 @@ export class Token {
   }
 
   get hasChildren() {
-    return Boolean(this._data.children?.length)
+    return (this._data.children?.length ?? 0) > 0
   }
 
   /**

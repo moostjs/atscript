@@ -1,4 +1,9 @@
-import { defineAnnotatedType, isPhantomType, type TAtscriptAnnotatedType, type TAtscriptTypeFinal } from './annotated-type'
+import {
+  defineAnnotatedType,
+  isPhantomType,
+  type TAtscriptAnnotatedType,
+  type TAtscriptTypeFinal,
+} from './annotated-type'
 import { forAnnotatedType } from './traverse'
 
 /** A JSON Schema object (draft-compatible). */
@@ -32,14 +37,16 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         const properties: Record<string, TJsonSchema> = {}
         const required: string[] = []
         for (const [key, val] of d.type.props.entries()) {
-          if (isPhantomType(val)) continue
+          if (isPhantomType(val)) {
+            continue
+          }
           properties[key] = build(val)
           if (!val.optional) {
             required.push(key)
           }
         }
         const schema: TJsonSchema = { type: 'object', properties }
-        if (required.length) {
+        if (required.length > 0) {
           schema.required = required
         }
         return schema
@@ -93,7 +100,9 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
             if (patterns.length === 1) {
               schema.pattern = patterns[0].pattern
             } else {
-              schema.allOf = (schema.allOf || []).concat(patterns.map(p => ({ pattern: p.pattern })))
+              schema.allOf = (schema.allOf || []).concat(
+                patterns.map(p => ({ pattern: p.pattern }))
+              )
             }
           }
         }
@@ -216,15 +225,23 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
       }
       const itemType = s.items ? convert(s.items) : defineAnnotatedType().designType('any').$type
       const handle = defineAnnotatedType('array').of(itemType)
-      if (typeof s.minItems === 'number') handle.annotate('expect.minLength', { length: s.minItems })
-      if (typeof s.maxItems === 'number') handle.annotate('expect.maxLength', { length: s.maxItems })
+      if (typeof s.minItems === 'number') {
+        handle.annotate('expect.minLength', { length: s.minItems })
+      }
+      if (typeof s.maxItems === 'number') {
+        handle.annotate('expect.maxLength', { length: s.maxItems })
+      }
       return handle.$type
     }
 
     if (s.type === 'string') {
       const handle = defineAnnotatedType().designType('string').tags('string')
-      if (typeof s.minLength === 'number') handle.annotate('expect.minLength', { length: s.minLength })
-      if (typeof s.maxLength === 'number') handle.annotate('expect.maxLength', { length: s.maxLength })
+      if (typeof s.minLength === 'number') {
+        handle.annotate('expect.minLength', { length: s.minLength })
+      }
+      if (typeof s.maxLength === 'number') {
+        handle.annotate('expect.maxLength', { length: s.maxLength })
+      }
       if (s.pattern) {
         handle.annotate('expect.pattern', { pattern: s.pattern }, true)
       }
@@ -241,15 +258,23 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
     if (s.type === 'integer') {
       const handle = defineAnnotatedType().designType('number').tags('number')
       handle.annotate('expect.int', true)
-      if (typeof s.minimum === 'number') handle.annotate('expect.min', { minValue: s.minimum })
-      if (typeof s.maximum === 'number') handle.annotate('expect.max', { maxValue: s.maximum })
+      if (typeof s.minimum === 'number') {
+        handle.annotate('expect.min', { minValue: s.minimum })
+      }
+      if (typeof s.maximum === 'number') {
+        handle.annotate('expect.max', { maxValue: s.maximum })
+      }
       return handle.$type
     }
 
     if (s.type === 'number') {
       const handle = defineAnnotatedType().designType('number').tags('number')
-      if (typeof s.minimum === 'number') handle.annotate('expect.min', { minValue: s.minimum })
-      if (typeof s.maximum === 'number') handle.annotate('expect.max', { maxValue: s.maximum })
+      if (typeof s.minimum === 'number') {
+        handle.annotate('expect.min', { minValue: s.minimum })
+      }
+      if (typeof s.maximum === 'number') {
+        handle.annotate('expect.max', { maxValue: s.maximum })
+      }
       return handle.$type
     }
 

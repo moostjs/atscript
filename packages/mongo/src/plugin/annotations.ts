@@ -1,12 +1,11 @@
 // eslint-disable max-lines
+import type { TAnnotationsTree, TMessages } from '@atscript/core'
 import {
-  TAnnotationsTree,
   AnnotationSpec,
   isInterface,
   isStructure,
   isRef,
   isPrimitive,
-  TMessages,
   isArray,
 } from '@atscript/core'
 

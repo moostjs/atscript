@@ -12,7 +12,7 @@ export class NodeIterator {
   constructor(
     private readonly nodes: TLexicalToken[],
     public readonly messages: TMessages = [],
-    public readonly badNodes: Map<TLexicalToken, string> = new Map(),
+    public readonly badNodes = new Map<TLexicalToken, string>(),
     public readonly issues: TNodeIteratorIssues = {},
     public readonly parent?: TLexicalToken,
     private i = -1

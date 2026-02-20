@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest'
-import { defineAnnotatedType as $, TAtscriptAnnotatedType } from './annotated-type'
-import { buildJsonSchema as $$, fromJsonSchema } from './json-schema'
-import { AnnotationSpec, build } from '@atscript/core'
-import { tsPlugin } from './plugin'
 import path from 'path'
+
+import { build } from '@atscript/core'
+import { describe, expect, it } from 'vitest'
+
+import type { TAtscriptAnnotatedType } from './annotated-type'
+import { defineAnnotatedType as $ } from './annotated-type'
+import { buildJsonSchema as $$, fromJsonSchema } from './json-schema'
+import { tsPlugin } from './plugin'
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
 // export interface JsonDeep {
@@ -194,9 +197,7 @@ describe('json-schema', () => {
       plugins: [tsPlugin({ jsonSchema: 'bundle' })],
     })
     const out = await repo.generate({ format: 'js' })
-    const content = out[0].content
-      .split('\n')
-      .filter(s => s.trim().startsWith('return {'))?.[0]
+    const content = out[0].content.split('\n').filter(s => s.trim().startsWith('return {'))?.[0]
     const schema = content.trim().slice('return '.length)
     expect(JSON.parse(schema)).toEqual(expectedSchema)
   })
@@ -390,7 +391,12 @@ describe('fromJsonSchema', () => {
     })
 
     it('should convert array minItems/maxItems', () => {
-      const type = fromJsonSchema({ type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 5 })
+      const type = fromJsonSchema({
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        maxItems: 5,
+      })
       expect(type.metadata.get('expect.minLength')).toEqual({ length: 1 })
       expect(type.metadata.get('expect.maxLength')).toEqual({ length: 5 })
     })
@@ -404,11 +410,17 @@ describe('fromJsonSchema', () => {
       const normalize = (s: any) => {
         const copy = JSON.parse(JSON.stringify(s))
         const sortRequired = (obj: any) => {
-          if (obj?.required) obj.required = [...obj.required].sort()
-          if (obj?.properties) {
-            for (const v of Object.values(obj.properties)) sortRequired(v)
+          if (obj?.required) {
+            obj.required = [...obj.required].sort()
           }
-          if (obj?.items && !Array.isArray(obj.items)) sortRequired(obj.items)
+          if (obj?.properties) {
+            for (const v of Object.values(obj.properties)) {
+              sortRequired(v)
+            }
+          }
+          if (obj?.items && !Array.isArray(obj.items)) {
+            sortRequired(obj.items)
+          }
         }
         sortRequired(copy)
         return copy
@@ -491,9 +503,7 @@ describe('fromJsonSchema', () => {
 
   describe('error handling', () => {
     it('should throw on $ref', () => {
-      expect(() => fromJsonSchema({ $ref: '#/definitions/Foo' })).toThrow(
-        /\$ref is not supported/
-      )
+      expect(() => fromJsonSchema({ $ref: '#/definitions/Foo' })).toThrow(/\$ref is not supported/)
     })
   })
 })

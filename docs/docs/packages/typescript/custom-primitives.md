@@ -50,13 +50,13 @@ export default defineConfig({
 
 Each extension object supports:
 
-| Field | Description |
-|-------|-------------|
-| `type` | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, etc.) — **inherited** from parent if omitted |
-| `documentation` | Description shown in IntelliSense — inherited from parent if omitted |
-| `expect` | Implicit validation constraints — merged with parent's `expect` |
-| `extensions` | Nested sub-extensions (e.g., `number.int.positive`) |
-| `isContainer` | If `true`, the primitive cannot be used directly — one of its extensions must be chosen |
+| Field           | Description                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------- |
+| `type`          | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, etc.) — **inherited** from parent if omitted |
+| `documentation` | Description shown in IntelliSense — inherited from parent if omitted                                          |
+| `expect`        | Implicit validation constraints — merged with parent's `expect`                                               |
+| `extensions`    | Nested sub-extensions (e.g., `number.int.positive`)                                                           |
+| `isContainer`   | If `true`, the primitive cannot be used directly — one of its extensions must be chosen                       |
 
 ::: tip Inheritance
 Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own `expect` constraints.

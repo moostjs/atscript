@@ -2,6 +2,27 @@
   "name": "@atscript/core",
   "version": "0.1.17",
   "description": "Core library for Atscript parsing and file generation.",
+  "keywords": [
+    "annotations",
+    "atscript",
+    "code-generation",
+    "interfaces",
+    "runtime"
+  ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/core"
+  },
+  "files": [
+    "dist"
+  ],
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -13,31 +34,10 @@
     },
     "./package.json": "./package.json"
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "pub": "pnpm publish --access public",
     "test": "vitest"
   },
-  "keywords": [
-    "atscript",
-    "annotations",
-    "interfaces",
-    "runtime",
-    "code-generation"
-  ],
-  "author": "Artem Maltsev",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/moostjs/atscript.git",
-    "directory": "packages/core"
-  },
-  "bugs": {
-    "url": "https://github.com/moostjs/atscript/issues"
-  },
-  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/core#readme",
-  "license": "ISC",
   "dependencies": {
     "@prostojs/parser": "^0.5.11",
     "defu": "^6.1.4",

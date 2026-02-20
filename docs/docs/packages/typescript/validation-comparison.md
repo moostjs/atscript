@@ -10,6 +10,7 @@ How does Atscript validation compare to popular TypeScript validation libraries?
 A user with a name (2–50 chars), email, and optional age (integer, 18+):
 
 ::: code-group
+
 ```atscript [Atscript]
 export interface User {
   @expect.minLength 2
@@ -36,10 +37,7 @@ type User = z.infer<typeof User>
 ```
 
 ```typescript [class-validator]
-import {
-  IsString, IsEmail, IsInt, IsOptional,
-  MinLength, MaxLength, Min,
-} from 'class-validator'
+import { IsString, IsEmail, IsInt, IsOptional, MinLength, MaxLength, Min } from 'class-validator'
 
 export class User {
   @IsString()
@@ -56,6 +54,7 @@ export class User {
   age?: number
 }
 ```
+
 :::
 
 Atscript reads like a type definition with constraints — because it is one. Zod is schema-first (you infer the type from it, so there's no duplication), but every field still needs `z.string()`, `z.number()`, etc. — the syntax is a schema DSL, not a type language. Class-validator requires a decorator for every property, including `@IsString()` for something already typed as `string`.
@@ -65,6 +64,7 @@ Atscript reads like a type definition with constraints — because it is one. Zo
 An order with an array of items and nested addresses:
 
 ::: code-group
+
 ```atscript [Atscript]
 export interface Order {
   items: {
@@ -92,27 +92,37 @@ export interface Order {
 import { z } from 'zod'
 
 const Order = z.object({
-  items: z.array(z.object({
-    productId: z.string().min(1),
-    quantity: z.number().int().min(1),
-  })),
+  items: z.array(
+    z.object({
+      productId: z.string().min(1),
+      quantity: z.number().int().min(1),
+    })
+  ),
   shipping: z.object({
     street: z.string(),
     city: z.string(),
     zip: z.string().regex(/^[0-9]{5}$/),
   }),
-  billing: z.object({
-    street: z.string(),
-    city: z.string(),
-    zip: z.string().regex(/^[0-9]{5}$/),
-  }).optional(),
+  billing: z
+    .object({
+      street: z.string(),
+      city: z.string(),
+      zip: z.string().regex(/^[0-9]{5}$/),
+    })
+    .optional(),
 })
 ```
 
 ```typescript [class-validator]
 import {
-  IsString, IsInt, Min, MinLength, Matches,
-  ValidateNested, IsArray, IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  MinLength,
+  Matches,
+  ValidateNested,
+  IsArray,
+  IsOptional,
 } from 'class-validator'
 import { Type } from 'class-transformer'
 
@@ -154,6 +164,7 @@ export class Order {
   billing?: Address
 }
 ```
+
 :::
 
 Atscript and Zod both support inline nested structures. Class-validator **must** declare a separate class for every nested shape, wired up with `@ValidateNested()` and `@Type(() => ClassName)` on each field. Arrays add `{ each: true }`. Optional fields add `@IsOptional()`.
@@ -163,6 +174,7 @@ Atscript and Zod both support inline nested structures. Class-validator **must**
 Validating a standalone email string or a positive integer — not wrapped in an object:
 
 ::: code-group
+
 ```atscript [Atscript]
 export type Email = string.email
 export type PositiveInt = number.int & number.positive
@@ -181,6 +193,7 @@ class EmailDto {
 }
 // No way to validate a bare string or number
 ```
+
 :::
 
 Zod supports standalone primitives. Class-validator does not — every validated value must be a class property. In Atscript, `string.email` is a semantic type that carries the email regex as a built-in constraint. You can use it as a property type, a standalone parameter type, or compose it with `&`.
@@ -190,6 +203,7 @@ Zod supports standalone primitives. Class-validator does not — every validated
 Complex type compositions — unions, intersections, inline objects mixed with primitives — are where the syntax differences become most pronounced:
 
 ::: code-group
+
 ```atscript [Atscript]
 export interface ApiResponse {
   result: string | number | {
@@ -216,13 +230,15 @@ const ApiResponse = z.object({
       total: z.number().int(),
     }),
   ]),
-  metadata: z.union([
-    z.object({
-      requestId: z.string().uuid(),
-      timing: z.number().positive(),
-    }),
-    z.string(),
-  ]).optional(),
+  metadata: z
+    .union([
+      z.object({
+        requestId: z.string().uuid(),
+        timing: z.number().positive(),
+      }),
+      z.string(),
+    ])
+    .optional(),
 })
 ```
 
@@ -232,6 +248,7 @@ const ApiResponse = z.object({
 // You would need custom validation logic for every
 // union field, defeating the purpose of the library.
 ```
+
 :::
 
 Zod's `z.union()` works the same way as Atscript's `|` — it tries each variant and accepts the first match. The validation behavior is equivalent. The difference is syntax: Atscript writes `string | number | { ... }` inline, just like TypeScript. Zod requires `z.union([...])` with full schema definitions for every branch — same result, more ceremony. Class-validator has no union support at all.
@@ -241,6 +258,7 @@ Zod's `z.union()` works the same way as Atscript's `|` — it tries each variant
 Composing types with `&` is a common TypeScript pattern. In Atscript it works exactly as you'd expect — and the merged result validates correctly:
 
 ::: code-group
+
 ```atscript [Atscript]
 export interface Timestamped {
   createdAt: string.isoDate
@@ -296,10 +314,7 @@ const Article = z.object({
 
 // Inline intersection of two objects:
 const Log = z.object({
-  entry: z.intersection(
-    z.object({ level: z.string() }),
-    z.object({ message: z.string() }),
-  ),
+  entry: z.intersection(z.object({ level: z.string() }), z.object({ message: z.string() })),
   // ↑ entry is ZodIntersection, not ZodObject
 })
 ```
@@ -327,6 +342,7 @@ class Article extends Timestamped {
   @IsString() body: string
 }
 ```
+
 :::
 
 In Atscript, `Type1 & Type2 & { ... }` merges all properties into a single validated type — just like TypeScript's `&`. Zod has no direct equivalent: `z.intersection()` does **not** merge properties into one object schema — it returns a `ZodIntersection` that loses object methods like `.pick()` and `.extend()`. To actually merge, you spread `.shape` into a new `z.object()` — a workaround, not a first-class feature. Class-validator only has single class inheritance — composing two unrelated types means manually copying properties.
@@ -348,11 +364,11 @@ Product.validator({ partial: 'deep' }).validate(data)
 
 // Custom — fine-grained control per type and path
 Product.validator({
-  partial: (type, path) => path.startsWith('metadata')
+  partial: (type, path) => path.startsWith('metadata'),
 }).validate(data)
 ```
 
-Zod's `.partial()` works for top-level properties, but `.deepPartial()` — the recursive version needed for nested PATCH operations — was [deprecated in Zod 3.21 and removed in Zod v4](https://github.com/colinhacks/zod/issues/2854) with no built-in replacement. The Zod v4 changelog states: *"There is no direct alternative to this API."* This has been a [significant pain point](https://github.com/colinhacks/zod/issues/2854) for the community, with over 100 reactions and over 70 comments asking for a solution. Developers must either use third-party packages, write their own recursive utilities, or maintain separate creation and update schemas.
+Zod's `.partial()` works for top-level properties, but `.deepPartial()` — the recursive version needed for nested PATCH operations — was [deprecated in Zod 3.21 and removed in Zod v4](https://github.com/colinhacks/zod/issues/2854) with no built-in replacement. The Zod v4 changelog states: _"There is no direct alternative to this API."_ This has been a [significant pain point](https://github.com/colinhacks/zod/issues/2854) for the community, with over 100 reactions and over 70 comments asking for a solution. Developers must either use third-party packages, write their own recursive utilities, or maintain separate creation and update schemas.
 
 Class-validator has no partial validation concept at all. You must define separate DTO classes for create and update operations, manually marking fields with `@IsOptional()` in the update variant.
 
@@ -373,18 +389,17 @@ Zod achieves custom validation through `.refine()` and `.superRefine()` — meth
 
 ## Summary
 
-|  | Atscript | Zod | class-validator |
-|---|---|---|---|
-| **Syntax** | Type definitions with constraints | Schema DSL with method chains | Decorator stacks on classes |
-| **Nesting** | Inline — no extra declarations | Inline — no extra declarations | Separate class per nested shape |
-| **Primitives** | Standalone validated types | Standalone schemas | Requires wrapper class |
-| **Unions & intersections** | `\|` and `&` — native syntax | `z.union()`, `z.intersection()` (no merge) | Not supported / single inheritance |
-| **Partial validation** | `partial: true \| 'deep' \| function` | `.partial()` only (deep removed) | Manual duplicate DTOs |
-| **Custom logic** | Pluggable at validator level | `.refine()` per schema node | Custom validator class per rule |
-| **TypeScript integration** | Generates `.d.ts` directly | `z.infer<>` utility type | `reflect-metadata` + experimental decorators |
-| **Type guards** | `validate(data, true)` narrows input | `.parse()` returns typed data | None |
-| **Ecosystem** | Growing | Largest (form libs, adapters) | NestJS standard |
-
+|                            | Atscript                              | Zod                                        | class-validator                              |
+| -------------------------- | ------------------------------------- | ------------------------------------------ | -------------------------------------------- |
+| **Syntax**                 | Type definitions with constraints     | Schema DSL with method chains              | Decorator stacks on classes                  |
+| **Nesting**                | Inline — no extra declarations        | Inline — no extra declarations             | Separate class per nested shape              |
+| **Primitives**             | Standalone validated types            | Standalone schemas                         | Requires wrapper class                       |
+| **Unions & intersections** | `\|` and `&` — native syntax          | `z.union()`, `z.intersection()` (no merge) | Not supported / single inheritance           |
+| **Partial validation**     | `partial: true \| 'deep' \| function` | `.partial()` only (deep removed)           | Manual duplicate DTOs                        |
+| **Custom logic**           | Pluggable at validator level          | `.refine()` per schema node                | Custom validator class per rule              |
+| **TypeScript integration** | Generates `.d.ts` directly            | `z.infer<>` utility type                   | `reflect-metadata` + experimental decorators |
+| **Type guards**            | `validate(data, true)` narrows input  | `.parse()` returns typed data              | None                                         |
+| **Ecosystem**              | Growing                               | Largest (form libs, adapters)              | NestJS standard                              |
 
 ## More Than Validation
 

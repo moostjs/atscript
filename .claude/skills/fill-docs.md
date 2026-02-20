@@ -13,7 +13,7 @@ You are tasked with populating empty documentation stub files with comprehensive
 **Critical**: Atscript is language-agnostic. The TypeScript plugin is the FIRST language extension, but Python, Java, etc. will follow. The docs must reflect this:
 
 1. **Language-specific "worlds"** (packages/typescript/, future: packages/python/) — **self-contained** sections covering the full journey for each target language. Common .as concepts are included via shared fragments.
-2. **Plugin-specific** (packages/mongo/, packages/moost-*/) — framework/database integrations nested under their language in navigation.
+2. **Plugin-specific** (packages/mongo/, packages/moost-\*/) — framework/database integrations nested under their language in navigation.
 3. **Plugin Development** (plugin-development/) — for plugin/language extension creators. Core architecture, AST, hooks, code generation, LSP.
 
 **Navigation**: TypeScript dropdown (Guide, MongoDB, Moost) | VSCode | Plugin Development
@@ -32,6 +32,7 @@ To keep language-specific sections self-contained without duplicating content, u
 ## Usage
 
 The user will specify which section to fill, e.g.:
+
 - `/fill-docs packages/mongo` -- Fill all stub files in `docs/docs/packages/mongo/`
 - `/fill-docs plugin-development` -- Fill all stub files in `docs/docs/plugin-development/`
 - `/fill-docs packages/vscode` -- Fill VSCode extension docs
@@ -63,24 +64,29 @@ If no section is specified, ask which section to fill.
 ## Section-specific guidance
 
 ### packages/typescript/ docs (COMPLETE — reference for style)
+
 - This is a **self-contained world** for TypeScript developers — already fully written
 - Uses shared fragments from `_fragments/` for common .as concepts
 - Use this as the style reference when filling other sections
 
 ### packages/mongo/ docs
+
 - TypeScript-specific MongoDB integration
 - Cover annotations, collections, indexes, validation
 - Separate annotation documentation from runtime classes
 
 ### packages/moost-mongo/ and packages/moost-validator/ docs
+
 - Moost framework integrations (TypeScript-specific)
 - Cover controllers, decorators, DTOs, validation pipes
 
 ### packages/vscode/ docs
+
 - VSCode extension: syntax highlighting, LSP, diagnostics
 - Target audience: all Atscript users wanting IDE support
 
 ### plugin-development/ docs
+
 - Target plugin/extension developers who want to create new language extensions or LSPs
 - Language-agnostic: describes the parser, AST, plugin system, annotation system
 - Include complete code examples referencing `@atscript/core` APIs

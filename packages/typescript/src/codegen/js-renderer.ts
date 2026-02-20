@@ -1,12 +1,7 @@
 // oxlint-disable max-lines
 // oxlint-disable max-depth
-import {
+import type {
   AtscriptDoc,
-  isGroup,
-  isInterface,
-  isPrimitive,
-  isRef,
-  isStructure,
   SemanticAnnotateNode,
   SemanticArrayNode,
   SemanticConstNode,
@@ -21,15 +16,17 @@ import {
   TAnnotationTokens,
   TPrimitiveTypeDef,
 } from '@atscript/core'
-import { BaseRenderer } from './base-renderer'
-import { escapeQuotes, wrapProp } from './utils'
-import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
+import { isGroup, isInterface, isPrimitive, isRef, isStructure } from '@atscript/core'
+
 import {
   defineAnnotatedType,
   type TAtscriptAnnotatedType,
   type TAnnotatedTypeHandle,
 } from '../annotated-type'
 import { buildJsonSchema } from '../json-schema'
+import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
+import { BaseRenderer } from './base-renderer'
+import { escapeQuotes, wrapProp } from './utils'
 
 export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
@@ -171,7 +168,11 @@ export class JsRenderer extends BaseRenderer {
       this.writeln('}')
     } else {
       this.writeln('static toJsonSchema() {')
-      this.indent().writeln("throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.\")").unindent()
+      this.indent()
+        .writeln(
+          "throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.\")"
+        )
+        .unindent()
       this.writeln('}')
     }
   }
@@ -294,7 +295,7 @@ export class JsRenderer extends BaseRenderer {
     annotations?.forEach(a => {
       switch (a.name) {
         case 'expect.minLength':
-        case 'expect.maxLength':
+        case 'expect.maxLength': {
           if (a.args[0]) {
             handle.annotate(a.name as any, {
               length: Number(a.args[0].text),
@@ -302,7 +303,8 @@ export class JsRenderer extends BaseRenderer {
             })
           }
           break
-        case 'expect.min':
+        }
+        case 'expect.min': {
           if (a.args[0]) {
             handle.annotate(a.name as any, {
               minValue: Number(a.args[0].text),
@@ -310,7 +312,8 @@ export class JsRenderer extends BaseRenderer {
             })
           }
           break
-        case 'expect.max':
+        }
+        case 'expect.max': {
           if (a.args[0]) {
             handle.annotate(a.name as any, {
               maxValue: Number(a.args[0].text),
@@ -318,7 +321,8 @@ export class JsRenderer extends BaseRenderer {
             })
           }
           break
-        case 'expect.pattern':
+        }
+        case 'expect.pattern': {
           handle.annotate(
             a.name as any,
             {
@@ -329,9 +333,11 @@ export class JsRenderer extends BaseRenderer {
             true
           )
           break
-        case 'expect.int':
+        }
+        case 'expect.int': {
           handle.annotate(a.name as any, true)
           break
+        }
         default:
       }
     })
@@ -419,7 +425,7 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       default: {
-        console.log('!!!!!!! UNKNOWN ', node.entity)
+        console.log('!!!!!!! UNKNOWN', node.entity)
         return this
       }
     }
@@ -473,13 +479,14 @@ export class JsRenderer extends BaseRenderer {
     }
 
     switch (def.kind) {
-      case 'final':
+      case 'final': {
         return this.writeln(
           `$(${d()}).designType("${def.value === 'void' ? 'undefined' : def.value}")`
         )
+      }
       case 'union':
       case 'intersection':
-      case 'tuple':
+      case 'tuple': {
         this.writeln(`$(${d(def.kind)})`)
         this.indent()
         for (const itemDef of def.items) {
@@ -492,7 +499,8 @@ export class JsRenderer extends BaseRenderer {
         }
         this.unindent()
         return
-      case 'array':
+      }
+      case 'array': {
         this.writeln(`$(${d('array')})`)
         this.indent()
         this.write('.of(')
@@ -503,7 +511,8 @@ export class JsRenderer extends BaseRenderer {
         this.writeln(`)`)
         this.unindent()
         return
-      case 'object':
+      }
+      case 'object': {
         this.writeln(`$(${d('object')})`)
         this.indent()
         for (const [key, propDef] of Object.entries(def.props)) {
@@ -534,9 +543,11 @@ export class JsRenderer extends BaseRenderer {
         }
         this.unindent()
         return
-      default:
+      }
+      default: {
         // Fallback in case of unexpected input
         return this.writeln(`$(${d()}).designType("any")`)
+      }
     }
   }
 
@@ -681,7 +692,7 @@ export class JsRenderer extends BaseRenderer {
       }
     } else {
       multiple = node.countAnnotations(an.name) > 1 || an.args.length > 1
-      if (an.args.length) {
+      if (an.args.length > 0) {
         targetValue =
           an.args[0].type === 'text' ? `"${escapeQuotes(an.args[0].text)}"` : an.args[0].text
       }
@@ -695,12 +706,12 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('// Ad-hoc annotations for ', targetName)
     for (const entry of node.entries) {
       const anns = entry.annotations
-      if (!anns || anns.length === 0) continue
+      if (!anns || anns.length === 0) {
+        continue
+      }
 
       // Build the navigation chain at compile time
-      const parts = entry.hasChain
-        ? [entry.id!, ...entry.chain.map(c => c.text)]
-        : [entry.id!]
+      const parts = entry.hasChain ? [entry.id!, ...entry.chain.map(c => c.text)] : [entry.id!]
       const accessors = this.buildMutatingAccessors(targetName, targetDef, parts)
 
       for (const accessor of accessors) {
@@ -749,7 +760,9 @@ export class JsRenderer extends BaseRenderer {
 
   private resolveTargetDef(targetName: string): SemanticNode | undefined {
     const unwound = this.doc.unwindType(targetName)
-    if (!unwound?.def) return undefined
+    if (!unwound?.def) {
+      return undefined
+    }
     let def = unwound.def
     if (isInterface(def)) {
       def = def.getDefinition() || def
@@ -768,24 +781,24 @@ export class JsRenderer extends BaseRenderer {
     targetDef: SemanticNode | undefined,
     parts: string[]
   ): string[] {
-    let accessors = [{ prefix: targetName + '.type', def: targetDef }]
+    let accessors = [{ prefix: `${targetName}.type`, def: targetDef }]
 
     for (let i = 0; i < parts.length; i++) {
-      const nextAccessors: { prefix: string; def: SemanticNode | undefined }[] = []
+      const nextAccessors: Array<{ prefix: string; def: SemanticNode | undefined }> = []
       for (const { prefix, def } of accessors) {
         const results = this.buildPropPaths(def, parts[i])
         if (results.length > 0) {
           for (const result of results) {
             if (i < parts.length - 1) {
-              nextAccessors.push({ prefix: prefix + result.path + '?.type', def: result.propDef })
+              nextAccessors.push({ prefix: `${prefix}${result.path}?.type`, def: result.propDef })
             } else {
-              nextAccessors.push({ prefix: prefix + result.path + '?', def: result.propDef })
+              nextAccessors.push({ prefix: `${prefix}${result.path}?`, def: result.propDef })
             }
           }
         } else {
           // Fallback for unresolvable paths
-          const suffix = `.props.get("${escapeQuotes(parts[i])}")` + (i < parts.length - 1 ? '?.type' : '?')
-          nextAccessors.push({ prefix: prefix + suffix, def: undefined })
+          const suffix = `.props.get("${escapeQuotes(parts[i])}")${i < parts.length - 1 ? '?.type' : '?'}`
+          nextAccessors.push({ prefix: `${prefix}${suffix}`, def: undefined })
         }
       }
       accessors = nextAccessors
@@ -802,8 +815,10 @@ export class JsRenderer extends BaseRenderer {
   private buildPropPaths(
     def: SemanticNode | undefined,
     propName: string
-  ): { path: string; propDef: SemanticNode | undefined }[] {
-    if (!def) return []
+  ): Array<{ path: string; propDef: SemanticNode | undefined }> {
+    if (!def) {
+      return []
+    }
 
     // Merge intersections into structures
     def = this.doc.mergeIntersection(def)
@@ -824,10 +839,12 @@ export class JsRenderer extends BaseRenderer {
     if (isStructure(def)) {
       const prop = def.props.get(propName) as SemanticPropNode | undefined
       if (prop) {
-        return [{
-          path: `.props.get("${escapeQuotes(propName)}")`,
-          propDef: prop.getDefinition(),
-        }]
+        return [
+          {
+            path: `.props.get("${escapeQuotes(propName)}")`,
+            propDef: prop.getDefinition(),
+          },
+        ]
       }
       return []
     }
@@ -836,7 +853,7 @@ export class JsRenderer extends BaseRenderer {
     if (isGroup(def)) {
       const group = def as SemanticGroup
       const items = group.unwrap()
-      const results: { path: string; propDef: SemanticNode | undefined }[] = []
+      const results: Array<{ path: string; propDef: SemanticNode | undefined }> = []
       for (let i = 0; i < items.length; i++) {
         for (const result of this.buildPropPaths(items[i], propName)) {
           results.push({

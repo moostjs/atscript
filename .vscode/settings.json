@@ -1,8 +1,6 @@
 {
   "extensions.ignoreRecommendations": true,
-  "eslint.validate": [
-    "yaml"
-  ],
+  "eslint.validate": ["yaml"],
   "[css]": {
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode"

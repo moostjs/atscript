@@ -1,3 +1,4 @@
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import type { InitializeParams, InitializeResult } from 'vscode-languageserver/node'
 import {
   createConnection,
@@ -5,7 +6,6 @@ import {
   TextDocuments,
   TextDocumentSyncKind,
 } from 'vscode-languageserver/node'
-import { TextDocument } from 'vscode-languageserver-textdocument'
 
 import { VscodeAtscriptRepo } from './repo'
 

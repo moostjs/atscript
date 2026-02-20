@@ -1,5 +1,5 @@
 import { AnnotationSpec } from '../annotations'
-import { TAnnotationsTree } from '../config'
+import type { TAnnotationsTree } from '../config'
 
 export const emitAnnotations: TAnnotationsTree = {
   jsonSchema: new AnnotationSpec({

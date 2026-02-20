@@ -4,31 +4,33 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 
 ## Key source files
 
-| File | Role |
-|------|------|
-| `src/plugin.ts` | Plugin entry point; implements `TAtscriptPlugin` with `render()` and `buildEnd()` hooks |
-| `src/index.ts` | Main export; re-exports the plugin as default |
-| `src/utils.ts` | Secondary export (`@atscript/typescript/utils`); re-exports runtime utilities for generated code |
-| `src/annotated-type.ts` | Core runtime type system: `TAtscriptAnnotatedType`, `defineAnnotatedType()` builder, `annotate()`, type guards |
-| `src/traverse.ts` | `forAnnotatedType()` -- type-safe kind-dispatch used by validator, json-schema, and serializer |
-| `src/validator.ts` | `Validator` class -- validates values against annotated types with plugin support |
-| `src/json-schema.ts` | `buildJsonSchema()` -- converts annotated types to JSON Schema objects |
-| `src/serialize.ts` | `serializeAnnotatedType()` / `deserializeAnnotatedType()` -- JSON-safe round-trip |
-| `src/codegen/base-renderer.ts` | `BaseRenderer` -- walks `AtscriptDoc` nodes, dispatches to `renderInterface/renderType/renderImport/renderAnnotate` |
-| `src/codegen/type-renderer.ts` | `TypeRenderer` extends `BaseRenderer` -- generates `.d.ts` output |
-| `src/codegen/js-renderer.ts` | `JsRenderer` extends `BaseRenderer` -- generates `.js` output with runtime type metadata |
-| `src/codegen/code-printer.ts` | `CodePrinter` -- indentation-aware code string builder (write/writeln/block/pop) |
-| `src/codegen/utils.ts` | `wrapProp()`, `escapeQuotes()` -- shared codegen helpers |
-| `src/cli/cli.ts` | CLI entry point; boots a `CliApp` with `Commands` controller |
-| `src/cli/commands.controller.ts` | `Commands` class -- implements the default `asc` command (build with diagnostics) |
-| `src/atscript.d.ts` | Global type declarations for `AtscriptMetadata` interface and `AtscriptPrimitiveTags` |
+| File                             | Role                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `src/plugin.ts`                  | Plugin entry point; implements `TAtscriptPlugin` with `render()` and `buildEnd()` hooks                             |
+| `src/index.ts`                   | Main export; re-exports the plugin as default                                                                       |
+| `src/utils.ts`                   | Secondary export (`@atscript/typescript/utils`); re-exports runtime utilities for generated code                    |
+| `src/annotated-type.ts`          | Core runtime type system: `TAtscriptAnnotatedType`, `defineAnnotatedType()` builder, `annotate()`, type guards      |
+| `src/traverse.ts`                | `forAnnotatedType()` -- type-safe kind-dispatch used by validator, json-schema, and serializer                      |
+| `src/validator.ts`               | `Validator` class -- validates values against annotated types with plugin support                                   |
+| `src/json-schema.ts`             | `buildJsonSchema()` -- converts annotated types to JSON Schema objects                                              |
+| `src/serialize.ts`               | `serializeAnnotatedType()` / `deserializeAnnotatedType()` -- JSON-safe round-trip                                   |
+| `src/codegen/base-renderer.ts`   | `BaseRenderer` -- walks `AtscriptDoc` nodes, dispatches to `renderInterface/renderType/renderImport/renderAnnotate` |
+| `src/codegen/type-renderer.ts`   | `TypeRenderer` extends `BaseRenderer` -- generates `.d.ts` output                                                   |
+| `src/codegen/js-renderer.ts`     | `JsRenderer` extends `BaseRenderer` -- generates `.js` output with runtime type metadata                            |
+| `src/codegen/code-printer.ts`    | `CodePrinter` -- indentation-aware code string builder (write/writeln/block/pop)                                    |
+| `src/codegen/utils.ts`           | `wrapProp()`, `escapeQuotes()` -- shared codegen helpers                                                            |
+| `src/cli/cli.ts`                 | CLI entry point; boots a `CliApp` with `Commands` controller                                                        |
+| `src/cli/commands.controller.ts` | `Commands` class -- implements the default `asc` command (build with diagnostics)                                   |
+| `src/atscript.d.ts`              | Global type declarations for `AtscriptMetadata` interface and `AtscriptPrimitiveTags`                               |
 
 ## Public API surface
 
 ### Default export (`@atscript/typescript`)
+
 - `tsPlugin(opts?)` -- factory returning a `TAtscriptPlugin` (the codegen plugin)
 
 ### `@atscript/typescript/utils` (runtime, used by generated .js files)
+
 - `defineAnnotatedType(kind?, base?)` -- fluent builder for `TAtscriptAnnotatedType`
 - `annotate(metadata, key, value, asArray?)` -- set/append metadata on annotated types
 - `isAnnotatedType(type)` / `isAnnotatedTypeOfPrimitive(type)` -- type guards

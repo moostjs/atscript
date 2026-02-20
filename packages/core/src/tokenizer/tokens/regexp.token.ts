@@ -1,4 +1,5 @@
 import { BasicNode } from '@prostojs/parser'
+
 import type { TLexicalToken } from '../types'
 
 const REGEXP_LITERAL_RE = /\/(?![/*])(?:\\.|\[.*?]|[^/\\\n\r[])*\/[dgimsuy]*/

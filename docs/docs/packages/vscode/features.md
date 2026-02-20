@@ -38,6 +38,7 @@ The extension provides context-aware completions triggered by typing or by speci
 ### Keyword Completions
 
 At the top level of an `.as` file, the extension suggests:
+
 - `import`, `export`, `annotate`, `interface`, `type`
 - After `export`: `annotate`, `interface`, `type`
 
@@ -50,6 +51,7 @@ Annotation arguments are also completed — predefined allowed values appear for
 ### Type Completions
 
 When typing in a type position (after `:`, `=`, `|`, `&`), the extension suggests:
+
 - All declared types and interfaces in the current file
 - All imported types
 - All primitive types from the configuration
@@ -68,12 +70,14 @@ For nested property access (e.g., `address.city`), the extension resolves the ty
 The extension reports errors in real-time as you type, with a short debounce delay for performance.
 
 **Errors** reported include:
+
 - Syntax errors
 - Unknown identifiers (unresolved type references)
 - Invalid annotations (wrong context or arguments)
 - Unknown properties in `annotate` blocks
 
 **Hints** include:
+
 - Unused tokens — displayed as faded/dimmed text, helping you identify dead code
 
 Diagnostics update automatically when related files change. If you modify a type that other files import, those files are re-validated too.

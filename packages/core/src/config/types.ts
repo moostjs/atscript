@@ -1,6 +1,6 @@
 import type { AnnotationSpec } from '../annotations/annotation-spec'
 import type { TPrimitiveConfig } from '../parser/nodes'
-import { TAtscriptPlugin, TAtscriptRenderFormat } from '../plugin/types'
+import type { TAtscriptPlugin, TAtscriptRenderFormat } from '../plugin/types'
 
 export interface TAtscriptConfigInput {
   rootDir: string

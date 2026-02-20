@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+
 import { defineAnnotatedType } from './annotated-type'
 import { Validator, type TValidatorPlugin, type TValidatorPluginContext } from './validator'
 
@@ -243,7 +244,9 @@ describe('Validator @meta.required', () => {
   })
 
   it('should use custom error message', () => {
-    const t = defineAnnotatedType().designType('string').annotate('meta.required', { message: 'Name is required' })
+    const t = defineAnnotatedType()
+      .designType('string')
+      .annotate('meta.required', { message: 'Name is required' })
     const validator = new Validator(t.$type)
     expect(validator.validate('', true)).toBe(false)
     expect(validator.errors[0].message).toBe('Name is required')
@@ -263,7 +266,9 @@ describe('Validator @meta.required', () => {
   })
 
   it('should use custom error message for boolean', () => {
-    const t = defineAnnotatedType().designType('boolean').annotate('meta.required', { message: 'You must accept the terms' })
+    const t = defineAnnotatedType()
+      .designType('boolean')
+      .annotate('meta.required', { message: 'You must accept the terms' })
     const validator = new Validator(t.$type)
     expect(validator.validate(false, true)).toBe(false)
     expect(validator.errors[0].message).toBe('You must accept the terms')
