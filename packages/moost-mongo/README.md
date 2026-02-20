@@ -40,7 +40,9 @@ export interface User {
 
 ```ts
 import { AsMongoController, CollectionController } from '@atscript/moost-mongo'
-import type { User } from '../collections/user.collection.as'
+import { AsMongo } from '@atscript/mongo'
+import { Provide } from 'moost'
+import { User } from '../collections/user.collection.as'
 
 /* Provide AsMongo connection for the controller */
 @Provide(AsMongo, () => new AsMongo(process.env.MONGO_URI!))
@@ -85,6 +87,7 @@ Base class you extend. **T** is the atscript constructor exported from the
 | --------------------------- | ------------------------------------ | --------------------------------------- |
 | `protected init()`          | Once at controller creation          | Create indexes, seed data               |
 | `transformProjection()`     | Before running `find()`              | Force whitelist / blacklist projections |
+| `transformFilter(filter)`   | Before every query                   | Rewrite or restrict query filters       |
 | `validate*Controls()`       | Per endpoint                         | Custom URLQL control validation         |
 | `onRemove(id, opts)`        | Before `deleteOne`                   | Soft‑delete or veto                     |
 | `onWrite(action,data,opts)` | Before any insert / update / replace | Auto‑populate fields, audit, veto       |
@@ -171,4 +174,4 @@ export class UsersController extends AsMongoController<typeof User> {
 
 ## License
 
-MIT © 2025 Artem Maltsev
+ISC © 2025 Artem Maltsev

@@ -941,7 +941,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const config = await manager.getDocConfig()
       const atscript = new AtscriptDoc(id, config, manager)
       atscript.update(td.getText())
-      await manager.onDocumnet(atscript)
+      await manager.onDocument(atscript)
       return atscript
     }
     return super._openDocument(id, text)

@@ -248,7 +248,7 @@ export class AtscriptRepo {
     }
     const atscript = new AtscriptDoc(id, await manager.getDocConfig(), manager)
     atscript.update(content)
-    await manager.onDocumnet(atscript)
+    await manager.onDocument(atscript)
     return atscript
   }
 

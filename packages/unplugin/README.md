@@ -7,7 +7,7 @@ An Unplugin for processing `.as` files using [Atscript](https://github.com/moost
 - Supports `.as` file resolution and transformation
 - Loads and processes `.as` files with Atscript
 - Generates JavaScript output
-- Compatible with Vite, Rollup, and other Unplugin-supported bundlers
+- Compatible with Vite, Rollup, Rolldown, Webpack, Rspack, esbuild, and Farm
 
 ## Installation
 
@@ -57,17 +57,49 @@ export default {
 }
 ```
 
+### Webpack
+
+```js
+// webpack.config.js
+const atscript = require('unplugin-atscript')
+
+module.exports = {
+  plugins: [atscript.webpack()],
+}
+```
+
+### esbuild
+
+```js
+import atscript from 'unplugin-atscript'
+import { build } from 'esbuild'
+
+build({
+  plugins: [atscript.esbuild()],
+})
+```
+
+### Rolldown / Rspack / Farm
+
+Use `atscript.rolldown()`, `atscript.rspack()`, or `atscript.farm()` respectively — same pattern as above.
+
 ## How It Works
 
 1. Resolves `.as` files in the project.
 2. Loads the Atscript configuration.
-3. Uses `@atscript/core` to parse and transform `.as` files into JavaScript.
+3. Uses `@atscript/core` and `@atscript/typescript` to parse and transform `.as` files into JavaScript.
 4. Outputs the generated JavaScript for further processing.
 
 ## Configuration
 
-The plugin automatically loads the Atscript configuration from your project. You can define additional options in your Atscript configuration file (`atscript.config.js` or `atscript.config.ts`).
+The plugin automatically loads the Atscript configuration from your project. You can define additional options in your Atscript configuration file (`atscript.config.{js,mjs,cjs,ts,mts,cts}`).
+
+### Plugin Options
+
+| Option   | Type      | Default | Description                                                        |
+| -------- | --------- | ------- | ------------------------------------------------------------------ |
+| `strict` | `boolean` | `true`  | When `true`, throws an error if any `.as` document has diagnostics |
 
 ## License
 
-MIT
+ISC

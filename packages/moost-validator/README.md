@@ -80,9 +80,9 @@ async create(@Body() dto: CreateUserDto) {}
 
 | Export                          | Type            | Description                                                                                                                                                                       |
 | ------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `validatorPipe(opts?)`          | `PipeFn`        | Low‑level factory. Returns a pipe that runs `type.validator(opts).validate(value)` on the argument **if** the type was produced by atscript. Registered with priority `VALIDATE`. |
+| `validatorPipe(opts?)`          | `TPipeFn`        | Low‑level factory. Returns a pipe that runs `type.validator(opts).validate(value)` on the argument **if** the type was produced by atscript. Registered with priority `VALIDATE`. |
 | `UseValidatorPipe(opts?)`       | `Decorator`     | Sugar over `validatorPipe`. Apply to a class, method, parameter, or property.                                                                                                     |
-| `validationErrorTransform()`    | `InterceptorFn` | Catches `ValidatorError`, wraps it into `HttpError(400)` with `{ message, statusCode, _body }`. Priority `CATCH_ERROR`.                                                           |
+| `validationErrorTransform()`    | `TInterceptorFn` | Catches `ValidatorError`, wraps it into `HttpError(400)` with `{ message, statusCode, _body }`. Priority `CATCH_ERROR`.                                                           |
 | `UseValidationErrorTransform()` | `Decorator`     | Sugar over `validationErrorTransform()`.                                                                                                                                          |
 
 ### `opts` (`Partial<TValidatorOptions>`)
@@ -105,4 +105,4 @@ Any options accepted by `atscript.validator(opts)`. E.g. `{ abortEarly: false }`
 
 ## License
 
-MIT © 2025 Artem Maltsev
+ISC © 2025 Artem Maltsev

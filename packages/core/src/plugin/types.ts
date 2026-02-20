@@ -21,7 +21,7 @@ export interface TAtscriptPlugin {
 
   load?: (id: string) => Promise<string | undefined> | string | undefined
 
-  onDocumnet?: (doc: AtscriptDoc) => Promise<void> | void
+  onDocument?: (doc: AtscriptDoc) => Promise<void> | void
 
   render?: (
     doc: AtscriptDoc,

@@ -31,7 +31,7 @@ export function resolveJsonSchemaMode(opts?: TTsPluginOptions): false | 'lazy' |
 
 export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
   return {
-    name: 'typesccript',
+    name: 'typescript',
 
     render(doc, format) {
       if (format === 'dts') {

@@ -9,7 +9,7 @@ Core library for Atscript: parses `.as` files into a semantic AST, tracks cross-
 | `src/document.ts`                    | `AtscriptDoc` -- central class representing a single `.as` file; owns parsing, token/block indexes, imports, exports, diagnostics, type resolution (`unwindType`), and annotation merging |
 | `src/repo.ts`                        | `AtscriptRepo` -- document repository; caches open documents, resolves configs per-file, manages cross-file import checking and dependency wiring                                         |
 | `src/build.ts`                       | `build()` entry point and `BuildRepo` -- glob entries, open docs, run diagnostics, call plugin `render`/`buildEnd`, write output files                                                    |
-| `src/plugin/types.ts`                | `TAtscriptPlugin` interface -- the plugin contract (hooks: `config`, `resolve`, `load`, `onDocumnet`, `render`, `buildEnd`)                                                               |
+| `src/plugin/types.ts`                | `TAtscriptPlugin` interface -- the plugin contract (hooks: `config`, `resolve`, `load`, `onDocument`, `render`, `buildEnd`)                                                               |
 | `src/plugin/plugin-manager.ts`       | `PluginManager` -- iterates plugins for each lifecycle hook; builds merged config; creates `TAtscriptDocConfig` with resolved primitives and annotations                                  |
 | `src/config/types.ts`                | `TAtscriptConfig`, `TAnnotationsTree` -- configuration shape for `atscript.config.*` files                                                                                                |
 | `src/config/load-config.ts`          | `resolveConfigFile`, `loadConfig` -- walks up directories to find `atscript.config.*`, bundles TS configs via rolldown, dynamic-imports JS configs                                        |
@@ -52,7 +52,7 @@ Plugins implement the `TAtscriptPlugin` interface with these hooks (all optional
 | `config(config)`                 | During `PluginManager.config()` init            | Extend/modify the merged config (add primitives, annotations, etc.); return value is merged via `defu` |
 | `resolve(id)`                    | `AtscriptRepo._openDocument`                    | Resolve a document ID to a final path (virtual modules, aliases)                                       |
 | `load(id)`                       | `AtscriptRepo._openDocument`                    | Provide file content for a document ID (virtual file systems)                                          |
-| `onDocumnet(doc)`                | After a doc is parsed and registered            | Post-parse processing (add virtual props, validate, etc.)                                              |
+| `onDocument(doc)`                | After a doc is parsed and registered            | Post-parse processing (add virtual props, validate, etc.)                                              |
 | `render(doc, format)`            | `AtscriptDoc.render()` / `BuildRepo.generate()` | Generate output files (`.d.ts`, `.js`, etc.) from a parsed document                                    |
 | `buildEnd(output, format, repo)` | After all docs are rendered                     | Post-build hook (aggregate outputs, generate index files)                                              |
 

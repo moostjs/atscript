@@ -96,10 +96,10 @@ export class PluginManager {
     return content.toString()
   }
 
-  async onDocumnet(doc: AtscriptDoc) {
+  async onDocument(doc: AtscriptDoc) {
     for (const plugin of this.plugins) {
-      if (plugin.onDocumnet) {
-        await plugin.onDocumnet(doc)
+      if (plugin.onDocument) {
+        await plugin.onDocument(doc)
       }
     }
   }

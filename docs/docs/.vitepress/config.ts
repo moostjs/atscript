@@ -374,6 +374,7 @@ export default defineConfig({
         {
           text: 'Setup & Tooling',
           items: [
+            { text: 'Installation', link: '/packages/typescript/installation' },
             { text: 'Configuration', link: '/packages/typescript/configuration' },
             { text: 'CLI', link: '/packages/typescript/cli' },
             { text: 'Build Setup', link: '/packages/typescript/build-setup' },
@@ -382,6 +383,7 @@ export default defineConfig({
         {
           text: 'Advanced',
           items: [
+            { text: 'Code Generation', link: '/packages/typescript/code-generation' },
             { text: 'Custom Primitives', link: '/packages/typescript/custom-primitives' },
             { text: 'Custom Annotations', link: '/packages/typescript/custom-annotations' },
           ],

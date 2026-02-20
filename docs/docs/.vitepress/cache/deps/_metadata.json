@@ -1,43 +1,43 @@
 {
-  "hash": "72d28e72",
+  "hash": "c6d220b0",
   "configHash": "9518667b",
-  "lockfileHash": "54fa39c7",
-  "browserHash": "c83a097d",
+  "lockfileHash": "a45a4c17",
+  "browserHash": "63eec1d3",
   "optimized": {
     "vue": {
       "src": "../../../../../node_modules/.pnpm/vue@3.5.21_typescript@5.9.3/node_modules/vue/dist/vue.runtime.esm-bundler.js",
       "file": "vue.js",
-      "fileHash": "5e92d93d",
+      "fileHash": "2d9071ca",
       "needsInterop": false
     },
     "vitepress > @vue/devtools-api": {
       "src": "../../../../../node_modules/.pnpm/@vue+devtools-api@7.7.1/node_modules/@vue/devtools-api/dist/index.js",
       "file": "vitepress___@vue_devtools-api.js",
-      "fileHash": "14c577a1",
+      "fileHash": "b634c5ee",
       "needsInterop": false
     },
     "vitepress > @vueuse/core": {
       "src": "../../../../../node_modules/.pnpm/@vueuse+core@12.5.0_typescript@5.9.3/node_modules/@vueuse/core/index.mjs",
       "file": "vitepress___@vueuse_core.js",
-      "fileHash": "723b9a85",
+      "fileHash": "403edce3",
       "needsInterop": false
     },
     "vitepress > @vueuse/integrations/useFocusTrap": {
       "src": "../../../../../node_modules/.pnpm/@vueuse+integrations@12.5.0_focus-trap@7.6.4_typescript@5.9.3/node_modules/@vueuse/integrations/useFocusTrap.mjs",
       "file": "vitepress___@vueuse_integrations_useFocusTrap.js",
-      "fileHash": "3816eaf1",
+      "fileHash": "b6210d47",
       "needsInterop": false
     },
     "vitepress > mark.js/src/vanilla.js": {
       "src": "../../../../../node_modules/.pnpm/mark.js@8.11.1/node_modules/mark.js/src/vanilla.js",
       "file": "vitepress___mark__js_src_vanilla__js.js",
-      "fileHash": "a125827d",
+      "fileHash": "985a58f4",
       "needsInterop": false
     },
     "vitepress > minisearch": {
       "src": "../../../../../node_modules/.pnpm/minisearch@7.1.1/node_modules/minisearch/dist/es/index.js",
       "file": "vitepress___minisearch.js",
-      "fileHash": "8e5eea4c",
+      "fileHash": "a95ed003",
       "needsInterop": false
     }
   },
