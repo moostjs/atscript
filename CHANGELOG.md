@@ -1,3 +1,12 @@
+## [0.1.19](https://github.com/moostjs/atscript/compare/v0.1.18...v0.1.19) (2026-02-20)
+
+
+### Bug Fixes
+
+* fix typo ([2375f7c](https://github.com/moostjs/atscript/commit/2375f7c77989f3d3fb8467f3630ed9e4293298ac))
+
+
+
 ## [0.1.18](https://github.com/moostjs/atscript/compare/v0.1.17...v0.1.18) (2026-02-20)
 
 
