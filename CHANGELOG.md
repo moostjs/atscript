@@ -1,3 +1,12 @@
+## [0.1.22](https://github.com/moostjs/atscript/compare/v0.1.21...v0.1.22) (2026-02-21)
+
+
+### Features
+
+* add type utility TAtscriptDataType ([7348267](https://github.com/moostjs/atscript/commit/7348267eae8506980af253631f73bf7f7ca0a87b))
+
+
+
 ## [0.1.21](https://github.com/moostjs/atscript/compare/v0.1.20...v0.1.21) (2026-02-21)
 
 
