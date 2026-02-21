@@ -1,3 +1,12 @@
+## [0.1.21](https://github.com/moostjs/atscript/compare/v0.1.20...v0.1.21) (2026-02-21)
+
+
+### Features
+
+* add toExampleData() ([d1be890](https://github.com/moostjs/atscript/commit/d1be89013ed8e02a23366f97d2ff35989de216fc))
+
+
+
 ## [0.1.20](https://github.com/moostjs/atscript/compare/v0.1.19...v0.1.20) (2026-02-21)
 
 
