@@ -45,7 +45,7 @@ export declare class ArraysCollection {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ArraysCollection>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
-  /** @deprecated Example Data support is disabled. Calling this method will throw a runtime error. To enable, set `exampleData: 'lazy'` or `exampleData: 'bundle'` in tsPlugin options, or add `@emit.exampleData` annotation to individual interfaces. */
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
 }
 // prettier-ignore-end
