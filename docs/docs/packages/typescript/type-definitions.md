@@ -380,6 +380,99 @@ The handle provides methods like `.designType()`, `.value()`, `.tags()`, `.of()`
 - `isAnnotatedTypeOfPrimitive(type)` — returns `true` if the type resolves to a primitive shape (not object or array). Recursively checks union/intersection/tuple members.
 - `isPhantomType(def)` — returns `true` if the type is a [phantom](/packages/typescript/primitives#phantom-type) type (`kind === ''` and `designType === 'phantom'`)
 
+## Default Data Generation
+
+`createDataFromAnnotatedType()` creates a data object that conforms to an annotated type's shape. It supports four modes for controlling how values are resolved.
+
+### Basic Usage
+
+```typescript
+import { createDataFromAnnotatedType } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+// Empty mode (default) — structural defaults only
+const empty = createDataFromAnnotatedType(Product)
+// { name: '', price: 0, tags: [] }
+
+// Default mode — reads @meta.default annotations
+const withDefaults = createDataFromAnnotatedType(Product, { mode: 'default' })
+
+// Example mode — reads @meta.example annotations
+const withExamples = createDataFromAnnotatedType(Product, { mode: 'example' })
+```
+
+### Modes
+
+| Mode | Value source | Optional props |
+|------|-------------|----------------|
+| `'empty'` | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped |
+| `'default'` | `@meta.default` annotations | Skipped unless annotated |
+| `'example'` | `@meta.example` annotations | Skipped unless annotated |
+| `function` | Custom resolver callback | Skipped unless resolver returns a value |
+
+### Annotations
+
+`@meta.default` and `@meta.example` accept a string argument. For string fields, the value is used as-is. For other types, it is parsed as JSON:
+
+```atscript
+export interface User {
+    @meta.default "unknown"
+    name: string
+
+    @meta.default "0"
+    age: number
+
+    @meta.example '{"street": "123 Main St", "city": "Springfield"}'
+    address: Address
+
+    @meta.example '["admin", "user"]'
+    roles: string[]
+}
+```
+
+When an annotation is set on a complex type (object, array) and passes validation, the entire subtree is used as-is — inner properties are not traversed. If validation fails, the annotation is ignored and the utility falls back to building from inner properties.
+
+### Validation
+
+All resolved values are validated against the full type definition (including `@expect.*` constraints). If a default or example value doesn't pass validation, it is silently ignored and the structural default is used instead.
+
+### Custom Resolver
+
+Pass a function to compute values per field:
+
+```typescript
+const data = createDataFromAnnotatedType(Product, {
+  mode: (prop, path) => {
+    if (path === 'name') return 'Custom Name'
+    if (path === 'price') return 9.99
+    return undefined // fall through to structural default
+  },
+})
+```
+
+The resolver receives the `TAtscriptAnnotatedType` for each field and the dot-separated path. Return `undefined` to use the structural default. Returned values are validated against the type — invalid values are skipped.
+
+### Optional Props
+
+Optional properties are **omitted** from the output (the key is not present in the object) unless the active mode provides a value for them:
+
+```atscript
+export interface User {
+    name: string
+    @meta.default "buddy"
+    nickname?: string
+    bio?: string
+}
+```
+
+```typescript
+createDataFromAnnotatedType(User, { mode: 'empty' })
+// { name: '' }  — both optional props omitted
+
+createDataFromAnnotatedType(User, { mode: 'default' })
+// { name: '', nickname: 'buddy' }  — bio omitted, nickname included
+```
+
 ## Next Steps
 
 - [Validation](/packages/typescript/validation) — validate data against annotated types

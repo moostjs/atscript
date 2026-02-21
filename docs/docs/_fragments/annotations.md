@@ -123,6 +123,8 @@ Atscript provides common-purpose annotations:
 - `@meta.placeholder 'text'` - UI placeholder text
 - `@meta.sensitive` - Marks sensitive data
 - `@meta.readonly` - Read-only field
+- `@meta.default 'value'` - Default value (string as-is, other types parsed as JSON)
+- `@meta.example 'value'` - Example value (string as-is, other types parsed as JSON)
 - `@meta.isKey` - Key field in arrays for lookups
 
 ### Validation Annotations (@expect.\*)

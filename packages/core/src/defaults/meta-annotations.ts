@@ -133,6 +133,52 @@ export const metaAnnotations: TAnnotationsTree = {
     ],
   }),
 
+  default: new AnnotationSpec({
+    description:
+      'Defines a **default value** for a property or type. ' +
+      'For string fields the value is used as-is; for other types it is parsed as JSON.' +
+      '\n\n**Example:**' +
+      '```atscript' +
+      '@meta.default "unknown"' +
+      'name: string' +
+      '\n' +
+      '@meta.default "0"' +
+      'count: number' +
+      '\n' +
+      '@meta.default \'{"street":"","city":""}\'' +
+      'address: Address' +
+      '```',
+    nodeType: ['prop', 'type'],
+    argument: {
+      name: 'value',
+      type: 'string',
+      description: 'The default value. Strings are used as-is; other types are parsed as JSON.',
+    },
+  }),
+
+  example: new AnnotationSpec({
+    description:
+      'Defines an **example value** for a property or type, useful for documentation and data generation. ' +
+      'For string fields the value is used as-is; for other types it is parsed as JSON.' +
+      '\n\n**Example:**' +
+      '```atscript' +
+      '@meta.example "John Doe"' +
+      'name: string' +
+      '\n' +
+      '@meta.example "42"' +
+      'age: number' +
+      '\n' +
+      '@meta.example \'["admin","user"]\'' +
+      'roles: string[]' +
+      '```',
+    nodeType: ['prop', 'type'],
+    argument: {
+      name: 'value',
+      type: 'string',
+      description: 'The example value. Strings are used as-is; other types are parsed as JSON.',
+    },
+  }),
+
   isKey: new AnnotationSpec({
     description:
       'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +

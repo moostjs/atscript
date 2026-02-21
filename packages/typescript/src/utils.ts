@@ -24,6 +24,9 @@ export { buildJsonSchema, fromJsonSchema } from './json-schema'
 
 export { forAnnotatedType } from './traverse'
 
+export { createDataFromAnnotatedType } from './default-value'
+export type { TCreateDataOptions, TValueResolver } from './default-value'
+
 export { flattenAnnotatedType } from './flatten'
 export type { TFlattenOptions } from './flatten'
 
