@@ -1,6 +1,6 @@
 {
   "name": "atscript",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Atscript is a language for describing data and interfaces with extensible annotations, enabling the generation of files at runtime for streamlined workflows.",
   "keywords": [],
   "license": "ISC",
