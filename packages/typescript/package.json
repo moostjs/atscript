@@ -19,11 +19,14 @@
     "directory": "packages/typescript"
   },
   "bin": {
-    "asc": "./cli.cjs"
+    "asc": "./cli.cjs",
+    "setup-skills": "./scripts/setup-skills.js"
   },
   "files": [
     "dist",
-    "cli.cjs"
+    "cli.cjs",
+    "skills",
+    "scripts/setup-skills.js"
   ],
   "type": "module",
   "main": "dist/index.mjs",
@@ -55,7 +58,9 @@
   },
   "scripts": {
     "pub": "pnpm publish --access public",
-    "test": "vitest"
+    "test": "vitest",
+    "setup-skills": "node ./scripts/setup-skills.js",
+    "postinstall": "node ./scripts/setup-skills.js --postinstall"
   },
   "dependencies": {
     "@moostjs/event-cli": "^0.5.32",

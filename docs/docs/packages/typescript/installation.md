@@ -96,6 +96,32 @@ The extension provides:
 - Error checking
 - Auto-generation of `.d.ts` files on save
 
+## AI Agent Skills
+
+`@atscript/typescript` ships an AI agent skill for Claude Code, Cursor, Windsurf, Codex, and other compatible agents. The skill teaches your agent the library's APIs, patterns, and best practices so it can help you write correct code without hallucinating.
+
+**Install the skill into your agent:**
+
+```bash
+# Project-local (recommended — version-locked, commits with your repo)
+npx @atscript/typescript setup-skills
+
+# Global (available across all your projects)
+npx @atscript/typescript setup-skills --global
+```
+
+Restart your agent after installing.
+
+**Auto-update on install** — to keep the skill in sync whenever you upgrade the package, add this to your project's `package.json`:
+
+```jsonc
+{
+  "scripts": {
+    "postinstall": "npx @atscript/typescript setup-skills --postinstall"
+  }
+}
+```
+
 ## Next Steps
 
 - [Quick Start](/packages/typescript/quick-start) — Create your first .as file
