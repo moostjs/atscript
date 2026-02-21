@@ -1,3 +1,13 @@
+## [0.1.20](https://github.com/moostjs/atscript/compare/v0.1.19...v0.1.20) (2026-02-21)
+
+
+### Features
+
+* add skill setup ([fa15cd5](https://github.com/moostjs/atscript/commit/fa15cd55139e648d83972263ae156946a1d2ef0b))
+* **ts:** add createDataFromAnnotatedType ([914edd6](https://github.com/moostjs/atscript/commit/914edd603772fafc506f53308ece54ae4ce12d0a))
+
+
+
 ## [0.1.19](https://github.com/moostjs/atscript/compare/v0.1.18...v0.1.19) (2026-02-20)
 
 
