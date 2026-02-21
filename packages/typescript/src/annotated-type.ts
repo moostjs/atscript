@@ -71,6 +71,30 @@ export interface TAtscriptTypeFinal<DataType = unknown> {
  */
 export type InferDataType<T> = T extends { __dataType?: infer D } ? D : unknown
 
+/**
+ * Extract the DataType from a {@link TAtscriptAnnotatedType}.
+ *
+ * Resolves the phantom `__dataType` carried by the type definition.
+ * When `__dataType` is `unknown` (unset), falls back to the constructor
+ * instance type if `T` is also a class (i.e. a generated interface).
+ *
+ * @example
+ * ```ts
+ * import type { TAtscriptDataType } from '@atscript/typescript/utils'
+ * import MyInterface from './my-interface.as'
+ *
+ * type Data = TAtscriptDataType<typeof MyInterface>
+ * ```
+ */
+export type TAtscriptDataType<T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType> =
+  T extends { type: { __dataType?: infer D } }
+    ? unknown extends D
+      ? T extends new (...args: any[]) => infer I
+        ? I
+        : unknown
+      : D
+    : unknown
+
 /** Union of all possible type definition shapes. */
 export type TAtscriptTypeDef<DataType = unknown> =
   | TAtscriptTypeComplex<DataType>

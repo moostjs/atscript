@@ -1,13 +1,14 @@
 // eslint-disable max-lines
 // eslint-disable max-params
-import type { Validator } from '@atscript/typescript/utils'
 import {
   isAnnotatedType,
+  flattenAnnotatedType,
+  type Validator,
   type TAtscriptAnnotatedType,
+  type TAtscriptDataType,
   type TAtscriptTypeObject,
   type TMetadataMap,
   type TValidatorOptions,
-  flattenAnnotatedType,
 } from '@atscript/typescript/utils'
 import type { Collection, Filter, InsertOneOptions, ReplaceOptions, UpdateOptions } from 'mongodb'
 import { ObjectId } from 'mongodb'
@@ -56,13 +57,7 @@ type TValidatorPurpose = 'insert' | 'update' | 'patch'
 
 export class AsCollection<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
-  DataType = T extends { type: { __dataType?: infer D } }
-    ? unknown extends D
-      ? T extends new (...args: any[]) => infer I
-        ? I
-        : unknown
-      : D
-    : unknown,
+  DataType = TAtscriptDataType<T>,
 > {
   public readonly name: string
 

@@ -300,6 +300,55 @@ import { isPhantomType } from '@atscript/typescript/utils'
 isPhantomType(someProperty)  // true if designType === 'phantom'
 ```
 
+## `TAtscriptDataType<T>` — Extract DataType from Annotated Type
+
+Utility type that extracts the underlying data shape from a `TAtscriptAnnotatedType`. This is the primary way to obtain a TypeScript data type from an Atscript-generated class, especially useful in generic contexts.
+
+```ts
+import type { TAtscriptDataType } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+type ProductData = TAtscriptDataType<typeof Product>
+// ProductData = { name: string; price: number; tags: string[] }
+```
+
+### How It Resolves
+
+1. Extracts the phantom `__dataType` from the type definition
+2. If `__dataType` is `unknown` (unset), falls back to the constructor's instance type (`T extends new (...) => infer I`)
+3. Otherwise returns `unknown`
+
+### Use in Generics
+
+`TAtscriptDataType` is designed for generic code that needs to derive data types from annotated type parameters:
+
+```ts
+import type { TAtscriptAnnotatedType, TAtscriptDataType } from '@atscript/typescript/utils'
+
+// Generic repository that infers its entity type
+class Repository<T extends TAtscriptAnnotatedType> {
+  findOne(id: string): Promise<TAtscriptDataType<T>> { /* ... */ }
+  insertOne(data: TAtscriptDataType<T>): Promise<void> { /* ... */ }
+}
+
+// Usage — DataType is automatically inferred
+const repo = new Repository<typeof Product>()
+const product = await repo.findOne('123') // typed as Product
+
+// Generic function
+function validate<T extends TAtscriptAnnotatedType>(
+  schema: T,
+  data: unknown
+): data is TAtscriptDataType<T> {
+  return schema.validator().validate(data, true)
+}
+```
+
+### Difference from `InferDataType`
+
+- `TAtscriptDataType<T>` — operates on `TAtscriptAnnotatedType` (the full annotated wrapper). Use this for generated classes and generic code.
+- `InferDataType<T>` — operates on raw type definitions (`TAtscriptTypeDef`, `TAtscriptTypeObject`, etc.). Lower-level, extracts `__dataType` from the type def's phantom generic directly.
+
 ## Type Exports
 
 Key types you may need to import:
@@ -315,7 +364,8 @@ import type {
   TAtscriptTypeComplex,           // union/intersection/tuple type def
   TMetadataMap,                   // typed metadata map
   TAnnotatedTypeHandle,           // fluent builder handle
-  InferDataType,                  // extract DataType from a type def
+  InferDataType,                  // extract DataType from a type def's phantom generic
+  TAtscriptDataType,              // extract DataType from TAtscriptAnnotatedType
   TValidatorOptions,              // validator config
   TValidatorPlugin,               // plugin function type
   TValidatorPluginContext,         // plugin context

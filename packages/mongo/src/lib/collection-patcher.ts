@@ -1,6 +1,6 @@
 // oxlint-disable max-lines
 // oxlint-disable max-depth
-import type { TAtscriptAnnotatedType, TAtscriptTypeArray } from '@atscript/typescript/utils'
+import type { TAtscriptAnnotatedType, TAtscriptDataType, TAtscriptTypeArray } from '@atscript/typescript/utils'
 import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 
@@ -30,13 +30,7 @@ import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './va
  */
 export class CollectionPatcher<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
-  DataType = T extends { type: { __dataType?: infer D } }
-    ? unknown extends D
-      ? T extends new (...args: any[]) => infer I
-        ? I
-        : unknown
-      : D
-    : unknown,
+  DataType = TAtscriptDataType<T>,
 > {
   constructor(
     private collection: AsCollection<T>,

@@ -16,6 +16,7 @@ export type {
   TMetadataMap,
   TAtscriptTypeDef,
   InferDataType,
+  TAtscriptDataType,
 } from './annotated-type'
 
 export * from './validator'

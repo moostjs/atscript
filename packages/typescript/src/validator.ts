@@ -2,6 +2,7 @@
 // eslint-disable max-lines
 import type {
   TAtscriptAnnotatedType,
+  TAtscriptDataType,
   TAtscriptTypeArray,
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
@@ -75,13 +76,7 @@ export interface TValidatorPluginContext {
  */
 export class Validator<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
-  DataType = T extends { type: { __dataType?: infer D } }
-    ? unknown extends D
-      ? T extends new (...args: any[]) => infer I
-        ? I
-        : unknown
-      : D
-    : unknown,
+  DataType = TAtscriptDataType<T>,
 > {
   protected opts: TValidatorOptions
 

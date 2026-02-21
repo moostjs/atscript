@@ -1,6 +1,6 @@
 import type { AsMongo, AsCollection } from '@atscript/mongo'
 import type { Validator } from '@atscript/typescript/utils'
-import { ValidatorError, type TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+import { ValidatorError, type TAtscriptAnnotatedType, type TAtscriptDataType } from '@atscript/typescript/utils'
 // oxlint-disable max-lines
 import { Body, Delete, Get, HttpError, Patch, Post, Put, Url } from '@moostjs/event-http'
 import type {
@@ -46,13 +46,7 @@ import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/con
  */
 export class AsMongoController<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
-  DataType = T extends { type: { __dataType?: infer D } }
-    ? unknown extends D
-      ? T extends new (...args: any[]) => infer I
-        ? I
-        : unknown
-      : D
-    : unknown,
+  DataType = TAtscriptDataType<T>,
 > {
   /** Reference to the lazily created {@link AsCollection}. */
   protected asCollection: AsCollection<T>

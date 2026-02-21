@@ -69,7 +69,19 @@ function processData(data: unknown) {
 }
 ```
 
-Use `InferDataType<T>` to extract the DataType from any type definition:
+Use `TAtscriptDataType<T>` to extract the DataType from any annotated type — this is the recommended utility for end users:
+
+```typescript
+import type { TAtscriptDataType } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+type ProductData = TAtscriptDataType<typeof Product>
+// ProductData = { name: string; price: number; tags: string[] }
+```
+
+When the phantom `__dataType` is `unknown` (unset), `TAtscriptDataType` falls back to the constructor's instance type — so it works seamlessly with both typed and untyped generated interfaces.
+
+For lower-level use, `InferDataType<T>` extracts the DataType from a raw type definition (not an annotated type):
 
 ```typescript
 import type { InferDataType, TAtscriptTypeObject } from '@atscript/typescript/utils'
