@@ -45,8 +45,15 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('/* eslint-disable */')
     this.writeln('/* oxlint-disable */')
     const imports = ['defineAnnotatedType as $', 'annotate as $a']
-    if (resolveJsonSchemaMode(this.opts) === 'lazy') {
+    const jsonSchemaMode = resolveJsonSchemaMode(this.opts)
+    if (jsonSchemaMode === 'lazy') {
       imports.push('buildJsonSchema as $$')
+    }
+    if (this.opts?.exampleData) {
+      imports.push('createDataFromAnnotatedType as $e')
+    }
+    if (jsonSchemaMode === false) {
+      imports.push('throwFeatureDisabled as $d')
     }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
   }
@@ -106,6 +113,7 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
     this.renderJsonSchemaMethod(node)
+    this.renderExampleDataMethod(node)
   }
 
   renderInterface(node: SemanticInterfaceNode): void {
@@ -168,11 +176,15 @@ export class JsRenderer extends BaseRenderer {
       this.writeln('}')
     } else {
       this.writeln('static toJsonSchema() {')
-      this.indent()
-        .writeln(
-          "throw new Error(\"JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.\")"
-        )
-        .unindent()
+      this.indent().writeln('$d("JSON Schema", "jsonSchema", "emit.jsonSchema")').unindent()
+      this.writeln('}')
+    }
+  }
+
+  private renderExampleDataMethod(_node: SemanticNode) {
+    if (this.opts?.exampleData) {
+      this.writeln('static toExampleData() {')
+      this.indent().writeln('return $e(this, { mode: "example" })').unindent()
       this.writeln('}')
     }
   }

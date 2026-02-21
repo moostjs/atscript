@@ -34,7 +34,7 @@ import {
   buildJsonSchema, fromJsonSchema,
   serializeAnnotatedType, deserializeAnnotatedType,
   flattenAnnotatedType, createDataFromAnnotatedType,
-  forAnnotatedType,
+  forAnnotatedType, throwFeatureDisabled,
 } from '@atscript/typescript/utils'
 
 // CLI

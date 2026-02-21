@@ -56,6 +56,37 @@ plugins: [ts({ jsonSchema: 'bundle' })]
 
 Individual interfaces can also opt into build-time embedding via the `@emit.jsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
 
+### `exampleData`
+
+Controls whether generated types include a `toExampleData()` static method. When enabled, each generated class gets a method that creates example data using `@meta.example` annotations.
+
+| Value               | `toExampleData()` behavior                                          |
+| ------------------- | ------------------------------------------------------------------- |
+| `false` _(default)_ | Not rendered in `.js`; `.d.ts` marks it as optional + `@deprecated` |
+| `true`              | Calls `createDataFromAnnotatedType(this, { mode: 'example' })`     |
+
+```javascript
+// Default — no example data method
+plugins: [ts()]
+
+// Enable — each type gets toExampleData()
+plugins: [ts({ exampleData: true })]
+```
+
+Unlike `toJsonSchema`, there is no caching — `toExampleData()` creates a new data object on each call. This is intentional since it acts as a factory function.
+
+::: tip Manual use is always available
+Even with `exampleData: false`, you can import `createDataFromAnnotatedType` from `@atscript/typescript/utils` and call it directly. The config option only affects the _generated_ `.toExampleData()` method.
+
+```typescript
+import { createDataFromAnnotatedType } from '@atscript/typescript/utils'
+import { Product } from './product.as'
+
+const example = createDataFromAnnotatedType(Product, { mode: 'example' })
+```
+
+:::
+
 ## The `atscript.d.ts` File
 
 When you run `asc -f dts`, an `atscript.d.ts` file is generated alongside your output. It declares the global `AtscriptMetadata` interface and `AtscriptPrimitiveTags` type — these provide TypeScript IntelliSense for all annotations and semantic type tags used in your project.

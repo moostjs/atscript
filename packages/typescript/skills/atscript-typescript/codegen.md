@@ -44,6 +44,8 @@ export declare class User {
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof User>
   static toJsonSchema: () => any
+  /** When exampleData is disabled (default), marked @deprecated + optional */
+  static toExampleData?: () => any
 }
 
 export type Status = "active" | "inactive"
@@ -53,13 +55,15 @@ declare namespace Status {
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof Status>
   const toJsonSchema: () => any
+  const toExampleData: (() => any) | undefined
 }
 ```
 
 Key points:
 - **Interfaces** become `declare class` — so they work both as types and runtime values
 - **Types** become a `type` alias + a companion `namespace` with runtime statics
-- Each has `type`, `metadata`, `validator()`, and `toJsonSchema()` statics
+- Each has `type`, `metadata`, `validator()`, `toJsonSchema()`, and `toExampleData()` statics
+- `toExampleData` is always optional in `.d.ts`. When `exampleData: true`, it's rendered without deprecation; when disabled, it's marked `@deprecated`
 
 ## `.js` Output
 
@@ -68,6 +72,8 @@ The JS module creates actual classes with runtime type definitions and metadata:
 - Uses `defineAnnotatedType` (aliased as `$`) to build the type tree
 - Populates metadata maps with all annotation values
 - Wires up `validator()` and `toJsonSchema()` methods
+- When `exampleData: true`, adds `toExampleData()` that calls `createDataFromAnnotatedType(this, { mode: 'example' })` (aliased as `$e`)
+- When `jsonSchema: false` (default), `toJsonSchema()` calls `throwFeatureDisabled()` (aliased as `$d`) instead of inlining the error message
 
 You don't normally read or modify generated JS — the build tool handles it.
 

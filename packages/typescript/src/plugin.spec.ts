@@ -635,7 +635,7 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     expect(out[0].content).toContain('static toJsonSchema()')
-    expect(out[0].content).toContain('throw new Error')
+    expect(out[0].content).toContain('$d("JSON Schema"')
     expect(out[0].content).not.toContain('buildJsonSchema as $$')
     expect(out[0].content).not.toContain('this._jsonSchema')
   })
@@ -681,7 +681,7 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     expect(out[0].content).toContain('static toJsonSchema()')
-    expect(out[0].content).toContain('throw new Error')
+    expect(out[0].content).toContain('$d("JSON Schema"')
     expect(out[0].content).not.toContain('buildJsonSchema as $$')
     expect(out[0].content).not.toContain('this._jsonSchema')
   })
@@ -710,8 +710,8 @@ describe('ts-plugin', () => {
     )
     const noAnnotationSection = content.slice(content.indexOf('class NoAnnotation'))
     expect(userSection).toContain('return {')
-    expect(userSection).not.toContain('throw new Error')
-    expect(noAnnotationSection).toContain('throw new Error')
+    expect(userSection).not.toContain('$d("JSON Schema"')
+    expect(noAnnotationSection).toContain('$d("JSON Schema"')
     expect(noAnnotationSection).not.toContain('return {')
   })
 
@@ -749,7 +749,7 @@ describe('ts-plugin', () => {
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].content).toContain('static toJsonSchema: () => any')
-    expect(outDts[0].content).not.toContain('@deprecated')
+    expect(outDts[0].content).not.toContain('JSON Schema support is disabled')
   })
 
   it('must render dts without deprecation in bundle mode', async () => {
@@ -761,7 +761,7 @@ describe('ts-plugin', () => {
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].content).toContain('static toJsonSchema: () => any')
-    expect(outDts[0].content).not.toContain('@deprecated')
+    expect(outDts[0].content).not.toContain('JSON Schema support is disabled')
   })
 
   it('must render dts with deprecation jsdoc when json schema disabled', async () => {

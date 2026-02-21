@@ -71,10 +71,21 @@ tsPlugin({
   jsonSchema: false    // default — toJsonSchema() throws at runtime
   // jsonSchema: 'lazy'   — import buildJsonSchema, compute on demand, cache
   // jsonSchema: 'bundle' — pre-compute at build time, embed in output
+
+  exampleData: false   // default — toExampleData() not rendered
+  // exampleData: true  — render toExampleData() using createDataFromAnnotatedType
 })
 ```
 
-Individual interfaces can override this with `@emit.jsonSchema` annotation to force build-time embedding regardless of plugin setting.
+### `jsonSchema`
+
+Individual interfaces can override the JSON Schema setting with `@emit.jsonSchema` annotation to force build-time embedding regardless of plugin setting.
+
+### `exampleData`
+
+Controls whether `toExampleData()` is generated on output classes:
+- `false` *(default)* — method is not rendered in `.js`; `.d.ts` marks it as optional + `@deprecated`
+- `true` — each class gets `static toExampleData()` that calls `createDataFromAnnotatedType(this, { mode: 'example' })`, creating a new example data object on each call (no caching)
 
 ## Build Tool Integration
 

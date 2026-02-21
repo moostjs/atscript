@@ -384,6 +384,19 @@ The handle provides methods like `.designType()`, `.value()`, `.tags()`, `.of()`
 
 `createDataFromAnnotatedType()` creates a data object that conforms to an annotated type's shape. It supports four modes for controlling how values are resolved.
 
+### Generated `toExampleData()` Method
+
+When `exampleData: true` is set in the [plugin options](/packages/typescript/configuration#exampledata), each generated class includes a `toExampleData()` static method:
+
+```typescript
+import { Product } from './product.as'
+
+// Uses @meta.example annotations, creates a new object each call
+const example = Product.toExampleData()
+```
+
+This is equivalent to calling `createDataFromAnnotatedType(Product, { mode: 'example' })` manually. Without the plugin option, the method is not rendered in `.js` and the `.d.ts` declaration marks it as `@deprecated`.
+
 ### Basic Usage
 
 ```typescript

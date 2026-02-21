@@ -59,8 +59,7 @@
   "scripts": {
     "pub": "pnpm publish --access public",
     "test": "vitest",
-    "setup-skills": "node ./scripts/setup-skills.js",
-    "postinstall": "node ./scripts/setup-skills.js --postinstall"
+    "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
     "@moostjs/event-cli": "^0.5.32",

@@ -24,8 +24,14 @@ import {
   flattenAnnotatedType,
   // Data creation
   createDataFromAnnotatedType,
+  // Feature gating (used by generated code)
+  throwFeatureDisabled,
 } from '@atscript/typescript/utils'
 ```
+
+### `throwFeatureDisabled(feature, option, annotation)`
+
+Throws a runtime error indicating a feature is disabled. Used by generated `.js` files to avoid duplicating the error message string across all classes. Called as `$d("JSON Schema", "jsonSchema", "emit.jsonSchema")` in generated code when `jsonSchema: false`.
 
 ## `forAnnotatedType(def, handlers)` — Type-Safe Dispatch
 

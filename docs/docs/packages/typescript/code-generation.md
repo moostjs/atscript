@@ -34,6 +34,7 @@ export declare class Product {
   static metadata: TMetadataMap<AtscriptMetadata>
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof Product>
   static toJsonSchema: () => any
+  static toExampleData?: () => any
 }
 export declare namespace Product {
   type DataType = Product
@@ -43,7 +44,8 @@ export declare namespace Product {
 Key points:
 
 - Interfaces become `declare class` with instance properties and static members
-- The static members provide access to type metadata, validation, and JSON Schema at runtime
+- The static members provide access to type metadata, validation, JSON Schema, and example data at runtime
+- `toExampleData` is always optional — when `exampleData: true` is set in plugin options, it's rendered without deprecation; otherwise it's marked `@deprecated`
 - `Product.DataType` is a type alias for the data shape — useful for generic utilities
 
 For types (not interfaces), a companion `namespace` carries the same static members:
@@ -57,6 +59,7 @@ declare namespace Status {
   const metadata: TMetadataMap<AtscriptMetadata>
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, Status>
   const toJsonSchema: () => any
+  const toExampleData: (() => any) | undefined
 }
 ```
 
@@ -71,6 +74,7 @@ import {
   defineAnnotatedType as $,
   annotate as $a,
   buildJsonSchema as $$,
+  createDataFromAnnotatedType as $e,
 } from '@atscript/typescript/utils'
 
 export class Product {
@@ -79,6 +83,9 @@ export class Product {
   static metadata = new Map()
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
+  }
+  static toExampleData() {
+    return $e(this, { mode: "example" })
   }
 }
 
@@ -98,8 +105,13 @@ $('object', Product)
 
 The `defineAnnotatedType()` calls build the type structure and attach all annotations as runtime metadata. Semantic types (like `string.email`) automatically add validation rules and tags.
 
-::: info JSON Schema import depends on config
-The `buildJsonSchema as $$` import and the lazy `toJsonSchema()` method shown above require `jsonSchema: 'lazy'` in your plugin options. By default, JSON Schema is disabled (`jsonSchema: false`) — `toJsonSchema()` will throw a runtime error and the `buildJsonSchema` import is omitted to keep your bundle lighter. With `jsonSchema: 'bundle'`, the schema is pre-computed and embedded as a static return value (no import needed). See [Configuration — `jsonSchema`](/packages/typescript/configuration#jsonschema) for details.
+::: info Imports depend on config
+The example above shows imports for `jsonSchema: 'lazy'` and `exampleData: true`. By default:
+
+- **JSON Schema** is disabled (`jsonSchema: false`) — `toJsonSchema()` calls `throwFeatureDisabled()` (aliased as `$d`) instead, and the `buildJsonSchema` import is omitted. With `jsonSchema: 'bundle'`, the schema is pre-computed and embedded as a static return value (no import needed).
+- **Example Data** is disabled (`exampleData: false`) — `toExampleData()` is not rendered at all, and the `createDataFromAnnotatedType` import is omitted.
+
+See [Configuration](/packages/typescript/configuration#plugin-options) for details.
 :::
 
 ## When to Use Which

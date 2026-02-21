@@ -171,6 +171,12 @@ export class TypeRenderer extends BaseRenderer {
         )
       }
       this.writeln('static toJsonSchema: () => any')
+      if (!this.opts?.exampleData) {
+        this.writeln(
+          "/** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */"
+        )
+      }
+      this.writeln('static toExampleData?: () => any')
     }
     this.pop()
   }
@@ -261,6 +267,12 @@ export class TypeRenderer extends BaseRenderer {
       )
     }
     this.writeln('const toJsonSchema: () => any')
+    if (!this.opts?.exampleData) {
+      this.writeln(
+        "/** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */"
+      )
+    }
+    this.writeln('const toExampleData: (() => any) | undefined')
     this.popln()
   }
 

@@ -35,6 +35,8 @@ export declare class WithMetadata {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof WithMetadata>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
 }
 
 /**
@@ -51,5 +53,7 @@ declare namespace SomeType {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof SomeType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 // prettier-ignore-end

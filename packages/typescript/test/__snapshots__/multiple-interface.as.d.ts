@@ -21,6 +21,8 @@ declare namespace TContactType {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TContactType>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -39,6 +41,8 @@ export declare class Address {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof Address>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
 }
 
 /**
@@ -55,6 +59,8 @@ declare class Contact {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof Contact>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
 }
 
 /**
@@ -72,5 +78,7 @@ export declare class User {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof User>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
 }
 // prettier-ignore-end

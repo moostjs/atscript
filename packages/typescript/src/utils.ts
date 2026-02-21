@@ -27,6 +27,8 @@ export { forAnnotatedType } from './traverse'
 export { createDataFromAnnotatedType } from './default-value'
 export type { TCreateDataOptions, TValueResolver } from './default-value'
 
+export { throwFeatureDisabled } from './throw-disabled'
+
 export { flattenAnnotatedType } from './flatten'
 export type { TFlattenOptions } from './flatten'
 

@@ -47,6 +47,8 @@ export declare class SimpleCollection {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof SimpleCollection>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. Calling this method will throw a runtime error. To enable, set `exampleData: 'lazy'` or `exampleData: 'bundle'` in tsPlugin options, or add `@emit.exampleData` annotation to individual interfaces. */
+  static toExampleData?: () => any
 }
 
 /**
@@ -62,6 +64,8 @@ export declare class MinimalCollection {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MinimalCollection>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. Calling this method will throw a runtime error. To enable, set `exampleData: 'lazy'` or `exampleData: 'bundle'` in tsPlugin options, or add `@emit.exampleData` annotation to individual interfaces. */
+  static toExampleData?: () => any
 }
 
 /**
@@ -77,5 +81,7 @@ export declare class MinimalCollectionString {
   static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MinimalCollectionString>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. Calling this method will throw a runtime error. To enable, set `exampleData: 'lazy'` or `exampleData: 'bundle'` in tsPlugin options, or add `@emit.exampleData` annotation to individual interfaces. */
+  static toExampleData?: () => any
 }
 // prettier-ignore-end

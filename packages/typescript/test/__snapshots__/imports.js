@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 
@@ -10,7 +10,7 @@ export class People {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 

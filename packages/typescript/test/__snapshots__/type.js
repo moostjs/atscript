@@ -1,14 +1,14 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
 
 export class TPrimitive {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -18,7 +18,7 @@ export class TPirmiitiveUn {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -28,7 +28,7 @@ export class TLiteral {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -38,7 +38,7 @@ export class TNumber {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -48,7 +48,7 @@ export class TTuple1 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -58,7 +58,7 @@ export class TTuple2 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -68,7 +68,7 @@ export class TTupleArray {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -78,7 +78,7 @@ export class TArray {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -88,7 +88,7 @@ export class TArray2 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -98,7 +98,7 @@ export class TArray3 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -108,7 +108,7 @@ export class TComplexArray {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -118,7 +118,7 @@ export class TComplexArray2 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -128,7 +128,7 @@ export class TComplexArray3 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -138,7 +138,7 @@ export class TComplexArray4 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -148,7 +148,7 @@ export class TComplexArray5 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -158,7 +158,7 @@ export class TObject {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -168,7 +168,7 @@ export class TObjectUnion1 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -178,7 +178,7 @@ export class TObjectUnion2 {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
@@ -188,7 +188,7 @@ export class TObjectIntersection {
   static type = {}
   static metadata = new Map()
   static toJsonSchema() {
-    throw new Error("JSON Schema support is disabled. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add @emit.jsonSchema annotation to individual interfaces.")
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 

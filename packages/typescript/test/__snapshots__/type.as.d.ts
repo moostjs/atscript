@@ -21,6 +21,8 @@ declare namespace TPrimitive {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TPrimitive>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -35,6 +37,8 @@ declare namespace TPirmiitiveUn {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TPirmiitiveUn>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -49,6 +53,8 @@ declare namespace TLiteral {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TLiteral>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -63,6 +69,8 @@ declare namespace TNumber {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TNumber>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -77,6 +85,8 @@ declare namespace TTuple1 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTuple1>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -91,6 +101,8 @@ declare namespace TTuple2 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTuple2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -105,6 +117,8 @@ declare namespace TTupleArray {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TTupleArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -119,6 +133,8 @@ declare namespace TArray {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -133,6 +149,8 @@ declare namespace TArray2 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -147,6 +165,8 @@ declare namespace TArray3 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TArray3>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -161,6 +181,8 @@ declare namespace TComplexArray {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -175,6 +197,8 @@ declare namespace TComplexArray2 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -189,6 +213,8 @@ declare namespace TComplexArray3 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray3>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -203,6 +229,8 @@ declare namespace TComplexArray4 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray4>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -217,6 +245,8 @@ declare namespace TComplexArray5 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TComplexArray5>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -238,6 +268,8 @@ declare namespace TObject {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObject>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -254,6 +286,8 @@ declare namespace TObjectUnion1 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectUnion1>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -270,6 +304,8 @@ declare namespace TObjectUnion2 {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectUnion2>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 
 /**
@@ -288,5 +324,7 @@ declare namespace TObjectIntersection {
   const validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof TObjectIntersection>
   /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
   const toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  const toExampleData: (() => any) | undefined
 }
 // prettier-ignore-end

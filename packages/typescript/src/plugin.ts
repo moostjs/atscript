@@ -18,6 +18,13 @@ export interface TTsPluginOptions {
    * to force build-time embedding regardless of this setting.
    */
   jsonSchema?: false | 'lazy' | 'bundle'
+
+  /**
+   * Example data support:
+   * - `false` — No support. `toExampleData` is not rendered. *(default)*
+   * - `true` — Import `createDataFromAnnotatedType`, create example data on each call.
+   */
+  exampleData?: boolean
 }
 
 /**
