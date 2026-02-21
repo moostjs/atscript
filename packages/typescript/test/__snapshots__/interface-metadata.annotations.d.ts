@@ -20,6 +20,8 @@ declare global {
     "meta.sensitive": boolean
     "meta.readonly": boolean
     "meta.required": { message?: string }
+    "meta.default": string
+    "meta.example": string
     "meta.isKey": boolean
     "expect.minLength": { length: number, message?: string }
     "expect.maxLength": { length: number, message?: string }
