@@ -507,3 +507,159 @@ describe('fromJsonSchema', () => {
     })
   })
 })
+
+describe('discriminated unions', () => {
+  it('should emit oneOf with discriminator when all items share a common const prop', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+      .prop('name', $().designType('string').tags('string').$type)
+
+    const dog = $('object')
+      .prop('petType', $().designType('string').value('dog').$type)
+      .prop('breed', $().designType('string').tags('string').$type)
+
+    const union = $('union').item(cat.$type).item(dog.$type)
+
+    expect($$(union.$type)).toEqual({
+      oneOf: [
+        {
+          type: 'object',
+          properties: {
+            petType: { const: 'cat', type: 'string' },
+            name: { type: 'string' },
+          },
+          required: ['petType', 'name'],
+        },
+        {
+          type: 'object',
+          properties: {
+            petType: { const: 'dog', type: 'string' },
+            breed: { type: 'string' },
+          },
+          required: ['petType', 'breed'],
+        },
+      ],
+      discriminator: {
+        propertyName: 'petType',
+        mapping: {
+          cat: '#/oneOf/0',
+          dog: '#/oneOf/1',
+        },
+      },
+    })
+  })
+
+  it('should fall back to anyOf when union has non-object items', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+
+    const union = $('union')
+      .item(cat.$type)
+      .item($().designType('string').tags('string').$type)
+
+    const schema = $$(union.$type)
+    expect(schema).toHaveProperty('anyOf')
+    expect(schema).not.toHaveProperty('oneOf')
+  })
+
+  it('should fall back to anyOf when no common const prop exists', () => {
+    const a = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+
+    const b = $('object')
+      .prop('age', $().designType('number').tags('number').$type)
+
+    const schema = $$($('union').item(a.$type).item(b.$type).$type)
+    expect(schema).toHaveProperty('anyOf')
+    expect(schema).not.toHaveProperty('oneOf')
+  })
+
+  it('should fall back to anyOf when const values are not distinct', () => {
+    const a = $('object')
+      .prop('kind', $().designType('string').value('same').$type)
+
+    const b = $('object')
+      .prop('kind', $().designType('string').value('same').$type)
+
+    const schema = $$($('union').item(a.$type).item(b.$type).$type)
+    expect(schema).toHaveProperty('anyOf')
+    expect(schema).not.toHaveProperty('oneOf')
+  })
+
+  it('should fall back to anyOf for single-item union', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+
+    const schema = $$($('union').item(cat.$type).$type)
+    expect(schema).toHaveProperty('anyOf')
+    expect(schema).not.toHaveProperty('oneOf')
+  })
+
+  it('should pick the one qualifying candidate when multiple const props exist', () => {
+    // Both items have 'kind' with distinct values AND 'version' with same value
+    const a = $('object')
+      .prop('kind', $().designType('string').value('a').$type)
+      .prop('version', $().designType('number').value(1).$type)
+      .prop('data', $().designType('string').tags('string').$type)
+
+    const b = $('object')
+      .prop('kind', $().designType('string').value('b').$type)
+      .prop('version', $().designType('number').value(1).$type)
+      .prop('data', $().designType('number').tags('number').$type)
+
+    const schema = $$($('union').item(a.$type).item(b.$type).$type)
+    expect(schema).toHaveProperty('oneOf')
+    expect(schema.discriminator).toEqual({
+      propertyName: 'kind',
+      mapping: { a: '#/oneOf/0', b: '#/oneOf/1' },
+    })
+  })
+
+  it('should fall back to anyOf when multiple candidate props qualify', () => {
+    // Both 'kind' and 'type' have distinct values across items — ambiguous
+    const a = $('object')
+      .prop('kind', $().designType('string').value('a').$type)
+      .prop('type', $().designType('string').value('x').$type)
+
+    const b = $('object')
+      .prop('kind', $().designType('string').value('b').$type)
+      .prop('type', $().designType('string').value('y').$type)
+
+    const schema = $$($('union').item(a.$type).item(b.$type).$type)
+    expect(schema).toHaveProperty('anyOf')
+    expect(schema).not.toHaveProperty('oneOf')
+  })
+
+  it('should round-trip a discriminated union through fromJsonSchema', () => {
+    const schema = {
+      oneOf: [
+        {
+          type: 'object',
+          properties: {
+            petType: { const: 'cat', type: 'string' },
+            name: { type: 'string' },
+          },
+          required: ['petType', 'name'],
+        },
+        {
+          type: 'object',
+          properties: {
+            petType: { const: 'dog', type: 'string' },
+            breed: { type: 'string' },
+          },
+          required: ['petType', 'breed'],
+        },
+      ],
+      discriminator: {
+        propertyName: 'petType',
+        mapping: {
+          cat: '#/oneOf/0',
+          dog: '#/oneOf/1',
+        },
+      },
+    }
+    const type = fromJsonSchema(schema)
+    const rebuilt = $$(type)
+    expect(rebuilt).toEqual(schema)
+  })
+})

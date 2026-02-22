@@ -3,11 +3,79 @@ import {
   isPhantomType,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeFinal,
+  type TAtscriptTypeObject,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 
 /** A JSON Schema object (draft-compatible). */
 export type TJsonSchema = Record<string, any>
+
+/**
+ * Detects a discriminator property across union items.
+ *
+ * Scans all items for object-typed members that share a common property
+ * with distinct const/literal values. If exactly one such property exists,
+ * it is returned as the discriminator.
+ */
+function detectDiscriminator(
+  items: TAtscriptAnnotatedType[]
+): { propertyName: string; mapping: Record<string, string> } | null {
+  if (items.length < 2) {
+    return null
+  }
+
+  // All items must be objects
+  for (const item of items) {
+    if (item.type.kind !== 'object') {
+      return null
+    }
+  }
+
+  // Collect candidate prop names: props that have a const value in the first item
+  const firstObj = items[0].type as TAtscriptTypeObject<string>
+  const candidates: string[] = []
+  for (const [propName, propType] of firstObj.props.entries()) {
+    if (propType.type.kind === '' && (propType.type as TAtscriptTypeFinal).value !== undefined) {
+      candidates.push(propName)
+    }
+  }
+
+  // Filter candidates: must exist with a const value in ALL items, all values must be distinct
+  const validCandidates: Array<{ propertyName: string; mapping: Record<string, string> }> = []
+
+  for (const candidate of candidates) {
+    const values = new Set<string | number | boolean>()
+    const mapping: Record<string, string> = {}
+    let valid = true
+
+    for (let i = 0; i < items.length; i++) {
+      const obj = items[i].type as TAtscriptTypeObject<string>
+      const prop = obj.props.get(candidate)
+      if (!prop || prop.type.kind !== '' || (prop.type as TAtscriptTypeFinal).value === undefined) {
+        valid = false
+        break
+      }
+      const val = (prop.type as TAtscriptTypeFinal).value!
+      if (values.has(val)) {
+        valid = false
+        break
+      }
+      values.add(val)
+      mapping[String(val)] = `#/oneOf/${i}`
+    }
+
+    if (valid) {
+      validCandidates.push({ propertyName: candidate, mapping })
+    }
+  }
+
+  // Exactly one qualifying prop → use it as discriminator
+  if (validCandidates.length === 1) {
+    return validCandidates[0]
+  }
+
+  return null
+}
 
 /**
  * Builds a JSON Schema from an {@link TAtscriptAnnotatedType}.
@@ -64,6 +132,16 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         return schema
       },
       union(d) {
+        const disc = detectDiscriminator(d.type.items)
+        if (disc) {
+          return {
+            oneOf: d.type.items.map(build),
+            discriminator: {
+              propertyName: disc.propertyName,
+              mapping: disc.mapping,
+            },
+          }
+        }
         return { anyOf: d.type.items.map(build) }
       },
       intersection(d) {

@@ -94,6 +94,64 @@ export interface Product {
 }
 ```
 
+## Discriminated Unions
+
+When a union type consists entirely of objects that share a common property with distinct literal values, `buildJsonSchema` automatically detects it as a discriminated union and emits `oneOf` with a `discriminator` object instead of plain `anyOf`:
+
+```atscript
+interface Cat {
+    petType: 'cat'
+    name: string
+}
+
+interface Dog {
+    petType: 'dog'
+    breed: string
+}
+
+export type CatOrDog = Cat | Dog
+```
+
+`buildJsonSchema(CatOrDog)` produces:
+
+```json
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "petType": { "const": "cat", "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["petType", "name"]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "petType": { "const": "dog", "type": "string" },
+        "breed": { "type": "string" }
+      },
+      "required": ["petType", "breed"]
+    }
+  ],
+  "discriminator": {
+    "propertyName": "petType",
+    "mapping": {
+      "cat": "#/oneOf/0",
+      "dog": "#/oneOf/1"
+    }
+  }
+}
+```
+
+Detection is fully automatic — no annotations required. The rules are:
+
+- All union items must be objects
+- Exactly **one** property must have a `const` literal value across **all** items
+- All literal values for that property must be **distinct**
+
+If these conditions aren't met, the union falls back to `anyOf`.
+
 ## Converting from JSON Schema
 
 You can also convert a JSON Schema object back into an Atscript annotated type using `fromJsonSchema`:

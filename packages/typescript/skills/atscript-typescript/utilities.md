@@ -88,10 +88,14 @@ const schema = buildJsonSchema(User)
 | `@expect.pattern` (multiple) | `allOf: [{ pattern }, ...]` |
 | `@meta.required` on string | `minLength: 1` |
 | optional property | not in `required` array |
-| union | `anyOf` |
+| union | `anyOf` (or `oneOf` + `discriminator` for discriminated unions) |
 | intersection | `allOf` |
 | tuple | `items` as array |
 | phantom | empty object `{}` (excluded) |
+
+### Discriminated Unions
+
+When all union items are objects sharing exactly one property with distinct const/literal values, `buildJsonSchema` auto-detects it and emits `oneOf` with a `discriminator` object (including `propertyName` and `mapping`) instead of `anyOf`. No annotations needed — detection is automatic.
 
 ## `fromJsonSchema(schema)` — JSON Schema → Annotated Type
 
