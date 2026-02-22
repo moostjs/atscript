@@ -1,3 +1,12 @@
+## [0.1.24](https://github.com/moostjs/atscript/compare/v0.1.23...v0.1.24) (2026-02-22)
+
+
+### Bug Fixes
+
+* improve example generation ([c376569](https://github.com/moostjs/atscript/commit/c376569f3c120ad5d7c7f25137409fa68c79d1f8))
+
+
+
 ## [0.1.23](https://github.com/moostjs/atscript/compare/v0.1.22...v0.1.23) (2026-02-22)
 
 
