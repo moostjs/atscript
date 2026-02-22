@@ -1,3 +1,12 @@
+## [0.1.23](https://github.com/moostjs/atscript/compare/v0.1.22...v0.1.23) (2026-02-22)
+
+
+### Features
+
+* **unplugin:** create multiple exports for bundlers ([0a4ea00](https://github.com/moostjs/atscript/commit/0a4ea00d8d9edc19fdeb0a2a340f223354ab1a40))
+
+
+
 ## [0.1.22](https://github.com/moostjs/atscript/compare/v0.1.21...v0.1.22) (2026-02-21)
 
 
