@@ -104,10 +104,10 @@ npm install -D unplugin-atscript @atscript/typescript
 ```typescript
 // vite.config.ts
 import { defineConfig } from 'vite'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/vite'
 
 export default defineConfig({
-  plugins: [atscript.vite()],
+  plugins: [atscript()],
 })
 ```
 
@@ -122,15 +122,15 @@ Your plugin participates automatically — if it produces output for `format ===
 
 ### Supported Bundlers
 
-| Bundler | Plugin call |
+| Bundler | Import |
 | --- | --- |
-| Vite | `atscript.vite()` |
-| Rollup | `atscript.rollup()` |
-| Rolldown | `atscript.rolldown()` |
-| Webpack | `atscript.webpack()` |
-| Rspack | `atscript.rspack()` |
-| esbuild | `atscript.esbuild()` |
-| Farm | `atscript.farm()` |
+| Vite | `unplugin-atscript/vite` |
+| Rollup | `unplugin-atscript/rollup` |
+| Rolldown | `unplugin-atscript/rolldown` |
+| Webpack | `unplugin-atscript/webpack` |
+| Rspack | `unplugin-atscript/rspack` |
+| esbuild | `unplugin-atscript/esbuild` |
+| Farm | `unplugin-atscript/farm` |
 
 ## VSCode Extension On-Save
 

@@ -15,7 +15,7 @@ export interface atscriptPluginOptions {
   strict?: boolean
 }
 
-const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
+export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
   const root = process.cwd()
   const atscriptConfig = new Promise<TAtscriptConfig>(resolve => {
     resolveConfigFile(root).then(p => {
@@ -25,7 +25,7 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
   const strict = opts?.strict ?? true
   let repo: AtscriptRepo
   return {
-    name: 'atscript',
+    name: 'unplugin-atscript',
 
     resolveId(id, importer) {
       if (importer && id.endsWith('.as')) {
@@ -77,6 +77,9 @@ const atscriptPluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> 
   }
 }
 
-export const asPlugin = /* #__PURE__ */ createUnplugin(atscriptPluginFactory)
+export const unplugin = /* #__PURE__ */ createUnplugin(unpluginFactory)
 
-export default asPlugin
+/** @deprecated Use `import atscript from 'unplugin-atscript/vite'` (or /rollup, /webpack, etc.) instead */
+export const asPlugin = unplugin
+
+export default unplugin

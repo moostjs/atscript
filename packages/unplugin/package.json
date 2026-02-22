@@ -5,10 +5,13 @@
   "keywords": [
     "annotations",
     "atscript",
-    "config",
+    "unplugin",
+    "vite-plugin",
+    "rollup-plugin",
     "rolldown-plugin",
-    "runtime",
-    "vite-plugin"
+    "webpack-plugin",
+    "esbuild-plugin",
+    "rspack-plugin"
   ],
   "homepage": "https://github.com/moostjs/atscript/tree/main/packages/unplugin#readme",
   "bugs": {
@@ -33,6 +36,41 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.mjs",
+      "require": "./dist/vite.cjs"
+    },
+    "./rollup": {
+      "types": "./dist/rollup.d.ts",
+      "import": "./dist/rollup.mjs",
+      "require": "./dist/rollup.cjs"
+    },
+    "./rolldown": {
+      "types": "./dist/rolldown.d.ts",
+      "import": "./dist/rolldown.mjs",
+      "require": "./dist/rolldown.cjs"
+    },
+    "./webpack": {
+      "types": "./dist/webpack.d.ts",
+      "import": "./dist/webpack.mjs",
+      "require": "./dist/webpack.cjs"
+    },
+    "./esbuild": {
+      "types": "./dist/esbuild.d.ts",
+      "import": "./dist/esbuild.mjs",
+      "require": "./dist/esbuild.cjs"
+    },
+    "./rspack": {
+      "types": "./dist/rspack.d.ts",
+      "import": "./dist/rspack.mjs",
+      "require": "./dist/rspack.cjs"
+    },
+    "./farm": {
+      "types": "./dist/farm.d.ts",
+      "import": "./dist/farm.mjs",
+      "require": "./dist/farm.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -48,5 +86,15 @@
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^"
-  }
+  },
+  "build": [
+    {},
+    { "entries": ["src/vite.ts"] },
+    { "entries": ["src/rollup.ts"] },
+    { "entries": ["src/rolldown.ts"] },
+    { "entries": ["src/webpack.ts"] },
+    { "entries": ["src/esbuild.ts"] },
+    { "entries": ["src/rspack.ts"] },
+    { "entries": ["src/farm.ts"] }
+  ]
 }

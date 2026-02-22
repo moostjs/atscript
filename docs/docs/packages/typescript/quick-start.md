@@ -54,10 +54,10 @@ Install `unplugin-atscript` and configure your bundler. Here's a Vite example fo
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/vite'
 
 export default defineConfig({
-  plugins: [atscript.vite()],
+  plugins: [atscript()],
   build: {
     lib: {
       entry: 'src/index.ts',

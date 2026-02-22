@@ -15,10 +15,10 @@ The most common setup: build a Node.js library with external dependencies. The p
 ```javascript
 // vite.config.js
 import { defineConfig } from 'vite'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/vite'
 
 export default defineConfig({
-  plugins: [atscript.vite()],
+  plugins: [atscript()],
   build: {
     lib: {
       entry: 'src/index.ts',
@@ -39,10 +39,10 @@ For frontend projects (e.g. Vue, React), add the Atscript plugin alongside your 
 // vite.config.js
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/vite'
 
 export default defineConfig({
-  plugins: [atscript.vite(), vue()],
+  plugins: [atscript(), vue()],
 })
 ```
 
@@ -50,26 +50,26 @@ This lets you import `.as` types directly in your components — for example, to
 
 ## Other Bundlers
 
-`unplugin-atscript` supports all major bundlers:
+`unplugin-atscript` supports all major bundlers. Import from the bundler-specific entry point:
 
 ::: code-group
 
 ```javascript [Rollup]
 // rollup.config.js
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/rollup'
 
 export default {
-  plugins: [atscript.rollup()],
+  plugins: [atscript()],
 }
 ```
 
 ```javascript [esbuild]
 // build.js
 import { build } from 'esbuild'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/esbuild'
 
 build({
-  plugins: [atscript.esbuild()],
+  plugins: [atscript()],
   entryPoints: ['src/index.ts'],
   bundle: true,
   outdir: 'dist',
@@ -78,10 +78,10 @@ build({
 
 ```javascript [Rolldown]
 // rolldown.config.js
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/rolldown'
 
 export default {
-  plugins: [atscript.rolldown()],
+  plugins: [atscript()],
 }
 ```
 

@@ -260,7 +260,7 @@
     "import/first": "error",
     "import/no-absolute-path": "error",
     "import/no-anonymous-default-export": "warn",
-    "import/no-default-export": "error",
+    "import/no-default-export": "off",
     "import/no-duplicates": "warn",
     "import/no-dynamic-require": "error",
     "import/no-empty-named-blocks": "error",

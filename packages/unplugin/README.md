@@ -8,6 +8,7 @@ An Unplugin for processing `.as` files using [Atscript](https://github.com/moost
 - Loads and processes `.as` files with Atscript
 - Generates JavaScript output
 - Compatible with Vite, Rollup, Rolldown, Webpack, Rspack, esbuild, and Farm
+- Separate entry point for each bundler — import only what you need
 
 ## Installation
 
@@ -34,10 +35,10 @@ pnpm add -D unplugin-atscript @atscript/typescript
 ```ts
 // vite.config.ts
 import { defineConfig } from 'vite'
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/vite'
 
 export default defineConfig({
-  plugins: [atscript.vite()],
+  plugins: [atscript()],
 })
 ```
 
@@ -45,7 +46,7 @@ export default defineConfig({
 
 ```ts
 // rollup.config.js
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/rollup'
 
 export default {
   input: 'src/main.ts',
@@ -53,7 +54,7 @@ export default {
     dir: 'dist',
     format: 'esm',
   },
-  plugins: [atscript.rollup()],
+  plugins: [atscript()],
 }
 ```
 
@@ -61,27 +62,37 @@ export default {
 
 ```js
 // webpack.config.js
-const atscript = require('unplugin-atscript')
+const atscript = require('unplugin-atscript/webpack')
 
 module.exports = {
-  plugins: [atscript.webpack()],
+  plugins: [atscript()],
 }
 ```
 
 ### esbuild
 
 ```js
-import atscript from 'unplugin-atscript'
+import atscript from 'unplugin-atscript/esbuild'
 import { build } from 'esbuild'
 
 build({
-  plugins: [atscript.esbuild()],
+  plugins: [atscript()],
 })
 ```
 
-### Rolldown / Rspack / Farm
+### Rolldown
 
-Use `atscript.rolldown()`, `atscript.rspack()`, or `atscript.farm()` respectively — same pattern as above.
+```js
+import atscript from 'unplugin-atscript/rolldown'
+
+export default {
+  plugins: [atscript()],
+}
+```
+
+### Rspack / Farm
+
+Use `unplugin-atscript/rspack` or `unplugin-atscript/farm` respectively — same pattern as above.
 
 ## How It Works
 

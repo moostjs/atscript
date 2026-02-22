@@ -4,26 +4,40 @@ Build tool plugin that integrates `.as` file compilation into modern bundlers vi
 
 ## Source Files
 
-- `src/index.ts` -- Single source file. Plugin factory with `resolveId` and `load` hooks for `.as` file transformation.
+- `src/index.ts` -- Plugin factory (`unpluginFactory`) with `resolveId` and `load` hooks for `.as` file transformation
+- `src/vite.ts` -- Vite entry point
+- `src/rollup.ts` -- Rollup entry point
+- `src/rolldown.ts` -- Rolldown entry point
+- `src/webpack.ts` -- Webpack entry point
+- `src/esbuild.ts` -- esbuild entry point
+- `src/rspack.ts` -- Rspack entry point
+- `src/farm.ts` -- Farm entry point
 
 ## Public API
 
-- `asPlugin` (default export) -- `UnpluginInstance` configurable for different bundlers
-- `atscriptPluginOptions` -- Config interface: `{ strict?: boolean }` (default: `true`, throws on validation errors)
-
-Usage:
+Each bundler has a dedicated entry point with a default export:
 
 ```ts
 // Vite
-plugins: [atscript.vite()]
+import atscript from 'unplugin-atscript/vite'
+plugins: [atscript()]
+
 // Rollup
-plugins: [atscript.rollup()]
-// Webpack, esbuild, Rspack — via unplugin's universal interface
+import atscript from 'unplugin-atscript/rollup'
+plugins: [atscript()]
+
+// Webpack, esbuild, Rspack, Rolldown, Farm — same pattern
 ```
+
+Main entry (`unplugin-atscript`) exports:
+- `unpluginFactory` -- Raw factory function for creating bundler-specific plugins
+- `unplugin` (default export) -- `UnpluginInstance` with all bundler adapters
+- `asPlugin` -- Deprecated alias for `unplugin`
+- `atscriptPluginOptions` -- Config interface: `{ strict?: boolean }` (default: `true`, throws on validation errors)
 
 ## Supported Build Tools
 
-Vite, Rollup, Webpack, esbuild, Rspack (via Unplugin 2.1.2)
+Vite, Rollup, Rolldown, Webpack, esbuild, Rspack, Farm (via Unplugin 2.x)
 
 ## How It Works
 
