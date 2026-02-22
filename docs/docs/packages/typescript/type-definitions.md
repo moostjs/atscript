@@ -432,7 +432,7 @@ const withExamples = createDataFromAnnotatedType(Product, { mode: 'example' })
 |------|-------------|----------------|
 | `'empty'` | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped |
 | `'default'` | `@meta.default` annotations | Skipped unless annotated |
-| `'example'` | `@meta.example` annotations | Skipped unless annotated |
+| `'example'` | `@meta.example` annotations | Always included |
 | `function` | Custom resolver callback | Skipped unless resolver returns a value |
 
 ### Annotations
@@ -479,7 +479,7 @@ The resolver receives the `TAtscriptAnnotatedType` for each field and the dot-se
 
 ### Optional Props
 
-Optional properties are **omitted** from the output (the key is not present in the object) unless the active mode provides a value for them:
+Optional properties are **omitted** from the output (the key is not present in the object) unless the active mode provides a value for them. The exception is **`'example'` mode**, which always includes all optional props (using `@meta.example` annotations when available, structural defaults otherwise):
 
 ```atscript
 export interface User {
@@ -496,7 +496,21 @@ createDataFromAnnotatedType(User, { mode: 'empty' })
 
 createDataFromAnnotatedType(User, { mode: 'default' })
 // { name: '', nickname: 'buddy' }  — bio omitted, nickname included
+
+createDataFromAnnotatedType(User, { mode: 'example' })
+// { name: '', nickname: '', bio: '' }  — all props included
 ```
+
+### Arrays in Example Mode
+
+In `'example'` mode, arrays generate **one sample item** from the element type instead of an empty array. This makes examples much more useful:
+
+```typescript
+// empty mode: { tags: [], items: [] }
+// example mode: { tags: [''], items: [{ name: '', price: 0 }] }
+```
+
+If `@meta.example` is annotated on the array itself, that annotation takes priority over the generated item.
 
 ## Next Steps
 

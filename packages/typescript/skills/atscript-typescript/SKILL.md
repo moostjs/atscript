@@ -1,6 +1,6 @@
 ---
 name: atscript-typescript
-description: Atscript TypeScript language extension — .as file syntax, code generation, runtime type system, validation, and utilities for the Atscript metadata description language.
+description: Use when working with Atscript (.as files) in TypeScript projects — writing or editing .as interfaces/types/annotations, configuring atscript.config.ts or tsPlugin, understanding generated .d.ts/.js output, using runtime APIs (TAtscriptAnnotatedType, metadata, validators), generating JSON Schema or example data from types, serializing/deserializing annotated types, or running the asc CLI.
 ---
 
 # @atscript/typescript

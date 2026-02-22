@@ -257,12 +257,13 @@ const custom = createDataFromAnnotatedType(User, {
 |------|----------|
 | `'empty'` (default) | Structural defaults: `''`, `0`, `false`, `[]`, `{}`. Optional props omitted |
 | `'default'` | Uses `@meta.default` annotations. Optional props only included if annotated |
-| `'example'` | Uses `@meta.example` annotations. Optional props only included if annotated |
+| `'example'` | Uses `@meta.example` annotations. Optional props always included. Arrays get one sample item |
 | `function` | Custom resolver per field. Return `undefined` to fall through |
 
 ### Behavior Notes
 
-- **Optional properties** are omitted unless the mode provides a value for them
+- **Optional properties** are omitted unless the mode provides a value for them (exception: `'example'` mode always includes all optional props)
+- **Arrays** in `'example'` mode generate one sample item from the element type instead of an empty array
 - **Complex types** (object, array): if a `@meta.default`/`@meta.example` annotation is set and passes validation, the entire subtree is replaced (no recursion into inner props)
 - **Annotation values**: strings are used as-is for string types; everything else is parsed via `JSON.parse`
 - **Unions/Intersections**: defaults to first item's value

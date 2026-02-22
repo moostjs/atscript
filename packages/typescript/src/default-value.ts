@@ -20,7 +20,7 @@ export interface TCreateDataOptions {
    * How to resolve values:
    * - `'empty'` — structural defaults only (`''`, `0`, `false`, `[]`, `{}`); optional props skipped
    * - `'default'` — use `@meta.default` annotations; optional props skipped unless annotated
-   * - `'example'` — use `@meta.example` annotations; optional props skipped unless annotated
+   * - `'example'` — use `@meta.example` annotations; optional props always included; arrays get one sample item
    * - `function` — custom resolver per field; optional props skipped unless resolver returns a value
    *
    * @default 'empty'
@@ -104,7 +104,7 @@ function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown 
  * Supports four modes:
  * - `'empty'` — structural defaults only; optional props omitted
  * - `'default'` — uses `@meta.default` annotations; optional props omitted unless annotated
- * - `'example'` — uses `@meta.example` annotations; optional props omitted unless annotated
+ * - `'example'` — uses `@meta.example` annotations; optional props always included; arrays get one sample item
  * - `function` — custom resolver; optional props omitted unless resolver returns a value
  *
  * When a `@meta.default` / `@meta.example` value is set on a complex type (object, array)
@@ -143,12 +143,16 @@ function build(
         const childPath = path ? `${path}.${key}` : key
 
         if (prop.optional) {
-          // Optional props: only include if mode provides a value
-          const childResolved = resolveValue(prop, childPath, mode)
-          if (childResolved !== undefined) {
-            data[key] = childResolved.value
+          if (mode === 'example') {
+            // Example mode: always include optional props for a complete example
+            data[key] = build(prop, childPath, mode)
+          } else {
+            // Other modes: only include if mode provides a value
+            const childResolved = resolveValue(prop, childPath, mode)
+            if (childResolved !== undefined) {
+              data[key] = childResolved.value
+            }
           }
-          // Otherwise skip entirely — don't add key to object
           continue
         }
 
@@ -157,7 +161,14 @@ function build(
       return data
     },
 
-    array: () => [],
+    array: d => {
+      if (mode === 'example') {
+        // In example mode, generate one sample item so the array isn't uselessly empty
+        const item = build(d.type.of, `${path}.0`, mode)
+        return item !== undefined ? [item] : []
+      }
+      return []
+    },
 
     tuple: d => d.type.items.map((item, i) => build(item, `${path}.${i}`, mode)),
 

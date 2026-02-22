@@ -253,6 +253,47 @@ describe('createDataFromAnnotatedType — example mode', () => {
     // example mode ignores meta.default — falls through to structural default
     expect(createDataFromAnnotatedType(prop, { mode: 'example' })).toBe('')
   })
+
+  it('should always include optional props even without meta.example', () => {
+    const type = defineAnnotatedType('object')
+      .prop('name', str())
+      .prop('nickname', str(true))
+      .prop('age', num(true)).$type
+
+    const result = createDataFromAnnotatedType(type, { mode: 'example' })
+    expect(result).toEqual({ name: '', nickname: '', age: 0 })
+  })
+
+  it('should generate one sample item for array types', () => {
+    const type = defineAnnotatedType('array').of(str()).$type
+    expect(createDataFromAnnotatedType(type, { mode: 'example' })).toEqual([''])
+  })
+
+  it('should generate one sample item for array of objects', () => {
+    const item = defineAnnotatedType('object')
+      .prop('name', str())
+      .prop('age', num()).$type
+    const type = defineAnnotatedType('array').of(item).$type
+
+    expect(createDataFromAnnotatedType(type, { mode: 'example' })).toEqual([{ name: '', age: 0 }])
+  })
+
+  it('should use meta.example annotation on array over generated item', () => {
+    const arrType = defineAnnotatedType('array')
+      .of(str())
+      .annotate('meta.example' as any, '["a","b","c"]').$type
+
+    expect(createDataFromAnnotatedType(arrType, { mode: 'example' })).toEqual(['a', 'b', 'c'])
+  })
+
+  it('should use meta.example on array items when available', () => {
+    const itemType = defineAnnotatedType('object')
+      .prop('name', defineAnnotatedType().designType('string').annotate('meta.example' as any, 'Jane').$type)
+      .prop('age', defineAnnotatedType().designType('number').annotate('meta.example' as any, '25').$type).$type
+    const type = defineAnnotatedType('array').of(itemType).$type
+
+    expect(createDataFromAnnotatedType(type, { mode: 'example' })).toEqual([{ name: 'Jane', age: 25 }])
+  })
 })
 
 // ── Callback mode ───────────────────────────────────────────
