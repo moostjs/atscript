@@ -1,6 +1,6 @@
 {
   "name": "@atscript/moost-mongo",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Atscript Mongo for Moost.",
   "keywords": [
     "annotations",

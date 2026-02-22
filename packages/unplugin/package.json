@@ -1,6 +1,6 @@
 {
   "name": "unplugin-atscript",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "description": "Atscript: Configuration and build plugins.",
   "keywords": [
     "annotations",
@@ -89,12 +89,40 @@
   },
   "build": [
     {},
-    { "entries": ["src/vite.ts"] },
-    { "entries": ["src/rollup.ts"] },
-    { "entries": ["src/rolldown.ts"] },
-    { "entries": ["src/webpack.ts"] },
-    { "entries": ["src/esbuild.ts"] },
-    { "entries": ["src/rspack.ts"] },
-    { "entries": ["src/farm.ts"] }
+    {
+      "entries": [
+        "src/vite.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/rollup.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/rolldown.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/webpack.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/esbuild.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/rspack.ts"
+      ]
+    },
+    {
+      "entries": [
+        "src/farm.ts"
+      ]
+    }
   ]
 }
