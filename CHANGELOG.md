@@ -1,3 +1,12 @@
+## [0.1.25](https://github.com/moostjs/atscript/compare/v0.1.24...v0.1.25) (2026-02-22)
+
+
+### Features
+
+* **typescript:** auto-detect discriminated unions in toJsonSchema ([bc37917](https://github.com/moostjs/atscript/commit/bc37917c0b40c4fdcc385ba3a7ea5f8cf8bd6d61))
+
+
+
 ## [0.1.24](https://github.com/moostjs/atscript/compare/v0.1.23...v0.1.24) (2026-02-22)
 
 
