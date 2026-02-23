@@ -120,6 +120,7 @@ export interface TAtscriptAnnotatedType<
   validator(opts?: Partial<TValidatorOptions>): Validator<this, DataType>
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
+  id?: string
 }
 
 /** An annotated type that is also a class constructor (i.e. a generated interface class). */
@@ -290,6 +291,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
           __is_atscript_annotated_type: true,
           type: newBase.type,
           metadata,
+          id: newBase.id,
           validator(opts?: Partial<TValidatorOptions>) {
             return new Validator(this as TAtscriptAnnotatedType, opts)
           },
@@ -301,6 +303,10 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     },
     annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {
       annotate(this.$metadata, key, value, asArray)
+      return this
+    },
+    id(value: string) {
+      this.$type.id = value
       return this
     },
   }
@@ -340,6 +346,7 @@ export interface TAnnotatedTypeHandle {
   copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>): TAnnotatedTypeHandle
   refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]): TAnnotatedTypeHandle
   annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean): TAnnotatedTypeHandle
+  id(value: string): TAnnotatedTypeHandle
 }
 
 /**

@@ -554,6 +554,12 @@ export class AtscriptDoc {
     })
   }
 
+  private _nextTypeId = 0
+
+  nextTypeId(): number {
+    return this._nextTypeId++
+  }
+
   registerDefinition(token?: Token, asImport = false) {
     if (token) {
       token.isDefinition = !asImport

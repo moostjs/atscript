@@ -7,6 +7,7 @@ export class FlattenTest {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "FlattenTest"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

@@ -11,6 +11,7 @@ export class SemanticInterfaceNode extends SemanticNode {
 
   registerAtDocument(doc: AtscriptDoc): void {
     super.registerAtDocument(doc)
+    this.__typeId = doc.nextTypeId()
     const token = this.token('identifier')
     doc.registerDefinition(token)
     if (token && this.token('export')) {

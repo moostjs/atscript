@@ -31,7 +31,7 @@ import tsPlugin from '@atscript/typescript'
 import {
   defineAnnotatedType, isAnnotatedType, annotate,
   Validator, ValidatorError,
-  buildJsonSchema, fromJsonSchema,
+  buildJsonSchema, fromJsonSchema, mergeJsonSchemas,
   serializeAnnotatedType, deserializeAnnotatedType,
   flattenAnnotatedType, createDataFromAnnotatedType,
   forAnnotatedType, throwFeatureDisabled,

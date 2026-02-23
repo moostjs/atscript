@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { TAtscriptAnnotatedType } from './annotated-type'
 import { defineAnnotatedType as $ } from './annotated-type'
-import { buildJsonSchema as $$, fromJsonSchema } from './json-schema'
+import { buildJsonSchema as $$, fromJsonSchema, mergeJsonSchemas } from './json-schema'
 import { tsPlugin } from './plugin'
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
@@ -502,8 +502,8 @@ describe('fromJsonSchema', () => {
   })
 
   describe('error handling', () => {
-    it('should throw on $ref', () => {
-      expect(() => fromJsonSchema({ $ref: '#/definitions/Foo' })).toThrow(/\$ref is not supported/)
+    it('should throw on unresolvable $ref', () => {
+      expect(() => fromJsonSchema({ $ref: '#/definitions/Foo' })).toThrow(/Unresolvable \$ref/)
     })
   })
 })
@@ -661,5 +661,203 @@ describe('discriminated unions', () => {
     const type = fromJsonSchema(schema)
     const rebuilt = $$(type)
     expect(rebuilt).toEqual(schema)
+  })
+})
+
+describe('$defs and $ref', () => {
+  it('should extract named object union items into $defs', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+      .prop('name', $().designType('string').tags('string').$type)
+      .id('Cat')
+
+    const dog = $('object')
+      .prop('petType', $().designType('string').value('dog').$type)
+      .prop('breed', $().designType('string').tags('string').$type)
+      .id('Dog')
+
+    const union = $('union').item(cat.$type).item(dog.$type)
+
+    const schema = $$(union.$type)
+
+    expect(schema.$defs).toEqual({
+      Cat: {
+        type: 'object',
+        properties: {
+          petType: { const: 'cat', type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['petType', 'name'],
+      },
+      Dog: {
+        type: 'object',
+        properties: {
+          petType: { const: 'dog', type: 'string' },
+          breed: { type: 'string' },
+        },
+        required: ['petType', 'breed'],
+      },
+    })
+    expect(schema.oneOf).toEqual([
+      { $ref: '#/$defs/Cat' },
+      { $ref: '#/$defs/Dog' },
+    ])
+  })
+
+  it('should produce discriminator mapping with $ref paths for named types', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+      .prop('name', $().designType('string').tags('string').$type)
+      .id('Cat')
+
+    const dog = $('object')
+      .prop('petType', $().designType('string').value('dog').$type)
+      .prop('breed', $().designType('string').tags('string').$type)
+      .id('Dog')
+
+    const union = $('union').item(cat.$type).item(dog.$type)
+    const schema = $$(union.$type)
+
+    expect(schema.discriminator).toEqual({
+      propertyName: 'petType',
+      mapping: {
+        cat: '#/$defs/Cat',
+        dog: '#/$defs/Dog',
+      },
+    })
+  })
+
+  it('should NOT extract root type into $defs', () => {
+    const obj = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+      .id('MyObj')
+
+    const schema = $$(obj.$type)
+    expect(schema.$defs).toBeUndefined()
+    expect(schema.type).toBe('object')
+    expect(schema.properties).toBeDefined()
+  })
+
+  it('should deduplicate shared types in $defs', () => {
+    // Create a shared Address type
+    const address = $('object')
+      .prop('street', $().designType('string').tags('string').$type)
+      .id('Address')
+
+    // Two object types referencing the same Address
+    const person = $('object')
+      .prop('home', address.$type)
+      .prop('work', address.$type)
+      .id('Person')
+
+    const schema = $$(person.$type)
+
+    // Address should appear once in $defs
+    expect(Object.keys(schema.$defs!)).toEqual(['Address'])
+    // Both props should be $ref
+    expect(schema.properties.home).toEqual({ $ref: '#/$defs/Address' })
+    expect(schema.properties.work).toEqual({ $ref: '#/$defs/Address' })
+  })
+
+  it('should keep types without id inline', () => {
+    const cat = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+      // no .id() call
+
+    const dog = $('object')
+      .prop('breed', $().designType('string').tags('string').$type)
+      // no .id() call
+
+    const union = $('union').item(cat.$type).item(dog.$type)
+    const schema = $$(union.$type)
+
+    expect(schema.$defs).toBeUndefined()
+    expect(schema.anyOf).toBeDefined()
+    expect(schema.anyOf[0].type).toBe('object')
+  })
+
+  it('should resolve $ref in fromJsonSchema', () => {
+    const schema = {
+      $defs: {
+        Cat: {
+          type: 'object',
+          properties: {
+            petType: { const: 'cat', type: 'string' },
+            name: { type: 'string' },
+          },
+          required: ['petType', 'name'],
+        },
+      },
+      oneOf: [
+        { $ref: '#/$defs/Cat' },
+      ],
+    }
+
+    const type = fromJsonSchema(schema)
+    expect(type.type.kind).toBe('union')
+    const items = (type.type as any).items
+    expect(items).toHaveLength(1)
+    expect(items[0].type.kind).toBe('object')
+    expect(items[0].type.props.has('petType')).toBe(true)
+    expect(items[0].type.props.has('name')).toBe(true)
+  })
+
+  it('should round-trip schema with $defs through fromJsonSchema', () => {
+    const cat = $('object')
+      .prop('petType', $().designType('string').value('cat').$type)
+      .prop('name', $().designType('string').tags('string').$type)
+      .id('Cat')
+
+    const dog = $('object')
+      .prop('petType', $().designType('string').value('dog').$type)
+      .prop('breed', $().designType('string').tags('string').$type)
+      .id('Dog')
+
+    const union = $('union').item(cat.$type).item(dog.$type)
+    const schema = $$(union.$type)
+
+    // Round-trip: the rebuilt schema won't have $defs because fromJsonSchema
+    // doesn't preserve ids, but the structure should be equivalent
+    const type = fromJsonSchema(schema)
+    const rebuilt = $$(type)
+
+    // Without ids, the rebuilt schema should have inline objects (no $defs)
+    expect(rebuilt.oneOf || rebuilt.anyOf).toBeDefined()
+    const items = rebuilt.oneOf || rebuilt.anyOf
+    expect(items).toHaveLength(2)
+  })
+})
+
+describe('mergeJsonSchemas', () => {
+  it('should merge multiple schemas with shared $defs', () => {
+    const cat = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+      .id('Cat')
+
+    const dog = $('object')
+      .prop('breed', $().designType('string').tags('string').$type)
+      .id('Dog')
+
+    const pets = $('union').item(cat.$type).item(dog.$type).id('Pets')
+    const order = $('object')
+      .prop('id', $().designType('number').tags('number').$type)
+      .id('Order')
+
+    const merged = mergeJsonSchemas([pets.$type, order.$type])
+
+    expect(merged.schemas.Pets).toBeDefined()
+    expect(merged.schemas.Order).toBeDefined()
+    // Cat and Dog should be in shared $defs
+    expect(merged.$defs.Cat).toBeDefined()
+    expect(merged.$defs.Dog).toBeDefined()
+    // Pets schema should not have its own $defs
+    expect(merged.schemas.Pets.$defs).toBeUndefined()
+  })
+
+  it('should throw when a type has no id', () => {
+    const noId = $('object')
+      .prop('name', $().designType('string').tags('string').$type)
+
+    expect(() => mergeJsonSchemas([noId.$type])).toThrow(/all types must have an id/)
   })
 })

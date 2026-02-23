@@ -7,6 +7,7 @@ export class PlaygroundForm {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "PlaygroundForm"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ class Address {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "Address"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ class Contact {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "Contact"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -37,6 +40,7 @@ class MyString {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "MyString"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

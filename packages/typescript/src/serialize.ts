@@ -25,6 +25,7 @@ export interface TSerializedAnnotatedTypeInner {
   type: TSerializedTypeDef
   metadata: Record<string, unknown>
   optional?: boolean
+  id?: string
 }
 
 export interface TSerializedTypeFinal {
@@ -135,6 +136,9 @@ function serializeNode(
   }
   if (def.optional) {
     result.optional = true
+  }
+  if (def.id) {
+    result.id = def.id
   }
   return result
 }
@@ -290,6 +294,9 @@ function deserializeNode(data: TSerializedAnnotatedTypeInner): TAtscriptAnnotate
 
   if (data.optional) {
     result.optional = true
+  }
+  if (data.id) {
+    result.id = data.id
   }
 
   return result

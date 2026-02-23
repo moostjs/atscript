@@ -94,9 +94,9 @@ export interface Product {
 }
 ```
 
-## Discriminated Unions
+## Named Types: `$defs` and `$ref`
 
-When a union type consists entirely of objects that share a common property with distinct literal values, `buildJsonSchema` automatically detects it as a discriminated union and emits `oneOf` with a `discriminator` object instead of plain `anyOf`:
+Types compiled from `.as` files carry a stable `id` (the type name from the source file). When `buildJsonSchema` encounters named object types nested inside other types (e.g., union items, object properties), it automatically extracts them into `$defs` and references them via `$ref`:
 
 ```atscript
 interface Cat {
@@ -116,8 +116,8 @@ export type CatOrDog = Cat | Dog
 
 ```json
 {
-  "oneOf": [
-    {
+  "$defs": {
+    "Cat": {
       "type": "object",
       "properties": {
         "petType": { "const": "cat", "type": "string" },
@@ -125,7 +125,7 @@ export type CatOrDog = Cat | Dog
       },
       "required": ["petType", "name"]
     },
-    {
+    "Dog": {
       "type": "object",
       "properties": {
         "petType": { "const": "dog", "type": "string" },
@@ -133,16 +133,44 @@ export type CatOrDog = Cat | Dog
       },
       "required": ["petType", "breed"]
     }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/Cat" },
+    { "$ref": "#/$defs/Dog" }
   ],
   "discriminator": {
     "propertyName": "petType",
     "mapping": {
-      "cat": "#/oneOf/0",
-      "dog": "#/oneOf/1"
+      "cat": "#/$defs/Cat",
+      "dog": "#/$defs/Dog"
     }
   }
 }
 ```
+
+Key behaviors:
+
+- Only **named object types** (those with an `id`) are extracted to `$defs`. Primitives, unions, and arrays stay inline.
+- The **root type** is never extracted — it IS the schema.
+- If the same named type is referenced multiple times, it appears once in `$defs` and all occurrences become `$ref`.
+- Types without an `id` (e.g., inline anonymous objects, hand-built types via `defineAnnotatedType()`) produce inline schemas as before.
+
+### Programmatic `id`
+
+For types built programmatically (not compiled from `.as` files), you can assign an `id` using the builder API:
+
+```typescript
+import { defineAnnotatedType } from '@atscript/typescript/utils'
+
+const address = defineAnnotatedType('object')
+  .prop('street', defineAnnotatedType().designType('string').$type)
+  .prop('city', defineAnnotatedType().designType('string').$type)
+  .id('Address')
+```
+
+## Discriminated Unions
+
+When a union type consists entirely of objects that share a common property with distinct literal values, `buildJsonSchema` automatically detects it as a discriminated union and emits `oneOf` with a `discriminator` object instead of plain `anyOf`. When the union items have named types, the discriminator mapping uses `$ref` paths into `$defs` (as shown above).
 
 Detection is fully automatic — no annotations required. The rules are:
 
@@ -188,14 +216,37 @@ const roundTripped = buildJsonSchema(type)
 - Literals (`const`)
 - Enums (`enum` — converted to union of literals)
 - Constraints: `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`
+- `$ref` / `$defs` — references are resolved automatically from `$defs` or `definitions`
 
 ::: tip Use case: external schemas
 `fromJsonSchema` is useful for importing type definitions from external JSON Schema sources (OpenAPI specs, form generators, etc.) and using them with Atscript's validator at runtime.
 :::
 
 ::: warning Unsupported features
-`$ref` is not supported — dereference your schema before passing it to `fromJsonSchema`. Features like `not`, `if/then/else`, `patternProperties`, and `additionalProperties` have no Atscript equivalent and are silently ignored.
+Features like `not`, `if/then/else`, `patternProperties`, and `additionalProperties` have no Atscript equivalent and are silently ignored.
 :::
+
+## Merging Schemas (OpenAPI / Swagger)
+
+`mergeJsonSchemas` combines multiple annotated types into a single schema map with shared `$defs` — useful for building OpenAPI `components/schemas`:
+
+```typescript
+import { mergeJsonSchemas } from '@atscript/typescript/utils'
+import { CatOrDog } from './pets.as'
+import { Order } from './orders.as'
+
+const merged = mergeJsonSchemas([CatOrDog, Order])
+
+// merged.schemas.CatOrDog — the CatOrDog schema (oneOf with $ref)
+// merged.schemas.Order    — the Order schema
+// merged.$defs: { Cat, Dog, ... } — shared definitions, deduplicated
+```
+
+Each type passed to `mergeJsonSchemas` must have an `id` (all types compiled from `.as` files do). The function:
+
+1. Calls `buildJsonSchema` on each type
+2. Hoists all `$defs` into a shared pool, deduplicating by name
+3. Returns individual schemas (without their `$defs`) alongside the merged definitions
 
 ## Next Steps
 

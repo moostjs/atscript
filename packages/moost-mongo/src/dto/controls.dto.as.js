@@ -7,6 +7,7 @@ export class QueryControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "QueryControlsDto"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class PagesControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "PagesControlsDto"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ export class GetOneControlsDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "GetOneControlsDto"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -37,6 +40,7 @@ class SortControlDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "SortControlDto"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -47,6 +51,7 @@ class SelectControlDto {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "SelectControlDto"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

@@ -70,6 +70,7 @@ Key points:
 The JS module creates actual classes with runtime type definitions and metadata:
 
 - Uses `defineAnnotatedType` (aliased as `$`) to build the type tree
+- Each class gets a `static id` field with the stable type name (collision-safe via `__N` suffix)
 - Populates metadata maps with all annotation values
 - Wires up `validator()` and `toJsonSchema()` methods
 - When `exampleData: true`, adds `toExampleData()` that calls `createDataFromAnnotatedType(this, { mode: 'example' })` (aliased as `$e`)

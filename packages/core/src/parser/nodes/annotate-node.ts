@@ -48,6 +48,7 @@ export class SemanticAnnotateNode extends SemanticNode {
     const identifierToken = this.token('identifier')
     if (identifierToken) {
       // Non-mutating: register identifier as definition
+      this.__typeId = doc.nextTypeId()
       doc.registerDefinition(identifierToken)
       if (this.token('export')) {
         identifierToken.exported = true

@@ -12,7 +12,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 | `src/annotated-type.ts`          | Core runtime type system: `TAtscriptAnnotatedType`, `defineAnnotatedType()` builder, `annotate()`, type guards      |
 | `src/traverse.ts`                | `forAnnotatedType()` -- type-safe kind-dispatch used by validator, json-schema, and serializer                      |
 | `src/validator.ts`               | `Validator` class -- validates values against annotated types with plugin support                                   |
-| `src/json-schema.ts`             | `buildJsonSchema()` -- converts annotated types to JSON Schema objects                                              |
+| `src/json-schema.ts`             | `buildJsonSchema()`, `fromJsonSchema()`, `mergeJsonSchemas()` -- JSON Schema conversion with `$defs`/`$ref` support |
 | `src/serialize.ts`               | `serializeAnnotatedType()` / `deserializeAnnotatedType()` -- JSON-safe round-trip                                   |
 | `src/codegen/base-renderer.ts`   | `BaseRenderer` -- walks `AtscriptDoc` nodes, dispatches to `renderInterface/renderType/renderImport/renderAnnotate` |
 | `src/codegen/type-renderer.ts`   | `TypeRenderer` extends `BaseRenderer` -- generates `.d.ts` output                                                   |
@@ -35,7 +35,9 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 - `annotate(metadata, key, value, asArray?)` -- set/append metadata on annotated types
 - `isAnnotatedType(type)` / `isAnnotatedTypeOfPrimitive(type)` -- type guards
 - `Validator` class + `ValidatorError`
-- `buildJsonSchema(type)` -- JSON Schema generation
+- `buildJsonSchema(type)` -- JSON Schema generation with `$defs`/`$ref` for named types
+- `fromJsonSchema(schema)` -- converts JSON Schema back to annotated types (resolves `$ref`/`$defs`)
+- `mergeJsonSchemas(types)` -- combines multiple schemas with shared `$defs` (for OpenAPI)
 - `forAnnotatedType(def, handlers)` -- type-kind dispatcher
 - `serializeAnnotatedType(type, options?)` / `deserializeAnnotatedType(data)` -- JSON round-trip
 - `SERIALIZE_VERSION` -- current serialization format version
@@ -45,14 +47,14 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 1. `@atscript/core` parses `.as` files into `AtscriptDoc` objects containing `SemanticNode` trees.
 2. `tsPlugin()` returns a plugin with a `render(doc, format)` method.
 3. **d.ts generation**: `TypeRenderer` walks all nodes -- interfaces become `declare class`, types become `export type`, with companion `declare namespace` blocks.
-4. **js generation**: `JsRenderer` emits `defineAnnotatedType()` call chains that build the full runtime type tree with metadata via `.prop()`, `.item()`, `.of()`, `.annotate()`.
+4. **js generation**: `JsRenderer` emits `defineAnnotatedType()` call chains that build the full runtime type tree with metadata via `.prop()`, `.item()`, `.of()`, `.annotate()`. Each generated class gets a `static id` field with a stable type name (collision-safe).
 5. **buildEnd**: emits a project-wide `atscript.d.ts` declaring `AtscriptMetadata` and `AtscriptPrimitiveTags`.
 
 ## Runtime utilities
 
 - **Validator**: Validates values against annotated types. Reads `expect.*` metadata for constraints. Options: `partial`, `unknownProps`, `errorLimit`, `plugins`.
 - **Serializer**: `serializeAnnotatedType()` / `deserializeAnnotatedType()` for JSON-safe round-trip.
-- **JSON Schema**: `buildJsonSchema()` converts annotated types to JSON Schema draft-compatible objects.
+- **JSON Schema**: `buildJsonSchema()` converts annotated types to JSON Schema with `$defs`/`$ref` for named object types. Auto-detects discriminated unions. `fromJsonSchema()` converts back (resolves `$ref`). `mergeJsonSchemas()` combines multiple schemas with shared `$defs` for OpenAPI.
 
 ## CLI (`asc` command)
 
@@ -82,3 +84,4 @@ vitest run -u                            # Update snapshots
 - **`CodePrinter`**: all renderers use indentation tracking. Never construct output strings manually.
 - **Global `AtscriptMetadata` interface**: generated `atscript.d.ts` provides typed metadata keys.
 - **`jsonSchema` option**: `false` (default, no support), `'lazy'` (runtime compute + cache), or `'bundle'` (build-time embed). `@emit.jsonSchema` annotation overrides per interface.
+- **Type `id`**: Every interface/type/annotate-alias gets a `static id` string on the generated class and an `id` field on `TAtscriptAnnotatedType`. Used by `buildJsonSchema()` to extract named object types into `$defs` and reference via `$ref`. The `id()` builder method sets it programmatically. Carried through `refTo()` and preserved in serialization.

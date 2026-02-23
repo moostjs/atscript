@@ -32,6 +32,7 @@ export class JsRenderer extends BaseRenderer {
   postAnnotate = [] as SemanticNode[]
   private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
   private _propPath: string[] = []
+  private typeIds = new Map<SemanticNode, string>()
 
   constructor(
     doc: AtscriptDoc,
@@ -56,6 +57,27 @@ export class JsRenderer extends BaseRenderer {
       imports.push('throwFeatureDisabled as $d')
     }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
+
+    // Pre-scan definition nodes to detect name collisions and assign string IDs
+    const nameCounts = new Map<string, number>()
+    const nodesByName = new Map<string, SemanticNode[]>()
+    for (const node of this.doc.nodes) {
+      if (node.__typeId != null && node.id) {
+        const name = node.id
+        nameCounts.set(name, (nameCounts.get(name) || 0) + 1)
+        if (!nodesByName.has(name)) nodesByName.set(name, [])
+        nodesByName.get(name)!.push(node)
+      }
+    }
+    for (const [name, nodes] of nodesByName) {
+      if (nodes.length === 1) {
+        this.typeIds.set(nodes[0], name)
+      } else {
+        for (let i = 0; i < nodes.length; i++) {
+          this.typeIds.set(nodes[i], `${name}__${i + 1}`)
+        }
+      }
+    }
   }
 
   private buildAdHocMap(annotateNodes: SemanticAnnotateNode[]) {
@@ -112,6 +134,10 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('static __is_atscript_annotated_type = true')
     this.writeln('static type = {}')
     this.writeln('static metadata = new Map()')
+    const typeId = this.typeIds.get(node)
+    if (typeId) {
+      this.writeln(`static id = "${typeId}"`)
+    }
     this.renderJsonSchemaMethod(node)
     this.renderExampleDataMethod(node)
   }
@@ -203,6 +229,11 @@ export class JsRenderer extends BaseRenderer {
       case 'type': {
         const def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
         const handle = this.toAnnotatedHandle(def, true)
+        // Assign id for $defs/$ref support in buildJsonSchema (bundle mode)
+        const typeId = this.typeIds.get(node) ?? (node.__typeId != null ? node.id : undefined)
+        if (typeId) {
+          handle.id(typeId)
+        }
         return skipAnnotations
           ? handle
           : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))

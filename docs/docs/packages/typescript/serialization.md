@@ -37,6 +37,7 @@ A deserialized type is a fully functional `TAtscriptAnnotatedType`:
 - Works with `buildJsonSchema()` and `forAnnotatedType()`
 - `isAnnotatedType()` returns `true`
 - Metadata is accessible via `.metadata.get()`
+- The `id` field (type name) is preserved through serialization, so `buildJsonSchema` will still produce `$defs`/`$ref` for deserialized types
 
 ## Versioning
 

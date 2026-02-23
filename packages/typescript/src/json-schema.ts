@@ -95,29 +95,47 @@ function detectDiscriminator(
  * @returns A JSON Schema object.
  */
 export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
+  const defs: Record<string, TJsonSchema> = {}
+  let isRoot = true
+
+  const buildObject = (d: TAtscriptAnnotatedType): TJsonSchema => {
+    const properties: Record<string, TJsonSchema> = {}
+    const required: string[] = []
+    for (const [key, val] of (d.type as TAtscriptTypeObject<string>).props.entries()) {
+      if (isPhantomType(val)) {
+        continue
+      }
+      properties[key] = build(val)
+      if (!val.optional) {
+        required.push(key)
+      }
+    }
+    const schema: TJsonSchema = { type: 'object', properties }
+    if (required.length > 0) {
+      schema.required = required
+    }
+    return schema
+  }
+
   const build = (def: TAtscriptAnnotatedType): TJsonSchema => {
+    // Extract named object types into $defs (unless root level)
+    if (def.id && def.type.kind === 'object' && !isRoot) {
+      const name = def.id
+      if (!defs[name]) {
+        defs[name] = {} // placeholder to prevent infinite recursion
+        defs[name] = buildObject(def)
+      }
+      return { $ref: `#/$defs/${name}` }
+    }
+    isRoot = false
+
     const meta = def.metadata
     return forAnnotatedType(def, {
       phantom() {
         return {}
       },
       object(d) {
-        const properties: Record<string, TJsonSchema> = {}
-        const required: string[] = []
-        for (const [key, val] of d.type.props.entries()) {
-          if (isPhantomType(val)) {
-            continue
-          }
-          properties[key] = build(val)
-          if (!val.optional) {
-            required.push(key)
-          }
-        }
-        const schema: TJsonSchema = { type: 'object', properties }
-        if (required.length > 0) {
-          schema.required = required
-        }
-        return schema
+        return buildObject(d)
       },
       array(d) {
         const schema: TJsonSchema = { type: 'array', items: build(d.type.of) }
@@ -134,11 +152,23 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       union(d) {
         const disc = detectDiscriminator(d.type.items)
         if (disc) {
+          const oneOf = d.type.items.map(build)
+          // Update mapping to use $ref paths when items were extracted to $defs
+          const mapping: Record<string, string> = {}
+          for (const [val, origPath] of Object.entries(disc.mapping)) {
+            const idx = Number.parseInt(origPath.split('/').pop()!)
+            const item = d.type.items[idx]
+            if (item.id && defs[item.id]) {
+              mapping[val] = `#/$defs/${item.id}`
+            } else {
+              mapping[val] = origPath
+            }
+          }
           return {
-            oneOf: d.type.items.map(build),
+            oneOf,
             discriminator: {
               propertyName: disc.propertyName,
-              mapping: disc.mapping,
+              mapping,
             },
           }
         }
@@ -198,7 +228,12 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       },
     })
   }
-  return build(type)
+
+  const schema = build(type)
+  if (Object.keys(defs).length > 0) {
+    return { ...schema, $defs: defs }
+  }
+  return schema
 }
 
 /**
@@ -222,13 +257,25 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
  * @returns An annotated type with full validator support.
  */
 export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
+  const defsSource = schema.$defs || schema.definitions || {}
+  const resolved = new Map<string, TAtscriptAnnotatedType>()
+
   const convert = (s: TJsonSchema): TAtscriptAnnotatedType => {
     if (!s || Object.keys(s).length === 0) {
       return defineAnnotatedType().designType('any').$type
     }
 
     if (s.$ref) {
-      throw new Error('$ref is not supported by fromJsonSchema. Dereference the schema first.')
+      const refName = s.$ref.replace(/^#\/(\$defs|definitions)\//, '')
+      if (resolved.has(refName)) {
+        return resolved.get(refName)!
+      }
+      if (defsSource[refName]) {
+        const type = convert(defsSource[refName])
+        resolved.set(refName, type)
+        return type
+      }
+      throw new Error(`Unresolvable $ref: ${s.$ref}`)
     }
 
     if ('const' in s) {
@@ -368,4 +415,42 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
   }
 
   return convert(schema)
+}
+
+/**
+ * Merges multiple annotated types into a combined schema map with shared `$defs`.
+ *
+ * Each type must have an `id`. The returned `schemas` object contains individual
+ * schemas keyed by type id, and `$defs` contains all shared type definitions
+ * deduplicated across schemas.
+ *
+ * @param types - Array of annotated types, each with an `id`.
+ * @returns An object with `schemas` (keyed by id) and shared `$defs`.
+ */
+export function mergeJsonSchemas(
+  types: TAtscriptAnnotatedType[]
+): { schemas: Record<string, TJsonSchema>; $defs: Record<string, TJsonSchema> } {
+  const mergedDefs: Record<string, TJsonSchema> = {}
+  const schemas: Record<string, TJsonSchema> = {}
+
+  for (const type of types) {
+    const name = type.id
+    if (!name) {
+      throw new Error('mergeJsonSchemas: all types must have an id')
+    }
+    const schema = buildJsonSchema(type)
+    if (schema.$defs) {
+      for (const [defName, defSchema] of Object.entries(schema.$defs)) {
+        if (!mergedDefs[defName]) {
+          mergedDefs[defName] = defSchema as TJsonSchema
+        }
+      }
+      const { $defs: _, ...rest } = schema
+      schemas[name] = rest
+    } else {
+      schemas[name] = schema
+    }
+  }
+
+  return { schemas, $defs: mergedDefs }
 }

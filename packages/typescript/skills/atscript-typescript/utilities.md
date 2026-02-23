@@ -17,7 +17,7 @@ import {
   // Validation
   Validator, ValidatorError,
   // JSON Schema
-  buildJsonSchema, fromJsonSchema,
+  buildJsonSchema, fromJsonSchema, mergeJsonSchemas,
   // Serialization
   serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION,
   // Flattening
@@ -55,7 +55,7 @@ All handlers except `phantom` are required. Each handler receives the type with 
 
 ## `buildJsonSchema(type)` — Annotated Type → JSON Schema
 
-Converts an annotated type into a standard JSON Schema object, translating validation metadata:
+Converts an annotated type into a standard JSON Schema object, translating validation metadata. Named object types (those with an `id`) are automatically extracted into `$defs` and referenced via `$ref`:
 
 ```ts
 import { buildJsonSchema } from '@atscript/typescript/utils'
@@ -72,6 +72,27 @@ const schema = buildJsonSchema(User)
 //   required: ['name', 'age']
 // }
 ```
+
+### `$defs` and `$ref`
+
+Types compiled from `.as` files carry a stable `id` (the type name). When `buildJsonSchema` encounters named object types nested inside other types (unions, properties), it extracts them into `$defs` and references via `$ref`:
+
+```ts
+import { CatOrDog } from './pets.as'
+const schema = buildJsonSchema(CatOrDog)
+// {
+//   $defs: { Cat: { type: 'object', ... }, Dog: { type: 'object', ... } },
+//   oneOf: [{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }],
+//   discriminator: { propertyName: 'petType', mapping: { cat: '#/$defs/Cat', dog: '#/$defs/Dog' } }
+// }
+```
+
+Key behaviors:
+- Only **named object types** (with `id`) are extracted to `$defs`. Primitives, unions, arrays stay inline.
+- The **root type** is never extracted — it IS the schema.
+- Same `id` referenced multiple times → one `$defs` entry, all occurrences become `$ref`.
+- Types without `id` (inline/anonymous) produce inline schemas.
+- For programmatic types, use `.id('Name')` on the builder to enable `$defs` extraction.
 
 ### Metadata → JSON Schema Mapping
 
@@ -95,7 +116,7 @@ const schema = buildJsonSchema(User)
 
 ### Discriminated Unions
 
-When all union items are objects sharing exactly one property with distinct const/literal values, `buildJsonSchema` auto-detects it and emits `oneOf` with a `discriminator` object (including `propertyName` and `mapping`) instead of `anyOf`. No annotations needed — detection is automatic.
+When all union items are objects sharing exactly one property with distinct const/literal values, `buildJsonSchema` auto-detects it and emits `oneOf` with a `discriminator` object (including `propertyName` and `mapping`) instead of `anyOf`. When items have `id`, the mapping uses `$ref` paths into `$defs`. No annotations needed — detection is automatic.
 
 ## `fromJsonSchema(schema)` — JSON Schema → Annotated Type
 
@@ -117,9 +138,26 @@ const type = fromJsonSchema({
 type.validator().validate({ name: 'Alice', age: 30 })  // passes
 ```
 
-Supports: `type`, `properties`, `required`, `items`, `anyOf`, `oneOf`, `allOf`, `enum`, `const`, `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`, `minItems`, `maxItems`.
+Supports: `type`, `properties`, `required`, `items`, `anyOf`, `oneOf`, `allOf`, `enum`, `const`, `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`, `minItems`, `maxItems`, `$ref`/`$defs`.
 
-Does **not** support `$ref` — dereference schemas first.
+`$ref` paths are automatically resolved from `$defs` or `definitions` in the schema. Unresolvable `$ref` throws an error.
+
+## `mergeJsonSchemas(types)` — Combine Schemas for OpenAPI
+
+Combines multiple annotated types into a single schema map with shared `$defs` — useful for building OpenAPI `components/schemas`:
+
+```ts
+import { mergeJsonSchemas } from '@atscript/typescript/utils'
+import { CatOrDog } from './pets.as'
+import { Order } from './orders.as'
+
+const merged = mergeJsonSchemas([CatOrDog, Order])
+// merged.schemas.CatOrDog — the CatOrDog schema (oneOf with $ref)
+// merged.schemas.Order    — the Order schema
+// merged.$defs: { Cat, Dog, ... } — shared definitions, deduplicated
+```
+
+All types must have an `id` (all types compiled from `.as` files do). The function calls `buildJsonSchema` on each, hoists `$defs` into a shared pool, and returns individual schemas alongside merged definitions.
 
 ## `serializeAnnotatedType(type, options?)` — Serialize to JSON
 
@@ -171,7 +209,7 @@ type.validator().validate(someData)
 type.metadata.get('meta.label')
 ```
 
-Throws if the serialized version doesn't match `SERIALIZE_VERSION`.
+Throws if the serialized version doesn't match `SERIALIZE_VERSION`. The `id` field is preserved through serialization/deserialization.
 
 ### `SERIALIZE_VERSION`
 

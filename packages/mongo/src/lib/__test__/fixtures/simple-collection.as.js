@@ -7,6 +7,7 @@ export class SimpleCollection {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "SimpleCollection"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class MinimalCollection {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "MinimalCollection"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ export class MinimalCollectionString {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "MinimalCollectionString"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

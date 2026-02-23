@@ -7,6 +7,7 @@ export class IdPlugin {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "IdPlugin"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class UniqueItems {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "UniqueItems"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

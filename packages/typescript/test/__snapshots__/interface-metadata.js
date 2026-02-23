@@ -7,6 +7,7 @@ export class WithMetadata {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "WithMetadata"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class SomeType {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "SomeType"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

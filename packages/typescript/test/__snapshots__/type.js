@@ -7,6 +7,7 @@ export class TPrimitive {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TPrimitive"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class TPirmiitiveUn {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TPirmiitiveUn"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ export class TLiteral {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TLiteral"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -37,6 +40,7 @@ export class TNumber {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TNumber"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -47,6 +51,7 @@ export class TTuple1 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TTuple1"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -57,6 +62,7 @@ export class TTuple2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TTuple2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -67,6 +73,7 @@ export class TTupleArray {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TTupleArray"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -77,6 +84,7 @@ export class TArray {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TArray"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -87,6 +95,7 @@ export class TArray2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TArray2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -97,6 +106,7 @@ export class TArray3 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TArray3"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -107,6 +117,7 @@ export class TComplexArray {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TComplexArray"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -117,6 +128,7 @@ export class TComplexArray2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TComplexArray2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -127,6 +139,7 @@ export class TComplexArray3 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TComplexArray3"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -137,6 +150,7 @@ export class TComplexArray4 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TComplexArray4"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -147,6 +161,7 @@ export class TComplexArray5 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TComplexArray5"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -157,6 +172,7 @@ export class TObject {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TObject"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -167,6 +183,7 @@ export class TObjectUnion1 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TObjectUnion1"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -177,6 +194,7 @@ export class TObjectUnion2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TObjectUnion2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -187,6 +205,7 @@ export class TObjectIntersection {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TObjectIntersection"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

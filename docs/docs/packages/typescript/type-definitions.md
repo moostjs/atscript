@@ -15,6 +15,7 @@ interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<
   metadata: TMetadataMap<AtscriptMetadata> // annotation values
   validator: (opts?) => Validator // creates a validator instance
   optional?: boolean
+  id?: string // stable type name (e.g. "Cat") — used for $defs/$ref in JSON Schema
 }
 ```
 

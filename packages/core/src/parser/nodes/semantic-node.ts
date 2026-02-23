@@ -15,6 +15,7 @@ export class SemanticNode {
 
   public annotations?: TAnnotationTokens[]
   public annotationsCounter?: Map<string, number>
+  public __typeId?: number
 
   registerAtDocument(doc: AtscriptDoc): void {
     if (this.definition) {

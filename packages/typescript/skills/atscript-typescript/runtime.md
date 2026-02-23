@@ -12,6 +12,7 @@ interface TAtscriptAnnotatedType<T extends TAtscriptTypeDef = TAtscriptTypeDef> 
   type: T                                // the type definition (shape)
   metadata: TMetadataMap<AtscriptMetadata>  // annotation metadata
   optional?: boolean                     // whether this type is optional
+  id?: string                            // stable type name (set by codegen or .id() builder)
   validator(opts?): Validator            // create a validator instance
 }
 ```
@@ -272,5 +273,6 @@ const labeledType = defineAnnotatedType().designType('string')
 | `.optional(flag?)` | Mark as optional |
 | `.annotate(key, value, asArray?)` | Set metadata annotation |
 | `.copyMetadata(from, ignore?)` | Copy metadata from another type |
-| `.refTo(type, chain?)` | Reference another annotated type's definition |
+| `.id(name)` | Set a stable type name (used by `buildJsonSchema` for `$defs`/`$ref`) |
+| `.refTo(type, chain?)` | Reference another annotated type's definition (carries `id`) |
 | `.$type` | Get the final `TAtscriptAnnotatedType` |

@@ -7,6 +7,7 @@ export class TString {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TString"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class TString2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TString2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ class TO {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TO"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -37,6 +40,7 @@ export class TO2 {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TO2"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

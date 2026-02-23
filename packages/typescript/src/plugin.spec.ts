@@ -672,6 +672,23 @@ describe('ts-plugin', () => {
     expect(out[0].content).toContain('"maxItems":5')
   })
 
+  it('must produce $defs/$ref in bundle mode for discriminated union', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-defs.as'],
+      plugins: [tsPlugin({ jsonSchema: false })],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const content = out[0].content
+    // DogCat has @emit.jsonSchema — should have embedded schema with $defs
+    expect(content).toContain('"$defs"')
+    expect(content).toContain('"$ref":"#/$defs/Dog"')
+    expect(content).toContain('"$ref":"#/$defs/Cat"')
+    expect(content).toContain('"discriminator"')
+    expect(content).toContain('"petType"')
+  })
+
   it('must disable json schema (false mode)', async () => {
     const repo = await build({
       rootDir: wd,

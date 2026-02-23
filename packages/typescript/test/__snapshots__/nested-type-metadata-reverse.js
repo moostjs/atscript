@@ -7,6 +7,7 @@ export class ExplorationForm {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "ExplorationForm"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ class TAddress {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TAddress"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }

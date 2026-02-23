@@ -7,6 +7,7 @@ class TContactType {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "TContactType"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -17,6 +18,7 @@ export class Address {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "Address"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -27,6 +29,7 @@ class Contact {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "Contact"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
@@ -37,6 +40,7 @@ export class User {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
+  static id = "User"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
