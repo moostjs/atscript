@@ -1,3 +1,17 @@
+## [0.1.26](https://github.com/moostjs/atscript/compare/v0.1.25...v0.1.26) (2026-02-23)
+
+
+### Bug Fixes
+
+* **typescript:** clone refs in mutating annotate and inline refs in non-mutating annotate to fix deep path annotations ([d3fe70d](https://github.com/moostjs/atscript/commit/d3fe70dfb12c5966fc463e63cbe4b6c07c2f09cd))
+
+
+### Features
+
+* **typescript:** add $defs/$ref, type id, mergeJsonSchemas, and fromJsonSchema $ref resolution to JSON Schema support ([2dd2855](https://github.com/moostjs/atscript/commit/2dd2855b8fbc3e13a44728ca61eba311ca52675e))
+
+
+
 ## [0.1.25](https://github.com/moostjs/atscript/compare/v0.1.24...v0.1.25) (2026-02-22)
 
 
