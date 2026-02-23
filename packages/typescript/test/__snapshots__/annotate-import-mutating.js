@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
 import { MyInterface } from "./annotate-nonmutating.as"
 // Ad-hoc annotations for MyInterface
 $a(MyInterface.type.props.get("name")?.metadata, "label", "Cross-File Name")

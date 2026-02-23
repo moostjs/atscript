@@ -5,3 +5,6 @@ temp
 *.local.md
 explorations
 .DS_Store
+TODO.md
+*.log
+*.tmp

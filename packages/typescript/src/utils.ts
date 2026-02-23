@@ -1,5 +1,6 @@
 export {
   annotate,
+  cloneRefProp,
   defineAnnotatedType,
   isAnnotatedType,
   isAnnotatedTypeOfPrimitive,

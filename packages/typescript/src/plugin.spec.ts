@@ -485,6 +485,31 @@ describe('ts-plugin', () => {
     expect(outDts[0].content).not.toContain('extends TO')
   })
 
+  it('must render annotate through deep refs (mutating + non-mutating)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-deep-ref.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('annotate-deep-ref.as.js')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-deep-ref.js')
+    )
+    // BUG 1: Mutating annotate should clone ref boundaries before mutating
+    expect(out[0].content).toContain('$c(')
+    expect(out[0].content).toContain('"Mobile Phone"')
+    // BUG 2: Non-mutating annotate should inline through refs and carry annotations
+    expect(out[0].content).toContain('"Work Phone"')
+
+    const outDts = await repo.generate({ format: 'dts' })
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/annotate-deep-ref.as.d.ts')
+    )
+  })
+
   it('must respect merge strategy (replace vs append) in annotate blocks', async () => {
     const repo = await build({
       rootDir: wd,

@@ -46,6 +46,12 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('/* eslint-disable */')
     this.writeln('/* oxlint-disable */')
     const imports = ['defineAnnotatedType as $', 'annotate as $a']
+    const hasMutatingAnnotate = this.doc.nodes.some(
+      n => n.entity === 'annotate' && (n as SemanticAnnotateNode).isMutating
+    )
+    if (hasMutatingAnnotate) {
+      imports.push('cloneRefProp as $c')
+    }
     const jsonSchemaMode = resolveJsonSchemaMode(this.opts)
     if (jsonSchemaMode === 'lazy') {
       imports.push('buildJsonSchema as $$')
@@ -95,6 +101,23 @@ export class JsRenderer extends BaseRenderer {
       }
     }
     return map.size > 0 ? map : null
+  }
+
+  /**
+   * Checks if any ad-hoc annotation path extends beyond the current _propPath,
+   * meaning annotations target properties inside a referenced type.
+   */
+  private hasAdHocAnnotationsThroughRef(): boolean {
+    if (!this._adHocAnnotations || this._propPath.length === 0) {
+      return false
+    }
+    const prefix = this._propPath.join('.') + '.'
+    for (const key of this._adHocAnnotations.keys()) {
+      if (key.startsWith(prefix)) {
+        return true
+      }
+    }
+    return false
   }
 
   post() {
@@ -404,6 +427,18 @@ export class JsRenderer extends BaseRenderer {
           const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
           if (!ownerDecl?.node || (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')) {
             this.annotateType(decl, name)
+            return this
+          }
+        }
+        // When ad-hoc annotations target paths through this ref,
+        // inline the referenced type so _propPath can traverse it
+        if (this._adHocAnnotations && this.hasAdHocAnnotationsThroughRef()) {
+          let resolved = decl ? this.doc.mergeIntersection(decl) : undefined
+          if (resolved && isInterface(resolved)) {
+            resolved = resolved.getDefinition() || resolved
+          }
+          if (resolved) {
+            this.annotateType(resolved, name)
             return this
           }
         }
@@ -760,16 +795,35 @@ export class JsRenderer extends BaseRenderer {
     const targetName = node.targetName
     const targetDef = this.resolveTargetDef(targetName)
     this.writeln('// Ad-hoc annotations for ', targetName)
+
+    // First pass: collect all accessor paths and clone operations
+    const allClones: Array<{ parentPath: string; propName: string }> = []
+    const entryAccessors: Array<{ entry: SemanticAnnotateNode['entries'][number]; accessors: string[] }> = []
+
     for (const entry of node.entries) {
       const anns = entry.annotations
       if (!anns || anns.length === 0) {
         continue
       }
-
-      // Build the navigation chain at compile time
       const parts = entry.hasChain ? [entry.id!, ...entry.chain.map(c => c.text)] : [entry.id!]
-      const accessors = this.buildMutatingAccessors(targetName, targetDef, parts)
+      const { accessors, clones } = this.buildMutatingAccessors(targetName, targetDef, parts)
+      allClones.push(...clones)
+      entryAccessors.push({ entry, accessors })
+    }
 
+    // Emit deduplicated clone operations (shallowest first, already in order)
+    const cloneKeys = new Set<string>()
+    for (const clone of allClones) {
+      const key = `${clone.parentPath}|${clone.propName}`
+      if (!cloneKeys.has(key)) {
+        cloneKeys.add(key)
+        this.writeln(`$c(${clone.parentPath}, "${escapeQuotes(clone.propName)}")`)
+      }
+    }
+
+    // Emit mutation statements
+    for (const { entry, accessors } of entryAccessors) {
+      const anns = entry.annotations!
       for (const accessor of accessors) {
         const cleared = new Set<string>()
         for (const an of anns) {
@@ -836,8 +890,9 @@ export class JsRenderer extends BaseRenderer {
     targetName: string,
     targetDef: SemanticNode | undefined,
     parts: string[]
-  ): string[] {
+  ): { accessors: string[]; clones: Array<{ parentPath: string; propName: string }> } {
     let accessors = [{ prefix: `${targetName}.type`, def: targetDef }]
+    const clones: Array<{ parentPath: string; propName: string }> = []
 
     for (let i = 0; i < parts.length; i++) {
       const nextAccessors: Array<{ prefix: string; def: SemanticNode | undefined }> = []
@@ -846,6 +901,11 @@ export class JsRenderer extends BaseRenderer {
         if (results.length > 0) {
           for (const result of results) {
             if (i < parts.length - 1) {
+              // If this prop's definition is a ref, its .type is shared via refTo().
+              // Clone this prop so mutations don't leak to the referenced type.
+              if (result.propDef && isRef(result.propDef)) {
+                clones.push({ parentPath: prefix, propName: parts[i] })
+              }
               nextAccessors.push({ prefix: `${prefix}${result.path}?.type`, def: result.propDef })
             } else {
               nextAccessors.push({ prefix: `${prefix}${result.path}?`, def: result.propDef })
@@ -860,7 +920,7 @@ export class JsRenderer extends BaseRenderer {
       accessors = nextAccessors
     }
 
-    return accessors.map(a => a.prefix)
+    return { accessors: accessors.map(a => a.prefix), clones }
   }
 
   /**

@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
 
 export class MyInterface {
   static __is_atscript_annotated_type = true
