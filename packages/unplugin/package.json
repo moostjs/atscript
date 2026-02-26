@@ -5,13 +5,13 @@
   "keywords": [
     "annotations",
     "atscript",
+    "esbuild-plugin",
+    "rolldown-plugin",
+    "rollup-plugin",
+    "rspack-plugin",
     "unplugin",
     "vite-plugin",
-    "rollup-plugin",
-    "rolldown-plugin",
-    "webpack-plugin",
-    "esbuild-plugin",
-    "rspack-plugin"
+    "webpack-plugin"
   ],
   "homepage": "https://github.com/moostjs/atscript/tree/main/packages/unplugin#readme",
   "bugs": {

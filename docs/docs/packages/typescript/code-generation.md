@@ -81,12 +81,12 @@ export class Product {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "Product"
+  static id = 'Product'
   static toJsonSchema() {
     return this._jsonSchema ?? (this._jsonSchema = $$(this))
   }
   static toExampleData() {
-    return $e(this, { mode: "example" })
+    return $e(this, { mode: 'example' })
   }
 }
 

@@ -1,90 +1,62 @@
 ## [0.1.26](https://github.com/moostjs/atscript/compare/v0.1.25...v0.1.26) (2026-02-23)
 
-
 ### Bug Fixes
 
-* **typescript:** clone refs in mutating annotate and inline refs in non-mutating annotate to fix deep path annotations ([d3fe70d](https://github.com/moostjs/atscript/commit/d3fe70dfb12c5966fc463e63cbe4b6c07c2f09cd))
-
+- **typescript:** clone refs in mutating annotate and inline refs in non-mutating annotate to fix deep path annotations ([d3fe70d](https://github.com/moostjs/atscript/commit/d3fe70dfb12c5966fc463e63cbe4b6c07c2f09cd))
 
 ### Features
 
-* **typescript:** add $defs/$ref, type id, mergeJsonSchemas, and fromJsonSchema $ref resolution to JSON Schema support ([2dd2855](https://github.com/moostjs/atscript/commit/2dd2855b8fbc3e13a44728ca61eba311ca52675e))
-
-
+- **typescript:** add $defs/$ref, type id, mergeJsonSchemas, and fromJsonSchema $ref resolution to JSON Schema support ([2dd2855](https://github.com/moostjs/atscript/commit/2dd2855b8fbc3e13a44728ca61eba311ca52675e))
 
 ## [0.1.25](https://github.com/moostjs/atscript/compare/v0.1.24...v0.1.25) (2026-02-22)
 
-
 ### Features
 
-* **typescript:** auto-detect discriminated unions in toJsonSchema ([bc37917](https://github.com/moostjs/atscript/commit/bc37917c0b40c4fdcc385ba3a7ea5f8cf8bd6d61))
-
-
+- **typescript:** auto-detect discriminated unions in toJsonSchema ([bc37917](https://github.com/moostjs/atscript/commit/bc37917c0b40c4fdcc385ba3a7ea5f8cf8bd6d61))
 
 ## [0.1.24](https://github.com/moostjs/atscript/compare/v0.1.23...v0.1.24) (2026-02-22)
 
-
 ### Bug Fixes
 
-* improve example generation ([c376569](https://github.com/moostjs/atscript/commit/c376569f3c120ad5d7c7f25137409fa68c79d1f8))
-
-
+- improve example generation ([c376569](https://github.com/moostjs/atscript/commit/c376569f3c120ad5d7c7f25137409fa68c79d1f8))
 
 ## [0.1.23](https://github.com/moostjs/atscript/compare/v0.1.22...v0.1.23) (2026-02-22)
 
-
 ### Features
 
-* **unplugin:** create multiple exports for bundlers ([0a4ea00](https://github.com/moostjs/atscript/commit/0a4ea00d8d9edc19fdeb0a2a340f223354ab1a40))
-
-
+- **unplugin:** create multiple exports for bundlers ([0a4ea00](https://github.com/moostjs/atscript/commit/0a4ea00d8d9edc19fdeb0a2a340f223354ab1a40))
 
 ## [0.1.22](https://github.com/moostjs/atscript/compare/v0.1.21...v0.1.22) (2026-02-21)
 
-
 ### Features
 
-* add type utility TAtscriptDataType ([7348267](https://github.com/moostjs/atscript/commit/7348267eae8506980af253631f73bf7f7ca0a87b))
-
-
+- add type utility TAtscriptDataType ([7348267](https://github.com/moostjs/atscript/commit/7348267eae8506980af253631f73bf7f7ca0a87b))
 
 ## [0.1.21](https://github.com/moostjs/atscript/compare/v0.1.20...v0.1.21) (2026-02-21)
 
-
 ### Features
 
-* add toExampleData() ([d1be890](https://github.com/moostjs/atscript/commit/d1be89013ed8e02a23366f97d2ff35989de216fc))
-
-
+- add toExampleData() ([d1be890](https://github.com/moostjs/atscript/commit/d1be89013ed8e02a23366f97d2ff35989de216fc))
 
 ## [0.1.20](https://github.com/moostjs/atscript/compare/v0.1.19...v0.1.20) (2026-02-21)
 
-
 ### Features
 
-* add skill setup ([fa15cd5](https://github.com/moostjs/atscript/commit/fa15cd55139e648d83972263ae156946a1d2ef0b))
-* **ts:** add createDataFromAnnotatedType ([914edd6](https://github.com/moostjs/atscript/commit/914edd603772fafc506f53308ece54ae4ce12d0a))
-
-
+- add skill setup ([fa15cd5](https://github.com/moostjs/atscript/commit/fa15cd55139e648d83972263ae156946a1d2ef0b))
+- **ts:** add createDataFromAnnotatedType ([914edd6](https://github.com/moostjs/atscript/commit/914edd603772fafc506f53308ece54ae4ce12d0a))
 
 ## [0.1.19](https://github.com/moostjs/atscript/compare/v0.1.18...v0.1.19) (2026-02-20)
 
-
 ### Bug Fixes
 
-* fix typo ([2375f7c](https://github.com/moostjs/atscript/commit/2375f7c77989f3d3fb8467f3630ed9e4293298ac))
-
-
+- fix typo ([2375f7c](https://github.com/moostjs/atscript/commit/2375f7c77989f3d3fb8467f3630ed9e4293298ac))
 
 ## [0.1.18](https://github.com/moostjs/atscript/compare/v0.1.17...v0.1.18) (2026-02-20)
 
-
 ### Bug Fixes
 
-* fix flatten optional flag lost ([cdcb827](https://github.com/moostjs/atscript/commit/cdcb8274b19d34ecb42999e03ebc8a86dc5ccbfb))
-* fix primitive annotations in props complex types ([8d3932f](https://github.com/moostjs/atscript/commit/8d3932fc21298ad40424beb924106d44a6697183))
-
-
+- fix flatten optional flag lost ([cdcb827](https://github.com/moostjs/atscript/commit/cdcb8274b19d34ecb42999e03ebc8a86dc5ccbfb))
+- fix primitive annotations in props complex types ([8d3932f](https://github.com/moostjs/atscript/commit/8d3932fc21298ad40424beb924106d44a6697183))
 
 ## <small>0.1.17 (2026-02-19)</small>
 

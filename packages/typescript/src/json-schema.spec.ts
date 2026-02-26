@@ -550,12 +550,9 @@ describe('discriminated unions', () => {
   })
 
   it('should fall back to anyOf when union has non-object items', () => {
-    const cat = $('object')
-      .prop('petType', $().designType('string').value('cat').$type)
+    const cat = $('object').prop('petType', $().designType('string').value('cat').$type)
 
-    const union = $('union')
-      .item(cat.$type)
-      .item($().designType('string').tags('string').$type)
+    const union = $('union').item(cat.$type).item($().designType('string').tags('string').$type)
 
     const schema = $$(union.$type)
     expect(schema).toHaveProperty('anyOf')
@@ -563,11 +560,9 @@ describe('discriminated unions', () => {
   })
 
   it('should fall back to anyOf when no common const prop exists', () => {
-    const a = $('object')
-      .prop('name', $().designType('string').tags('string').$type)
+    const a = $('object').prop('name', $().designType('string').tags('string').$type)
 
-    const b = $('object')
-      .prop('age', $().designType('number').tags('number').$type)
+    const b = $('object').prop('age', $().designType('number').tags('number').$type)
 
     const schema = $$($('union').item(a.$type).item(b.$type).$type)
     expect(schema).toHaveProperty('anyOf')
@@ -575,11 +570,9 @@ describe('discriminated unions', () => {
   })
 
   it('should fall back to anyOf when const values are not distinct', () => {
-    const a = $('object')
-      .prop('kind', $().designType('string').value('same').$type)
+    const a = $('object').prop('kind', $().designType('string').value('same').$type)
 
-    const b = $('object')
-      .prop('kind', $().designType('string').value('same').$type)
+    const b = $('object').prop('kind', $().designType('string').value('same').$type)
 
     const schema = $$($('union').item(a.$type).item(b.$type).$type)
     expect(schema).toHaveProperty('anyOf')
@@ -587,8 +580,7 @@ describe('discriminated unions', () => {
   })
 
   it('should fall back to anyOf for single-item union', () => {
-    const cat = $('object')
-      .prop('petType', $().designType('string').value('cat').$type)
+    const cat = $('object').prop('petType', $().designType('string').value('cat').$type)
 
     const schema = $$($('union').item(cat.$type).$type)
     expect(schema).toHaveProperty('anyOf')
@@ -698,10 +690,7 @@ describe('$defs and $ref', () => {
         required: ['petType', 'breed'],
       },
     })
-    expect(schema.oneOf).toEqual([
-      { $ref: '#/$defs/Cat' },
-      { $ref: '#/$defs/Dog' },
-    ])
+    expect(schema.oneOf).toEqual([{ $ref: '#/$defs/Cat' }, { $ref: '#/$defs/Dog' }])
   })
 
   it('should produce discriminator mapping with $ref paths for named types', () => {
@@ -728,9 +717,7 @@ describe('$defs and $ref', () => {
   })
 
   it('should NOT extract root type into $defs', () => {
-    const obj = $('object')
-      .prop('name', $().designType('string').tags('string').$type)
-      .id('MyObj')
+    const obj = $('object').prop('name', $().designType('string').tags('string').$type).id('MyObj')
 
     const schema = $$(obj.$type)
     expect(schema.$defs).toBeUndefined()
@@ -745,10 +732,7 @@ describe('$defs and $ref', () => {
       .id('Address')
 
     // Two object types referencing the same Address
-    const person = $('object')
-      .prop('home', address.$type)
-      .prop('work', address.$type)
-      .id('Person')
+    const person = $('object').prop('home', address.$type).prop('work', address.$type).id('Person')
 
     const schema = $$(person.$type)
 
@@ -760,13 +744,11 @@ describe('$defs and $ref', () => {
   })
 
   it('should keep types without id inline', () => {
-    const cat = $('object')
-      .prop('name', $().designType('string').tags('string').$type)
-      // no .id() call
+    const cat = $('object').prop('name', $().designType('string').tags('string').$type)
+    // no .id() call
 
-    const dog = $('object')
-      .prop('breed', $().designType('string').tags('string').$type)
-      // no .id() call
+    const dog = $('object').prop('breed', $().designType('string').tags('string').$type)
+    // no .id() call
 
     const union = $('union').item(cat.$type).item(dog.$type)
     const schema = $$(union.$type)
@@ -788,9 +770,7 @@ describe('$defs and $ref', () => {
           required: ['petType', 'name'],
         },
       },
-      oneOf: [
-        { $ref: '#/$defs/Cat' },
-      ],
+      oneOf: [{ $ref: '#/$defs/Cat' }],
     }
 
     const type = fromJsonSchema(schema)
@@ -830,18 +810,12 @@ describe('$defs and $ref', () => {
 
 describe('mergeJsonSchemas', () => {
   it('should merge multiple schemas with shared $defs', () => {
-    const cat = $('object')
-      .prop('name', $().designType('string').tags('string').$type)
-      .id('Cat')
+    const cat = $('object').prop('name', $().designType('string').tags('string').$type).id('Cat')
 
-    const dog = $('object')
-      .prop('breed', $().designType('string').tags('string').$type)
-      .id('Dog')
+    const dog = $('object').prop('breed', $().designType('string').tags('string').$type).id('Dog')
 
     const pets = $('union').item(cat.$type).item(dog.$type).id('Pets')
-    const order = $('object')
-      .prop('id', $().designType('number').tags('number').$type)
-      .id('Order')
+    const order = $('object').prop('id', $().designType('number').tags('number').$type).id('Order')
 
     const merged = mergeJsonSchemas([pets.$type, order.$type])
 
@@ -855,8 +829,7 @@ describe('mergeJsonSchemas', () => {
   })
 
   it('should throw when a type has no id', () => {
-    const noId = $('object')
-      .prop('name', $().designType('string').tags('string').$type)
+    const noId = $('object').prop('name', $().designType('string').tags('string').$type)
 
     expect(() => mergeJsonSchemas([noId.$type])).toThrow(/all types must have an id/)
   })

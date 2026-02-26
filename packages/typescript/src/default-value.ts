@@ -1,10 +1,4 @@
-import type {
-  TAtscriptAnnotatedType,
-  TAtscriptTypeArray,
-  TAtscriptTypeComplex,
-  TAtscriptTypeFinal,
-  TAtscriptTypeObject,
-} from './annotated-type'
+import type { TAtscriptAnnotatedType, TAtscriptTypeFinal } from './annotated-type'
 import { isPhantomType } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 
@@ -37,12 +31,16 @@ function resolveValue(
   path: string,
   mode: TCreateDataOptions['mode']
 ): { value: unknown } | undefined {
-  if (!mode || mode === 'empty') return undefined
+  if (!mode || mode === 'empty') {
+    return undefined
+  }
 
   let raw: unknown
   if (typeof mode === 'function') {
     raw = mode(prop, path)
-    if (raw === undefined) return undefined
+    if (raw === undefined) {
+      return undefined
+    }
     // Callback returns already-parsed values — validate directly
     if (prop.validator({ unknownProps: 'ignore' }).validate(raw, true)) {
       return { value: raw }
@@ -53,10 +51,14 @@ function resolveValue(
   // 'default' or 'example'
   const metaKey = mode === 'default' ? 'meta.default' : 'meta.example'
   const rawStr = prop.metadata.get(metaKey as keyof AtscriptMetadata) as string | undefined
-  if (rawStr === undefined) return undefined
+  if (rawStr === undefined) {
+    return undefined
+  }
 
   const parsed = parseRawValue(rawStr, prop)
-  if (parsed === undefined) return undefined
+  if (parsed === undefined) {
+    return undefined
+  }
 
   if (prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)) {
     return { value: parsed }
@@ -81,20 +83,28 @@ function parseRawValue(raw: string, prop: TAtscriptAnnotatedType): unknown {
 
 /** Returns the structural default for a final (primitive/literal) type. */
 function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown {
-  if (def.type.value !== undefined) return def.type.value
+  if (def.type.value !== undefined) {
+    return def.type.value
+  }
   switch (def.type.designType) {
-    case 'string':
+    case 'string': {
       return ''
-    case 'number':
+    }
+    case 'number': {
       return 0
-    case 'boolean':
+    }
+    case 'boolean': {
       return false
-    case 'undefined':
+    }
+    case 'undefined': {
       return undefined
-    case 'null':
+    }
+    case 'null': {
       return null
-    default:
+    }
+    default: {
       return undefined
+    }
   }
 }
 
@@ -129,7 +139,9 @@ function build(
 ): unknown {
   // Try to resolve a value from the mode before structural defaults
   const resolved = resolveValue(def, path, mode)
-  if (resolved !== undefined) return resolved.value
+  if (resolved !== undefined) {
+    return resolved.value
+  }
 
   return forAnnotatedType(def, {
     phantom: () => undefined,
@@ -139,7 +151,9 @@ function build(
     object: d => {
       const data: Record<string, unknown> = {}
       for (const [key, prop] of d.type.props.entries()) {
-        if (isPhantomType(prop)) continue
+        if (isPhantomType(prop)) {
+          continue
+        }
         const childPath = path ? `${path}.${key}` : key
 
         if (prop.optional) {

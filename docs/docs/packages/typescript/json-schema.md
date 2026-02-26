@@ -134,10 +134,7 @@ export type CatOrDog = Cat | Dog
       "required": ["petType", "breed"]
     }
   },
-  "oneOf": [
-    { "$ref": "#/$defs/Cat" },
-    { "$ref": "#/$defs/Dog" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/Cat" }, { "$ref": "#/$defs/Dog" }],
   "discriminator": {
     "propertyName": "petType",
     "mapping": {

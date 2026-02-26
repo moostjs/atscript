@@ -6,11 +6,11 @@ Once your plugin is built and tested, you need to integrate it with the develope
 
 Code generation flows through the same `build()` → `generate()` → `write()` pipeline regardless of how it's triggered:
 
-| Entry Point | Trigger | Formats |
-| --- | --- | --- |
-| **CLI** (`asc`) | Manual invocation | `DEFAULT_FORMAT` when no `-f` flag; any format via `-f` |
-| **Build tools** (unplugin) | File change during build/dev | `'js'` (configured in unplugin) |
-| **VSCode extension** | File save | `DEFAULT_FORMAT` |
+| Entry Point                | Trigger                      | Formats                                                 |
+| -------------------------- | ---------------------------- | ------------------------------------------------------- |
+| **CLI** (`asc`)            | Manual invocation            | `DEFAULT_FORMAT` when no `-f` flag; any format via `-f` |
+| **Build tools** (unplugin) | File change during build/dev | `'js'` (configured in unplugin)                         |
+| **VSCode extension**       | File save                    | `DEFAULT_FORMAT`                                        |
 
 All three discover your plugin through `atscript.config.ts` and call `render(doc, format)` on every registered plugin.
 
@@ -26,16 +26,17 @@ Every plugin that produces output essential for the development experience shoul
 ```typescript
 import { createAtscriptPlugin, DEFAULT_FORMAT } from '@atscript/core'
 
-export const myPlugin = () => createAtscriptPlugin({
-  name: 'my-plugin',
+export const myPlugin = () =>
+  createAtscriptPlugin({
+    name: 'my-plugin',
 
-  render(doc, format) {
-    if (format === 'myformat' || format === DEFAULT_FORMAT) {
-      // Generate the primary output for this plugin
-      return [{ fileName: `${doc.name}.ext`, content: generate(doc) }]
-    }
-  },
-})
+    render(doc, format) {
+      if (format === 'myformat' || format === DEFAULT_FORMAT) {
+        // Generate the primary output for this plugin
+        return [{ fileName: `${doc.name}.ext`, content: generate(doc) }]
+      }
+    },
+  })
 ```
 
 This way, when a user saves a file in their editor, **all plugins** generate their primary output automatically — not just a single hardcoded format.
@@ -122,15 +123,15 @@ Your plugin participates automatically — if it produces output for `format ===
 
 ### Supported Bundlers
 
-| Bundler | Import |
-| --- | --- |
-| Vite | `unplugin-atscript/vite` |
-| Rollup | `unplugin-atscript/rollup` |
+| Bundler  | Import                       |
+| -------- | ---------------------------- |
+| Vite     | `unplugin-atscript/vite`     |
+| Rollup   | `unplugin-atscript/rollup`   |
 | Rolldown | `unplugin-atscript/rolldown` |
-| Webpack | `unplugin-atscript/webpack` |
-| Rspack | `unplugin-atscript/rspack` |
-| esbuild | `unplugin-atscript/esbuild` |
-| Farm | `unplugin-atscript/farm` |
+| Webpack  | `unplugin-atscript/webpack`  |
+| Rspack   | `unplugin-atscript/rspack`   |
+| esbuild  | `unplugin-atscript/esbuild`  |
+| Farm     | `unplugin-atscript/farm`     |
 
 ## VSCode Extension On-Save
 
@@ -228,14 +229,14 @@ npx asc -f myformat
 
 ## Summary
 
-| Feature | CLI | Build Tools | VSCode |
-| --- | --- | --- | --- |
-| `DEFAULT_FORMAT` | When no `-f` flag | No | On save |
-| Custom formats | Any (`-f` flag) | `'js'` only | No |
-| Primitives & annotations | Active | Active | Active |
-| Diagnostics | Via `--noEmit` | On error | Real-time |
-| File watching | Via external tools | Built-in (HMR) | On save |
-| Output writing | Automatic | In-memory (bundled) | Automatic |
+| Feature                  | CLI                | Build Tools         | VSCode    |
+| ------------------------ | ------------------ | ------------------- | --------- |
+| `DEFAULT_FORMAT`         | When no `-f` flag  | No                  | On save   |
+| Custom formats           | Any (`-f` flag)    | `'js'` only         | No        |
+| Primitives & annotations | Active             | Active              | Active    |
+| Diagnostics              | Via `--noEmit`     | On error            | Real-time |
+| File watching            | Via external tools | Built-in (HMR)      | On save   |
+| Output writing           | Automatic          | In-memory (bundled) | Automatic |
 
 Your plugin's primitives and annotations work everywhere — the editor provides IntelliSense and validation regardless of which formats your plugin generates. Code generation is triggered differently depending on the tool, but the `render()` hook works identically in all cases.
 

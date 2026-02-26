@@ -20,16 +20,16 @@ new AnnotationSpec({
 
 ### TAnnotationSpecConfig Options
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `description` | `string` | — | Documentation shown in IntelliSense hover |
-| `nodeType` | `TNodeEntity[]` | — | Where annotation can appear: `'interface'`, `'type'`, `'prop'` |
-| `argument` | `object \| object[]` | — | Argument definition(s) |
-| `multiple` | `boolean` | `false` | Allow the annotation to appear more than once on the same node |
-| `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance |
-| `defType` | `string[]` | — | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
-| `validate` | `function` | — | Custom validation at parse time |
-| `modify` | `function` | — | AST mutation after validation |
+| Option          | Type                    | Default     | Description                                                                                        |
+| --------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `description`   | `string`                | —           | Documentation shown in IntelliSense hover                                                          |
+| `nodeType`      | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                     |
+| `argument`      | `object \| object[]`    | —           | Argument definition(s)                                                                             |
+| `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                     |
+| `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                   |
+| `defType`       | `string[]`              | —           | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
+| `validate`      | `function`              | —           | Custom validation at parse time                                                                    |
+| `modify`        | `function`              | —           | AST mutation after validation                                                                      |
 
 ## Registering Annotations via config()
 
@@ -38,41 +38,48 @@ Annotations are registered in a nested tree structure. The tree path becomes the
 ```typescript
 import { createAtscriptPlugin, AnnotationSpec } from '@atscript/core'
 
-export const apiPlugin = () => createAtscriptPlugin({
-  name: 'api',
-  config() {
-    return {
-      annotations: {
-        api: {                                    // @api.* namespace
-          endpoint: new AnnotationSpec({          // @api.endpoint
-            description: 'REST endpoint for this interface',
-            nodeType: ['interface'],
-            argument: { name: 'path', type: 'string' },
-          }),
-          method: new AnnotationSpec({            // @api.method
-            description: 'HTTP method',
-            nodeType: ['interface'],
-            argument: {
-              name: 'method',
-              type: 'string',
-              values: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+export const apiPlugin = () =>
+  createAtscriptPlugin({
+    name: 'api',
+    config() {
+      return {
+        annotations: {
+          api: {
+            // @api.* namespace
+            endpoint: new AnnotationSpec({
+              // @api.endpoint
+              description: 'REST endpoint for this interface',
+              nodeType: ['interface'],
+              argument: { name: 'path', type: 'string' },
+            }),
+            method: new AnnotationSpec({
+              // @api.method
+              description: 'HTTP method',
+              nodeType: ['interface'],
+              argument: {
+                name: 'method',
+                type: 'string',
+                values: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+              },
+            }),
+            field: {
+              // @api.field.* sub-namespace
+              readonly: new AnnotationSpec({
+                // @api.field.readonly
+                description: 'Field is read-only in API responses',
+                nodeType: ['prop'],
+              }),
+              writeOnly: new AnnotationSpec({
+                // @api.field.writeOnly
+                description: 'Field is accepted in requests but excluded from responses',
+                nodeType: ['prop'],
+              }),
             },
-          }),
-          field: {                                // @api.field.* sub-namespace
-            readonly: new AnnotationSpec({        // @api.field.readonly
-              description: 'Field is read-only in API responses',
-              nodeType: ['prop'],
-            }),
-            writeOnly: new AnnotationSpec({       // @api.field.writeOnly
-              description: 'Field is accepted in requests but excluded from responses',
-              nodeType: ['prop'],
-            }),
           },
         },
-      },
-    }
-  },
-})
+      }
+    },
+  })
 ```
 
 The nesting depth is arbitrary — `@api.field.readonly` comes from `annotations.api.field.readonly`.
@@ -87,7 +94,7 @@ interface TAnnotationArgument {
   type: 'string' | 'number' | 'boolean'
   optional?: boolean
   description?: string
-  values?: string[]    // Enum — restrict to specific values
+  values?: string[] // Enum — restrict to specific values
 }
 ```
 
@@ -126,7 +133,12 @@ new AnnotationSpec({
   description: 'Vector search index',
   argument: [
     { name: 'dimensions', type: 'number' },
-    { name: 'similarity', type: 'string', optional: true, values: ['cosine', 'euclidean', 'dotProduct'] },
+    {
+      name: 'similarity',
+      type: 'string',
+      optional: true,
+      values: ['cosine', 'euclidean', 'dotProduct'],
+    },
     { name: 'indexName', type: 'string', optional: true },
   ],
 })
@@ -160,7 +172,7 @@ The annotation on the child/inner type overwrites the parent's:
 
 ```typescript
 new AnnotationSpec({
-  mergeStrategy: 'replace',  // default
+  mergeStrategy: 'replace', // default
   argument: { name: 'value', type: 'string' },
 })
 ```
@@ -213,19 +225,19 @@ For validation logic beyond type checks and argument counts, provide a `validate
 validate(mainToken: Token, args: Token[], doc: AtscriptDoc): TMessages | undefined
 ```
 
-| Parameter | Description |
-| --- | --- |
-| `mainToken` | The annotation token (e.g., `@api.endpoint`). Access the parent node via `mainToken.parentNode`. |
-| `args` | Array of argument tokens. Each has `.text` (raw value), `.type` (token type), `.range` (source location). |
-| `doc` | The `AtscriptDoc` instance for resolving types and querying the document. |
+| Parameter   | Description                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------- |
+| `mainToken` | The annotation token (e.g., `@api.endpoint`). Access the parent node via `mainToken.parentNode`.          |
+| `args`      | Array of argument tokens. Each has `.text` (raw value), `.type` (token type), `.range` (source location). |
+| `doc`       | The `AtscriptDoc` instance for resolving types and querying the document.                                 |
 
 Return an array of diagnostic messages, or `undefined` if valid:
 
 ```typescript
 interface TMessage {
-  severity: 1 | 2 | 3 | 4  // 1=Error, 2=Warning, 3=Info, 4=Hint
+  severity: 1 | 2 | 3 | 4 // 1=Error, 2=Warning, 3=Info, 4=Hint
   message: string
-  range: { start: Position, end: Position }
+  range: { start: Position; end: Position }
 }
 ```
 
@@ -244,7 +256,7 @@ new AnnotationSpec({
   validate(token, args, doc) {
     const parent = token.parentNode
     if (!isInterface(parent) || !parent.props.has('_id')) {
-      return  // no _id field — nothing to validate
+      return // no _id field — nothing to validate
     }
 
     const errors = []
@@ -301,11 +313,13 @@ new AnnotationSpec({
     }
 
     if (!isStructure(def) && !isInterface(def) && !isArray(def)) {
-      return [{
-        severity: 1,
-        message: 'Patch strategy requires an object or array type',
-        range: token.range,
-      }]
+      return [
+        {
+          severity: 1,
+          message: 'Patch strategy requires an object or array type',
+          range: token.range,
+        },
+      ]
     }
   },
 })
@@ -318,7 +332,7 @@ For basic type restrictions, use `defType` instead of a full `validate` function
 ```typescript
 new AnnotationSpec({
   description: 'Decimal precision for numeric display',
-  defType: ['number'],  // only valid on number fields
+  defType: ['number'], // only valid on number fields
   argument: { name: 'digits', type: 'number' },
 })
 ```
@@ -333,7 +347,7 @@ The `modify` hook runs after successful validation and can mutate the AST. This 
 modify(mainToken: Token, args: Token[], doc: AtscriptDoc): void
 ```
 
-### Example: Auto-Add _id Property
+### Example: Auto-Add \_id Property
 
 The MongoDB plugin uses `modify` on `@mongo.collection` to automatically add an `_id` property when the interface doesn't already have one:
 
@@ -408,62 +422,63 @@ Here's a full plugin combining primitives and annotations for an API documentati
 ```typescript
 import { createAtscriptPlugin, AnnotationSpec, isInterface } from '@atscript/core'
 
-export const openApiPlugin = () => createAtscriptPlugin({
-  name: 'openapi',
-  config() {
-    return {
-      primitives: {
-        openapi: {
-          extensions: {
-            date: {
-              type: 'string',
-              documentation: 'ISO 8601 date string (format: date)',
-              tags: ['date'],
-              expect: {
-                pattern: /^\d{4}-\d{2}-\d{2}$/,
-                message: 'Expected ISO date format (YYYY-MM-DD)',
+export const openApiPlugin = () =>
+  createAtscriptPlugin({
+    name: 'openapi',
+    config() {
+      return {
+        primitives: {
+          openapi: {
+            extensions: {
+              date: {
+                type: 'string',
+                documentation: 'ISO 8601 date string (format: date)',
+                tags: ['date'],
+                expect: {
+                  pattern: /^\d{4}-\d{2}-\d{2}$/,
+                  message: 'Expected ISO date format (YYYY-MM-DD)',
+                },
               },
-            },
-            dateTime: {
-              type: 'string',
-              documentation: 'ISO 8601 date-time string (format: date-time)',
-              tags: ['dateTime'],
-              expect: {
-                pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
-                message: 'Expected ISO date-time format',
+              dateTime: {
+                type: 'string',
+                documentation: 'ISO 8601 date-time string (format: date-time)',
+                tags: ['dateTime'],
+                expect: {
+                  pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
+                  message: 'Expected ISO date-time format',
+                },
               },
             },
           },
         },
-      },
-      annotations: {
-        openapi: {
-          schema: new AnnotationSpec({
-            description: 'OpenAPI schema name for this interface',
-            nodeType: ['interface'],
-            argument: { name: 'name', type: 'string', optional: true },
-          }),
-          tag: new AnnotationSpec({
-            description: 'OpenAPI tag for grouping endpoints',
-            nodeType: ['interface'],
-            multiple: true,
-            mergeStrategy: 'append',
-            argument: { name: 'tag', type: 'string' },
-          }),
-          deprecated: new AnnotationSpec({
-            description: 'Mark as deprecated in OpenAPI spec',
-            nodeType: ['prop', 'interface'],
-          }),
-          example: new AnnotationSpec({
-            description: 'Example value for OpenAPI documentation',
-            nodeType: ['prop'],
-            argument: { name: 'value', type: 'string' },
-          }),
+        annotations: {
+          openapi: {
+            schema: new AnnotationSpec({
+              description: 'OpenAPI schema name for this interface',
+              nodeType: ['interface'],
+              argument: { name: 'name', type: 'string', optional: true },
+            }),
+            tag: new AnnotationSpec({
+              description: 'OpenAPI tag for grouping endpoints',
+              nodeType: ['interface'],
+              multiple: true,
+              mergeStrategy: 'append',
+              argument: { name: 'tag', type: 'string' },
+            }),
+            deprecated: new AnnotationSpec({
+              description: 'Mark as deprecated in OpenAPI spec',
+              nodeType: ['prop', 'interface'],
+            }),
+            example: new AnnotationSpec({
+              description: 'Example value for OpenAPI documentation',
+              nodeType: ['prop'],
+              argument: { name: 'value', type: 'string' },
+            }),
+          },
         },
-      },
-    }
-  },
-})
+      }
+    },
+  })
 ```
 
 Usage in `.as` files:

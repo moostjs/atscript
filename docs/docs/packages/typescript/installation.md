@@ -117,8 +117,8 @@ Restart your agent after installing.
 ```jsonc
 {
   "scripts": {
-    "postinstall": "npx @atscript/typescript setup-skills --postinstall"
-  }
+    "postinstall": "npx @atscript/typescript setup-skills --postinstall",
+  },
 }
 ```
 

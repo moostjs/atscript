@@ -1,6 +1,6 @@
 import { ValidatorError } from '@atscript/typescript/utils'
 import { HttpError } from '@moostjs/event-http'
-import { defineInterceptorFn, Intercept, TInterceptorPriority } from 'moost'
+import { defineInterceptor, Intercept, TInterceptorPriority } from 'moost'
 
 /**
  * **validationErrorTransform** ─ Moost interceptor that catches
@@ -17,10 +17,13 @@ import { defineInterceptorFn, Intercept, TInterceptorPriority } from 'moost'
  * ```
  */
 export const validationErrorTransform = () =>
-  defineInterceptorFn((before, after, onError) => {
-    after(transformValidationError)
-    onError(transformValidationError)
-  }, TInterceptorPriority.CATCH_ERROR)
+  defineInterceptor(
+    {
+      after: transformValidationError,
+      error: transformValidationError,
+    },
+    TInterceptorPriority.CATCH_ERROR
+  )
 
 /**
  * Internal helper that performs the actual conversion: wraps a

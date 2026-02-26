@@ -68,10 +68,12 @@ export class JsRenderer extends BaseRenderer {
     const nameCounts = new Map<string, number>()
     const nodesByName = new Map<string, SemanticNode[]>()
     for (const node of this.doc.nodes) {
-      if (node.__typeId != null && node.id) {
+      if (node.__typeId !== null && node.__typeId !== undefined && node.id) {
         const name = node.id
         nameCounts.set(name, (nameCounts.get(name) || 0) + 1)
-        if (!nodesByName.has(name)) nodesByName.set(name, [])
+        if (!nodesByName.has(name)) {
+          nodesByName.set(name, [])
+        }
         nodesByName.get(name)!.push(node)
       }
     }
@@ -111,7 +113,7 @@ export class JsRenderer extends BaseRenderer {
     if (!this._adHocAnnotations || this._propPath.length === 0) {
       return false
     }
-    const prefix = this._propPath.join('.') + '.'
+    const prefix = `${this._propPath.join('.')}.`
     for (const key of this._adHocAnnotations.keys()) {
       if (key.startsWith(prefix)) {
         return true
@@ -253,7 +255,9 @@ export class JsRenderer extends BaseRenderer {
         const def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
         const handle = this.toAnnotatedHandle(def, true)
         // Assign id for $defs/$ref support in buildJsonSchema (bundle mode)
-        const typeId = this.typeIds.get(node) ?? (node.__typeId != null ? node.id : undefined)
+        const typeId =
+          this.typeIds.get(node) ??
+          (node.__typeId !== null && node.__typeId !== undefined ? node.id : undefined)
         if (typeId) {
           handle.id(typeId)
         }
@@ -425,7 +429,10 @@ export class JsRenderer extends BaseRenderer {
           // Only inline as primitive if the ref directly targets a built-in primitive,
           // not a named type alias that resolves to a primitive (e.g. `type MyString = string`).
           const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
-          if (!ownerDecl?.node || (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')) {
+          if (
+            !ownerDecl?.node ||
+            (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')
+          ) {
             this.annotateType(decl, name)
             return this
           }
@@ -699,7 +706,10 @@ export class JsRenderer extends BaseRenderer {
           // that resolves to a primitive — annotateType emits refTo + type-level
           // annotations for these, so evalAnnotationsForNode would duplicate them.
           const ownerDecl = this.doc.getDeclarationOwnerNode(refNode.id!)
-          if (ownerDecl?.node && (ownerDecl.node.entity === 'type' || ownerDecl.node.entity === 'interface')) {
+          if (
+            ownerDecl?.node &&
+            (ownerDecl.node.entity === 'type' || ownerDecl.node.entity === 'interface')
+          ) {
             annotations = node.annotations ?? []
           }
         }
@@ -798,7 +808,10 @@ export class JsRenderer extends BaseRenderer {
 
     // First pass: collect all accessor paths and clone operations
     const allClones: Array<{ parentPath: string; propName: string }> = []
-    const entryAccessors: Array<{ entry: SemanticAnnotateNode['entries'][number]; accessors: string[] }> = []
+    const entryAccessors: Array<{
+      entry: SemanticAnnotateNode['entries'][number]
+      accessors: string[]
+    }> = []
 
     for (const entry of node.entries) {
       const anns = entry.annotations

@@ -162,15 +162,15 @@ class Cat {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "Cat"
+  static id = 'Cat'
 }
 
 // Name collision (two "Helper" types from different files) — suffixed:
 class Helper {
-  static id = "Helper__1"
+  static id = 'Helper__1'
 }
 class Helper$1 {
-  static id = "Helper__2"
+  static id = 'Helper__2'
 }
 ```
 
@@ -199,7 +199,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       if (!defs[name]) {
         // Placeholder to prevent infinite recursion on circular refs
         defs[name] = {}
-        defs[name] = buildObjectSchema(def)  // same logic as current object() handler
+        defs[name] = buildObjectSchema(def) // same logic as current object() handler
       }
       return { $ref: `#/$defs/${name}` }
     }
@@ -249,10 +249,7 @@ With named types, the discriminated union output becomes:
       "required": ["petType", "breed"]
     }
   },
-  "oneOf": [
-    { "$ref": "#/$defs/Cat" },
-    { "$ref": "#/$defs/Dog" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/Cat" }, { "$ref": "#/$defs/Dog" }],
   "discriminator": {
     "propertyName": "petType",
     "mapping": {
@@ -298,9 +295,10 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
 Add a new utility for combining multiple schemas. It accepts annotated types directly — extracting `id` from each to use as the schema name:
 
 ```ts
-export function mergeJsonSchemas(
-  types: TAtscriptAnnotatedType[]
-): { schemas: Record<string, TJsonSchema>; $defs: Record<string, TJsonSchema> } {
+export function mergeJsonSchemas(types: TAtscriptAnnotatedType[]): {
+  schemas: Record<string, TJsonSchema>
+  $defs: Record<string, TJsonSchema>
+} {
   const mergedDefs: Record<string, TJsonSchema> = {}
   const schemas: Record<string, TJsonSchema> = {}
 
@@ -338,10 +336,7 @@ import { mergeJsonSchemas } from '@atscript/typescript/utils'
 import { CatOrDog } from './pets.as'
 import { Order } from './orders.as'
 
-const merged = mergeJsonSchemas([
-  CatOrDog,
-  Order,
-])
+const merged = mergeJsonSchemas([CatOrDog, Order])
 
 // merged.schemas.CatOrDog — uses $ref pointers into $defs
 // merged.schemas.Order    — uses $ref pointers into $defs
@@ -373,15 +368,15 @@ if (data.id) {
 
 ## File Change Summary
 
-| File | Change |
-|------|--------|
-| `packages/core/src/parser/nodes/semantic-node.ts` | Add `__typeId?: number` field |
-| `packages/core/src/document.ts` | Assign auto-incrementing `__typeId` in `registerDefinition()` |
-| `packages/typescript/src/annotated-type.ts` | Add `id?: string` to `TAtscriptAnnotatedType`, add `id()` method to builder handle (programmatic use), carry `id` through `refTo()` |
-| `packages/typescript/src/codegen/js-renderer.ts` | Emit `static id = "{Name}"` (or `"{Name}__{N}"` on collision) in `renderClassStatics()` for interface/type/annotate nodes |
-| `packages/typescript/src/json-schema.ts` | Collect `$defs`, emit `$ref` for named object types, update discriminated union to use `$ref`-based mapping, update `fromJsonSchema` to resolve `$ref`/`$defs` |
-| `packages/typescript/src/serialize.ts` | Include `id` in serialized/deserialized output |
-| `packages/typescript/src/json-schema.spec.ts` | Tests for `$defs`/`$ref` generation, discriminated union with refs, round-trip with `$defs`, multi-schema merging |
+| File                                              | Change                                                                                                                                                         |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/core/src/parser/nodes/semantic-node.ts` | Add `__typeId?: number` field                                                                                                                                  |
+| `packages/core/src/document.ts`                   | Assign auto-incrementing `__typeId` in `registerDefinition()`                                                                                                  |
+| `packages/typescript/src/annotated-type.ts`       | Add `id?: string` to `TAtscriptAnnotatedType`, add `id()` method to builder handle (programmatic use), carry `id` through `refTo()`                            |
+| `packages/typescript/src/codegen/js-renderer.ts`  | Emit `static id = "{Name}"` (or `"{Name}__{N}"` on collision) in `renderClassStatics()` for interface/type/annotate nodes                                      |
+| `packages/typescript/src/json-schema.ts`          | Collect `$defs`, emit `$ref` for named object types, update discriminated union to use `$ref`-based mapping, update `fromJsonSchema` to resolve `$ref`/`$defs` |
+| `packages/typescript/src/serialize.ts`            | Include `id` in serialized/deserialized output                                                                                                                 |
+| `packages/typescript/src/json-schema.spec.ts`     | Tests for `$defs`/`$ref` generation, discriminated union with refs, round-trip with `$defs`, multi-schema merging                                              |
 
 ## ID Format
 
@@ -432,35 +427,35 @@ class Cat {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "Cat"
+  static id = 'Cat'
 }
 
 class Dog {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "Dog"
+  static id = 'Dog'
 }
 
 export class CatOrDog {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "CatOrDog"
+  static id = 'CatOrDog'
 }
 
 // Builder calls — order doesn't matter for id because it's already on the class
-$("object", Cat)
-  .prop("petType", $().designType("string").value("cat").$type)
-  .prop("name", $().designType("string").tags("string").$type)
+$('object', Cat)
+  .prop('petType', $().designType('string').value('cat').$type)
+  .prop('name', $().designType('string').tags('string').$type)
 
-$("object", Dog)
-  .prop("petType", $().designType("string").value("dog").$type)
-  .prop("breed", $().designType("string").tags("string").$type)
+$('object', Dog)
+  .prop('petType', $().designType('string').value('dog').$type)
+  .prop('breed', $().designType('string').tags('string').$type)
 
-$("union", CatOrDog)
-  .item($().refTo(Cat).$type)   // Cat.id = "Cat" — already available
-  .item($().refTo(Dog).$type)   // Dog.id = "Dog" — already available
+$('union', CatOrDog)
+  .item($().refTo(Cat).$type) // Cat.id = "Cat" — already available
+  .item($().refTo(Dog).$type) // Dog.id = "Dog" — already available
 ```
 
 **`buildJsonSchema(CatOrDog)`** output:
@@ -485,10 +480,7 @@ $("union", CatOrDog)
       "required": ["petType", "breed"]
     }
   },
-  "oneOf": [
-    { "$ref": "#/$defs/Cat" },
-    { "$ref": "#/$defs/Dog" }
-  ],
+  "oneOf": [{ "$ref": "#/$defs/Cat" }, { "$ref": "#/$defs/Dog" }],
   "discriminator": {
     "propertyName": "petType",
     "mapping": {

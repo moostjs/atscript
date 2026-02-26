@@ -1,3 +1,1 @@
-import { tsPlugin } from './plugin'
-
-export default tsPlugin
+export { tsPlugin, tsPlugin as default } from './plugin'

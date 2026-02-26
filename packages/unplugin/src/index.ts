@@ -3,7 +3,7 @@ import path from 'path'
 
 import type { TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
 import { AtscriptRepo, isAnnotate, loadConfig, resolveConfigFile } from '@atscript/core'
-import ts from '@atscript/typescript'
+import { tsPlugin as ts } from '@atscript/typescript'
 import type { UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 

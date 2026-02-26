@@ -1,6 +1,10 @@
 import type { AsMongo, AsCollection } from '@atscript/mongo'
 import type { Validator } from '@atscript/typescript/utils'
-import { ValidatorError, type TAtscriptAnnotatedType, type TAtscriptDataType } from '@atscript/typescript/utils'
+import {
+  ValidatorError,
+  type TAtscriptAnnotatedType,
+  type TAtscriptDataType,
+} from '@atscript/typescript/utils'
 // oxlint-disable max-lines
 import { Body, Delete, Get, HttpError, Patch, Post, Put, Url } from '@moostjs/event-http'
 import type {

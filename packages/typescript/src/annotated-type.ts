@@ -167,26 +167,30 @@ export function annotate<K extends keyof AtscriptMetadata>(
  * Clones a property's type tree in-place so mutations don't leak to shared refs.
  * Used by mutating annotate codegen when paths cross ref boundaries.
  */
-export function cloneRefProp(
-  parentType: TAtscriptTypeDef,
-  propName: string
-): void {
-  if (parentType.kind !== 'object') return
+export function cloneRefProp(parentType: TAtscriptTypeDef, propName: string): void {
+  if (parentType.kind !== 'object') {
+    return
+  }
   const objType = parentType as TAtscriptTypeObject
   const existing = objType.props.get(propName)
-  if (!existing) return
+  if (!existing) {
+    return
+  }
 
   const clonedType = cloneTypeDef(existing.type)
-  objType.props.set(propName as any, {
-    __is_atscript_annotated_type: true,
-    type: clonedType,
-    metadata: new Map(existing.metadata),
-    id: existing.id,
-    optional: existing.optional,
-    validator(opts?: Partial<TValidatorOptions>) {
-      return new Validator(this as TAtscriptAnnotatedType, opts)
-    },
-  } as TAtscriptAnnotatedType)
+  objType.props.set(
+    propName as any,
+    {
+      __is_atscript_annotated_type: true,
+      type: clonedType,
+      metadata: new Map(existing.metadata),
+      id: existing.id,
+      optional: existing.optional,
+      validator(opts?: Partial<TValidatorOptions>) {
+        return new Validator(this as TAtscriptAnnotatedType, opts)
+      },
+    } as TAtscriptAnnotatedType
+  )
 }
 
 function cloneTypeDef(type: TAtscriptTypeDef): TAtscriptTypeDef {
@@ -219,7 +223,11 @@ function cloneTypeDef(type: TAtscriptTypeDef): TAtscriptTypeDef {
   }
   if (type.kind === 'union' || type.kind === 'intersection' || type.kind === 'tuple') {
     const complex = type as TAtscriptTypeComplex
-    return { kind: type.kind, items: [...complex.items], tags: new Set(complex.tags) } as TAtscriptTypeDef
+    return {
+      kind: type.kind,
+      items: [...complex.items],
+      tags: new Set(complex.tags),
+    } as TAtscriptTypeDef
   }
   // primitive — spread
   return { ...type, tags: new Set(type.tags) } as TAtscriptTypeDef
@@ -288,7 +296,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     _existingObject: undefined as TAtscriptAnnotatedType | undefined,
     tags(...tags: string[]) {
       for (const tag of tags) {
-        this.$def.tags.add(tag)
+        this.$def.tags.add(tag as AtscriptPrimitiveTags)
       }
       return this
     },

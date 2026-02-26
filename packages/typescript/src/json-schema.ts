@@ -156,7 +156,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           // Update mapping to use $ref paths when items were extracted to $defs
           const mapping: Record<string, string> = {}
           for (const [val, origPath] of Object.entries(disc.mapping)) {
-            const idx = Number.parseInt(origPath.split('/').pop()!)
+            const idx = Number.parseInt(origPath.split('/').pop()!, 10)
             const item = d.type.items[idx]
             if (item.id && defs[item.id]) {
               mapping[val] = `#/$defs/${item.id}`
@@ -427,9 +427,10 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
  * @param types - Array of annotated types, each with an `id`.
  * @returns An object with `schemas` (keyed by id) and shared `$defs`.
  */
-export function mergeJsonSchemas(
-  types: TAtscriptAnnotatedType[]
-): { schemas: Record<string, TJsonSchema>; $defs: Record<string, TJsonSchema> } {
+export function mergeJsonSchemas(types: TAtscriptAnnotatedType[]): {
+  schemas: Record<string, TJsonSchema>
+  $defs: Record<string, TJsonSchema>
+} {
   const mergedDefs: Record<string, TJsonSchema> = {}
   const schemas: Record<string, TJsonSchema> = {}
 

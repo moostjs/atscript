@@ -120,15 +120,15 @@ annotate User {
 
 ### Built-in Primitives
 
-| Primitive | Description |
-|-----------|-------------|
-| `string` | Text data |
-| `number` | Numeric data |
-| `boolean` | True/false |
-| `null` | Null value |
-| `void` / `undefined` | No value |
-| `never` | Impossible type |
-| `phantom` | Metadata-only type (no runtime/schema impact) |
+| Primitive            | Description                                   |
+| -------------------- | --------------------------------------------- |
+| `string`             | Text data                                     |
+| `number`             | Numeric data                                  |
+| `boolean`            | True/false                                    |
+| `null`               | Null value                                    |
+| `void` / `undefined` | No value                                      |
+| `never`              | Impossible type                               |
+| `phantom`            | Metadata-only type (no runtime/schema impact) |
 
 ### Primitive Extensions (Subtypes)
 
@@ -153,35 +153,35 @@ interface User {
 
 #### String Extensions
 
-| Extension | Validation |
-|-----------|-----------|
-| `string.email` | Email format (`^[^\s@]+@[^\s@]+\.[^\s@]+$`) |
-| `string.phone` | Phone format (`^\+?[0-9\s-]{10,15}$`) |
-| `string.date` | Date string (YYYY-MM-DD, MM/DD/YYYY, etc.) |
-| `string.isoDate` | ISO 8601 date/time |
-| `string.uuid` | UUID v4 format |
-| `string.required` | Non-empty (trimmed length >= 1) |
+| Extension         | Validation                                  |
+| ----------------- | ------------------------------------------- |
+| `string.email`    | Email format (`^[^\s@]+@[^\s@]+\.[^\s@]+$`) |
+| `string.phone`    | Phone format (`^\+?[0-9\s-]{10,15}$`)       |
+| `string.date`     | Date string (YYYY-MM-DD, MM/DD/YYYY, etc.)  |
+| `string.isoDate`  | ISO 8601 date/time                          |
+| `string.uuid`     | UUID v4 format                              |
+| `string.required` | Non-empty (trimmed length >= 1)             |
 
 #### Number Extensions
 
-| Extension | Validation |
-|-----------|-----------|
-| `number.int` | Integer (no decimals) |
-| `number.positive` | >= 0 |
-| `number.negative` | <= 0 |
-| `number.single` | Single-precision float |
-| `number.double` | Double-precision float |
-| `number.timestamp` | Integer timestamp |
-| `number.int.positive` | Integer >= 0 |
-| `number.int.negative` | Integer <= 0 |
+| Extension             | Validation             |
+| --------------------- | ---------------------- |
+| `number.int`          | Integer (no decimals)  |
+| `number.positive`     | >= 0                   |
+| `number.negative`     | <= 0                   |
+| `number.single`       | Single-precision float |
+| `number.double`       | Double-precision float |
+| `number.timestamp`    | Integer timestamp      |
+| `number.int.positive` | Integer >= 0           |
+| `number.int.negative` | Integer <= 0           |
 
 #### Boolean Extensions
 
-| Extension | Validation |
-|-----------|-----------|
+| Extension          | Validation     |
+| ------------------ | -------------- |
 | `boolean.required` | Must be `true` |
-| `boolean.true` | Literal true |
-| `boolean.false` | Literal false |
+| `boolean.true`     | Literal true   |
+| `boolean.false`    | Literal false  |
 
 ## Imports and Exports
 

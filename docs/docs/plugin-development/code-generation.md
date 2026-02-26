@@ -32,11 +32,11 @@ for (const node of doc.nodes) {
   switch (node.entity) {
     case 'interface': // SemanticInterfaceNode — a named structure with properties
       break
-    case 'type':      // SemanticTypeNode — a type alias (type Foo = ...)
+    case 'type': // SemanticTypeNode — a type alias (type Foo = ...)
       break
-    case 'import':    // SemanticImportNode — an import statement
+    case 'import': // SemanticImportNode — an import statement
       break
-    case 'annotate':  // SemanticAnnotateNode — an annotate block (ad-hoc annotations)
+    case 'annotate': // SemanticAnnotateNode — an annotate block (ad-hoc annotations)
       break
   }
 }
@@ -50,12 +50,12 @@ An `SemanticInterfaceNode` represents a named interface with properties. This is
 
 ```typescript
 function processInterface(node: SemanticInterfaceNode, doc: AtscriptDoc) {
-  const name = node.id!                          // interface name
-  const isExported = !!node.token('export')       // was it exported?
+  const name = node.id! // interface name
+  const isExported = !!node.token('export') // was it exported?
 
   for (const [propName, prop] of node.props) {
-    const isOptional = !!prop.token('optional')   // field marked with ?
-    const definition = prop.getDefinition()       // the field's type definition
+    const isOptional = !!prop.token('optional') // field marked with ?
+    const definition = prop.getDefinition() // the field's type definition
     // definition is a SemanticNode — could be ref, primitive, structure, group, array, const
   }
 }
@@ -83,8 +83,8 @@ if (isRef(def)) {
   if (resolved?.def) {
     if (isPrimitive(resolved.def)) {
       // Terminal: it's a primitive like string, number, string.email, etc.
-      resolved.def.type       // underlying scalar: 'string', 'number', 'boolean', etc.
-      resolved.def.config     // full TPrimitiveConfig with expect, tags, documentation
+      resolved.def.type // underlying scalar: 'string', 'number', 'boolean', etc.
+      resolved.def.config // full TPrimitiveConfig with expect, tags, documentation
     } else {
       // It references another interface/type — use the resolved name
       resolved.name
@@ -101,8 +101,13 @@ Use type guards to dispatch on definition kind. This is the core of any code gen
 
 ```typescript
 import {
-  isRef, isPrimitive, isStructure, isGroup,
-  isArray, isConst, isInterface
+  isRef,
+  isPrimitive,
+  isStructure,
+  isGroup,
+  isArray,
+  isConst,
+  isInterface,
 } from '@atscript/core/nodes'
 
 function resolveType(def: SemanticNode | undefined, doc: AtscriptDoc): string {
@@ -133,8 +138,8 @@ function resolveType(def: SemanticNode | undefined, doc: AtscriptDoc): string {
 
   if (isGroup(def)) {
     // A union (|) or intersection (&) of types
-    const items = def.unwrap()  // array of child SemanticNodes
-    const op = def.op           // '|' or '&'
+    const items = def.unwrap() // array of child SemanticNodes
+    const op = def.op // '|' or '&'
     // Also check def.entity === 'tuple' for tuple types [A, B, C]
     return items.map(item => resolveType(item, doc)).join(op)
   }
@@ -187,8 +192,8 @@ Annotations carry metadata that code generators can use to produce richer output
 
 ```typescript
 for (const ann of prop.annotations) {
-  ann.name          // 'label', 'expect.minLength', 'mongo.index.unique', etc.
-  ann.args          // array of Token objects
+  ann.name // 'label', 'expect.minLength', 'mongo.index.unique', etc.
+  ann.args // array of Token objects
   ann.args[0]?.text // first argument's value as string
 }
 ```
@@ -260,7 +265,7 @@ function processImport(node: SemanticImportNode) {
 ```typescript
 if (isAnnotate(node)) {
   const targetName = node.token('target')?.text
-  const aliasName = node.id                       // undefined for mutating
+  const aliasName = node.id // undefined for mutating
   const isMutating = !aliasName
 
   if (!isMutating) {
@@ -301,6 +306,7 @@ createAtscriptPlugin({
 ### Typical Use Cases
 
 Common reasons to use `buildEnd`:
+
 - **Global type registry** — collect all annotation types or primitive tags used across the project into a single declaration file
 - **Index / barrel file** — generate an entry point that re-exports all generated modules
 - **Manifest / schema file** — produce a JSON manifest listing all interfaces, their annotations, and relationships

@@ -25,27 +25,27 @@ interface TPrimitiveConfig {
   tags?: string[]
   isContainer?: boolean
   expect?: {
-    min?: number         // for number types
-    max?: number         // for number types
-    int?: boolean        // for number types
-    minLength?: number   // for string or array types
-    maxLength?: number   // for string or array types
-    pattern?: string | RegExp | (string | RegExp)[]  // for string types
-    required?: boolean   // for string or boolean types
-    message?: string     // custom error message
+    min?: number // for number types
+    max?: number // for number types
+    int?: boolean // for number types
+    minLength?: number // for string or array types
+    maxLength?: number // for string or array types
+    pattern?: string | RegExp | (string | RegExp)[] // for string types
+    required?: boolean // for string or boolean types
+    message?: string // custom error message
   }
   extensions?: Record<string, Partial<TPrimitiveConfig>>
 }
 ```
 
-| Field | Type | Description |
-| --- | --- | --- |
-| `type` | `TPrimitiveTypeDef` | Underlying scalar or complex type. Inherited from parent if omitted. |
-| `documentation` | `string` | Markdown text shown in IntelliSense. Inherited from parent if omitted. |
-| `tags` | `string[]` | Semantic tags for runtime discrimination (e.g., `['email']`). |
-| `isContainer` | `boolean` | If `true`, the primitive itself can't be used — one of its extensions must be chosen. |
-| `expect` | `object` | Validation constraints automatically enforced at runtime. Merged with parent's `expect`. |
-| `extensions` | `Record<string, ...>` | Sub-primitives accessible via dot notation. |
+| Field           | Type                  | Description                                                                              |
+| --------------- | --------------------- | ---------------------------------------------------------------------------------------- |
+| `type`          | `TPrimitiveTypeDef`   | Underlying scalar or complex type. Inherited from parent if omitted.                     |
+| `documentation` | `string`              | Markdown text shown in IntelliSense. Inherited from parent if omitted.                   |
+| `tags`          | `string[]`            | Semantic tags for runtime discrimination (e.g., `['email']`).                            |
+| `isContainer`   | `boolean`             | If `true`, the primitive itself can't be used — one of its extensions must be chosen.    |
+| `expect`        | `object`              | Validation constraints automatically enforced at runtime. Merged with parent's `expect`. |
+| `extensions`    | `Record<string, ...>` | Sub-primitives accessible via dot notation.                                              |
 
 ## Adding Primitives via config()
 
@@ -54,42 +54,43 @@ Register primitives in your plugin's `config()` hook:
 ```typescript
 import { createAtscriptPlugin } from '@atscript/core'
 
-export const geoPlugin = () => createAtscriptPlugin({
-  name: 'geo',
-  config() {
-    return {
-      primitives: {
-        geo: {
-          isContainer: true,
-          documentation: 'Geographic data types',
-          extensions: {
-            latitude: {
-              type: 'number',
-              documentation: 'Latitude coordinate (-90 to 90)',
-              tags: ['latitude'],
-              expect: { min: -90, max: 90 },
-            },
-            longitude: {
-              type: 'number',
-              documentation: 'Longitude coordinate (-180 to 180)',
-              tags: ['longitude'],
-              expect: { min: -180, max: 180 },
-            },
-            postalCode: {
-              type: 'string',
-              documentation: 'Postal/ZIP code',
-              tags: ['postalCode'],
-              expect: {
-                pattern: /^[A-Z0-9 -]{3,10}$/i,
-                message: 'Invalid postal code format',
+export const geoPlugin = () =>
+  createAtscriptPlugin({
+    name: 'geo',
+    config() {
+      return {
+        primitives: {
+          geo: {
+            isContainer: true,
+            documentation: 'Geographic data types',
+            extensions: {
+              latitude: {
+                type: 'number',
+                documentation: 'Latitude coordinate (-90 to 90)',
+                tags: ['latitude'],
+                expect: { min: -90, max: 90 },
+              },
+              longitude: {
+                type: 'number',
+                documentation: 'Longitude coordinate (-180 to 180)',
+                tags: ['longitude'],
+                expect: { min: -180, max: 180 },
+              },
+              postalCode: {
+                type: 'string',
+                documentation: 'Postal/ZIP code',
+                tags: ['postalCode'],
+                expect: {
+                  pattern: /^[A-Z0-9 -]{3,10}$/i,
+                  message: 'Invalid postal code format',
+                },
               },
             },
           },
         },
-      },
-    }
-  },
-})
+      }
+    },
+  })
 ```
 
 Now `.as` files can use these types:
@@ -113,28 +114,29 @@ The `@atscript/mongo` plugin adds two primitives:
 
 ```typescript
 // from @atscript/mongo
-export const MongoPlugin = () => createAtscriptPlugin({
-  name: 'mongo',
-  config() {
-    return {
-      primitives: {
-        mongo: {
-          extensions: {
-            objectId: {
-              type: 'string',
-              documentation: 'MongoDB ObjectId',
-              expect: { pattern: /^[a-fA-F0-9]{24}$/ },
-            },
-            vector: {
-              type: { kind: 'array', of: 'number' },
-              documentation: 'Vector embedding array for vector search',
+export const MongoPlugin = () =>
+  createAtscriptPlugin({
+    name: 'mongo',
+    config() {
+      return {
+        primitives: {
+          mongo: {
+            extensions: {
+              objectId: {
+                type: 'string',
+                documentation: 'MongoDB ObjectId',
+                expect: { pattern: /^[a-fA-F0-9]{24}$/ },
+              },
+              vector: {
+                type: { kind: 'array', of: 'number' },
+                documentation: 'Vector embedding array for vector search',
+              },
             },
           },
         },
-      },
-    }
-  },
-})
+      }
+    },
+  })
 ```
 
 Notice how `mongo.vector` uses a complex type definition (`{ kind: 'array', of: 'number' }`) rather than a simple scalar string.
@@ -148,12 +150,12 @@ The `type` field accepts `TPrimitiveTypeDef`, which can be:
 A plain string for simple types:
 
 ```typescript
-type: 'string'   // textual data
-type: 'number'   // numeric data
-type: 'boolean'  // true/false
-type: 'void'     // no value
-type: 'null'     // null value
-type: 'phantom'  // metadata-only (excluded from generated types and validation)
+type: 'string' // textual data
+type: 'number' // numeric data
+type: 'boolean' // true/false
+type: 'void' // no value
+type: 'null' // null value
+type: 'phantom' // metadata-only (excluded from generated types and validation)
 ```
 
 ### Array Type

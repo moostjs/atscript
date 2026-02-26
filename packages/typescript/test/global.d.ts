@@ -1,4 +1,5 @@
 declare module '@atscript/typescript' {
+  export const tsPlugin: typeof import('../src/plugin').tsPlugin
   export const defineAnnotatedType: typeof import('../src/annotated-type').defineAnnotatedType
   export type TAtscriptTypeObject = import('../src/annotated-type').TAtscriptTypeObject
   export type TAtscriptTypeComplex = import('../src/annotated-type').TAtscriptTypeComplex

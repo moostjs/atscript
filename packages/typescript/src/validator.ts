@@ -535,7 +535,7 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: number
   ): boolean {
-    const int = def.metadata.get('expect.int')
+    const int = def.metadata.get('expect.int') as { message?: string } | true | undefined
     if (int && value % 1 !== 0) {
       const message =
         typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`

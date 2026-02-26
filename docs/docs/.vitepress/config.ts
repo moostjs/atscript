@@ -336,9 +336,7 @@ export default defineConfig({
       { text: 'VSCode', link: '/packages/vscode/' },
       {
         text: 'Plugins',
-        items: [
-          { text: 'Creating a Plugin', link: '/plugin-development/' },
-        ],
+        items: [{ text: 'Creating a Plugin', link: '/plugin-development/' }],
       },
     ],
 

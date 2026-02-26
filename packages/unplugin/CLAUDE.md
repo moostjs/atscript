@@ -30,6 +30,7 @@ plugins: [atscript()]
 ```
 
 Main entry (`unplugin-atscript`) exports:
+
 - `unpluginFactory` -- Raw factory function for creating bundler-specific plugins
 - `unplugin` (default export) -- `UnpluginInstance` with all bundler adapters
 - `asPlugin` -- Deprecated alias for `unplugin`

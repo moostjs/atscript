@@ -4,15 +4,15 @@ Atscript plugins extend the language with custom primitives, annotations, and co
 
 ## What Plugins Can Do
 
-| Capability | Hook | Example |
-| --- | --- | --- |
-| Add semantic types (primitives) | `config()` | `mongo.objectId`, `mongo.vector` |
-| Define annotation specs | `config()` | `@mongo.collection`, `@mongo.index.unique` |
-| Remap or virtualize module paths | `resolve()` | Path aliases, virtual modules |
-| Provide virtual file content | `load()` | Synthetic `.as` modules |
-| Post-process parsed documents | `onDocument()` | Inject virtual props, run custom checks |
-| Generate output files | `render()` | `.d.ts`, `.js`, `.py`, `.json` — any format |
-| Aggregate across all documents | `buildEnd()` | Global type declarations, indexes |
+| Capability                       | Hook           | Example                                     |
+| -------------------------------- | -------------- | ------------------------------------------- |
+| Add semantic types (primitives)  | `config()`     | `mongo.objectId`, `mongo.vector`            |
+| Define annotation specs          | `config()`     | `@mongo.collection`, `@mongo.index.unique`  |
+| Remap or virtualize module paths | `resolve()`    | Path aliases, virtual modules               |
+| Provide virtual file content     | `load()`       | Synthetic `.as` modules                     |
+| Post-process parsed documents    | `onDocument()` | Inject virtual props, run custom checks     |
+| Generate output files            | `render()`     | `.d.ts`, `.js`, `.py`, `.json` — any format |
+| Aggregate across all documents   | `buildEnd()`   | Global type declarations, indexes           |
 
 ## Your First Plugin
 
@@ -21,21 +21,22 @@ Here's a minimal plugin that adds a `@ui.hidden` annotation:
 ```typescript
 import { createAtscriptPlugin, AnnotationSpec } from '@atscript/core'
 
-export const uiPlugin = () => createAtscriptPlugin({
-  name: 'ui',
-  config() {
-    return {
-      annotations: {
-        ui: {
-          hidden: new AnnotationSpec({
-            description: 'Hide this field in the UI',
-            nodeType: ['prop'],
-          }),
+export const uiPlugin = () =>
+  createAtscriptPlugin({
+    name: 'ui',
+    config() {
+      return {
+        annotations: {
+          ui: {
+            hidden: new AnnotationSpec({
+              description: 'Hide this field in the UI',
+              nodeType: ['prop'],
+            }),
+          },
         },
-      },
-    }
-  },
-})
+      }
+    },
+  })
 ```
 
 `createAtscriptPlugin` is a type-safe identity function — it returns the object you pass in, but gives you full TypeScript IntelliSense on the hook signatures.

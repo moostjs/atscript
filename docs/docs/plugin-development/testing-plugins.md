@@ -195,7 +195,7 @@ it('should report error for invalid annotation target', async () => {
   // diagnostics is a Map<docId, TMessages>
   const [, messages] = [...diagnostics.entries()][0]
   expect(messages.length).toBeGreaterThan(0)
-  expect(messages[0].severity).toBe(1)  // 1 = Error
+  expect(messages[0].severity).toBe(1) // 1 = Error
   expect(messages[0].message).toContain('only valid on')
 })
 ```
@@ -255,6 +255,7 @@ export interface Product {
 ### Test Edge Cases Separately
 
 Create dedicated fixtures for:
+
 - Empty interfaces
 - Type aliases (simple, union, intersection)
 - Nested structures (inline objects)

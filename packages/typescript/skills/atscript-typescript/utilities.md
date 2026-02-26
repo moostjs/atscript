@@ -9,17 +9,25 @@ All utilities are exported from `@atscript/typescript/utils`:
 ```ts
 import {
   // Type construction
-  defineAnnotatedType, annotate,
+  defineAnnotatedType,
+  annotate,
   // Type checking
-  isAnnotatedType, isAnnotatedTypeOfPrimitive, isPhantomType,
+  isAnnotatedType,
+  isAnnotatedTypeOfPrimitive,
+  isPhantomType,
   // Type traversal
   forAnnotatedType,
   // Validation
-  Validator, ValidatorError,
+  Validator,
+  ValidatorError,
   // JSON Schema
-  buildJsonSchema, fromJsonSchema, mergeJsonSchemas,
+  buildJsonSchema,
+  fromJsonSchema,
+  mergeJsonSchemas,
   // Serialization
-  serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION,
+  serializeAnnotatedType,
+  deserializeAnnotatedType,
+  SERIALIZE_VERSION,
   // Flattening
   flattenAnnotatedType,
   // Data creation
@@ -41,13 +49,27 @@ Dispatches over `TAtscriptAnnotatedType` by its `type.kind`, providing type-narr
 import { forAnnotatedType } from '@atscript/typescript/utils'
 
 const description = forAnnotatedType(someType, {
-  final(d)        { return `${d.type.designType}` },
-  object(d)       { return `object(${d.type.props.size} props)` },
-  array(d)        { return `array` },
-  union(d)        { return `union(${d.type.items.length})` },
-  intersection(d) { return `intersection(${d.type.items.length})` },
-  tuple(d)        { return `[${d.type.items.length}]` },
-  phantom(d)      { return `phantom` },  // optional — without it, phantoms go to final
+  final(d) {
+    return `${d.type.designType}`
+  },
+  object(d) {
+    return `object(${d.type.props.size} props)`
+  },
+  array(d) {
+    return `array`
+  },
+  union(d) {
+    return `union(${d.type.items.length})`
+  },
+  intersection(d) {
+    return `intersection(${d.type.items.length})`
+  },
+  tuple(d) {
+    return `[${d.type.items.length}]`
+  },
+  phantom(d) {
+    return `phantom`
+  }, // optional — without it, phantoms go to final
 })
 ```
 
@@ -88,6 +110,7 @@ const schema = buildJsonSchema(CatOrDog)
 ```
 
 Key behaviors:
+
 - Only **named object types** (with `id`) are extracted to `$defs`. Primitives, unions, arrays stay inline.
 - The **root type** is never extracted — it IS the schema.
 - Same `id` referenced multiple times → one `$defs` entry, all occurrences become `$ref`.
@@ -96,23 +119,23 @@ Key behaviors:
 
 ### Metadata → JSON Schema Mapping
 
-| Annotation | JSON Schema |
-|-----------|-------------|
-| `@expect.minLength` on string | `minLength` |
-| `@expect.maxLength` on string | `maxLength` |
-| `@expect.minLength` on array | `minItems` |
-| `@expect.maxLength` on array | `maxItems` |
-| `@expect.min` | `minimum` |
-| `@expect.max` | `maximum` |
-| `@expect.int` | `type: 'integer'` (instead of `'number'`) |
-| `@expect.pattern` (single) | `pattern` |
-| `@expect.pattern` (multiple) | `allOf: [{ pattern }, ...]` |
-| `@meta.required` on string | `minLength: 1` |
-| optional property | not in `required` array |
-| union | `anyOf` (or `oneOf` + `discriminator` for discriminated unions) |
-| intersection | `allOf` |
-| tuple | `items` as array |
-| phantom | empty object `{}` (excluded) |
+| Annotation                    | JSON Schema                                                     |
+| ----------------------------- | --------------------------------------------------------------- |
+| `@expect.minLength` on string | `minLength`                                                     |
+| `@expect.maxLength` on string | `maxLength`                                                     |
+| `@expect.minLength` on array  | `minItems`                                                      |
+| `@expect.maxLength` on array  | `maxItems`                                                      |
+| `@expect.min`                 | `minimum`                                                       |
+| `@expect.max`                 | `maximum`                                                       |
+| `@expect.int`                 | `type: 'integer'` (instead of `'number'`)                       |
+| `@expect.pattern` (single)    | `pattern`                                                       |
+| `@expect.pattern` (multiple)  | `allOf: [{ pattern }, ...]`                                     |
+| `@meta.required` on string    | `minLength: 1`                                                  |
+| optional property             | not in `required` array                                         |
+| union                         | `anyOf` (or `oneOf` + `discriminator` for discriminated unions) |
+| intersection                  | `allOf`                                                         |
+| tuple                         | `items` as array                                                |
+| phantom                       | empty object `{}` (excluded)                                    |
 
 ### Discriminated Unions
 
@@ -131,11 +154,11 @@ const type = fromJsonSchema({
     name: { type: 'string', minLength: 1 },
     age: { type: 'integer', minimum: 0 },
   },
-  required: ['name', 'age']
+  required: ['name', 'age'],
 })
 
 // The resulting type has a working validator
-type.validator().validate({ name: 'Alice', age: 30 })  // passes
+type.validator().validate({ name: 'Alice', age: 30 }) // passes
 ```
 
 Supports: `type`, `properties`, `required`, `items`, `anyOf`, `oneOf`, `allOf`, `enum`, `const`, `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`, `minItems`, `maxItems`, `$ref`/`$defs`.
@@ -288,19 +311,19 @@ const custom = createDataFromAnnotatedType(User, {
   mode: (prop, path) => {
     if (path === 'name') return 'John Doe'
     if (path === 'age') return 25
-    return undefined  // fall through to structural default
-  }
+    return undefined // fall through to structural default
+  },
 })
 ```
 
 ### Modes
 
-| Mode | Behavior |
-|------|----------|
-| `'empty'` (default) | Structural defaults: `''`, `0`, `false`, `[]`, `{}`. Optional props omitted |
-| `'default'` | Uses `@meta.default` annotations. Optional props only included if annotated |
-| `'example'` | Uses `@meta.example` annotations. Optional props always included. Arrays get one sample item |
-| `function` | Custom resolver per field. Return `undefined` to fall through |
+| Mode                | Behavior                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `'empty'` (default) | Structural defaults: `''`, `0`, `false`, `[]`, `{}`. Optional props omitted                  |
+| `'default'`         | Uses `@meta.default` annotations. Optional props only included if annotated                  |
+| `'example'`         | Uses `@meta.example` annotations. Optional props always included. Arrays get one sample item |
+| `function`          | Custom resolver per field. Return `undefined` to fall through                                |
 
 ### Behavior Notes
 
@@ -317,8 +340,8 @@ const custom = createDataFromAnnotatedType(User, {
 import { isAnnotatedType } from '@atscript/typescript/utils'
 
 if (isAnnotatedType(value)) {
-  value.metadata  // safe
-  value.type      // safe
+  value.metadata // safe
+  value.type // safe
 }
 ```
 
@@ -329,10 +352,10 @@ Returns `true` for final types and for unions/intersections/tuples whose all mem
 ```ts
 import { isAnnotatedTypeOfPrimitive } from '@atscript/typescript/utils'
 
-isAnnotatedTypeOfPrimitive(stringType)                    // true
-isAnnotatedTypeOfPrimitive(objectType)                    // false
-isAnnotatedTypeOfPrimitive(unionOfStringAndNumber)        // true
-isAnnotatedTypeOfPrimitive(unionOfStringAndObject)        // false
+isAnnotatedTypeOfPrimitive(stringType) // true
+isAnnotatedTypeOfPrimitive(objectType) // false
+isAnnotatedTypeOfPrimitive(unionOfStringAndNumber) // true
+isAnnotatedTypeOfPrimitive(unionOfStringAndObject) // false
 ```
 
 ## `isPhantomType(def)` — Check if Phantom
@@ -340,7 +363,7 @@ isAnnotatedTypeOfPrimitive(unionOfStringAndObject)        // false
 ```ts
 import { isPhantomType } from '@atscript/typescript/utils'
 
-isPhantomType(someProperty)  // true if designType === 'phantom'
+isPhantomType(someProperty) // true if designType === 'phantom'
 ```
 
 ## `TAtscriptDataType<T>` — Extract DataType from Annotated Type
@@ -370,8 +393,12 @@ import type { TAtscriptAnnotatedType, TAtscriptDataType } from '@atscript/typesc
 
 // Generic repository that infers its entity type
 class Repository<T extends TAtscriptAnnotatedType> {
-  findOne(id: string): Promise<TAtscriptDataType<T>> { /* ... */ }
-  insertOne(data: TAtscriptDataType<T>): Promise<void> { /* ... */ }
+  findOne(id: string): Promise<TAtscriptDataType<T>> {
+    /* ... */
+  }
+  insertOne(data: TAtscriptDataType<T>): Promise<void> {
+    /* ... */
+  }
 }
 
 // Usage — DataType is automatically inferred
@@ -398,25 +425,25 @@ Key types you may need to import:
 
 ```ts
 import type {
-  TAtscriptAnnotatedType,         // core annotated type
+  TAtscriptAnnotatedType, // core annotated type
   TAtscriptAnnotatedTypeConstructor, // annotated type that's also a class
-  TAtscriptTypeDef,                // union of all type def shapes
-  TAtscriptTypeFinal,             // primitive/literal type def
-  TAtscriptTypeObject,            // object type def
-  TAtscriptTypeArray,             // array type def
-  TAtscriptTypeComplex,           // union/intersection/tuple type def
-  TMetadataMap,                   // typed metadata map
-  TAnnotatedTypeHandle,           // fluent builder handle
-  InferDataType,                  // extract DataType from a type def's phantom generic
-  TAtscriptDataType,              // extract DataType from TAtscriptAnnotatedType
-  TValidatorOptions,              // validator config
-  TValidatorPlugin,               // plugin function type
-  TValidatorPluginContext,         // plugin context
-  TSerializedAnnotatedType,       // serialized type (top-level)
-  TSerializeOptions,              // serialization options
-  TFlattenOptions,                // flatten options
-  TCreateDataOptions,             // createData options
-  TValueResolver,                 // custom resolver for createData
-  TJsonSchema,                    // JSON Schema object
+  TAtscriptTypeDef, // union of all type def shapes
+  TAtscriptTypeFinal, // primitive/literal type def
+  TAtscriptTypeObject, // object type def
+  TAtscriptTypeArray, // array type def
+  TAtscriptTypeComplex, // union/intersection/tuple type def
+  TMetadataMap, // typed metadata map
+  TAnnotatedTypeHandle, // fluent builder handle
+  InferDataType, // extract DataType from a type def's phantom generic
+  TAtscriptDataType, // extract DataType from TAtscriptAnnotatedType
+  TValidatorOptions, // validator config
+  TValidatorPlugin, // plugin function type
+  TValidatorPluginContext, // plugin context
+  TSerializedAnnotatedType, // serialized type (top-level)
+  TSerializeOptions, // serialization options
+  TFlattenOptions, // flatten options
+  TCreateDataOptions, // createData options
+  TValueResolver, // custom resolver for createData
+  TJsonSchema, // JSON Schema object
 } from '@atscript/typescript/utils'
 ```

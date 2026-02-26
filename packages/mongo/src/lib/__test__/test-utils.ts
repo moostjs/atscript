@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 
 import { build } from '@atscript/core'
-import ts from '@atscript/typescript'
+import { tsPlugin as ts } from '@atscript/typescript'
 
 import { MongoPlugin } from '../../plugin/index'
 

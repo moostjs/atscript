@@ -4,14 +4,14 @@ This page documents all six hooks in the `TAtscriptPlugin` interface — their s
 
 ## Hook Summary
 
-| Hook | When | Return | Execution |
-| --- | --- | --- | --- |
-| `config(config)` | At startup (once) | `TAtscriptConfig \| undefined` | Sequential, merged with `defu` |
-| `resolve(id)` | Opening a document | `string \| undefined` | Sequential, last non-undefined wins |
-| `load(id)` | Loading source content | `string \| undefined` | Sequential, first non-undefined wins |
-| `onDocument(doc)` | After parsing | `void` | Sequential, all plugins called |
-| `render(doc, format)` | Code generation | `TPluginOutput[]` | Sequential, outputs concatenated |
-| `buildEnd(output, format, repo)` | After all docs rendered | `void` | Sequential, all plugins called |
+| Hook                             | When                    | Return                         | Execution                            |
+| -------------------------------- | ----------------------- | ------------------------------ | ------------------------------------ |
+| `config(config)`                 | At startup (once)       | `TAtscriptConfig \| undefined` | Sequential, merged with `defu`       |
+| `resolve(id)`                    | Opening a document      | `string \| undefined`          | Sequential, last non-undefined wins  |
+| `load(id)`                       | Loading source content  | `string \| undefined`          | Sequential, first non-undefined wins |
+| `onDocument(doc)`                | After parsing           | `void`                         | Sequential, all plugins called       |
+| `render(doc, format)`            | Code generation         | `TPluginOutput[]`              | Sequential, outputs concatenated     |
+| `buildEnd(output, format, repo)` | After all docs rendered | `void`                         | Sequential, all plugins called       |
 
 All hooks can be synchronous or async (return `Promise`). All are optional — implement only the ones you need.
 
@@ -210,11 +210,13 @@ buildEnd?(output: TOutput[], format: string, repo: AtscriptRepo): void
 Called once after all documents have been rendered for a given format. Use this for cross-document aggregation.
 
 **Parameters**:
+
 - `output` — Mutable array of all output files. You can push new files or modify existing ones.
 - `format` — The format string (same as passed to `render()`).
 - `repo` — The `AtscriptRepo` instance for querying across all documents.
 
 **`TOutput` extends `TPluginOutput`** with:
+
 - `source` — The source document path
 - `target` — The resolved output file path
 

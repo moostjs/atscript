@@ -63,7 +63,7 @@ Controls whether generated types include a `toExampleData()` static method. When
 | Value               | `toExampleData()` behavior                                          |
 | ------------------- | ------------------------------------------------------------------- |
 | `false` _(default)_ | Not rendered in `.js`; `.d.ts` marks it as optional + `@deprecated` |
-| `true`              | Calls `createDataFromAnnotatedType(this, { mode: 'example' })`     |
+| `true`              | Calls `createDataFromAnnotatedType(this, { mode: 'example' })`      |
 
 ```javascript
 // Default — no example data method

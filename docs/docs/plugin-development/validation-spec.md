@@ -27,7 +27,7 @@ This check happens **before** type dispatch and before any constraint annotation
 
 ### Content: @meta.required
 
-`@meta.required` is a **value constraint**, not a presence constraint. It controls what counts as a valid value when the field *is* present:
+`@meta.required` is a **value constraint**, not a presence constraint. It controls what counts as a valid value when the field _is_ present:
 
 - **For strings**: the value must contain at least one non-whitespace character. Empty strings and whitespace-only strings fail.
 - **For booleans**: the value must be `true`. `false` fails.
@@ -47,14 +47,14 @@ name: string
 
 These two dimensions compose independently:
 
-| `.as` syntax | Absent (`undefined`) | Empty string `""` | Non-empty string |
-| --- | --- | --- | --- |
-| `name: string` | Fail | Pass | Pass |
-| `name: string.required` | Fail | Fail | Pass |
-| `name?: string` | Pass | Pass | Pass |
-| `name?: string.required` | Pass | Fail | Pass |
+| `.as` syntax             | Absent (`undefined`) | Empty string `""` | Non-empty string |
+| ------------------------ | -------------------- | ----------------- | ---------------- |
+| `name: string`           | Fail                 | Pass              | Pass             |
+| `name: string.required`  | Fail                 | Fail              | Pass             |
+| `name?: string`          | Pass                 | Pass              | Pass             |
+| `name?: string.required` | Pass                 | Fail              | Pass             |
 
-The last row is the subtle case: the field is optional (may be absent), but *if present*, it must be non-empty.
+The last row is the subtle case: the field is optional (may be absent), but _if present_, it must be non-empty.
 
 ## Type Dispatch
 
@@ -66,30 +66,30 @@ Every validation call follows this sequence:
 2. **Plugins**: Run validator plugins in order. If any returns a definitive result (`true` or `false`), use it. If all return "no opinion" → continue
 3. **Type dispatch**: Branch on the type kind:
 
-| Kind | Handler |
-| --- | --- |
-| Primitive (scalar) | [Primitives](#primitives) |
-| Literal (const value) | [Literals](#literals) |
-| Phantom | [Phantom](#phantom-types) |
-| Object | [Objects](#objects) |
-| Array | [Arrays](#arrays) |
-| Union | [Unions](#unions) |
-| Intersection | [Intersections](#intersections) |
-| Tuple | [Tuples](#tuples) |
+| Kind                  | Handler                         |
+| --------------------- | ------------------------------- |
+| Primitive (scalar)    | [Primitives](#primitives)       |
+| Literal (const value) | [Literals](#literals)           |
+| Phantom               | [Phantom](#phantom-types)       |
+| Object                | [Objects](#objects)             |
+| Array                 | [Arrays](#arrays)               |
+| Union                 | [Unions](#unions)               |
+| Intersection          | [Intersections](#intersections) |
+| Tuple                 | [Tuples](#tuples)               |
 
 ### Primitives
 
 Check that the runtime type of the value matches the declared primitive type:
 
-| Declared type | Check |
-| --- | --- |
-| `string` | `typeof value === 'string'` |
-| `number` | `typeof value === 'number'` |
-| `boolean` | `typeof value === 'boolean'` |
-| `null` | `value === null` |
-| `undefined` | `value === undefined` |
-| `any` | Always pass |
-| `never` | Always fail |
+| Declared type | Check                        |
+| ------------- | ---------------------------- |
+| `string`      | `typeof value === 'string'`  |
+| `number`      | `typeof value === 'number'`  |
+| `boolean`     | `typeof value === 'boolean'` |
+| `null`        | `value === null`             |
+| `undefined`   | `value === undefined`        |
+| `any`         | Always pass                  |
+| `never`       | Always fail                  |
 
 ::: warning Array disambiguation
 In languages where arrays are a subtype of objects (like JavaScript), check for arrays first: `Array.isArray(value) ? 'array' : typeof value`. An array should not match `'object'`.
@@ -150,7 +150,7 @@ A union (`A | B | C`) passes if the value matches **any one** branch:
 Error: `"Value does not match any of the allowed types: [string(0)], [number(1)]"` with a `details` array containing the errors from each branch attempt.
 
 ::: tip Branch error isolation
-Each branch attempt should be evaluated in its own error scope. If a branch fails, its errors are captured but not committed to the main error list. Only if *all* branches fail are the captured errors included as `details` in the aggregate error.
+Each branch attempt should be evaluated in its own error scope. If a branch fails, its errors are captured but not committed to the main error list. Only if _all_ branches fail are the captured errors included as `details` in the aggregate error.
 :::
 
 ### Intersections
@@ -178,12 +178,12 @@ Constraint annotations are metadata attached to type definitions that add valida
 
 Applied when the value is a valid string:
 
-| Annotation | Condition | Default error |
-| --- | --- | --- |
-| `@meta.required` | `value.trim().length === 0` | `"Must not be empty"` |
-| `@expect.minLength N` | `value.length < N` | `"Expected minimum length of N characters, got M characters"` |
-| `@expect.maxLength N` | `value.length > N` | `"Expected maximum length of N characters, got M characters"` |
-| `@expect.pattern "regex" [flags]` | `!regex.test(value)` | `"Value is expected to match pattern \"...\""` |
+| Annotation                        | Condition                   | Default error                                                 |
+| --------------------------------- | --------------------------- | ------------------------------------------------------------- |
+| `@meta.required`                  | `value.trim().length === 0` | `"Must not be empty"`                                         |
+| `@expect.minLength N`             | `value.length < N`          | `"Expected minimum length of N characters, got M characters"` |
+| `@expect.maxLength N`             | `value.length > N`          | `"Expected maximum length of N characters, got M characters"` |
+| `@expect.pattern "regex" [flags]` | `!regex.test(value)`        | `"Value is expected to match pattern \"...\""`                |
 
 **Evaluation order**: `@meta.required` first (fail fast on empty), then `@expect.minLength`, then `@expect.maxLength`, then `@expect.pattern`.
 
@@ -193,11 +193,11 @@ Applied when the value is a valid string:
 
 Applied when the value is a valid number:
 
-| Annotation | Condition | Default error |
-| --- | --- | --- |
-| `@expect.int` | `value % 1 !== 0` | `"Expected integer, got N"` |
-| `@expect.min N` | `value < N` | `"Expected minimum N, got M"` |
-| `@expect.max N` | `value > N` | `"Expected maximum N, got M"` |
+| Annotation      | Condition         | Default error                 |
+| --------------- | ----------------- | ----------------------------- |
+| `@expect.int`   | `value % 1 !== 0` | `"Expected integer, got N"`   |
+| `@expect.min N` | `value < N`       | `"Expected minimum N, got M"` |
+| `@expect.max N` | `value > N`       | `"Expected maximum N, got M"` |
 
 **Evaluation order**: `@expect.int` first, then `@expect.min`, then `@expect.max`.
 
@@ -205,16 +205,16 @@ Applied when the value is a valid number:
 
 Applied when the value is a valid boolean:
 
-| Annotation | Condition | Default error |
-| --- | --- | --- |
+| Annotation       | Condition        | Default error       |
+| ---------------- | ---------------- | ------------------- |
 | `@meta.required` | `value !== true` | `"Must be checked"` |
 
 ### Array Length Constraints
 
 Applied at the array level (before element validation):
 
-| Annotation | Condition | Default error |
-| --- | --- | --- |
+| Annotation            | Condition          | Default error                                       |
+| --------------------- | ------------------ | --------------------------------------------------- |
 | `@expect.minLength N` | `value.length < N` | `"Expected minimum length of N items, got M items"` |
 | `@expect.maxLength N` | `value.length > N` | `"Expected maximum length of N items, got M items"` |
 
@@ -267,18 +267,19 @@ Partial validation relaxes presence checks for required fields. It is useful for
 
 ### Modes
 
-| Mode | Behavior |
-| --- | --- |
-| `false` (default) | All required props must be present |
-| `true` | Skip undefined checks at the top-level object only |
-| `'deep'` | Skip undefined checks at all nesting levels |
-| Function | Called per-object to decide whether to apply partial behavior |
+| Mode              | Behavior                                                      |
+| ----------------- | ------------------------------------------------------------- |
+| `false` (default) | All required props must be present                            |
+| `true`            | Skip undefined checks at the top-level object only            |
+| `'deep'`          | Skip undefined checks at all nesting levels                   |
+| Function          | Called per-object to decide whether to apply partial behavior |
 
 ### Interaction with Content Constraints
 
-Partial mode only affects **presence** — whether an `undefined` value for a required field is accepted. When a value *is* present, all content constraints (`@meta.required`, `@expect.*`) still run normally.
+Partial mode only affects **presence** — whether an `undefined` value for a required field is accepted. When a value _is_ present, all content constraints (`@meta.required`, `@expect.*`) still run normally.
 
 Example: with `partial: true` and `name: string.required`:
+
 - `{ }` (name absent) → **pass** (partial skips the presence check)
 - `{ name: "" }` (name present but empty) → **fail** (`@meta.required` still rejects empty strings)
 - `{ name: "Alice" }` → **pass**
@@ -287,11 +288,11 @@ Example: with `partial: true` and `name: string.required`:
 
 When the data object contains keys that are not declared in the type definition:
 
-| Policy | Behavior |
-| --- | --- |
-| `'error'` (default) | Emit `"Unexpected property"` error |
-| `'strip'` | Delete the key from the data object (destructive mutation) |
-| `'ignore'` | Silently skip |
+| Policy              | Behavior                                                   |
+| ------------------- | ---------------------------------------------------------- |
+| `'error'` (default) | Emit `"Unexpected property"` error                         |
+| `'strip'`           | Delete the key from the data object (destructive mutation) |
+| `'ignore'`          | Silently skip                                              |
 
 ### Pattern Properties
 
@@ -308,6 +309,7 @@ A validator may support a plugin mechanism allowing users to intercept and custo
 - **Execution**: after the optional check, before type dispatch. Plugins run in registration order; the first definitive result wins.
 
 Plugins receive access to a context that includes:
+
 - An error reporting function
 - The current path
 - A recursive validation function (for delegating to sub-validations)

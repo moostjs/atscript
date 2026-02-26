@@ -429,12 +429,12 @@ const withExamples = createDataFromAnnotatedType(Product, { mode: 'example' })
 
 ### Modes
 
-| Mode | Value source | Optional props |
-|------|-------------|----------------|
-| `'empty'` | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped |
-| `'default'` | `@meta.default` annotations | Skipped unless annotated |
-| `'example'` | `@meta.example` annotations | Always included |
-| `function` | Custom resolver callback | Skipped unless resolver returns a value |
+| Mode        | Value source                                         | Optional props                          |
+| ----------- | ---------------------------------------------------- | --------------------------------------- |
+| `'empty'`   | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped                          |
+| `'default'` | `@meta.default` annotations                          | Skipped unless annotated                |
+| `'example'` | `@meta.example` annotations                          | Always included                         |
+| `function`  | Custom resolver callback                             | Skipped unless resolver returns a value |
 
 ### Annotations
 

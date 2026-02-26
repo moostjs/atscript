@@ -1,6 +1,10 @@
 // oxlint-disable max-lines
 // oxlint-disable max-depth
-import type { TAtscriptAnnotatedType, TAtscriptDataType, TAtscriptTypeArray } from '@atscript/typescript/utils'
+import type {
+  TAtscriptAnnotatedType,
+  TAtscriptDataType,
+  TAtscriptTypeArray,
+} from '@atscript/typescript/utils'
 import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 

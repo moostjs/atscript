@@ -20,7 +20,7 @@
   },
   "bin": {
     "asc": "./cli.cjs",
-    "setup-skills": "./scripts/setup-skills.js"
+    "atscript-typescript-skill": "./scripts/setup-skills.js"
   },
   "files": [
     "dist",
@@ -62,8 +62,8 @@
     "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.5.32",
-    "moost": "^0.5.32"
+    "@moostjs/event-cli": "^0.6.0",
+    "moost": "^0.6.0"
   },
   "devDependencies": {
     "vitest": "3.2.4"

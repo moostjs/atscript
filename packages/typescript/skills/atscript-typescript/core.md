@@ -51,18 +51,18 @@ export default defineConfig({
 
 ### `TAtscriptConfig` Fields
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `rootDir` | `string` | Root directory for resolving files |
-| `entries` | `string[]` | Entry point globs for `.as` files |
-| `include` | `string[]` | Include globs |
-| `exclude` | `string[]` | Exclude globs |
-| `plugins` | `TAtscriptPlugin[]` | Build plugins (e.g. `tsPlugin()`) |
-| `primitives` | `Record<string, TPrimitiveConfig>` | Custom primitive type definitions |
-| `annotations` | `TAnnotationsTree` | Custom annotation definitions |
-| `unknownAnnotation` | `'allow' \| 'warn' \| 'error'` | Unknown annotation handling |
-| `format` | `string` | Output format (set by CLI or build tool) |
-| `outDir` | `string` | Output directory |
+| Field               | Type                               | Description                              |
+| ------------------- | ---------------------------------- | ---------------------------------------- |
+| `rootDir`           | `string`                           | Root directory for resolving files       |
+| `entries`           | `string[]`                         | Entry point globs for `.as` files        |
+| `include`           | `string[]`                         | Include globs                            |
+| `exclude`           | `string[]`                         | Exclude globs                            |
+| `plugins`           | `TAtscriptPlugin[]`                | Build plugins (e.g. `tsPlugin()`)        |
+| `primitives`        | `Record<string, TPrimitiveConfig>` | Custom primitive type definitions        |
+| `annotations`       | `TAnnotationsTree`                 | Custom annotation definitions            |
+| `unknownAnnotation` | `'allow' \| 'warn' \| 'error'`     | Unknown annotation handling              |
+| `format`            | `string`                           | Output format (set by CLI or build tool) |
+| `outDir`            | `string`                           | Output directory                         |
 
 ## TypeScript Plugin Options
 
@@ -84,7 +84,8 @@ Individual interfaces can override the JSON Schema setting with `@emit.jsonSchem
 ### `exampleData`
 
 Controls whether `toExampleData()` is generated on output classes:
-- `false` *(default)* — method is not rendered in `.js`; `.d.ts` marks it as optional + `@deprecated`
+
+- `false` _(default)_ — method is not rendered in `.js`; `.d.ts` marks it as optional + `@deprecated`
 - `true` — each class gets `static toExampleData()` that calls `createDataFromAnnotatedType(this, { mode: 'example' })`, creating a new example data object on each call (no caching)
 
 ## Build Tool Integration
@@ -96,7 +97,7 @@ Controls whether `toExampleData()` is generated on output classes:
 import atscript from 'unplugin-atscript/vite'
 
 export default {
-  plugins: [atscript()]
+  plugins: [atscript()],
 }
 ```
 
@@ -106,7 +107,7 @@ export default {
 // webpack.config.js
 const atscript = require('unplugin-atscript/webpack')
 module.exports = {
-  plugins: [atscript()]
+  plugins: [atscript()],
 }
 ```
 
@@ -136,6 +137,7 @@ npx asc --skipDiag
 ### Why run `npx asc -f dts`?
 
 This generates two things:
+
 1. **`*.as.d.ts`** files next to each `.as` file — TypeScript type declarations for all interfaces/types
 2. **`atscript.d.ts`** in the project root — global type declarations for `AtscriptMetadata` and `AtscriptPrimitiveTags`
 
@@ -143,12 +145,12 @@ The `atscript.d.ts` file is **crucial for type safety** — it tells TypeScript 
 
 ### CLI Options
 
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--config <path>` | `-c` | Path to config file |
-| `--format <fmt>` | `-f` | Output format: `dts`, `js` |
-| `--noEmit` | | Only check for errors |
-| `--skipDiag` | | Skip diagnostics, always emit |
+| Option            | Short | Description                   |
+| ----------------- | ----- | ----------------------------- |
+| `--config <path>` | `-c`  | Path to config file           |
+| `--format <fmt>`  | `-f`  | Output format: `dts`, `js`    |
+| `--noEmit`        |       | Only check for errors         |
+| `--skipDiag`      |       | Skip diagnostics, always emit |
 
 ## Project Structure Example
 

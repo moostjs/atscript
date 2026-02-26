@@ -18,7 +18,7 @@ validator.validate(data)
 // Safe mode — returns boolean, no throw
 if (validator.validate(data, true)) {
   // data is narrowed to User (type guard)
-  data.name  // TypeScript knows this exists
+  data.name // TypeScript knows this exists
 }
 ```
 
@@ -30,11 +30,11 @@ import { Validator } from '@atscript/typescript/utils'
 // Create from any annotated type
 const validator = new Validator(someAnnotatedType, {
   // Options (all optional):
-  partial: false,           // allow missing required props
-  unknownProps: 'error',    // 'error' | 'strip' | 'ignore'
-  errorLimit: 10,           // max errors before stopping
-  plugins: [],              // custom validator plugins
-  skipList: new Set(),      // property paths to skip
+  partial: false, // allow missing required props
+  unknownProps: 'error', // 'error' | 'strip' | 'ignore'
+  errorLimit: 10, // max errors before stopping
+  plugins: [], // custom validator plugins
+  skipList: new Set(), // property paths to skip
 })
 ```
 
@@ -68,7 +68,7 @@ User.validator({ partial: 'deep' }).validate(data, true)
 User.validator({
   partial: (objectType, path) => {
     return path === '' // only root object is partial
-  }
+  },
 }).validate(data, true)
 ```
 
@@ -91,7 +91,7 @@ User.validator({ unknownProps: 'ignore' }).validate(data, true)
 
 ```ts
 User.validator({
-  skipList: new Set(['password', 'address.zip'])
+  skipList: new Set(['password', 'address.zip']),
 }).validate(data, true)
 ```
 
@@ -102,7 +102,7 @@ User.validator({
   replace: (type, path) => {
     if (path === 'status') return customStatusType
     return type
-  }
+  },
 }).validate(data, true)
 ```
 
@@ -130,9 +130,9 @@ try {
 
 ```ts
 interface TError {
-  path: string        // dot-separated path, e.g. "address.city"
-  message: string     // human-readable error message
-  details?: TError[]  // nested errors (for unions — shows why each branch failed)
+  path: string // dot-separated path, e.g. "address.city"
+  message: string // human-readable error message
+  details?: TError[] // nested errors (for unions — shows why each branch failed)
 }
 ```
 
@@ -190,23 +190,23 @@ User.validator({ errorLimit: 50 }).validate(data, true)
 
 ## What Gets Validated
 
-| Type Kind | Validation |
-|-----------|-----------|
-| `string` | Type check + `@meta.required` (non-empty) + `@expect.minLength/maxLength` + `@expect.pattern` |
-| `number` | Type check + `@expect.int` + `@expect.min/max` |
-| `boolean` | Type check + `@meta.required` (must be true) |
-| `null` | Exact `null` check |
-| `undefined` | Exact `undefined` check |
-| `any` | Always passes |
-| `never` | Always fails |
-| `phantom` | Always passes (skipped) |
-| `object` | Recursively validates all props, handles unknown props, pattern props |
-| `array` | Type check + `@expect.minLength/maxLength` + recursively validates each element |
-| `union` | At least one branch must pass |
-| `intersection` | All branches must pass |
-| `tuple` | Array length must match + each element validated against its position |
-| `literal` | Exact value match |
-| `optional` | `undefined` is accepted; if value is present, validated against inner type |
+| Type Kind      | Validation                                                                                    |
+| -------------- | --------------------------------------------------------------------------------------------- |
+| `string`       | Type check + `@meta.required` (non-empty) + `@expect.minLength/maxLength` + `@expect.pattern` |
+| `number`       | Type check + `@expect.int` + `@expect.min/max`                                                |
+| `boolean`      | Type check + `@meta.required` (must be true)                                                  |
+| `null`         | Exact `null` check                                                                            |
+| `undefined`    | Exact `undefined` check                                                                       |
+| `any`          | Always passes                                                                                 |
+| `never`        | Always fails                                                                                  |
+| `phantom`      | Always passes (skipped)                                                                       |
+| `object`       | Recursively validates all props, handles unknown props, pattern props                         |
+| `array`        | Type check + `@expect.minLength/maxLength` + recursively validates each element               |
+| `union`        | At least one branch must pass                                                                 |
+| `intersection` | All branches must pass                                                                        |
+| `tuple`        | Array length must match + each element validated against its position                         |
+| `literal`      | Exact value match                                                                             |
+| `optional`     | `undefined` is accepted; if value is present, validated against inner type                    |
 
 ## Custom Validator Plugins
 
@@ -227,11 +227,11 @@ type TValidatorPlugin = (
 
 ```ts
 interface TValidatorPluginContext {
-  opts: TValidatorOptions                // current validator options
-  validateAnnotatedType(def, value)      // call default validation for a specific type
-  error(message, path?, details?)        // report an error
-  path: string                           // current dot-separated path
-  context: unknown                       // external context from validate(data, safe, context)
+  opts: TValidatorOptions // current validator options
+  validateAnnotatedType(def, value) // call default validation for a specific type
+  error(message, path?, details?) // report an error
+  path: string // current dot-separated path
+  context: unknown // external context from validate(data, safe, context)
 }
 ```
 
@@ -261,10 +261,10 @@ User.validator({ plugins: [datePlugin] }).validate(data, true)
 
 ### Plugin Return Values
 
-| Return | Meaning |
-|--------|---------|
-| `true` | Value is accepted — skip all further validation for this node |
-| `false` | Value is rejected — error should be reported via `ctx.error()` before returning |
+| Return      | Meaning                                                                             |
+| ----------- | ----------------------------------------------------------------------------------- |
+| `true`      | Value is accepted — skip all further validation for this node                       |
+| `false`     | Value is rejected — error should be reported via `ctx.error()` before returning     |
 | `undefined` | Plugin doesn't handle this type — fall through to next plugin or default validation |
 
 ### Plugin Example — Coerce String to Number
@@ -288,6 +288,6 @@ Plugins run in order. The first plugin to return `true` or `false` wins — subs
 
 ```ts
 User.validator({
-  plugins: [authPlugin, datePlugin, coercePlugin]
+  plugins: [authPlugin, datePlugin, coercePlugin],
 }).validate(data, true)
 ```

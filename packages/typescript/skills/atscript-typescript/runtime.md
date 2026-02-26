@@ -8,12 +8,12 @@ Every generated interface/type is a `TAtscriptAnnotatedType` — the core runtim
 
 ```ts
 interface TAtscriptAnnotatedType<T extends TAtscriptTypeDef = TAtscriptTypeDef> {
-  __is_atscript_annotated_type: true    // brand for type checking
-  type: T                                // the type definition (shape)
-  metadata: TMetadataMap<AtscriptMetadata>  // annotation metadata
-  optional?: boolean                     // whether this type is optional
-  id?: string                            // stable type name (set by codegen or .id() builder)
-  validator(opts?): Validator            // create a validator instance
+  __is_atscript_annotated_type: true // brand for type checking
+  type: T // the type definition (shape)
+  metadata: TMetadataMap<AtscriptMetadata> // annotation metadata
+  optional?: boolean // whether this type is optional
+  id?: string // stable type name (set by codegen or .id() builder)
+  validator(opts?): Validator // create a validator instance
 }
 ```
 
@@ -38,7 +38,7 @@ The `type` field describes the shape. There are 5 kinds:
 interface TAtscriptTypeFinal {
   kind: ''
   designType: 'string' | 'number' | 'boolean' | 'undefined' | 'null' | 'any' | 'never' | 'phantom'
-  value?: string | number | boolean   // for literal types
+  value?: string | number | boolean // for literal types
   tags: Set<AtscriptPrimitiveTags>
 }
 ```
@@ -48,8 +48,8 @@ interface TAtscriptTypeFinal {
 ```ts
 interface TAtscriptTypeObject<K extends string = string> {
   kind: 'object'
-  props: Map<K, TAtscriptAnnotatedType>                    // named properties
-  propsPatterns: Array<{ pattern: RegExp; def: TAtscriptAnnotatedType }>  // pattern properties
+  props: Map<K, TAtscriptAnnotatedType> // named properties
+  propsPatterns: Array<{ pattern: RegExp; def: TAtscriptAnnotatedType }> // pattern properties
   tags: Set<AtscriptPrimitiveTags>
 }
 ```
@@ -59,7 +59,7 @@ interface TAtscriptTypeObject<K extends string = string> {
 ```ts
 interface TAtscriptTypeArray {
   kind: 'array'
-  of: TAtscriptAnnotatedType        // element type
+  of: TAtscriptAnnotatedType // element type
   tags: Set<AtscriptPrimitiveTags>
 }
 ```
@@ -82,12 +82,12 @@ The `metadata` field is a typed `Map<keyof AtscriptMetadata, value>`:
 import { User } from './models/user.as'
 
 // Read annotations
-const label = User.metadata.get('meta.label')         // string | undefined
-const required = User.metadata.get('meta.required')    // { message?: string } | true | undefined
-const minLen = User.metadata.get('expect.minLength')   // { length: number; message?: string } | undefined
+const label = User.metadata.get('meta.label') // string | undefined
+const required = User.metadata.get('meta.required') // { message?: string } | true | undefined
+const minLen = User.metadata.get('expect.minLength') // { length: number; message?: string } | undefined
 
 // Check if annotation exists
-User.metadata.has('meta.sensitive')  // boolean
+User.metadata.has('meta.sensitive') // boolean
 
 // Iterate all annotations
 for (const [key, value] of User.metadata.entries()) {
@@ -104,11 +104,11 @@ Navigate into object properties via `type.props`:
 const nameProp = User.type.props.get('name')!
 
 // Read that property's metadata
-nameProp.metadata.get('meta.label')        // "Full Name"
-nameProp.metadata.get('meta.required')     // true or { message: "..." }
+nameProp.metadata.get('meta.label') // "Full Name"
+nameProp.metadata.get('meta.required') // true or { message: "..." }
 
 // Check if optional
-nameProp.optional  // boolean | undefined
+nameProp.optional // boolean | undefined
 ```
 
 ### Nested Properties
@@ -148,15 +148,15 @@ The `annotate()` function handles array annotations correctly — if `asArray` i
 ```ts
 function inspect(def: TAtscriptAnnotatedType) {
   switch (def.type.kind) {
-    case '':        // final/primitive
+    case '': // final/primitive
       console.log('Primitive:', def.type.designType)
       break
-    case 'object':  // object with props
+    case 'object': // object with props
       for (const [name, prop] of def.type.props) {
         console.log(`  ${name}:`, prop.type.kind || prop.type.designType)
       }
       break
-    case 'array':   // array
+    case 'array': // array
       console.log('Array of:', def.type.of.type.kind)
       break
     case 'union':
@@ -176,14 +176,28 @@ A type-safe dispatch helper that covers all `kind` values:
 import { forAnnotatedType } from '@atscript/typescript/utils'
 
 const result = forAnnotatedType(someType, {
-  final(d)        { return `primitive: ${d.type.designType}` },
-  object(d)       { return `object with ${d.type.props.size} props` },
-  array(d)        { return `array` },
-  union(d)        { return `union of ${d.type.items.length}` },
-  intersection(d) { return `intersection of ${d.type.items.length}` },
-  tuple(d)        { return `tuple of ${d.type.items.length}` },
+  final(d) {
+    return `primitive: ${d.type.designType}`
+  },
+  object(d) {
+    return `object with ${d.type.props.size} props`
+  },
+  array(d) {
+    return `array`
+  },
+  union(d) {
+    return `union of ${d.type.items.length}`
+  },
+  intersection(d) {
+    return `intersection of ${d.type.items.length}`
+  },
+  tuple(d) {
+    return `tuple of ${d.type.items.length}`
+  },
   // Optional: handle phantom types separately from final
-  phantom(d)      { return `phantom` },
+  phantom(d) {
+    return `phantom`
+  },
 })
 ```
 
@@ -195,7 +209,7 @@ Each type definition has a `tags` Set containing primitive tags (e.g. `"string"`
 
 ```ts
 const nameProp = User.type.props.get('name')!
-nameProp.type.tags.has('string')  // true
+nameProp.type.tags.has('string') // true
 ```
 
 Tags come from primitive definitions and their extensions. They're useful for categorizing types at runtime.
@@ -221,7 +235,7 @@ for (const [name, prop] of User.type.props) {
 import { isAnnotatedTypeOfPrimitive } from '@atscript/typescript/utils'
 
 // Returns true for final types and unions/intersections/tuples of all primitives
-isAnnotatedTypeOfPrimitive(someType)  // true if no objects or arrays
+isAnnotatedTypeOfPrimitive(someType) // true if no objects or arrays
 ```
 
 ## Building Types at Runtime
@@ -238,41 +252,39 @@ const strType = defineAnnotatedType().designType('string').tags('string').$type
 const userType = defineAnnotatedType('object')
   .prop('name', defineAnnotatedType().designType('string').$type)
   .prop('age', defineAnnotatedType().designType('number').$type)
-  .prop('email', defineAnnotatedType().optional().designType('string').$type)
-  .$type
+  .prop('email', defineAnnotatedType().optional().designType('string').$type).$type
 
 // Array
-const listType = defineAnnotatedType('array')
-  .of(defineAnnotatedType().designType('string').$type)
-  .$type
+const listType = defineAnnotatedType('array').of(
+  defineAnnotatedType().designType('string').$type
+).$type
 
 // Union
 const statusType = defineAnnotatedType('union')
   .item(defineAnnotatedType().designType('string').value('active').$type)
-  .item(defineAnnotatedType().designType('string').value('inactive').$type)
-  .$type
+  .item(defineAnnotatedType().designType('string').value('inactive').$type).$type
 
 // With metadata
-const labeledType = defineAnnotatedType().designType('string')
+const labeledType = defineAnnotatedType()
+  .designType('string')
   .annotate('meta.label', 'My Label')
-  .annotate('expect.minLength', { length: 3 })
-  .$type
+  .annotate('expect.minLength', { length: 3 }).$type
 ```
 
 ### `TAnnotatedTypeHandle` Fluent API
 
-| Method | Description |
-|--------|-------------|
-| `.designType(dt)` | Set primitive design type |
-| `.value(v)` | Set literal value |
-| `.tags(...tags)` | Add primitive tags |
-| `.prop(name, type)` | Add named property (object kind) |
-| `.propPattern(regex, type)` | Add pattern property (object kind) |
-| `.of(type)` | Set element type (array kind) |
-| `.item(type)` | Add item (union/intersection/tuple kind) |
-| `.optional(flag?)` | Mark as optional |
-| `.annotate(key, value, asArray?)` | Set metadata annotation |
-| `.copyMetadata(from, ignore?)` | Copy metadata from another type |
-| `.id(name)` | Set a stable type name (used by `buildJsonSchema` for `$defs`/`$ref`) |
-| `.refTo(type, chain?)` | Reference another annotated type's definition (carries `id`) |
-| `.$type` | Get the final `TAtscriptAnnotatedType` |
+| Method                            | Description                                                           |
+| --------------------------------- | --------------------------------------------------------------------- |
+| `.designType(dt)`                 | Set primitive design type                                             |
+| `.value(v)`                       | Set literal value                                                     |
+| `.tags(...tags)`                  | Add primitive tags                                                    |
+| `.prop(name, type)`               | Add named property (object kind)                                      |
+| `.propPattern(regex, type)`       | Add pattern property (object kind)                                    |
+| `.of(type)`                       | Set element type (array kind)                                         |
+| `.item(type)`                     | Add item (union/intersection/tuple kind)                              |
+| `.optional(flag?)`                | Mark as optional                                                      |
+| `.annotate(key, value, asArray?)` | Set metadata annotation                                               |
+| `.copyMetadata(from, ignore?)`    | Copy metadata from another type                                       |
+| `.id(name)`                       | Set a stable type name (used by `buildJsonSchema` for `$defs`/`$ref`) |
+| `.refTo(type, chain?)`            | Reference another annotated type's definition (carries `id`)          |
+| `.$type`                          | Get the final `TAtscriptAnnotatedType`                                |

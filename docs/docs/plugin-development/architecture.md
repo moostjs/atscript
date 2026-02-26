@@ -20,31 +20,31 @@ Plugins don't modify the parser. Instead, they hook into the pipeline at specifi
 
 ## Key Classes
 
-| Class | Package | Role |
-| --- | --- | --- |
-| `AtscriptRepo` | `@atscript/core` | Manages a collection of documents. Resolves config, loads plugins, opens documents, tracks dependencies. |
-| `AtscriptDoc` | `@atscript/core` | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods. |
-| `BuildRepo` | `@atscript/core` | Build orchestrator. Iterates documents, calls `render()` per format, resolves output paths, writes files. |
-| `PluginManager` | `@atscript/core` | Executes plugin hooks in order. Merges config, converts primitives to semantic nodes. |
-| `SemanticNode` | `@atscript/core` | Base class for all AST nodes. Subclasses represent interfaces, types, props, refs, etc. |
+| Class           | Package          | Role                                                                                                      |
+| --------------- | ---------------- | --------------------------------------------------------------------------------------------------------- |
+| `AtscriptRepo`  | `@atscript/core` | Manages a collection of documents. Resolves config, loads plugins, opens documents, tracks dependencies.  |
+| `AtscriptDoc`   | `@atscript/core` | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods.     |
+| `BuildRepo`     | `@atscript/core` | Build orchestrator. Iterates documents, calls `render()` per format, resolves output paths, writes files. |
+| `PluginManager` | `@atscript/core` | Executes plugin hooks in order. Merges config, converts primitives to semantic nodes.                     |
+| `SemanticNode`  | `@atscript/core` | Base class for all AST nodes. Subclasses represent interfaces, types, props, refs, etc.                   |
 
 ## AST Node Types
 
 The parsed AST is a tree of `SemanticNode` subclasses. Each node has an `entity` string that identifies its kind:
 
-| Entity | Node Class | Description |
-| --- | --- | --- |
-| `'interface'` | `SemanticInterfaceNode` | An interface declaration with named properties |
-| `'type'` | `SemanticTypeNode` | A type alias (`type Foo = ...`) |
-| `'prop'` | `SemanticPropNode` | A property within an interface |
-| `'ref'` | `SemanticRefNode` | A reference to another type by name |
+| Entity        | Node Class              | Description                                           |
+| ------------- | ----------------------- | ----------------------------------------------------- |
+| `'interface'` | `SemanticInterfaceNode` | An interface declaration with named properties        |
+| `'type'`      | `SemanticTypeNode`      | A type alias (`type Foo = ...`)                       |
+| `'prop'`      | `SemanticPropNode`      | A property within an interface                        |
+| `'ref'`       | `SemanticRefNode`       | A reference to another type by name                   |
 | `'structure'` | `SemanticStructureNode` | An inline object structure (the body of an interface) |
-| `'group'` | `SemanticGroupNode` | A union (`\|`), intersection (`&`), or tuple |
-| `'array'` | `SemanticArrayNode` | An array type |
-| `'const'` | `SemanticConstNode` | A literal value (`"hello"`, `42`) |
-| `'primitive'` | `SemanticPrimitiveNode` | A built-in or plugin-defined primitive type |
-| `'import'` | `SemanticImportNode` | An import statement |
-| `'annotate'` | `SemanticAnnotateNode` | An `annotate` block (ad-hoc annotations) |
+| `'group'`     | `SemanticGroupNode`     | A union (`\|`), intersection (`&`), or tuple          |
+| `'array'`     | `SemanticArrayNode`     | An array type                                         |
+| `'const'`     | `SemanticConstNode`     | A literal value (`"hello"`, `42`)                     |
+| `'primitive'` | `SemanticPrimitiveNode` | A built-in or plugin-defined primitive type           |
+| `'import'`    | `SemanticImportNode`    | An import statement                                   |
+| `'annotate'`  | `SemanticAnnotateNode`  | An `annotate` block (ad-hoc annotations)              |
 
 ### Type Guards
 
@@ -74,7 +74,7 @@ if (isInterface(node)) {
 
 if (isRef(node)) {
   // node is SemanticRefNode
-  console.log(node.id)    // referenced type name
+  console.log(node.id) // referenced type name
   console.log(node.chain) // property access chain (e.g., ["address", "street"])
 }
 ```
@@ -84,11 +84,11 @@ if (isRef(node)) {
 Every `SemanticNode` provides:
 
 ```typescript
-node.entity          // 'interface' | 'type' | 'ref' | etc.
-node.id              // Name identifier (e.g., 'User', 'string')
+node.entity // 'interface' | 'type' | 'ref' | etc.
+node.id // Name identifier (e.g., 'User', 'string')
 node.token('export') // Access specific tokens — returns Token | undefined
 node.getDefinition() // Get the node's body/definition (e.g., the structure of an interface)
-node.annotations     // Raw annotation tokens on this node
+node.annotations // Raw annotation tokens on this node
 ```
 
 ## Plugin Lifecycle

@@ -78,12 +78,12 @@ async create(@Body() dto: CreateUserDto) {}
 
 ## API reference
 
-| Export                          | Type            | Description                                                                                                                                                                       |
-| ------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Export                          | Type             | Description                                                                                                                                                                       |
+| ------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `validatorPipe(opts?)`          | `TPipeFn`        | Low‑level factory. Returns a pipe that runs `type.validator(opts).validate(value)` on the argument **if** the type was produced by atscript. Registered with priority `VALIDATE`. |
-| `UseValidatorPipe(opts?)`       | `Decorator`     | Sugar over `validatorPipe`. Apply to a class, method, parameter, or property.                                                                                                     |
+| `UseValidatorPipe(opts?)`       | `Decorator`      | Sugar over `validatorPipe`. Apply to a class, method, parameter, or property.                                                                                                     |
 | `validationErrorTransform()`    | `TInterceptorFn` | Catches `ValidatorError`, wraps it into `HttpError(400)` with `{ message, statusCode, _body }`. Priority `CATCH_ERROR`.                                                           |
-| `UseValidationErrorTransform()` | `Decorator`     | Sugar over `validationErrorTransform()`.                                                                                                                                          |
+| `UseValidationErrorTransform()` | `Decorator`      | Sugar over `validationErrorTransform()`.                                                                                                                                          |
 
 ### `opts` (`Partial<TValidatorOptions>`)
 
