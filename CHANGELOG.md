@@ -1,3 +1,7 @@
+## [0.1.27](https://github.com/moostjs/atscript/compare/v0.1.26...v0.1.27) (2026-02-26)
+
+
+
 ## [0.1.26](https://github.com/moostjs/atscript/compare/v0.1.25...v0.1.26) (2026-02-23)
 
 ### Bug Fixes
