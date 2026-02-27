@@ -1,47 +1,34 @@
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
-import { h, nextTick } from 'vue'
+import { nextTick } from 'vue'
+import HomeLayout from './HomeLayout.vue'
 
 import './style.css'
 
+function colorizeAtscriptAnnotations() {
+  if (typeof window === 'undefined') return
+  const lines = window.document.querySelectorAll('.language-atscript code .line')
+  lines.forEach((line: Element) => {
+    const spans = line.querySelectorAll('span')
+    spans.forEach((span: HTMLElement) => {
+      if (span.textContent && span.textContent.trim().startsWith('@')) {
+        span.style.color = '#2baac4ff'
+        span.style.fontWeight = '600'
+      }
+    })
+  })
+}
+
 export default {
   extends: DefaultTheme,
-  Layout: () =>
-    h(DefaultTheme.Layout, null, {
-      // Add custom slots if needed
-    }),
+  Layout: HomeLayout,
   enhanceApp({ app }) {
-    // Add a global mixin to handle annotation coloring after mount
     app.mixin({
       mounted() {
-        this.colorizeAnnotations()
+        nextTick(colorizeAtscriptAnnotations)
       },
       updated() {
-        this.colorizeAnnotations()
-      },
-      methods: {
-        colorizeAnnotations() {
-          nextTick(() => {
-            // Only run in browser environment
-            if (typeof window === 'undefined') {
-              return
-            }
-
-            // Find all atscript code blocks
-            const codeBlocks = window.document.querySelectorAll('.language-atscript code .line')
-            codeBlocks.forEach((line: Element) => {
-              // Find spans that contain text starting with @
-              const spans = line.querySelectorAll('span')
-              spans.forEach((span: HTMLElement) => {
-                if (span.textContent && span.textContent.trim().startsWith('@')) {
-                  // Force blue-ish color for annotations
-                  span.style.color = '#2baac4ff'
-                  span.style.fontWeight = '600'
-                }
-              })
-            })
-          })
-        },
+        nextTick(colorizeAtscriptAnnotations)
       },
     })
   },
