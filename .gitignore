@@ -14,4 +14,5 @@ TODO.md
 .claude/skills/moostjs-event-http
 .codex/skills/moostjs-event-http
 .vitepress/dist
+.vitepress/cache
 cache
