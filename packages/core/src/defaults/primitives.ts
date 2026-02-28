@@ -2,16 +2,12 @@ import type { TPrimitiveConfig } from '../parser/nodes'
 
 const positive: Partial<TPrimitiveConfig> = {
   documentation: 'Number that greater than or equal to zero.',
-  expect: {
-    min: 0,
-  },
+  annotations: { 'expect.min': 0 },
 }
 
 const negative: Partial<TPrimitiveConfig> = {
   documentation: 'Number that less than or equal to zero.',
-  expect: {
-    max: 0,
-  },
+  annotations: { 'expect.max': 0 },
 }
 
 const positiveOrNegative = {
@@ -30,52 +26,62 @@ export const primitives: Record<string, TPrimitiveConfig> = {
     extensions: {
       email: {
         documentation: 'Represents an email address.',
-        expect: {
-          pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-          message: 'Invalid email format.',
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+            message: 'Invalid email format.',
+          },
         },
       },
       phone: {
         documentation: 'Represents an phone number.',
-        expect: {
-          pattern: /^\+?[0-9\s-]{10,15}$/,
-          message: 'Invalid phone number format.',
+        annotations: {
+          'expect.pattern': {
+            pattern: '^\\+?[0-9\\s-]{10,15}$',
+            message: 'Invalid phone number format.',
+          },
         },
       },
       date: {
         documentation: 'Represents a date string.',
-        expect: {
-          pattern: [
-            /^\d{4}-\d{2}-\d{2}$/, // YYYY-MM-DD
-            /^\d{2}\/\d{2}\/\d{4}$/, // MM/DD/YYYY
-            /^\d{2}-\d{2}-\d{4}$/, // DD-MM-YYYY
-            /^\d{1,2} [A-Za-z]+ \d{4}$/, // D Month YYYY
+        annotations: {
+          'expect.pattern': [
+            { pattern: '^\\d{4}-\\d{2}-\\d{2}$', message: 'Invalid date format.' }, // YYYY-MM-DD
+            { pattern: '^\\d{2}/\\d{2}/\\d{4}$', message: 'Invalid date format.' }, // MM/DD/YYYY
+            { pattern: '^\\d{2}-\\d{2}-\\d{4}$', message: 'Invalid date format.' }, // DD-MM-YYYY
+            { pattern: '^\\d{1,2} [A-Za-z]+ \\d{4}$', message: 'Invalid date format.' }, // D Month YYYY
           ],
-          message: 'Invalid date format.',
         },
       },
       isoDate: {
         documentation: 'Represents a date string in ISO format.',
-        expect: {
-          pattern: [
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/, // UTC ISO 8601
-            /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?([+-]\d{2}:\d{2})$/, // ISO 8601 with timezone
+        annotations: {
+          'expect.pattern': [
+            {
+              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$',
+              message: 'Invalid ISO date format.',
+            }, // UTC ISO 8601
+            {
+              pattern:
+                '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?([+-]\\d{2}:\\d{2})$',
+              message: 'Invalid ISO date format.',
+            }, // ISO 8601 with timezone
           ],
-          message: 'Invalid ISO date format.',
         },
       },
       uuid: {
         documentation: 'Represents a UUID.',
-        expect: {
-          pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
-          message: 'Invalid UUID format.',
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            flags: 'i',
+            message: 'Invalid UUID format.',
+          },
         },
       },
       required: {
         documentation: 'Non-empty string that contains at least one non-whitespace character.',
-        expect: {
-          required: true,
-        },
+        annotations: { 'meta.required': true },
       },
     },
   },
@@ -96,11 +102,24 @@ export const primitives: Record<string, TPrimitiveConfig> = {
       int: {
         extensions: positiveOrNegative,
         documentation: 'Represents an integer number.',
-        expect: { int: true },
+        annotations: { 'expect.int': true },
       },
       timestamp: {
         documentation: 'Represents a timestamp.',
-        expect: { int: true },
+        annotations: { 'expect.int': true },
+        extensions: {
+          created: {
+            documentation:
+              'Timestamp auto-set on creation. Auto-applies @db.default.fn "now".',
+            tags: ['created'],
+            annotations: { 'db.default.fn': 'now' },
+          },
+          updated: {
+            documentation:
+              'Timestamp auto-updated on every write. DB adapters read the "updated" tag.',
+            tags: ['updated'],
+          },
+        },
       },
     },
   },
@@ -111,9 +130,7 @@ export const primitives: Record<string, TPrimitiveConfig> = {
     extensions: {
       required: {
         documentation: 'Boolean that must be true. Useful for checkboxes like "accept terms".',
-        expect: {
-          required: true,
-        },
+        annotations: { 'meta.required': true },
       },
       true: {
         documentation: 'Represents a true value.',

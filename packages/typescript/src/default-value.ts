@@ -15,11 +15,12 @@ export interface TCreateDataOptions {
    * - `'empty'` — structural defaults only (`''`, `0`, `false`, `[]`, `{}`); optional props skipped
    * - `'default'` — use `@meta.default` annotations; optional props skipped unless annotated
    * - `'example'` — use `@meta.example` annotations; optional props always included; arrays get one sample item
+   * - `'db'` — use `@db.default.value` (parsed) or `@db.default.fn` (returns fn name string); optional props skipped unless annotated
    * - `function` — custom resolver per field; optional props skipped unless resolver returns a value
    *
    * @default 'empty'
    */
-  mode?: 'empty' | 'default' | 'example' | TValueResolver
+  mode?: 'empty' | 'default' | 'example' | 'db' | TValueResolver
 }
 
 /**
@@ -44,6 +45,28 @@ function resolveValue(
     // Callback returns already-parsed values — validate directly
     if (prop.validator({ unknownProps: 'ignore' }).validate(raw, true)) {
       return { value: raw }
+    }
+    return undefined
+  }
+
+  if (mode === 'db') {
+    // Try @db.default.value first (static value, parsed like meta.default)
+    const dbValue = prop.metadata.get('db.default.value' as keyof AtscriptMetadata) as
+      | string
+      | undefined
+    if (dbValue !== undefined) {
+      const parsed = parseRawValue(dbValue, prop)
+      if (parsed !== undefined && prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)) {
+        return { value: parsed }
+      }
+      return undefined
+    }
+    // Fall back to @db.default.fn (return function name as-is)
+    const dbFn = prop.metadata.get('db.default.fn' as keyof AtscriptMetadata) as
+      | string
+      | undefined
+    if (dbFn !== undefined) {
+      return { value: dbFn }
     }
     return undefined
   }
@@ -111,10 +134,11 @@ function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown 
 /**
  * Creates a data object from an ATScript annotated type definition.
  *
- * Supports four modes:
+ * Supports five modes:
  * - `'empty'` — structural defaults only; optional props omitted
  * - `'default'` — uses `@meta.default` annotations; optional props omitted unless annotated
  * - `'example'` — uses `@meta.example` annotations; optional props always included; arrays get one sample item
+ * - `'db'` — uses `@db.default.value` (parsed) or `@db.default.fn` (fn name string); optional props omitted unless annotated
  * - `function` — custom resolver; optional props omitted unless resolver returns a value
  *
  * When a `@meta.default` / `@meta.example` value is set on a complex type (object, array)

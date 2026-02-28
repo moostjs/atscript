@@ -13,8 +13,8 @@ export const primitives: TAtscriptConfig['primitives'] = {
           '```atscript\n' +
           'userId: mongo.objectId\n' +
           '```\n',
-        expect: {
-          pattern: /^[a-fA-F0-9]{24}$/,
+        annotations: {
+          'expect.pattern': { pattern: '^[a-fA-F0-9]{24}$' },
         },
       },
       vector: {

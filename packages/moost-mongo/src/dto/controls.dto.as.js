@@ -62,16 +62,16 @@ $("object", QueryControlsDto)
     "$skip",
     $().designType("number")
       .tags("positive", "int", "number")
-      .annotate("expect.min", { minValue: 0,  })
       .annotate("expect.int", true)
+      .annotate("expect.min", { minValue: 0,  })
       .optional()
       .$type
   ).prop(
     "$limit",
     $().designType("number")
       .tags("positive", "int", "number")
-      .annotate("expect.min", { minValue: 0,  })
       .annotate("expect.int", true)
+      .annotate("expect.min", { minValue: 0,  })
       .optional()
       .$type
   ).prop(

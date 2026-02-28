@@ -1,4 +1,5 @@
-@mongo.collection 'flatten-test'
+@db.table 'flatten-test'
+@db.mongo.collection
 export interface FlattenTest {
     level0: string
     nested: {

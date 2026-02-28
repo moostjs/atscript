@@ -42,9 +42,19 @@ pnpm --filter @atscript/moost-mongo test    # Run tests
 
 Note: `before-build` script runs `node ../typescript/cli.cjs -f js` to generate `.as.d.ts` + `.as.js`.
 
+### Regenerating `atscript.d.ts`
+
+To regenerate the `src/atscript.d.ts` type declarations after annotation changes:
+
+```bash
+cd packages/moost-mongo && node ../typescript/dist/cli.cjs -f dts
+```
+
+This scans all `.as` files in the package and rebuilds the `AtscriptMetadata` interface with the correct annotation keys.
+
 ## Important patterns
 
 - **Subclass-and-go**: Empty subclass with `@CollectionController` is a complete controller.
 - **URLQL query language**: All GET endpoints use `urlql` to parse query strings.
-- **`_id` or unique field lookup**: `GET /one/:id` tries `_id` first, then `@mongo.index.unique` fields.
+- **`_id` or unique field lookup**: `GET /one/:id` tries `_id` first, then `@db.index.unique` fields.
 - **Peer dependencies**: `moost`, `@moostjs/event-http`, `@atscript/mongo`, `@atscript/typescript`, `mongodb`.

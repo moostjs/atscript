@@ -20,8 +20,13 @@
     "url": "git+https://github.com/moostjs/atscript.git",
     "directory": "packages/moost-mongo"
   },
+  "bin": {
+    "atscript-moost-mongo-skill": "./scripts/setup-skills.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "skills",
+    "scripts/setup-skills.js"
   ],
   "type": "module",
   "main": "dist/index.mjs",
@@ -37,7 +42,8 @@
   "scripts": {
     "pub": "pnpm publish --access public",
     "before-build": "node ../typescript/cli.cjs -f js",
-    "test": "vitest"
+    "test": "vitest",
+    "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
     "urlql": "^0.0.5"

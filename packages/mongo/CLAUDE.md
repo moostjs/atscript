@@ -9,7 +9,7 @@ src/
   index.ts                    - Package entry: re-exports MongoPlugin, AsCollection, AsMongo
   plugin/
     index.ts                  - MongoPlugin factory (TAtscriptPlugin with name, primitives, annotations)
-    annotations.ts            - All mongo.* annotation definitions (collection, index, search, patch, array)
+    annotations.ts            - All db.mongo.* annotation definitions (collection, index, search, patch, array)
     primitives.ts             - Custom primitives: mongo.objectId (string /^[a-fA-F0-9]{24}$/), mongo.vector (number[])
   lib/
     index.ts                  - Re-exports AsCollection and AsMongo
@@ -23,34 +23,36 @@ src/
 
 ## Annotations
 
-All annotations live under the `mongo.*` namespace.
+Mongo-specific annotations live under the `db.mongo.*` namespace. Generic database annotations (`@db.table`, `@db.index.*`) come from core.
 
 ### Collection-level
 
-| Annotation                                            | Description                                                                         |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `@mongo.collection "name"`                            | Marks interface as a MongoDB collection; auto-adds `_id: mongo.objectId` if missing |
-| `@mongo.autoIndexes true/false`                       | Toggle automatic index creation (default: true)                                     |
-| `@mongo.search.dynamic "analyzer", fuzzy`             | Dynamic Atlas Search index                                                          |
-| `@mongo.search.static "analyzer", fuzzy, "indexName"` | Named static Atlas Search index                                                     |
+| Annotation                                               | Description                                                                         |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@db.table "name"` (core)                                | Names the collection/table                                                          |
+| `@db.mongo.collection`                                   | Optional; auto-adds `_id: mongo.objectId` if missing                                |
+| `@db.mongo.autoIndexes true/false`                       | Toggle automatic index creation (default: true)                                     |
+| `@db.mongo.search.dynamic "analyzer", fuzzy`             | Dynamic Atlas Search index                                                          |
+| `@db.mongo.search.static "analyzer", fuzzy, "indexName"` | Named static Atlas Search index                                                     |
 
 ### Field-level indexes
 
-| Annotation                                                   | Description                                |
-| ------------------------------------------------------------ | ------------------------------------------ |
-| `@mongo.index.plain "indexName"`                             | Standard index (compound when name shared) |
-| `@mongo.index.unique "indexName"`                            | Unique index                               |
-| `@mongo.index.text weight`                                   | Legacy text index with optional weight     |
-| `@mongo.search.text "analyzer", "indexName"`                 | Atlas Search text field                    |
-| `@mongo.search.vector dimensions, "similarity", "indexName"` | Vector search index                        |
-| `@mongo.search.filter "indexName"`                           | Pre-filter for vector search               |
+| Annotation                                                      | Description                                |
+| --------------------------------------------------------------- | ------------------------------------------ |
+| `@db.index.plain "indexName"` (core)                             | Standard index (compound when name shared) |
+| `@db.index.unique "indexName"` (core)                            | Unique index                               |
+| `@db.mongo.index.text weight`                                    | Text index with optional weight (mongo-specific, has weight arg) |
+| `@db.index.fulltext "indexName"` (core)                          | Generic fulltext index (weight always 1)   |
+| `@db.mongo.search.text "analyzer", "indexName"`                  | Atlas Search text field                    |
+| `@db.mongo.search.vector dimensions, "similarity", "indexName"`  | Vector search index                        |
+| `@db.mongo.search.filter "indexName"`                            | Pre-filter for vector search               |
 
 ### Patch and array behavior
 
-| Annotation                                 | Description                        |
-| ------------------------------------------ | ---------------------------------- |
-| `@mongo.patch.strategy "replace"\|"merge"` | Controls update behavior           |
-| `@mongo.array.uniqueItems`                 | Enforce set-semantics on `$insert` |
+| Annotation                                        | Description                        |
+| ------------------------------------------------- | ---------------------------------- |
+| `@db.mongo.patch.strategy "replace"\|"merge"`     | Controls update behavior           |
+| `@db.mongo.array.uniqueItems`                     | Enforce set-semantics on `$insert` |
 
 ## Primitives
 
@@ -78,6 +80,16 @@ Converts patch payloads into MongoDB `$set` aggregation stages. Array operations
 pnpm --filter @atscript/mongo test     # Run this package's tests
 pnpm build                             # Build all from repo root
 ```
+
+### Regenerating `atscript.d.ts`
+
+To regenerate fixture `atscript.d.ts` type declarations after annotation changes:
+
+```bash
+cd packages/mongo && node ../typescript/dist/cli.cjs -f dts
+```
+
+Note: The test fixtures' `atscript.d.ts` is also regenerated automatically by `prepareFixtures()` in `beforeAll`.
 
 ## Important patterns
 

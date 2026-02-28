@@ -9,7 +9,7 @@
 | Annotation            | Arguments                  | Description                                                        |
 | --------------------- | -------------------------- | ------------------------------------------------------------------ |
 | `@meta.label`         | `text: string`             | Human-readable label for UI, logs, documentation                   |
-| `@meta.id`            | `name?: string` (optional) | Mark field as unique identifier; optional custom name              |
+| `@meta.id`            | _(none)_                   | Mark field as unique identifier; multiple fields form composite PK |
 | `@meta.description`   | `text: string`             | Detailed description of a field or entity                          |
 | `@meta.documentation` | `text: string`             | Multi-line docs (Markdown). Multiple allowed — each appends        |
 | `@meta.placeholder`   | `text: string`             | Placeholder for UI input fields (props/types only)                 |
@@ -18,7 +18,7 @@
 | `@meta.required`      | `message?: string`         | Required field. Strings: non-whitespace. Booleans: must be `true`  |
 | `@meta.default`       | `value: string`            | Default value (strings as-is, others parsed as JSON)               |
 | `@meta.example`       | `value: string`            | Example value (strings as-is, others parsed as JSON)               |
-| `@meta.isKey`         | _(none)_                   | Mark field as key inside array (string/number types only)          |
+| `@expect.array.key`   | _(none)_                   | Mark field as key inside array (string/number types only)          |
 
 ### `@expect.*` — Validation Constraints
 

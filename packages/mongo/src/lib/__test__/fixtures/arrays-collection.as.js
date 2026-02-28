@@ -41,13 +41,13 @@ $("object", ArraysCollection)
             "key1",
             $().designType("string")
               .tags("string")
-              .annotate("meta.isKey", true)
+              .annotate("expect.array.key", true)
               .$type
           ).prop(
             "key2",
             $().designType("string")
               .tags("string")
-              .annotate("meta.isKey", true)
+              .annotate("expect.array.key", true)
               .$type
           ).prop(
             "value",
@@ -70,13 +70,13 @@ $("object", ArraysCollection)
             "key1",
             $().designType("string")
               .tags("string")
-              .annotate("meta.isKey", true)
+              .annotate("expect.array.key", true)
               .$type
           ).prop(
             "key2",
             $().designType("string")
               .tags("string")
-              .annotate("meta.isKey", true)
+              .annotate("expect.array.key", true)
               .$type
           ).prop(
             "value",
@@ -90,7 +90,7 @@ $("object", ArraysCollection)
               .$type
           )
           .$type)
-      .annotate("mongo.patch.strategy", "merge")
+      .annotate("db.mongo.patch.strategy", "merge")
       .$type
   ).prop(
     "withoutKey",
@@ -136,15 +136,16 @@ $("object", ArraysCollection)
               .$type
           )
           .$type)
-      .annotate("mongo.patch.strategy", "merge")
+      .annotate("db.mongo.patch.strategy", "merge")
       .$type
   ).prop(
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "arrays")
+  .annotate("db.table", "arrays")
+  .annotate("db.mongo.collection", true)
 
 // prettier-ignore-end

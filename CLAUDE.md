@@ -89,3 +89,7 @@ Six domain expert agents exist in `.claude/agents/`:
 - Plugins extend the core by adding annotations, primitives, and metadata — they don't modify the parser
 - The core provides AST + utilities (annotation merging, type unwinding) that language extensions and LSPs consume
 - Moost integrations (`moost-mongo`, `moost-validator`) demonstrate how .as types flow into a real framework
+- **`@db.*` annotations** are shipped with `@atscript/core` (not a separate package) — defined in `packages/core/src/defaults/db-annotations.ts`
+- **Primitive `annotations` map** — primitives use a generic `annotations: Record<string, TPrimitiveAnnotationValue>` to apply any annotation (the old hardcoded `expect` property was removed). The `applyAnnotations()` method is spec-aware: it resolves annotation specs, respects `multiple` flags, and maps object values by spec argument names
+- **`@meta.isKey` was renamed to `@expect.array.key`** — it's a validation constraint, not semantic metadata
+- **`@meta.id` takes no arguments** — multiple fields annotated with `@meta.id` form a composite primary key

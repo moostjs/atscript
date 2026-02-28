@@ -95,7 +95,7 @@ $("object", SimpleCollection)
           .tags("string")
           .$type
       )
-      .annotate("mongo.patch.strategy", "replace")
+      .annotate("db.mongo.patch.strategy", "replace")
       .$type
   ).prop(
     "contacts",
@@ -111,7 +111,7 @@ $("object", SimpleCollection)
           .tags("string")
           .$type
       )
-      .annotate("mongo.patch.strategy", "merge")
+      .annotate("db.mongo.patch.strategy", "merge")
       .$type
   ).prop(
     "nested",
@@ -132,7 +132,7 @@ $("object", SimpleCollection)
               .optional()
               .$type
           )
-          .annotate("mongo.patch.strategy", "replace")
+          .annotate("db.mongo.patch.strategy", "replace")
           .optional()
           .$type
       ).prop(
@@ -151,21 +151,22 @@ $("object", SimpleCollection)
               .optional()
               .$type
           )
-          .annotate("mongo.patch.strategy", "merge")
+          .annotate("db.mongo.patch.strategy", "merge")
           .optional()
           .$type
       )
-      .annotate("mongo.patch.strategy", "merge")
+      .annotate("db.mongo.patch.strategy", "merge")
       .optional()
       .$type
   ).prop(
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "simple")
+  .annotate("db.table", "simple")
+  .annotate("db.mongo.collection", true)
 
 $("object", MinimalCollection)
   .prop(
@@ -177,10 +178,11 @@ $("object", MinimalCollection)
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "minimal")
+  .annotate("db.table", "minimal")
+  .annotate("db.mongo.collection", true)
 
 $("object", MinimalCollectionString)
   .prop(
@@ -194,6 +196,7 @@ $("object", MinimalCollectionString)
       .tags("string")
       .$type
   )
-  .annotate("mongo.collection", "minimal-string")
+  .annotate("db.table", "minimal-string")
+  .annotate("db.mongo.collection", true)
 
 // prettier-ignore-end

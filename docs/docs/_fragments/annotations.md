@@ -117,7 +117,7 @@ Atscript provides common-purpose annotations:
 ### Meta Annotations (@meta.\*)
 
 - `@meta.label 'text'` - Human-readable label
-- `@meta.id` or `@meta.id 'name'` - Marks identifier field
+- `@meta.id` - Marks identifier field (multiple fields form composite PK)
 - `@meta.description 'text'` - Field description
 - `@meta.documentation 'text'` - Multi-line docs (repeatable)
 - `@meta.placeholder 'text'` - UI placeholder text
@@ -125,7 +125,7 @@ Atscript provides common-purpose annotations:
 - `@meta.readonly` - Read-only field
 - `@meta.default 'value'` - Default value (string as-is, other types parsed as JSON)
 - `@meta.example 'value'` - Example value (string as-is, other types parsed as JSON)
-- `@meta.isKey` - Key field in arrays for lookups
+- `@expect.array.key` - Key field in arrays for lookups
 
 ### Validation Annotations (@expect.\*)
 

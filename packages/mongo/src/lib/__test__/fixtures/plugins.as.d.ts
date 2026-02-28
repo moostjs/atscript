@@ -11,7 +11,7 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
 
 /**
  * Atscript interface **IdPlugin**
- * @see {@link ./plugins.as:2:18}
+ * @see {@link ./plugins.as:3:18}
  */
 export declare class IdPlugin {
   _id: string /* objectId */
@@ -27,7 +27,7 @@ export declare class IdPlugin {
 
 /**
  * Atscript interface **UniqueItems**
- * @see {@link ./plugins.as:7:18}
+ * @see {@link ./plugins.as:9:18}
  */
 export declare class UniqueItems {
   str?: string[]

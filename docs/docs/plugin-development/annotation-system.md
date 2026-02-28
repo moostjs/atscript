@@ -1,6 +1,6 @@
 # Custom Annotations
 
-Annotations are the metadata layer in Atscript — `@label "Name"`, `@expect.minLength 3`, `@mongo.collection "users"`. Plugins can define custom annotations with typed arguments, validation logic, and even AST modification. Custom annotations get full IntelliSense, type checking, and flow into runtime metadata.
+Annotations are the metadata layer in Atscript — `@label "Name"`, `@expect.minLength 3`, `@db.table "users"`. Plugins can define custom annotations with typed arguments, validation logic, and even AST modification. Custom annotations get full IntelliSense, type checking, and flow into runtime metadata.
 
 ## The AnnotationSpec Class
 
@@ -247,12 +247,11 @@ Built-in validation runs before your `validate` callback. The `AnnotationSpec` c
 
 ### Example: Validate Collection ID Type
 
-The MongoDB plugin's `@mongo.collection` validates that the `_id` field (if present) has the right type:
+The MongoDB plugin's `@db.mongo.collection` validates that the `_id` field (if present) has the right type:
 
 ```typescript
 new AnnotationSpec({
   nodeType: ['interface'],
-  argument: { name: 'name', type: 'string' },
   validate(token, args, doc) {
     const parent = token.parentNode
     if (!isInterface(parent) || !parent.props.has('_id')) {
@@ -349,12 +348,11 @@ modify(mainToken: Token, args: Token[], doc: AtscriptDoc): void
 
 ### Example: Auto-Add \_id Property
 
-The MongoDB plugin uses `modify` on `@mongo.collection` to automatically add an `_id` property when the interface doesn't already have one:
+The MongoDB plugin uses `modify` on `@db.mongo.collection` to automatically add an `_id` property when the interface doesn't already have one:
 
 ```typescript
 new AnnotationSpec({
   nodeType: ['interface'],
-  argument: { name: 'name', type: 'string' },
   modify(token, args, doc) {
     const parent = token.parentNode
     const struc = parent?.getDefinition()
@@ -369,10 +367,11 @@ new AnnotationSpec({
 })
 ```
 
-Now every `@mongo.collection` interface automatically gets `_id: mongo.objectId` without the author writing it explicitly:
+Now every `@db.mongo.collection` interface automatically gets `_id: mongo.objectId` without the author writing it explicitly:
 
 ```atscript
-@mongo.collection "users"
+@db.table "users"
+@db.mongo.collection
 export interface User {
     // _id: mongo.objectId — injected automatically
     email: string.email

@@ -29,10 +29,11 @@ $("object", IdPlugin)
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "IdPlugin")
+  .annotate("db.table", "IdPlugin")
+  .annotate("db.mongo.collection", true)
 
 $("object", UniqueItems)
   .prop(
@@ -49,7 +50,7 @@ $("object", UniqueItems)
       .of($().designType("string")
           .tags("string")
           .$type)
-      .annotate("mongo.array.uniqueItems", true)
+      .annotate("db.mongo.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(
@@ -86,7 +87,7 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("mongo.array.uniqueItems", true)
+      .annotate("db.mongo.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(
@@ -97,7 +98,7 @@ $("object", UniqueItems)
             "a",
             $().designType("string")
               .tags("string")
-              .annotate("meta.isKey", true)
+              .annotate("expect.array.key", true)
               .$type
           ).prop(
             "b",
@@ -106,16 +107,17 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("mongo.array.uniqueItems", true)
+      .annotate("db.mongo.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "UniqueItems")
+  .annotate("db.table", "UniqueItems")
+  .annotate("db.mongo.collection", true)
 
 // prettier-ignore-end

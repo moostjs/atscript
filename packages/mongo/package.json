@@ -19,9 +19,14 @@
     "directory": "packages/mongo"
   },
   "files": [
-    "dist"
+    "dist",
+    "skills",
+    "scripts/setup-skills.js"
   ],
   "type": "module",
+  "bin": {
+    "atscript-mongo-skill": "./scripts/setup-skills.js"
+  },
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
@@ -34,7 +39,8 @@
   },
   "scripts": {
     "pub": "pnpm publish --access public",
-    "test": "vitest"
+    "test": "vitest",
+    "setup-skills": "node ./scripts/setup-skills.js"
   },
   "devDependencies": {
     "vitest": "3.2.4"

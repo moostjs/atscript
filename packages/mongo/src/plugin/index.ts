@@ -9,7 +9,11 @@ export const MongoPlugin: () => TAtscriptPlugin = () => ({
   config() {
     return {
       primitives,
-      annotations,
+      annotations: {
+        db: {
+          mongo: annotations,
+        },
+      },
     }
   },
 })

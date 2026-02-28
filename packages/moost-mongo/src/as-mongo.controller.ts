@@ -75,7 +75,7 @@ export class AsMongoController<
     protected type: T,
     app: Moost
   ) {
-    this.logger = app.getLogger(`mongo [${type.metadata.get('mongo.collection') || ''}]`)
+    this.logger = app.getLogger(`mongo [${type.metadata.get('db.table') || ''}]`)
     this.asCollection = this.asMongo.getCollection(type, this.logger)
     this.logger.info(`Initializing Collection`)
     try {
@@ -103,7 +103,7 @@ export class AsMongoController<
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected init(): void | Promise<any> {
-    if (this.type.metadata.get('mongo.autoIndexes') === false) {
+    if (this.type.metadata.get('db.mongo.autoIndexes') === false) {
       // indexing explicitly disabled
     } else {
       return this.asCollection.syncIndexes()

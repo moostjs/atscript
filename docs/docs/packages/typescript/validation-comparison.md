@@ -405,7 +405,7 @@ Zod achieves custom validation through `.refine()` and `.superRefine()` — meth
 
 The key difference isn't just syntax or performance — it's scope. Zod and class-validator are validation libraries. Atscript is a type and metadata description language.
 
-The same `.as` file that defines validation constraints can also carry `@label` for UI display names, `@mongo.index` for database indexes, `@description` for documentation, and any custom annotations your project needs. All of this metadata is accessible at runtime through a single import. Other libraries validate data; Atscript **describes** it.
+The same `.as` file that defines validation constraints can also carry `@label` for UI display names, `@db.index.*` for database indexes, `@description` for documentation, and any custom annotations your project needs. All of this metadata is accessible at runtime through a single import. Other libraries validate data; Atscript **describes** it.
 
 ```atscript
 export interface Product {
@@ -417,7 +417,7 @@ export interface Product {
   price: number.positive
 
   @label "SKU"
-  @mongo.index unique
+  @db.index.unique
   sku: string
 
   @label "Description"

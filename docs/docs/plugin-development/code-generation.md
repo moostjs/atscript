@@ -192,7 +192,7 @@ Annotations carry metadata that code generators can use to produce richer output
 
 ```typescript
 for (const ann of prop.annotations) {
-  ann.name // 'label', 'expect.minLength', 'mongo.index.unique', etc.
+  ann.name // 'label', 'expect.minLength', 'db.index.unique', etc.
   ann.args // array of Token objects
   ann.args[0]?.text // first argument's value as string
 }

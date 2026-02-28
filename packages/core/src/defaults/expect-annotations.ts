@@ -1,5 +1,7 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
+import { isPrimitive, isRef } from '../parser/nodes'
+import type { TMessages } from '../parser/types'
 
 export const expectAnnotations: TAnnotationsTree = {
   minLength: new AnnotationSpec({
@@ -222,4 +224,57 @@ export const expectAnnotations: TAnnotationsTree = {
       return []
     },
   }),
+
+  array: {
+    key: new AnnotationSpec({
+      description:
+        'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        'export interface User {\n' +
+        '  id: string\n' +
+        '  profiles: {\n' +
+        '    @expect.array.key\n' +
+        '    profileId: string\n' +
+        '    name: string\n' +
+        '  }[]\n' +
+        '}\n' +
+        '```\n',
+      nodeType: ['prop', 'type'],
+      multiple: false,
+      validate(token, args, doc) {
+        const field = token.parentNode!
+        const errors = [] as TMessages
+        const isOptional = !!field.token('optional')
+        if (isOptional) {
+          errors.push({
+            message: `@expect.array.key can't be optional`,
+            severity: 1,
+            range: field.token('identifier')!.range,
+          })
+        }
+        const definition = field.getDefinition()
+        if (!definition) {
+          return errors
+        }
+        let wrongType = false
+        if (isRef(definition)) {
+          const def = doc.unwindType(definition.id!, definition.chain)?.def
+          if (isPrimitive(def) && !['string', 'number'].includes(def.config.type as string)) {
+            wrongType = true
+          }
+        } else {
+          wrongType = true
+        }
+        if (wrongType) {
+          errors.push({
+            message: `@expect.array.key must be of type string or number`,
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+  },
 }

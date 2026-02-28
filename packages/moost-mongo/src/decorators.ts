@@ -11,7 +11,7 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
 /**
  * Combines the boilerplate needed to turn an {@link AsMongoController}
  * subclass into a fully wired HTTP controller for a given
- * **@mongo.collection** model.
+ * **@db.table** model.
  *
  * Internally applies three decorators:
  * 1. **Provide** – registers the collection constructor under {@link COLLECTION_DEF}.
@@ -20,9 +20,9 @@ export const COLLECTION_DEF = '__atscript_mongo_collection_def'
  * 3. **Inherit** – copies metadata (routes, guards, etc.) from the
  *    parent class so they stay active in the derived controller.
  *
- * @param type   AtScript-annotated constructor produced by `@mongo.collection`.
+ * @param type   AtScript-annotated constructor produced by `@db.table`.
  * @param prefix Optional route prefix. Defaults to
- *               `type.metadata.get("mongo.collection")` or the class name.
+ *               `type.metadata.get("db.table")` or the class name.
  *
  * @example
  * ```ts
@@ -36,7 +36,7 @@ export const CollectionController = (
 ) =>
   ApplyDecorators(
     Provide(COLLECTION_DEF, () => type),
-    Controller(prefix || type.metadata.get('mongo.collection') || type.name),
+    Controller(prefix || type.metadata.get('db.table') || type.name),
     Inherit()
   )
 
@@ -48,7 +48,7 @@ export const CollectionController = (
  * > (e.g. `@Provide(AsMongo, () => new AsMongo(url))`).
  *
  * @param type AtScript-annotated constructor produced by
- *             `@mongo.collection`.
+ *             `@db.table`.
  *
  * @example
  * ```ts

@@ -1,12 +1,16 @@
+import type { AnnotationSpec } from '../../annotations'
+import { resolveAnnotation } from '../../annotations'
+import type { TAnnotationsTree } from '../../config'
 import { Token } from '../token'
 import { SemanticNode } from './semantic-node'
-import type { TPrimitiveConfig } from './types'
+import type { TAnnotationTokens, TPrimitiveConfig } from './types'
 
 export class SemanticPrimitiveNode extends SemanticNode {
   constructor(
     private readonly _id: string,
     public readonly config: TPrimitiveConfig,
-    private readonly parentKey: string = ''
+    private readonly parentKey: string = '',
+    private readonly annotationTree?: TAnnotationsTree
   ) {
     super('primitive')
     this.props = new Map()
@@ -19,9 +23,10 @@ export class SemanticPrimitiveNode extends SemanticNode {
           documentation: def.documentation ?? config.documentation,
           extensions: def.extensions,
           tags: Array.from(new Set([...(def.tags || []), ...Array.from(this.tags)])),
-          expect: { ...config.expect, ...def.expect },
+          annotations: { ...config.annotations, ...def.annotations },
         },
-        this.key
+        this.key,
+        this.annotationTree
       )
       this.props.set(ext, node)
     }
@@ -35,77 +40,23 @@ export class SemanticPrimitiveNode extends SemanticNode {
 
   protected applyAnnotations() {
     this.annotations = []
-    if (this.type === 'string' || this.type === 'array') {
-      if (typeof this.config.expect?.minLength === 'number') {
-        this.annotations.push({
-          name: 'expect.minLength',
-          token: dummyToken,
-          args: [num(this.config.expect.minLength)],
-        })
-      }
-      if (typeof this.config.expect?.maxLength === 'number') {
-        this.annotations.push({
-          name: 'expect.maxLength',
-          token: dummyToken,
-          args: [num(this.config.expect.maxLength)],
-        })
-      }
-    }
-    if (this.type === 'string') {
-      if (this.config.expect?.required === true) {
-        this.annotations.push({
-          name: 'meta.required',
-          token: dummyToken,
-          args: [],
-        })
-      }
-      if (this.config.expect?.pattern !== undefined) {
-        const patterns = Array.isArray(this.config.expect.pattern)
-          ? this.config.expect.pattern
-          : [this.config.expect.pattern]
-        for (const p of patterns) {
-          const args: Token[] = typeof p === 'string' ? [text(p)] : [text(p.source), text(p.flags)]
-          if (this.config.expect.message) {
-            args[2] = text(this.config.expect.message)
+    for (const [name, value] of Object.entries(this.config.annotations || {})) {
+      const spec = this.annotationTree ? resolveAnnotation(name, this.annotationTree) : undefined
+      const isMultiple = spec?.config.multiple ?? false
+
+      if (Array.isArray(value)) {
+        if (isMultiple) {
+          for (const item of value) {
+            this.annotations.push(toAnnotationTokens(name, item, spec))
           }
-          this.annotations.push({
-            name: 'expect.pattern',
-            token: dummyToken,
-            args,
-          })
+        } else {
+          // multiple:false — take only the first item
+          if (value.length > 0) {
+            this.annotations.push(toAnnotationTokens(name, value[0], spec))
+          }
         }
-      }
-    }
-    if (this.type === 'number') {
-      if (typeof this.config.expect?.min === 'number') {
-        this.annotations.push({
-          name: 'expect.min',
-          token: dummyToken,
-          args: [num(this.config.expect.min)],
-        })
-      }
-      if (typeof this.config.expect?.max === 'number') {
-        this.annotations.push({
-          name: 'expect.max',
-          token: dummyToken,
-          args: [num(this.config.expect.max)],
-        })
-      }
-      if (this.config.expect?.int === true) {
-        this.annotations.push({
-          name: 'expect.int',
-          token: dummyToken,
-          args: [],
-        })
-      }
-    }
-    if (this.type === 'boolean') {
-      if (this.config.expect?.required === true) {
-        this.annotations.push({
-          name: 'meta.required',
-          token: dummyToken,
-          args: [],
-        })
+      } else {
+        this.annotations.push(toAnnotationTokens(name, value, spec))
       }
     }
   }
@@ -162,6 +113,35 @@ export class SemanticPrimitiveNode extends SemanticNode {
     s += this.renderChildren()
     return indent + s.split('\n').join(`\n${indent}`)
   }
+}
+
+function toAnnotationTokens(
+  name: string,
+  value: boolean | string | number | Record<string, string | number | boolean>,
+  spec?: AnnotationSpec
+): TAnnotationTokens {
+  if (typeof value === 'boolean') {
+    return { name, token: dummyToken, args: [] }
+  }
+  if (typeof value === 'string') {
+    return { name, token: dummyToken, args: [text(value)] }
+  }
+  if (typeof value === 'number') {
+    return { name, token: dummyToken, args: [num(value)] }
+  }
+  // Object with named args → map by spec argument names (ordered, positional)
+  const argNames = spec?.arguments.map(a => a.name) ?? Object.keys(value)
+  const raw: (Token | undefined)[] = argNames.map(argName => {
+    const v = value[argName]
+    if (v === undefined) return undefined
+    return typeof v === 'number' ? num(v) : text(String(v))
+  })
+  // Trim trailing undefined entries, then fill inner gaps with empty-string tokens
+  while (raw.length > 0 && raw[raw.length - 1] === undefined) {
+    raw.pop()
+  }
+  const args: Token[] = raw.map(t => t ?? text(''))
+  return { name, token: dummyToken, args }
 }
 
 const dummyToken = new Token({

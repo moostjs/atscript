@@ -333,6 +333,7 @@ export default defineConfig({
           { text: 'Moost Validator', link: '/packages/moost-validator/' },
         ],
       },
+      { text: 'DB Support', link: '/db-support/' },
       { text: 'VSCode', link: '/packages/vscode/' },
       {
         text: 'Plugins',
@@ -391,6 +392,23 @@ export default defineConfig({
             { text: 'Custom Annotations', link: '/packages/typescript/custom-annotations' },
           ],
         },
+      ],
+
+      '/db-support/': [
+        {
+          text: 'DB Support',
+          items: [
+            { text: 'Overview', link: '/db-support/' },
+            { text: 'Future Features', link: '/db-support/future-features' },
+          ],
+        },
+        // {
+        //   text: 'Databases',
+        //   items: [
+        //     { text: 'MongoDB', link: '/packages/mongo/' },
+        //     { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
+        //   ],
+        // },
       ],
 
       '/packages/mongo/': [

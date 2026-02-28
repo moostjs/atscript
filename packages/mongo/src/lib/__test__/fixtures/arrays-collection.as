@@ -1,35 +1,36 @@
-@mongo.collection 'arrays'
+@db.table 'arrays'
+@db.mongo.collection
 export interface ArraysCollection {
     primitive: string[]
 
     primitiveComplex: (number | string)[]
-    
+
     withKey: {
-        @meta.isKey
+        @expect.array.key
         key1: string
-        @meta.isKey
+        @expect.array.key
         key2: string
         value: string
         attribute: string
     }[]
 
-    @mongo.patch.strategy 'merge'
+    @db.mongo.patch.strategy 'merge'
     withKeyMerge: {
-        @meta.isKey
+        @expect.array.key
         key1: string
-        @meta.isKey
+        @expect.array.key
         key2: string
         value: string
         attribute: string
     }[]
-    
+
     withoutKey: {
         key: string
         value: string
         attribute?: string
     }[]
 
-    @mongo.patch.strategy 'merge'
+    @db.mongo.patch.strategy 'merge'
     withoutKeyMerge: {
         key: string
         value: string

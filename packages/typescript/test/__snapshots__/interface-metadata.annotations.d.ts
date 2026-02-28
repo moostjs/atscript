@@ -13,7 +13,7 @@ export {}
 declare global {
   interface AtscriptMetadata {
     "meta.label": string
-    "meta.id": string | true
+    "meta.id": boolean
     "meta.description": string
     "meta.documentation": (string)[]
     "meta.placeholder": string
@@ -22,14 +22,23 @@ declare global {
     "meta.required": { message?: string }
     "meta.default": string
     "meta.example": string
-    "meta.isKey": boolean
     "expect.minLength": { length: number, message?: string }
     "expect.maxLength": { length: number, message?: string }
     "expect.min": { minValue: number, message?: string }
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
+    "expect.array.key": boolean
     "emit.jsonSchema": boolean
+    "db.table": string | true
+    "db.schema": string
+    "db.index.plain": ({ name?: string, sort?: string })[]
+    "db.index.unique": (string | true)[]
+    "db.index.fulltext": (string | true)[]
+    "db.column": string
+    "db.default.value": string
+    "db.default.fn": string
+    "db.ignore": boolean
     label: string
     labelOptional: string | true
     mul: (number)[]
@@ -42,6 +51,6 @@ declare global {
     id: string
     "bool.flag": boolean
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
 }
 // prettier-ignore-end

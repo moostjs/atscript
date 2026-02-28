@@ -1,7 +1,5 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
-import { isPrimitive, isRef } from '../parser/nodes'
-import type { TMessages } from '../parser/types'
 
 export const metaAnnotations: TAnnotationsTree = {
   label: new AnnotationSpec({
@@ -21,18 +19,14 @@ export const metaAnnotations: TAnnotationsTree = {
 
   id: new AnnotationSpec({
     description:
-      'Marks a field as a unique identifier across multiple domains (DB, API, UI, logs).' +
+      'Marks a field as a unique identifier across multiple domains (DB, API, UI, logs). ' +
+      'Multiple fields can be annotated with `@meta.id` to form a composite primary key.' +
       '\n\n**Example:**' +
       '```atscript' +
-      '@meta.id "userId"' +
+      '@meta.id' +
       'id: string' +
       '```',
-    argument: {
-      optional: true,
-      name: 'name',
-      type: 'string',
-      description: 'Custom identifier name (defaults to property name if omitted).',
-    },
+    nodeType: ['prop'],
   }),
 
   description: new AnnotationSpec({
@@ -179,54 +173,4 @@ export const metaAnnotations: TAnnotationsTree = {
     },
   }),
 
-  isKey: new AnnotationSpec({
-    description:
-      'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +
-      '\n\n**Example:**\n' +
-      '```atscript\n' +
-      'export interface User {\n' +
-      '  id: string\n' +
-      '  profiles: {\n' +
-      '    @meta.isKey\n' +
-      '    profileId: string\n' +
-      '    name: string\n' +
-      '  }[]\n' +
-      '}\n' +
-      '```\n',
-    nodeType: ['prop', 'type'],
-    multiple: false,
-    validate(token, args, doc) {
-      const field = token.parentNode!
-      const errors = [] as TMessages
-      const isOptional = !!field.token('optional')
-      if (isOptional) {
-        errors.push({
-          message: `@meta.isKey can't be optional`,
-          severity: 1,
-          range: field.token('identifier')!.range,
-        })
-      }
-      const definition = field.getDefinition()
-      if (!definition) {
-        return errors
-      }
-      let wrongType = false
-      if (isRef(definition)) {
-        const def = doc.unwindType(definition.id!, definition.chain)?.def
-        if (isPrimitive(def) && !['string', 'number'].includes(def.config.type as string)) {
-          wrongType = true
-        }
-      } else {
-        wrongType = true
-      }
-      if (wrongType) {
-        errors.push({
-          message: `@meta.isKey must be of type string or number`,
-          severity: 1,
-          range: token.range,
-        })
-      }
-      return errors
-    },
-  }),
 }

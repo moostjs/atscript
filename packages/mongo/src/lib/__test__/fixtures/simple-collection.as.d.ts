@@ -11,7 +11,7 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
 
 /**
  * Atscript interface **SimpleCollection**
- * @see {@link ./simple-collection.as:2:18}
+ * @see {@link ./simple-collection.as:3:18}
  */
 export declare class SimpleCollection {
   name: string
@@ -53,7 +53,7 @@ export declare class SimpleCollection {
 
 /**
  * Atscript interface **MinimalCollection**
- * @see {@link ./simple-collection.as:35:18}
+ * @see {@link ./simple-collection.as:37:18}
  */
 export declare class MinimalCollection {
   name: string
@@ -70,7 +70,7 @@ export declare class MinimalCollection {
 
 /**
  * Atscript interface **MinimalCollectionString**
- * @see {@link ./simple-collection.as:40:18}
+ * @see {@link ./simple-collection.as:43:18}
  */
 export declare class MinimalCollectionString {
   _id: string

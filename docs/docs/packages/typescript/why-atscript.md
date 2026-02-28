@@ -55,16 +55,17 @@ const userFormFields = {
 
 ```atscript
 // user.as - Everything in one place!
-@mongo.collection 'users'
+@db.table 'users'
+@db.mongo.collection
 export interface User {
     @meta.label 'User Email'
-    @mongo.index.unique 'email_idx'
+    @db.index.unique 'email_idx'
     email: string.email
 
     @meta.label 'Full Name'
     @expect.minLength 2
     @expect.maxLength 100
-    @mongo.index.text 5
+    @db.mongo.index.text 5
     name: string
 
     @meta.label 'Age'
@@ -74,7 +75,7 @@ export interface User {
     age: number
 
     @meta.label 'Account Status'
-    @mongo.index.plain 'status_idx'
+    @db.index.plain 'status_idx'
     isActive: boolean
 }
 ```

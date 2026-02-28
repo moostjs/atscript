@@ -3,7 +3,7 @@ export {}
 declare global {
   interface AtscriptMetadata {
     'meta.label': string
-    'meta.id': string | true
+    'meta.id': boolean
     'meta.description': string
     'meta.documentation': string[]
     'meta.placeholder': string

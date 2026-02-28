@@ -7,7 +7,7 @@ Atscript plugins extend the language with custom primitives, annotations, and co
 | Capability                       | Hook           | Example                                     |
 | -------------------------------- | -------------- | ------------------------------------------- |
 | Add semantic types (primitives)  | `config()`     | `mongo.objectId`, `mongo.vector`            |
-| Define annotation specs          | `config()`     | `@mongo.collection`, `@mongo.index.unique`  |
+| Define annotation specs          | `config()`     | `@db.mongo.collection`, `@db.index.unique`  |
 | Remap or virtualize module paths | `resolve()`    | Path aliases, virtual modules               |
 | Provide virtual file content     | `load()`       | Synthetic `.as` modules                     |
 | Post-process parsed documents    | `onDocument()` | Inject virtual props, run custom checks     |

@@ -14,7 +14,8 @@ export interface User {
 ### Nested & Annotations
 
 ```atscript
-@mongo.collection 'users'
+@db.table 'users'
+@db.mongo.collection
 export interface User {
     id: string
     profile: {
@@ -107,7 +108,8 @@ interface Post {
 ```atscript
 import { Address } from './address'
 
-@mongo.collection 'users'
+@db.table 'users'
+@db.mongo.collection
 export interface User {
     @meta.id
     _id: mongo.objectId

@@ -11,7 +11,7 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
 
 /**
  * Atscript interface **FlattenTest**
- * @see {@link ./flatten-test.as:2:18}
+ * @see {@link ./flatten-test.as:3:18}
  */
 export declare class FlattenTest {
   level0: string

@@ -83,9 +83,9 @@ export class AsCollection<
     if (!isAnnotatedType(_type)) {
       throw new Error('Atscript Annotated Type expected')
     }
-    const name = _type.metadata.get('mongo.collection') as string
+    const name = _type.metadata.get('db.table') as string
     if (!name) {
-      throw new Error('@mongo.collection annotation expected with collection name')
+      throw new Error('@db.table annotation expected with collection name')
     }
     if (_type.type.kind !== 'object') {
       throw new Error('Mongo collection must be an object type')
@@ -268,7 +268,7 @@ export class AsCollection<
 
   protected _prepareIndexesForCollection() {
     const typeMeta = this.type.metadata
-    const dynamicText = typeMeta.get('mongo.search.dynamic')
+    const dynamicText = typeMeta.get('db.mongo.search.dynamic')
     if (dynamicText) {
       this._setSearchIndex('dynamic_text', '_', {
         mappings: { dynamic: true },
@@ -276,7 +276,7 @@ export class AsCollection<
         text: { fuzzy: { maxEdits: dynamicText.fuzzy || 0 } },
       })
     }
-    for (const textSearch of typeMeta.get('mongo.search.static') || []) {
+    for (const textSearch of typeMeta.get('db.mongo.search.static') || []) {
       this._setSearchIndex('search_text', textSearch.indexName, {
         mappings: { fields: {} },
         analyzer: textSearch.analyzer,
@@ -312,20 +312,30 @@ export class AsCollection<
   }
 
   protected _prepareIndexesForField(fieldName: string, metadata: TMetadataMap<AtscriptMetadata>) {
-    for (const index of metadata.get('mongo.index.plain') || []) {
-      this._addIndexField('plain', index === true ? fieldName : index, fieldName)
+    // Core @db.index.plain — metadata shape: array of { name?, sort? } | true
+    for (const index of metadata.get('db.index.plain') || []) {
+      const name = index === true ? fieldName : (index.name || fieldName)
+      this._addIndexField('plain', name, fieldName)
     }
-    for (const index of metadata.get('mongo.index.unique') || []) {
-      this._addIndexField('unique', index === true ? fieldName : index, fieldName)
+    // Core @db.index.unique — metadata shape: array of { name? } | true
+    for (const index of metadata.get('db.index.unique') || []) {
+      const name = index === true ? fieldName : (index.name || fieldName)
+      this._addIndexField('unique', name, fieldName)
     }
-    const textWeight = metadata.get('mongo.index.text')
+    // Core @db.index.fulltext (no weight arg → always weight 1)
+    for (const index of metadata.get('db.index.fulltext') || []) {
+      const name = index === true ? '' : (index.name || '')
+      this._addIndexField('text', name, fieldName, 1)
+    }
+    // Mongo-specific @db.mongo.index.text (has weight arg)
+    const textWeight = metadata.get('db.mongo.index.text')
     if (textWeight) {
       this._addIndexField('text', '', fieldName, textWeight === true ? 1 : textWeight)
     }
-    for (const index of metadata.get('mongo.search.text') || []) {
+    for (const index of metadata.get('db.mongo.search.text') || []) {
       this._addFieldToSearchIndex('search_text', index.indexName, fieldName, index.analyzer)
     }
-    const vectorIndex = metadata.get('mongo.search.vector')
+    const vectorIndex = metadata.get('db.mongo.search.vector')
     if (vectorIndex) {
       this._setSearchIndex('vector', vectorIndex.indexName || fieldName, {
         fields: [
@@ -338,7 +348,7 @@ export class AsCollection<
         ],
       })
     }
-    for (const index of metadata.get('mongo.search.filter') || []) {
+    for (const index of metadata.get('db.mongo.search.filter') || []) {
       this._vectorFilters.set(indexKey('vector', index.indexName), fieldName)
     }
   }
@@ -347,7 +357,7 @@ export class AsCollection<
     if (!this._flatMap) {
       this._prepareIndexesForCollection()
       this._flatMap = flattenAnnotatedType(this.type, {
-        topLevelArrayTag: 'mongo.__topLevelArray',
+        topLevelArrayTag: 'db.mongo.__topLevelArray',
         excludePhantomTypes: true,
         onField: (path, _type, metadata) => this._prepareIndexesForField(path, metadata),
       })

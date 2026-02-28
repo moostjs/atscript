@@ -1,13 +1,15 @@
-@mongo.collection 'IdPlugin'
+@db.table 'IdPlugin'
+@db.mongo.collection
 export interface IdPlugin {
     _id: mongo.objectId
 }
 
-@mongo.collection 'UniqueItems'
+@db.table 'UniqueItems'
+@db.mongo.collection
 export interface UniqueItems {
     str?: string[]
 
-    @mongo.array.uniqueItems
+    @db.mongo.array.uniqueItems
     strUnique?: string[]
 
     obj?: {
@@ -15,15 +17,15 @@ export interface UniqueItems {
         b: string
     }[]
 
-    @mongo.array.uniqueItems
+    @db.mongo.array.uniqueItems
     objUnique?: {
         a: string
         b: string
     }[]
 
-    @mongo.array.uniqueItems
+    @db.mongo.array.uniqueItems
     kObj?: {
-        @meta.isKey
+        @expect.array.key
         a: string
         b: string
     }[]

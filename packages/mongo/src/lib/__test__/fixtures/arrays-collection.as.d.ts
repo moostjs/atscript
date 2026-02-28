@@ -11,7 +11,7 @@ import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAt
 
 /**
  * Atscript interface **ArraysCollection**
- * @see {@link ./arrays-collection.as:2:18}
+ * @see {@link ./arrays-collection.as:3:18}
  */
 export declare class ArraysCollection {
   primitive: string[]

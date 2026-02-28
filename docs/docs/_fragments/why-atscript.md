@@ -21,11 +21,12 @@ This scattering leads to:
 Atscript brings order to this chaos by providing a single place to define:
 
 ```atscript
-@mongo.collection 'users'
+@db.table 'users'
+@db.mongo.collection
 @meta.description 'User entity for our application'
 export interface User {
     @meta.id
-    @mongo.index.unique 'email_idx'
+    @db.index.unique 'email_idx'
     @meta.label 'User Email'
     @meta.description 'Primary contact email'
     email: string.email
@@ -33,7 +34,7 @@ export interface User {
     @meta.label 'Full Name'
     @expect.minLength 2
     @expect.maxLength 100
-    @mongo.index.text 5
+    @db.mongo.index.text 5
     name: string
 
     @meta.label 'Age'
@@ -44,7 +45,7 @@ export interface User {
 
     @meta.label 'Account Status'
     @meta.documentation 'Indicates if the user can access the system'
-    @mongo.index.plain 'status_idx'
+    @db.index.plain 'status_idx'
     isActive: boolean
 }
 ```
@@ -72,7 +73,8 @@ Atscript uses annotations to attach any kind of metadata:
 
 - `@meta.*` - Human-readable information
 - `@expect.*` - Validation constraints
-- `@mongo.*` - Database-specific configuration
+- `@db.*` - Database configuration (tables, indexes)
+- `@db.mongo.*` - MongoDB-specific configuration
 - `@your.custom` - Whatever your project needs
 
 ### 3. Language Agnostic

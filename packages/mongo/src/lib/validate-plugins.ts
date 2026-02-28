@@ -15,7 +15,7 @@ export const validateMongoIdPlugin: TValidatorPlugin = (ctx, def, value) => {
 }
 
 export const validateMongoUniqueArrayItemsPlugin: TValidatorPlugin = (ctx, def, value) => {
-  if (def.metadata.has('mongo.array.uniqueItems') && def.type.kind === 'array') {
+  if (def.metadata.has('db.mongo.array.uniqueItems') && def.type.kind === 'array') {
     if (Array.isArray(value)) {
       const separator = '▼↩'
       const seen = new Set<string>()

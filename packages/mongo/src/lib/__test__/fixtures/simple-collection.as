@@ -1,4 +1,5 @@
-@mongo.collection 'simple'
+@db.table 'simple'
+@db.mongo.collection
 export interface SimpleCollection {
     name: string
     active: boolean
@@ -6,7 +7,7 @@ export interface SimpleCollection {
     tags?: string[]
     age: number
 
-    @mongo.patch.strategy 'replace'
+    @db.mongo.patch.strategy 'replace'
     address: {
         line1: string
         line2?: string
@@ -15,28 +16,30 @@ export interface SimpleCollection {
         zip: string
     }
 
-    @mongo.patch.strategy 'merge'
+    @db.mongo.patch.strategy 'merge'
     contacts: {
         email: string
         phone: string
     }
 
-    @mongo.patch.strategy 'merge'
+    @db.mongo.patch.strategy 'merge'
     nested?: {
-        @mongo.patch.strategy 'replace'
+        @db.mongo.patch.strategy 'replace'
         nested1?: { a?: number, b?: string }
 
-        @mongo.patch.strategy 'merge'
+        @db.mongo.patch.strategy 'merge'
         nested2?: { c?: number, d?: string }
     }
 }
 
-@mongo.collection 'minimal'
+@db.table 'minimal'
+@db.mongo.collection
 export interface MinimalCollection {
     name: string
 }
 
-@mongo.collection 'minimal-string'
+@db.table 'minimal-string'
+@db.mongo.collection
 export interface MinimalCollectionString {
     _id: string
     name: string

@@ -20,7 +20,11 @@ primitives.set(
     extensions: {
       email: {
         type: 'string',
-        expect: { pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}$' },
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,4}$',
+          },
+        },
       },
     },
   })
@@ -30,8 +34,8 @@ primitives.set(
   new SemanticPrimitiveNode('number', {
     type: 'number',
     extensions: {
-      int: { type: 'number', expect: { int: true } },
-      positive: { type: 'number', expect: { min: 0 } },
+      int: { type: 'number', annotations: { 'expect.int': true } },
+      positive: { type: 'number', annotations: { 'expect.min': 0 } },
     },
   })
 )
@@ -358,7 +362,7 @@ describe('document', () => {
     expect(str?.def).toBeDefined()
     expect(str?.def.entity).toEqual('primitive')
     if (isPrimitive(str?.def)) {
-      expect(str.def.config.expect).toHaveProperty('pattern')
+      expect(str.def.config.annotations).toHaveProperty('expect.pattern')
       expect(str.def.annotations).toHaveLength(1)
       expect(str.def.annotations?.[0]?.name).toBe('expect.pattern')
     }
@@ -367,7 +371,7 @@ describe('document', () => {
     expect(num?.def).toBeDefined()
     expect(num?.def.entity).toEqual('primitive')
     if (isPrimitive(num?.def)) {
-      expect(num.def.config.expect).toHaveProperty('int')
+      expect(num.def.config.annotations).toHaveProperty('expect.int')
       expect(num.def.annotations).toHaveLength(1)
       expect(num.def.annotations?.[0]?.name).toBe('expect.int')
     }

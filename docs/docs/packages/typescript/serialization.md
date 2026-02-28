@@ -56,7 +56,7 @@ Use `TSerializeOptions` to control which annotations are included in the output.
 
 ```typescript
 const serialized = serializeAnnotatedType(Product, {
-  ignoreAnnotations: ['mongo.collection', 'mongo.index.unique'],
+  ignoreAnnotations: ['db.table', 'db.mongo.collection'],
 })
 ```
 
@@ -93,7 +93,7 @@ import { serializeAnnotatedType } from '@atscript/typescript/utils'
 
 app.get('/api/form/user', (req, res) => {
   const schema = serializeAnnotatedType(User, {
-    ignoreAnnotations: ['mongo.collection'], // strip server-only metadata
+    ignoreAnnotations: ['db.table', 'db.mongo.collection'], // strip server-only metadata
   })
   res.json(schema)
 })

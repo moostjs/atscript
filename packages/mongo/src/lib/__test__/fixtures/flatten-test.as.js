@@ -96,9 +96,10 @@ $("object", FlattenTest)
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")
-      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  flags: "",  }, true)
+      .annotate("expect.pattern", { pattern: "^[a-fA-F0-9]{24}$",  }, true)
       .$type
   )
-  .annotate("mongo.collection", "flatten-test")
+  .annotate("db.table", "flatten-test")
+  .annotate("db.mongo.collection", true)
 
 // prettier-ignore-end

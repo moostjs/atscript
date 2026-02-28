@@ -13,7 +13,7 @@ export {}
 declare global {
   interface AtscriptMetadata {
     "meta.label": string
-    "meta.id": string | true
+    "meta.id": boolean
     "meta.description": string
     "meta.documentation": (string)[]
     "meta.placeholder": string
@@ -22,27 +22,34 @@ declare global {
     "meta.required": { message?: string }
     "meta.default": string
     "meta.example": string
-    "meta.isKey": boolean
     "expect.minLength": { length: number, message?: string }
     "expect.maxLength": { length: number, message?: string }
     "expect.min": { minValue: number, message?: string }
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
+    "expect.array.key": boolean
     "emit.jsonSchema": boolean
-    "mongo.collection": string
-    "mongo.autoIndexes": boolean
-    "mongo.index.plain": (string | true)[]
-    "mongo.index.unique": (string | true)[]
-    "mongo.index.text": number | true
-    "mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
-    "mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
-    "mongo.search.text": ({ analyzer?: string, indexName?: string })[]
-    "mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
-    "mongo.search.filter": ({ indexName: string })[]
-    "mongo.patch.strategy": string
-    "mongo.array.uniqueItems": boolean
+    "db.table": string | true
+    "db.schema": string
+    "db.index.plain": ({ name?: string, sort?: string })[]
+    "db.index.unique": (string | true)[]
+    "db.index.fulltext": (string | true)[]
+    "db.column": string
+    "db.default.value": string
+    "db.default.fn": string
+    "db.ignore": boolean
+    "db.mongo.collection": boolean
+    "db.mongo.autoIndexes": boolean
+    "db.mongo.index.text": number | true
+    "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
+    "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
+    "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]
+    "db.mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
+    "db.mongo.search.filter": ({ indexName: string })[]
+    "db.mongo.patch.strategy": string
+    "db.mongo.array.uniqueItems": boolean
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
 }
 // prettier-ignore-end

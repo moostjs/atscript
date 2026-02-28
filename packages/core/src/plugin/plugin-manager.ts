@@ -36,7 +36,10 @@ export class PluginManager {
       if (raw?.primitives) {
         this._docConfig.primitives = this._docConfig.primitives || new Map()
         for (const [key, value] of Object.entries(raw.primitives)) {
-          this._docConfig.primitives.set(key, new SemanticPrimitiveNode(key, value))
+          this._docConfig.primitives.set(
+            key,
+            new SemanticPrimitiveNode(key, value, '', raw.annotations)
+          )
         }
       }
       if (raw?.annotations) {
