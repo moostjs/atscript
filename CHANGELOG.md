@@ -1,3 +1,12 @@
+## [0.1.28](https://github.com/moostjs/atscript/compare/v0.1.27...v0.1.28) (2026-02-28)
+
+
+### Features
+
+* add db integrations (experimental) ([49178ce](https://github.com/moostjs/atscript/commit/49178ce09a884e19620c524f773c7c189710d2f6))
+
+
+
 ## [0.1.27](https://github.com/moostjs/atscript/compare/v0.1.26...v0.1.27) (2026-02-26)
 
 
