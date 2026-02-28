@@ -16,3 +16,4 @@ TODO.md
 .vitepress/dist
 .vitepress/cache
 cache
+.specs
