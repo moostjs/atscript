@@ -6,7 +6,7 @@ declare global {
     'meta.id': boolean
     'meta.description': string
     'meta.documentation': string[]
-    'meta.placeholder': string
+
     'meta.sensitive': boolean
     'meta.readonly': boolean
     'expect.minLength': { length: number; message?: string }

@@ -15,7 +15,7 @@ Read the domain file that matches the task. Do not load all files — only what 
 | ------------------------ | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | Setup & configuration    | [core.md](core.md)               | Installing, configuring `atscript.config.ts`, using the `tsPlugin`, running the CLI         |
 | `.as` file syntax        | [syntax.md](syntax.md)           | Writing `.as` files — interfaces, types, imports/exports, property syntax                   |
-| Annotations & primitives | [annotations.md](annotations.md) | Using built-in `@meta.*`/`@expect.*` annotations, defining custom annotations or primitives |
+| Annotations & primitives | [annotations.md](annotations.md) | Using built-in `@meta.*`/`@expect.*`/`@ui.*`/`@db.*` annotations, defining custom annotations or primitives |
 | Code generation          | [codegen.md](codegen.md)         | Understanding what `.d.ts` and `.js` files are generated, `atscript.d.ts` global types      |
 | Runtime type system      | [runtime.md](runtime.md)         | Reading/writing metadata, walking type definitions, understanding `TAtscriptAnnotatedType`  |
 | Validation               | [validation.md](validation.md)   | Validating data, type guards, error handling, custom validator plugins                      |

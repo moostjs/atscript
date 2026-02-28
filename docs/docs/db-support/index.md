@@ -1,197 +1,126 @@
-# DB Support
+# DB Integrations Guide
 
-Atscript provides a layered annotation system for database integration. Generic annotations under the `@db.*` namespace cover concepts shared across all databases, while database-specific plugins add their own annotations under namespaces like `@db.mongo.*`.
+::: warning Experimental
+DB Integrations are experimental. APIs may change at any moment.
+:::
 
-## Design Philosophy
+Atscript provides a database abstraction layer that turns annotated `.as` interfaces into fully functional database tables — with CRUD operations, validation, index management, and more — all driven by annotations.
 
-Database metadata in Atscript follows two principles:
+## How It Works
 
-1. **Generic first** — Common concepts (table names, indexes, column mappings) are defined once in `@db.*` and work with any database plugin.
-2. **Specific when needed** — Database-specific features (MongoDB's `_id` auto-injection, Atlas Search indexes, patch strategies) live in dedicated sub-namespaces like `@db.mongo.*`.
+The DB integration stack has three layers:
 
-This means a single `.as` file can describe a data model that works with multiple databases, while still using database-specific features where needed.
+1. **Annotations** — `@db.*` annotations in your `.as` files declare table names, indexes, column mappings, defaults, and ignored fields. These are provided by `@atscript/core` and work with any database.
 
-## Core `@db.*` Annotations
+2. **Abstraction layer** (`@atscript/utils-db`) — The `AtscriptDbTable` class reads annotations from your types and provides a unified CRUD interface. The `BaseDbAdapter` abstract class defines what each database driver must implement.
 
-These annotations are provided by Atscript core and are available to all database plugins.
+3. **Database adapters** — Concrete adapter packages (like `@atscript/db-sqlite`) implement the `BaseDbAdapter` for a specific database engine.
 
-| Annotation | Level | Arguments | Purpose |
-|------------|-------|-----------|---------|
-| `@db.table` | interface | `name` (string) | Names the database table or collection |
-| `@db.schema` | interface | `name` (string) | Database schema (e.g. PostgreSQL schemas) |
-| `@db.index.plain` | field | `name?`, `sort?` | Standard index; shared names create compound indexes |
-| `@db.index.unique` | field | `name?` | Unique constraint index |
-| `@db.index.fulltext` | field | `name?` | Fulltext search index |
-| `@db.column` | field | `name` (string) | Override the database column/field name |
-| `@db.default.value` | field | `value` (string) | Static default value |
-| `@db.default.fn` | field | `fn` (string) | Database function for default value |
-| `@db.ignore` | field | — | Exclude field from database operations |
+```
+┌─────────────────────────────────┐
+│  .as file with @db.* annotations│
+└──────────────┬──────────────────┘
+               │
+┌──────────────▼──────────────────┐
+│  AtscriptDbTable                │
+│  (reads annotations, validates, │
+│   maps columns, applies defaults│
+│   delegates CRUD to adapter)    │
+└──────────────┬──────────────────┘
+               │
+┌──────────────▼──────────────────┐
+│  BaseDbAdapter (abstract)       │
+│  ├─ SqliteAdapter               │
+│  ├─ MongoAdapter (planned)      │
+│  └─ PostgresAdapter (planned)   │
+└─────────────────────────────────┘
+```
 
-### `@db.table`
+## Quick Example
 
-Names the database table or collection. This is the primary annotation that marks an interface as a database entity.
+Define a table in Atscript:
 
 ```atscript
 @db.table 'users'
 export interface User {
-    name: string
-    email: string.email
-}
-```
+    @db.id
+    id: number
 
-The name argument is the table/collection name used by the database driver.
-
-### `@db.index.plain`
-
-Creates a standard index on a field. Fields sharing the same index name form a compound index.
-
-```atscript
-@db.table 'products'
-export interface Product {
-    @db.index.plain 'category_status'
-    category: string
-
-    @db.index.plain 'category_status'
-    status: string
-
-    @db.index.plain
-    sku: string
-}
-```
-
-Arguments: `name?` (optional index name), `sort?` (sort direction).
-
-### `@db.index.unique`
-
-Creates a unique index, enforcing that no two documents share the same value.
-
-```atscript
-@db.table 'users'
-export interface User {
     @db.index.unique 'email_idx'
-    email: string.email
+    @db.column 'email_address'
+    email: string
 
-    name: string
-}
-```
-
-### `@db.index.fulltext`
-
-Creates a fulltext search index for text-based searching.
-
-```atscript
-@db.table 'articles'
-export interface Article {
-    @db.index.fulltext
-    title: string
-
-    @db.index.fulltext
-    body: string
-}
-```
-
-### `@db.column`
-
-Overrides the field name used in the database. The Atscript property name is used in code, while the column name is used in the database.
-
-```atscript
-@db.table 'users'
-export interface User {
-    @db.column 'full_name'
-    name: string
-}
-```
-
-### `@db.default.value` / `@db.default.fn`
-
-Sets default values for fields.
-
-```atscript
-@db.table 'posts'
-export interface Post {
-    @db.default.value 'draft'
+    @db.default.value 'active'
     status: string
-
-    @db.default.fn 'now()'
-    createdAt: string.isoDate
-}
-```
-
-### `@db.ignore`
-
-Excludes a field from database operations. The field exists in the type but is not persisted.
-
-```atscript
-@db.table 'users'
-export interface User {
-    name: string
 
     @db.ignore
-    temporaryToken?: string
+    displayName?: string
 }
 ```
 
-### `@db.schema`
+Use it in TypeScript:
 
-Specifies a database schema name (for databases that support schemas like PostgreSQL).
+```typescript
+import { AtscriptDbTable } from '@atscript/utils-db'
+import { SqliteAdapter } from '@atscript/db-sqlite'
+import { BetterSqlite3Driver } from '@atscript/db-sqlite'
+import UserMeta from './user.as.js'
 
-```atscript
-@db.table 'users'
-@db.schema 'auth'
-export interface User {
-    name: string
-}
+// Create adapter and table
+const driver = new BetterSqlite3Driver('myapp.db')
+const adapter = new SqliteAdapter(driver)
+const users = new AtscriptDbTable(UserMeta, adapter)
+
+// Create table and sync indexes
+await users.ensureTable()
+await users.syncIndexes()
+
+// Insert
+await users.insertOne({ id: 1, email: 'alice@example.com' })
+// → status defaults to 'active', displayName is stripped
+
+// Query
+const user = await users.findOne({ email: 'alice@example.com' })
+
+// Update
+await users.updateOne({ id: 1, status: 'inactive' })
+
+// Delete
+await users.deleteOne({ id: 1 })
 ```
 
-## Database-Specific Plugins
+## What's in This Section
 
-Each database plugin extends the `@db.*` namespace with its own annotations:
+| Page | Description |
+|------|-------------|
+| [Core Annotations](./annotations) | Reference for all `@db.*` annotations |
+| [DB Tables](./db-table) | Working with `AtscriptDbTable` — the main entry point |
+| [Database Adapters](./adapters) | The `BaseDbAdapter` interface and how to create adapters |
+| [Queries & Filters](./queries) | Filter syntax, sorting, projection, and pagination |
+| [Patch Operations](./patch-operations) | Array-level patch operations (`$insert`, `$upsert`, `$remove`, etc.) |
+| [Future Features](./future-features) | Phase 2 roadmap: relations, views, query expressions |
 
-| Plugin | Namespace | Package |
-|--------|-----------|---------|
-| MongoDB | `@db.mongo.*` | `@atscript/mongo` |
+## Not an ORM
 
-### MongoDB (`@db.mongo.*`)
+Atscript's data layer is **not** an ORM — it's something broader. An ORM's entire job is mapping objects to database tables. Atscript's job is being the single source of truth for *everything* about your data: types, validation, database schemas, UI metadata, API contracts, and documentation.
 
-The MongoDB plugin adds annotations for MongoDB-specific features. See the [MongoDB documentation](/packages/mongo/) for full details.
+The database layer is one capability among many. Where an ORM stops at the database, Atscript keeps going — the same `.as` file that creates your table also generates TypeScript types, runtime validators, JSON Schema, and rich metadata for form generation.
 
-Key annotations:
+| | Traditional ORM | Atscript |
+|---|---|---|
+| **Scope** | Database only | Types + validation + DB + metadata + API schemas |
+| **Schema source** | ORM-specific model classes | Language-agnostic `.as` files |
+| **Validation** | Separate library (Zod, Joi, etc.) | Built into the type system |
+| **UI metadata** | Manual config | Annotations on the same type |
+| **Multi-database** | Usually one DB engine | Same `.as` file, swap the adapter |
+| **Multi-language** | One language | Designed for any language target |
 
-- `@db.mongo.collection` — Optional; auto-injects `_id: mongo.objectId` if missing
-- `@db.mongo.index.text weight` — Text index with weight (extends `@db.index.fulltext` with weight support)
-- `@db.mongo.search.*` — Atlas Search index definitions
-- `@db.mongo.patch.strategy` — Controls update behavior for objects and arrays
-- `@db.mongo.array.uniqueItems` — Enforces set-semantics on array insertions
+As the data layer matures (relations, joins, migrations are [on the roadmap](./future-features)), it will cover most ORM capabilities — but it will always be one part of a larger system. Think of it as an **annotation-driven data layer** inside a universal type definition language.
 
-Example combining core and MongoDB annotations:
+## Available Adapters
 
-```atscript
-@db.table 'users'
-@db.mongo.collection
-export interface User {
-    @db.index.unique 'email_idx'
-    email: string.email
-
-    @db.mongo.index.text 5
-    name: string
-
-    @db.index.plain 'status_idx'
-    isActive: boolean
-
-    @db.mongo.patch.strategy 'merge'
-    profile: {
-        bio?: string
-        avatar?: string
-    }
-}
-```
-
-## Adding Database Support
-
-Database plugins are regular Atscript plugins that contribute annotations under the `@db.*` namespace. To create support for a new database:
-
-1. Define your annotations in the `db.yourdb.*` namespace
-2. Read core `@db.*` metadata in your runtime code
-3. Add database-specific annotations for features not covered by core
-
-See [Creating a Plugin](/plugin-development/) for the full plugin development guide.
+| Adapter | Package | Status |
+|---------|---------|--------|
+| [SQLite](/db-sqlite/) | `@atscript/db-sqlite` | Experimental |
+| MongoDB | `@atscript/mongo` | Planned |
+| PostgreSQL | — | Planned |

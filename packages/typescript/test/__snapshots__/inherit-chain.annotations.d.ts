@@ -16,7 +16,6 @@ declare global {
     "meta.id": boolean
     "meta.description": string
     "meta.documentation": (string)[]
-    "meta.placeholder": string
     "meta.sensitive": boolean
     "meta.readonly": boolean
     "meta.required": { message?: string }
@@ -39,6 +38,19 @@ declare global {
     "db.default.value": string
     "db.default.fn": string
     "db.ignore": boolean
+    "ui.placeholder": string
+    "ui.component": string
+    "ui.hidden": boolean
+    "ui.group": string
+    "ui.order": number
+    "ui.width": string
+    "ui.icon": string
+    "ui.hint": string
+    "ui.disabled": boolean
+    "ui.type": string
+    "ui.attr": ({ key: string, value: string })[]
+    "ui.class": (string)[]
+    "ui.style": (string)[]
     label: string
     labelOptional: string | true
     mul: (number)[]

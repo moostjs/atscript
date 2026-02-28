@@ -56,7 +56,6 @@ const userFormFields = {
 ```atscript
 // user.as - Everything in one place!
 @db.table 'users'
-@db.mongo.collection
 export interface User {
     @meta.label 'User Email'
     @db.index.unique 'email_idx'
@@ -65,7 +64,7 @@ export interface User {
     @meta.label 'Full Name'
     @expect.minLength 2
     @expect.maxLength 100
-    @db.mongo.index.text 5
+    @db.index.fulltext 'search_idx'
     name: string
 
     @meta.label 'Age'
@@ -84,11 +83,12 @@ Then use it in TypeScript:
 
 ```typescript
 import { User } from './user.as'
+import { AtscriptDbTable } from '@atscript/utils-db'
+import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
+import UserMeta from './user.as.js'
 
 // Type checking
-const user: User = {
-  /* ... */
-}
+const user: User = { /* ... */ }
 
 // Validation
 const validator = User.validator()
@@ -97,11 +97,15 @@ validator.validate(userData)
 // Access metadata for UI
 User.metadata.get('meta.label') // For form labels
 
-// Database schema is auto-generated
-// Indexes are auto-created
-// Documentation is auto-extracted
+// Database — tables and indexes from annotations
+const adapter = new SqliteAdapter(new BetterSqlite3Driver('app.db'))
+const users = new AtscriptDbTable(UserMeta, adapter)
+await users.ensureTable()   // Creates table
+await users.syncIndexes()   // Creates indexes
+await users.insertOne(user) // Validates and inserts
 ```
 
 ## Next Steps
 
 - [Quick Start](/packages/typescript/quick-start) — create your first .as file
+- [DB Integrations](/db-support/) — use annotations to drive database operations

@@ -16,17 +16,33 @@ import { decomposePatch } from './patch-decomposer'
 import type {
   TDbDefaultValue,
   TDbDeleteResult,
+  TDbFieldMeta,
   TDbFilter,
   TDbFindOptions,
   TDbIndex,
   TDbIndexField,
   TDbInsertManyResult,
   TDbInsertResult,
+  TDbProjection,
   TDbUpdateResult,
   TIdDescriptor,
 } from './types'
 
 const INDEX_PREFIX = 'atscript__'
+
+/**
+ * Resolves the design type from an annotated type.
+ * Encapsulates the `kind === ''` check and fallback logic that
+ * otherwise trips up every adapter author.
+ */
+export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
+  if (fieldType.type.kind === '') {
+    return (fieldType.type as any).designType ?? 'string'
+  }
+  if (fieldType.type.kind === 'object') { return 'object' }
+  if (fieldType.type.kind === 'array') { return 'array' }
+  return 'string'
+}
 
 function indexKey(type: string, name: string): string {
   const cleanName = name
@@ -69,6 +85,7 @@ export class AtscriptDbTable<
   // ── Lazy-computed field analysis ──────────────────────────────────────────
 
   protected _flatMap?: Map<string, TAtscriptAnnotatedType>
+  protected _fieldDescriptors?: TDbFieldMeta[]
   protected _indexes = new Map<string, TDbIndex>()
   protected _primaryKeys: string[] = []
   protected _columnMap = new Map<string, string>()
@@ -165,6 +182,62 @@ export class AtscriptDbTable<
     }
   }
 
+  /**
+   * Pre-computed field metadata for adapter use.
+   * Filters root entry, resolves designType, physicalName, optional —
+   * encapsulating all the type introspection gotchas.
+   */
+  public get fieldDescriptors(): readonly TDbFieldMeta[] {
+    this._flatten()
+    if (!this._fieldDescriptors) {
+      this._fieldDescriptors = []
+      for (const [path, type] of this._flatMap!.entries()) {
+        if (!path) { continue } // skip root entry
+        this._fieldDescriptors.push({
+          path,
+          type,
+          physicalName: this._columnMap.get(path) ?? path,
+          designType: resolveDesignType(type),
+          optional: type.optional === true,
+          isPrimaryKey: this._primaryKeys.includes(path),
+          ignored: this._ignoredFields.has(path),
+          defaultValue: this._defaults.get(path),
+        })
+      }
+    }
+    return this._fieldDescriptors
+  }
+
+  /**
+   * Resolves a projection to a list of field names to include.
+   * - `undefined` → `undefined` (all fields)
+   * - `string[]` → pass through
+   * - `Record<K, 1>` → extract included keys
+   * - `Record<K, 0>` → invert using known field names
+   */
+  public resolveProjection(projection?: TDbProjection<DataType>): string[] | undefined {
+    if (!projection) { return undefined }
+
+    if (Array.isArray(projection)) {
+      return projection.length > 0 ? projection : undefined
+    }
+
+    const entries = Object.entries(projection)
+    if (entries.length === 0) { return undefined }
+
+    const firstVal = entries[0][1]
+    if (firstVal === 1) {
+      // Inclusion — return listed fields
+      return entries.filter(([, v]) => v === 1).map(([k]) => k)
+    }
+
+    // Exclusion — invert using known non-ignored field names
+    const excluded = new Set(entries.filter(([, v]) => v === 0).map(([k]) => k))
+    return this.fieldDescriptors
+      .filter(f => !f.ignored && !excluded.has(f.path))
+      .map(f => f.path)
+  }
+
   // ── Validation ────────────────────────────────────────────────────────────
 
   /**
@@ -198,7 +271,7 @@ export class AtscriptDbTable<
    * Applies defaults, validates, prepares ID, maps columns, strips ignored fields.
    */
   public async insertOne(
-    payload: Omit<DataType, string> & Record<string, unknown>
+    payload: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbInsertResult> {
     this._flatten()
     const data = this._applyDefaults({ ...payload })
@@ -213,11 +286,11 @@ export class AtscriptDbTable<
    * Inserts multiple records.
    */
   public async insertMany(
-    payloads: Array<Omit<DataType, string> & Record<string, unknown>>
+    payloads: Array<Partial<DataType> & Record<string, unknown>>
   ): Promise<TDbInsertManyResult> {
     this._flatten()
     const validator = this.getValidator('insert')
-    const prepared: Record<string, unknown>[] = []
+    const prepared: Array<Record<string, unknown>> = []
     for (const payload of payloads) {
       const data = this._applyDefaults({ ...payload })
       if (!validator.validate(data)) {
@@ -251,7 +324,7 @@ export class AtscriptDbTable<
    * `$update`, `$remove`) for top-level array fields.
    */
   public async updateOne(
-    payload: Record<string, unknown>
+    payload: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this._flatten()
     const validator = this.getValidator('patch')
@@ -297,47 +370,47 @@ export class AtscriptDbTable<
    * Finds a single record matching the filter.
    */
   public async findOne(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    filter: TDbFilter<DataType>,
+    options?: TDbFindOptions<DataType>
   ): Promise<DataType | null> {
-    return this.adapter.findOne(filter, options) as Promise<DataType | null>
+    return this.adapter.findOne(filter as TDbFilter, options as TDbFindOptions) as Promise<DataType | null>
   }
 
   /**
    * Finds all records matching the filter.
    */
   public async findMany(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    filter: TDbFilter<DataType>,
+    options?: TDbFindOptions<DataType>
   ): Promise<DataType[]> {
-    return this.adapter.findMany(filter, options) as Promise<DataType[]>
+    return this.adapter.findMany(filter as TDbFilter, options as TDbFindOptions) as Promise<DataType[]>
   }
 
   /**
    * Counts records matching the filter.
    */
-  public async count(filter: TDbFilter = {}): Promise<number> {
-    return this.adapter.count(filter)
+  public async count(filter: TDbFilter<DataType> = {} as TDbFilter<DataType>): Promise<number> {
+    return this.adapter.count(filter as TDbFilter)
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
 
   public async updateMany(
-    filter: TDbFilter,
-    data: Record<string, unknown>
+    filter: TDbFilter<DataType>,
+    data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.updateMany(filter, data)
+    return this.adapter.updateMany(filter as TDbFilter, data)
   }
 
   public async replaceMany(
-    filter: TDbFilter,
+    filter: TDbFilter<DataType>,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.replaceMany(filter, data)
+    return this.adapter.replaceMany(filter as TDbFilter, data)
   }
 
-  public async deleteMany(filter: TDbFilter): Promise<TDbDeleteResult> {
-    return this.adapter.deleteMany(filter)
+  public async deleteMany(filter: TDbFilter<DataType>): Promise<TDbDeleteResult> {
+    return this.adapter.deleteMany(filter as TDbFilter)
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -423,15 +496,15 @@ export class AtscriptDbTable<
       this._addIndexField('plain', name, fieldName, sort as 'asc' | 'desc')
     }
 
-    // @db.index.unique
+    // @db.index.unique (single arg → raw string or { name })
     for (const index of (metadata.get('db.index.unique') as any[]) || []) {
-      const name = index === true ? fieldName : (index?.name || fieldName)
+      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
       this._addIndexField('unique', name, fieldName)
     }
 
-    // @db.index.fulltext
+    // @db.index.fulltext (single arg → raw string or { name })
     for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
-      const name = index === true ? fieldName : (index?.name || fieldName)
+      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
       this._addIndexField('fulltext', name, fieldName)
     }
   }

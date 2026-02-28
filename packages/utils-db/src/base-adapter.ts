@@ -4,7 +4,7 @@ import type {
   TValidatorPlugin,
 } from '@atscript/typescript/utils'
 
-import type { TDbFilter, TDbFindOptions } from './types'
+import type { TDbFilter, TDbFindOptions, TDbIndex } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { AtscriptDbTable } from './db-table'
 
@@ -137,12 +137,81 @@ export abstract class BaseDbAdapter {
    */
   getTopLevelArrayTag?(): string
 
+  // ── Table name resolution ──────────────────────────────────────────────────
+
+  /**
+   * Resolves the full table name, optionally including the schema prefix.
+   * Override for databases that don't support schemas (e.g., SQLite).
+   *
+   * @param includeSchema - Whether to prepend `schema.` prefix (default: true).
+   */
+  resolveTableName(includeSchema = true): string {
+    const schema = this._table.schema
+    const name = this._table.tableName
+    return includeSchema && schema ? `${schema}.${name}` : name
+  }
+
+  // ── Index sync helper ──────────────────────────────────────────────────────
+
+  /**
+   * Template method for index synchronization.
+   * Implements the diff algorithm (list → compare → create/drop).
+   * Adapters provide the three DB-specific primitives.
+   *
+   * @example
+   * ```typescript
+   * async syncIndexes() {
+   *   await this.syncIndexesWithDiff({
+   *     listExisting: async () => this.driver.all('PRAGMA index_list(...)'),
+   *     createIndex: async (index) => this.driver.exec('CREATE INDEX ...'),
+   *     dropIndex: async (name) => this.driver.exec('DROP INDEX ...'),
+   *     shouldSkipType: (type) => type === 'fulltext',
+   *   })
+   * }
+   * ```
+   */
+  protected async syncIndexesWithDiff(opts: {
+    listExisting(): Promise<Array<{ name: string }>>
+    createIndex(index: TDbIndex): Promise<void>
+    dropIndex(name: string): Promise<void>
+    prefix?: string
+    shouldSkipType?(type: TDbIndex['type']): boolean
+  }): Promise<void> {
+    const prefix = opts.prefix ?? 'atscript__'
+
+    // List existing indexes, filter to managed ones
+    const existing = await opts.listExisting()
+    const existingNames = new Set(
+      existing.filter(i => i.name.startsWith(prefix)).map(i => i.name)
+    )
+
+    const desiredNames = new Set<string>()
+
+    // Create missing indexes
+    for (const index of this._table.indexes.values()) {
+      if (opts.shouldSkipType?.(index.type)) { continue }
+
+      desiredNames.add(index.key)
+
+      if (!existingNames.has(index.key)) {
+        await opts.createIndex(index)
+      }
+    }
+
+    // Drop stale indexes
+    for (const name of existingNames) {
+      if (!desiredNames.has(name)) {
+        await opts.dropIndex(name)
+      }
+    }
+  }
+
   // ── Abstract CRUD — adapters must implement ───────────────────────────────
   // The adapter reads this._table.tableName and any other metadata it needs
   // internally. No table name parameter needed.
 
   abstract insertOne(data: Record<string, unknown>): Promise<TDbInsertResult>
-  abstract insertMany(data: Record<string, unknown>[]): Promise<TDbInsertManyResult>
+  abstract insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult>
   abstract replaceOne(
     filter: TDbFilter,
     data: Record<string, unknown>
@@ -159,7 +228,7 @@ export abstract class BaseDbAdapter {
   abstract findMany(
     filter: TDbFilter,
     options?: TDbFindOptions
-  ): Promise<Record<string, unknown>[]>
+  ): Promise<Array<Record<string, unknown>>>
   abstract count(filter: TDbFilter): Promise<number>
 
   // ── Batch operations ──────────────────────────────────────────────────────

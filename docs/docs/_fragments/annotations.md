@@ -17,7 +17,7 @@ Annotations can be applied anywhere:
 ```atscript
 @meta.description 'User entity'    // Interface annotation
 export interface User {
-    @meta.id                       // Property annotation
+    @meta.id                     // Property annotation
     id: string
 }
 
@@ -120,12 +120,27 @@ Atscript provides common-purpose annotations:
 - `@meta.id` - Marks identifier field (multiple fields form composite PK)
 - `@meta.description 'text'` - Field description
 - `@meta.documentation 'text'` - Multi-line docs (repeatable)
-- `@meta.placeholder 'text'` - UI placeholder text
 - `@meta.sensitive` - Marks sensitive data
 - `@meta.readonly` - Read-only field
 - `@meta.default 'value'` - Default value (string as-is, other types parsed as JSON)
 - `@meta.example 'value'` - Example value (string as-is, other types parsed as JSON)
 - `@expect.array.key` - Key field in arrays for lookups
+
+### UI Annotations (@ui.\*)
+
+- `@ui.placeholder 'text'` - Input placeholder text
+- `@ui.component 'name'` - UI component hint (e.g., `"select"`, `"datepicker"`)
+- `@ui.hidden` - Hide field from UI forms and tables
+- `@ui.group 'name'` - Group fields into form sections
+- `@ui.order 1` - Display order in auto-generated forms
+- `@ui.width 'half'` - Layout width hint (e.g., `"half"`, `"full"`, `"third"`)
+- `@ui.icon 'name'` - Icon hint for the field or entity
+- `@ui.hint 'text'` - Help text or tooltip
+- `@ui.disabled` - Mark field as non-interactive
+- `@ui.type 'textarea'` - Input type (maps to HTML input types: `"text"`, `"textarea"`, `"password"`, etc.)
+- `@ui.attr 'key', 'value'` - Pass arbitrary HTML/component attributes (repeatable)
+- `@ui.class 'names'` - CSS class names (repeatable)
+- `@ui.style 'css'` - Inline CSS styles (repeatable)
 
 ### Validation Annotations (@expect.\*)
 

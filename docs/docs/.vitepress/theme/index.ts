@@ -6,7 +6,7 @@ import HomeLayout from './HomeLayout.vue'
 import './style.css'
 
 function colorizeAtscriptAnnotations() {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') { return }
   const lines = window.document.querySelectorAll('.language-atscript code .line')
   lines.forEach((line: Element) => {
     const spans = line.querySelectorAll('span')

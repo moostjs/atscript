@@ -333,7 +333,13 @@ export default defineConfig({
           { text: 'Moost Validator', link: '/packages/moost-validator/' },
         ],
       },
-      { text: 'DB Support', link: '/db-support/' },
+      {
+        text: 'DB Integrations',
+        items: [
+          { text: 'Guide', link: '/db-support/' },
+          { text: 'SQLite', link: '/db-sqlite/' },
+        ],
+      },
       { text: 'VSCode', link: '/packages/vscode/' },
       {
         text: 'Plugins',
@@ -396,19 +402,33 @@ export default defineConfig({
 
       '/db-support/': [
         {
-          text: 'DB Support',
+          text: 'DB Annotations',
           items: [
             { text: 'Overview', link: '/db-support/' },
+            { text: 'Core Annotations', link: '/db-support/annotations' },
             { text: 'Future Features', link: '/db-support/future-features' },
           ],
         },
-        // {
-        //   text: 'Databases',
-        //   items: [
-        //     { text: 'MongoDB', link: '/packages/mongo/' },
-        //     { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
-        //   ],
-        // },
+        {
+          text: 'Abstraction Layer',
+          items: [
+            { text: 'DB Tables', link: '/db-support/db-table' },
+            { text: 'Database Adapters', link: '/db-support/adapters' },
+            { text: 'Queries & Filters', link: '/db-support/queries' },
+            { text: 'Patch Operations', link: '/db-support/patch-operations' },
+          ],
+        },
+      ],
+
+      '/db-sqlite/': [
+        {
+          text: 'SQLite Adapter',
+          items: [
+            { text: 'Overview', link: '/db-sqlite/' },
+            { text: 'Quick Start', link: '/db-sqlite/quick-start' },
+            { text: 'API Reference', link: '/db-sqlite/api-reference' },
+          ],
+        },
       ],
 
       '/packages/mongo/': [

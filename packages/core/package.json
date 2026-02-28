@@ -20,8 +20,13 @@
     "url": "git+https://github.com/moostjs/atscript.git",
     "directory": "packages/core"
   },
+  "bin": {
+    "atscript-core-skill": "./scripts/setup-skills.js"
+  },
   "files": [
-    "dist"
+    "dist",
+    "skills",
+    "scripts/setup-skills.js"
   ],
   "type": "module",
   "main": "dist/index.mjs",
@@ -36,7 +41,8 @@
   },
   "scripts": {
     "pub": "pnpm publish --access public",
-    "test": "vitest"
+    "test": "vitest",
+    "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
     "@prostojs/parser": "^0.5.11",

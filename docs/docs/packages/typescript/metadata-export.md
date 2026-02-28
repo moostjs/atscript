@@ -83,7 +83,7 @@ function buildFormFields(type: TAtscriptAnnotatedType) {
     name: key,
     label: prop.metadata.get('meta.label') || key,
     required: !prop.optional,
-    placeholder: prop.metadata.get('meta.placeholder'),
+    placeholder: prop.metadata.get('ui.placeholder'),
     sensitive: prop.metadata.get('meta.sensitive') || false,
     readonly: prop.metadata.get('meta.readonly') || false,
     phantom: isPhantomType(prop), // non-data UI elements

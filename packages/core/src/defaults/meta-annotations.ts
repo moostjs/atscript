@@ -63,22 +63,6 @@ export const metaAnnotations: TAnnotationsTree = {
     },
   }),
 
-  placeholder: new AnnotationSpec({
-    description:
-      'Defines a **default placeholder value** for UI input fields.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.placeholder "Enter your name"' +
-      'name: string' +
-      '```',
-    nodeType: ['prop', 'type'],
-    argument: {
-      name: 'text',
-      type: 'string',
-      description: 'The placeholder text to display in UI forms.',
-    },
-  }),
-
   sensitive: new AnnotationSpec({
     description:
       'Marks a field as **sensitive** (e.g., passwords, API keys), ensuring it is hidden in logs and UI.' +

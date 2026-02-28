@@ -16,21 +16,26 @@ Atscript plugins extend the language with custom primitives, annotations, and co
 
 ## Your First Plugin
 
-Here's a minimal plugin that adds a `@ui.hidden` annotation:
+Here's a minimal plugin that adds a `@api.deprecated` annotation:
 
 ```typescript
 import { createAtscriptPlugin, AnnotationSpec } from '@atscript/core'
 
-export const uiPlugin = () =>
+export const apiPlugin = () =>
   createAtscriptPlugin({
-    name: 'ui',
+    name: 'api',
     config() {
       return {
         annotations: {
-          ui: {
-            hidden: new AnnotationSpec({
-              description: 'Hide this field in the UI',
-              nodeType: ['prop'],
+          api: {
+            deprecated: new AnnotationSpec({
+              description: 'Mark this field as deprecated in the API',
+              nodeType: ['prop', 'interface'],
+              argument: {
+                name: 'message',
+                type: 'string',
+                optional: true,
+              },
             }),
           },
         },
@@ -48,11 +53,11 @@ Add the plugin to your `atscript.config.ts`:
 ```typescript
 import { defineConfig } from '@atscript/core'
 import { tsPlugin } from '@atscript/typescript'
-import { uiPlugin } from './plugins/ui-plugin'
+import { apiPlugin } from './plugins/api-plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [tsPlugin(), uiPlugin()],
+  plugins: [tsPlugin(), apiPlugin()],
 })
 ```
 

@@ -175,20 +175,20 @@ Given this `.as` file:
 
 ```atscript
 export interface SignupForm {
-    @label "Full Name"
-    @placeholder "Enter your name"
+    @meta.label "Full Name"
+    @ui.placeholder "Enter your name"
     name: string
 
-    @label "Email Address"
+    @meta.label "Email Address"
     email: string.email
 
-    @label "Password"
-    @sensitive
+    @meta.label "Password"
+    @meta.sensitive
     password: string
 
-    @label "Already have an account? Sign in"
-    @component "link"
-    @href "/login"
+    @meta.label "Already have an account? Sign in"
+    @ui.component "link"
+    @ui.attr "href", "/login"
     signIn: phantom
 }
 ```
@@ -214,7 +214,7 @@ function collectFields(def: TAtscriptAnnotatedType): FormField[] {
   const fields: FormField[] = []
 
   for (const [key, prop] of def.type.props.entries()) {
-    const label = (prop.metadata.get('label') as string) || key
+    const label = (prop.metadata.get('meta.label') as string) || key
 
     if (isPhantomType(prop)) {
       // Non-data element — collect its annotations for the renderer
@@ -246,7 +246,7 @@ const fields = collectFields(SignupForm)
 //   { key: 'email',    label: 'Email Address', type: 'input', tags: ['email', 'string'], ... },
 //   { key: 'password', label: 'Password',   type: 'input',   tags: ['string'], ... },
 //   { key: 'signIn',   label: 'Already have an account? Sign in', type: 'phantom',
-//     tags: ['phantom'], metadata: { label: '...', component: 'link', href: '/login' } },
+//     tags: ['phantom'], metadata: { 'meta.label': '...', 'ui.component': 'link', ... } },
 // ]
 ```
 

@@ -1,5 +1,9 @@
 # Future Features
 
+::: warning Experimental
+DB Integrations are experimental. APIs may change at any moment.
+:::
+
 Atscript's database support is designed to grow in phases. Phase 1 (current) covers single-table definitions — table names, indexes, column mappings, and defaults. Phase 2 will add cross-table features: relations, views, and a portable query expression language.
 
 ## Core Improvements
@@ -45,7 +49,7 @@ interface Timestamped {
 
 @db.table "users"
 interface User extends Timestamped {
-    @meta.id
+    @db.id
     id: number
     name: string
 }
@@ -62,7 +66,7 @@ The most natural way to express relationships — the field type IS the foreign 
 ```atscript
 @db.table "posts"
 export interface Post {
-    @meta.id
+    @db.id
     id: number
 
     authorId: User.id         // chain ref → type is number, FK → users.id

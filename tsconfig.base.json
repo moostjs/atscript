@@ -29,6 +29,8 @@
       "@atscript/typescript/*": ["packages/typescript/src/*"],
       "@atscript/utils-db": ["packages/utils-db/src/index.ts"],
       "@atscript/utils-db/*": ["packages/utils-db/src/*"],
+      "@atscript/db-sqlite": ["packages/db-sqlite/src/index.ts"],
+      "@atscript/db-sqlite/*": ["packages/db-sqlite/src/*"],
       "@atscript/mongo": ["packages/mongo/src/index.ts"],
       "@atscript/mongo/*": ["packages/mongo/src/*"],
       "@atscript/moost-mongo": ["packages/moost-mongo/src/index.ts"],

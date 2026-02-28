@@ -65,8 +65,8 @@ const serialized = serializeAnnotatedType(Product, {
 ```typescript
 const serialized = serializeAnnotatedType(Product, {
   processAnnotation({ key, value, path, kind }) {
-    // Only keep meta.* and expect.* annotations
-    if (key.startsWith('meta.') || key.startsWith('expect.')) {
+    // Only keep meta.*, expect.*, and ui.* annotations
+    if (key.startsWith('meta.') || key.startsWith('expect.') || key.startsWith('ui.')) {
       return { key, value }
     }
     // Return undefined to strip
@@ -118,7 +118,7 @@ onMounted(async () => {
     fields.value.push({
       name,
       label: prop.metadata.get('meta.label') || name,
-      placeholder: prop.metadata.get('meta.placeholder') || '',
+      placeholder: prop.metadata.get('ui.placeholder') || '',
     })
     formData.value[name] = ''
   }

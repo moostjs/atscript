@@ -16,7 +16,6 @@ declare global {
     "meta.id": boolean
     "meta.description": string
     "meta.documentation": (string)[]
-    "meta.placeholder": string
     "meta.sensitive": boolean
     "meta.readonly": boolean
     "meta.required": { message?: string }
@@ -49,6 +48,19 @@ declare global {
     "db.mongo.search.filter": ({ indexName: string })[]
     "db.mongo.patch.strategy": string
     "db.mongo.array.uniqueItems": boolean
+    "ui.placeholder": string
+    "ui.component": string
+    "ui.hidden": boolean
+    "ui.group": string
+    "ui.order": number
+    "ui.width": string
+    "ui.icon": string
+    "ui.hint": string
+    "ui.disabled": boolean
+    "ui.type": string
+    "ui.attr": ({ key: string, value: string })[]
+    "ui.class": (string)[]
+    "ui.style": (string)[]
   }
   type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
 }

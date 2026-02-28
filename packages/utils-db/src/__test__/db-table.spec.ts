@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
 import { AtscriptDbTable } from '../db-table'
@@ -12,8 +12,11 @@ import type {
   TDbDeleteResult,
 } from '../types'
 
-// @ts-expect-error — test fixture
-import { UsersTable, NoTableAnnotation } from './fixtures/test-table.as'
+import { prepareFixtures } from './test-utils'
+
+// Populated by beforeAll after fixtures are compiled
+let UsersTable: any
+let NoTableAnnotation: any
 
 // ── Mock adapter ────────────────────────────────────────────────────────────
 
@@ -29,7 +32,7 @@ class MockAdapter extends BaseDbAdapter {
     return { insertedId: 1 }
   }
 
-  async insertMany(data: Record<string, unknown>[]): Promise<TDbInsertManyResult> {
+  async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
     this.record('insertMany', data)
     return { insertedCount: data.length, insertedIds: data.map((_, i) => i + 1) }
   }
@@ -66,7 +69,7 @@ class MockAdapter extends BaseDbAdapter {
   async findMany(
     filter: TDbFilter,
     options?: TDbFindOptions
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<Array<Record<string, unknown>>> {
     this.record('findMany', filter, options)
     return [{ id: 1, name: 'test' }]
   }
@@ -111,6 +114,13 @@ class MockAdapter extends BaseDbAdapter {
 describe('AtscriptDbTable', () => {
   let adapter: MockAdapter
   let table: AtscriptDbTable
+
+  beforeAll(async () => {
+    await prepareFixtures()
+    const fixtures = await import('./fixtures/test-table.as.js')
+    UsersTable = fixtures.UsersTable
+    NoTableAnnotation = fixtures.NoTableAnnotation
+  })
 
   beforeEach(() => {
     adapter = new MockAdapter()

@@ -12,7 +12,6 @@
 | `@meta.id`            | _(none)_                   | Mark field as unique identifier; multiple fields form composite PK |
 | `@meta.description`   | `text: string`             | Detailed description of a field or entity                          |
 | `@meta.documentation` | `text: string`             | Multi-line docs (Markdown). Multiple allowed — each appends        |
-| `@meta.placeholder`   | `text: string`             | Placeholder for UI input fields (props/types only)                 |
 | `@meta.sensitive`     | _(none)_                   | Mark as sensitive (passwords, API keys). Strips from serialization |
 | `@meta.readonly`      | _(none)_                   | Mark as read-only                                                  |
 | `@meta.required`      | `message?: string`         | Required field. Strings: non-whitespace. Booleans: must be `true`  |
@@ -30,6 +29,24 @@
 | `@expect.max`       | `maxValue: number`, `message?: string`                  | number        | Maximum value                                          |
 | `@expect.int`       | _(none)_                                                | number        | Must be integer                                        |
 | `@expect.pattern`   | `pattern: string`, `flags?: string`, `message?: string` | string        | Regex validation. **Multiple allowed** (all must pass) |
+
+### `@ui.*` — UI / Presentation Hints
+
+| Annotation        | Arguments                      | Description                                    |
+| ----------------- | ------------------------------ | ---------------------------------------------- |
+| `@ui.placeholder` | `text: string`                 | Input placeholder text                         |
+| `@ui.component`   | `name: string`                 | UI component hint (`"select"`, `"datepicker"`) |
+| `@ui.hidden`      | _(none)_                       | Hide from UI forms/tables                      |
+| `@ui.group`       | `name: string`                 | Group fields into form sections                |
+| `@ui.order`       | `order: number`                | Display order (lower = first)                  |
+| `@ui.width`       | `width: string`                | Layout hint (`"half"`, `"full"`, `"third"`)    |
+| `@ui.icon`        | `name: string`                 | Icon hint                                      |
+| `@ui.hint`        | `text: string`                 | Help text / tooltip                            |
+| `@ui.disabled`    | _(none)_                       | Non-interactive field                          |
+| `@ui.type`        | `type: string`                 | Input type (`"textarea"`, `"password"`, etc.)  |
+| `@ui.attr`        | `key: string`, `value: string` | Arbitrary attribute (**multiple**, append)      |
+| `@ui.class`       | `names: string`                | CSS class names (**multiple**, append)          |
+| `@ui.style`       | `css: string`                  | Inline CSS styles (**multiple**, append)        |
 
 ### `@emit.*` — Build-time Directives
 
@@ -49,21 +66,21 @@ export default defineConfig({
   plugins: [tsPlugin()],
   annotations: {
     // Namespaced annotations use nested objects
-    ui: {
-      // @ui.component "DatePicker"
-      component: new AnnotationSpec({
-        argument: { name: 'name', type: 'string' },
-        description: 'UI component to render this field',
+    grid: {
+      // @grid.column 200
+      column: new AnnotationSpec({
+        argument: { name: 'width', type: 'number' },
+        description: 'Table column width in data grid',
       }),
 
-      // @ui.hidden (no arguments — boolean flag)
+      // @grid.hidden (no arguments — boolean flag)
       hidden: new AnnotationSpec({
-        description: 'Hide this field in the UI',
+        description: 'Hide column in data grid',
       }),
 
-      // @ui.order 5
-      order: new AnnotationSpec({
-        argument: { name: 'position', type: 'number' },
+      // @grid.sortable
+      sortable: new AnnotationSpec({
+        description: 'Allow sorting by this column',
       }),
     },
 

@@ -47,7 +47,7 @@ annotate User {
     @meta.label 'Name'        // annotation for the property
     name                       // property reference
 
-    @meta.placeholder 'you@example.com'
+    @ui.placeholder 'you@example.com'
     @expect.maxLength 100
     email                      // multiple annotations on one property
 }

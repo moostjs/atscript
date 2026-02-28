@@ -111,7 +111,7 @@ import { Address } from './address'
 @db.table 'users'
 @db.mongo.collection
 export interface User {
-    @meta.id
+    @db.id
     _id: mongo.objectId
 
     username: string

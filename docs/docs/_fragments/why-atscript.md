@@ -22,10 +22,9 @@ Atscript brings order to this chaos by providing a single place to define:
 
 ```atscript
 @db.table 'users'
-@db.mongo.collection
 @meta.description 'User entity for our application'
 export interface User {
-    @meta.id
+    @db.id
     @db.index.unique 'email_idx'
     @meta.label 'User Email'
     @meta.description 'Primary contact email'
@@ -34,7 +33,7 @@ export interface User {
     @meta.label 'Full Name'
     @expect.minLength 2
     @expect.maxLength 100
-    @db.mongo.index.text 5
+    @db.index.fulltext 'search_idx'
     name: string
 
     @meta.label 'Age'
@@ -50,11 +49,11 @@ export interface User {
 }
 ```
 
-From this single definition, Atscript can generate:
+From this single definition, Atscript generates:
 
 - Types with full type safety in your target language
 - Runtime validators with all constraints
-- Database schemas with indexes
+- Database tables with indexes via the [DB abstraction layer](/db-support/)
 - JSON Schema for API documentation
 - UI metadata for form generation
 - And more via the plugin system
@@ -73,8 +72,7 @@ Atscript uses annotations to attach any kind of metadata:
 
 - `@meta.*` - Human-readable information
 - `@expect.*` - Validation constraints
-- `@db.*` - Database configuration (tables, indexes)
-- `@db.mongo.*` - MongoDB-specific configuration
+- `@db.*` - Database configuration (tables, indexes, columns, defaults)
 - `@your.custom` - Whatever your project needs
 
 ### 3. Language Agnostic
@@ -104,7 +102,7 @@ While currently supporting TypeScript/JavaScript, Atscript is designed to be uni
 
 - **Microservices contracts** - Share types between services
 - **API-first design** - Generate OpenAPI from types
-- **Database migrations** - Generate schemas with constraints
+- **Database from annotations** - Tables, indexes, and CRUD from `@db.*` annotations
 - **Cross-platform** - Same types for backend and frontend
 
 ## Who Benefits from Atscript?

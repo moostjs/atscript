@@ -131,9 +131,9 @@ function toAnnotationTokens(
   }
   // Object with named args → map by spec argument names (ordered, positional)
   const argNames = spec?.arguments.map(a => a.name) ?? Object.keys(value)
-  const raw: (Token | undefined)[] = argNames.map(argName => {
+  const raw: Array<Token | undefined> = argNames.map(argName => {
     const v = value[argName]
-    if (v === undefined) return undefined
+    if (v === undefined) { return undefined }
     return typeof v === 'number' ? num(v) : text(String(v))
   })
   // Trim trailing undefined entries, then fill inner gaps with empty-string tokens

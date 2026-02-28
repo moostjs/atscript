@@ -1,6 +1,6 @@
 # Custom Annotations
 
-You can define your own annotation types in `atscript.config.ts`. Custom annotations get full IntelliSense support, type checking, and are available in runtime metadata — just like the built-in `@meta.*` and `@expect.*` annotations.
+You can define your own annotation types in `atscript.config.ts`. Custom annotations get full IntelliSense support, type checking, and are available in runtime metadata — just like the built-in `@meta.*`, `@expect.*`, and `@ui.*` annotations.
 
 ## Allowing Unknown Annotations
 
@@ -31,9 +31,9 @@ export default defineConfig({
   rootDir: 'src',
   plugins: [ts()],
   annotations: {
-    ui: {
+    grid: {
       hidden: new AnnotationSpec({
-        description: 'Hide field in UI',
+        description: 'Hide column in data grid',
         nodeType: ['prop'],
       }),
       column: new AnnotationSpec({
@@ -44,7 +44,7 @@ export default defineConfig({
         },
       }),
       tag: new AnnotationSpec({
-        description: 'UI display tag',
+        description: 'Display tag',
         multiple: true,
         mergeStrategy: 'append',
         argument: {
@@ -61,12 +61,12 @@ Then use them in `.as` files:
 
 ```atscript
 export interface User {
-    @ui.hidden
+    @grid.hidden
     internalId: string
 
-    @ui.column 200
-    @ui.tag 'primary'
-    @ui.tag 'searchable'
+    @grid.column 200
+    @grid.tag 'primary'
+    @grid.tag 'searchable'
     name: string
 }
 ```
@@ -77,8 +77,8 @@ Custom annotations appear in runtime metadata alongside built-in ones:
 import { User } from './user.as'
 
 const nameProp = User.type.props.get('name')
-nameProp?.metadata.get('ui.column') // 200
-nameProp?.metadata.get('ui.tag') // ['primary', 'searchable']
+nameProp?.metadata.get('grid.column') // 200
+nameProp?.metadata.get('grid.tag') // ['primary', 'searchable']
 ```
 
 ## AnnotationSpec Options

@@ -1,4 +1,4 @@
-export { AtscriptDbTable } from './db-table'
+export { AtscriptDbTable, resolveDesignType } from './db-table'
 export { BaseDbAdapter } from './base-adapter'
 export { decomposePatch } from './patch-decomposer'
 export { getKeyProps } from './patch-types'
@@ -7,6 +7,8 @@ export type { TArrayPatch, TDbPatch } from './patch-types'
 export type {
   TDbFilter,
   TDbFindOptions,
+  TDbProjection,
+  TFilterOperators,
   TDbInsertResult,
   TDbInsertManyResult,
   TDbUpdateResult,

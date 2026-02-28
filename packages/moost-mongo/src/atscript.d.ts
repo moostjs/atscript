@@ -16,7 +16,7 @@ declare global {
     "meta.id": boolean
     "meta.description": string
     "meta.documentation": (string)[]
-    "meta.placeholder": string
+
     "meta.sensitive": boolean
     "meta.readonly": boolean
     "meta.required": { message?: string }

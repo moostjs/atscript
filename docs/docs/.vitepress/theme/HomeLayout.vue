@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, nextTick, watch } from 'vue'
+// oxlint-disable-next-line import/named -- vitepress re-exports these
 import { useData, useRoute } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import VPButton from 'vitepress/dist/client/theme-default/components/VPButton.vue'
@@ -12,7 +13,7 @@ const route = useRoute()
 
 function setupScrollAnimations() {
     nextTick(() => {
-        const observer = new IntersectionObserver(
+        const observer = new IntersectionObserver( // oxlint-disable-line no-undef -- browser global
             (entries) => {
                 entries.forEach((e) => {
                     if (e.isIntersecting) {
@@ -23,7 +24,7 @@ function setupScrollAnimations() {
             },
             { threshold: 0.1 }
         )
-        document.querySelectorAll('.animate-in').forEach((el) => {
+        document.querySelectorAll('.animate-in').forEach((el) => { // oxlint-disable-line no-undef -- browser global
             el.classList.remove('visible')
             observer.observe(el)
         })
@@ -36,38 +37,38 @@ watch(() => route.path, setupScrollAnimations)
 const features = [
     {
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-3-3v6m-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>`,
-        title: 'Kill the Duplication',
-        details: 'Your types, validation, DB schemas, and UI metadata live in one <code>.as</code> file. Change once, update everywhere.',
+        title: 'One File, Zero Drift',
+        details: 'Types, validation, DB schemas, and UI metadata in a single <code>.as</code> file. Change once, everything stays in sync.',
         link: '/packages/typescript/why-atscript',
     },
     {
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>`,
-        title: 'Types That Validate Themselves',
-        details: "<code>string.email</code> isn't just a type — it's a built-in validator. <code>number.int.positive</code> carries constraints automatically.",
+        title: 'Types That Validate',
+        details: "<code>string.email</code> isn't just a type — it's a validator. <code>number.int.positive</code> carries constraints automatically.",
         link: '/packages/typescript/primitives',
     },
     {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>`,
-        title: 'Metadata That Actually Works',
-        details: 'Attach labels, examples, sensitivity flags, DB indexes — all accessible at runtime for forms, docs, and APIs.',
-        link: '/packages/typescript/annotations',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M21 6.375c0 2.692-4.03 4.875-9 4.875S3 9.067 3 6.375S7.03 1.5 12 1.5s9 2.183 9 4.875z"/><path fill="currentColor" d="M12 12.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384Q21 10.09 21 10.5v1.875c0 2.692-4.03 4.875-9 4.875S3 15.067 3 12.375V10.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 12.164 9.315 12.75 12 12.75z"/><path fill="currentColor" d="M12 18.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384q.025.333.025.743v1.875c0 2.692-4.03 4.875-9 4.875S3 21.067 3 18.375V16.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 18.164 9.315 18.75 12 18.75z"/></svg>`,
+        title: 'Database From Annotations',
+        details: '<code>@db.table</code>, <code>@db.index.unique</code>, <code>@db.column</code> — your schema creates tables, syncs indexes, and handles CRUD.',
+        link: '/db-support/',
     },
     {
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>`,
-        title: 'One File → Full Stack',
-        details: 'TypeScript types, runtime validators, JSON Schema, database schemas with indexes — all generated from one <code>.as</code> file.',
+        title: 'Full Stack From One Source',
+        details: 'TypeScript types, runtime validators, JSON Schema, database tables with indexes — all generated from one <code>.as</code> file.',
         link: '/packages/typescript/quick-start',
     },
     {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0 0 21 18V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v12a2.25 2.25 0 0 0 2.25 2.25z"/></svg>`,
-        title: 'Dynamic UIs From Types',
-        details: 'Build forms, tables, and documentation directly from your type metadata. All annotations are preserved at runtime.',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>`,
+        title: 'Rich Runtime Metadata',
+        details: 'Labels, descriptions, sensitivity flags, UI hints — all accessible at runtime for forms, docs, and APIs.',
         link: '/packages/typescript/metadata-export',
     },
     {
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M41.5 10h-6m-8-4v8m0-4h-22m8 14h-8m16-4v8m22-4h-22m20 14h-6m-8-4v8m0-4h-22"/></svg>`,
-        title: 'Your Rules, Your Annotations',
-        details: 'Add domain-specific metadata that flows through your entire stack. Build plugins for any language or framework.',
+        title: 'Your Rules, Your Plugins',
+        details: 'Add domain-specific annotations that flow through your entire stack. Build plugins for any language, database, or framework.',
         link: '/plugin-development/',
     },
 ]
@@ -154,7 +155,7 @@ const features = [
                             </div>
                         </div>
                     </div>
-                    <p class="section-footnote animate-in"><code>@db.*</code> and <code>@ui.*</code> annotations are illustrative — Atscript's <a href="/plugin-development/">plugin system</a> lets ORM and UI framework authors define their own.</p>
+                    <p class="section-footnote animate-in"><code>@meta.*</code> annotations are built-in. <code>@db.*</code> annotations power real <a href="/db-support/">database integrations</a>. Add your own via the <a href="/plugin-development/">plugin system</a>.</p>
                 </div>
             </section>
 
