@@ -94,7 +94,7 @@ Array patch operations use **keys** to identify elements. Keys are defined with 
 ```atscript
 @db.table 'orders'
 export interface Order {
-    @db.id
+    @meta.id
     id: number
 
     items: OrderItem[]

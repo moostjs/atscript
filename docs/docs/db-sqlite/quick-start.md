@@ -12,7 +12,7 @@ Create a `.as` file with `@db.*` annotations:
 // user.as
 @db.table 'users'
 export interface User {
-    @db.id
+    @meta.id
     id: number
 
     @db.index.unique 'email_idx'

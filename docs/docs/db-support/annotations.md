@@ -29,6 +29,10 @@ This means a single `.as` file can describe a data model that works with multipl
 | `@db.default.fn` | field | `fn` (string) | Database function for default value |
 | `@db.ignore` | field | — | Exclude field from database operations |
 
+::: tip Primary Keys
+Primary keys are declared with `@meta.id` (from the `@meta.*` namespace, not `@db.*`). See [Primary Keys](#primary-keys) below.
+:::
+
 ## `@db.table`
 
 Names the database table or collection. This is the primary annotation that marks an interface as a database entity.
@@ -145,14 +149,15 @@ export interface User {
 }
 ```
 
-## `@db.id`
+## Primary Keys
 
-Marks a field as the primary key. Multiple fields annotated with `@db.id` form a composite primary key.
+Primary keys use `@meta.id` — a general-purpose annotation from the `@meta.*` namespace (not `@db.*`). Multiple fields annotated with `@meta.id` form a composite primary key. `@meta.id` takes no arguments.
 
 ```atscript
 @db.table 'users'
 export interface User {
-    @db.id
+    @meta.id
+    @db.default.fn 'increment'
     id: number
 
     name: string
@@ -164,10 +169,10 @@ Composite primary key:
 ```atscript
 @db.table 'order_items'
 export interface OrderItem {
-    @db.id
+    @meta.id
     orderId: number
 
-    @db.id
+    @meta.id
     productId: number
 
     quantity: number

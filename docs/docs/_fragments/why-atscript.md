@@ -24,7 +24,7 @@ Atscript brings order to this chaos by providing a single place to define:
 @db.table 'users'
 @meta.description 'User entity for our application'
 export interface User {
-    @db.id
+    @meta.id
     @db.index.unique 'email_idx'
     @meta.label 'User Email'
     @meta.description 'Primary contact email'

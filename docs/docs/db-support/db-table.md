@@ -154,7 +154,7 @@ users.tableName // → 'users'
 // Schema from @db.schema (if set)
 users.schema // → 'auth' or undefined
 
-// Primary key fields from @db.id
+// Primary key fields from @meta.id
 users.primaryKeys // → ['id']
 
 // Column mappings from @db.column

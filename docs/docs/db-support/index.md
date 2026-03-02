@@ -43,7 +43,7 @@ Define a table in Atscript:
 ```atscript
 @db.table 'users'
 export interface User {
-    @db.id
+    @meta.id
     id: number
 
     @db.index.unique 'email_idx'
