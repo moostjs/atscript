@@ -149,7 +149,7 @@ describe('buildWhere', () => {
     const { sql, params } = buildWhere({
       $and: [{ name: 'John' }, { age: { $gt: 18 } }],
     })
-    expect(sql).toBe('("name" = ? AND "age" > ?)')
+    expect(sql).toBe('"name" = ? AND "age" > ?')
     expect(params).toEqual(['John', 18])
   })
 
@@ -176,7 +176,7 @@ describe('buildWhere', () => {
         { status: 'admin' },
       ],
     })
-    expect(sql).toBe('(("name" = ? AND "age" > ?) OR "status" = ?)')
+    expect(sql).toBe('("name" = ? AND "age" > ? OR "status" = ?)')
     expect(params).toEqual(['John', 18, 'admin'])
   })
 

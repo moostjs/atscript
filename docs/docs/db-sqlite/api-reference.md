@@ -158,7 +158,7 @@ const { sql, params } = buildWhere({ status: 'active', age: { $gt: 18 } })
 | `{ field: { $exists: true } }` | `"field" IS NOT NULL` |
 | `{ field: { $exists: false } }` | `"field" IS NULL` |
 | `{ field: { $regex: '^abc' } }` | `"field" LIKE 'abc%'` |
-| `{ $and: [...] }` | `(... AND ...)` |
+| `{ $and: [...] }` | `... AND ...` |
 | `{ $or: [...] }` | `(... OR ...)` |
 | `{ $not: {...} }` | `NOT (...)` |
 

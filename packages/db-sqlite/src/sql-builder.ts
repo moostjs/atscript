@@ -1,4 +1,5 @@
-import type { TDbFieldMeta, TDbFindOptions, TDbProjection } from '@atscript/utils-db'
+import type { TDbFieldMeta } from '@atscript/utils-db'
+import type { UniqueryControls } from '@uniqu/core'
 
 import type { TSqlFragment } from './filter-builder'
 
@@ -28,15 +29,15 @@ export function buildInsert(
 export function buildSelect(
   table: string,
   where: TSqlFragment,
-  options?: TDbFindOptions
+  controls?: UniqueryControls
 ): TSqlFragment {
-  const cols = buildProjection(options?.projection)
+  const cols = buildProjection(controls?.$select)
   let sql = `SELECT ${cols} FROM "${esc(table)}" WHERE ${where.sql}`
   const params = [...where.params]
 
-  if (options?.sort) {
+  if (controls?.$sort) {
     const orderParts: string[] = []
-    for (const [col, dir] of Object.entries(options.sort)) {
+    for (const [col, dir] of Object.entries(controls.$sort)) {
       orderParts.push(`"${esc(col)}" ${dir === -1 ? 'DESC' : 'ASC'}`)
     }
     if (orderParts.length > 0) {
@@ -44,17 +45,17 @@ export function buildSelect(
     }
   }
 
-  if (options?.limit !== undefined) {
+  if (controls?.$limit !== undefined) {
     sql += ` LIMIT ?`
-    params.push(options.limit)
+    params.push(controls.$limit)
   }
 
-  if (options?.skip !== undefined) {
-    if (options.limit === undefined) {
+  if (controls?.$skip !== undefined) {
+    if (controls.$limit === undefined) {
       sql += ` LIMIT -1`
     }
     sql += ` OFFSET ?`
-    params.push(options.skip)
+    params.push(controls.$skip)
   }
 
   return { sql, params }
@@ -155,17 +156,17 @@ export function sqliteTypeFromDesignType(designType: string): string {
 }
 
 function buildProjection(
-  projection?: TDbProjection
+  select?: UniqueryControls['$select']
 ): string {
-  if (!projection) { return '*' }
+  if (!select) { return '*' }
 
   // Array form: list of field names
-  if (Array.isArray(projection)) {
-    if (projection.length === 0) { return '*' }
-    return projection.map(k => `"${esc(k)}"`).join(', ')
+  if (Array.isArray(select)) {
+    if (select.length === 0) { return '*' }
+    return select.map(k => `"${esc(k)}"`).join(', ')
   }
 
-  const entries = Object.entries(projection)
+  const entries = Object.entries(select)
   if (entries.length === 0) { return '*' }
 
   // Check if it's an inclusion or exclusion projection

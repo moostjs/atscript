@@ -4,7 +4,9 @@ import type {
   TValidatorPlugin,
 } from '@atscript/typescript/utils'
 
-import type { TDbFilter, TDbFindOptions, TDbIndex } from './types'
+import type { FilterExpr, Uniquery } from '@uniqu/core'
+
+import type { TDbIndex } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { AtscriptDbTable } from './db-table'
 
@@ -89,7 +91,7 @@ export abstract class BaseDbAdapter {
    * @param patch - The patch payload with array operations.
    * @returns Update result.
    */
-  async nativePatch(filter: TDbFilter, patch: unknown): Promise<TDbUpdateResult> {
+  async nativePatch(filter: FilterExpr, patch: unknown): Promise<TDbUpdateResult> {
     throw new Error('Native patch not supported by this adapter')
   }
 
@@ -213,35 +215,33 @@ export abstract class BaseDbAdapter {
   abstract insertOne(data: Record<string, unknown>): Promise<TDbInsertResult>
   abstract insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult>
   abstract replaceOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult>
   abstract updateOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult>
-  abstract deleteOne(filter: TDbFilter): Promise<TDbDeleteResult>
+  abstract deleteOne(filter: FilterExpr): Promise<TDbDeleteResult>
   abstract findOne(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Record<string, unknown> | null>
   abstract findMany(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Array<Record<string, unknown>>>
-  abstract count(filter: TDbFilter): Promise<number>
+  abstract count(query: Uniquery): Promise<number>
 
   // ── Batch operations ──────────────────────────────────────────────────────
 
   abstract updateMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult>
   abstract replaceMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult>
-  abstract deleteMany(filter: TDbFilter): Promise<TDbDeleteResult>
+  abstract deleteMany(filter: FilterExpr): Promise<TDbDeleteResult>
 
   // ── Schema ────────────────────────────────────────────────────────────────
 

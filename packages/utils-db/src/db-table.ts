@@ -9,6 +9,8 @@ import {
   type TValidatorOptions,
 } from '@atscript/typescript/utils'
 
+import type { FilterExpr, UniqueryControls, Uniquery } from '@uniqu/core'
+
 import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
@@ -17,13 +19,10 @@ import type {
   TDbDefaultValue,
   TDbDeleteResult,
   TDbFieldMeta,
-  TDbFilter,
-  TDbFindOptions,
   TDbIndex,
   TDbIndexField,
   TDbInsertManyResult,
   TDbInsertResult,
-  TDbProjection,
   TDbUpdateResult,
   TIdDescriptor,
 } from './types'
@@ -209,20 +208,20 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Resolves a projection to a list of field names to include.
+   * Resolves `$select` from {@link UniqueryControls} to a list of field names.
    * - `undefined` → `undefined` (all fields)
    * - `string[]` → pass through
    * - `Record<K, 1>` → extract included keys
    * - `Record<K, 0>` → invert using known field names
    */
-  public resolveProjection(projection?: TDbProjection<DataType>): string[] | undefined {
-    if (!projection) { return undefined }
+  public resolveProjection(select?: UniqueryControls['$select']): string[] | undefined {
+    if (!select) { return undefined }
 
-    if (Array.isArray(projection)) {
-      return projection.length > 0 ? projection : undefined
+    if (Array.isArray(select)) {
+      return select.length > 0 ? select : undefined
     }
 
-    const entries = Object.entries(projection)
+    const entries = Object.entries(select)
     if (entries.length === 0) { return undefined }
 
     const firstVal = entries[0][1]
@@ -350,7 +349,7 @@ export class AtscriptDbTable<
     if (pkFields.length === 0) {
       throw new Error('No primary key defined — cannot delete by ID')
     }
-    const filter: TDbFilter = {}
+    const filter: FilterExpr = {}
     if (pkFields.length === 1) {
       const field = pkFields[0]
       const fieldType = this.flatMap.get(field)
@@ -367,50 +366,48 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Finds a single record matching the filter.
+   * Finds a single record matching the query.
    */
   public async findOne(
-    filter: TDbFilter<DataType>,
-    options?: TDbFindOptions<DataType>
+    query: Uniquery<DataType>
   ): Promise<DataType | null> {
-    return this.adapter.findOne(filter as TDbFilter, options as TDbFindOptions) as Promise<DataType | null>
+    return this.adapter.findOne(query as Uniquery) as Promise<DataType | null>
   }
 
   /**
-   * Finds all records matching the filter.
+   * Finds all records matching the query.
    */
   public async findMany(
-    filter: TDbFilter<DataType>,
-    options?: TDbFindOptions<DataType>
+    query: Uniquery<DataType>
   ): Promise<DataType[]> {
-    return this.adapter.findMany(filter as TDbFilter, options as TDbFindOptions) as Promise<DataType[]>
+    return this.adapter.findMany(query as Uniquery) as Promise<DataType[]>
   }
 
   /**
-   * Counts records matching the filter.
+   * Counts records matching the query.
    */
-  public async count(filter: TDbFilter<DataType> = {} as TDbFilter<DataType>): Promise<number> {
-    return this.adapter.count(filter as TDbFilter)
+  public async count(query: Uniquery<DataType> = { filter: {}, controls: {} } as Uniquery<DataType>): Promise<number> {
+    return this.adapter.count(query as Uniquery)
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
 
   public async updateMany(
-    filter: TDbFilter<DataType>,
+    filter: FilterExpr<DataType>,
     data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.updateMany(filter as TDbFilter, data)
+    return this.adapter.updateMany(filter as FilterExpr, data)
   }
 
   public async replaceMany(
-    filter: TDbFilter<DataType>,
+    filter: FilterExpr<DataType>,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.replaceMany(filter as TDbFilter, data)
+    return this.adapter.replaceMany(filter as FilterExpr, data)
   }
 
-  public async deleteMany(filter: TDbFilter<DataType>): Promise<TDbDeleteResult> {
-    return this.adapter.deleteMany(filter as TDbFilter)
+  public async deleteMany(filter: FilterExpr<DataType>): Promise<TDbDeleteResult> {
+    return this.adapter.deleteMany(filter as FilterExpr)
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -595,12 +592,12 @@ export class AtscriptDbTable<
   /**
    * Extracts primary key field(s) from a payload to build a filter.
    */
-  protected _extractPrimaryKeyFilter(payload: Record<string, unknown>): TDbFilter {
+  protected _extractPrimaryKeyFilter(payload: Record<string, unknown>): FilterExpr {
     const pkFields = this.primaryKeys
     if (pkFields.length === 0) {
       throw new Error('No primary key defined — cannot extract filter')
     }
-    const filter: TDbFilter = {}
+    const filter: FilterExpr = {}
     for (const field of pkFields) {
       if (payload[field] === undefined) {
         throw new Error(`Missing primary key field "${field}" in payload`)

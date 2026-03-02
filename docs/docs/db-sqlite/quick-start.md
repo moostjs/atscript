@@ -70,18 +70,26 @@ await users.insertOne({
 
 ### Query
 
+Read operations use the `Uniquery` format — `{ filter, controls }`:
+
 ```typescript
 // Find by filter
-const user = await users.findOne({ email: 'alice@example.com' })
+const user = await users.findOne({
+  filter: { email: 'alice@example.com' },
+  controls: {},
+})
 
 // Find with sorting and pagination
-const page = await users.findMany(
-  { status: 'active' },
-  { sort: { name: 1 }, limit: 10, skip: 0 }
-)
+const page = await users.findMany({
+  filter: { status: 'active' },
+  controls: { $sort: { name: 1 }, $limit: 10, $skip: 0 },
+})
 
 // Count
-const total = await users.count({ status: 'active' })
+const total = await users.count({
+  filter: { status: 'active' },
+  controls: {},
+})
 ```
 
 ### Update
@@ -110,20 +118,23 @@ The SQLite adapter supports MongoDB-style filters translated to SQL:
 
 ```typescript
 // Comparison
-await users.findMany({ createdAt: { $gt: 1700000000 } })
+await users.findMany({ filter: { createdAt: { $gt: 1700000000 } }, controls: {} })
 
 // Set membership
-await users.findMany({ status: { $in: ['active', 'pending'] } })
+await users.findMany({ filter: { status: { $in: ['active', 'pending'] } }, controls: {} })
 
 // Pattern matching (regex → LIKE)
-await users.findMany({ name: { $regex: '^Ali' } }) // LIKE 'Ali%'
+await users.findMany({ filter: { name: { $regex: '^Ali' } }, controls: {} }) // LIKE 'Ali%'
 
 // Logical operators
 await users.findMany({
-  $or: [
-    { status: 'admin' },
-    { createdAt: { $gt: 1700000000 } },
-  ]
+  filter: {
+    $or: [
+      { status: 'admin' },
+      { createdAt: { $gt: 1700000000 } },
+    ]
+  },
+  controls: {},
 })
 ```
 

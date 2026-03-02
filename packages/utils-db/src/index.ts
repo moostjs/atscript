@@ -5,10 +5,10 @@ export { getKeyProps } from './patch-types'
 
 export type { TArrayPatch, TDbPatch } from './patch-types'
 export type {
-  TDbFilter,
-  TDbFindOptions,
-  TDbProjection,
-  TFilterOperators,
+  FilterExpr,
+  FieldOpsFor,
+  UniqueryControls,
+  Uniquery,
   TDbInsertResult,
   TDbInsertManyResult,
   TDbUpdateResult,
@@ -21,3 +21,7 @@ export type {
 } from './types'
 export type { TGenericLogger } from './logger'
 export { NoopLogger } from './logger'
+
+// Re-export walker utilities from @uniqu/core for adapter implementations
+export { walkFilter, isPrimitive } from '@uniqu/core'
+export type { FilterVisitor } from '@uniqu/core'

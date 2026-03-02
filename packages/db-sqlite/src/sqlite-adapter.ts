@@ -2,13 +2,12 @@ import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { BaseDbAdapter } from '@atscript/utils-db'
 import type {
   TDbDeleteResult,
-  TDbFilter,
-  TDbFindOptions,
   TDbIndex,
   TDbInsertManyResult,
   TDbInsertResult,
   TDbUpdateResult,
 } from '@atscript/utils-db'
+import type { FilterExpr, Uniquery } from '@uniqu/core'
 
 import { buildWhere } from './filter-builder'
 import {
@@ -82,29 +81,28 @@ export class SqliteAdapter extends BaseDbAdapter {
   // ── CRUD: Read ─────────────────────────────────────────────────────────────
 
   async findOne(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Record<string, unknown> | null> {
-    const where = buildWhere(filter)
+    const where = buildWhere(query.filter)
+    const controls = { ...query.controls, $limit: 1 }
     const { sql, params } = buildSelect(
       this.resolveTableName(),
       where,
-      { ...options, limit: 1 }
+      controls
     )
     return this.driver.get(sql, params)
   }
 
   async findMany(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Array<Record<string, unknown>>> {
-    const where = buildWhere(filter)
-    const { sql, params } = buildSelect(this.resolveTableName(), where, options)
+    const where = buildWhere(query.filter)
+    const { sql, params } = buildSelect(this.resolveTableName(), where, query.controls)
     return this.driver.all(sql, params)
   }
 
-  async count(filter: TDbFilter): Promise<number> {
-    const where = buildWhere(filter)
+  async count(query: Uniquery): Promise<number> {
+    const where = buildWhere(query.filter)
     const tableName = this.resolveTableName()
     const sql = `SELECT COUNT(*) as cnt FROM "${esc(tableName)}" WHERE ${where.sql}`
     const row = this.driver.get<{ cnt: number }>(sql, where.params)
@@ -114,7 +112,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   // ── CRUD: Update ───────────────────────────────────────────────────────────
 
   async updateOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     // SQLite doesn't support UPDATE ... LIMIT 1 directly.
@@ -135,7 +133,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async updateMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     const where = buildWhere(filter)
@@ -147,7 +145,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   // ── CRUD: Replace ──────────────────────────────────────────────────────────
 
   async replaceOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     // DELETE old row, then INSERT the new one
@@ -170,7 +168,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async replaceMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     // For replaceMany we do a full UPDATE (set all columns)
@@ -182,7 +180,7 @@ export class SqliteAdapter extends BaseDbAdapter {
 
   // ── CRUD: Delete ───────────────────────────────────────────────────────────
 
-  async deleteOne(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
     const where = buildWhere(filter)
     const tableName = this.resolveTableName()
     const sql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
@@ -190,7 +188,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     return { deletedCount: result.changes }
   }
 
-  async deleteMany(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     const where = buildWhere(filter)
     const { sql, params } = buildDelete(this.resolveTableName(), where)
     const result = this.driver.run(sql, params)

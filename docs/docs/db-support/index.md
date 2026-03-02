@@ -80,7 +80,10 @@ await users.insertOne({ id: 1, email: 'alice@example.com' })
 // → status defaults to 'active', displayName is stripped
 
 // Query
-const user = await users.findOne({ email: 'alice@example.com' })
+const user = await users.findOne({
+  filter: { email: 'alice@example.com' },
+  controls: {},
+})
 
 // Update
 await users.updateOne({ id: 1, status: 'inactive' })

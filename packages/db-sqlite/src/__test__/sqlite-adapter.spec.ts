@@ -195,7 +195,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
 
       expect(result.insertedCount).toBe(2)
 
-      const count = await table.count({})
+      const count = await table.count()
       expect(count).toBe(2)
     })
   })
@@ -213,13 +213,13 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
     })
 
     it('should find a record by filter', async () => {
-      const result = await table.findOne({ id: 1 })
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} })
       expect(result).not.toBeNull()
       expect((result as any).name).toBe('John')
     })
 
     it('should return null when not found', async () => {
-      const result = await table.findOne({ id: 999 })
+      const result = await table.findOne({ filter: { id: 999 }, controls: {} })
       expect(result).toBeNull()
     })
   })
@@ -235,41 +235,43 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
     })
 
     it('should find records matching filter', async () => {
-      const results = await table.findMany({ status: 'active' })
+      const results = await table.findMany({ filter: { status: 'active' }, controls: {} })
       expect(results.length).toBe(2)
     })
 
     it('should respect limit option', async () => {
-      const results = await table.findMany({}, { limit: 2 })
+      const results = await table.findMany({ filter: {}, controls: { $limit: 2 } })
       expect(results.length).toBe(2)
     })
 
     it('should respect skip option', async () => {
-      const results = await table.findMany({}, { limit: 2, skip: 1 })
+      const results = await table.findMany({ filter: {}, controls: { $limit: 2, $skip: 1 } })
       expect(results.length).toBe(2)
     })
 
     it('should respect sort option', async () => {
-      const results = await table.findMany({}, { sort: { createdAt: -1 } })
+      const results = await table.findMany({ filter: {}, controls: { $sort: { createdAt: -1 } } })
       expect((results[0] as any).name).toBe('Charlie')
       expect((results[2] as any).name).toBe('Alice')
     })
 
     it('should handle $or filter', async () => {
       const results = await table.findMany({
-        $or: [{ name: 'Alice' }, { name: 'Charlie' }],
+        filter: { $or: [{ name: 'Alice' }, { name: 'Charlie' }] },
+        controls: {},
       })
       expect(results.length).toBe(2)
     })
 
     it('should handle $gt filter', async () => {
-      const results = await table.findMany({ createdAt: { $gt: 1500 } })
+      const results = await table.findMany({ filter: { createdAt: { $gt: 1500 } }, controls: {} })
       expect(results.length).toBe(2)
     })
 
     it('should handle $in filter', async () => {
       const results = await table.findMany({
-        name: { $in: ['Alice', 'Bob'] },
+        filter: { name: { $in: ['Alice', 'Bob'] } },
+        controls: {},
       })
       expect(results.length).toBe(2)
     })
@@ -290,7 +292,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
     })
 
     it('should count records matching filter', async () => {
-      expect(await table.count({ status: 'active' })).toBe(2)
+      expect(await table.count({ filter: { status: 'active' }, controls: {} })).toBe(2)
     })
   })
 
@@ -310,7 +312,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
       )
       expect(result.modifiedCount).toBe(2)
 
-      const rows = await table.findMany({ status: 'suspended' })
+      const rows = await table.findMany({ filter: { status: 'suspended' }, controls: {} })
       expect(rows.length).toBe(2)
     })
   })
@@ -331,7 +333,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
       const result = await table.deleteOne(1)
       expect(result.deletedCount).toBe(1)
 
-      const row = await table.findOne({ id: 1 })
+      const row = await table.findOne({ filter: { id: 1 }, controls: {} })
       expect(row).toBeNull()
     })
   })
@@ -398,7 +400,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
         status: 'active',
       } as any)
 
-      const result = await customTable.findOne({ id: 1 })
+      const result = await customTable.findOne({ filter: { id: 1 }, controls: {} })
       expect(result).not.toBeNull()
       expect(calls.length).toBeGreaterThan(0)
       expect(calls.some(c => c.startsWith('exec:'))).toBe(true)

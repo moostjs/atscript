@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+import type { FilterExpr, Uniquery } from '@uniqu/core'
 
 import { AtscriptDbTable } from '../db-table'
 import { BaseDbAdapter } from '../base-adapter'
 import type {
-  TDbFilter,
-  TDbFindOptions,
   TDbInsertResult,
   TDbInsertManyResult,
   TDbUpdateResult,
@@ -38,7 +37,7 @@ class MockAdapter extends BaseDbAdapter {
   }
 
   async replaceOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this.record('replaceOne', filter, data)
@@ -46,41 +45,39 @@ class MockAdapter extends BaseDbAdapter {
   }
 
   async updateOne(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this.record('updateOne', filter, data)
     return { matchedCount: 1, modifiedCount: 1 }
   }
 
-  async deleteOne(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
     this.record('deleteOne', filter)
     return { deletedCount: 1 }
   }
 
   async findOne(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Record<string, unknown> | null> {
-    this.record('findOne', filter, options)
+    this.record('findOne', query)
     return { id: 1, name: 'test' }
   }
 
   async findMany(
-    filter: TDbFilter,
-    options?: TDbFindOptions
+    query: Uniquery
   ): Promise<Array<Record<string, unknown>>> {
-    this.record('findMany', filter, options)
+    this.record('findMany', query)
     return [{ id: 1, name: 'test' }]
   }
 
-  async count(filter: TDbFilter): Promise<number> {
-    this.record('count', filter)
+  async count(query: Uniquery): Promise<number> {
+    this.record('count', query)
     return 42
   }
 
   async updateMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this.record('updateMany', filter, data)
@@ -88,14 +85,14 @@ class MockAdapter extends BaseDbAdapter {
   }
 
   async replaceMany(
-    filter: TDbFilter,
+    filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this.record('replaceMany', filter, data)
     return { matchedCount: 1, modifiedCount: 1 }
   }
 
-  async deleteMany(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     this.record('deleteMany', filter)
     return { deletedCount: 3 }
   }
@@ -250,21 +247,20 @@ describe('AtscriptDbTable', () => {
 
   describe('CRUD operations', () => {
     it('should delegate findOne to adapter', async () => {
-      const result = await table.findOne({ id: 1 })
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} })
       expect(adapter.calls[0].method).toBe('findOne')
-      expect(adapter.calls[0].args[0]).toEqual({ id: 1 })
+      expect(adapter.calls[0].args[0]).toEqual({ filter: { id: 1 }, controls: {} })
       expect(result).toEqual({ id: 1, name: 'test' })
     })
 
     it('should delegate findMany to adapter', async () => {
-      await table.findMany({ name: 'test' }, { limit: 10 })
+      await table.findMany({ filter: { name: 'test' }, controls: { $limit: 10 } })
       expect(adapter.calls[0].method).toBe('findMany')
-      expect(adapter.calls[0].args[0]).toEqual({ name: 'test' })
-      expect(adapter.calls[0].args[1]).toEqual({ limit: 10 })
+      expect(adapter.calls[0].args[0]).toEqual({ filter: { name: 'test' }, controls: { $limit: 10 } })
     })
 
     it('should delegate count to adapter', async () => {
-      const result = await table.count({ status: 'active' })
+      const result = await table.count({ filter: { status: 'active' }, controls: {} })
       expect(adapter.calls[0].method).toBe('count')
       expect(result).toBe(42)
     })

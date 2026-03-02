@@ -22,13 +22,12 @@ To create a new database adapter, extend `BaseDbAdapter` and implement the abstr
 ```typescript
 import { BaseDbAdapter } from '@atscript/utils-db'
 import type {
-  TDbFilter,
-  TDbFindOptions,
   TDbInsertResult,
   TDbInsertManyResult,
   TDbUpdateResult,
   TDbDeleteResult,
 } from '@atscript/utils-db'
+import type { FilterExpr, Uniquery } from '@uniqu/core'
 
 class MyAdapter extends BaseDbAdapter {
   // --- Insert ---
@@ -42,41 +41,41 @@ class MyAdapter extends BaseDbAdapter {
   }
 
   // --- Read ---
-  async findOne(filter: TDbFilter, options?: TDbFindOptions): Promise<Record<string, unknown> | null> {
-    // Convert filter to database query, return one row or null
+  async findOne(query: Uniquery): Promise<Record<string, unknown> | null> {
+    // Use query.filter for WHERE, query.controls for ORDER/LIMIT/SELECT
   }
 
-  async findMany(filter: TDbFilter, options?: TDbFindOptions): Promise<Array<Record<string, unknown>>> {
-    // Convert filter to database query, return matching rows
+  async findMany(query: Uniquery): Promise<Array<Record<string, unknown>>> {
+    // Use query.filter for WHERE, query.controls for ORDER/LIMIT/SELECT
   }
 
-  async count(filter: TDbFilter): Promise<number> {
-    // Return count of matching rows
+  async count(query: Uniquery): Promise<number> {
+    // Use query.filter for WHERE
   }
 
   // --- Update ---
-  async updateOne(filter: TDbFilter, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+  async updateOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
     // Update one matching row
   }
 
-  async updateMany(filter: TDbFilter, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+  async updateMany(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
     // Update all matching rows
   }
 
-  async replaceOne(filter: TDbFilter, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+  async replaceOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
     // Full replacement of one matching row
   }
 
-  async replaceMany(filter: TDbFilter, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+  async replaceMany(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
     // Full replacement of all matching rows
   }
 
   // --- Delete ---
-  async deleteOne(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
     // Delete one matching row
   }
 
-  async deleteMany(filter: TDbFilter): Promise<TDbDeleteResult> {
+  async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     // Delete all matching rows
   }
 
@@ -142,7 +141,7 @@ class MongoAdapter extends BaseDbAdapter {
     return true
   }
 
-  async nativePatch(filter: TDbFilter, patch: unknown): Promise<TDbUpdateResult> {
+  async nativePatch(filter: FilterExpr, patch: unknown): Promise<TDbUpdateResult> {
     // Convert patch operators to database-native operations
   }
 }

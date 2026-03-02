@@ -1,117 +1,112 @@
-import type { TDbFilter } from '@atscript/utils-db'
+import { walkFilter, type FilterExpr, type FilterVisitor } from '@uniqu/core'
 
 export interface TSqlFragment {
   sql: string
   params: unknown[]
 }
 
+const EMPTY_AND: TSqlFragment = { sql: '1=1', params: [] }
+const EMPTY_OR: TSqlFragment = { sql: '0=1', params: [] }
+
 /**
- * Translates a MongoDB-style filter object into a SQL WHERE clause
- * with parameterized values.
- *
- * Supports:
- * - Equality: `{ field: value }`
- * - Comparison: `$gt`, `$gte`, `$lt`, `$lte`, `$ne`
- * - Set: `$in`, `$nin`
- * - Existence: `$exists`
- * - Pattern: `$regex` (converted to LIKE)
- * - Logical: `$and`, `$or`, `$not`
- *
- * @returns `{ sql, params }` — the WHERE clause (without "WHERE") and bound params.
- *          Returns `{ sql: '1=1', params: [] }` for empty filters.
+ * SQL visitor for `walkFilter` — renders a filter expression tree
+ * into a parameterized SQL WHERE clause.
  */
-export function buildWhere(filter: TDbFilter): TSqlFragment {
-  if (!filter || Object.keys(filter).length === 0) {
-    return { sql: '1=1', params: [] }
-  }
+const sqlVisitor: FilterVisitor<TSqlFragment> = {
+  comparison(field, op, value) {
+    const col = `"${escapeIdent(field)}"`
 
-  const parts: string[] = []
-  const params: unknown[] = []
-
-  for (const [key, value] of Object.entries(filter)) {
-    if (key === '$and') {
-      const sub = (value as TDbFilter[]).map(f => buildWhere(f))
-      parts.push(`(${sub.map(s => s.sql).join(' AND ')})`)
-      for (const s of sub) { params.push(...s.params) }
-    } else if (key === '$or') {
-      const sub = (value as TDbFilter[]).map(f => buildWhere(f))
-      parts.push(`(${sub.map(s => s.sql).join(' OR ')})`)
-      for (const s of sub) { params.push(...s.params) }
-    } else if (key === '$not') {
-      const sub = buildWhere(value as TDbFilter)
-      parts.push(`NOT (${sub.sql})`)
-      params.push(...sub.params)
-    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      // Operator object: { $gt: 5, $lt: 10 }
-      for (const [op, opVal] of Object.entries(value as Record<string, unknown>)) {
-        const fragment = buildOperator(key, op, opVal)
-        parts.push(fragment.sql)
-        params.push(...fragment.params)
+    switch (op) {
+      case '$eq': {
+        if (value === null) {
+          return { sql: `${col} IS NULL`, params: [] }
+        }
+        return { sql: `${col} = ?`, params: [value] }
       }
-    } else if (value === null) {
-      parts.push(`"${escapeIdent(key)}" IS NULL`)
-    } else {
-      parts.push(`"${escapeIdent(key)}" = ?`)
-      params.push(value)
+      case '$ne': {
+        if (value === null) {
+          return { sql: `${col} IS NOT NULL`, params: [] }
+        }
+        return { sql: `${col} != ?`, params: [value] }
+      }
+      case '$gt': {
+        return { sql: `${col} > ?`, params: [value] }
+      }
+      case '$gte': {
+        return { sql: `${col} >= ?`, params: [value] }
+      }
+      case '$lt': {
+        return { sql: `${col} < ?`, params: [value] }
+      }
+      case '$lte': {
+        return { sql: `${col} <= ?`, params: [value] }
+      }
+      case '$in': {
+        const arr = value as unknown[]
+        if (arr.length === 0) {
+          return EMPTY_OR // 0=1 — no match
+        }
+        const placeholders = arr.map(() => '?').join(', ')
+        return { sql: `${col} IN (${placeholders})`, params: [...arr] }
+      }
+      case '$nin': {
+        const arr = value as unknown[]
+        if (arr.length === 0) {
+          return EMPTY_AND // 1=1 — all match
+        }
+        const placeholders = arr.map(() => '?').join(', ')
+        return { sql: `${col} NOT IN (${placeholders})`, params: [...arr] }
+      }
+      case '$exists': {
+        return value
+          ? { sql: `${col} IS NOT NULL`, params: [] }
+          : { sql: `${col} IS NULL`, params: [] }
+      }
+      case '$regex': {
+        const pattern = regexToLike(value instanceof RegExp ? value.source : String(value))
+        return { sql: `${col} LIKE ?`, params: [pattern] }
+      }
+      default: {
+        throw new Error(`Unsupported filter operator: ${op}`)
+      }
     }
-  }
+  },
 
-  return { sql: parts.join(' AND '), params }
+  and(children) {
+    if (children.length === 0) { return EMPTY_AND }
+    return {
+      sql: children.map(c => c.sql).join(' AND '),
+      params: children.flatMap(c => c.params),
+    }
+  },
+
+  or(children) {
+    if (children.length === 0) { return EMPTY_OR }
+    return {
+      sql: `(${children.map(c => c.sql).join(' OR ')})`,
+      params: children.flatMap(c => c.params),
+    }
+  },
+
+  not(child) {
+    return {
+      sql: `NOT (${child.sql})`,
+      params: child.params,
+    }
+  },
 }
 
-function buildOperator(field: string, op: string, value: unknown): TSqlFragment {
-  const col = `"${escapeIdent(field)}"`
-
-  switch (op) {
-    case '$gt': {
-      return { sql: `${col} > ?`, params: [value] }
-    }
-    case '$gte': {
-      return { sql: `${col} >= ?`, params: [value] }
-    }
-    case '$lt': {
-      return { sql: `${col} < ?`, params: [value] }
-    }
-    case '$lte': {
-      return { sql: `${col} <= ?`, params: [value] }
-    }
-    case '$ne': {
-      if (value === null) {
-        return { sql: `${col} IS NOT NULL`, params: [] }
-      }
-      return { sql: `${col} != ?`, params: [value] }
-    }
-    case '$in': {
-      const arr = value as unknown[]
-      if (arr.length === 0) {
-        return { sql: '0=1', params: [] }
-      }
-      const placeholders = arr.map(() => '?').join(', ')
-      return { sql: `${col} IN (${placeholders})`, params: [...arr] }
-    }
-    case '$nin': {
-      const arr = value as unknown[]
-      if (arr.length === 0) {
-        return { sql: '1=1', params: [] }
-      }
-      const placeholders = arr.map(() => '?').join(', ')
-      return { sql: `${col} NOT IN (${placeholders})`, params: [...arr] }
-    }
-    case '$exists': {
-      return value
-        ? { sql: `${col} IS NOT NULL`, params: [] }
-        : { sql: `${col} IS NULL`, params: [] }
-    }
-    case '$regex': {
-      // Basic conversion: regex → LIKE pattern
-      // Only handles simple cases (^prefix, suffix$, contains)
-      const pattern = regexToLike(String(value))
-      return { sql: `${col} LIKE ?`, params: [pattern] }
-    }
-    default: {
-      throw new Error(`Unsupported filter operator: ${op}`)
-    }
+/**
+ * Translates a uniqu filter expression into a parameterized SQL WHERE clause.
+ *
+ * @returns `{ sql, params }` — the WHERE clause (without "WHERE") and bound params.
+ *          Returns `{ sql: '1=1', params: [] }` for empty/null filters.
+ */
+export function buildWhere(filter: FilterExpr): TSqlFragment {
+  if (!filter || Object.keys(filter).length === 0) {
+    return EMPTY_AND
   }
+  return walkFilter(filter, sqlVisitor)
 }
 
 /**

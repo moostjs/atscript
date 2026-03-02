@@ -4,7 +4,32 @@
 DB Integrations are experimental. APIs may change at any moment.
 :::
 
-`AtscriptDbTable` uses a MongoDB-style filter syntax for queries. Database adapters translate these filters into their native query language (SQL WHERE clauses, MongoDB queries, etc.).
+`AtscriptDbTable` uses a MongoDB-style filter syntax for queries. Filters and controls are wrapped in a `Uniquery` object — a canonical query format provided by [`@uniqu/core`](https://github.com/niceguymissing/uniqu).
+
+## Uniquery Format
+
+Read operations (`findOne`, `findMany`, `count`) accept a `Uniquery` object:
+
+```typescript
+await users.findMany({
+  filter: { status: 'active' },
+  controls: { $sort: { name: 1 }, $limit: 10 },
+})
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `filter` | `FilterExpr<T>` | MongoDB-style filter tree |
+| `controls` | `UniqueryControls<T>` | Sorting, pagination, projection |
+
+Write-with-filter operations (`updateMany`, `replaceMany`, `deleteMany`) accept a bare `FilterExpr`:
+
+```typescript
+await users.updateMany(
+  { status: 'pending' },   // FilterExpr
+  { status: 'active' },    // data
+)
+```
 
 ## Basic Filters
 
@@ -12,72 +37,72 @@ DB Integrations are experimental. APIs may change at any moment.
 
 ```typescript
 // Exact match
-await users.findMany({ status: 'active' })
+await users.findMany({ filter: { status: 'active' }, controls: {} })
 
 // Multiple conditions (implicit AND)
-await users.findMany({ status: 'active', role: 'admin' })
+await users.findMany({ filter: { status: 'active', role: 'admin' }, controls: {} })
 
 // Null check
-await users.findMany({ deletedAt: null })
+await users.findMany({ filter: { deletedAt: null }, controls: {} })
 ```
 
 ### Comparison Operators
 
 ```typescript
 // Greater than
-await users.findMany({ age: { $gt: 18 } })
+await users.findMany({ filter: { age: { $gt: 18 } }, controls: {} })
 
 // Greater than or equal
-await users.findMany({ age: { $gte: 18 } })
+await users.findMany({ filter: { age: { $gte: 18 } }, controls: {} })
 
 // Less than
-await users.findMany({ age: { $lt: 65 } })
+await users.findMany({ filter: { age: { $lt: 65 } }, controls: {} })
 
 // Less than or equal
-await users.findMany({ age: { $lte: 65 } })
+await users.findMany({ filter: { age: { $lte: 65 } }, controls: {} })
 
 // Not equal
-await users.findMany({ status: { $ne: 'banned' } })
+await users.findMany({ filter: { status: { $ne: 'banned' } }, controls: {} })
 ```
 
 ### Set Operators
 
 ```typescript
 // In a set of values
-await users.findMany({ role: { $in: ['admin', 'moderator'] } })
+await users.findMany({ filter: { role: { $in: ['admin', 'moderator'] } }, controls: {} })
 
 // Not in a set of values
-await users.findMany({ status: { $nin: ['banned', 'suspended'] } })
+await users.findMany({ filter: { status: { $nin: ['banned', 'suspended'] } }, controls: {} })
 ```
 
 ### Existence
 
 ```typescript
 // Field is not null
-await users.findMany({ email: { $exists: true } })
+await users.findMany({ filter: { email: { $exists: true } }, controls: {} })
 
 // Field is null
-await users.findMany({ deletedAt: { $exists: false } })
+await users.findMany({ filter: { deletedAt: { $exists: false } }, controls: {} })
 ```
 
 ### Pattern Matching
 
 ```typescript
 // Contains
-await users.findMany({ name: { $regex: 'alice' } })
+await users.findMany({ filter: { name: { $regex: 'alice' } }, controls: {} })
 
 // Starts with
-await users.findMany({ name: { $regex: '^alice' } })
+await users.findMany({ filter: { name: { $regex: '^alice' } }, controls: {} })
 
 // Ends with
-await users.findMany({ email: { $regex: 'example.com$' } })
+await users.findMany({ filter: { email: { $regex: 'example.com$' } }, controls: {} })
 
 // Exact match
-await users.findMany({ code: { $regex: '^ABC123$' } })
+await users.findMany({ filter: { code: { $regex: '^ABC123$' } }, controls: {} })
 ```
 
 ::: tip
-The `$regex` operator is translated to database-native pattern matching. For SQLite, it becomes a `LIKE` expression. For MongoDB, it uses `$regex`.
+The `$regex` operator is translated to database-native pattern matching. For SQLite, it becomes a `LIKE` expression. For MongoDB, it uses `$regex`. Both `RegExp` and `string` values are accepted.
 :::
 
 ## Logical Operators
@@ -88,10 +113,13 @@ Explicit AND (usually not needed since multiple conditions are implicitly AND'd)
 
 ```typescript
 await users.findMany({
-  $and: [
-    { age: { $gte: 18 } },
-    { age: { $lt: 65 } },
-  ]
+  filter: {
+    $and: [
+      { age: { $gte: 18 } },
+      { age: { $lt: 65 } },
+    ]
+  },
+  controls: {},
 })
 ```
 
@@ -99,10 +127,13 @@ await users.findMany({
 
 ```typescript
 await users.findMany({
-  $or: [
-    { role: 'admin' },
-    { role: 'moderator' },
-  ]
+  filter: {
+    $or: [
+      { role: 'admin' },
+      { role: 'moderator' },
+    ]
+  },
+  controls: {},
 })
 ```
 
@@ -110,7 +141,8 @@ await users.findMany({
 
 ```typescript
 await users.findMany({
-  $not: { status: 'banned' }
+  filter: { $not: { status: 'banned' } },
+  controls: {},
 })
 ```
 
@@ -118,40 +150,57 @@ await users.findMany({
 
 ```typescript
 await users.findMany({
-  status: 'active',
-  $or: [
-    { role: 'admin' },
-    { age: { $gte: 21 } },
-  ],
+  filter: {
+    $and: [
+      { status: 'active' },
+      {
+        $or: [
+          { role: 'admin' },
+          { age: { $gte: 21 } },
+        ],
+      },
+    ],
+  },
+  controls: {},
 })
 ```
 
-## Query Options
+::: warning
+Do not mix comparison fields and logical operators in the same object (e.g., `{ name: 'foo', $or: [...] }`). This is a type error — use `$and` to combine them explicitly.
+:::
+
+## Query Controls
 
 ### Sorting
 
 ```typescript
 // Ascending (1) or descending (-1)
-await users.findMany({}, {
-  sort: { name: 1 }         // A → Z
+await users.findMany({
+  filter: {},
+  controls: { $sort: { name: 1 } },         // A → Z
 })
 
-await users.findMany({}, {
-  sort: { createdAt: -1 }   // newest first
+await users.findMany({
+  filter: {},
+  controls: { $sort: { createdAt: -1 } },    // newest first
 })
 
 // Multiple sort fields
-await users.findMany({}, {
-  sort: { status: 1, name: 1 }
+await users.findMany({
+  filter: {},
+  controls: { $sort: { status: 1, name: 1 } },
 })
 ```
 
 ### Pagination
 
 ```typescript
-await users.findMany({}, {
-  limit: 10,   // max 10 results
-  skip: 20,    // skip first 20 results (page 3)
+await users.findMany({
+  filter: {},
+  controls: {
+    $limit: 10,   // max 10 results
+    $skip: 20,    // skip first 20 results (page 3)
+  },
 })
 ```
 
@@ -161,32 +210,34 @@ Select only specific fields:
 
 ```typescript
 // Array form
-await users.findMany({}, {
-  projection: ['id', 'name', 'email']
+await users.findMany({
+  filter: {},
+  controls: { $select: ['id', 'name', 'email'] },
 })
 
 // Object form (1 = include)
-await users.findMany({}, {
-  projection: { id: 1, name: 1, email: 1 }
+await users.findMany({
+  filter: {},
+  controls: { $select: { id: 1, name: 1, email: 1 } },
 })
 ```
 
-## Filter Types
+## Filter & Query Types
 
-The filter and options types are fully typed:
+The filter and query types are provided by `@uniqu/core` and re-exported from `@atscript/utils-db`:
 
 ```typescript
 import type {
-  TDbFilter,
-  TDbFindOptions,
-  TDbProjection,
-  TFilterOperators,
+  FilterExpr,
+  FieldOpsFor,
+  UniqueryControls,
+  Uniquery,
 } from '@atscript/utils-db'
 ```
 
 | Type | Description |
 |------|-------------|
-| `TDbFilter<T>` | Filter object with field conditions and logical operators |
-| `TFilterOperators<V>` | Comparison and set operators for a field value |
-| `TDbFindOptions<T>` | Query options: sort, limit, skip, projection |
-| `TDbProjection<T>` | Field projection (array or object form) |
+| `FilterExpr<T>` | Filter tree with field conditions and logical operators (`$and`, `$or`, `$not`) |
+| `FieldOpsFor<V>` | Comparison and set operators for a field value type |
+| `UniqueryControls<T>` | Query controls: `$sort`, `$limit`, `$skip`, `$select` |
+| `Uniquery<T>` | Combined query: `{ filter, controls }` |

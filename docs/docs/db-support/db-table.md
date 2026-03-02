@@ -71,23 +71,31 @@ Before inserting, `AtscriptDbTable`:
 
 ### Find
 
+Read operations accept a `Uniquery` object with `filter` and `controls`:
+
 ```typescript
 // Find one
-const user = await users.findOne({ email: 'alice@example.com' })
+const user = await users.findOne({
+  filter: { email: 'alice@example.com' },
+  controls: {},
+})
 
-// Find many with options
-const activeUsers = await users.findMany(
-  { status: 'active' },
-  {
-    sort: { name: 1 },    // ascending
-    limit: 10,
-    skip: 20,
-    projection: ['id', 'name', 'email'],
-  }
-)
+// Find many with controls
+const activeUsers = await users.findMany({
+  filter: { status: 'active' },
+  controls: {
+    $sort: { name: 1 },    // ascending
+    $limit: 10,
+    $skip: 20,
+    $select: ['id', 'name', 'email'],
+  },
+})
 
 // Count
-const total = await users.count({ status: 'active' })
+const total = await users.count({
+  filter: { status: 'active' },
+  controls: {},
+})
 ```
 
 See [Queries & Filters](./queries) for the full filter syntax.
