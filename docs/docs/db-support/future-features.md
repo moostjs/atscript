@@ -169,14 +169,13 @@ Phase 3 adds many-to-many relations through explicit junction tables, a `@db.vie
 
 ### `@db.rel.via` — Many-to-Many
 
-Declares a many-to-many navigational property through an explicit junction table:
+Declares a many-to-many navigational property through an explicit junction table. Self-sufficient — no `@db.rel.from` needed because both sides of a M:N are inverse:
 
 ```atscript
 @db.table "posts"
 export interface Post extends Identifiable {
     title: string
 
-    @db.rel.from
     @db.rel.via PostTag              // M:N through PostTag junction
     tags: Tag[]
 }
@@ -186,7 +185,6 @@ export interface Tag extends Identifiable {
     @db.index.unique
     name: string
 
-    @db.rel.from
     @db.rel.via PostTag
     posts: Post[]
 }
