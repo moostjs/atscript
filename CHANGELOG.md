@@ -1,3 +1,12 @@
+## [0.1.30](https://github.com/moostjs/atscript/compare/v0.1.29...v0.1.30) (2026-03-02)
+
+
+### Features
+
+* **core:** add support for interface extends ([59b8452](https://github.com/moostjs/atscript/commit/59b84528bd911df666b1e912b30ece34fe5eb79b))
+
+
+
 ## [0.1.29](https://github.com/moostjs/atscript/compare/v0.1.28...v0.1.29) (2026-03-02)
 
 
