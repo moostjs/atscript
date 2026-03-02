@@ -11,6 +11,7 @@ import type { NodeIterator } from '../iterator'
 import type { SemanticNode, TSemanticToken } from '../nodes'
 import { $n, isRef } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
+import type { SemanticInterfaceNode } from '../nodes/interface-node'
 import { Token } from '../token'
 import type { TExpect, TTarget } from '../types'
 import type { TPipe } from './core.pipe'
@@ -379,4 +380,41 @@ function parseRegExpLiteral(literal: string): RegExp {
   }
   const [, pattern, flags] = match
   return new RegExp(pattern.replace(/\\\//g, '/'), flags)
+}
+
+export function extendsClause() {
+  const s = {
+    extends: { node: 'identifier', text: 'extends' } as TExpect,
+    comma: { node: 'punctuation', text: ',' } as TExpect,
+    id: { node: 'identifier' } as TExpect,
+  }
+  return {
+    handler(ni: NodeIterator, target: TTarget) {
+      if (!ni.$ || !ni.satisfies(s.extends)) {
+        return true // optional: no extends clause
+      }
+      ni.accepted()
+      ni.move()
+      ni.skip(['\n'])
+
+      const node = target.node as SemanticInterfaceNode
+
+      // Parse comma-separated identifiers
+      while (ni.$ && ni.satisfies(s.id)) {
+        node.addExtendsToken(new Token(ni.$))
+        ni.accepted()
+        ni.move()
+        ni.skip(['\n'])
+        // Check for comma (another parent)
+        if (ni.$ && ni.satisfies(s.comma)) {
+          ni.accepted()
+          ni.move()
+          ni.skip(['\n'])
+        } else {
+          break
+        }
+      }
+      return true
+    },
+  }
 }

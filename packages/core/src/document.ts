@@ -27,6 +27,7 @@ import {
   isType,
 } from './parser/nodes'
 import type { SemanticAnnotateNode } from './parser/nodes/annotate-node'
+import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
@@ -381,6 +382,67 @@ export class AtscriptDoc {
     return result
   }
 
+  /**
+   * Resolves an interface with `extends` by merging parent structures with own props.
+   * Parents are merged left-to-right, then own props overlay on top (own takes priority).
+   * Only merges props and their annotations; interface-level annotations are NOT inherited.
+   */
+  resolveInterfaceExtends(
+    node: SemanticInterfaceNode,
+    _visited?: Set<string>
+  ): SemanticNode | undefined {
+    if (!node.hasExtends) {
+      return undefined
+    }
+
+    const visited = _visited || new Set<string>()
+    if (node.id && visited.has(node.id)) {
+      return undefined // circular extends
+    }
+    if (node.id) {
+      visited.add(node.id)
+    }
+
+    let mergedStruct: SemanticNode | undefined
+
+    for (const extendsToken of node.extendsTokens) {
+      const unwound = this.unwindType(extendsToken.text)
+      if (!unwound?.def) {
+        continue
+      }
+
+      let parentDef = unwound.def
+      // If parent is also an interface with extends, resolve recursively
+      if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
+        const resolved = unwound.doc.resolveInterfaceExtends(
+          parentDef as SemanticInterfaceNode,
+          visited
+        )
+        parentDef = resolved || parentDef.getDefinition() || parentDef
+      } else if (isInterface(parentDef)) {
+        parentDef = parentDef.getDefinition() || parentDef
+      }
+
+      parentDef = this.mergeIntersection(parentDef)
+
+      if (!mergedStruct) {
+        mergedStruct = parentDef
+      } else {
+        const merged = this.mergeDefs(mergedStruct, parentDef)
+        mergedStruct = merged[0]
+      }
+    }
+
+    // Merge with own props (own props take priority = right side)
+    const ownDef = node.getDefinition()
+    if (ownDef && mergedStruct) {
+      const merged = this.mergeDefs(mergedStruct, ownDef)
+      return merged[0]
+    }
+
+    return mergedStruct || ownDef
+  }
+
   usageListFor(
     token: Token
   ): Array<{ uri: string; range: Token['range']; token: Token }> | undefined {
@@ -729,6 +791,60 @@ export class AtscriptDoc {
         ...this.semanticMessages,
         ...this.messages,
       ] as TMessages
+      // Validate interface extends targets
+      for (const node of this.nodes) {
+        if (isInterface(node) && (node as SemanticInterfaceNode).hasExtends) {
+          const iface = node as SemanticInterfaceNode
+          for (const t of iface.extendsTokens) {
+            if (t.text === iface.id) {
+              this._allMessages.push({
+                severity: TSeverity.Error,
+                message: `Interface "${iface.id}" cannot extend itself`,
+                range: t.range,
+              })
+            }
+          }
+          // Check for prop overrides: own props that shadow parent props
+          const ownDef = iface.getDefinition()
+          if (ownDef && isStructure(ownDef)) {
+            const parentProps = new Map<string, string>()
+            for (const t of iface.extendsTokens) {
+              if (t.text === iface.id) { continue }
+              const unwound = this.unwindType(t.text)
+              if (!unwound?.def) { continue }
+              let parentDef = unwound.def
+              if (isInterface(parentDef)) {
+                if ((parentDef as SemanticInterfaceNode).hasExtends) {
+                  const resolved = unwound.doc.resolveInterfaceExtends(
+                    parentDef as SemanticInterfaceNode
+                  )
+                  if (resolved && isStructure(resolved)) {
+                    for (const [name] of resolved.props) { parentProps.set(name, t.text) }
+                    continue
+                  }
+                }
+                parentDef = parentDef.getDefinition() || parentDef
+              }
+              if (isStructure(parentDef)) {
+                for (const [name] of parentDef.props) { parentProps.set(name, t.text) }
+              }
+            }
+            for (const [name, prop] of ownDef.props) {
+              const parentName = parentProps.get(name)
+              if (parentName) {
+                const propToken = prop.token('identifier')
+                if (propToken) {
+                  this._allMessages.push({
+                    severity: TSeverity.Error,
+                    message: `Property "${name}" already exists in parent "${parentName}" — override in extends is not allowed`,
+                    range: propToken.range,
+                  })
+                }
+              }
+            }
+          }
+        }
+      }
       for (const t of this.referred) {
         // Annotate entry refs resolve through the target interface
         // e.g. `annotate User { firstName }` → validates firstName as User.firstName

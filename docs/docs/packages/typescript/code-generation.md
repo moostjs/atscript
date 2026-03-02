@@ -48,6 +48,39 @@ Key points:
 - `toExampleData` is always optional — when `exampleData: true` is set in plugin options, it's rendered without deprecation; otherwise it's marked `@deprecated`
 - `Product.DataType` is a type alias for the data shape — useful for generic utilities
 
+### Interface Extends
+
+When an interface uses `extends`, the first parent becomes the TypeScript `extends` target. Properties from additional parents and own properties are rendered in the class body:
+
+```atscript
+interface Base {
+    id: string
+    createdAt: string
+}
+
+interface Auditable {
+    updatedBy: string
+}
+
+export interface Post extends Base, Auditable {
+    title: string
+}
+```
+
+Generates:
+
+```typescript
+export declare class Post extends Base {
+  updatedBy: string  // from Auditable (second parent, inlined)
+  title: string      // own prop
+  // id and createdAt come via TS extends from Base
+  static __is_atscript_annotated_type: true
+  // ... static members
+}
+```
+
+The JS output resolves all parent properties into a single merged type tree, so runtime metadata includes all inherited props and their annotations.
+
 For types (not interfaces), a companion `namespace` carries the same static members:
 
 ```typescript

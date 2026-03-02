@@ -386,7 +386,8 @@ export class AtscriptDbTable<
   /**
    * Counts records matching the query.
    */
-  public async count(query: Uniquery<DataType> = { filter: {}, controls: {} } as Uniquery<DataType>): Promise<number> {
+  public async count(query?: Uniquery<DataType>): Promise<number> {
+    query ??= { filter: {}, controls: {} } as Uniquery<DataType>
     return this.adapter.count(query as Uniquery)
   }
 

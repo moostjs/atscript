@@ -84,6 +84,15 @@ importers:
         specifier: 3.5.21
         version: 3.5.21(typescript@5.9.3)
 
+  explorations:
+    devDependencies:
+      '@atscript/core':
+        specifier: workspace:^
+        version: link:../packages/core
+      '@atscript/typescript':
+        specifier: workspace:^
+        version: link:../packages/typescript
+
   explorations/sqllite:
     dependencies:
       '@atscript/core':

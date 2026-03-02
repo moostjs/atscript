@@ -3,10 +3,25 @@ import { isStructure } from '.'
 import type { AtscriptDoc } from '../../document'
 import type { SemanticPropNode } from './prop-node'
 import { SemanticNode } from './semantic-node'
+import type { Token } from '../token'
 
 export class SemanticInterfaceNode extends SemanticNode {
+  private _extendsTokens: Token[] = []
+
   constructor() {
     super('interface')
+  }
+
+  addExtendsToken(token: Token) {
+    this._extendsTokens.push(token)
+  }
+
+  get extendsTokens(): Token[] {
+    return this._extendsTokens
+  }
+
+  get hasExtends(): boolean {
+    return this._extendsTokens.length > 0
   }
 
   registerAtDocument(doc: AtscriptDoc): void {
@@ -18,6 +33,12 @@ export class SemanticInterfaceNode extends SemanticNode {
       token.exported = true
       doc.registerExport(this)
     }
+    // Register extends tokens as references for go-to-definition and find-usages
+    for (const t of this._extendsTokens) {
+      t.isReference = true
+      doc.referred.push(t)
+      doc.tokensIndex.add(t)
+    }
   }
 
   get props() {
@@ -27,5 +48,14 @@ export class SemanticInterfaceNode extends SemanticNode {
         : new Map<string, SemanticPropNode>()
     }
     return new Map<string, SemanticPropNode>()
+  }
+
+  toString(level = 0, prefix = '●') {
+    let s = super.toString(level, prefix)
+    if (this._extendsTokens.length > 0) {
+      const extendsStr = this._extendsTokens.map(t => t.text).join(', ')
+      s = s.replace('[interface]', `[interface extends ${extendsStr}]`)
+    }
+    return s
   }
 }

@@ -83,6 +83,36 @@ export interface Data {
 }
 ```
 
+## Interface Extends
+
+Interfaces can extend one or more parent interfaces, inheriting all their properties and annotations:
+
+```atscript
+interface Base {
+    @meta.label 'ID'
+    id: string
+    createdAt: string
+}
+
+interface Timestamped {
+    updatedAt: string
+}
+
+export interface Post extends Base, Timestamped {
+    title: string
+    body: string
+}
+// Post has: id, createdAt, updatedAt, title, body
+// id inherits @meta.label 'ID' from Base
+```
+
+Rules:
+- Own properties are added to the inherited ones
+- Prop-level annotations are inherited from parents
+- Interface-level annotations are **not** inherited
+- Overriding a parent property in a child is **not** allowed (produces a diagnostic error)
+- Self-extends and circular extends are detected as errors
+
 ## Intersection Types
 
 ```atscript

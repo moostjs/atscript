@@ -360,6 +360,18 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         const lineStartOffset = document.offsetAt({ line: position.line, character: 0 })
         const lineText = text.slice(lineStartOffset, offset)
 
+        // After "interface Name extends" or "interface Name extends A," → suggest type names
+        if (/^\s*(?:export\s+)?interface\s+\w+\s+extends\s+(?:[\w.]+\s*,\s*)*\w*$/u.test(lineText)) {
+          return this.getDeclarationsCompletions(atscript, text, false)
+        }
+
+        // After "interface Name " → suggest extends keyword
+        if (/^\s*(?:export\s+)?interface\s+\w+\s+\w*$/u.test(lineText)) {
+          return [
+            { label: 'extends', kind: CompletionItemKind.Keyword },
+          ]
+        }
+
         // After "annotate" keyword → suggest annotatable targets
         if (/^\s*(?:export\s+)?annotate\s+\w*$/u.test(lineText)) {
           return this.getDeclarationsCompletions(atscript, text, false)

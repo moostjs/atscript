@@ -133,7 +133,18 @@ export class JsRenderer extends BaseRenderer {
           if (unwound?.def) {
             let def = this.doc.mergeIntersection(unwound.def)
             if (isInterface(def)) {
-              def = def.getDefinition() || def
+              if ((def as SemanticInterfaceNode).hasExtends) {
+                const resolved = unwound.doc.resolveInterfaceExtends(
+                  def as SemanticInterfaceNode
+                )
+                if (resolved) {
+                  def = resolved
+                } else {
+                  def = def.getDefinition() || def
+                }
+              } else {
+                def = def.getDefinition() || def
+              }
             }
             this._adHocAnnotations = this.buildAdHocMap([annotateNode])
             this.annotateType(def, node.id)
@@ -146,7 +157,14 @@ export class JsRenderer extends BaseRenderer {
         }
       } else {
         // For interface/type nodes, inline definition uses only original annotations.
-        this.annotateType(node.getDefinition(), node.id)
+        let def = node.getDefinition()
+        if (isInterface(node) && (node as SemanticInterfaceNode).hasExtends) {
+          const resolved = this.doc.resolveInterfaceExtends(node as SemanticInterfaceNode)
+          if (resolved) {
+            def = resolved
+          }
+        }
+        this.annotateType(def, node.id)
         this.indent().defineMetadata(node).unindent()
         this.writeln()
       }
@@ -252,7 +270,13 @@ export class JsRenderer extends BaseRenderer {
     switch (node.entity) {
       case 'interface':
       case 'type': {
-        const def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
+        let def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
+        if (isInterface(node) && (node as SemanticInterfaceNode).hasExtends) {
+          const resolved = this.doc.resolveInterfaceExtends(node as SemanticInterfaceNode)
+          if (resolved) {
+            def = resolved
+          }
+        }
         const handle = this.toAnnotatedHandle(def, true)
         // Assign id for $defs/$ref support in buildJsonSchema (bundle mode)
         const typeId =

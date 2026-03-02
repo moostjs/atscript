@@ -5,7 +5,7 @@ import { $n } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
 import type { TPipe } from './core.pipe'
 import { $pipe } from './core.pipe'
-import { annotations, definition, propName, refWithChain, unwrap } from './special.pipe'
+import { annotations, definition, extendsClause, propName, refWithChain, unwrap } from './special.pipe'
 import { $token, block, identifier, pun, text } from './tokens.pipe'
 
 const ref = $pipe('ref', [refWithChain()]) // defineValuePipe('ref', 'identifier', true)
@@ -101,6 +101,7 @@ const interfaceType = $pipe('interface', [
   identifier('export').saveAs('export').optional().skip('\n'),
   identifier('interface').saveAs('type').skip('\n').suppressEobError(),
   identifier().saveAs('identifier').global().skip('\n'),
+  extendsClause(),
   definition([structureBlock()]),
 ]).skip('\n', ';')
 

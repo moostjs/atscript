@@ -98,6 +98,20 @@
           "name": "keyword.control.export.atscript"
         },
         {
+          "name": "meta.interface.extends.atscript",
+          "begin": "(\\binterface\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)\\s+(extends)\\b",
+          "beginCaptures": {
+            "1": { "name": "storage.type" },
+            "2": { "name": "entity.name.type" },
+            "3": { "name": "storage.modifier.extends.atscript" }
+          },
+          "end": "(?=\\{)",
+          "patterns": [
+            { "match": "\\b[A-Za-z_][A-Za-z0-9_.]*\\b", "name": "entity.name.type" },
+            { "match": ",", "name": "punctuation.separator.comma.atscript" }
+          ]
+        },
+        {
           "match": "(\\b(?:type|interface)\\b)\\s+([A-Za-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": {
