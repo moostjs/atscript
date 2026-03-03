@@ -245,8 +245,28 @@ These `@db.*` annotations are defined in `@atscript/core` and processed by `Atsc
 | `@db.index.plain "name"` | Field | B-tree index (optional sort: `"name", "desc"`) |
 | `@db.index.unique "name"` | Field | Unique index |
 | `@db.index.fulltext "name"` | Field | Full-text search index |
+| `@db.json` | Field | Store as a single JSON column (skip flattening) |
 
 Multiple fields with the same index name form a **composite index**.
+
+## Type-Safe Queries with `__flat`
+
+Interfaces annotated with `@db.table` get a `__flat` static property in the generated `.d.ts` file, mapping all dot-notation paths to their value types. This enables autocomplete and type checking for filter expressions and `$select`/`$sort` operations.
+
+Use `FlatOf<T>` to extract the flat type:
+
+```typescript
+import type { FlatOf } from '@atscript/utils-db'
+
+type UserFlat = FlatOf<typeof User>
+// → { id: number; name: string; contact: never; "contact.email": string; ... }
+```
+
+`AtscriptDbTable` uses `FlatOf<T>` as the type parameter for query methods (`findOne`, `findMany`, `count`, `updateMany`, `replaceMany`, `deleteMany`), giving you autocomplete on filter keys and select paths. When `__flat` is not present (no `@db.table`), `FlatOf<T>` falls back to the regular data shape — fully backward-compatible.
+
+### `$select` Parent Path Expansion
+
+Selecting a parent object path (e.g., `$select: ['contact']`) automatically expands to all its leaf physical columns for relational databases. Sorting by parent paths is silently ignored.
 
 ## Cross-Cutting Concerns
 
@@ -305,6 +325,7 @@ export { decomposePatch } from './patch-decomposer'
 export { getKeyProps } from './patch-types'
 
 // Types
+export type { FlatOf } from '@atscript/typescript/utils'
 export type {
   TDbFilter, TDbFindOptions,
   TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult,

@@ -37,6 +37,7 @@ declare global {
     "db.column": string
     "db.default.value": string
     "db.default.fn": string
+    "db.json": boolean
     "db.ignore": boolean
     "db.mongo.collection": boolean
     "db.mongo.autoIndexes": boolean

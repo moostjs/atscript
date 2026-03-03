@@ -222,6 +222,82 @@ await users.findMany({
 })
 ```
 
+## Nested Fields
+
+When your Atscript interface has nested objects, use dot-notation to filter, sort, and select by nested paths. The generic layer translates these paths to physical column names automatically.
+
+### Filtering
+
+```typescript
+// Filter by nested field (contact.email → contact__email in SQL)
+await users.findMany({
+  filter: { 'contact.email': 'alice@example.com' },
+  controls: {},
+})
+
+// Deep nested path
+await users.findMany({
+  filter: { 'settings.notifications.email': true },
+  controls: {},
+})
+
+// All filter operators work on nested paths
+await users.findMany({
+  filter: { 'contact.phone': { $exists: true } },
+  controls: {},
+})
+```
+
+### Sorting
+
+```typescript
+await users.findMany({
+  filter: {},
+  controls: { $sort: { 'contact.phone': -1 } },
+})
+```
+
+### Projection
+
+```typescript
+await users.findMany({
+  filter: {},
+  controls: { $select: ['id', 'contact.email'] },
+})
+```
+
+#### Parent Path Expansion
+
+Selecting a parent object path automatically expands it to all its leaf columns in relational databases:
+
+```typescript
+// Select a parent path
+await users.findMany({
+  filter: {},
+  controls: { $select: ['id', 'contact'] },
+})
+// Translates to: $select: ['id', 'contact__email', 'contact__phone']
+
+// Works with object form too
+await users.findMany({
+  filter: {},
+  controls: { $select: { contact: 1, name: 1 } },
+})
+// Translates to: $select: { contact__email: 1, contact__phone: 1, name: 1 }
+```
+
+Deep parent paths also expand recursively — `$select: ['settings']` expands to all leaf columns under `settings` (e.g., `settings__notifications__email`, `settings__notifications__sms`).
+
+### Parent Path in Sorting
+
+Sorting by a parent object path (e.g., `$sort: { contact: 1 }`) is silently ignored for relational databases — there is no single column to sort by. Sort by specific leaf fields instead (e.g., `$sort: { 'contact.email': 1 }`).
+
+::: tip
+Dot-notation paths work only for **flattened** nested fields (those stored as separate `__`-separated columns). Sub-paths of `@db.json` fields cannot be queried at the generic layer — the data is stored as a single JSON string.
+:::
+
+See [Embedded Objects](./db-table#embedded-objects) for how nested objects are stored.
+
 ## Filter & Query Types
 
 The filter and query types are provided by `@uniqu/core` and re-exported from `@atscript/utils-db`:

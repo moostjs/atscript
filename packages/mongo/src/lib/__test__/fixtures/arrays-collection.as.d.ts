@@ -47,5 +47,27 @@ export declare class ArraysCollection {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "primitive": string[]
+    "primitiveComplex": never
+    "withKey": never
+    "withKey.key1": string
+    "withKey.key2": string
+    "withKey.value": string
+    "withKey.attribute": string
+    "withKeyMerge": never
+    "withKeyMerge.key1": string
+    "withKeyMerge.key2": string
+    "withKeyMerge.value": string
+    "withKeyMerge.attribute": string
+    "withoutKey": never
+    "withoutKey.key": string
+    "withoutKey.value": string
+    "withoutKey.attribute"?: string
+    "withoutKeyMerge": never
+    "withoutKeyMerge.key": string
+    "withoutKeyMerge.value": string
+    "withoutKeyMerge.attribute": string
+    "_id": string /* objectId */
+  }}
 // prettier-ignore-end

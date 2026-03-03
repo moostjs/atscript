@@ -23,7 +23,9 @@ export declare class IdPlugin {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "_id": string /* objectId */
+  }}
 
 /**
  * Atscript interface **UniqueItems**
@@ -53,5 +55,18 @@ export declare class UniqueItems {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "str"?: string[]
+    "strUnique"?: string[]
+    "obj"?: never
+    "obj.a"?: string
+    "obj.b"?: string
+    "objUnique"?: never
+    "objUnique.a"?: string
+    "objUnique.b"?: string
+    "kObj"?: never
+    "kObj.a"?: string
+    "kObj.b"?: string
+    "_id": string /* objectId */
+  }}
 // prettier-ignore-end

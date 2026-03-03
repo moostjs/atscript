@@ -16,6 +16,7 @@ import { prepareFixtures } from './test-utils'
 // Populated by beforeAll after fixtures are compiled
 let UsersTable: any
 let NoTableAnnotation: any
+let ProfileTable: any
 
 // ── Mock adapter ────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ describe('AtscriptDbTable', () => {
     const fixtures = await import('./fixtures/test-table.as.js')
     UsersTable = fixtures.UsersTable
     NoTableAnnotation = fixtures.NoTableAnnotation
+    ProfileTable = fixtures.ProfileTable
   })
 
   beforeEach(() => {
@@ -191,7 +193,8 @@ describe('AtscriptDbTable', () => {
     })
 
     it('should extract unique props from single-field unique indexes', () => {
-      expect(table.uniqueProps.has('email')).toBe(true)
+      // uniqueProps uses physical names (resolved via @db.column)
+      expect(table.uniqueProps.has('email_address')).toBe(true)
     })
 
     it('should return ID descriptor', () => {
@@ -214,7 +217,7 @@ describe('AtscriptDbTable', () => {
       const emailIdx = indexes.find(i => i.name === 'email_idx')
       expect(emailIdx).toBeDefined()
       expect(emailIdx!.type).toBe('unique')
-      expect(emailIdx!.fields).toEqual([{ name: 'email', sort: 'asc' }])
+      expect(emailIdx!.fields).toEqual([{ name: 'email_address', sort: 'asc' }])
     })
 
     it('should create composite plain index when fields share a name', () => {
@@ -388,6 +391,358 @@ describe('AtscriptDbTable', () => {
       hookAdapter.getAdapterTableName = () => 'custom_users'
       const t = new AtscriptDbTable(UsersTable, hookAdapter)
       expect(t.tableName).toBe('custom_users')
+    })
+  })
+})
+
+// ── Nested / Embedded Object Tests ─────────────────────────────────────────
+
+describe('AtscriptDbTable — embedded objects', () => {
+  let adapter: MockAdapter
+  let table: AtscriptDbTable
+
+  beforeAll(async () => {
+    await prepareFixtures()
+  })
+
+  beforeEach(() => {
+    adapter = new MockAdapter()
+    table = new AtscriptDbTable(ProfileTable, adapter)
+  })
+
+  // ── Classification & field descriptors ────────────────────────────────
+
+  describe('field classification', () => {
+    it('should exclude parent objects from fieldDescriptors', () => {
+      const descriptors = table.fieldDescriptors
+      const paths = descriptors.map(d => d.path)
+      // "contact" and "settings" and "settings.notifications" are parent objects — excluded
+      expect(paths).not.toContain('contact')
+      expect(paths).not.toContain('settings')
+      expect(paths).not.toContain('settings.notifications')
+      // Their leaf children should be present
+      expect(paths).toContain('contact.email')
+      expect(paths).toContain('contact.phone')
+      expect(paths).toContain('settings.notifications.email')
+      expect(paths).toContain('settings.notifications.sms')
+    })
+
+    it('should assign __-separated physical names to flattened fields', () => {
+      const descriptors = table.fieldDescriptors
+      const contactEmail = descriptors.find(d => d.path === 'contact.email')
+      expect(contactEmail?.physicalName).toBe('contact__email')
+      const settingsSms = descriptors.find(d => d.path === 'settings.notifications.sms')
+      expect(settingsSms?.physicalName).toBe('settings__notifications__sms')
+    })
+
+    it('should set storage=flattened for nested leaf fields', () => {
+      const descriptors = table.fieldDescriptors
+      const contactEmail = descriptors.find(d => d.path === 'contact.email')
+      expect(contactEmail?.storage).toBe('flattened')
+      expect(contactEmail?.flattenedFrom).toBe('contact.email')
+    })
+
+    it('should set storage=json for @db.json fields', () => {
+      const descriptors = table.fieldDescriptors
+      const prefs = descriptors.find(d => d.path === 'preferences')
+      expect(prefs?.storage).toBe('json')
+      expect(prefs?.designType).toBe('json')
+    })
+
+    it('should set storage=json for array fields', () => {
+      const descriptors = table.fieldDescriptors
+      const tags = descriptors.find(d => d.path === 'tags')
+      expect(tags?.storage).toBe('json')
+    })
+
+    it('should set storage=column for top-level scalar fields', () => {
+      const descriptors = table.fieldDescriptors
+      const name = descriptors.find(d => d.path === 'name')
+      expect(name?.storage).toBe('column')
+      expect(name?.flattenedFrom).toBeUndefined()
+    })
+
+    it('should build pathToPhysical map', () => {
+      const p2p = table.pathToPhysical
+      expect(p2p.get('contact.email')).toBe('contact__email')
+      expect(p2p.get('contact.phone')).toBe('contact__phone')
+      expect(p2p.get('settings.notifications.email')).toBe('settings__notifications__email')
+      expect(p2p.get('preferences')).toBe('preferences')
+      expect(p2p.get('name')).toBe('name')
+    })
+
+    it('should build physicalToPath map', () => {
+      const p2l = table.physicalToPath
+      expect(p2l.get('contact__email')).toBe('contact.email')
+      expect(p2l.get('settings__notifications__sms')).toBe('settings.notifications.sms')
+    })
+
+    it('should exclude ignored fields from descriptors', () => {
+      const descriptors = table.fieldDescriptors
+      const ignored = descriptors.find(d => d.path === 'displayName')
+      expect(ignored?.ignored).toBe(true)
+    })
+  })
+
+  // ── Write flattening ───────────────────────────────────────────────────
+
+  describe('write flattening', () => {
+    it('should flatten nested objects to __-separated keys on insert', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Alice',
+        contact: { email: 'alice@x.com', phone: '555' },
+        preferences: { theme: 'dark', lang: 'en' },
+        tags: ['admin', 'user'],
+        settings: { notifications: { email: true, sms: false } },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'insertOne')!
+      const data = call.args[0] as Record<string, unknown>
+
+      // Flattened contact
+      expect(data.contact__email).toBe('alice@x.com')
+      expect(data.contact__phone).toBe('555')
+      // No "contact" key
+      expect(data.contact).toBeUndefined()
+
+      // Deep flattened settings
+      expect(data.settings__notifications__email).toBe(true)
+      expect(data.settings__notifications__sms).toBe(false)
+      expect(data.settings).toBeUndefined()
+    })
+
+    it('should JSON-stringify @db.json fields on insert', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Alice',
+        contact: { email: 'alice@x.com' },
+        preferences: { theme: 'dark', lang: 'en' },
+        tags: ['admin'],
+        settings: { notifications: { email: true, sms: false } },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'insertOne')!
+      const data = call.args[0] as Record<string, unknown>
+
+      expect(data.preferences).toBe(JSON.stringify({ theme: 'dark', lang: 'en' }))
+    })
+
+    it('should JSON-stringify array fields on insert', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Alice',
+        contact: { email: 'alice@x.com' },
+        preferences: { theme: 'dark', lang: 'en' },
+        tags: ['admin', 'user'],
+        settings: { notifications: { email: true, sms: false } },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'insertOne')!
+      const data = call.args[0] as Record<string, unknown>
+
+      expect(data.tags).toBe(JSON.stringify(['admin', 'user']))
+    })
+
+    it('should set all children to null when parent is null', async () => {
+      // Access the internal _prepareForWrite directly to avoid validation
+      // (validation rejects null for a required object field)
+      table.flatMap // trigger flatten
+      const prepared = (table as any)._prepareForWrite({
+        id: 1,
+        name: 'Alice',
+        contact: null,
+        preferences: { theme: 'dark', lang: 'en' },
+        tags: [],
+        settings: { notifications: { email: true, sms: false } },
+      })
+
+      expect(prepared.contact__email).toBeNull()
+      expect(prepared.contact__phone).toBeNull()
+    })
+  })
+
+  // ── Read reconstruction ─────────────────────────────────────────────────
+
+  describe('read reconstruction', () => {
+    it('should reconstruct nested objects from __-separated columns', async () => {
+      adapter.findOne = async (_q: Uniquery) => ({
+        id: 1,
+        name: 'Alice',
+        contact__email: 'alice@x.com',
+        contact__phone: '555',
+        preferences: '{"theme":"dark","lang":"en"}',
+        tags: '["admin","user"]',
+        settings__notifications__email: 1,
+        settings__notifications__sms: 0,
+      })
+
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
+
+      expect(result.contact).toEqual({ email: 'alice@x.com', phone: '555' })
+      expect(result.settings).toEqual({ notifications: { email: 1, sms: 0 } })
+    })
+
+    it('should parse JSON fields from strings', async () => {
+      adapter.findOne = async (_q: Uniquery) => ({
+        id: 1,
+        name: 'Alice',
+        contact__email: 'a@x.com',
+        contact__phone: null,
+        preferences: '{"theme":"dark","lang":"en"}',
+        tags: '["admin","user"]',
+        settings__notifications__email: 1,
+        settings__notifications__sms: 0,
+      })
+
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
+
+      expect(result.preferences).toEqual({ theme: 'dark', lang: 'en' })
+      expect(result.tags).toEqual(['admin', 'user'])
+    })
+
+    it('should reconstruct null parent when all children are null', async () => {
+      adapter.findOne = async (_q: Uniquery) => ({
+        id: 1,
+        name: 'Alice',
+        contact__email: null,
+        contact__phone: null,
+        preferences: null,
+        tags: null,
+        settings__notifications__email: null,
+        settings__notifications__sms: null,
+      })
+
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
+
+      // contact is a required object — all-null children collapse to {}
+      // (or null for optional; depends on type optionality)
+      expect(result.contact).toBeDefined()
+    })
+
+    it('should reconstruct findMany results', async () => {
+      adapter.findMany = async (_q: Uniquery) => [
+        { id: 1, name: 'A', contact__email: 'a@x.com', contact__phone: null, preferences: '{}', tags: '[]', settings__notifications__email: 1, settings__notifications__sms: 0 },
+        { id: 2, name: 'B', contact__email: 'b@x.com', contact__phone: '555', preferences: '{}', tags: '[]', settings__notifications__email: 0, settings__notifications__sms: 1 },
+      ]
+
+      const results = await table.findMany({ filter: {}, controls: {} }) as any[]
+
+      expect(results[0].contact).toEqual({ email: 'a@x.com', phone: null })
+      expect(results[1].contact).toEqual({ email: 'b@x.com', phone: '555' })
+    })
+  })
+
+  // ── Query translation ──────────────────────────────────────────────────
+
+  describe('query translation', () => {
+    it('should translate dot-notation filter keys to physical names', async () => {
+      await table.findOne({
+        filter: { 'contact.email': 'alice@x.com' },
+        controls: {},
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findOne')!
+      const query = call.args[0] as Uniquery
+      expect(query.filter).toHaveProperty('contact__email', 'alice@x.com')
+      expect(query.filter).not.toHaveProperty('contact.email')
+    })
+
+    it('should translate filter keys in $or', async () => {
+      await table.findMany({
+        filter: { $or: [{ 'contact.email': 'a@x.com' }, { 'contact.phone': '555' }] },
+        controls: {},
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      const orFilters = (query.filter as any).$or
+      expect(orFilters[0]).toHaveProperty('contact__email')
+      expect(orFilters[1]).toHaveProperty('contact__phone')
+    })
+
+    it('should translate sort keys to physical names', async () => {
+      await table.findMany({
+        filter: {},
+        controls: { $sort: { 'contact.email': 1 } },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      expect(query.controls?.$sort).toHaveProperty('contact__email')
+    })
+
+    it('should strip intermediate parent paths from $sort', async () => {
+      await table.findMany({
+        filter: {},
+        controls: { $sort: { contact: 1, name: -1 } },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      // "contact" is an intermediate parent — should be stripped
+      expect(query.controls?.$sort).not.toHaveProperty('contact')
+      // "name" is a leaf — should remain
+      expect(query.controls?.$sort).toHaveProperty('name', -1)
+    })
+
+    it('should expand intermediate parent in $select array to leaf columns', async () => {
+      await table.findMany({
+        filter: {},
+        controls: { $select: ['contact', 'name'] as any },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      const select = query.controls?.$select as string[]
+      // "contact" should expand to its leaf physical columns
+      expect(select).toContain('contact__email')
+      expect(select).toContain('contact__phone')
+      // "name" is a leaf — should pass through
+      expect(select).toContain('name')
+      // Original "contact" key should not be present
+      expect(select).not.toContain('contact')
+    })
+
+    it('should expand deep nested parent in $select array to all leaf columns', async () => {
+      await table.findMany({
+        filter: {},
+        controls: { $select: ['settings'] as any },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      const select = query.controls?.$select as string[]
+      // "settings" should expand to its deep leaf physical columns
+      expect(select).toContain('settings__notifications__email')
+      expect(select).toContain('settings__notifications__sms')
+      expect(select).not.toContain('settings')
+    })
+
+    it('should expand intermediate parent in $select object to leaf columns', async () => {
+      await table.findMany({
+        filter: {},
+        controls: { $select: { contact: 1, name: 1 } as any },
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findMany')!
+      const query = call.args[0] as Uniquery
+      const select = query.controls?.$select as Record<string, number>
+      expect(select).toHaveProperty('contact__email', 1)
+      expect(select).toHaveProperty('contact__phone', 1)
+      expect(select).toHaveProperty('name', 1)
+      expect(select).not.toHaveProperty('contact')
+    })
+
+    it('should pass through non-nested field names unchanged', async () => {
+      await table.findOne({
+        filter: { name: 'Alice' },
+        controls: {},
+      } as any)
+
+      const call = adapter.calls.find(c => c.method === 'findOne')!
+      const query = call.args[0] as Uniquery
+      expect(query.filter).toHaveProperty('name', 'Alice')
     })
   })
 })

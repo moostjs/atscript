@@ -28,6 +28,7 @@ This means a single `.as` file can describe a data model that works with multipl
 | `@db.default.value` | field | `value` (string) | Static default value |
 | `@db.default.fn` | field | `fn` (string) | Database function for default value |
 | `@db.ignore` | field | — | Exclude field from database operations |
+| `@db.json` | field | — | Force a field to be stored as a single JSON column |
 
 ::: tip Primary Keys
 Primary keys are declared with `@meta.id` (from the `@meta.*` namespace, not `@db.*`). See [Primary Keys](#primary-keys) below.
@@ -178,6 +179,49 @@ export interface OrderItem {
     quantity: number
 }
 ```
+
+## `@db.json`
+
+Forces a field to be stored as a single JSON column instead of being flattened into separate columns. By default, nested object fields are flattened into `__`-separated columns (e.g., `contact: { email: string }` becomes a `contact__email` column). `@db.json` overrides this behavior.
+
+```atscript
+@db.table 'users'
+export interface User {
+    @meta.id
+    id: number
+
+    // Flattened by default → columns: contact__email, contact__phone
+    contact: {
+        email: string
+        phone?: string
+    }
+
+    // Stored as single JSON column "preferences"
+    @db.json
+    preferences: {
+        theme: string
+        lang: string
+    }
+
+    // Arrays are always stored as JSON (no annotation needed)
+    tags: string[]
+}
+```
+
+When to use `@db.json`:
+- **Opaque data** — metadata, settings, or config you don't need to query by individual keys
+- **Deep nesting** — use `@db.json` on an intermediate field to cap flatten depth
+- **Variable structure** — data where the shape changes frequently
+
+::: tip
+Array fields (`string[]`, `{ label: string }[]`) are always stored as JSON — no `@db.json` needed.
+:::
+
+::: warning
+`@db.json` on a primitive field (string, number, boolean) has no effect and produces a warning. Most databases cannot index into JSON columns — placing `@db.index.*` on a `@db.json` field also produces a warning.
+:::
+
+See [Embedded Objects](./db-table#embedded-objects) for the full flattening strategy.
 
 ## Database-Specific Extensions
 

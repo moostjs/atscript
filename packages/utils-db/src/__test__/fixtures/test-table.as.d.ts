@@ -29,11 +29,65 @@ export declare class UsersTable {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "id": number
+    "email": string
+    "name": string
+    "createdAt": number
+    "displayName"?: string
+    "status": string
+    "bio"?: string
+  }}
+
+/**
+ * Atscript interface **ProfileTable**
+ * @see {@link ./test-table.as:30:18}
+ */
+export declare class ProfileTable {
+  id: number
+  name: string
+  contact: {
+    email: string
+    phone?: string
+  }
+  preferences: {
+    theme: string
+    lang: string
+  }
+  tags: string[]
+  settings: {
+    notifications: {
+      email: boolean
+      sms: boolean
+    }
+  }
+  displayName?: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof ProfileTable, ProfileTable>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ProfileTable>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "name": string
+    "contact": never
+    "contact.email": string
+    "contact.phone"?: string
+    "preferences": string
+    "tags": string[]
+    "settings": never
+    "settings.notifications": never
+    "settings.notifications.email": boolean
+    "settings.notifications.sms": boolean
+    "displayName"?: string
+  }}
 
 /**
  * Atscript interface **NoTableAnnotation**
- * @see {@link ./test-table.as:29:18}
+ * @see {@link ./test-table.as:61:18}
  */
 export declare class NoTableAnnotation {
   name: string

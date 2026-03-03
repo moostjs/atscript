@@ -4,6 +4,7 @@ import type {
   SemanticArrayNode,
   SemanticInterfaceNode,
   SemanticNode,
+  SemanticPrimitiveNode,
   SemanticPropNode,
   SemanticRefNode,
   SemanticStructureNode,
@@ -11,6 +12,7 @@ import type {
   TPrimitiveTypeDef,
 } from '@atscript/core'
 import {
+  flattenInterfaceNode,
   isArray,
   isConst,
   isGroup,
@@ -112,9 +114,12 @@ export class TypeRenderer extends BaseRenderer {
       }
       return this.write('[]')
     }
+    if (isPrimitive(def as SemanticNode)) {
+      return this.write(renderPrimitiveTypeDef((def as unknown as SemanticPrimitiveNode).config.type))
+    }
   }
 
-  renderStructure(struct: SemanticStructureNode, asClass?: string) {
+  renderStructure(struct: SemanticStructureNode, asClass?: string, interfaceNode?: SemanticInterfaceNode) {
     this.blockln('{}')
     // let propsList = ''
     const patterns = [] as SemanticPropNode[]
@@ -177,6 +182,9 @@ export class TypeRenderer extends BaseRenderer {
         )
       }
       this.writeln('static toExampleData?: () => any')
+      if (interfaceNode && this.hasDbTable(interfaceNode)) {
+        this.renderFlat(interfaceNode)
+      }
     }
     this.pop()
   }
@@ -220,7 +228,8 @@ export class TypeRenderer extends BaseRenderer {
         this.renderStructureFiltered(
           resolved as SemanticStructureNode,
           node.id!,
-          firstParentProps
+          firstParentProps,
+          node
         )
       } else {
         this.writeln('{}')
@@ -229,7 +238,7 @@ export class TypeRenderer extends BaseRenderer {
       this.write(`class ${node.id!} `)
       const struct = node.getDefinition()
       if (struct?.entity === 'structure') {
-        this.renderStructure(struct as SemanticStructureNode, node.id!)
+        this.renderStructure(struct as SemanticStructureNode, node.id!, node)
       } else {
         this.writeln('{}')
       }
@@ -243,10 +252,11 @@ export class TypeRenderer extends BaseRenderer {
   private renderStructureFiltered(
     struct: SemanticStructureNode,
     asClass: string,
-    filterProps?: Map<string, SemanticPropNode>
+    filterProps?: Map<string, SemanticPropNode>,
+    interfaceNode?: SemanticInterfaceNode
   ) {
     if (!filterProps) {
-      return this.renderStructure(struct, asClass)
+      return this.renderStructure(struct, asClass, interfaceNode)
     }
     this.blockln('{}')
     for (const prop of Array.from(struct.props.values())) {
@@ -285,6 +295,9 @@ export class TypeRenderer extends BaseRenderer {
       )
     }
     this.writeln('static toExampleData?: () => any')
+    if (interfaceNode && this.hasDbTable(interfaceNode)) {
+      this.renderFlat(interfaceNode)
+    }
     this.pop()
   }
 
@@ -366,6 +379,69 @@ export class TypeRenderer extends BaseRenderer {
     }
     this.writeln('const toExampleData: (() => any) | undefined')
     this.popln()
+  }
+
+  /**
+   * Checks whether an interface has the `@db.table` annotation.
+   *
+   * NOTE: Only `@db.table` interfaces get the `__flat` static property.
+   * This is intentionally hardcoded — `__flat` exists solely to improve
+   * type-safety for filter expressions and `$select`/`$sort` operations
+   * in the DB layer. Non-DB interfaces have no use for dot-notation path types.
+   */
+  private hasDbTable(node: SemanticInterfaceNode): boolean {
+    return !!node.annotations?.some(a => a.name === 'db.table')
+  }
+
+  /**
+   * Renders the `static __flat` property — a map of all dot-notation paths
+   * to their TypeScript value types.
+   *
+   * This enables type-safe autocomplete for filter keys and `$select`/`$sort`
+   * paths when using `AtscriptDbTable`. The `FlatOf<T>` utility type extracts
+   * this map at the type level.
+   *
+   * Special rendering rules:
+   * - **Intermediate paths** (structures, arrays of structures) → `never`
+   *   (prevents `$eq` comparisons, but allows `$select` and `$exists`)
+   * - **`@db.json` fields** → `string` (stored as serialized JSON in DB,
+   *   not individually queryable)
+   * - **Leaf fields** → their original TypeScript type
+   */
+  private renderFlat(node: SemanticInterfaceNode) {
+    const flatMap = flattenInterfaceNode(this.doc, node)
+    if (flatMap.size === 0) {
+      return
+    }
+    this.write('static __flat: ')
+    this.blockln('{}')
+    for (const [path, descriptor] of flatMap) {
+      this.write(`"${escapeQuotes(path)}"`)
+      if (descriptor.optional) {
+        this.write('?')
+      }
+      this.write(': ')
+      if (descriptor.intermediate) {
+        // Intermediate nodes (structures, arrays of structures, unions of only complex types)
+        // are typed as `never` to prevent meaningless $eq comparisons, while still
+        // appearing in autocomplete for $select and $exists checks.
+        this.writeln('never')
+      } else if (descriptor.dbJson) {
+        // @db.json fields are stored as JSON strings in the DB
+        this.writeln('string')
+      } else {
+        // Use the original prop definition for rendering (preserves named refs like Address,
+        // and gives the renderer ref nodes it knows how to resolve to TS types).
+        // Fall back to descriptor.def for synthetic union merges or missing propNode.
+        const originalDef = descriptor.propNode?.getDefinition()
+        const defToRender = originalDef && !(isGroup(descriptor.def) && descriptor.def !== originalDef)
+          ? originalDef
+          : descriptor.def
+        const renderedDef = this.renderTypeDefString(defToRender)
+        renderedDef.split('\n').forEach(l => this.writeln(l))
+      }
+    }
+    this.pop()
   }
 
   private phantomPropType(def?: SemanticNode): string | undefined {

@@ -872,4 +872,17 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/union-type-alias-ref.as.d.ts')
     )
   })
+  it('must render __flat for @db.table interfaces', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/db-table-flat.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].fileName).toBe('db-table-flat.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/db-table-flat.as.d.ts')
+    )
+  })
 })

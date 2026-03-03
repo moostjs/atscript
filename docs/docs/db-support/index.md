@@ -25,6 +25,7 @@ The DB integration stack has three layers:
 │  AtscriptDbTable                │
 │  (reads annotations, validates, │
 │   maps columns, applies defaults│
+│   flattens nested objects,      │
 │   delegates CRUD to adapter)    │
 └──────────────┬──────────────────┘
                │

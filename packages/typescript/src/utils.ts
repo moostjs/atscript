@@ -20,6 +20,15 @@ export type {
   TAtscriptDataType,
 } from './annotated-type'
 
+/**
+ * Extracts the flat dot-notation type map from an Atscript annotated type.
+ * If the type has a `__flat` static property (emitted for `@db.table` interfaces),
+ * returns that flat map. Otherwise falls back to `TAtscriptDataType<T>`.
+ *
+ * Use this for type-safe filters and selects with dot-notation field paths.
+ */
+export type FlatOf<T> = T extends { __flat: infer F } ? F : TAtscriptDataType<T>
+
 export * from './validator'
 
 export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './json-schema'

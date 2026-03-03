@@ -138,6 +138,59 @@ await users.findMany({
 })
 ```
 
+## 5. Nested Objects
+
+Nested object fields are automatically flattened into `__`-separated columns. Use `@db.json` to store as a single JSON column instead:
+
+```atscript
+// product.as
+@db.table 'products'
+export interface Product {
+    @meta.id
+    id: number
+    name: string
+
+    // Flattened → columns: dimensions__width, dimensions__height
+    dimensions: {
+        width: number
+        height: number
+    }
+
+    // Single JSON column
+    @db.json
+    metadata: {
+        color: string
+        material?: string
+    }
+
+    // Arrays are always JSON
+    tags: string[]
+}
+```
+
+```typescript
+// Insert with nested objects
+await products.insertOne({
+  id: 1,
+  name: 'Widget',
+  dimensions: { width: 10, height: 5 },
+  metadata: { color: 'red', material: 'plastic' },
+  tags: ['sale', 'new'],
+})
+
+// Query by nested path (dot-notation → __-separated column)
+const results = await products.findMany({
+  filter: { 'dimensions.width': { $gt: 5 } },
+  controls: { $sort: { 'dimensions.height': 1 } },
+})
+
+// Read back — nested objects reconstructed automatically
+// results[0].dimensions → { width: 10, height: 5 }
+// results[0].metadata → { color: 'red', material: 'plastic' }
+```
+
+See [Embedded Objects](/db-support/db-table#embedded-objects) for the full flattening strategy.
+
 ## Using a Custom Driver
 
 The `SqliteAdapter` accepts any object implementing `TSqliteDriver`. This makes it easy to swap drivers or wrap existing ones:

@@ -9,6 +9,7 @@ import { prepareFixtures } from './test-utils'
 // Populated by beforeAll after fixtures are compiled
 let UsersTable: any
 let NoTableAnnotation: any
+let ProfileTable: any
 
 describe('SqliteAdapter + AtscriptDbTable', () => {
   let driver: BetterSqlite3Driver
@@ -20,6 +21,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
     const fixtures = await import('./fixtures/test-table.as.js')
     UsersTable = fixtures.UsersTable
     NoTableAnnotation = fixtures.NoTableAnnotation
+    ProfileTable = fixtures.ProfileTable
   })
 
   beforeEach(() => {
@@ -420,6 +422,160 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
       const t = new AtscriptDbTable(NoTableAnnotation, a)
       expect(t.tableName).toBe('NoTableAnnotation')
       d.close()
+    })
+  })
+})
+
+// ── Embedded Objects Integration ──────────────────────────────────────────
+
+describe('SqliteAdapter — embedded objects', () => {
+  let driver: BetterSqlite3Driver
+  let adapter: SqliteAdapter
+  let table: AtscriptDbTable
+
+  beforeAll(async () => {
+    await prepareFixtures()
+  })
+
+  beforeEach(async () => {
+    driver = new BetterSqlite3Driver(':memory:')
+    adapter = new SqliteAdapter(driver)
+    table = new AtscriptDbTable(ProfileTable, adapter)
+    await table.ensureTable()
+  })
+
+  afterEach(() => {
+    driver.close()
+  })
+
+  describe('ensureTable', () => {
+    it('should create __-separated columns for flattened fields', () => {
+      const columns = driver.all<{ name: string }>(
+        `PRAGMA table_info("profiles")`
+      )
+      const colNames = columns.map(c => c.name)
+
+      expect(colNames).toContain('contact__email')
+      expect(colNames).toContain('contact__phone')
+      expect(colNames).toContain('settings__notifications__email')
+      expect(colNames).toContain('settings__notifications__sms')
+      // Parent object should NOT be a column
+      expect(colNames).not.toContain('contact')
+      expect(colNames).not.toContain('settings')
+      expect(colNames).not.toContain('settings__notifications')
+    })
+
+    it('should create a single column for @db.json fields', () => {
+      const columns = driver.all<{ name: string }>(
+        `PRAGMA table_info("profiles")`
+      )
+      const colNames = columns.map(c => c.name)
+
+      expect(colNames).toContain('preferences')
+      expect(colNames).toContain('tags')
+    })
+
+    it('should exclude @db.ignore fields', () => {
+      const columns = driver.all<{ name: string }>(
+        `PRAGMA table_info("profiles")`
+      )
+      const colNames = columns.map(c => c.name)
+      expect(colNames).not.toContain('displayName')
+    })
+  })
+
+  describe('insert + findOne round-trip', () => {
+    it('should preserve nested object structure through insert and read', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Alice',
+        contact: { email: 'alice@x.com', phone: '555-0100' },
+        preferences: { theme: 'dark', lang: 'en' },
+        tags: ['admin', 'user'],
+        settings: { notifications: { email: true, sms: false } },
+      } as any)
+
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
+
+      expect(result.name).toBe('Alice')
+      expect(result.contact).toEqual({ email: 'alice@x.com', phone: '555-0100' })
+      expect(result.preferences).toEqual({ theme: 'dark', lang: 'en' })
+      expect(result.tags).toEqual(['admin', 'user'])
+      expect(result.settings).toEqual({ notifications: { email: 1, sms: 0 } })
+    })
+
+    it('should handle omitted optional fields within nested objects', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Bob',
+        contact: { email: 'bob@x.com' },
+        preferences: { theme: 'light', lang: 'en' },
+        tags: [],
+        settings: { notifications: { email: false, sms: false } },
+      } as any)
+
+      const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
+
+      expect(result.name).toBe('Bob')
+      expect(result.contact.email).toBe('bob@x.com')
+      // phone was omitted — stored as NULL, reconstructed as null
+      expect(result.contact.phone).toBeNull()
+    })
+
+    it('should store @db.json fields as JSON TEXT in the database', async () => {
+      await table.insertOne({
+        id: 1,
+        name: 'Carol',
+        contact: { email: 'carol@x.com' },
+        preferences: { theme: 'light', lang: 'fr' },
+        tags: ['viewer'],
+        settings: { notifications: { email: true, sms: true } },
+      } as any)
+
+      // Read the raw row to verify JSON storage
+      const raw = driver.get<Record<string, unknown>>(
+        `SELECT preferences, tags FROM profiles WHERE id = 1`
+      )
+      expect(typeof raw?.preferences).toBe('string')
+      expect(JSON.parse(raw?.preferences as string)).toEqual({ theme: 'light', lang: 'fr' })
+      expect(typeof raw?.tags).toBe('string')
+      expect(JSON.parse(raw?.tags as string)).toEqual(['viewer'])
+    })
+  })
+
+  describe('query by nested path', () => {
+    beforeEach(async () => {
+      await table.insertMany([
+        { id: 1, name: 'Alice', contact: { email: 'alice@x.com', phone: '111' }, preferences: { theme: 'dark', lang: 'en' }, tags: [], settings: { notifications: { email: true, sms: false } } },
+        { id: 2, name: 'Bob', contact: { email: 'bob@x.com', phone: '222' }, preferences: { theme: 'light', lang: 'en' }, tags: [], settings: { notifications: { email: false, sms: true } } },
+        { id: 3, name: 'Carol', contact: { email: 'carol@x.com', phone: '333' }, preferences: { theme: 'dark', lang: 'fr' }, tags: [], settings: { notifications: { email: true, sms: true } } },
+      ] as any[])
+    })
+
+    it('should filter by dot-notation nested path', async () => {
+      const results = await table.findMany({
+        filter: { 'contact.email': 'alice@x.com' },
+        controls: {},
+      } as any)
+      expect(results.length).toBe(1)
+      expect((results[0] as any).name).toBe('Alice')
+    })
+
+    it('should filter by deep nested path', async () => {
+      const results = await table.findMany({
+        filter: { 'settings.notifications.email': true },
+        controls: {},
+      } as any)
+      expect(results.length).toBe(2)
+    })
+
+    it('should sort by nested path', async () => {
+      const results = await table.findMany({
+        filter: {},
+        controls: { $sort: { 'contact.phone': -1 } },
+      } as any)
+      expect((results[0] as any).name).toBe('Carol')
+      expect((results[2] as any).name).toBe('Alice')
     })
   })
 })

@@ -1,6 +1,7 @@
 import {
   flattenAnnotatedType,
   isAnnotatedType,
+  type FlatOf,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type TAtscriptTypeObject,
@@ -74,6 +75,7 @@ function indexKey(type: string, name: string): string {
 export class AtscriptDbTable<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
+  FlatType = FlatOf<T>,
 > {
   /** Resolved table/collection name. */
   public readonly tableName: string
@@ -91,6 +93,21 @@ export class AtscriptDbTable<
   protected _defaults = new Map<string, TDbDefaultValue>()
   protected _ignoredFields = new Set<string>()
   protected _uniqueProps = new Set<string>()
+
+  // ── Embedded object mapping ──────────────────────────────────────────────
+
+  /** Logical dot-path → physical column name. */
+  protected _pathToPhysical = new Map<string, string>()
+  /** Physical column name → logical dot-path (inverse). */
+  protected _physicalToPath = new Map<string, string>()
+  /** Object paths being flattened into __-separated columns (no column themselves). */
+  protected _flattenedParents = new Set<string>()
+  /** Fields stored as JSON (@db.json + array fields). */
+  protected _jsonFields = new Set<string>()
+  /** Intermediate paths → their leaf physical column names (for $select expansion in relational DBs). */
+  protected _selectExpansion = new Map<string, string[]>()
+  /** Fast-path flag: skip all mapping when no nested/json fields exist. */
+  protected _requiresMappings = false
 
   // ── Validators ────────────────────────────────────────────────────────────
 
@@ -172,6 +189,18 @@ export class AtscriptDbTable<
     return this._uniqueProps
   }
 
+  /** Precomputed logical dot-path → physical column name map. */
+  public get pathToPhysical(): ReadonlyMap<string, string> {
+    this._flatten()
+    return this._pathToPhysical
+  }
+
+  /** Precomputed physical column name → logical dot-path map (inverse). */
+  public get physicalToPath(): ReadonlyMap<string, string> {
+    this._flatten()
+    return this._physicalToPath
+  }
+
   /** Descriptor for the primary ID field(s). */
   public getIdDescriptor(): TIdDescriptor {
     this._flatten()
@@ -190,17 +219,51 @@ export class AtscriptDbTable<
     this._flatten()
     if (!this._fieldDescriptors) {
       this._fieldDescriptors = []
+      const skipFlattening = this.adapter.supportsNestedObjects()
+
       for (const [path, type] of this._flatMap!.entries()) {
         if (!path) { continue } // skip root entry
+
+        // Skip parent objects that are being flattened (they have no column)
+        if (!skipFlattening && this._flattenedParents.has(path)) {
+          continue
+        }
+
+        // Skip children of @db.json fields (they live inside the JSON blob)
+        if (!skipFlattening && this._findJsonParent(path) !== undefined) {
+          continue
+        }
+
+        const isJson = this._jsonFields.has(path)
+        const isFlattened = !skipFlattening && this._findFlattenedParent(path) !== undefined
+        const designType = isJson ? 'json' : resolveDesignType(type)
+
+        let storage: 'column' | 'flattened' | 'json'
+        if (skipFlattening) {
+          storage = 'column'
+        } else if (isJson) {
+          storage = 'json'
+        } else if (isFlattened) {
+          storage = 'flattened'
+        } else {
+          storage = 'column'
+        }
+
+        const physicalName = skipFlattening
+          ? (this._columnMap.get(path) ?? path)
+          : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
+
         this._fieldDescriptors.push({
           path,
           type,
-          physicalName: this._columnMap.get(path) ?? path,
-          designType: resolveDesignType(type),
+          physicalName,
+          designType,
           optional: type.optional === true,
           isPrimaryKey: this._primaryKeys.includes(path),
           ignored: this._ignoredFields.has(path),
           defaultValue: this._defaults.get(path),
+          storage,
+          flattenedFrom: isFlattened ? path : undefined,
         })
       }
     }
@@ -221,20 +284,29 @@ export class AtscriptDbTable<
       return select.length > 0 ? select : undefined
     }
 
-    const entries = Object.entries(select)
-    if (entries.length === 0) { return undefined }
+    const selectObj = select as Record<string, number>
+    const keys = Object.keys(selectObj)
+    if (keys.length === 0) { return undefined }
 
-    const firstVal = entries[0][1]
-    if (firstVal === 1) {
+    if (selectObj[keys[0]] === 1) {
       // Inclusion — return listed fields
-      return entries.filter(([, v]) => v === 1).map(([k]) => k)
+      const result: string[] = []
+      for (const k of keys) {
+        if (selectObj[k] === 1) { result.push(k) }
+      }
+      return result
     }
 
     // Exclusion — invert using known non-ignored field names
-    const excluded = new Set(entries.filter(([, v]) => v === 0).map(([k]) => k))
-    return this.fieldDescriptors
-      .filter(f => !f.ignored && !excluded.has(f.path))
-      .map(f => f.path)
+    const excluded = new Set<string>()
+    for (const k of keys) {
+      if (selectObj[k] === 0) { excluded.add(k) }
+    }
+    const result: string[] = []
+    for (const f of this.fieldDescriptors) {
+      if (!f.ignored && !excluded.has(f.path)) { result.push(f.path) }
+    }
+    return result
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -333,11 +405,11 @@ export class AtscriptDbTable<
     const filter = this._extractPrimaryKeyFilter(payload)
 
     if (this.adapter.supportsNativePatch()) {
-      return this.adapter.nativePatch(filter, payload)
+      return this.adapter.nativePatch(this._translateFilter(filter), payload)
     }
 
     const update = decomposePatch(payload, this)
-    return this.adapter.updateOne(filter, update)
+    return this.adapter.updateOne(this._translateFilter(filter), this._translatePatchKeys(update))
   }
 
   /**
@@ -362,53 +434,69 @@ export class AtscriptDbTable<
         filter[field] = fieldType ? this.adapter.prepareId(idObj[field], fieldType) : idObj[field]
       }
     }
-    return this.adapter.deleteOne(filter)
+    return this.adapter.deleteOne(this._translateFilter(filter))
   }
 
   /**
    * Finds a single record matching the query.
    */
   public async findOne(
-    query: Uniquery<DataType>
+    query: Uniquery<FlatType>
   ): Promise<DataType | null> {
-    return this.adapter.findOne(query as Uniquery) as Promise<DataType | null>
+    this._flatten()
+    const translatedQuery = this._translateQuery(query as Uniquery)
+    const result = await this.adapter.findOne(translatedQuery)
+    return result ? this._reconstructFromRead(result) as DataType : null
   }
 
   /**
    * Finds all records matching the query.
    */
   public async findMany(
-    query: Uniquery<DataType>
+    query: Uniquery<FlatType>
   ): Promise<DataType[]> {
-    return this.adapter.findMany(query as Uniquery) as Promise<DataType[]>
+    this._flatten()
+    const translatedQuery = this._translateQuery(query as Uniquery)
+    const results = await this.adapter.findMany(translatedQuery)
+    return results.map(row => this._reconstructFromRead(row)) as DataType[]
   }
 
   /**
    * Counts records matching the query.
    */
-  public async count(query?: Uniquery<DataType>): Promise<number> {
-    query ??= { filter: {}, controls: {} } as Uniquery<DataType>
-    return this.adapter.count(query as Uniquery)
+  public async count(query?: Uniquery<FlatType>): Promise<number> {
+    this._flatten()
+    query ??= { filter: {}, controls: {} } as Uniquery<FlatType>
+    return this.adapter.count(this._translateQuery(query as Uniquery))
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
 
   public async updateMany(
-    filter: FilterExpr<DataType>,
+    filter: FilterExpr<FlatType>,
     data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.updateMany(filter as FilterExpr, data)
+    this._flatten()
+    return this.adapter.updateMany(
+      this._translateFilter(filter as FilterExpr),
+      this._prepareForWrite({ ...data })
+    )
   }
 
   public async replaceMany(
-    filter: FilterExpr<DataType>,
+    filter: FilterExpr<FlatType>,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.adapter.replaceMany(filter as FilterExpr, data)
+    this._flatten()
+    return this.adapter.replaceMany(
+      this._translateFilter(filter as FilterExpr),
+      this._prepareForWrite({ ...data })
+    )
   }
 
-  public async deleteMany(filter: FilterExpr<DataType>): Promise<TDbDeleteResult> {
-    return this.adapter.deleteMany(filter as FilterExpr)
+  public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
+    this._flatten()
+    return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -447,6 +535,11 @@ export class AtscriptDbTable<
         this.adapter.onFieldScanned?.(path, type, metadata)
       },
     })
+
+    // Classify fields and build path maps (before finalizing indexes)
+    if (!this.adapter.supportsNestedObjects()) {
+      this._classifyFields()
+    }
 
     this._finalizeIndexes()
     this.adapter.onAfterFlatten?.()
@@ -505,6 +598,21 @@ export class AtscriptDbTable<
       const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
       this._addIndexField('fulltext', name, fieldName)
     }
+
+    // @db.json → mark as JSON storage
+    if (metadata.has('db.json')) {
+      this._jsonFields.add(fieldName)
+
+      // J2: warn if any index is also present on this field
+      const hasIndex = metadata.has('db.index.plain')
+        || metadata.has('db.index.unique')
+        || metadata.has('db.index.fulltext')
+      if (hasIndex) {
+        this.logger.warn(
+          `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
+        )
+      }
+    }
   }
 
   // ── Internal: index helpers ───────────────────────────────────────────────
@@ -530,7 +638,126 @@ export class AtscriptDbTable<
     }
   }
 
+  /**
+   * Classifies each field as column, flattened, json, or parent-object.
+   * Builds the bidirectional _pathToPhysical / _physicalToPath maps.
+   * Only called when the adapter does NOT support nested objects natively.
+   */
+  private _classifyFields(): void {
+    // Pass 1: identify parent objects and JSON fields
+    for (const [path, type] of this._flatMap!.entries()) {
+      if (!path) { continue }
+
+      const designType = resolveDesignType(type)
+      const isJson = this._jsonFields.has(path)
+      const isArray = designType === 'array'
+      const isObject = designType === 'object'
+
+      if (isArray) {
+        this._jsonFields.add(path)
+      } else if (isObject && isJson) {
+        // Already in _jsonFields from @db.json detection
+      } else if (isObject && !isJson) {
+        this._flattenedParents.add(path)
+      }
+    }
+
+    // Propagate @db.ignore from parent objects to their children
+    for (const ignoredField of this._ignoredFields) {
+      if (this._flattenedParents.has(ignoredField)) {
+        const prefix = `${ignoredField}.`
+        for (const path of this._flatMap!.keys()) {
+          if (path.startsWith(prefix)) {
+            this._ignoredFields.add(path)
+          }
+        }
+      }
+    }
+
+    // J4: @db.column on a flattened parent is invalid
+    for (const parentPath of this._flattenedParents) {
+      if (this._columnMap.has(parentPath)) {
+        throw new Error(
+          `@db.column cannot rename a flattened object field "${parentPath}" — ` +
+          `apply @db.column to individual nested fields, or use @db.json to store as a single column`
+        )
+      }
+    }
+
+    // Pass 2: build physical name maps for all non-parent fields
+    for (const [path] of this._flatMap!.entries()) {
+      if (!path) { continue }
+      if (this._flattenedParents.has(path)) { continue }
+      // Skip children of @db.json fields — they live inside the JSON blob
+      if (this._findJsonParent(path) !== undefined) { continue }
+
+      const isFlattened = this._findFlattenedParent(path) !== undefined
+      const physicalName = this._columnMap.get(path)
+        ?? (isFlattened ? path.replace(/\./g, '__') : path)
+
+      this._pathToPhysical.set(path, physicalName)
+      this._physicalToPath.set(physicalName, path)
+    }
+
+    // Build select expansion map: intermediate path → leaf physical column names
+    for (const parentPath of this._flattenedParents) {
+      const prefix = `${parentPath}.`
+      const leaves: string[] = []
+      for (const [path, physical] of this._pathToPhysical) {
+        if (path.startsWith(prefix)) {
+          leaves.push(physical)
+        }
+      }
+      if (leaves.length > 0) {
+        this._selectExpansion.set(parentPath, leaves)
+      }
+    }
+
+    this._requiresMappings = this._flattenedParents.size > 0 || this._jsonFields.size > 0
+  }
+
+  /**
+   * Finds the nearest ancestor that is a flattened parent object.
+   * Returns the parent path, or undefined if no ancestor is being flattened.
+   */
+  private _findFlattenedParent(path: string): string | undefined {
+    let pos = path.length
+    while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
+      const ancestor = path.slice(0, pos)
+      if (this._flattenedParents.has(ancestor)) {
+        return ancestor
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Finds the nearest ancestor that is a @db.json field.
+   * Children of JSON fields don't get their own columns.
+   */
+  private _findJsonParent(path: string): string | undefined {
+    let pos = path.length
+    while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
+      const ancestor = path.slice(0, pos)
+      if (this._jsonFields.has(ancestor)) {
+        return ancestor
+      }
+    }
+    return undefined
+  }
+
   private _finalizeIndexes(): void {
+    // Always resolve index field names to physical names.
+    // Uses _pathToPhysical when available (covers both @db.column and __ flattening),
+    // falls back to _columnMap for @db.column-only cases.
+    for (const index of this._indexes.values()) {
+      for (const field of index.fields) {
+        field.name = this._pathToPhysical.get(field.name)
+          ?? this._columnMap.get(field.name)
+          ?? field.name
+      }
+    }
+
     for (const index of this._indexes.values()) {
       if (index.type === 'unique' && index.fields.length === 1) {
         this._uniqueProps.add(index.fields[0].name)
@@ -558,7 +785,7 @@ export class AtscriptDbTable<
 
   /**
    * Prepares a payload for writing to the database:
-   * prepares IDs, strips ignored fields, maps column names.
+   * prepares IDs, strips ignored fields, flattens nested objects, maps column names.
    * Defaults should be applied before this via `_applyDefaults`.
    */
   protected _prepareForWrite(payload: Record<string, unknown>): Record<string, unknown> {
@@ -574,20 +801,342 @@ export class AtscriptDbTable<
       }
     }
 
-    // Strip ignored fields
+    // Strip top-level ignored fields
     for (const field of this._ignoredFields) {
-      delete data[field]
-    }
-
-    // Map column names (logical → physical)
-    for (const [logical, physical] of this._columnMap.entries()) {
-      if (logical in data) {
-        data[physical] = data[logical]
-        delete data[logical]
+      if (!field.includes('.')) {
+        delete data[field]
       }
     }
 
-    return data
+    // Fast path: no nested/json fields — just do column mapping
+    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+      for (const [logical, physical] of this._columnMap.entries()) {
+        if (logical in data) {
+          data[physical] = data[logical]
+          delete data[logical]
+        }
+      }
+      return data
+    }
+
+    // Flatten nested objects and apply physical names
+    return this._flattenPayload(data)
+  }
+
+  /**
+   * Flattens nested object fields into __-separated keys and
+   * JSON-stringifies @db.json / array fields.
+   * Uses _pathToPhysical for final key names.
+   */
+  private _flattenPayload(data: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {}
+
+    const dataKeys = Object.keys(data)
+    for (const key of dataKeys) {
+      const value = data[key]
+      if (this._flattenedParents.has(key)) {
+        // Expand flattened parent object
+        if (value === null || value === undefined) {
+          this._setFlattenedChildrenNull(key, result)
+        } else if (typeof value === 'object' && !Array.isArray(value)) {
+          this._flattenObject(key, value as Record<string, unknown>, result)
+        }
+      } else if (this._jsonFields.has(key)) {
+        // JSON field — serialize
+        const physical = this._pathToPhysical.get(key) ?? key
+        result[physical] = (value !== undefined && value !== null)
+          ? JSON.stringify(value)
+          : value
+      } else {
+        // Regular scalar field
+        const physical = this._pathToPhysical.get(key) ?? key
+        result[physical] = value
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Recursively flattens a nested object, writing physical keys to result.
+   */
+  private _flattenObject(
+    prefix: string,
+    obj: Record<string, unknown>,
+    result: Record<string, unknown>
+  ): void {
+    const objKeys = Object.keys(obj)
+    for (const key of objKeys) {
+      const value = obj[key]
+      const dotPath = `${prefix}.${key}`
+
+      if (this._ignoredFields.has(dotPath)) {
+        continue
+      }
+
+      if (this._flattenedParents.has(dotPath)) {
+        if (value === null || value === undefined) {
+          this._setFlattenedChildrenNull(dotPath, result)
+        } else if (typeof value === 'object' && !Array.isArray(value)) {
+          this._flattenObject(dotPath, value as Record<string, unknown>, result)
+        }
+      } else if (this._jsonFields.has(dotPath)) {
+        const physical = this._pathToPhysical.get(dotPath) ?? dotPath.replace(/\./g, '__')
+        result[physical] = (value !== undefined && value !== null)
+          ? JSON.stringify(value)
+          : value
+      } else {
+        const physical = this._pathToPhysical.get(dotPath) ?? dotPath.replace(/\./g, '__')
+        result[physical] = value
+      }
+    }
+  }
+
+  /**
+   * When a parent object is null/undefined, set all its flattened children to null.
+   */
+  private _setFlattenedChildrenNull(
+    parentPath: string,
+    result: Record<string, unknown>
+  ): void {
+    const prefix = `${parentPath}.`
+    for (const [path, physical] of this._pathToPhysical.entries()) {
+      if (path.startsWith(prefix)) {
+        result[physical] = null
+      }
+    }
+  }
+
+  // ── Internal: read reconstruction ────────────────────────────────────────
+
+  /**
+   * Reconstructs nested objects from flat __-separated column values.
+   * JSON fields are parsed from strings back to objects/arrays.
+   */
+  protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
+    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+      return row
+    }
+
+    const result: Record<string, unknown> = {}
+
+    const rowKeys = Object.keys(row)
+    for (const physical of rowKeys) {
+      const value = row[physical]
+      const logicalPath = this._physicalToPath.get(physical)
+
+      if (!logicalPath) {
+        // Unknown column — pass through as-is
+        result[physical] = value
+        continue
+      }
+
+      if (this._jsonFields.has(logicalPath)) {
+        // JSON field — parse if it's a string
+        const parsed = typeof value === 'string' ? JSON.parse(value) : value
+        this._setNestedValue(result, logicalPath, parsed)
+      } else if (logicalPath.includes('.')) {
+        // Flattened field — reconstruct nesting
+        this._setNestedValue(result, logicalPath, value)
+      } else {
+        // Top-level scalar
+        result[logicalPath] = value
+      }
+    }
+
+    // Collapse null parent objects
+    for (const parentPath of this._flattenedParents) {
+      this._reconstructNullParent(result, parentPath)
+    }
+
+    return result
+  }
+
+  /**
+   * Sets a value at a dot-notation path, creating intermediate objects as needed.
+   */
+  private _setNestedValue(
+    obj: Record<string, unknown>,
+    dotPath: string,
+    value: unknown
+  ): void {
+    const parts = dotPath.split('.')
+    let current: Record<string, unknown> = obj
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i]
+      if (current[part] === undefined || current[part] === null) {
+        current[part] = {}
+      }
+      current = current[part] as Record<string, unknown>
+    }
+
+    current[parts[parts.length - 1]] = value
+  }
+
+  /**
+   * If all children of a flattened parent are null, collapse the parent to null.
+   */
+  private _reconstructNullParent(
+    obj: Record<string, unknown>,
+    parentPath: string
+  ): void {
+    const parts = parentPath.split('.')
+    let current: Record<string, unknown> = obj
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (current[parts[i]] === undefined) { return }
+      current = current[parts[i]] as Record<string, unknown>
+    }
+
+    const lastPart = parts[parts.length - 1]
+    const parentObj = current[lastPart]
+    if (typeof parentObj !== 'object' || parentObj === null) { return }
+
+    let allNull = true
+    const parentKeys = Object.keys(parentObj as Record<string, unknown>)
+    for (const k of parentKeys) {
+      const v = (parentObj as Record<string, unknown>)[k]
+      if (v !== null && v !== undefined) {
+        allNull = false
+        break
+      }
+    }
+
+    if (allNull) {
+      const parentType = this._flatMap?.get(parentPath)
+      current[lastPart] = parentType?.optional ? null : {}
+    }
+  }
+
+  // ── Internal: query translation ──────────────────────────────────────────
+
+  /**
+   * Translates a Uniquery's filter, sort, and projection from logical
+   * dot-notation paths to physical column names.
+   */
+  private _translateQuery(query: Uniquery): Uniquery {
+    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+      return query
+    }
+    return {
+      filter: this._translateFilter(query.filter),
+      controls: query.controls ? this._translateControls(query.controls) : query.controls,
+      insights: (query as any).insights,
+    }
+  }
+
+  /**
+   * Recursively translates field names in a filter expression.
+   */
+  private _translateFilter(filter: FilterExpr): FilterExpr {
+    if (!filter || typeof filter !== 'object') { return filter }
+    if (!this._requiresMappings) { return filter }
+
+    const result: Record<string, unknown> = {}
+
+    const filterKeys = Object.keys(filter)
+    for (const key of filterKeys) {
+      const value = (filter as Record<string, unknown>)[key]
+      if (key === '$and' || key === '$or') {
+        result[key] = (value as FilterExpr[]).map(f => this._translateFilter(f))
+      } else if (key === '$not') {
+        result[key] = this._translateFilter(value as FilterExpr)
+      } else if (key.startsWith('$')) {
+        result[key] = value
+      } else {
+        const physical = this._pathToPhysical.get(key) ?? key
+        result[physical] = value
+      }
+    }
+
+    return result as FilterExpr
+  }
+
+  /**
+   * Translates field names in sort and projection controls.
+   */
+  private _translateControls(controls: UniqueryControls): UniqueryControls {
+    if (!controls) { return controls }
+
+    const result: UniqueryControls = { ...controls }
+
+    if (controls.$sort) {
+      const translated: Record<string, unknown> = {}
+      const sortObj = controls.$sort as Record<string, unknown>
+      const sortKeys = Object.keys(sortObj)
+      for (const key of sortKeys) {
+        // Skip intermediate (parent) paths — sorting by a parent object is meaningless in relational DBs
+        if (this._flattenedParents.has(key)) { continue }
+        const physical = this._pathToPhysical.get(key) ?? key
+        translated[physical] = sortObj[key]
+      }
+      result.$sort = translated as UniqueryControls['$sort']
+    }
+
+    if (controls.$select) {
+      if (Array.isArray(controls.$select)) {
+        const expanded: string[] = []
+        for (const key of controls.$select) {
+          const expansion = this._selectExpansion.get(key as string)
+          if (expansion) {
+            // Intermediate path — expand to all leaf physical columns
+            expanded.push(...expansion)
+          } else {
+            expanded.push((this._pathToPhysical.get(key as string) ?? key) as string)
+          }
+        }
+        result.$select = expanded
+      } else {
+        const translated: Record<string, unknown> = {}
+        const selectObj = controls.$select as Record<string, number>
+        const selectKeys = Object.keys(selectObj)
+        for (const key of selectKeys) {
+          const val = selectObj[key]
+          const expansion = this._selectExpansion.get(key)
+          if (expansion) {
+            // Intermediate path — expand to all leaf physical columns
+            for (const leaf of expansion) {
+              translated[leaf] = val
+            }
+          } else {
+            const physical = this._pathToPhysical.get(key) ?? key
+            translated[physical] = val
+          }
+        }
+        result.$select = translated as UniqueryControls['$select']
+      }
+    }
+
+    return result
+  }
+
+  /**
+   * Translates dot-notation keys in a decomposed patch to physical column names.
+   */
+  private _translatePatchKeys(update: Record<string, unknown>): Record<string, unknown> {
+    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+      return update
+    }
+
+    const result: Record<string, unknown> = {}
+    const updateKeys = Object.keys(update)
+    for (const key of updateKeys) {
+      const value = update[key]
+      // Handle array patch operator keys like "tags.__$insert"
+      const operatorMatch = key.match(/^(.+?)(\.__\$.+)$/)
+      const basePath = operatorMatch ? operatorMatch[1] : key
+      const suffix = operatorMatch ? operatorMatch[2] : ''
+
+      const physical = this._pathToPhysical.get(basePath) ?? basePath
+      const finalKey = physical + suffix
+
+      if (this._jsonFields.has(basePath) && typeof value === 'object' && value !== null && !suffix) {
+        result[finalKey] = JSON.stringify(value)
+      } else {
+        result[finalKey] = value
+      }
+    }
+    return result
   }
 
   /**

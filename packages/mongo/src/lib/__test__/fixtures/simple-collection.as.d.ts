@@ -49,7 +49,30 @@ export declare class SimpleCollection {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "name": string
+    "active": boolean
+    "occupation"?: string
+    "tags"?: string[]
+    "age": number
+    "address": never
+    "address.line1": string
+    "address.line2"?: string
+    "address.city": string
+    "address.state": string
+    "address.zip": string
+    "contacts": never
+    "contacts.email": string
+    "contacts.phone": string
+    "nested"?: never
+    "nested.nested1"?: never
+    "nested.nested1.a"?: number
+    "nested.nested1.b"?: string
+    "nested.nested2"?: never
+    "nested.nested2.c"?: number
+    "nested.nested2.d"?: string
+    "_id": string /* objectId */
+  }}
 
 /**
  * Atscript interface **MinimalCollection**
@@ -66,7 +89,10 @@ export declare class MinimalCollection {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "name": string
+    "_id": string /* objectId */
+  }}
 
 /**
  * Atscript interface **MinimalCollectionString**
@@ -83,5 +109,8 @@ export declare class MinimalCollectionString {
   static toJsonSchema: () => any
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
-}
+  static __flat: {
+    "_id": string
+    "name": string
+  }}
 // prettier-ignore-end

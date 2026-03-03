@@ -1,4 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+export type { FlatOf } from '@atscript/typescript/utils'
 
 // ── Re-export uniqu types as canonical filter/query format ──────────────────
 
@@ -69,9 +70,9 @@ export interface TDbFieldMeta {
   path: string
   /** The annotated type for this field. */
   type: TAtscriptAnnotatedType
-  /** Physical column/field name (from @db.column, or same as path). */
+  /** Physical column/field name (from @db.column, __-separated for flattened, or same as path). */
   physicalName: string
-  /** Resolved design type: 'string', 'number', 'boolean', 'object', etc. */
+  /** Resolved design type: 'string', 'number', 'boolean', 'object', 'json', etc. */
   designType: string
   /** Whether the field is optional. */
   optional: boolean
@@ -81,4 +82,17 @@ export interface TDbFieldMeta {
   ignored: boolean
   /** Default value from @db.default.* */
   defaultValue?: TDbDefaultValue
+  /**
+   * How this field is stored in the database.
+   * - 'column': a standard scalar column (default for primitives)
+   * - 'flattened': a leaf scalar from a flattened nested object
+   * - 'json': stored as a single JSON column (arrays, @db.json fields)
+   */
+  storage: 'column' | 'flattened' | 'json'
+  /**
+   * For flattened fields: the dot-notation path (same as `path`).
+   * E.g., for physicalName 'contact__email', this is 'contact.email'.
+   * Undefined for non-flattened fields.
+   */
+  flattenedFrom?: string
 }

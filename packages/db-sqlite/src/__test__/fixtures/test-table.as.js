@@ -14,6 +14,17 @@ export class UsersTable {
 }
 
 
+export class ProfileTable {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "ProfileTable"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
+
 export class NoTableAnnotation {
   static __is_atscript_annotated_type = true
   static type = {}
@@ -75,6 +86,88 @@ $("object", UsersTable)
   )
   .annotate("db.table", "users")
   .annotate("db.schema", "auth")
+
+$("object", ProfileTable)
+  .prop(
+    "id",
+    $().designType("number")
+      .tags("number")
+      .annotate("meta.id", true)
+      .annotate("db.default.fn", "increment")
+      .$type
+  ).prop(
+    "name",
+    $().designType("string")
+      .tags("string")
+      .$type
+  ).prop(
+    "contact",
+    $("object")
+      .prop(
+        "email",
+        $().designType("string")
+          .tags("string")
+          .$type
+      ).prop(
+        "phone",
+        $().designType("string")
+          .tags("string")
+          .optional()
+          .$type
+      )
+      .$type
+  ).prop(
+    "preferences",
+    $("object")
+      .prop(
+        "theme",
+        $().designType("string")
+          .tags("string")
+          .$type
+      ).prop(
+        "lang",
+        $().designType("string")
+          .tags("string")
+          .$type
+      )
+      .annotate("db.json", true)
+      .$type
+  ).prop(
+    "tags",
+    $("array")
+      .of($().designType("string")
+          .tags("string")
+          .$type)
+      .$type
+  ).prop(
+    "settings",
+    $("object")
+      .prop(
+        "notifications",
+        $("object")
+          .prop(
+            "email",
+            $().designType("boolean")
+              .tags("boolean")
+              .$type
+          ).prop(
+            "sms",
+            $().designType("boolean")
+              .tags("boolean")
+              .$type
+          )
+          .$type
+      )
+      .$type
+  ).prop(
+    "displayName",
+    $().designType("string")
+      .tags("string")
+      .annotate("db.ignore", true)
+      .optional()
+      .$type
+  )
+  .annotate("db.table", "profiles")
 
 $("object", NoTableAnnotation)
   .prop(

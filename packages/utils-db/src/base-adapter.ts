@@ -84,6 +84,16 @@ export abstract class BaseDbAdapter {
   }
 
   /**
+   * Whether this adapter handles nested objects natively.
+   * When `true`, the generic layer skips flattening and
+   * passes nested objects as-is to the adapter.
+   * MongoDB returns `true`; relational adapters return `false` (default).
+   */
+  supportsNestedObjects(): boolean {
+    return false
+  }
+
+  /**
    * Applies a patch payload using native database operations.
    * Only called when {@link supportsNativePatch} returns `true`.
    *

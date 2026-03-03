@@ -37,6 +37,7 @@ declare global {
     "db.column": string
     "db.default.value": string
     "db.default.fn": string
+    "db.json": boolean
     "db.ignore": boolean
     "ui.placeholder": string
     "ui.component": string

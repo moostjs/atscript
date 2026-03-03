@@ -207,7 +207,6 @@ export class SqliteAdapter extends BaseDbAdapter {
 
   async syncIndexes(): Promise<void> {
     const tableName = this.resolveTableName()
-    const columnMap = this._table.columnMap
 
     await this.syncIndexesWithDiff({
       listExisting: async () =>
@@ -216,11 +215,9 @@ export class SqliteAdapter extends BaseDbAdapter {
           .filter(i => !i.name.startsWith('sqlite_')),
       createIndex: async (index: TDbIndex) => {
         const unique = index.type === 'unique' ? 'UNIQUE ' : ''
+        // Field names are already resolved to physical names by the generic layer
         const cols = index.fields
-          .map(f => {
-            const physical = columnMap.get(f.name) ?? f.name
-            return `"${esc(physical)}" ${f.sort === 'desc' ? 'DESC' : 'ASC'}`
-          })
+          .map(f => `"${esc(f.name)}" ${f.sort === 'desc' ? 'DESC' : 'ASC'}`)
           .join(', ')
         this.driver.exec(
           `CREATE ${unique}INDEX IF NOT EXISTS "${esc(index.key)}" ON "${esc(tableName)}" (${cols})`

@@ -10,6 +10,7 @@ The SQLite adapter is experimental. APIs may change at any moment.
 
 - Full CRUD operations (insert, find, update, replace, delete)
 - Automatic table creation from Atscript field descriptors
+- **Embedded object support** — nested objects flattened to `__`-separated columns, `@db.json` for JSON storage
 - Index management (plain and unique indexes)
 - MongoDB-style filter-to-SQL translation with parameterized queries
 - Column mapping, defaults, and field ignoring via `@db.*` annotations
@@ -36,7 +37,7 @@ yarn add @atscript/db-sqlite @atscript/utils-db better-sqlite3
 
 - **Fulltext indexes** are skipped (not supported in basic SQLite)
 - **Schema names** (`@db.schema`) are ignored (SQLite doesn't have schemas)
-- **Objects and arrays** are stored as JSON strings in TEXT columns
+- **Nested objects** are flattened into `__`-separated columns by default; `@db.json` and arrays are stored as JSON TEXT
 - **Booleans** are stored as INTEGER (1/0)
 - **Native array patches** are not supported — patches are decomposed into flat updates
 

@@ -214,6 +214,39 @@ export const dbAnnotations: TAnnotationsTree = {
     }),
   },
 
+  json: new AnnotationSpec({
+    description:
+      'Forces a field to be stored as a single JSON column instead of being flattened ' +
+      'into separate columns. Use on nested object fields that should remain as JSON ' +
+      'in the database.' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@db.json\n' +
+      'metadata: { key: string, value: string }\n' +
+      '```\n',
+    nodeType: ['prop'],
+    validate(token, _args, doc) {
+      const errors = [] as TMessages
+      const field = token.parentNode!
+      const definition = field.getDefinition()
+
+      // J1: warning on primitive types
+      if (definition && isRef(definition)) {
+        const unwound = doc.unwindType(definition.id!, definition.chain)
+        if (unwound && isPrimitive(unwound.def)) {
+          errors.push({
+            message:
+              '@db.json on a primitive field has no effect — primitive fields are already stored as scalar columns',
+            severity: 2,
+            range: token.range,
+          })
+        }
+      }
+
+      return errors
+    },
+  }),
+
   ignore: new AnnotationSpec({
     description:
       'Excludes a field from the database schema. The field exists in the Atscript type ' +

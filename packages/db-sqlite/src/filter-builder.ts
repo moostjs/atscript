@@ -15,34 +15,35 @@ const EMPTY_OR: TSqlFragment = { sql: '0=1', params: [] }
 const sqlVisitor: FilterVisitor<TSqlFragment> = {
   comparison(field, op, value) {
     const col = `"${escapeIdent(field)}"`
+    const v = toSqliteParam(value)
 
     switch (op) {
       case '$eq': {
-        if (value === null) {
+        if (v === null) {
           return { sql: `${col} IS NULL`, params: [] }
         }
-        return { sql: `${col} = ?`, params: [value] }
+        return { sql: `${col} = ?`, params: [v] }
       }
       case '$ne': {
-        if (value === null) {
+        if (v === null) {
           return { sql: `${col} IS NOT NULL`, params: [] }
         }
-        return { sql: `${col} != ?`, params: [value] }
+        return { sql: `${col} != ?`, params: [v] }
       }
       case '$gt': {
-        return { sql: `${col} > ?`, params: [value] }
+        return { sql: `${col} > ?`, params: [v] }
       }
       case '$gte': {
-        return { sql: `${col} >= ?`, params: [value] }
+        return { sql: `${col} >= ?`, params: [v] }
       }
       case '$lt': {
-        return { sql: `${col} < ?`, params: [value] }
+        return { sql: `${col} < ?`, params: [v] }
       }
       case '$lte': {
-        return { sql: `${col} <= ?`, params: [value] }
+        return { sql: `${col} <= ?`, params: [v] }
       }
       case '$in': {
-        const arr = value as unknown[]
+        const arr = (value as unknown[]).map(toSqliteParam)
         if (arr.length === 0) {
           return EMPTY_OR // 0=1 — no match
         }
@@ -50,7 +51,7 @@ const sqlVisitor: FilterVisitor<TSqlFragment> = {
         return { sql: `${col} IN (${placeholders})`, params: [...arr] }
       }
       case '$nin': {
-        const arr = value as unknown[]
+        const arr = (value as unknown[]).map(toSqliteParam)
         if (arr.length === 0) {
           return EMPTY_AND // 1=1 — all match
         }
@@ -140,4 +141,13 @@ function regexToLike(pattern: string): string {
  */
 function escapeIdent(name: string): string {
   return name.replace(/"/g, '""')
+}
+
+/**
+ * Converts a JS value to a SQLite-bindable parameter.
+ * SQLite cannot bind booleans — they must be 0/1.
+ */
+function toSqliteParam(value: unknown): unknown {
+  if (typeof value === 'boolean') { return value ? 1 : 0 }
+  return value
 }

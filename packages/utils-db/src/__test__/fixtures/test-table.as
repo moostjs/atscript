@@ -26,6 +26,38 @@ export interface UsersTable {
     bio?: string
 }
 
+@db.table 'profiles'
+export interface ProfileTable {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    name: string
+
+    contact: {
+        email: string
+        phone?: string
+    }
+
+    @db.json
+    preferences: {
+        theme: string
+        lang: string
+    }
+
+    tags: string[]
+
+    settings: {
+        notifications: {
+            email: boolean
+            sms: boolean
+        }
+    }
+
+    @db.ignore
+    displayName?: string
+}
+
 export interface NoTableAnnotation {
     name: string
 }

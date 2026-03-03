@@ -149,6 +149,26 @@ class MongoAdapter extends BaseDbAdapter {
 
 When `supportsNativePatch()` returns `false` (the default), `AtscriptDbTable` uses `decomposePatch()` to flatten patch operations into standard update calls.
 
+## Nested Object Support
+
+If your database handles nested objects natively (like MongoDB with embedded documents), override `supportsNestedObjects()`:
+
+```typescript
+class MongoAdapter extends BaseDbAdapter {
+  supportsNestedObjects(): boolean {
+    return true
+  }
+}
+```
+
+When `supportsNestedObjects()` returns `true`:
+- Nested objects are passed through as-is (no flattening into `__`-separated columns)
+- `@db.json` is ignored (the adapter handles all storage decisions)
+- Read results are returned as-is (no reconstruction)
+- Index field names use dot-notation paths directly
+
+When it returns `false` (the default), the generic `AtscriptDbTable` layer handles all flattening, reconstruction, and query translation. Adapters receive pre-flattened data with physical column names — they never need to know about logical dot-notation paths.
+
 ## Index Sync Helper
 
 `BaseDbAdapter` provides a `syncIndexesWithDiff()` helper for implementing `syncIndexes()`:
@@ -195,7 +215,7 @@ class MyAdapter extends BaseDbAdapter {
     for (const field of fields) {
       // field.path, field.physicalName, field.designType,
       // field.optional, field.isPrimaryKey, field.ignored,
-      // field.defaultValue
+      // field.defaultValue, field.storage, field.flattenedFrom
     }
   }
 }
