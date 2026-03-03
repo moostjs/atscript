@@ -1,3 +1,12 @@
+## [0.1.31](https://github.com/moostjs/atscript/compare/v0.1.30...v0.1.31) (2026-03-03)
+
+
+### Features
+
+* **db:** add db.json annotation and improve filter expression type safety ([7a68d47](https://github.com/moostjs/atscript/commit/7a68d470997506b982ef2dffda692e56e9f5cdf1))
+
+
+
 ## [0.1.30](https://github.com/moostjs/atscript/compare/v0.1.29...v0.1.30) (2026-03-02)
 
 
