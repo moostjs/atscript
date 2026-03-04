@@ -474,7 +474,61 @@ export class AtscriptDoc {
       // eslint-disable-next-line max-statements-per-line
     }
     if (isProp(token.parentNode)) {
-      // todo[2025-12-31]: find usages for props
+      const propName = token.parentNode.id
+      if (!propName) return undefined
+
+      // Find the parent interface/structure that owns this prop
+      let parentName: string | undefined
+      for (const node of this.nodes) {
+        if (
+          (isInterface(node) || isStructure(node)) &&
+          node.props.get(propName) === token.parentNode
+        ) {
+          parentName = node.id
+          break
+        }
+      }
+      if (!parentName) return undefined
+
+      const refs: Array<{ uri: string; range: Token['range']; token: Token }> = []
+
+      const searchDoc = (doc: AtscriptDoc, uri: string) => {
+        // Ref chains: e.g., Product.description in type position
+        for (const t of doc.referred) {
+          if (t.text !== parentName || !isRef(t.parentNode) || !t.parentNode.hasChain) continue
+          const chainToken = t.parentNode.chain[0]
+          if (chainToken?.text === propName) {
+            refs.push({ uri, range: chainToken.range, token: chainToken })
+          }
+        }
+        // Annotate block entries: e.g., annotate Product { description: ... }
+        for (const node of doc.nodes) {
+          if (!isAnnotate(node) || node.targetName !== parentName) continue
+          for (const entry of node.entries) {
+            if (entry.id === propName) {
+              const entryToken = entry.token('identifier')
+              if (entryToken) {
+                refs.push({ uri, range: entryToken.range, token: entryToken })
+              }
+            }
+          }
+        }
+      }
+
+      searchDoc(this, this.id)
+
+      // Cross-file: search dependants if parent type is exported
+      const parentDefToken = this.registry.definitions.get(parentName)
+      if (parentDefToken?.exported) {
+        for (const d of this.dependants) {
+          const imp = d.imports.get(this.id)
+          if (imp?.imports.find(t => t.text === parentName)) {
+            searchDoc(d, d.id)
+          }
+        }
+      }
+
+      return refs
     } else {
       const defForToken = this.getDefinitionFor(token)
       if (defForToken?.token?.isDefinition && defForToken.doc) {

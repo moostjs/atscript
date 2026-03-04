@@ -332,6 +332,99 @@ describe('find references', () => {
     expect(refs).toBeDefined()
     expect(refs!.length).toBeGreaterThanOrEqual(1)
   })
+
+  it('finds prop references via ref chain (e.g., Product.description)', () => {
+    const source = 'interface Product {\n  description: string\n}\ntype Test = Product.description'
+    const doc = createDoc('file:///test.as', source)
+    // Line 1, char 2 = the 'description' prop identifier inside the interface
+    const propToken = doc.tokensIndex.at(1, 2)!
+    expect(propToken).toBeDefined()
+    expect(propToken.text).toBe('description')
+    const refs = doc.usageListFor(propToken)
+    expect(refs).toBeDefined()
+    expect(refs!.length).toBe(1)
+    expect(refs![0].token.text).toBe('description')
+    // The reference should point to the chain token on line 3
+    expect(refs![0].range.start.line).toBe(3)
+  })
+
+  it('finds prop references in annotate block entries', () => {
+    const source = [
+      'interface Product {',
+      '  description: string',
+      '}',
+      'annotate Product {',
+      '  @meta.label "Desc"',
+      '  description',
+      '}',
+    ].join('\n')
+    const doc = createDoc('file:///test.as', source)
+    const propToken = doc.tokensIndex.at(1, 2)!
+    expect(propToken.text).toBe('description')
+    const refs = doc.usageListFor(propToken)
+    expect(refs).toBeDefined()
+    expect(refs!.length).toBe(1)
+    expect(refs![0].range.start.line).toBe(5)
+  })
+
+  it('finds prop references across files via ref chain', () => {
+    const source1 = 'export interface Product {\n  description: string\n}'
+    const source2 = "import { Product } from './file1'\ntype Test = Product.description"
+    const doc1 = createDoc('file:///home/file1.as', source1)
+    const doc2 = createDoc('file:///home/file2.as', source2)
+    doc2.updateDependencies([doc1])
+    const propToken = doc1.tokensIndex.at(1, 2)!
+    expect(propToken.text).toBe('description')
+    const refs = doc1.usageListFor(propToken)
+    expect(refs).toBeDefined()
+    expect(refs!.length).toBe(1)
+    expect(refs![0].uri).toBe('file:///home/file2.as')
+    expect(refs![0].token.text).toBe('description')
+  })
+
+  it('finds prop references from both ref chains and annotate entries', () => {
+    const source = [
+      'interface Product {',
+      '  description: string',
+      '}',
+      'type Test = Product.description',
+      'annotate Product {',
+      '  @meta.label "Desc"',
+      '  description',
+      '}',
+    ].join('\n')
+    const doc = createDoc('file:///test.as', source)
+    const propToken = doc.tokensIndex.at(1, 2)!
+    expect(propToken.text).toBe('description')
+    const refs = doc.usageListFor(propToken)
+    expect(refs).toBeDefined()
+    expect(refs!.length).toBe(2)
+  })
+
+  it('finds prop references in a complex interface with annotations and optional props', () => {
+    const source = [
+      'export interface Product {',
+      '  @meta.id',
+      '  id: number',
+      '  name: string',
+      '  description?: string',
+      '  price: number',
+      '}',
+      'type Test = Product.description',
+      'annotate Product {',
+      '  @meta.description "test"',
+      '  description',
+      '}',
+    ].join('\n')
+    const doc = createDoc('file:///test.as', source)
+    // 'description' is on line 4 (0-indexed), after 2 spaces
+    const propToken = doc.tokensIndex.at(4, 2)!
+    expect(propToken).toBeDefined()
+    expect(propToken.text).toBe('description')
+    const refs = doc.usageListFor(propToken)
+    expect(refs).toBeDefined()
+    expect(refs!.length).toBe(2)
+  })
 })
 
 describe('rename', () => {
