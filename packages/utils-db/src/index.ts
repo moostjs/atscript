@@ -18,6 +18,9 @@ export type {
   TDbDefaultValue,
   TIdDescriptor,
   TDbFieldMeta,
+  TDbStorageType,
+  TDbIndexType,
+  TDbDefaultFn,
 } from './types'
 export type { TGenericLogger } from './logger'
 export { NoopLogger } from './logger'

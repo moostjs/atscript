@@ -32,6 +32,8 @@ export interface TDbDeleteResult {
 
 // ── Index Types ─────────────────────────────────────────────────────────────
 
+export type TDbIndexType = 'plain' | 'unique' | 'fulltext'
+
 export interface TDbIndexField {
   name: string
   sort: 'asc' | 'desc'
@@ -43,16 +45,18 @@ export interface TDbIndex {
   /** Human-readable index name. */
   name: string
   /** Index type. */
-  type: 'plain' | 'unique' | 'fulltext'
+  type: TDbIndexType
   /** Ordered list of fields in the index. */
   fields: TDbIndexField[]
 }
 
 // ── Default Value Types ─────────────────────────────────────────────────────
 
+export type TDbDefaultFn = 'increment' | 'uuid' | 'now'
+
 export type TDbDefaultValue =
   | { kind: 'value'; value: string }
-  | { kind: 'fn'; fn: 'increment' | 'uuid' | 'now' }
+  | { kind: 'fn'; fn: TDbDefaultFn }
 
 // ── ID Descriptor ───────────────────────────────────────────────────────────
 
@@ -62,6 +66,10 @@ export interface TIdDescriptor {
   /** Whether this is a composite key (multiple fields). */
   isComposite: boolean
 }
+
+// ── Field Storage ──────────────────────────────────────────────────────────
+
+export type TDbStorageType = 'column' | 'flattened' | 'json'
 
 // ── Field Metadata ──────────────────────────────────────────────────────────
 
@@ -88,7 +96,7 @@ export interface TDbFieldMeta {
    * - 'flattened': a leaf scalar from a flattened nested object
    * - 'json': stored as a single JSON column (arrays, @db.json fields)
    */
-  storage: 'column' | 'flattened' | 'json'
+  storage: TDbStorageType
   /**
    * For flattened fields: the dot-notation path (same as `path`).
    * E.g., for physicalName 'contact__email', this is 'contact.email'.

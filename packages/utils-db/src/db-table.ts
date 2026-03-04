@@ -17,6 +17,7 @@ import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
 import type {
+  TDbDefaultFn,
   TDbDefaultValue,
   TDbDeleteResult,
   TDbFieldMeta,
@@ -24,6 +25,7 @@ import type {
   TDbIndexField,
   TDbInsertManyResult,
   TDbInsertResult,
+  TDbStorageType,
   TDbUpdateResult,
   TIdDescriptor,
 } from './types'
@@ -109,6 +111,11 @@ export class AtscriptDbTable<
   /** Fast-path flag: skip all mapping when no nested/json fields exist. */
   protected _requiresMappings = false
 
+  // ── Adapter capabilities (cached) ────────────────────────────────────────
+
+  /** Cached result of adapter.supportsNestedObjects(). */
+  protected readonly _nestedObjects: boolean
+
   // ── Validators ────────────────────────────────────────────────────────────
 
   protected readonly validators = new Map<string, Validator<T, DataType>>()
@@ -135,6 +142,8 @@ export class AtscriptDbTable<
     }
 
     this.schema = _type.metadata.get('db.schema') as string | undefined
+
+    this._nestedObjects = adapter.supportsNestedObjects()
 
     // Establish bidirectional relationship
     adapter.registerTable(this)
@@ -219,7 +228,7 @@ export class AtscriptDbTable<
     this._flatten()
     if (!this._fieldDescriptors) {
       this._fieldDescriptors = []
-      const skipFlattening = this.adapter.supportsNestedObjects()
+      const skipFlattening = this._nestedObjects
 
       for (const [path, type] of this._flatMap!.entries()) {
         if (!path) { continue } // skip root entry
@@ -230,15 +239,15 @@ export class AtscriptDbTable<
         }
 
         // Skip children of @db.json fields (they live inside the JSON blob)
-        if (!skipFlattening && this._findJsonParent(path) !== undefined) {
+        if (!skipFlattening && this._findAncestorInSet(path, this._jsonFields) !== undefined) {
           continue
         }
 
         const isJson = this._jsonFields.has(path)
-        const isFlattened = !skipFlattening && this._findFlattenedParent(path) !== undefined
+        const isFlattened = !skipFlattening && this._findAncestorInSet(path, this._flattenedParents) !== undefined
         const designType = isJson ? 'json' : resolveDesignType(type)
 
-        let storage: 'column' | 'flattened' | 'json'
+        let storage: TDbStorageType
         if (skipFlattening) {
           storage = 'column'
         } else if (isJson) {
@@ -266,6 +275,7 @@ export class AtscriptDbTable<
           flattenedFrom: isFlattened ? path : undefined,
         })
       }
+      Object.freeze(this._fieldDescriptors)
     }
     return this._fieldDescriptors
   }
@@ -537,7 +547,7 @@ export class AtscriptDbTable<
     })
 
     // Classify fields and build path maps (before finalizing indexes)
-    if (!this.adapter.supportsNestedObjects()) {
+    if (!this._nestedObjects) {
       this._classifyFields()
     }
 
@@ -571,7 +581,7 @@ export class AtscriptDbTable<
     } else if (defaultFn !== undefined) {
       this._defaults.set(fieldName, {
         kind: 'fn',
-        fn: defaultFn as 'increment' | 'uuid' | 'now',
+        fn: defaultFn as TDbDefaultFn,
       })
     }
 
@@ -689,9 +699,9 @@ export class AtscriptDbTable<
       if (!path) { continue }
       if (this._flattenedParents.has(path)) { continue }
       // Skip children of @db.json fields — they live inside the JSON blob
-      if (this._findJsonParent(path) !== undefined) { continue }
+      if (this._findAncestorInSet(path, this._jsonFields) !== undefined) { continue }
 
-      const isFlattened = this._findFlattenedParent(path) !== undefined
+      const isFlattened = this._findAncestorInSet(path, this._flattenedParents) !== undefined
       const physicalName = this._columnMap.get(path)
         ?? (isFlattened ? path.replace(/\./g, '__') : path)
 
@@ -717,29 +727,14 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Finds the nearest ancestor that is a flattened parent object.
-   * Returns the parent path, or undefined if no ancestor is being flattened.
+   * Finds the nearest ancestor of `path` that belongs to `set`.
+   * Used to locate flattened parents and @db.json ancestors.
    */
-  private _findFlattenedParent(path: string): string | undefined {
+  private _findAncestorInSet(path: string, set: ReadonlySet<string>): string | undefined {
     let pos = path.length
     while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
       const ancestor = path.slice(0, pos)
-      if (this._flattenedParents.has(ancestor)) {
-        return ancestor
-      }
-    }
-    return undefined
-  }
-
-  /**
-   * Finds the nearest ancestor that is a @db.json field.
-   * Children of JSON fields don't get their own columns.
-   */
-  private _findJsonParent(path: string): string | undefined {
-    let pos = path.length
-    while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
-      const ancestor = path.slice(0, pos)
-      if (this._jsonFields.has(ancestor)) {
+      if (set.has(ancestor)) {
         return ancestor
       }
     }
@@ -809,7 +804,7 @@ export class AtscriptDbTable<
     }
 
     // Fast path: no nested/json fields — just do column mapping
-    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+    if (!this._requiresMappings || this._nestedObjects) {
       for (const [logical, physical] of this._columnMap.entries()) {
         if (logical in data) {
           data[physical] = data[logical]
@@ -830,65 +825,40 @@ export class AtscriptDbTable<
    */
   private _flattenPayload(data: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {}
-
-    const dataKeys = Object.keys(data)
-    for (const key of dataKeys) {
-      const value = data[key]
-      if (this._flattenedParents.has(key)) {
-        // Expand flattened parent object
-        if (value === null || value === undefined) {
-          this._setFlattenedChildrenNull(key, result)
-        } else if (typeof value === 'object' && !Array.isArray(value)) {
-          this._flattenObject(key, value as Record<string, unknown>, result)
-        }
-      } else if (this._jsonFields.has(key)) {
-        // JSON field — serialize
-        const physical = this._pathToPhysical.get(key) ?? key
-        result[physical] = (value !== undefined && value !== null)
-          ? JSON.stringify(value)
-          : value
-      } else {
-        // Regular scalar field
-        const physical = this._pathToPhysical.get(key) ?? key
-        result[physical] = value
-      }
+    for (const key of Object.keys(data)) {
+      this._writeFlattenedField(key, data[key], result)
     }
-
     return result
   }
 
   /**
-   * Recursively flattens a nested object, writing physical keys to result.
+   * Classifies and writes a single field to the result object.
+   * Recurses into nested objects that should be flattened.
    */
-  private _flattenObject(
-    prefix: string,
-    obj: Record<string, unknown>,
+  private _writeFlattenedField(
+    path: string,
+    value: unknown,
     result: Record<string, unknown>
   ): void {
-    const objKeys = Object.keys(obj)
-    for (const key of objKeys) {
-      const value = obj[key]
-      const dotPath = `${prefix}.${key}`
+    if (this._ignoredFields.has(path)) { return }
 
-      if (this._ignoredFields.has(dotPath)) {
-        continue
-      }
-
-      if (this._flattenedParents.has(dotPath)) {
-        if (value === null || value === undefined) {
-          this._setFlattenedChildrenNull(dotPath, result)
-        } else if (typeof value === 'object' && !Array.isArray(value)) {
-          this._flattenObject(dotPath, value as Record<string, unknown>, result)
+    if (this._flattenedParents.has(path)) {
+      if (value === null || value === undefined) {
+        this._setFlattenedChildrenNull(path, result)
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
+        const obj = value as Record<string, unknown>
+        for (const key of Object.keys(obj)) {
+          this._writeFlattenedField(`${path}.${key}`, obj[key], result)
         }
-      } else if (this._jsonFields.has(dotPath)) {
-        const physical = this._pathToPhysical.get(dotPath) ?? dotPath.replace(/\./g, '__')
-        result[physical] = (value !== undefined && value !== null)
-          ? JSON.stringify(value)
-          : value
-      } else {
-        const physical = this._pathToPhysical.get(dotPath) ?? dotPath.replace(/\./g, '__')
-        result[physical] = value
       }
+    } else if (this._jsonFields.has(path)) {
+      const physical = this._pathToPhysical.get(path) ?? path.replace(/\./g, '__')
+      result[physical] = (value !== undefined && value !== null)
+        ? JSON.stringify(value)
+        : value
+    } else {
+      const physical = this._pathToPhysical.get(path) ?? path.replace(/\./g, '__')
+      result[physical] = value
     }
   }
 
@@ -914,7 +884,7 @@ export class AtscriptDbTable<
    * JSON fields are parsed from strings back to objects/arrays.
    */
   protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
-    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+    if (!this._requiresMappings || this._nestedObjects) {
       return row
     }
 
@@ -1015,7 +985,7 @@ export class AtscriptDbTable<
    * dot-notation paths to physical column names.
    */
   private _translateQuery(query: Uniquery): Uniquery {
-    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+    if (!this._requiresMappings || this._nestedObjects) {
       return query
     }
     return {
@@ -1114,7 +1084,7 @@ export class AtscriptDbTable<
    * Translates dot-notation keys in a decomposed patch to physical column names.
    */
   private _translatePatchKeys(update: Record<string, unknown>): Record<string, unknown> {
-    if (!this._requiresMappings || this.adapter.supportsNestedObjects()) {
+    if (!this._requiresMappings || this._nestedObjects) {
       return update
     }
 
@@ -1180,9 +1150,6 @@ export class AtscriptDbTable<
             return type
           },
         })
-      }
-      case 'update': {
-        return this.createValidator({ plugins })
       }
       case 'patch': {
         return this.createValidator({
