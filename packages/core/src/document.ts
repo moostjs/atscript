@@ -624,6 +624,16 @@ export class AtscriptDoc {
         }
         return undefined
       }
+      if (isProp(token.parentNode)) {
+        return [
+          {
+            targetUri: this.id,
+            targetRange: token.range,
+            targetSelectionRange: token.range,
+            originSelectionRange: token.range,
+          },
+        ]
+      }
       if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
         const id = token.parentNode.id!
         const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
