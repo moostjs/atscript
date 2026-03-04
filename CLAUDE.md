@@ -15,7 +15,7 @@ packages/
   utils-db/       - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
   db-sqlite/      - SQLite adapter (better-sqlite3 / node:sqlite driver, filter-to-SQL translation)
   mongo/          - MongoDB metadata/primitives extension and MongoCollection classes
-  moost-mongo/    - Moost framework integration for MongoDB collections (REST, validation)
+  moost-db/       - Generic Moost framework database controller (works with any adapter)
   moost-validator/ - Moost framework integration for automatic .as-based data validation
   unplugin/       - Build tool plugin (Vite, Webpack, Rollup, esbuild, Rspack)
   vscode/         - VSCode extension (syntax highlighting, LSP, diagnostics, go-to-definition)
@@ -29,11 +29,12 @@ explorations/     - Sandbox/playground for testing features
 @atscript/core (foundation)
   ├─ @atscript/typescript (language extension)
   │    ├─ @atscript/mongo (metadata extension, + peer: mongodb)
-  │    │    └─ @atscript/moost-mongo (+ peer: moost)
   │    ├─ @atscript/moost-validator (+ peer: moost)
   │    └─ unplugin-atscript (build integration)
   └─ @atscript/utils-db (generic DB abstraction)
-       └─ @atscript/db-sqlite (SQLite adapter, + peer: better-sqlite3)
+       ├─ @atscript/moost-db (generic Moost controller, + peer: moost)
+       ├─ @atscript/db-sqlite (SQLite adapter, + peer: better-sqlite3)
+       └─ @atscript/mongo (MongoAdapter)
 @atscript/vscode (depends on core only)
 ```
 
@@ -92,7 +93,7 @@ Six domain expert agents exist in `.claude/agents/`:
 - Atscript is designed to be **language-agnostic** — `@atscript/typescript` is the first language extension; others (Python, Java, etc.) can follow the same pattern
 - Plugins extend the core by adding annotations, primitives, and metadata — they don't modify the parser
 - The core provides AST + utilities (annotation merging, type unwinding) that language extensions and LSPs consume
-- Moost integrations (`moost-mongo`, `moost-validator`) demonstrate how .as types flow into a real framework
+- Moost integrations (`moost-db`, `moost-validator`) demonstrate how .as types flow into a real framework
 - **`@db.*` annotations** are shipped with `@atscript/core` (not a separate package) — defined in `packages/core/src/defaults/db-annotations.ts`
 - **Primitive `annotations` map** — primitives use a generic `annotations: Record<string, TPrimitiveAnnotationValue>` to apply any annotation (the old hardcoded `expect` property was removed). The `applyAnnotations()` method is spec-aware: it resolves annotation specs, respects `multiple` flags, and maps object values by spec argument names
 - **`@meta.isKey` was renamed to `@expect.array.key`** — it's a validation constraint, not semantic metadata

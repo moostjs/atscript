@@ -20,7 +20,7 @@ docs/docs/
 ├── packages/
 │   ├── typescript/        — TypeScript Guide (18 pages — self-contained, COMPLETE)
 │   ├── mongo/             — MongoDB docs (9 STUB files)
-│   ├── moost-mongo/       — Moost MongoDB docs (6 STUB files)
+│   ├── moost-db/       — Moost MongoDB docs (6 STUB files)
 │   ├── moost-validator/   — Moost Validator docs (6 STUB files)
 │   └── vscode/            — VSCode extension docs (7 STUB files)
 ├── plugin-development/    — Plugin Development Guide (16 STUB files)
@@ -44,7 +44,7 @@ TypeScript ▾              VSCode        Plugin Development
 | ------------------------- | -------- | ------------------------------------------- |
 | packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments) |
 | packages/mongo/           | STUBS    | 9 files, needs content                      |
-| packages/moost-mongo/     | STUBS    | 6 files, needs content                      |
+| packages/moost-db/     | STUBS    | 6 files, needs content                      |
 | packages/moost-validator/ | STUBS    | 6 files, needs content                      |
 | packages/vscode/          | STUBS    | 7 files, needs content                      |
 | plugin-development/       | STUBS    | 16 files, needs content                     |
@@ -76,7 +76,7 @@ Atscript is **language-agnostic** — `@atscript/typescript` is the first langua
    - A TypeScript user should be able to read packages/typescript/ and have everything they need **without leaving that section**
    - A future Python user should read packages/python/ similarly
 
-2. **Plugin-specific** (packages/mongo/, packages/moost-mongo/, etc.):
+2. **Plugin-specific** (packages/mongo/, packages/moost-db/, etc.):
    - These are framework/database integrations nested under their language dropdown
    - Currently all TypeScript-ecosystem, but the pattern should allow for language-agnostic plugins too
 
@@ -132,7 +132,7 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | `packages/core/src/`            | `docs/docs/plugin-development/`                |
 | `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
 | `packages/mongo/src/`           | `docs/docs/packages/mongo/`                    |
-| `packages/moost-mongo/src/`     | `docs/docs/packages/moost-mongo/`              |
+| `packages/moost-db/src/`     | `docs/docs/packages/moost-db/`              |
 | `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
 | `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |
 | `packages/vscode/`              | `docs/docs/packages/vscode/`                   |

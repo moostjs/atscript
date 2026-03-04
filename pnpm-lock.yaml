@@ -274,34 +274,6 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/moost-mongo:
-    dependencies:
-      '@atscript/mongo':
-        specifier: workspace:^
-        version: link:../mongo
-      '@atscript/typescript':
-        specifier: workspace:^
-        version: link:../typescript
-      urlql:
-        specifier: ^0.0.5
-        version: 0.0.5
-    devDependencies:
-      '@atscript/core':
-        specifier: workspace:^
-        version: link:../core
-      '@moostjs/event-http':
-        specifier: ^0.6.2
-        version: 0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
-      mongodb:
-        specifier: ^6.17.0
-        version: 6.17.0
-      moost:
-        specifier: ^0.6.2
-        version: 0.6.2
-      vitest:
-        specifier: 3.2.4
-        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
-
   packages/moost-validator:
     dependencies:
       '@atscript/core':
@@ -4020,9 +3992,6 @@ packages:
 
   url-join@4.0.1:
     resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
-
-  urlql@0.0.5:
-    resolution: {integrity: sha512-Lsy3kJh19c5UOPK1qaoTiequIYfnGNMRX3hf5U9i2zHag5em/tAolfsa6bZkWUVU3mDkWHE8ys2eVJhMEYGpFQ==}
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -7868,8 +7837,6 @@ snapshots:
       webpack-virtual-modules: 0.6.2
 
   url-join@4.0.1: {}
-
-  urlql@0.0.5: {}
 
   util-deprecate@1.0.2: {}
 

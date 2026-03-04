@@ -21,7 +21,7 @@
     "release": "pnpm build && pnpm test && node ./scripts/versions && pnpm -r run pub",
     "vscode": "node ./scripts/vscode-publish",
     "sync": "node ./scripts/versions",
-    "postinstall": "node packages/moost-mongo/node_modules/@moostjs/event-http/scripts/setup-skills.js --postinstall"
+    "postinstall": "node packages/moost-db/node_modules/@moostjs/event-http/scripts/setup-skills.js --postinstall"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

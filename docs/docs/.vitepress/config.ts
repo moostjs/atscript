@@ -329,7 +329,7 @@ export default defineConfig({
         items: [
           { text: 'Guide', link: '/packages/typescript/' },
           // { text: 'MongoDB', link: '/packages/mongo/' },
-          // { text: 'Moost MongoDB', link: '/packages/moost-mongo/' },
+          // { text: 'Moost DB', link: '/packages/moost-db/' },
           { text: 'Moost Validator', link: '/packages/moost-validator/' },
         ],
       },
@@ -456,16 +456,11 @@ export default defineConfig({
         },
       ],
 
-      '/packages/moost-mongo/': [
+      '/packages/moost-db/': [
         {
-          text: '@atscript/moost-mongo',
+          text: '@atscript/moost-db',
           items: [
-            { text: 'Overview', link: '/packages/moost-mongo/' },
-            { text: 'Installation', link: '/packages/moost-mongo/installation' },
-            { text: 'Configuration', link: '/packages/moost-mongo/configuration' },
-            { text: 'Controllers', link: '/packages/moost-mongo/controllers' },
-            { text: 'Decorators', link: '/packages/moost-mongo/decorators' },
-            { text: 'DTOs', link: '/packages/moost-mongo/dtos' },
+            { text: 'Overview', link: '/packages/moost-db/' },
           ],
         },
       ],
