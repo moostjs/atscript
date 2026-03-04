@@ -8,7 +8,7 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token, SemanticAnnotateNode } from '@atscript/core'
+import type { SemanticNode, SemanticPropNode, Token, SemanticAnnotateNode } from '@atscript/core'
 import {
   AtscriptDoc,
   AtscriptRepo,
@@ -17,6 +17,7 @@ import {
   isAnnotate,
   isAnnotationSpec,
   isInterface,
+  isPhantomNode,
   isPrimitive,
   isProp,
   isRef,
@@ -135,10 +136,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const { textDocument, position, newName } = params
 
       // Open the document and find the token at the cursor
-      const atscript = await this.openDocument(textDocument.uri)
-      if (this.currentCheck) {
-        await this.currentCheck
-      }
+      const [atscript] = await Promise.all([this.openDocument(textDocument.uri), this.currentCheck])
       const token = atscript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return null // No token found at the cursor
@@ -191,8 +189,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       }
       const text = document.getText()
       const offset = document.offsetAt(position)
-      const atscript = await this.openDocument(textDocument.uri)
-      await this.currentCheck
+      const [atscript] = await Promise.all([this.openDocument(textDocument.uri), this.currentCheck])
 
       const block = atscript.blocksIndex.at(position.line, position.character)
 
@@ -254,25 +251,6 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
               options[0].kind = CompletionItemKind.Value
               options[0].command = undefined
               options[0].insertText = undefined
-              // if (a[key].arguments.length) {
-              //   options[0] = {
-              //     label: key,
-              //     labelDetails: {
-              //       detail: ` (snippet)`,
-              //     },
-              //     kind: CompletionItemKind.Snippet,
-              //     insertText: `${key} ${a[key].argumentsSnippet}`,
-              //     insertTextFormat: 2,
-              //     documentation: {
-              //       kind: 'markdown',
-              //       value: `## Snippet\n\n${documentation.value}`,
-              //     },
-              //     command: {
-              //       command: 'editor.action.triggerParameterHints',
-              //       title: 'Trigger Signature Help',
-              //     },
-              //   }
-              // }
             }
             return options
           })
@@ -302,48 +280,27 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       // property completions inside annotate blocks
       if (block?.blockType === 'annotate' && isAnnotate(block.parentNode)) {
         const annotateNode = block.parentNode as SemanticAnnotateNode
-        const unwound = atscript.unwindType(annotateNode.targetName)
-        if (unwound?.def) {
-          let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
-          if (isInterface(targetDef)) {
-            targetDef = targetDef.getDefinition() || targetDef
-          }
-          // chain completion (e.g., address.city)
-          if (token?.parentNode && isRef(token.parentNode)) {
-            const id = token.parentNode.token('identifier')
-            if (id && (token.parentNode.hasChain || token.text === '.')) {
-              const chain =
-                token.text === '.'
-                  ? [id.text, ...token.parentNode.chain.map(c => c.text)]
-                  : [id.text, ...token.parentNode.chain.slice(0, -1).map(c => c.text)]
-              const chainUnwound = atscript.unwindType(annotateNode.targetName, chain)
-              if (chainUnwound?.def) {
-                const chainDef = atscript.mergeIntersection(chainUnwound.def)
-                let options: SemanticNode[] | undefined
-                if (isInterface(chainDef) || isStructure(chainDef)) {
-                  options = Array.from(chainDef.props.values())
-                } else if (isProp(chainDef) && chainDef.nestedProps) {
-                  options = Array.from(chainDef.nestedProps.values())
-                }
-                return options?.map(t => ({
-                  label: t.id,
-                  kind: CompletionItemKind.Property,
-                  documentation: { kind: 'markdown', value: t.documentation },
-                })) as CompletionItem[]
-              }
-              return undefined
+        const targetDef = this.resolveAnnotateTarget(atscript, annotateNode.targetName)
+        if (!targetDef) {
+          return undefined
+        }
+        // chain completion (e.g., address.city)
+        if (token?.parentNode && isRef(token.parentNode)) {
+          const id = token.parentNode.token('identifier')
+          if (id && (token.parentNode.hasChain || token.text === '.')) {
+            const chain =
+              token.text === '.'
+                ? [id.text, ...token.parentNode.chain.map(c => c.text)]
+                : [id.text, ...token.parentNode.chain.slice(0, -1).map(c => c.text)]
+            const chainUnwound = atscript.unwindType(annotateNode.targetName, chain)
+            if (chainUnwound?.def) {
+              const chainDef = atscript.mergeIntersection(chainUnwound.def)
+              return this.propsToCompletionItems(this.getPropsFromDef(chainDef))
             }
-          }
-          // first-level: suggest top-level properties of target
-          if (isStructure(targetDef) || isInterface(targetDef)) {
-            return Array.from(targetDef.props.values()).map(t => ({
-              label: t.id,
-              kind: CompletionItemKind.Property,
-              documentation: { kind: 'markdown', value: t.documentation },
-            })) as CompletionItem[]
+            return undefined
           }
         }
-        return undefined
+        return this.propsToCompletionItems(Array.from(targetDef.props.values()))
       }
 
       // declared (imported) types or exported from other documents
@@ -409,22 +366,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         const unwound = atscript.unwindType(id.text, chain)
         if (unwound?.def) {
           const def = atscript.mergeIntersection(unwound.def)
-          let options: SemanticNode[] | undefined
-          if (isInterface(def) || isStructure(def)) {
-            options = Array.from(def.props.values())
-          } else if (isProp(def) && def.nestedProps) {
-            options = Array.from(def.nestedProps.values())
-          } else if (isPrimitive(def)) {
-            options = Array.from(def.props.values())
-          }
-          return options?.map(t => ({
-            label: t.id,
-            kind: CompletionItemKind.Property,
-            documentation: {
-              kind: 'markdown',
-              value: t.documentation,
-            },
-          })) as CompletionItem[]
+          const options = this.getPropsFromDef(def) ?? (isPrimitive(def) ? Array.from(def.props.values()) : undefined)
+          return this.propsToCompletionItems(options)
         }
       }
     })
@@ -514,7 +457,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           } as Hover
         }
       }
-      const aContext = await this.getAnnotationContextAt(document, position)
+      const aContext = await this.getAnnotationContextAt(document, position, atscript)
       if (!aContext) {
         return
       }
@@ -589,113 +532,62 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
 
     const builder = new SemanticTokensBuilder()
-    // Collect all phantom-related tokens: type references + prop names
     const phantomTokens: Array<{ line: number; char: number; length: number }> = []
+
+    const pushToken = (t: Token) => {
+      phantomTokens.push({
+        line: t.range.start.line,
+        char: t.range.start.character,
+        length: t.text.length,
+      })
+    }
+
     // 1. Mark phantom type reference tokens
     for (const token of atscript.referred) {
-      if (!isRef(token.parentNode)) {
+      if (!isRef(token.parentNode) || !isPhantomNode(atscript, token.parentNode)) {
         continue
       }
-      const ref = token.parentNode
-      const unwound = atscript.unwindType(ref.id!, ref.chain)
-      if (!unwound?.def) {
-        continue
-      }
-      if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') {
-        continue
-      }
-      phantomTokens.push({
-        line: token.range.start.line,
-        char: token.range.start.character,
-        length: token.text.length,
-      })
-      for (const c of ref.chain) {
-        phantomTokens.push({
-          line: c.range.start.line,
-          char: c.range.start.character,
-          length: c.text.length,
-        })
+      pushToken(token)
+      for (const c of token.parentNode.chain) {
+        pushToken(c)
       }
     }
-    // 2. Mark prop name tokens whose type resolves to phantom
+
+    // 2. Mark phantom-related tokens in interface props and annotate block entries
     for (const node of atscript.nodes) {
-      if (!isInterface(node)) {
-        continue
-      }
-      for (const [, prop] of node.props) {
-        const def = prop.getDefinition()
-        if (!isRef(def)) {
+      if (isInterface(node)) {
+        for (const [, prop] of node.props) {
+          if (!isPhantomNode(atscript, prop.getDefinition())) {
+            continue
+          }
+          const propToken = prop.token('identifier')
+          if (propToken) {
+            pushToken(propToken)
+          }
+        }
+      } else if (isAnnotate(node)) {
+        const targetDef = this.resolveAnnotateTarget(atscript, node.targetName)
+        if (!targetDef) {
           continue
         }
-        const unwound = atscript.unwindType(def.id!, def.chain)
-        if (!unwound?.def) {
-          continue
-        }
-        if (!isPrimitive(unwound.def) || unwound.def.config.type !== 'phantom') {
-          continue
-        }
-        const propToken = prop.token('identifier')
-        if (propToken) {
-          phantomTokens.push({
-            line: propToken.range.start.line,
-            char: propToken.range.start.character,
-            length: propToken.text.length,
-          })
-        }
-      }
-    }
-    // 3. Mark annotate block entry tokens that refer to phantom-typed props
-    for (const node of atscript.nodes) {
-      if (!isAnnotate(node)) {
-        continue
-      }
-      const unwound = atscript.unwindType(node.targetName)
-      if (!unwound?.def) {
-        continue
-      }
-      let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
-      if (isInterface(targetDef)) {
-        targetDef = targetDef.getDefinition() || targetDef
-      }
-      if (!isStructure(targetDef) && !isInterface(targetDef)) {
-        continue
-      }
-      for (const entry of node.entries) {
-        const propName = entry.id!
-        const prop = targetDef.props.get(propName)
-        if (!prop) {
-          continue
-        }
-        const propDef = prop.getDefinition()
-        if (!isRef(propDef)) {
-          continue
-        }
-        const propUnwound = atscript.unwindType(propDef.id!, propDef.chain)
-        if (!propUnwound?.def) {
-          continue
-        }
-        if (!isPrimitive(propUnwound.def) || propUnwound.def.config.type !== 'phantom') {
-          continue
-        }
-        const entryToken = entry.token('identifier')
-        if (entryToken) {
-          phantomTokens.push({
-            line: entryToken.range.start.line,
-            char: entryToken.range.start.character,
-            length: entryToken.text.length,
-          })
-        }
-        if (entry.hasChain) {
-          for (const c of entry.chain) {
-            phantomTokens.push({
-              line: c.range.start.line,
-              char: c.range.start.character,
-              length: c.text.length,
-            })
+        for (const entry of node.entries) {
+          const prop = targetDef.props.get(entry.id!)
+          if (!prop || !isPhantomNode(atscript, prop.getDefinition())) {
+            continue
+          }
+          const entryToken = entry.token('identifier')
+          if (entryToken) {
+            pushToken(entryToken)
+          }
+          if (entry.hasChain) {
+            for (const c of entry.chain) {
+              pushToken(c)
+            }
           }
         }
       }
     }
+
     // Sort by position (required by semantic tokens protocol)
     phantomTokens.sort((a, b) => a.line - b.line || a.char - b.char)
     for (const t of phantomTokens) {
@@ -708,7 +600,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     return builder.build()
   }
 
-  async getAnnotationContextAt(document: TextDocument, position: Position) {
+  async getAnnotationContextAt(document: TextDocument, position: Position, existingDoc?: AtscriptDoc) {
     const text = document.getText()
     const offset = document.offsetAt(position)
 
@@ -721,8 +613,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     if (!annotationMatch) {
       return
     }
-    // await this.currentCheck
-    const atscript = await this.openDocument(document.uri)
+    const atscript = existingDoc ?? await this.openDocument(document.uri)
     const annotationToken = atscript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
     if (!annotationToken?.parentNode) {
       return
@@ -780,8 +671,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         detail: token.fromPath ? `imported from '${token.fromPath}'` : undefined,
       })
     }
-    for (const docPromise of this.atscripts.values()) {
-      const doc = await docPromise
+    const allDocs = await Promise.all(this.atscripts.values())
+    for (const doc of allDocs) {
       if (doc !== atscript) {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
@@ -864,6 +755,13 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   ): Promise<CompletionItem[] | undefined> {
     const dif = position.character - token.range.start.character - 1
     const paths = await getItnFileCompletions(atscript.id, token.fromPath!.slice(0, dif))
+    const editRange = {
+      start: {
+        line: token.range.start.line,
+        character: token.range.start.character + 1,
+      },
+      end: { line: token.range.end.line, character: token.range.end.character - 1 },
+    }
     return paths.map(({ path, isDirectory }) => ({
       label: path,
       kind: isDirectory ? CompletionItemKind.Folder : CompletionItemKind.File,
@@ -874,26 +772,14 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           }
         : undefined,
       textEdit: {
-        replace: {
-          start: {
-            line: token.range.start.line,
-            character: token.range.start.character + 1,
-          },
-          end: { line: token.range.end.line, character: token.range.end.character - 1 },
-        },
-        range: {
-          start: {
-            line: token.range.start.line,
-            character: token.range.start.character + 1,
-          },
-          end: { line: token.range.end.line, character: token.range.end.character - 1 },
-        },
+        replace: editRange,
+        range: editRange,
         newText: isDirectory ? `${path}/` : path,
       },
     })) as CompletionItem[]
   }
 
-  async triggerChecks() {
+  triggerChecks() {
     if (this.idle) {
       this.currentCheck = this.runChecks()
     }
@@ -904,14 +790,11 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     if (this.idle && (this.changeQueue.length > 0 || this.revalidateQueue.length > 0)) {
       this.idle = false
       await new Promise(resolve => setTimeout(resolve, this.checksDelay))
-      const ids = [] as string[]
       while (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
-        const isFromChangeQueue = this.changeQueue.length > 0
-        const id = isFromChangeQueue ? this.changeQueue.shift()! : this.revalidateQueue.shift()!
-        ids.push(id)
+        const id = (this.changeQueue.shift() ?? this.revalidateQueue.shift())!
         this.pendingCheck.delete(id)
         const doc = await this.openDocument(id)
-        if (this.changedSet.has(id) && this.atscripts.has(id)) {
+        if (this.changedSet.has(id)) {
           const text = this.documents.get(id)?.getText()
           if (typeof text === 'string') {
             doc.update(text)
@@ -958,6 +841,42 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       return atscript
     }
     return super._openDocument(id, text)
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  resolveAnnotateTarget(atscript: AtscriptDoc, targetName: string): (SemanticNode & { props: Map<string, SemanticPropNode> }) | undefined {
+    const unwound = atscript.unwindType(targetName)
+    if (!unwound?.def) {
+      return undefined
+    }
+    let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
+    if (isInterface(targetDef)) {
+      targetDef = targetDef.getDefinition() || targetDef
+    }
+    if (!isStructure(targetDef) && !isInterface(targetDef)) {
+      return undefined
+    }
+    return targetDef
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  propsToCompletionItems(props: SemanticNode[] | undefined): CompletionItem[] | undefined {
+    return props?.map(t => ({
+      label: t.id!,
+      kind: CompletionItemKind.Property,
+      documentation: { kind: 'markdown', value: t.documentation } as MarkupContent,
+    }))
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  getPropsFromDef(def: SemanticNode): SemanticNode[] | undefined {
+    if (isInterface(def) || isStructure(def)) {
+      return Array.from(def.props.values())
+    }
+    if (isProp(def) && def.nestedProps) {
+      return Array.from(def.nestedProps.values())
+    }
+    return undefined
   }
 
   revalidateDependants(atscript: AtscriptDoc) {

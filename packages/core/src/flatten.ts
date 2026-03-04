@@ -100,7 +100,7 @@ function hasDbJsonAnnotation(prop: SemanticPropNode): boolean {
   return prop.annotations.some(a => a.name === 'db.json')
 }
 
-function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
+export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
   if (!def) {
     return false
   }
