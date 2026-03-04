@@ -29,7 +29,7 @@ import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
 export class JsRenderer extends BaseRenderer {
-  postAnnotate = [] as SemanticNode[]
+  private postAnnotate = [] as SemanticNode[]
   private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
   private _propPath: string[] = []
   private typeIds = new Map<SemanticNode, string>()
@@ -45,32 +45,16 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('// prettier-ignore-start')
     this.writeln('/* eslint-disable */')
     this.writeln('/* oxlint-disable */')
-    const imports = ['defineAnnotatedType as $', 'annotate as $a']
-    const hasMutatingAnnotate = this.doc.nodes.some(
-      n => n.entity === 'annotate' && (n as SemanticAnnotateNode).isMutating
-    )
-    if (hasMutatingAnnotate) {
-      imports.push('cloneRefProp as $c')
-    }
-    const jsonSchemaMode = resolveJsonSchemaMode(this.opts)
-    if (jsonSchemaMode === 'lazy') {
-      imports.push('buildJsonSchema as $$')
-    }
-    if (this.opts?.exampleData) {
-      imports.push('createDataFromAnnotatedType as $e')
-    }
-    if (jsonSchemaMode === false) {
-      imports.push('throwFeatureDisabled as $d')
-    }
-    this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
 
-    // Pre-scan definition nodes to detect name collisions and assign string IDs
-    const nameCounts = new Map<string, number>()
+    // Pre-scan nodes: detect name collisions for typeIds and check for mutating annotate
+    let hasMutatingAnnotate = false
     const nodesByName = new Map<string, SemanticNode[]>()
     for (const node of this.doc.nodes) {
+      if (node.entity === 'annotate' && (node as SemanticAnnotateNode).isMutating) {
+        hasMutatingAnnotate = true
+      }
       if (node.__typeId !== null && node.__typeId !== undefined && node.id) {
         const name = node.id
-        nameCounts.set(name, (nameCounts.get(name) || 0) + 1)
         if (!nodesByName.has(name)) {
           nodesByName.set(name, [])
         }
@@ -86,6 +70,22 @@ export class JsRenderer extends BaseRenderer {
         }
       }
     }
+
+    const imports = ['defineAnnotatedType as $', 'annotate as $a']
+    if (hasMutatingAnnotate) {
+      imports.push('cloneRefProp as $c')
+    }
+    const jsonSchemaMode = resolveJsonSchemaMode(this.opts)
+    if (jsonSchemaMode === 'lazy') {
+      imports.push('buildJsonSchema as $$')
+    }
+    if (this.opts?.exampleData) {
+      imports.push('createDataFromAnnotatedType as $e')
+    }
+    if (jsonSchemaMode === false) {
+      imports.push('throwFeatureDisabled as $d')
+    }
+    this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
   }
 
   private buildAdHocMap(annotateNodes: SemanticAnnotateNode[]) {
@@ -98,7 +98,11 @@ export class JsRenderer extends BaseRenderer {
         const anns = entry.annotations || []
         if (anns.length > 0) {
           const existing = map.get(path)
-          map.set(path, existing ? [...existing, ...anns] : anns)
+          if (existing) {
+            existing.push(...anns)
+          } else {
+            map.set(path, [...anns])
+          }
         }
       }
     }
@@ -186,27 +190,11 @@ export class JsRenderer extends BaseRenderer {
   }
 
   renderInterface(node: SemanticInterfaceNode): void {
-    this.writeln()
-    const exported = node.token('export')?.text === 'export'
-    this.write(exported ? 'export ' : '')
-    this.write(`class ${node.id!} `)
-    this.blockln('{}')
-    this.renderClassStatics(node)
-    this.popln()
-    this.postAnnotate.push(node)
-    this.writeln()
+    this.renderDefinitionClass(node)
   }
 
   renderType(node: SemanticTypeNode): void {
-    this.writeln()
-    const exported = node.token('export')?.text === 'export'
-    this.write(exported ? 'export ' : '')
-    this.write(`class ${node.id!} `)
-    this.blockln('{}')
-    this.renderClassStatics(node)
-    this.popln()
-    this.postAnnotate.push(node)
-    this.writeln()
+    this.renderDefinitionClass(node)
   }
 
   renderAnnotate(node: SemanticAnnotateNode): void {
@@ -214,11 +202,13 @@ export class JsRenderer extends BaseRenderer {
       this.postAnnotate.push(node)
       return
     }
-    const targetName = node.targetName
-    const unwound = this.doc.unwindType(targetName)
-    if (!unwound?.def) {
+    if (!this.doc.unwindType(node.targetName)?.def) {
       return
     }
+    this.renderDefinitionClass(node)
+  }
+
+  private renderDefinitionClass(node: SemanticNode) {
     this.writeln()
     const exported = node.token('export')?.text === 'export'
     this.write(exported ? 'export ' : '')
@@ -496,10 +486,6 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'primitive': {
         this.definePrimitive(node as SemanticPrimitiveNode, name)
-        // this.writeln(`$(${name ? `"", ${name}` : ''})`)
-        //   .indent()
-        //   .definePrimitive(node as SemanticPrimitiveNode)
-        //   .unindent()
         return this
       }
       case 'const': {
@@ -539,7 +525,6 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       default: {
-        console.log('!!!!!!! UNKNOWN', node.entity)
         return this
       }
     }
@@ -553,25 +538,6 @@ export class JsRenderer extends BaseRenderer {
     this.writeln(`.value(${t === 'text' ? `"${escapeQuotes(node.id!)}"` : node.id!})`)
     return this
   }
-  //   defineRef(node: SemanticRefNode) {
-  //     const def = this.doc.unwindType(node.id!, node.chain)?.def
-  //     if (!def) {
-  //       // imported?
-  //       this.writeln(`.refTo(${node.id!})`)
-  //       //   this.writeln('// unknown def ', node.id!)
-  //     }
-  //     if (isPrimitive(def)) {
-  //       this.definePrimitive(def)
-  //     }
-  //     if (isInterface(def)) {
-  //       // def.id!
-  //       this.writeln(`.refTo(${def.id!})`)
-  //     }
-  //     if (isGroup(def)) {
-  //       this.defineGroup(def)
-  //     }
-  //     return this
-  //   }
   definePrimitive(node: SemanticPrimitiveNode, name?: string) {
     this.renderPrimitiveDef(node.id! === 'never' ? 'never' : node.config.type, name)
     this.writeln(
@@ -860,49 +826,40 @@ export class JsRenderer extends BaseRenderer {
 
     // Emit mutation statements
     for (const { entry, accessors } of entryAccessors) {
-      const anns = entry.annotations!
       for (const accessor of accessors) {
-        const cleared = new Set<string>()
-        for (const an of anns) {
-          const { value, multiple } = this.computeAnnotationValue(entry, an)
-          if (multiple) {
-            // For multiple+replace: clear existing values before first append
-            if (!cleared.has(an.name)) {
-              const spec = this.doc.resolveAnnotation(an.name)
-              if (!spec || spec.config.mergeStrategy !== 'append') {
-                this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
-              }
-              cleared.add(an.name)
-            }
-            this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
-          } else {
-            this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
-          }
-        }
+        this.emitMutatingAnnotations(entry, entry.annotations!, accessor)
       }
     }
     // Top-level annotations on the annotate block mutate the target's metadata
     const topAnnotations = node.annotations
     if (topAnnotations && topAnnotations.length > 0) {
-      const cleared = new Set<string>()
-      for (const an of topAnnotations) {
-        const { value, multiple } = this.computeAnnotationValue(node, an)
-        if (multiple) {
-          if (!cleared.has(an.name)) {
-            const spec = this.doc.resolveAnnotation(an.name)
-            if (!spec || spec.config.mergeStrategy !== 'append') {
-              this.writeln(`${targetName}.metadata.delete("${escapeQuotes(an.name)}")`)
-            }
-            cleared.add(an.name)
-          }
-          this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
-        } else {
-          this.writeln(`$a(${targetName}.metadata, "${escapeQuotes(an.name)}", ${value})`)
-        }
-      }
+      this.emitMutatingAnnotations(node, topAnnotations, targetName)
     }
 
     this.writeln()
+  }
+
+  private emitMutatingAnnotations(
+    node: SemanticNode,
+    annotations: TAnnotationTokens[],
+    accessor: string
+  ) {
+    const cleared = new Set<string>()
+    for (const an of annotations) {
+      const { value, multiple } = this.computeAnnotationValue(node, an)
+      if (multiple) {
+        if (!cleared.has(an.name)) {
+          const spec = this.doc.resolveAnnotation(an.name)
+          if (!spec || spec.config.mergeStrategy !== 'append') {
+            this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
+          }
+          cleared.add(an.name)
+        }
+        this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value}, true)`)
+      } else {
+        this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
+      }
+    }
   }
 
   private resolveTargetDef(targetName: string): SemanticNode | undefined {

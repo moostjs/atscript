@@ -12,11 +12,14 @@ import { isGroup, isRef } from '@atscript/core'
 import { CodePrinter } from './code-printer'
 
 export class BaseRenderer extends CodePrinter {
-  unused: Set<string>
+  private _unused?: Set<string>
 
   constructor(protected readonly doc: AtscriptDoc) {
     super()
-    this.unused = new Set(this.doc.getUnusedTokens().map(t => t.text))
+  }
+
+  protected get unused(): Set<string> {
+    return (this._unused ??= new Set(this.doc.getUnusedTokens().map(t => t.text)))
   }
 
   pre() {}

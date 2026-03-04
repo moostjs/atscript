@@ -119,16 +119,19 @@ export class TypeRenderer extends BaseRenderer {
     }
   }
 
-  renderStructure(struct: SemanticStructureNode, asClass?: string, interfaceNode?: SemanticInterfaceNode) {
+  renderStructure(struct: SemanticStructureNode, asClass?: string, interfaceNode?: SemanticInterfaceNode, filterProps?: Map<string, SemanticPropNode>) {
     this.blockln('{}')
-    // let propsList = ''
     const patterns = [] as SemanticPropNode[]
     const propsDefs = new Set<string>()
 
-    for (const prop of Array.from(struct.props.values())) {
-      // propsList += (propsList ? ' | ' : '') + `"${escapeQuotes(prop.id!)}"`
+    for (const prop of struct.props.values()) {
+      if (filterProps?.has(prop.id!)) {
+        continue
+      }
       if (prop.token('identifier')?.pattern) {
-        patterns.push(prop)
+        if (!filterProps) {
+          patterns.push(prop)
+        }
         continue
       }
       const phantomType = this.phantomPropType(prop.getDefinition())
@@ -144,49 +147,51 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (patterns.length > 0) {
       this.write(`[key: string]: `)
-      if (patterns.length > 0) {
-        for (const prop of patterns) {
-          propsDefs.add(this.renderTypeDefString(prop.getDefinition()))
-        }
-        const defs = Array.from(propsDefs)
-        if (defs.length > 1) {
-          this.indent()
-          for (const def of defs) {
-            this.writeln()
-            this.write('| ')
-            def.split('\n').forEach(l => this.write(l.trim()))
-          }
-          this.unindent()
+      for (const prop of patterns) {
+        propsDefs.add(this.renderTypeDefString(prop.getDefinition()))
+      }
+      const defs = Array.from(propsDefs)
+      if (defs.length > 1) {
+        this.indent()
+        for (const def of defs) {
           this.writeln()
-        } else {
-          defs[0].split('\n').forEach(l => this.writeln(l))
+          this.write('| ')
+          def.split('\n').forEach(l => this.write(l.trim()))
         }
+        this.unindent()
+        this.writeln()
+      } else {
+        defs[0].split('\n').forEach(l => this.writeln(l))
       }
     }
     if (asClass) {
-      this.writeln('static __is_atscript_annotated_type: true')
-      this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}, ${asClass}>`)
-      this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
-      this.writeln(
-        `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
-      )
-      if (resolveJsonSchemaMode(this.opts) === false) {
-        this.writeln(
-          "/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */"
-        )
-      }
-      this.writeln('static toJsonSchema: () => any')
-      if (!this.opts?.exampleData) {
-        this.writeln(
-          '/** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */'
-        )
-      }
-      this.writeln('static toExampleData?: () => any')
-      if (interfaceNode && this.hasDbTable(interfaceNode)) {
-        this.renderFlat(interfaceNode)
-      }
+      this.renderStaticDeclarations(asClass, interfaceNode)
     }
     this.pop()
+  }
+
+  private renderStaticDeclarations(asClass: string, interfaceNode?: SemanticInterfaceNode) {
+    this.writeln('static __is_atscript_annotated_type: true')
+    this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}, ${asClass}>`)
+    this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
+    this.writeln(
+      `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
+    )
+    if (resolveJsonSchemaMode(this.opts) === false) {
+      this.writeln(
+        "/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */"
+      )
+    }
+    this.writeln('static toJsonSchema: () => any')
+    if (!this.opts?.exampleData) {
+      this.writeln(
+        '/** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */'
+      )
+    }
+    this.writeln('static toExampleData?: () => any')
+    if (interfaceNode && this.hasDbTable(interfaceNode)) {
+      this.renderFlat(interfaceNode)
+    }
   }
 
   renderInterface(node: SemanticInterfaceNode) {
@@ -225,11 +230,11 @@ export class TypeRenderer extends BaseRenderer {
           }
         }
         // Render only props NOT in first parent
-        this.renderStructureFiltered(
+        this.renderStructure(
           resolved as SemanticStructureNode,
           node.id!,
-          firstParentProps,
-          node
+          node,
+          firstParentProps
         )
       } else {
         this.writeln('{}')
@@ -244,61 +249,6 @@ export class TypeRenderer extends BaseRenderer {
       }
     }
     this.writeln()
-  }
-
-  /**
-   * Renders a structure block, optionally filtering out props that exist in a parent.
-   */
-  private renderStructureFiltered(
-    struct: SemanticStructureNode,
-    asClass: string,
-    filterProps?: Map<string, SemanticPropNode>,
-    interfaceNode?: SemanticInterfaceNode
-  ) {
-    if (!filterProps) {
-      return this.renderStructure(struct, asClass, interfaceNode)
-    }
-    this.blockln('{}')
-    for (const prop of Array.from(struct.props.values())) {
-      // Skip props inherited from the first parent (TS extends handles them)
-      if (filterProps.has(prop.id!)) {
-        continue
-      }
-      if (prop.token('identifier')?.pattern) {
-        continue // patterns handled separately
-      }
-      const phantomType = this.phantomPropType(prop.getDefinition())
-      if (phantomType) {
-        this.writeln(`// ${prop.id!}: ${phantomType}`)
-        continue
-      }
-      const optional = !!prop.token('optional')
-      this.write(wrapProp(prop.id!), optional ? '?' : '', ': ')
-      const renderedDef = this.renderTypeDefString(prop.getDefinition())
-      renderedDef.split('\n').forEach(l => this.writeln(l))
-    }
-    this.writeln('static __is_atscript_annotated_type: true')
-    this.writeln(`static type: TAtscriptTypeObject<keyof ${asClass}, ${asClass}>`)
-    this.writeln(`static metadata: TMetadataMap<AtscriptMetadata>`)
-    this.writeln(
-      `static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ${asClass}>`
-    )
-    if (resolveJsonSchemaMode(this.opts) === false) {
-      this.writeln(
-        "/** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */"
-      )
-    }
-    this.writeln('static toJsonSchema: () => any')
-    if (!this.opts?.exampleData) {
-      this.writeln(
-        '/** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */'
-      )
-    }
-    this.writeln('static toExampleData?: () => any')
-    if (interfaceNode && this.hasDbTable(interfaceNode)) {
-      this.renderFlat(interfaceNode)
-    }
-    this.pop()
   }
 
   renderType(node: SemanticTypeNode) {
