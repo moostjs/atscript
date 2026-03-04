@@ -47,7 +47,7 @@ function flattenPatchPayload(
     }
 
     const flatType = table.flatMap.get(key)
-    const isTopLevelArray = flatType?.metadata?.get(topLevelArrayTag) as boolean | undefined
+    const isTopLevelArray = flatType?.metadata?.get(topLevelArrayTag as keyof AtscriptMetadata) as boolean | undefined
 
     if (typeof value === 'object' && value !== null && isTopLevelArray) {
       // Top-level array with patch operators

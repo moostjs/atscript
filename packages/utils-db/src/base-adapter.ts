@@ -4,9 +4,9 @@ import type {
   TValidatorPlugin,
 } from '@atscript/typescript/utils'
 
-import type { FilterExpr, Uniquery } from '@uniqu/core'
+import type { FilterExpr } from '@uniqu/core'
 
-import type { TDbIndex } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { AtscriptDbTable } from './db-table'
 
@@ -27,6 +27,7 @@ export type TNativeCallMap = Record<string, { args: any; result: any }>
 /**
  * Extracts the native call map from an adapter type.
  */
+// oxlint-disable-next-line typescript-eslint/ban-types -- {} means "no native calls"
 export type InferNativeCalls<A> = A extends BaseDbAdapter<infer NC> ? NC : {}
 
 /**
@@ -53,6 +54,7 @@ export type InferNativeCalls<A> = A extends BaseDbAdapter<infer NC> ? NC : {}
  *
  * @typeParam NCalls - Map of native adapter-specific calls. Defaults to `{}` (no native calls).
  */
+// oxlint-disable-next-line typescript-eslint/ban-types -- {} means "no native calls"
 export abstract class BaseDbAdapter<NCalls extends TNativeCallMap = {}> {
   // ── Table back-reference ──────────────────────────────────────────────────
 
@@ -281,6 +283,69 @@ export abstract class BaseDbAdapter<NCalls extends TNativeCallMap = {}> {
     throw new Error(`Native call "${name}" is not supported by this adapter`)
   }
 
+  // ── Search index metadata ─────────────────────────────────────────────────
+
+  /**
+   * Returns available search indexes for this adapter.
+   * UI uses this to show index picker. Override in adapters that support search.
+   */
+  getSearchIndexes(): TSearchIndexInfo[] {
+    return []
+  }
+
+  /**
+   * Whether this adapter supports text search.
+   * Default: `true` when {@link getSearchIndexes} returns any entries.
+   */
+  isSearchable(): boolean {
+    return this.getSearchIndexes().length > 0
+  }
+
+  // ── Search ──────────────────────────────────────────────────────────────
+
+  /**
+   * Full-text search. Override in adapters that support search.
+   *
+   * @param text - Search text.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional search index to target.
+   */
+  async search(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    throw new Error('Search not supported by this adapter')
+  }
+
+  /**
+   * Full-text search with count (for paginated search results).
+   *
+   * @param text - Search text.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional search index to target.
+   */
+  async searchWithCount(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    throw new Error('Search not supported by this adapter')
+  }
+
+  // ── Optimized pagination ──────────────────────────────────────────────
+
+  /**
+   * Fetches records and total count in one call.
+   * Default: two parallel calls. Adapters may override for single-query optimization.
+   */
+  async findManyWithCount(
+    query: DbQuery
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    const [data, count] = await Promise.all([this.findMany(query), this.count(query)])
+    return { data, count }
+  }
+
   // ── Abstract CRUD — adapters must implement ───────────────────────────────
   // The adapter reads this._table.tableName and any other metadata it needs
   // internally. No table name parameter needed.
@@ -297,12 +362,12 @@ export abstract class BaseDbAdapter<NCalls extends TNativeCallMap = {}> {
   ): Promise<TDbUpdateResult>
   abstract deleteOne(filter: FilterExpr): Promise<TDbDeleteResult>
   abstract findOne(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Record<string, unknown> | null>
   abstract findMany(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Array<Record<string, unknown>>>
-  abstract count(query: Uniquery): Promise<number>
+  abstract count(query: DbQuery): Promise<number>
 
   // ── Batch operations ──────────────────────────────────────────────────────
 

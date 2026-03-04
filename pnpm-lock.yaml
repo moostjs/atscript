@@ -84,6 +84,58 @@ importers:
         specifier: 3.5.21
         version: 3.5.21(typescript@5.9.3)
 
+  explorations/moost:
+    dependencies:
+      '@atscript/core':
+        specifier: workspace:^
+        version: link:../../packages/core
+      '@atscript/db-sqlite':
+        specifier: workspace:^
+        version: link:../../packages/db-sqlite
+      '@atscript/moost-db':
+        specifier: workspace:^
+        version: link:../../packages/moost-db
+      '@atscript/typescript':
+        specifier: workspace:^
+        version: link:../../packages/typescript
+      '@atscript/utils-db':
+        specifier: workspace:^
+        version: link:../../packages/utils-db
+      '@moostjs/event-http':
+        specifier: ^0.6.2
+        version: 0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
+      '@moostjs/vite':
+        specifier: ^0.6.2
+        version: 0.6.2(@moostjs/event-http@0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4))(moost@0.6.2)(vite@7.3.1(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@uniqu/core':
+        specifier: ^0.0.1
+        version: 0.0.1
+      '@uniqu/url':
+        specifier: ^0.0.1
+        version: 0.0.1
+      better-sqlite3:
+        specifier: ^12.6.2
+        version: 12.6.2
+      moost:
+        specifier: ^0.6.2
+        version: 0.6.2
+    devDependencies:
+      '@swc/core':
+        specifier: ^1.10.0
+        version: 1.10.12
+      '@types/better-sqlite3':
+        specifier: ^7.6.13
+        version: 7.6.13
+      unplugin-atscript:
+        specifier: workspace:^
+        version: link:../../packages/unplugin
+      unplugin-swc:
+        specifier: ^1.5.0
+        version: 1.5.9(@swc/core@1.10.12)(rollup@4.59.0)
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
   explorations/sqllite:
     dependencies:
       '@atscript/core':
@@ -190,6 +242,34 @@ importers:
         specifier: ^6.17.0
         version: 6.17.0
     devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/moost-db:
+    dependencies:
+      '@atscript/typescript':
+        specifier: workspace:^
+        version: link:../typescript
+      '@atscript/utils-db':
+        specifier: workspace:^
+        version: link:../utils-db
+      '@uniqu/core':
+        specifier: ^0.0.1
+        version: 0.0.1
+      '@uniqu/url':
+        specifier: ^0.0.1
+        version: 0.0.1
+    devDependencies:
+      '@atscript/core':
+        specifier: workspace:^
+        version: link:../core
+      '@moostjs/event-http':
+        specifier: ^0.6.2
+        version: 0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
+      moost:
+        specifier: ^0.6.2
+        version: 0.6.2
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
@@ -1209,6 +1289,13 @@ packages:
       '@wooksjs/event-core': ^0.7.4
       moost: ^0.6.2
 
+  '@moostjs/vite@0.6.2':
+    resolution: {integrity: sha512-qe/v4++lfKw+JTmbw34WkV0u0LIqDkhOtIljBK8gCw3Z8y9s/vqN6nCl8LrBS3+00WPIM1ZgMmrMAY40O+XFug==}
+    peerDependencies:
+      '@moostjs/event-http': ^0.6.2
+      moost: ^0.6.2
+      vite: ^7.0.0
+
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
 
@@ -2022,6 +2109,9 @@ packages:
   '@uniqu/core@0.0.1':
     resolution: {integrity: sha512-XUOcLJ1Mp7KkpmBWrTmgGsV1McFaZ97Hh5LYCQjUeXJ08m4neGvF/fYDBz5RB0wPARer4jOP+jwSwyctWjHulg==}
 
+  '@uniqu/url@0.0.1':
+    resolution: {integrity: sha512-cHvrGsUdKiO5ui45WKqPr3BnhCJhyKzloXDL5sjP2K45dlmrJzitBjZjeeHYkW7qKARlosNlkpIGzYo6gAJOkA==}
+
   '@vitejs/plugin-vue@5.2.1':
     resolution: {integrity: sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -2736,6 +2826,15 @@ packages:
 
   fdir@6.4.6:
     resolution: {integrity: sha512-hiFoqpyZcfNm1yc4u8oWCf9A2c4D3QjCrks3zmoVKVxpQRzmPNar1hUJcBG2RQHvEVGDN+Jm81ZheVLAQMK6+w==}
+    peerDependencies:
+      picomatch: ^3 || ^4
+    peerDependenciesMeta:
+      picomatch:
+        optional: true
+
+  fdir@6.5.0:
+    resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
+    engines: {node: '>=12.0.0'}
     peerDependencies:
       picomatch: ^3 || ^4
     peerDependenciesMeta:
@@ -3796,6 +3895,10 @@ packages:
     resolution: {integrity: sha512-tX5e7OM1HnYr2+a2C/4V0htOcSQcoSTH9KgJnVvNm5zm/cyEWKJ7j7YutsH9CxMdtOkkLFy2AHrMci9IM8IPZQ==}
     engines: {node: '>=12.0.0'}
 
+  tinyglobby@0.2.15:
+    resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
   tinypool@1.1.1:
     resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -3990,6 +4093,46 @@ packages:
       sass-embedded: '*'
       stylus: '*'
       sugarss: '*'
+      terser: ^5.16.0
+      tsx: ^4.8.1
+      yaml: ^2.4.2
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      jiti:
+        optional: true
+      less:
+        optional: true
+      lightningcss:
+        optional: true
+      sass:
+        optional: true
+      sass-embedded:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      terser:
+        optional: true
+      tsx:
+        optional: true
+      yaml:
+        optional: true
+
+  vite@7.3.1:
+    resolution: {integrity: sha512-w+N7Hifpc3gRjZ63vYBXA56dvvRlNWRczTdmCBBa+CotUzAPf5b7YMdMR/8CQoeYE5LX3W4wj6RYTgonm1b9DA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      '@types/node': ^20.19.0 || >=22.12.0
+      jiti: '>=1.21.0'
+      less: ^4.0.0
+      lightningcss: ^1.21.0
+      sass: ^1.70.0
+      sass-embedded: ^1.70.0
+      stylus: '>=0.54.8'
+      sugarss: ^5.0.0
       terser: ^5.16.0
       tsx: ^4.8.1
       yaml: ^2.4.2
@@ -4976,6 +5119,13 @@ snapshots:
       - '@prostojs/router'
       - wooks
 
+  '@moostjs/vite@0.6.2(@moostjs/event-http@0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4))(moost@0.6.2)(vite@7.3.1(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))':
+    dependencies:
+      '@moostjs/event-http': 0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
+      magic-string: 0.30.21
+      moost: 0.6.2
+      vite: 7.3.1(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
   '@napi-rs/wasm-runtime@0.2.12':
     dependencies:
       '@emnapi/core': 1.8.1
@@ -5618,6 +5768,10 @@ snapshots:
   '@ungap/structured-clone@1.2.1': {}
 
   '@uniqu/core@0.0.1': {}
+
+  '@uniqu/url@0.0.1':
+    dependencies:
+      '@uniqu/core': 0.0.1
 
   '@vitejs/plugin-vue@5.2.1(vite@5.4.14(@types/node@22.19.11))(vue@3.5.21(typescript@5.9.3))':
     dependencies:
@@ -6401,7 +6555,6 @@ snapshots:
       '@esbuild/win32-arm64': 0.27.3
       '@esbuild/win32-ia32': 0.27.3
       '@esbuild/win32-x64': 0.27.3
-    optional: true
 
   escalade@3.2.0: {}
 
@@ -6440,6 +6593,10 @@ snapshots:
       picomatch: 4.0.2
 
   fdir@6.4.6(picomatch@4.0.3):
+    optionalDependencies:
+      picomatch: 4.0.3
+
+  fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
 
@@ -7596,6 +7753,11 @@ snapshots:
       fdir: 6.4.6(picomatch@4.0.2)
       picomatch: 4.0.2
 
+  tinyglobby@0.2.15:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+
   tinypool@1.1.1: {}
 
   tinypool@2.1.0: {}
@@ -7804,6 +7966,21 @@ snapshots:
       postcss: 8.5.6
       rollup: 4.59.0
       tinyglobby: 0.2.14
+    optionalDependencies:
+      '@types/node': 22.19.11
+      fsevents: 2.3.3
+      jiti: 2.6.1
+      tsx: 4.21.0
+      yaml: 2.8.2
+
+  vite@7.3.1(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2):
+    dependencies:
+      esbuild: 0.27.3
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.6
+      rollup: 4.59.0
+      tinyglobby: 0.2.15
     optionalDependencies:
       '@types/node': 22.19.11
       fsevents: 2.3.3

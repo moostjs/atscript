@@ -9,20 +9,19 @@ import type {
 import {
   BaseDbAdapter,
   type AtscriptDbTable,
+  type DbQuery,
   type FilterExpr,
-  type Uniquery,
-  type TDbIndex,
   type TDbInsertResult,
   type TDbInsertManyResult,
   type TDbUpdateResult,
   type TDbDeleteResult,
+  type TSearchIndexInfo,
 } from '@atscript/utils-db'
 import type {
   AggregationCursor,
   Collection,
   Db,
   Document,
-  Filter,
 } from 'mongodb'
 import { ObjectId } from 'mongodb'
 
@@ -63,7 +62,7 @@ function mongoIndexKey(type: TMongoIndex['type'], name: string) {
 
 // ── Native calls ─────────────────────────────────────────────────────────────
 
-export interface MongoNativeCalls {
+export type MongoNativeCalls = {
   aggregate: { args: Document[]; result: AggregationCursor }
 }
 
@@ -106,10 +105,12 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     opts: MongoNativeCalls[K]['args']
   ): MongoNativeCalls[K]['result'] {
     switch (name) {
-      case 'aggregate':
+      case 'aggregate': {
         return this.aggregate(opts as Document[]) as MongoNativeCalls[K]['result']
-      default:
+      }
+      default: {
         throw new Error(`Unknown native call: ${name}`)
+      }
     }
   }
 
@@ -118,7 +119,7 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
   get idType(): 'string' | 'number' | 'objectId' {
     const idProp = (this._table.type as any).type.props.get('_id')
     const idTags = idProp?.type.tags
-    if (idTags?.has('objectId') && idTags?.has('mongo')) {
+    if ((idTags as Set<string>)?.has('objectId') && (idTags as Set<string>)?.has('mongo')) {
       return 'objectId'
     }
     if (idProp?.type.kind === '') {
@@ -129,7 +130,7 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
 
   override prepareId(id: unknown, fieldType: TAtscriptAnnotatedType): unknown {
     const tags = fieldType.type.tags
-    if (tags?.has('objectId') && tags?.has('mongo')) {
+    if ((tags as Set<string>)?.has('objectId') && (tags as Set<string>)?.has('mongo')) {
       return id instanceof ObjectId ? id : new ObjectId(id as string)
     }
     if (fieldType.type.kind === '') {
@@ -145,14 +146,18 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
    */
   prepareIdFromIdType<D = string | number | ObjectId>(id: string | number | ObjectId): D {
     switch (this.idType) {
-      case 'objectId':
+      case 'objectId': {
         return (id instanceof ObjectId ? id : new ObjectId(id as string)) as D
-      case 'number':
+      }
+      case 'number': {
         return Number(id) as D
-      case 'string':
+      }
+      case 'string': {
         return String(id) as D
-      default:
+      }
+      default: {
         throw new Error('Unknown "_id" type')
+      }
     }
   }
 
@@ -187,7 +192,7 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
       plugins: this.getValidatorPlugins(),
       replace: (type, path) => {
         // Only make ObjectId primary keys optional (auto-generated)
-        if (path === '_id' && type.type.tags?.has('objectId')) {
+        if (path === '_id' && (type.type.tags as Set<string>)?.has('objectId')) {
           return { ...type, optional: true }
         }
         return type
@@ -296,10 +301,12 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
 
   // ── Search index management ──────────────────────────────────────────────
 
-  getSearchIndexes(): Map<string, TMongoIndex> {
+  /** Returns MongoDB-specific search index map (internal). */
+  getMongoSearchIndexes(): Map<string, TMongoIndex> {
     if (!this._searchIndexesMap) {
       // Trigger flattening to ensure indexes are built
-      void this._table.flatMap
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- trigger lazy init
+      this._table.flatMap
 
       this._searchIndexesMap = new Map()
       let defaultIndex: TMongoIndex | undefined
@@ -350,8 +357,127 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     return this._searchIndexesMap
   }
 
-  getSearchIndex(name = DEFAULT_INDEX_NAME): TMongoIndex | undefined {
-    return this.getSearchIndexes().get(name)
+  /** Returns a specific MongoDB search index by name. */
+  getMongoSearchIndex(name = DEFAULT_INDEX_NAME): TMongoIndex | undefined {
+    return this.getMongoSearchIndexes().get(name)
+  }
+
+  // ── BaseDbAdapter search overrides ──────────────────────────────────────
+
+  /** Returns available search indexes as generic metadata for UI. */
+  override getSearchIndexes(): TSearchIndexInfo[] {
+    const mongoIndexes = this.getMongoSearchIndexes()
+    return [...mongoIndexes.entries()].map(([name, index]) => ({
+      name,
+      description: `${index.type} index`,
+    }))
+  }
+
+  /**
+   * Builds a MongoDB `$search` pipeline stage.
+   * Override `buildVectorSearchStage` in subclasses to provide embeddings.
+   */
+  protected buildSearchStage(text: string, indexName?: string): Document | undefined {
+    const index = this.getMongoSearchIndex(indexName)
+    if (!index) { return undefined }
+    if (index.type === 'vector') {
+      return this.buildVectorSearchStage(text, index)
+    }
+    return {
+      $search: { index: index.key, text: { query: text, path: { wildcard: '*' } } },
+    }
+  }
+
+  /**
+   * Builds a vector search stage. Override in subclasses to generate embeddings.
+   * Returns `undefined` by default (vector search requires custom implementation).
+   */
+  protected buildVectorSearchStage(text: string, index: TMongoIndex): Document | undefined {
+    return undefined
+  }
+
+  override async search(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    const searchStage = this.buildSearchStage(text, indexName)
+    if (!searchStage) {
+      throw new Error(indexName ? `Search index "${indexName}" not found` : 'No search index available')
+    }
+
+    const filter = buildMongoFilter(query.filter)
+    const controls = query.controls || {}
+    const pipeline: Document[] = [searchStage, { $match: filter }]
+    if (controls.$sort) { pipeline.push({ $sort: controls.$sort }) }
+    if (controls.$skip) { pipeline.push({ $skip: controls.$skip }) }
+    if (controls.$limit) { pipeline.push({ $limit: controls.$limit }) }
+    else { pipeline.push({ $limit: 1000 }) }
+    if (controls.$select) { pipeline.push({ $project: controls.$select.asProjection }) }
+
+    return this.collection.aggregate(pipeline).toArray()
+  }
+
+  override async searchWithCount(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    const searchStage = this.buildSearchStage(text, indexName)
+    if (!searchStage) {
+      throw new Error(indexName ? `Search index "${indexName}" not found` : 'No search index available')
+    }
+
+    const filter = buildMongoFilter(query.filter)
+    const controls = query.controls || {}
+    const pipeline: Document[] = [
+      searchStage,
+      { $match: filter },
+      {
+        $facet: {
+          data: [
+            controls.$sort ? { $sort: controls.$sort } : undefined,
+            controls.$skip ? { $skip: controls.$skip } : undefined,
+            controls.$limit ? { $limit: controls.$limit } : undefined,
+            controls.$select ? { $project: controls.$select.asProjection } : undefined,
+          ].filter(Boolean),
+          meta: [{ $count: 'count' }],
+        },
+      },
+    ]
+
+    const result = await this.collection.aggregate(pipeline).toArray()
+    return {
+      data: result[0]?.data || [],
+      count: result[0]?.meta[0]?.count || 0,
+    }
+  }
+
+  override async findManyWithCount(
+    query: DbQuery
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    const filter = buildMongoFilter(query.filter)
+    const controls = query.controls || {}
+    const pipeline: Document[] = [
+      { $match: filter },
+      {
+        $facet: {
+          data: [
+            controls.$sort ? { $sort: controls.$sort } : undefined,
+            controls.$skip ? { $skip: controls.$skip } : undefined,
+            controls.$limit ? { $limit: controls.$limit } : undefined,
+            controls.$select ? { $project: controls.$select.asProjection } : undefined,
+          ].filter(Boolean),
+          meta: [{ $count: 'count' }],
+        },
+      },
+    ]
+
+    const result = await this.collection.aggregate(pipeline).toArray()
+    return {
+      data: result[0]?.data || [],
+      count: result[0]?.meta[0]?.count || 0,
+    }
   }
 
   // ── Collection existence ─────────────────────────────────────────────────
@@ -388,19 +514,20 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     }
   }
 
-  async findOne(query: Uniquery): Promise<Record<string, unknown> | null> {
+  async findOne(query: DbQuery): Promise<Record<string, unknown> | null> {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
     return this.collection.findOne(filter, opts)
   }
 
-  async findMany(query: Uniquery): Promise<Array<Record<string, unknown>>> {
+  async findMany(query: DbQuery): Promise<Array<Record<string, unknown>>> {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
+    // eslint-disable-next-line unicorn/no-array-method-this-argument -- MongoDB Collection.find, not Array.find
     return this.collection.find(filter, opts).toArray()
   }
 
-  async count(query: Uniquery): Promise<number> {
+  async count(query: DbQuery): Promise<number> {
     const filter = buildMongoFilter(query.filter)
     return this.collection.countDocuments(filter)
   }
@@ -610,13 +737,13 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
 
   // ── Internal helpers ─────────────────────────────────────────────────────
 
-  private _buildFindOptions(controls?: Uniquery['controls']) {
+  private _buildFindOptions(controls?: DbQuery['controls']) {
     const opts: Record<string, any> = {}
     if (!controls) { return opts }
     if (controls.$sort) { opts.sort = controls.$sort }
     if (controls.$limit) { opts.limit = controls.$limit }
     if (controls.$skip) { opts.skip = controls.$skip }
-    if (controls.$select) { opts.projection = controls.$select }
+    if (controls.$select) { opts.projection = controls.$select.asProjection }
     return opts
   }
 

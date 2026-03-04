@@ -4,7 +4,7 @@ import type {
 import { ObjectId } from 'mongodb'
 
 export const validateMongoIdPlugin: TValidatorPlugin = (ctx, def, value) => {
-  if (ctx.path === '_id' && def.type.tags.has('objectId')) {
+  if (ctx.path === '_id' && (def.type.tags as Set<string>).has('objectId')) {
     return ctx.validateAnnotatedType(def, value instanceof ObjectId ? value.toString() : value)
   }
 }

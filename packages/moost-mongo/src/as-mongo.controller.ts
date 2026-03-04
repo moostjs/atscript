@@ -54,7 +54,7 @@ export class AsMongoController<
   DataType = TAtscriptDataType<T>,
 > {
   /** Reference to the lazily created {@link AtscriptDbTable}. */
-  protected table: AtscriptDbTable<T, any, any, MongoAdapter>
+  protected table: AtscriptDbTable<T, any, any, any>
 
   /** Application‑scoped logger bound to the collection name. */
   protected logger: TConsoleBase
@@ -318,7 +318,7 @@ export class AsMongoController<
     if (!searchTerm) {
       return undefined
     }
-    const index = this.adapter.getSearchIndex(indexName)
+    const index = this.adapter.getMongoSearchIndex(indexName)
     if (!index) {
       return indexName ? `Search index "${indexName}" does not exist` : 'No search index found'
     }
@@ -383,7 +383,7 @@ export class AsMongoController<
       pipeline.push({ $project: projection })
     }
 
-    return this.table.nativeCall('aggregate', pipeline).toArray() as Promise<DataType[]>
+    return (this.table as any).nativeCall('aggregate', pipeline).toArray() as Promise<DataType[]>
   }
 
   /**
@@ -440,7 +440,7 @@ export class AsMongoController<
       }
     )
 
-    const result = await this.table.nativeCall('aggregate', pipeline).toArray()
+    const result = await (this.table as any).nativeCall('aggregate', pipeline).toArray()
     const totalDocuments = result[0]?.meta[0]?.count || 0
     return {
       documents: (result[0]?.documents || []) as DataType[],

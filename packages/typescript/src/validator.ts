@@ -94,7 +94,7 @@ export class Validator<
 
   /** Validation errors collected during the last {@link validate} call. */
   public errors: TError[] = []
-  protected stackErrors: (TError[] | null)[] = []
+  protected stackErrors: Array<TError[] | null> = []
   protected stackPath: string[] = []
   protected cachedPath = ''
   protected context: unknown
@@ -118,8 +118,8 @@ export class Validator<
     this.stackPath.pop()
     const popped = this.stackErrors.pop()
     if (saveErrors && popped !== null && popped !== undefined && popped.length > 0) {
-      for (let i = 0; i < popped.length; i++) {
-        this.error(popped[i].message, popped[i].path, popped[i].details)
+      for (const err of popped) {
+        this.error(err.message, err.path, err.details)
       }
     }
     this.cachedPath =
@@ -219,18 +219,24 @@ export class Validator<
         }
         return this.validatePrimitive(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>, value)
       }
-      case 'object':
+      case 'object': {
         return this.validateObject(def as TAtscriptAnnotatedType<TAtscriptTypeObject>, value)
-      case 'array':
+      }
+      case 'array': {
         return this.validateArray(def as TAtscriptAnnotatedType<TAtscriptTypeArray>, value)
-      case 'union':
+      }
+      case 'union': {
         return this.validateUnion(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      case 'intersection':
+      }
+      case 'intersection': {
         return this.validateIntersection(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      case 'tuple':
+      }
+      case 'tuple': {
         return this.validateTuple(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
-      default:
+      }
+      default: {
         throw new Error(`Unknown type kind "${(def.type as { kind: string }).kind}"`)
+      }
     }
   }
 
@@ -381,7 +387,7 @@ export class Validator<
       for (const item of this.opts.skipList) {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
-          if (!skipList) skipList = new Set()
+          if (!skipList) { skipList = new Set() }
           skipList.add(key)
           valueKeys.delete(key)
         }
@@ -594,7 +600,7 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: number
   ): boolean {
-    const int = def.metadata.get('expect.int')
+    const int = def.metadata.get('expect.int') as boolean | { message?: string }
     if (int && value % 1 !== 0) {
       const message =
         typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`

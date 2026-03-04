@@ -501,7 +501,7 @@ describe('SqliteAdapter — embedded objects', () => {
       expect(result.contact).toEqual({ email: 'alice@x.com', phone: '555-0100' })
       expect(result.preferences).toEqual({ theme: 'dark', lang: 'en' })
       expect(result.tags).toEqual(['admin', 'user'])
-      expect(result.settings).toEqual({ notifications: { email: 1, sms: 0 } })
+      expect(result.settings).toEqual({ notifications: { email: true, sms: false } })
     })
 
     it('should handle omitted optional fields within nested objects', async () => {

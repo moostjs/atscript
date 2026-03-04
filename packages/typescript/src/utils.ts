@@ -1,3 +1,5 @@
+import type { TAtscriptAnnotatedType, TAtscriptDataType } from './annotated-type'
+
 export {
   annotate,
   cloneRefProp,
@@ -27,7 +29,7 @@ export type {
  *
  * Use this for type-safe filters and selects with dot-notation field paths.
  */
-export type FlatOf<T> = T extends { __flat: infer F } ? F : TAtscriptDataType<T>
+export type FlatOf<T> = T extends { __flat: infer F } ? F : T extends TAtscriptAnnotatedType ? TAtscriptDataType<T> : unknown
 
 /**
  * Extracts the primary key type from an Atscript annotated type.

@@ -7,7 +7,7 @@ import type {
   TDbInsertResult,
   TDbUpdateResult,
 } from '@atscript/utils-db'
-import type { FilterExpr, Uniquery } from '@uniqu/core'
+import type { DbQuery, FilterExpr } from '@atscript/utils-db'
 
 import { buildWhere } from './filter-builder'
 import {
@@ -81,7 +81,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   // ── CRUD: Read ─────────────────────────────────────────────────────────────
 
   async findOne(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Record<string, unknown> | null> {
     const where = buildWhere(query.filter)
     const controls = { ...query.controls, $limit: 1 }
@@ -94,14 +94,14 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async findMany(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Array<Record<string, unknown>>> {
     const where = buildWhere(query.filter)
     const { sql, params } = buildSelect(this.resolveTableName(), where, query.controls)
     return this.driver.all(sql, params)
   }
 
-  async count(query: Uniquery): Promise<number> {
+  async count(query: DbQuery): Promise<number> {
     const where = buildWhere(query.filter)
     const tableName = this.resolveTableName()
     const sql = `SELECT COUNT(*) as cnt FROM "${esc(tableName)}" WHERE ${where.sql}`

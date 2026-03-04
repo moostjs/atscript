@@ -36,7 +36,7 @@ export const CollectionController = (
 ) =>
   ApplyDecorators(
     Provide(COLLECTION_DEF, () => type),
-    Controller(prefix || type.metadata.get('db.table') || type.name),
+    Controller(prefix || type.metadata.get('db.table') as string || type.name),
     Inherit()
   )
 

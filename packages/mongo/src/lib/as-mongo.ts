@@ -48,15 +48,15 @@ export class AsMongo {
   getTable<T extends TAtscriptAnnotatedType>(
     type: T,
     logger?: TGenericLogger
-  ): AtscriptDbTable<T, any, any, MongoAdapter> {
+  ): AtscriptDbTable<T, any, any, any> {
     this._ensureCreated(type, logger)
-    return this._tables.get(type) as AtscriptDbTable<T, any, any, MongoAdapter>
+    return this._tables.get(type) as AtscriptDbTable<T, any, any, any>
   }
 
   private _ensureCreated(type: TAtscriptAnnotatedType, logger?: TGenericLogger) {
     if (!this._adapters.has(type)) {
       const adapter = new MongoAdapter(this.db, this)
-      const table = new AtscriptDbTable(type, adapter, logger || this.logger)
+      const table = new AtscriptDbTable(type, adapter as any, logger || this.logger)
       this._adapters.set(type, adapter)
       this._tables.set(type, table)
     }

@@ -1,5 +1,4 @@
-import type { TDbFieldMeta } from '@atscript/utils-db'
-import type { UniqueryControls } from '@uniqu/core'
+import type { TDbFieldMeta, DbControls, UniquSelect } from '@atscript/utils-db'
 
 import type { TSqlFragment } from './filter-builder'
 
@@ -29,7 +28,7 @@ export function buildInsert(
 export function buildSelect(
   table: string,
   where: TSqlFragment,
-  controls?: UniqueryControls
+  controls?: DbControls
 ): TSqlFragment {
   const cols = buildProjection(controls?.$select)
   let sql = `SELECT ${cols} FROM "${esc(table)}" WHERE ${where.sql}`
@@ -110,7 +109,10 @@ export function buildCreateTable(
   for (const field of fields) {
     if (field.ignored) { continue }
 
-    const sqlType = sqliteTypeFromDesignType(field.designType)
+    // Numeric primary keys must be INTEGER (not REAL) for SQLite rowid alias / auto-increment
+    const sqlType = field.isPrimaryKey && (field.designType === 'number' || field.designType === 'integer')
+      ? 'INTEGER'
+      : sqliteTypeFromDesignType(field.designType)
 
     let def = `"${esc(field.physicalName)}" ${sqlType}`
     if (field.isPrimaryKey && primaryKeys.length === 1) {
@@ -155,32 +157,15 @@ export function sqliteTypeFromDesignType(designType: string): string {
   }
 }
 
-function buildProjection(
-  select?: UniqueryControls['$select']
-): string {
-  if (!select) { return '*' }
-
-  // Array form: list of field names
-  if (Array.isArray(select)) {
-    if (select.length === 0) { return '*' }
-    return select.map(k => `"${esc(k)}"`).join(', ')
+function buildProjection(select?: UniquSelect): string {
+  const fields = select?.asArray
+  if (!fields) { return '*' }
+  let sql = ''
+  for (let i = 0; i < fields.length; i++) {
+    if (i > 0) {sql += ', '}
+    sql += `"${esc(fields[i])}"`
   }
-
-  const entries = Object.entries(select)
-  if (entries.length === 0) { return '*' }
-
-  // Check if it's an inclusion or exclusion projection
-  const firstVal = entries[0][1]
-  if (firstVal === 1) {
-    // Inclusion: only these columns
-    return entries
-      .filter(([_, v]) => v === 1)
-      .map(([k]) => `"${esc(k)}"`)
-      .join(', ')
-  }
-  // Exclusion projections should be resolved by AtscriptDbTable.resolveProjection()
-  // before reaching here. Fall back to *.
-  return '*'
+  return sql || '*'
 }
 
 function esc(name: string): string {

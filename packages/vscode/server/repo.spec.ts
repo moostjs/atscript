@@ -91,37 +91,37 @@ function td(uri: string, content: string): TextDocument {
 // ---------------------------------------------------------------------------
 
 interface CapturedHandlers {
-  onCompletion?: Function
-  onHover?: Function
-  onDefinition?: Function
-  onReferences?: Function
-  onRenameRequest?: Function
-  onSignatureHelp?: Function
-  semanticTokensOnRange?: Function
-  onDidSaveTextDocument?: Function
-  workspaceFiles?: Function
+  onCompletion?: (...args: any[]) => any
+  onHover?: (...args: any[]) => any
+  onDefinition?: (...args: any[]) => any
+  onReferences?: (...args: any[]) => any
+  onRenameRequest?: (...args: any[]) => any
+  onSignatureHelp?: (...args: any[]) => any
+  semanticTokensOnRange?: (...args: any[]) => any
+  onDidSaveTextDocument?: (...args: any[]) => any
+  workspaceFiles?: (...args: any[]) => any
 }
 
 function createMockConnection() {
   const handlers: CapturedHandlers = {}
   const connection = {
-    onCompletion: vi.fn((h: Function) => { handlers.onCompletion = h }),
+    onCompletion: vi.fn((h: (...args: any[]) => any) => { handlers.onCompletion = h }),
     onCompletionResolve: vi.fn(),
-    onHover: vi.fn((h: Function) => { handlers.onHover = h }),
-    onDefinition: vi.fn((h: Function) => { handlers.onDefinition = h }),
-    onReferences: vi.fn((h: Function) => { handlers.onReferences = h }),
-    onRenameRequest: vi.fn((h: Function) => { handlers.onRenameRequest = h }),
-    onSignatureHelp: vi.fn((h: Function) => { handlers.onSignatureHelp = h }),
-    onDidSaveTextDocument: vi.fn((h: Function) => { handlers.onDidSaveTextDocument = h }),
+    onHover: vi.fn((h: (...args: any[]) => any) => { handlers.onHover = h }),
+    onDefinition: vi.fn((h: (...args: any[]) => any) => { handlers.onDefinition = h }),
+    onReferences: vi.fn((h: (...args: any[]) => any) => { handlers.onReferences = h }),
+    onRenameRequest: vi.fn((h: (...args: any[]) => any) => { handlers.onRenameRequest = h }),
+    onSignatureHelp: vi.fn((h: (...args: any[]) => any) => { handlers.onSignatureHelp = h }),
+    onDidSaveTextDocument: vi.fn((h: (...args: any[]) => any) => { handlers.onDidSaveTextDocument = h }),
     onDidChangeWatchedFiles: vi.fn(),
-    onNotification: vi.fn((method: string, h: Function) => {
-      if (method === 'workspace/files') handlers.workspaceFiles = h
+    onNotification: vi.fn((method: string, h: (...args: any[]) => any) => {
+      if (method === 'workspace/files') { handlers.workspaceFiles = h }
     }),
     listen: vi.fn(),
     sendDiagnostics: vi.fn(),
     languages: {
       semanticTokens: {
-        onRange: vi.fn((h: Function) => { handlers.semanticTokensOnRange = h }),
+        onRange: vi.fn((h: (...args: any[]) => any) => { handlers.semanticTokensOnRange = h }),
       },
     },
   }
@@ -145,7 +145,7 @@ class TestableRepo extends VscodeAtscriptRepo {
 
   protected async _openDocument(id: string): Promise<AtscriptDoc> {
     const doc = this.testDocs.get(id)
-    if (doc) return doc
+    if (doc) { return doc }
     throw new Error(`TestableRepo: doc not found for ${id}`)
   }
 

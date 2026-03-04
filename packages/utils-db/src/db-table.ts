@@ -17,7 +17,10 @@ import type { BaseDbAdapter, InferNativeCalls } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
+import { UniquSelect } from './uniqu-select'
 import type {
+  DbControls,
+  DbQuery,
   TDbDefaultFn,
   TDbDefaultValue,
   TDbDeleteResult,
@@ -29,6 +32,7 @@ import type {
   TDbStorageType,
   TDbUpdateResult,
   TIdDescriptor,
+  TSearchIndexInfo,
 } from './types'
 
 const INDEX_PREFIX = 'atscript__'
@@ -45,6 +49,12 @@ export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
   if (fieldType.type.kind === 'object') { return 'object' }
   if (fieldType.type.kind === 'array') { return 'array' }
   return 'string'
+}
+
+/** Coerces a storage value (0/1/null) back to a JS boolean. */
+function toBool(value: unknown): unknown {
+  if (value === null || value === undefined) { return value }
+  return !!value
 }
 
 function indexKey(type: string, name: string): string {
@@ -111,8 +121,12 @@ export class AtscriptDbTable<
   protected _jsonFields = new Set<string>()
   /** Intermediate paths → their leaf physical column names (for $select expansion in relational DBs). */
   protected _selectExpansion = new Map<string, string[]>()
+  /** Physical column names of boolean fields (for storage coercion on read). */
+  protected _booleanFields = new Set<string>()
   /** Fast-path flag: skip all mapping when no nested/json fields exist. */
   protected _requiresMappings = false
+  /** All non-ignored physical field names (for UniquSelect exclusion inversion). */
+  protected _allPhysicalFields: string[] = []
 
   // ── Adapter capabilities (cached) ────────────────────────────────────────
 
@@ -301,45 +315,6 @@ export class AtscriptDbTable<
     return this._fieldDescriptors
   }
 
-  /**
-   * Resolves `$select` from {@link UniqueryControls} to a list of field names.
-   * - `undefined` → `undefined` (all fields)
-   * - `string[]` → pass through
-   * - `Record<K, 1>` → extract included keys
-   * - `Record<K, 0>` → invert using known field names
-   */
-  public resolveProjection(select?: UniqueryControls['$select']): string[] | undefined {
-    if (!select) { return undefined }
-
-    if (Array.isArray(select)) {
-      return select.length > 0 ? select : undefined
-    }
-
-    const selectObj = select as Record<string, number>
-    const keys = Object.keys(selectObj)
-    if (keys.length === 0) { return undefined }
-
-    if (selectObj[keys[0]] === 1) {
-      // Inclusion — return listed fields
-      const result: string[] = []
-      for (const k of keys) {
-        if (selectObj[k] === 1) { result.push(k) }
-      }
-      return result
-    }
-
-    // Exclusion — invert using known non-ignored field names
-    const excluded = new Set<string>()
-    for (const k of keys) {
-      if (selectObj[k] === 0) { excluded.add(k) }
-    }
-    const result: string[] = []
-    for (const f of this.fieldDescriptors) {
-      if (!f.ignored && !excluded.has(f.path)) { result.push(f.path) }
-    }
-    return result
-  }
-
   // ── Validation ────────────────────────────────────────────────────────────
 
   /**
@@ -501,6 +476,147 @@ export class AtscriptDbTable<
     return this.adapter.count(this._translateQuery(query as Uniquery))
   }
 
+  // ── Paginated queries ────────────────────────────────────────────────────
+
+  /**
+   * Finds records and total count in a single logical call.
+   * Adapters may optimize into a single query (e.g., MongoDB `$facet`).
+   */
+  public async findManyWithCount(
+    query: Uniquery<FlatType>
+  ): Promise<{ data: DataType[]; count: number }> {
+    this._flatten()
+    const translated = this._translateQuery(query as Uniquery)
+    const result = await this.adapter.findManyWithCount(translated)
+    return {
+      data: result.data.map(row => this._reconstructFromRead(row)) as DataType[],
+      count: result.count,
+    }
+  }
+
+  // ── Search ──────────────────────────────────────────────────────────────
+
+  /** Whether the underlying adapter supports text search. */
+  public isSearchable(): boolean {
+    return this.adapter.isSearchable()
+  }
+
+  /** Returns available search indexes from the adapter. */
+  public getSearchIndexes(): TSearchIndexInfo[] {
+    return this.adapter.getSearchIndexes()
+  }
+
+  /**
+   * Full-text search with query translation and result reconstruction.
+   *
+   * @param text - Search text.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional search index to target.
+   */
+  public async search(
+    text: string,
+    query: Uniquery<FlatType>,
+    indexName?: string
+  ): Promise<DataType[]> {
+    this._flatten()
+    const translated = this._translateQuery(query as Uniquery)
+    const results = await this.adapter.search(text, translated, indexName)
+    return results.map(row => this._reconstructFromRead(row)) as DataType[]
+  }
+
+  /**
+   * Full-text search with count for paginated search results.
+   *
+   * @param text - Search text.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional search index to target.
+   */
+  public async searchWithCount(
+    text: string,
+    query: Uniquery<FlatType>,
+    indexName?: string
+  ): Promise<{ data: DataType[]; count: number }> {
+    this._flatten()
+    const translated = this._translateQuery(query as Uniquery)
+    const result = await this.adapter.searchWithCount(text, translated, indexName)
+    return {
+      data: result.data.map(row => this._reconstructFromRead(row)) as DataType[],
+      count: result.count,
+    }
+  }
+
+  // ── Find by ID ──────────────────────────────────────────────────────────
+
+  /**
+   * Finds a single record by primary key or unique property.
+   *
+   * 1. Tries primary key lookup (single or composite).
+   * 2. Falls back to unique properties if PK validation fails.
+   *
+   * @param id - Primary key value (scalar for single PK, object for composite).
+   * @param controls - Optional query controls ($select, etc.).
+   */
+  public async findById(
+    id: unknown,
+    controls?: UniqueryControls<FlatType>
+  ): Promise<DataType | null> {
+    this._flatten()
+    const pkFields = this.primaryKeys
+
+    if (pkFields.length === 0) {
+      throw new Error('No primary key defined — cannot find by ID')
+    }
+
+    // Try primary key lookup
+    const filter: FilterExpr = {}
+    let pkValid = true
+
+    if (pkFields.length === 1) {
+      const field = pkFields[0]
+      const fieldType = this.flatMap.get(field)
+      try {
+        filter[field] = fieldType ? this.adapter.prepareId(id, fieldType) : id
+      } catch {
+        pkValid = false
+      }
+    } else if (typeof id !== 'object' || id === null) {
+      // Composite key: id must be an object
+      pkValid = false
+    } else {
+      const idObj = id as Record<string, unknown>
+      for (const field of pkFields) {
+        const fieldType = this.flatMap.get(field)
+        try {
+          filter[field] = fieldType ? this.adapter.prepareId(idObj[field], fieldType) : idObj[field]
+        } catch {
+          pkValid = false
+          break
+        }
+      }
+    }
+
+    if (pkValid) {
+      return await this.findOne({
+        filter,
+        controls: controls || {},
+      } as Uniquery<FlatType>)
+    }
+
+    // Fallback: try unique properties
+    if (this.uniqueProps.size > 0) {
+      const orFilters: FilterExpr[] = []
+      for (const prop of this.uniqueProps) {
+        orFilters.push({ [prop]: id } as FilterExpr)
+      }
+      return await this.findOne({
+        filter: { $or: orFilters },
+        controls: controls || {},
+      } as Uniquery<FlatType>)
+    }
+
+    return null
+  }
+
   // ── Batch operations ──────────────────────────────────────────────────────
 
   public async updateMany(
@@ -594,6 +710,20 @@ export class AtscriptDbTable<
 
     this._finalizeIndexes()
     this.adapter.onAfterFlatten?.()
+
+    // Build physical field list for UniquSelect exclusion inversion
+    if (this._nestedObjects && this._flatMap) {
+      // Native nested: physical = logical paths (top-level fields from flatMap)
+      for (const path of this._flatMap.keys()) {
+        if (path && !this._ignoredFields.has(path)) {
+          this._allPhysicalFields.push(path)
+        }
+      }
+    } else {
+      for (const physical of this._pathToPhysical.values()) {
+        this._allPhysicalFields.push(physical)
+      }
+    }
   }
 
   /**
@@ -752,6 +882,11 @@ export class AtscriptDbTable<
 
       this._pathToPhysical.set(path, physicalName)
       this._physicalToPath.set(physicalName, path)
+
+      const fieldType = this._flatMap?.get(path)
+      if (fieldType && resolveDesignType(fieldType) === 'boolean') {
+        this._booleanFields.add(physicalName)
+      }
     }
 
     // Build select expansion map: intermediate path → leaf physical column names
@@ -816,8 +951,13 @@ export class AtscriptDbTable<
       if (data[field] === undefined) {
         if (def.kind === 'value') {
           data[field] = def.value
+        } else if (def.kind === 'fn') {
+          switch (def.fn) {
+            case 'now': { data[field] = Date.now(); break }
+            case 'uuid': { data[field] = crypto.randomUUID(); break }
+            // 'increment' is left to the DB (e.g. INTEGER PRIMARY KEY in SQLite)
+          }
         }
-        // 'fn' defaults (increment, uuid, now) are handled by the DB/adapter
       }
     }
     return data
@@ -930,14 +1070,14 @@ export class AtscriptDbTable<
    */
   protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
     if (!this._requiresMappings || this._nestedObjects) {
-      return row
+      return this._coerceBooleans(row)
     }
 
     const result: Record<string, unknown> = {}
 
     const rowKeys = Object.keys(row)
     for (const physical of rowKeys) {
-      const value = row[physical]
+      const value = this._booleanFields.has(physical) ? toBool(row[physical]) : row[physical]
       const logicalPath = this._physicalToPath.get(physical)
 
       if (!logicalPath) {
@@ -965,6 +1105,20 @@ export class AtscriptDbTable<
     }
 
     return result
+  }
+
+  /**
+   * Coerces boolean fields from storage representation (0/1) to JS booleans.
+   * Used on the fast-path when no column mapping is needed.
+   */
+  private _coerceBooleans(row: Record<string, unknown>): Record<string, unknown> {
+    if (this._booleanFields.size === 0) { return row }
+    for (const field of this._booleanFields) {
+      if (field in row) {
+        row[field] = toBool(row[field])
+      }
+    }
+    return row
   }
 
   /**
@@ -1028,15 +1182,24 @@ export class AtscriptDbTable<
   /**
    * Translates a Uniquery's filter, sort, and projection from logical
    * dot-notation paths to physical column names.
+   * Always wraps `$select` in {@link UniquSelect}.
    */
-  private _translateQuery(query: Uniquery): Uniquery {
+  private _translateQuery(query: Uniquery): DbQuery {
     if (!this._requiresMappings || this._nestedObjects) {
-      return query
+      const controls = query.controls
+      return {
+        filter: query.filter,
+        controls: {
+          ...controls,
+          $select: controls?.$select
+            ? new UniquSelect(controls.$select, this._allPhysicalFields)
+            : undefined,
+        },
+      }
     }
     return {
       filter: this._translateFilter(query.filter),
-      controls: query.controls ? this._translateControls(query.controls) : query.controls,
-      insights: (query as any).insights,
+      controls: query.controls ? this._translateControls(query.controls) : {},
     }
   }
 
@@ -1069,11 +1232,12 @@ export class AtscriptDbTable<
 
   /**
    * Translates field names in sort and projection controls.
+   * Wraps `$select` in {@link UniquSelect} after path translation.
    */
-  private _translateControls(controls: UniqueryControls): UniqueryControls {
-    if (!controls) { return controls }
+  private _translateControls(controls: UniqueryControls): DbControls {
+    if (!controls) { return {} }
 
-    const result: UniqueryControls = { ...controls }
+    const result: DbControls = { ...controls, $select: undefined }
 
     if (controls.$sort) {
       const translated: Record<string, unknown> = {}
@@ -1089,27 +1253,26 @@ export class AtscriptDbTable<
     }
 
     if (controls.$select) {
+      let translatedRaw: UniqueryControls['$select']
       if (Array.isArray(controls.$select)) {
         const expanded: string[] = []
         for (const key of controls.$select) {
           const expansion = this._selectExpansion.get(key as string)
           if (expansion) {
-            // Intermediate path — expand to all leaf physical columns
             expanded.push(...expansion)
           } else {
             expanded.push((this._pathToPhysical.get(key as string) ?? key) as string)
           }
         }
-        result.$select = expanded
+        translatedRaw = expanded
       } else {
-        const translated: Record<string, unknown> = {}
+        const translated: Record<string, number> = {}
         const selectObj = controls.$select as Record<string, number>
         const selectKeys = Object.keys(selectObj)
         for (const key of selectKeys) {
           const val = selectObj[key]
           const expansion = this._selectExpansion.get(key)
           if (expansion) {
-            // Intermediate path — expand to all leaf physical columns
             for (const leaf of expansion) {
               translated[leaf] = val
             }
@@ -1118,8 +1281,9 @@ export class AtscriptDbTable<
             translated[physical] = val
           }
         }
-        result.$select = translated as UniqueryControls['$select']
+        translatedRaw = translated as UniqueryControls['$select']
       }
+      result.$select = new UniquSelect(translatedRaw, this._allPhysicalFields)
     }
 
     return result

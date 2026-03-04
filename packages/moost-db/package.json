@@ -1,0 +1,58 @@
+{
+  "name": "@atscript/moost-db",
+  "version": "0.1.31",
+  "description": "Generic database controller for Moost with Atscript.",
+  "keywords": [
+    "annotations",
+    "atscript",
+    "database",
+    "moost",
+    "typescript"
+  ],
+  "homepage": "https://github.com/moostjs/atscript/tree/main/packages/moost-db#readme",
+  "bugs": {
+    "url": "https://github.com/moostjs/atscript/issues"
+  },
+  "license": "ISC",
+  "author": "Artem Maltsev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moostjs/atscript.git",
+    "directory": "packages/moost-db"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "pub": "pnpm publish --access public",
+    "before-build": "node ../typescript/cli.cjs -f js",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uniqu/url": "^0.0.1"
+  },
+  "devDependencies": {
+    "@atscript/core": "workspace:^",
+    "@moostjs/event-http": "^0.6.2",
+    "moost": "^0.6.2",
+    "vitest": "3.2.4"
+  },
+  "peerDependencies": {
+    "@atscript/utils-db": "workspace:^",
+    "@atscript/typescript": "workspace:^",
+    "@moostjs/event-http": "^0.6.2",
+    "moost": "^0.6.2",
+    "@uniqu/core": "^0.0.1"
+  }
+}

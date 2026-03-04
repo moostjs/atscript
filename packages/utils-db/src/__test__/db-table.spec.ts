@@ -580,7 +580,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
 
       expect(result.contact).toEqual({ email: 'alice@x.com', phone: '555' })
-      expect(result.settings).toEqual({ notifications: { email: 1, sms: 0 } })
+      expect(result.settings).toEqual({ notifications: { email: true, sms: false } })
     })
 
     it('should parse JSON fields from strings', async () => {
@@ -693,8 +693,8 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
-      const select = query.controls?.$select as string[]
+      const query = call.args[0] as any
+      const select = query.controls?.$select?.asArray as string[]
       // "contact" should expand to its leaf physical columns
       expect(select).toContain('contact__email')
       expect(select).toContain('contact__phone')
@@ -711,8 +711,8 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
-      const select = query.controls?.$select as string[]
+      const query = call.args[0] as any
+      const select = query.controls?.$select?.asArray as string[]
       // "settings" should expand to its deep leaf physical columns
       expect(select).toContain('settings__notifications__email')
       expect(select).toContain('settings__notifications__sms')
@@ -726,8 +726,8 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
-      const select = query.controls?.$select as Record<string, number>
+      const query = call.args[0] as any
+      const select = query.controls?.$select?.asProjection as Record<string, number>
       expect(select).toHaveProperty('contact__email', 1)
       expect(select).toHaveProperty('contact__phone', 1)
       expect(select).toHaveProperty('name', 1)

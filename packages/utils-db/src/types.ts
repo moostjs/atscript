@@ -1,4 +1,7 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls } from '@uniqu/core'
+import type { UniquSelect } from './uniqu-select'
+
 export type { FlatOf, PrimaryKeyOf } from '@atscript/typescript/utils'
 
 // ── Re-export uniqu types as canonical filter/query format ──────────────────
@@ -9,6 +12,29 @@ export type {
   UniqueryControls,
   Uniquery,
 } from '@uniqu/core'
+
+// ── Resolved query types (adapter-facing) ──────────────────────────────────
+
+/** Controls with resolved projection. Used in the adapter interface. */
+export interface DbControls extends Omit<_UniqueryControls, '$select'> {
+  $select?: UniquSelect
+}
+
+/** Query object with resolved projection. Passed to adapter methods. */
+export interface DbQuery {
+  filter: _FilterExpr
+  controls: DbControls
+}
+
+// ── Search Index Metadata ───────────────────────────────────────────────────
+
+/** Describes an available search index exposed by a database adapter. */
+export interface TSearchIndexInfo {
+  /** Index name. Empty string or 'DEFAULT' for the default index. */
+  name: string
+  /** Human-readable label for UI display. */
+  description?: string
+}
 
 // ── CRUD Result Types ───────────────────────────────────────────────────────
 
