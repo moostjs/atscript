@@ -48,6 +48,7 @@
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
+    "@atscript/utils-db": "workspace:^",
     "mongodb": "^6.17.0"
   }
 }

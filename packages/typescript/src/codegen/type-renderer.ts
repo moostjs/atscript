@@ -191,6 +191,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln('static toExampleData?: () => any')
     if (interfaceNode && this.hasDbTable(interfaceNode)) {
       this.renderFlat(interfaceNode)
+      this.renderPk(interfaceNode)
     }
   }
 
@@ -392,6 +393,59 @@ export class TypeRenderer extends BaseRenderer {
       }
     }
     this.pop()
+  }
+
+  /**
+   * Renders the `static __pk` property — the primary key type for type-safe
+   * `deleteOne`/`findById` signatures on `AtscriptDbTable`.
+   *
+   * - **Single PK** (one `@meta.id`) → `static __pk: <scalar type>`
+   * - **Compound PK** (multiple `@meta.id`) → `static __pk: { field1: Type1; field2: Type2 }`
+   * - **No PK** → no `__pk` emitted
+   */
+  private renderPk(node: SemanticInterfaceNode) {
+    let struct: SemanticNode | undefined
+    if (node.hasExtends) {
+      struct = this.doc.resolveInterfaceExtends(node)
+    }
+    if (!struct) {
+      struct = node.getDefinition()
+    }
+    if (!struct || !isStructure(struct)) {
+      return
+    }
+
+    const pkProps: Array<{ name: string; prop: SemanticPropNode }> = []
+    for (const [name, prop] of (struct as SemanticStructureNode).props) {
+      if (prop.token('identifier')?.pattern) {
+        continue
+      }
+      if (prop.countAnnotations('meta.id') > 0) {
+        pkProps.push({ name, prop })
+      }
+    }
+
+    if (pkProps.length === 0) {
+      return
+    }
+
+    // Flush any pending content on the current line (e.g. closing `}` from renderFlat's pop())
+    this.writeln()
+
+    if (pkProps.length === 1) {
+      this.write('static __pk: ')
+      const renderedDef = this.renderTypeDefString(pkProps[0].prop.getDefinition())
+      renderedDef.split('\n').forEach(l => this.writeln(l))
+    } else {
+      this.write('static __pk: ')
+      this.blockln('{}')
+      for (const { name, prop } of pkProps) {
+        this.write(wrapProp(name), ': ')
+        const renderedDef = this.renderTypeDefString(prop.getDefinition())
+        renderedDef.split('\n').forEach(l => this.writeln(l))
+      }
+      this.pop()
+    }
   }
 
   private phantomPropType(def?: SemanticNode): string | undefined {

@@ -1,10 +1,11 @@
-import type { AsMongo, AsCollection } from '@atscript/mongo'
+import { type AsMongo, type MongoAdapter, CollectionPatcher } from '@atscript/mongo'
 import type { Validator } from '@atscript/typescript/utils'
 import {
   ValidatorError,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
 } from '@atscript/typescript/utils'
+import type { AtscriptDbTable } from '@atscript/utils-db'
 // oxlint-disable max-lines
 import { Body, Delete, Get, HttpError, Patch, Post, Put, Url } from '@moostjs/event-http'
 import type {
@@ -52,11 +53,16 @@ export class AsMongoController<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
 > {
-  /** Reference to the lazily created {@link AsCollection}. */
-  protected asCollection: AsCollection<T>
+  /** Reference to the lazily created {@link AtscriptDbTable}. */
+  protected table: AtscriptDbTable<T, any, any, MongoAdapter>
 
   /** Application‑scoped logger bound to the collection name. */
   protected logger: TConsoleBase
+
+  /** Returns the {@link MongoAdapter} from the table. */
+  protected get adapter(): MongoAdapter {
+    return this.table.getAdapter()
+  }
 
   /**
    * Creates a controller instance and resolves the underlying collection.
@@ -76,7 +82,7 @@ export class AsMongoController<
     app: Moost
   ) {
     this.logger = app.getLogger(`mongo [${type.metadata.get('db.table') || ''}]`)
-    this.asCollection = this.asMongo.getCollection(type, this.logger)
+    this.table = this.asMongo.getTable(type, this.logger)
     this.logger.info(`Initializing Collection`)
     try {
       const p = this.init()
@@ -100,7 +106,7 @@ export class AsMongoController<
    * return types are supported.
    */
   protected init(): void | Promise<any> {
-    return this.asCollection.syncIndexes()
+    return this.table.syncIndexes()
   }
 
   // ---------------------------------------------------------------------
@@ -187,7 +193,7 @@ export class AsMongoController<
     insights: UrlqlQuery['insights']
   ): Promise<string | undefined> | string | undefined {
     for (const key of insights.keys()) {
-      if (!this.asCollection.flatMap.has(key)) {
+      if (!this.table.flatMap.has(key)) {
         return `Unknown field "${key}"`
       }
     }
@@ -312,7 +318,7 @@ export class AsMongoController<
     if (!searchTerm) {
       return undefined
     }
-    const index = this.asCollection.getSearchIndex(indexName)
+    const index = this.adapter.getSearchIndex(indexName)
     if (!index) {
       return indexName ? `Search index "${indexName}" does not exist` : 'No search index found'
     }
@@ -348,7 +354,7 @@ export class AsMongoController<
     }
 
     if (parsed.controls.$count) {
-      return this.asCollection.collection.countDocuments(parsed.filter as any)
+      return this.adapter.collection.countDocuments(parsed.filter as any)
     }
 
     const search = await this.prepareSearch(parsed.controls.$search, parsed.controls.$index)
@@ -377,7 +383,7 @@ export class AsMongoController<
       pipeline.push({ $project: projection })
     }
 
-    return this.asCollection.collection.aggregate(pipeline).toArray() as Promise<DataType[]>
+    return this.table.nativeCall('aggregate', pipeline).toArray() as Promise<DataType[]>
   }
 
   /**
@@ -434,7 +440,7 @@ export class AsMongoController<
       }
     )
 
-    const result = await this.asCollection.collection.aggregate(pipeline).toArray()
+    const result = await this.table.nativeCall('aggregate', pipeline).toArray()
     const totalDocuments = result[0]?.meta[0]?.count || 0
     return {
       documents: (result[0]?.documents || []) as DataType[],
@@ -460,7 +466,7 @@ export class AsMongoController<
     @Param('id') id: string,
     @Url() url: string
   ): Promise<DataType | HttpError | ValidatorError> {
-    const idValidator = this.asCollection.flatMap.get('_id')?.validator()
+    const idValidator = this.table.flatMap.get('_id')?.validator()
     const query = url.split('?').slice(1).join('?')
     const parsed = parseUrlql(query)
     if (Object.keys(parsed.filter).length > 0) {
@@ -475,23 +481,23 @@ export class AsMongoController<
     if (idValidator?.validate(id, true)) {
       // ObjectId passed
       return this.returnOne(
-        this.asCollection.collection
+        this.adapter.collection
           .find(
             this.transformFilter({
-              _id: this.asCollection.prepareId(id),
+              _id: this.adapter.prepareIdFromIdType(id),
             }),
             this.prepareQueryOptions(parsed.controls)
           )
           .toArray()
       )
-    } else if (this.asCollection.uniqueProps.size > 0) {
+    } else if (this.table.uniqueProps.size > 0) {
       // not ObjectId passed, trying unique indexes
       const filter = [] as Array<Filter<any>>
-      for (const prop of this.asCollection.uniqueProps) {
+      for (const prop of this.table.uniqueProps) {
         filter.push({ [prop]: id } as Filter<any>)
       }
       return this.returnOne(
-        this.asCollection.collection
+        this.adapter.collection
           .find(
             this.transformFilter({
               $or: filter,
@@ -537,22 +543,39 @@ export class AsMongoController<
    */
   @Post('')
   async insert(
-    @Body() payload: Parameters<AsCollection<T>['prepareInsert']>[0]
+    @Body() payload: any
   ): Promise<HttpError | InsertOneResult | InsertManyResult> {
-    const data = this.asCollection.prepareInsert(payload)
+    const v = this.table.getValidator('insert')!
+    const arr = Array.isArray(payload) ? payload : [payload]
+    const prepared = [] as DataType[]
+    for (const item of arr) {
+      if (v.validate(item)) {
+        const data = { ...item } as any & { _id?: string | number | ObjectId }
+        if (data._id) {
+          data._id = this.adapter.prepareIdFromIdType(data._id)
+        } else if (this.adapter.idType !== 'objectId') {
+          throw new Error('Missing "_id" field')
+        }
+        prepared.push(data)
+      } else {
+        throw new Error('Invalid payload')
+      }
+    }
+    const result = prepared.length === 1 ? prepared[0] : prepared
+
     const opts = {} as InsertOneOptions
-    if (Array.isArray(data)) {
-      const newData = await this.onWrite('insertMany', data as DataType[], opts as BulkWriteOptions)
+    if (Array.isArray(result)) {
+      const newData = await this.onWrite('insertMany', result as DataType[], opts as BulkWriteOptions)
       if (newData) {
-        return this.asCollection.collection.insertMany(newData as any[], opts)
+        return this.adapter.collection.insertMany(newData as any[], opts)
       } else {
         return new HttpError(500, 'Not saved')
       }
     }
-    if (data) {
-      const newData = await this.onWrite('insert', data as DataType, opts)
+    if (result) {
+      const newData = await this.onWrite('insert', result as DataType, opts)
       if (newData) {
-        return this.asCollection.collection.insertOne(newData as any, opts)
+        return this.adapter.collection.insertOne(newData as any, opts)
       } else {
         return new HttpError(500, 'Not saved')
       }
@@ -567,16 +590,21 @@ export class AsMongoController<
    */
   @Put('')
   async replace(
-    @Body() payload: Parameters<AsCollection<T>['prepareReplace']>[0]
+    @Body() payload: any
   ): Promise<HttpError | UpdateResult> {
-    const args = this.asCollection.prepareReplace(payload).toArgs()
-    const newData = await this.onWrite('replace', args[1], args[2])
-    if (newData) {
-      return this.asCollection.collection.replaceOne(
-        this.transformFilter(args[0]),
-        newData,
-        args[2]
-      )
+    const v = this.table.getValidator('update')!
+    if (v.validate(payload)) {
+      const _id = this.adapter.prepareIdFromIdType(payload._id)
+      const data = { ...payload, _id } as any
+      const filter = { _id } as Filter<any>
+      const newData = await this.onWrite('replace', data, {})
+      if (newData) {
+        return this.adapter.collection.replaceOne(
+          this.transformFilter(filter),
+          newData,
+          {}
+        )
+      }
     }
     return new HttpError(500, 'Not saved')
   }
@@ -584,16 +612,20 @@ export class AsMongoController<
   /**
    * **PATCH /** – updates one document using MongoDB update operators.
    *
-   * @param payload - Update payload produced by `asCollection.prepareUpdate`.
+   * @param payload - Update payload produced by the patch validator.
    */
   @Patch('')
   async update(
-    @Body() payload: Parameters<AsCollection<T>['prepareUpdate']>[0]
+    @Body() payload: any
   ): Promise<HttpError | UpdateResult> {
-    const args = this.asCollection.prepareUpdate(payload).toArgs()
-    const newData = await this.onWrite('update', args[1], args[2])
-    if (newData) {
-      return this.asCollection.collection.updateOne(this.transformFilter(args[0]), newData, args[2])
+    const v = this.table.getValidator('patch')!
+    if (v.validate(payload)) {
+      const patcher = new CollectionPatcher(this.adapter.getPatcherContext(), payload)
+      const { filter, updateFilter, updateOptions } = patcher.preparePatch()
+      const newData = await this.onWrite('update', updateFilter, updateOptions)
+      if (newData) {
+        return this.adapter.collection.updateOne(this.transformFilter(filter), newData, updateOptions)
+      }
     }
     return new HttpError(500, 'Not saved')
   }
@@ -608,8 +640,8 @@ export class AsMongoController<
     const opts = {} as DeleteOptions
     id = (await this.onRemove(id, opts)) as string
     if (id !== undefined) {
-      const result = await this.asCollection.collection.deleteOne(
-        this.transformFilter({ _id: this.asCollection.prepareId(id) }),
+      const result = await this.adapter.collection.deleteOne(
+        this.transformFilter({ _id: this.adapter.prepareIdFromIdType(id) }),
         opts
       )
       if (result.deletedCount < 1) {

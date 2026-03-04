@@ -2,14 +2,24 @@
 // oxlint-disable max-depth
 import type {
   TAtscriptAnnotatedType,
-  TAtscriptDataType,
   TAtscriptTypeArray,
+  TValidatorOptions,
+  Validator,
 } from '@atscript/typescript/utils'
 import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 
-import type { AsCollection } from './as-collection'
 import { validateMongoIdPlugin } from './validate-plugins'
+
+/**
+ * Context interface for CollectionPatcher.
+ * Decouples the patcher from AsCollection, allowing MongoAdapter to provide this.
+ */
+export interface TCollectionPatcherContext {
+  flatMap: Map<string, TAtscriptAnnotatedType>
+  prepareId(id: any): any
+  createValidator(opts?: Partial<TValidatorOptions>): Validator<any>
+}
 
 /**
  * CollectionPatcher is a small helper that converts a *patch payload* produced
@@ -32,12 +42,9 @@ import { validateMongoIdPlugin } from './validate-plugins'
  * MongoDB update document. Primitive fields are flattened into a regular
  * `$set` map.
  */
-export class CollectionPatcher<
-  T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
-  DataType = TAtscriptDataType<T>,
-> {
+export class CollectionPatcher {
   constructor(
-    private collection: AsCollection<T>,
+    private collection: TCollectionPatcherContext,
     private payload: any
   ) {}
 
@@ -72,8 +79,8 @@ export class CollectionPatcher<
    * @param collection Target collection wrapper
    * @returns Atscript Validator
    */
-  static prepareValidator<T extends TAtscriptAnnotatedType>(collection: AsCollection<T, any>) {
-    return collection.createValidator({
+  static prepareValidator(context: TCollectionPatcherContext) {
+    return context.createValidator({
       plugins: [validateMongoIdPlugin],
       replace: (def, path) => {
         if (path === '' && def.type.kind === 'object') {
@@ -92,7 +99,7 @@ export class CollectionPatcher<
         if (
           def.type.kind === 'array' &&
           // @ts-expect-error
-          collection.flatMap.get(path)?.metadata.get('db.mongo.__topLevelArray') && // only patching top level arrays
+          context.flatMap.get(path)?.metadata.get('db.mongo.__topLevelArray') && // only patching top level arrays
           // @ts-expect-error
           !def.metadata.has('db.mongo.__patchArrayValue')
         ) {

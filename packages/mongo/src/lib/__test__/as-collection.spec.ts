@@ -3,35 +3,93 @@ import { ObjectId } from 'mongodb'
 import { describe, it, expect, beforeAll } from 'vitest'
 
 import { AsMongo } from '../../lib/as-mongo'
+import { CollectionPatcher } from '../../lib/collection-patcher'
 import { prepareFixtures } from './test-utils'
 
 const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
+
+/**
+ * Helper: validates + prepares insert payload (replaces AsCollection.prepareInsert)
+ */
+function prepareInsert(mongo: AsMongo, type: any, payload: any) {
+  const table = mongo.getTable(type)
+  const adapter = mongo.getAdapter(type)
+  const v = table.getValidator('insert')!
+  const arr = Array.isArray(payload) ? payload : [payload]
+  const prepared = [] as any[]
+  for (const item of arr) {
+    if (v.validate(item)) {
+      const data = { ...item }
+      if (data._id) {
+        data._id = adapter.prepareIdFromIdType(data._id)
+      } else if (adapter.idType !== 'objectId') {
+        throw new Error('Missing "_id" field')
+      }
+      prepared.push(data)
+    } else {
+      throw new Error('Invalid payload')
+    }
+  }
+  return prepared.length === 1 ? prepared[0] : prepared
+}
+
+/**
+ * Helper: validates + prepares replace payload (replaces AsCollection.prepareReplace)
+ */
+function prepareReplace(mongo: AsMongo, type: any, payload: any) {
+  const table = mongo.getTable(type)
+  const adapter = mongo.getAdapter(type)
+  const v = table.getValidator('update')!
+  if (v.validate(payload)) {
+    const _id = adapter.prepareIdFromIdType(payload._id)
+    const data = { ...payload, _id }
+    return {
+      toArgs: () => [{ _id }, data, {}] as const,
+      filter: { _id },
+      updateFilter: data,
+      updateOptions: {},
+    }
+  }
+  throw new Error('Invalid payload')
+}
+
+/**
+ * Helper: validates + prepares update/patch payload (replaces AsCollection.prepareUpdate)
+ */
+function prepareUpdate(mongo: AsMongo, type: any, payload: any) {
+  const table = mongo.getTable(type)
+  const adapter = mongo.getAdapter(type)
+  const v = table.getValidator('patch')!
+  if (v.validate(payload)) {
+    return new CollectionPatcher(adapter.getPatcherContext(), payload).preparePatch()
+  }
+  throw new Error('Invalid payload')
+}
 
 describe('[mongo] AsCollection with structures', () => {
   beforeAll(prepareFixtures)
   it('[INSERT] checks _id as ObjectId', async () => {
     const { MinimalCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollection)
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollection, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollection, {
         _id: 'a', // bad ObjectId
         name: 'John Doe',
       })
     ).toThrowError()
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollection, {
         // allow ObjectId to be empty for autogeneration
         name: 'John Doe',
       })
@@ -39,21 +97,20 @@ describe('[mongo] AsCollection with structures', () => {
   })
   it('[INSERT] checks _id as string', async () => {
     const { MinimalCollectionString } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollectionString)
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollectionString, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).toThrowError()
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollectionString, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareInsert({
+      prepareInsert(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
     ).toThrowError()
@@ -61,50 +118,48 @@ describe('[mongo] AsCollection with structures', () => {
 
   it('[UPDATE] checks _id as ObjectId', async () => {
     const { MinimalCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollection)
     expect(() =>
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollection, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollection, {
         _id: 'a', // bad ObjectId
         name: 'John Doe',
       })
     ).toThrowError()
     expect(() =>
       // @ts-expect-error
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollection, {
         name: 'John Doe',
       })
     ).toThrowError()
   })
   it('[UPDATE] checks _id as string', async () => {
     const { MinimalCollectionString } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollectionString)
     expect(() =>
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollectionString, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).toThrowError()
     expect(() =>
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollectionString, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
       // @ts-expect-error
-      c.prepareReplace({
+      prepareReplace(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
     ).toThrowError()
@@ -112,21 +167,20 @@ describe('[mongo] AsCollection with structures', () => {
 
   it('[MERGE] checks _id as ObjectId', async () => {
     const { MinimalCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollection)
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollection, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollection, {
         _id: 'a', // bad ObjectId
 
         name: 'John Doe',
@@ -134,29 +188,28 @@ describe('[mongo] AsCollection with structures', () => {
     ).toThrowError()
     expect(() =>
       // @ts-expect-error
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollection, {
         name: 'John Doe',
       })
     ).toThrowError()
   })
   it('[MERGE] checks _id as string', async () => {
     const { MinimalCollectionString } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(MinimalCollectionString)
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollectionString, {
         _id: new ObjectId(),
         name: 'John Doe',
       })
     ).toThrowError()
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollectionString, {
         _id: 'a'.repeat(24),
         name: 'John Doe',
       })
     ).not.toThrowError()
     expect(() =>
       // @ts-expect-error
-      c.prepareUpdate({
+      prepareUpdate(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
     ).toThrowError()
@@ -164,9 +217,8 @@ describe('[mongo] AsCollection with structures', () => {
 
   it('prepares simple patch query', async () => {
     const { SimpleCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(SimpleCollection)
     expect(
-      c.prepareUpdate({
+      prepareUpdate(mongo, SimpleCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
         age: 25,
@@ -180,9 +232,8 @@ describe('[mongo] AsCollection with structures', () => {
 
   it('prepares simple patch with merge object', async () => {
     const { SimpleCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(SimpleCollection)
     expect(
-      c.prepareUpdate({
+      prepareUpdate(mongo, SimpleCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
         age: 25,
@@ -197,16 +248,15 @@ describe('[mongo] AsCollection with structures', () => {
 
   it('prepares simple patch replacing nested object with replace strategy', async () => {
     const { SimpleCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(SimpleCollection)
     expect(
       () =>
-        c.prepareUpdate({
+        prepareUpdate(mongo, SimpleCollection, {
           _id: new ObjectId(),
           address: { line1: '123 Main St' },
         }).updateFilter
     ).toThrowError() // replace strategy is not deep partial
     expect(
-      c.prepareUpdate({
+      prepareUpdate(mongo, SimpleCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
         age: 25,
@@ -224,9 +274,8 @@ describe('[mongo] AsCollection with structures', () => {
   })
   it('prepares simple patch replacing nested object with replace strategy and merging nested object with merge strategy', async () => {
     const { SimpleCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(SimpleCollection)
     expect(
-      c.prepareUpdate({
+      prepareUpdate(mongo, SimpleCollection, {
         _id: new ObjectId(),
         name: 'John Doe',
         age: 25,
@@ -248,9 +297,8 @@ describe('[mongo] AsCollection with structures', () => {
   })
   it('prepares simple patch for deeply nested structure with mixed strategies', async () => {
     const { SimpleCollection } = await import('./fixtures/simple-collection.as.js')
-    const c = mongo.getCollection(SimpleCollection)
     expect(
-      c.prepareUpdate({
+      prepareUpdate(mongo, SimpleCollection, {
         _id: new ObjectId(),
         nested: {
           nested1: { a: 5 },
@@ -272,8 +320,7 @@ describe('[mongo] AsCollection with arrays', () => {
   beforeAll(prepareFixtures)
   it('[PRIMITIVE] replace array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       primitive: {
         $replace: ['a', 'b'],
@@ -296,8 +343,7 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[COMPLEX PRIMITIVE] replace array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       primitiveComplex: {
         $replace: ['a', 'b'],
@@ -320,8 +366,7 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[PRIMITIVE] append array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       primitive: {
         $insert: ['a', 'b'],
@@ -354,8 +399,7 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[PRIMITIVE] merge array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       primitive: {
         $update: ['a', 'b'],
@@ -388,8 +432,7 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[PRIMITIVE] remove array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       primitive: {
         $remove: ['a', 'b'],
@@ -423,11 +466,10 @@ describe('[mongo] AsCollection with arrays', () => {
   // Array with key
   it('[OBJECT_WITH_KEY] replace array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$replace" always requires all required fields to be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKey: {
           $replace: [
@@ -443,7 +485,7 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       withKey: {
         $replace: [
@@ -477,11 +519,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITH_KEY] append array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$insert" always requires all required fields to be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKey: {
           $insert: [
@@ -497,7 +538,7 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       withKey: {
         $insert: [
@@ -580,11 +621,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITH_KEY] merge array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$update" + replace strategy => all required fields must be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKey: {
           $update: [
@@ -599,26 +639,25 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c
-      .prepareUpdate({
-        _id: new ObjectId(),
-        withKey: {
-          $update: [
-            {
-              key1: '1',
-              key2: '2',
-              value: 'a',
-              attribute: '555',
-            },
-            {
-              key1: '3',
-              key2: '4',
-              value: 'b',
-              attribute: '666',
-            },
-          ],
-        },
-      })
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withKey: {
+        $update: [
+          {
+            key1: '1',
+            key2: '2',
+            value: 'a',
+            attribute: '555',
+          },
+          {
+            key1: '3',
+            key2: '4',
+            value: 'b',
+            attribute: '666',
+          },
+        ],
+      },
+    })
       .toArgs()
 
     expect(result[1]).toMatchInlineSnapshot(`
@@ -686,11 +725,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITH_KEY] remove array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$remove" with keys => only keys are required
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKey: {
           $remove: [
@@ -703,23 +741,22 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).not.toThrowError()
 
-    const result = c
-      .prepareUpdate({
-        _id: new ObjectId(),
-        withKey: {
-          $remove: [
-            {
-              key1: '1',
-              key2: '2',
-              attribute: '555',
-            },
-            {
-              key1: '3',
-              key2: '4',
-            },
-          ],
-        },
-      })
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withKey: {
+        $remove: [
+          {
+            key1: '1',
+            key2: '2',
+            attribute: '555',
+          },
+          {
+            key1: '3',
+            key2: '4',
+          },
+        ],
+      },
+    })
       .toArgs()
 
     expect(result[1]).toMatchInlineSnapshot(`
@@ -789,11 +826,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITH_KEY_MERGE_STRATEGY] merge array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$update" + merge strategy => only keys required
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKeyMerge: {
           $update: [
@@ -807,24 +843,23 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).not.toThrowError()
 
-    const result = c
-      .prepareUpdate({
-        _id: new ObjectId(),
-        withKeyMerge: {
-          $update: [
-            {
-              key1: '1',
-              key2: '2',
-              attribute: '555',
-            },
-            {
-              key1: '3',
-              key2: '4',
-              attribute: '666',
-            },
-          ],
-        },
-      })
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withKeyMerge: {
+        $update: [
+          {
+            key1: '1',
+            key2: '2',
+            attribute: '555',
+          },
+          {
+            key1: '3',
+            key2: '4',
+            attribute: '666',
+          },
+        ],
+      },
+    })
       .toArgs()
 
     expect(result[1]).toMatchInlineSnapshot(`
@@ -896,11 +931,10 @@ describe('[mongo] AsCollection with arrays', () => {
   // Array without key
   it('[OBJECT_WITHOUT_KEY] replace array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$replace" always all required fields must be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKeyMerge: {
           $replace: [
@@ -914,7 +948,7 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       withoutKey: {
         $replace: [
@@ -946,11 +980,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITHOUT_KEY] append array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$insert" always all required fields must be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKeyMerge: {
           $insert: [
@@ -964,7 +997,7 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c.prepareUpdate({
+    const result = prepareUpdate(mongo, ArraysCollection, {
       _id: new ObjectId(),
       withoutKey: {
         $insert: [
@@ -1006,11 +1039,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITHOUT_KEY] merge array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$update" + without key => all required fields must be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKeyMerge: {
           $update: [
@@ -1023,22 +1055,21 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c
-      .prepareUpdate({
-        _id: new ObjectId(),
-        withoutKey: {
-          $update: [
-            {
-              key: '1',
-              value: '555',
-            },
-            {
-              key: '2',
-              value: '666',
-            },
-          ],
-        },
-      })
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withoutKey: {
+        $update: [
+          {
+            key: '1',
+            value: '555',
+          },
+          {
+            key: '2',
+            value: '666',
+          },
+        ],
+      },
+    })
       .toArgs()
 
     expect(result[1]).toMatchInlineSnapshot(`
@@ -1074,11 +1105,10 @@ describe('[mongo] AsCollection with arrays', () => {
 
   it('[OBJECT_WITHOUT_KEY] remove array', async () => {
     const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
-    const c = mongo.getCollection(ArraysCollection)
 
     // "$remove" without key => all required fields must be present
     expect(() =>
-      c.prepareUpdate({
+      prepareUpdate(mongo, ArraysCollection, {
         _id: new ObjectId(),
         withKeyMerge: {
           $remove: [
@@ -1091,22 +1121,21 @@ describe('[mongo] AsCollection with arrays', () => {
       })
     ).toThrowError()
 
-    const result = c
-      .prepareUpdate({
-        _id: new ObjectId(),
-        withoutKey: {
-          $remove: [
-            {
-              key: '1',
-              value: '555',
-            },
-            {
-              key: '2',
-              value: '666',
-            },
-          ],
-        },
-      })
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withoutKey: {
+        $remove: [
+          {
+            key: '1',
+            value: '555',
+          },
+          {
+            key: '2',
+            value: '666',
+          },
+        ],
+      },
+    })
       .toArgs()
 
     expect(result[1]).toMatchInlineSnapshot(`

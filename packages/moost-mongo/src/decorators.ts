@@ -4,7 +4,7 @@ import { Controller, Provide, ApplyDecorators, Inherit, Resolve } from 'moost'
 
 /**
  * DI token under which the AtScript-annotated collection definition
- * is exposed to the controller’s constructor via `@Inject`.
+ * is exposed to the controller's constructor via `@Inject`.
  */
 export const COLLECTION_DEF = '__atscript_mongo_collection_def'
 
@@ -41,7 +41,7 @@ export const CollectionController = (
   )
 
 /**
- * Parameter decorator that injects the lazily-resolved {@link AsCollection}
+ * Parameter decorator that injects the lazily-resolved {@link AtscriptDbTable}
  * instance for a given AtScript model.
  *
  * > `AsMongo` **must** be provided in the current DI scope
@@ -56,7 +56,7 @@ export const CollectionController = (
  * export class SomeProvider {
  *   constructor(
  *     ‎@InjectCollection(User)
- *     private users: AsCollection<typeof User>
+ *     private users: AtscriptDbTable<typeof User>
  *   ) {}
  * }
  * ```
@@ -64,5 +64,5 @@ export const CollectionController = (
 export const InjectCollection = (type: TAtscriptAnnotatedType) =>
   Resolve(async ({ instantiate }) => {
     const asMongo = await instantiate(AsMongo)
-    return asMongo.getCollection(type)
+    return asMongo.getTable(type)
   })

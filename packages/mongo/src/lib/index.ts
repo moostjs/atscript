@@ -1,2 +1,5 @@
-export * from './as-collection'
+export * from './mongo-adapter'
+export * from './mongo-filter'
+export * from './collection-patcher'
 export * from './as-mongo'
+export * from './validate-plugins'

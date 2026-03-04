@@ -885,4 +885,17 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/db-table-flat.as.d.ts')
     )
   })
+  it('must render __pk for @db.table interfaces with @meta.id', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/db-table-pk.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].fileName).toBe('db-table-pk.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/db-table-pk.as.d.ts')
+    )
+  })
 })

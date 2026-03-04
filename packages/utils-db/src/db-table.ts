@@ -2,6 +2,7 @@ import {
   flattenAnnotatedType,
   isAnnotatedType,
   type FlatOf,
+  type PrimaryKeyOf,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type TAtscriptTypeObject,
@@ -12,7 +13,7 @@ import {
 
 import type { FilterExpr, UniqueryControls, Uniquery } from '@uniqu/core'
 
-import type { BaseDbAdapter } from './base-adapter'
+import type { BaseDbAdapter, InferNativeCalls } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
@@ -78,6 +79,8 @@ export class AtscriptDbTable<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
   FlatType = FlatOf<T>,
+  A extends BaseDbAdapter<any> = BaseDbAdapter,
+  IdType = PrimaryKeyOf<T>,
 > {
   /** Resolved table/collection name. */
   public readonly tableName: string
@@ -122,7 +125,7 @@ export class AtscriptDbTable<
 
   constructor(
     protected readonly _type: T,
-    protected readonly adapter: BaseDbAdapter,
+    protected readonly adapter: A,
     protected readonly logger: TGenericLogger = NoopLogger
   ) {
     if (!isAnnotatedType(_type)) {
@@ -151,6 +154,11 @@ export class AtscriptDbTable<
 
   // ── Public getters ────────────────────────────────────────────────────────
 
+  /** Returns the underlying adapter with its concrete type preserved. */
+  public getAdapter(): A {
+    return this.adapter
+  }
+
   /** The raw annotated type. */
   public get type(): TAtscriptAnnotatedType<TAtscriptTypeObject> {
     return this._type as TAtscriptAnnotatedType<TAtscriptTypeObject>
@@ -172,6 +180,19 @@ export class AtscriptDbTable<
   public get primaryKeys(): readonly string[] {
     this._flatten()
     return this._primaryKeys
+  }
+
+  /**
+   * Registers an additional primary key field.
+   * Useful for adapters (e.g., MongoDB) where `_id` is always the primary key
+   * even without an explicit `@meta.id` annotation.
+   *
+   * Typically called from {@link BaseDbAdapter.onFieldScanned}.
+   */
+  public addPrimaryKey(field: string): void {
+    if (!this._primaryKeys.includes(field)) {
+      this._primaryKeys.push(field)
+    }
   }
 
   /** Logical → physical column name mapping from `@db.column`. */
@@ -425,7 +446,7 @@ export class AtscriptDbTable<
   /**
    * Deletes a single record by primary key value.
    */
-  public async deleteOne(id: unknown): Promise<TDbDeleteResult> {
+  public async deleteOne(id: IdType): Promise<TDbDeleteResult> {
     this._flatten()
     const pkFields = this.primaryKeys
     if (pkFields.length === 0) {
@@ -526,6 +547,26 @@ export class AtscriptDbTable<
   public async ensureTable(): Promise<void> {
     this._flatten()
     return this.adapter.ensureTable()
+  }
+
+  // ── Native calls ─────────────────────────────────────────────────────────
+
+  /**
+   * Executes an adapter-specific native call.
+   * Type safety is inferred from the adapter's {@link TNativeCallMap}.
+   *
+   * @example
+   * ```typescript
+   * // With MongoAdapter:
+   * const table = new AtscriptDbTable(type, mongoAdapter)
+   * const cursor = table.nativeCall('aggregate', pipeline) // AggregationCursor
+   * ```
+   */
+  nativeCall<K extends keyof InferNativeCalls<A> & string>(
+    name: K,
+    opts: InferNativeCalls<A>[K]['args']
+  ): InferNativeCalls<A>[K]['result'] {
+    return this.adapter.nativeCall(name, opts)
   }
 
   // ── Internal: field flattening ────────────────────────────────────────────
@@ -1144,6 +1185,9 @@ export class AtscriptDbTable<
 
     switch (purpose) {
       case 'insert': {
+        if (this.adapter.buildInsertValidator) {
+          return this.adapter.buildInsertValidator(this) as Validator<T, DataType>
+        }
         return this.createValidator({
           plugins,
           replace: (type, path) => {
@@ -1156,6 +1200,9 @@ export class AtscriptDbTable<
         })
       }
       case 'patch': {
+        if (this.adapter.buildPatchValidator) {
+          return this.adapter.buildPatchValidator(this) as Validator<T, DataType>
+        }
         return this.createValidator({
           plugins,
           partial: true,

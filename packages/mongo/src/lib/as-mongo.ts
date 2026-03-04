@@ -1,9 +1,10 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+import { AtscriptDbTable } from '@atscript/utils-db'
 import { MongoClient } from 'mongodb'
 
-import { AsCollection } from './as-collection'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
+import { MongoAdapter } from './mongo-adapter'
 
 export class AsMongo {
   public readonly client: MongoClient
@@ -39,23 +40,34 @@ export class AsMongo {
     return list.has(name)
   }
 
-  getCollection<T extends TAtscriptAnnotatedType>(
-    type: T,
-    logger?: TGenericLogger
-  ): AsCollection<T> {
-    let collection = this._collections.get(type)
-    if (!collection) {
-      collection = new AsCollection<T>(this, type, logger || this.logger)
-      this._collections.set(type, collection)
-    }
-    return collection
+  getAdapter<T extends TAtscriptAnnotatedType>(type: T): MongoAdapter {
+    this._ensureCreated(type)
+    return this._adapters.get(type) as MongoAdapter
   }
 
-  private _collections = new WeakMap() as TWeakMapOfCollections
+  getTable<T extends TAtscriptAnnotatedType>(
+    type: T,
+    logger?: TGenericLogger
+  ): AtscriptDbTable<T, any, any, MongoAdapter> {
+    this._ensureCreated(type, logger)
+    return this._tables.get(type) as AtscriptDbTable<T, any, any, MongoAdapter>
+  }
+
+  private _ensureCreated(type: TAtscriptAnnotatedType, logger?: TGenericLogger) {
+    if (!this._adapters.has(type)) {
+      const adapter = new MongoAdapter(this.db, this)
+      const table = new AtscriptDbTable(type, adapter, logger || this.logger)
+      this._adapters.set(type, adapter)
+      this._tables.set(type, table)
+    }
+  }
+
+  private _adapters = new WeakMap() as TWeakMapOf<MongoAdapter>
+  private _tables = new WeakMap() as TWeakMapOf<AtscriptDbTable>
 }
 
-interface TWeakMapOfCollections {
+interface TWeakMapOf<V> {
   has(key: TAtscriptAnnotatedType): boolean
-  get<T extends TAtscriptAnnotatedType>(key: T): AsCollection<T>
-  set<T extends TAtscriptAnnotatedType>(key: T, value: AsCollection<T>): void
+  get<T extends TAtscriptAnnotatedType>(key: T): V
+  set<T extends TAtscriptAnnotatedType>(key: T, value: V): void
 }

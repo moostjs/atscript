@@ -29,6 +29,17 @@ export type {
  */
 export type FlatOf<T> = T extends { __flat: infer F } ? F : TAtscriptDataType<T>
 
+/**
+ * Extracts the primary key type from an Atscript annotated type.
+ * If the type has a `__pk` static property (emitted for `@db.table` interfaces
+ * with `@meta.id` fields), returns that type. Otherwise falls back to `unknown`.
+ *
+ * - Single `@meta.id` field → scalar type (e.g., `string`, `number`)
+ * - Multiple `@meta.id` fields → object type (e.g., `{ userId: string; orderId: number }`)
+ * - No `@meta.id` fields → `unknown`
+ */
+export type PrimaryKeyOf<T> = T extends { __pk: infer PK } ? PK : unknown
+
 export * from './validator'
 
 export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './json-schema'

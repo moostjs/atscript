@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-export type { FlatOf } from '@atscript/typescript/utils'
+export type { FlatOf, PrimaryKeyOf } from '@atscript/typescript/utils'
 
 // ── Re-export uniqu types as canonical filter/query format ──────────────────
 

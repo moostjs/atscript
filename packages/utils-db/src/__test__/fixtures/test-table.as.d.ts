@@ -37,7 +37,9 @@ export declare class UsersTable {
     "displayName"?: string
     "status": string
     "bio"?: string
-  }}
+  }
+  static __pk: number
+}
 
 /**
  * Atscript interface **ProfileTable**
@@ -83,7 +85,9 @@ export declare class ProfileTable {
     "settings.notifications.email": boolean
     "settings.notifications.sms": boolean
     "displayName"?: string
-  }}
+  }
+  static __pk: number
+}
 
 /**
  * Atscript interface **NoTableAnnotation**
