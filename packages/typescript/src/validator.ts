@@ -291,6 +291,37 @@ export class Validator<
         return false
       }
     }
+    if (def.metadata.has('expect.array.uniqueItems')) {
+      const separator = '▼↩'
+      const seen = new Set<string>()
+      const keyProps = new Set<string>()
+      if (def.type.of.type.kind === 'object') {
+        for (const [key, val] of def.type.of.type.props.entries()) {
+          if (val.metadata.get('expect.array.key')) {
+            keyProps.add(key)
+          }
+        }
+      }
+      for (let idx = 0; idx < value.length; idx++) {
+        const item = value[idx]
+        let key: string
+        if (keyProps.size > 0) {
+          key = ''
+          for (const prop of keyProps) {
+            key += JSON.stringify(item[prop]) + separator
+          }
+        } else {
+          key = JSON.stringify(item)
+        }
+        if (seen.has(key)) {
+          this.push(String(idx))
+          this.error('Duplicate items are not allowed')
+          this.pop(true)
+          return false
+        }
+        seen.add(key)
+      }
+    }
     let i = 0
     let passed = true
     for (const item of value) {

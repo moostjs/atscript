@@ -1,6 +1,6 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
-import { isPrimitive, isRef } from '../parser/nodes'
+import { isArray, isPrimitive, isRef } from '../parser/nodes'
 import type { TMessages } from '../parser/types'
 
 export const expectAnnotations: TAnnotationsTree = {
@@ -226,6 +226,46 @@ export const expectAnnotations: TAnnotationsTree = {
   }),
 
   array: {
+    uniqueItems: new AnnotationSpec({
+      description:
+        'Marks an **array field** as containing *unique items*.\n\n' +
+        '- Enforces set-semantics: duplicate items are rejected during validation.\n' +
+        '- If the array\'s element type defines `@expect.array.key` properties, ' +
+        'uniqueness is checked by those keys; otherwise by deep equality.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@expect.array.uniqueItems\n' +
+        'tags: string[]\n' +
+        '```\n',
+      nodeType: ['prop'],
+      multiple: false,
+      validate(token, args, doc) {
+        const field = token.parentNode!
+        const errors = [] as TMessages
+        const definition = field.getDefinition()
+        if (!definition) {
+          return errors
+        }
+        let wrongType = false
+        if (isRef(definition)) {
+          const def = doc.unwindType(definition.id!, definition.chain)?.def
+          if (!isArray(def)) {
+            wrongType = true
+          }
+        } else if (!isArray(definition)) {
+          wrongType = true
+        }
+        if (wrongType) {
+          errors.push({
+            message: `@expect.array.uniqueItems requires an array field`,
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+
     key: new AnnotationSpec({
       description:
         'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +

@@ -80,7 +80,7 @@ $("object", UsersTable)
     "bio",
     $().designType("string")
       .tags("string")
-      .annotate("db.index.fulltext", "search_idx", true)
+      .annotate("db.index.fulltext", { name: "search_idx",  }, true)
       .optional()
       .$type
   )

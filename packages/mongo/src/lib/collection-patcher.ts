@@ -9,7 +9,7 @@ import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 
 import type { AsCollection } from './as-collection'
-import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
+import { validateMongoIdPlugin } from './validate-plugins'
 
 /**
  * CollectionPatcher is a small helper that converts a *patch payload* produced
@@ -67,14 +67,14 @@ export class CollectionPatcher<
    * Build a runtime *Validator* that understands the extended patch payload.
    *
    *  * Adds per‑array *patch* wrappers (the `$replace`, `$insert`, … fields).
-   *  * Honors `db.mongo.patch.strategy === "merge"` metadata.
+   *  * Honors `db.patch.strategy === "merge"` metadata.
    *
    * @param collection Target collection wrapper
    * @returns Atscript Validator
    */
   static prepareValidator<T extends TAtscriptAnnotatedType>(collection: AsCollection<T, any>) {
     return collection.createValidator({
-      plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
+      plugins: [validateMongoIdPlugin],
       replace: (def, path) => {
         if (path === '' && def.type.kind === 'object') {
           const obj = $('object').copyMetadata(def.metadata)
@@ -97,7 +97,7 @@ export class CollectionPatcher<
           !def.metadata.has('db.mongo.__patchArrayValue')
         ) {
           const defArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
-          const mergeStrategy = defArray.metadata.get('db.mongo.patch.strategy') === 'merge'
+          const mergeStrategy = defArray.metadata.get('db.patch.strategy') === 'merge'
           function getPatchType() {
             const isPrimitive = isAnnotatedTypeOfPrimitive(defArray.type.of)
             if (isPrimitive) {
@@ -158,7 +158,7 @@ export class CollectionPatcher<
         }
         return def
       },
-      partial: (def, path) => path !== '' && def.metadata.get('db.mongo.patch.strategy') === 'merge',
+      partial: (def, path) => path !== '' && def.metadata.get('db.patch.strategy') === 'merge',
     })
   }
 
@@ -245,7 +245,7 @@ export class CollectionPatcher<
         this.parseArrayPatch(key, value)
       } else if (
         typeof value === 'object' &&
-        this.collection.flatMap.get(key)?.metadata?.get('db.mongo.patch.strategy') === 'merge'
+        this.collection.flatMap.get(key)?.metadata?.get('db.patch.strategy') === 'merge'
       ) {
         this.flattenPayload(value, key)
       } else if (key !== '_id') {
@@ -330,7 +330,7 @@ export class CollectionPatcher<
       return
     }
 
-    const uniqueItems = this.collection.flatMap.get(key)?.metadata?.has('db.mongo.array.uniqueItems')
+    const uniqueItems = this.collection.flatMap.get(key)?.metadata?.has('expect.array.uniqueItems')
 
     if (uniqueItems || keyProps.size > 0) {
       this._upsert(key, input, keyProps)
@@ -402,7 +402,7 @@ export class CollectionPatcher<
 
     if (keyProps.size > 0) {
       const mergeStrategy =
-        this.collection.flatMap.get(key)?.metadata?.get('db.mongo.patch.strategy') === 'merge'
+        this.collection.flatMap.get(key)?.metadata?.get('db.patch.strategy') === 'merge'
 
       const keys = [...keyProps]
       // sequentially apply each patch item

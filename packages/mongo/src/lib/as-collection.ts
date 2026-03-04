@@ -17,7 +17,7 @@ import type { AsMongo } from './as-mongo'
 import { CollectionPatcher } from './collection-patcher'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
-import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from './validate-plugins'
+import { validateMongoIdPlugin } from './validate-plugins'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
@@ -162,7 +162,7 @@ export class AsCollection<
           this.validators.set(
             purpose,
             this.createValidator({
-              plugins: [validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin],
+              plugins: [validateMongoIdPlugin],
               replace(type, path) {
                 if (path === '_id' && type.type.tags.has('objectId')) {
                   return {
@@ -322,15 +322,11 @@ export class AsCollection<
       const name = index === true ? fieldName : (index.name || fieldName)
       this._addIndexField('unique', name, fieldName)
     }
-    // Core @db.index.fulltext (no weight arg → always weight 1)
+    // Core @db.index.fulltext (with optional weight arg)
     for (const index of metadata.get('db.index.fulltext') || []) {
       const name = index === true ? '' : (index.name || '')
-      this._addIndexField('text', name, fieldName, 1)
-    }
-    // Mongo-specific @db.mongo.index.text (has weight arg)
-    const textWeight = metadata.get('db.mongo.index.text')
-    if (textWeight) {
-      this._addIndexField('text', '', fieldName, textWeight === true ? 1 : textWeight)
+      const weight = (index !== true && typeof index === 'object') ? (index.weight || 1) : 1
+      this._addIndexField('text', name, fieldName, weight)
     }
     for (const index of metadata.get('db.mongo.search.text') || []) {
       this._addFieldToSearchIndex('search_text', index.indexName, fieldName, index.analyzer)

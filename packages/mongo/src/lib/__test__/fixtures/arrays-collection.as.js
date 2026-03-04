@@ -90,7 +90,7 @@ $("object", ArraysCollection)
               .$type
           )
           .$type)
-      .annotate("db.mongo.patch.strategy", "merge")
+      .annotate("db.patch.strategy", "merge")
       .$type
   ).prop(
     "withoutKey",
@@ -136,7 +136,7 @@ $("object", ArraysCollection)
               .$type
           )
           .$type)
-      .annotate("db.mongo.patch.strategy", "merge")
+      .annotate("db.patch.strategy", "merge")
       .$type
   ).prop(
     "_id",

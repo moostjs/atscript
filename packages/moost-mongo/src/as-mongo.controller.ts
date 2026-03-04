@@ -94,20 +94,13 @@ export class AsMongoController<
   /**
    * One‑time initialization hook executed right after the collection is obtained.
    *
-   * Default behaviour:
-   * * Automatically synchronises MongoDB indexes unless
-   *   `mongo.autoIndexes` metadata flag is set to `false` on the model.
+   * Default behaviour: synchronises MongoDB indexes.
    *
    * Override to seed data, register change streams, etc. Both sync and async
    * return types are supported.
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected init(): void | Promise<any> {
-    if (this.type.metadata.get('db.mongo.autoIndexes') === false) {
-      // indexing explicitly disabled
-    } else {
-      return this.asCollection.syncIndexes()
-    }
+    return this.asCollection.syncIndexes()
   }
 
   // ---------------------------------------------------------------------

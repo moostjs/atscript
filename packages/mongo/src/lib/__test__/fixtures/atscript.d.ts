@@ -27,28 +27,26 @@ declare global {
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
+    "expect.array.uniqueItems": boolean
     "expect.array.key": boolean
     "emit.jsonSchema": boolean
+    "db.patch.strategy": string
     "db.table": string | true
     "db.schema": string
     "db.index.plain": ({ name?: string, sort?: string })[]
     "db.index.unique": (string | true)[]
-    "db.index.fulltext": (string | true)[]
+    "db.index.fulltext": ({ name?: string, weight?: number })[]
     "db.column": string
     "db.default.value": string
     "db.default.fn": string
     "db.json": boolean
     "db.ignore": boolean
     "db.mongo.collection": boolean
-    "db.mongo.autoIndexes": boolean
-    "db.mongo.index.text": number | true
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
     "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
     "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]
     "db.mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
     "db.mongo.search.filter": ({ indexName: string })[]
-    "db.mongo.patch.strategy": string
-    "db.mongo.array.uniqueItems": boolean
     "ui.placeholder": string
     "ui.component": string
     "ui.hidden": boolean

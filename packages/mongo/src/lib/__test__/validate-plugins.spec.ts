@@ -1,7 +1,7 @@
 import { ObjectId } from 'mongodb'
 import { describe, beforeAll, it, expect } from 'vitest'
 
-import { validateMongoIdPlugin, validateMongoUniqueArrayItemsPlugin } from '../validate-plugins.js'
+import { validateMongoIdPlugin } from '../validate-plugins.js'
 import { prepareFixtures } from './test-utils'
 
 const dummyId = 'a'.repeat(24)
@@ -30,11 +30,9 @@ describe('mongo validate plugins', () => {
     ).not.toThrowError()
   })
 
-  it('must validate unique array items on string array', async () => {
+  it('must validate unique array items on string array (built-in validator)', async () => {
     const { UniqueItems } = await import('./fixtures/plugins.as.js')
-    const validator = UniqueItems.validator({
-      plugins: [validateMongoUniqueArrayItemsPlugin],
-    })
+    const validator = UniqueItems.validator()
     expect(() =>
       validator.validate({
         _id: dummyId,
@@ -49,11 +47,9 @@ describe('mongo validate plugins', () => {
     ).toThrowError()
   })
 
-  it('must validate unique array items on objects array', async () => {
+  it('must validate unique array items on objects array (built-in validator)', async () => {
     const { UniqueItems } = await import('./fixtures/plugins.as.js')
-    const validator = UniqueItems.validator({
-      plugins: [validateMongoUniqueArrayItemsPlugin],
-    })
+    const validator = UniqueItems.validator()
     expect(() =>
       validator.validate({
         _id: dummyId,
@@ -83,23 +79,9 @@ describe('mongo validate plugins', () => {
     ).toThrowError()
   })
 
-  it('must validate unique array items on objects array with defined key', async () => {
+  it('must validate unique array items on objects array with defined key (built-in validator)', async () => {
     const { UniqueItems } = await import('./fixtures/plugins.as.js')
-    const validator = UniqueItems.validator({
-      plugins: [validateMongoUniqueArrayItemsPlugin],
-    })
-
-    try {
-      validator.validate({
-        _id: dummyId,
-        kObj: [
-          { a: '1', b: 'a' },
-          { a: '2', b: 'a' },
-        ],
-      })
-    } catch (error) {
-      console.error(error)
-    }
+    const validator = UniqueItems.validator()
 
     expect(() =>
       validator.validate({

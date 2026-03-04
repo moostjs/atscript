@@ -14,7 +14,7 @@ export interface ArraysCollection {
         attribute: string
     }[]
 
-    @db.mongo.patch.strategy 'merge'
+    @db.patch.strategy 'merge'
     withKeyMerge: {
         @expect.array.key
         key1: string
@@ -30,7 +30,7 @@ export interface ArraysCollection {
         attribute?: string
     }[]
 
-    @db.mongo.patch.strategy 'merge'
+    @db.patch.strategy 'merge'
     withoutKeyMerge: {
         key: string
         value: string

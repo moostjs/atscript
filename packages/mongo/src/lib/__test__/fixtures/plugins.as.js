@@ -50,7 +50,7 @@ $("object", UniqueItems)
       .of($().designType("string")
           .tags("string")
           .$type)
-      .annotate("db.mongo.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(
@@ -87,7 +87,7 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("db.mongo.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(
@@ -107,7 +107,7 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("db.mongo.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", true)
       .optional()
       .$type
   ).prop(

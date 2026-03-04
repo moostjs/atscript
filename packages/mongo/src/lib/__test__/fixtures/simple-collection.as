@@ -7,7 +7,7 @@ export interface SimpleCollection {
     tags?: string[]
     age: number
 
-    @db.mongo.patch.strategy 'replace'
+    @db.patch.strategy 'replace'
     address: {
         line1: string
         line2?: string
@@ -16,18 +16,18 @@ export interface SimpleCollection {
         zip: string
     }
 
-    @db.mongo.patch.strategy 'merge'
+    @db.patch.strategy 'merge'
     contacts: {
         email: string
         phone: string
     }
 
-    @db.mongo.patch.strategy 'merge'
+    @db.patch.strategy 'merge'
     nested?: {
-        @db.mongo.patch.strategy 'replace'
+        @db.patch.strategy 'replace'
         nested1?: { a?: number, b?: string }
 
-        @db.mongo.patch.strategy 'merge'
+        @db.patch.strategy 'merge'
         nested2?: { c?: number, d?: string }
     }
 }

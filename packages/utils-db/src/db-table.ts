@@ -594,7 +594,7 @@ export class AtscriptDbTable<
     for (const index of (metadata.get('db.index.plain') as any[]) || []) {
       const name = index === true ? fieldName : (index?.name || fieldName)
       const sort = (index === true ? undefined : index?.sort) || 'asc'
-      this._addIndexField('plain', name, fieldName, sort as 'asc' | 'desc')
+      this._addIndexField('plain', name, fieldName, { sort: sort as 'asc' | 'desc' })
     }
 
     // @db.index.unique (single arg → raw string or { name })
@@ -603,10 +603,11 @@ export class AtscriptDbTable<
       this._addIndexField('unique', name, fieldName)
     }
 
-    // @db.index.fulltext (single arg → raw string or { name })
+    // @db.index.fulltext (args: name?, weight?)
     for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
       const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
-      this._addIndexField('fulltext', name, fieldName)
+      const weight = (index !== true && typeof index === 'object') ? index?.weight : undefined
+      this._addIndexField('fulltext', name, fieldName, { weight })
     }
 
     // @db.json → mark as JSON storage
@@ -631,11 +632,14 @@ export class AtscriptDbTable<
     type: TDbIndex['type'],
     name: string,
     field: string,
-    sort: 'asc' | 'desc' = 'asc'
+    opts?: { sort?: 'asc' | 'desc'; weight?: number }
   ): void {
     const key = indexKey(type, name)
     const index = this._indexes.get(key)
-    const indexField: TDbIndexField = { name: field, sort }
+    const indexField: TDbIndexField = { name: field, sort: opts?.sort ?? 'asc' }
+    if (opts?.weight !== undefined) {
+      indexField.weight = opts.weight
+    }
     if (index) {
       index.fields.push(indexField)
     } else {

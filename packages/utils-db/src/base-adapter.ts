@@ -119,7 +119,7 @@ export abstract class BaseDbAdapter {
    * Called for each field during flattening.
    * Use to extract field-level adapter-specific annotations.
    *
-   * Example: MongoDB adapter extracts `@db.mongo.index.text`, `@db.mongo.search.vector`.
+   * Example: MongoDB adapter extracts `@db.mongo.search.vector`, `@db.mongo.search.text`.
    */
   onFieldScanned?(
     field: string,

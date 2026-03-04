@@ -95,7 +95,7 @@ $("object", SimpleCollection)
           .tags("string")
           .$type
       )
-      .annotate("db.mongo.patch.strategy", "replace")
+      .annotate("db.patch.strategy", "replace")
       .$type
   ).prop(
     "contacts",
@@ -111,7 +111,7 @@ $("object", SimpleCollection)
           .tags("string")
           .$type
       )
-      .annotate("db.mongo.patch.strategy", "merge")
+      .annotate("db.patch.strategy", "merge")
       .$type
   ).prop(
     "nested",
@@ -132,7 +132,7 @@ $("object", SimpleCollection)
               .optional()
               .$type
           )
-          .annotate("db.mongo.patch.strategy", "replace")
+          .annotate("db.patch.strategy", "replace")
           .optional()
           .$type
       ).prop(
@@ -151,11 +151,11 @@ $("object", SimpleCollection)
               .optional()
               .$type
           )
-          .annotate("db.mongo.patch.strategy", "merge")
+          .annotate("db.patch.strategy", "merge")
           .optional()
           .$type
       )
-      .annotate("db.mongo.patch.strategy", "merge")
+      .annotate("db.patch.strategy", "merge")
       .optional()
       .$type
   ).prop(

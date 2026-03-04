@@ -1,9 +1,61 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
-import { isPrimitive, isRef } from '../parser/nodes'
+import { isArray, isInterface, isPrimitive, isRef, isStructure } from '../parser/nodes'
 import type { TMessages } from '../parser/types'
 
 export const dbAnnotations: TAnnotationsTree = {
+  patch: {
+    strategy: new AnnotationSpec({
+      description:
+        'Defines the **patching strategy** for updating nested objects.\n\n' +
+        '- **"replace"** → The field or object will be **fully replaced**.\n' +
+        '- **"merge"** → The field or object will be **merged recursively** (applies only to objects, not arrays).\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.patch.strategy "merge"\n' +
+        'settings: {\n' +
+        '  notifications: boolean\n' +
+        '  preferences: {\n' +
+        '    theme: string\n' +
+        '  }\n' +
+        '}\n' +
+        '```\n',
+      nodeType: ['prop'],
+      multiple: false,
+      argument: {
+        name: 'strategy',
+        type: 'string',
+        description: 'The **patch strategy** for this field: `"replace"` (default) or `"merge"`.',
+        values: ['replace', 'merge'],
+      },
+      validate(token, args, doc) {
+        const field = token.parentNode!
+        const errors = [] as TMessages
+        const definition = field.getDefinition()
+        if (!definition) {
+          return errors
+        }
+        let wrongType = false
+        if (isRef(definition)) {
+          const def = doc.unwindType(definition.id!, definition.chain)?.def
+          if (!isStructure(def) && !isInterface(def) && !isArray(def)) {
+            wrongType = true
+          }
+        } else if (!isStructure(definition) && !isInterface(definition) && !isArray(definition)) {
+          wrongType = true
+        }
+        if (wrongType) {
+          errors.push({
+            message: `@db.patch.strategy requires a field of type object or array`,
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+  },
+
   table: new AnnotationSpec({
     description:
       'Marks an interface as a database-persisted entity (table in SQL, collection in MongoDB). ' +
@@ -97,16 +149,29 @@ export const dbAnnotations: TAnnotationsTree = {
         '```atscript\n' +
         '@db.index.fulltext "ft_content"\n' +
         'title: string\n' +
+        '\n' +
+        '@db.index.fulltext "ft_content", 5\n' +
+        'bio: string\n' +
         '```\n',
       nodeType: ['prop'],
       multiple: true,
       mergeStrategy: 'append',
-      argument: {
-        optional: true,
-        name: 'name',
-        type: 'string',
-        description: 'Index name / composite group name.',
-      },
+      argument: [
+        {
+          optional: true,
+          name: 'name',
+          type: 'string',
+          description: 'Index name / composite group name.',
+        },
+        {
+          optional: true,
+          name: 'weight',
+          type: 'number',
+          description:
+            'Field importance in search results (higher = more relevant). ' +
+            'Defaults to `1`. Supported by databases with weighted fulltext (e.g., MongoDB, PostgreSQL).',
+        },
+      ],
     }),
   },
 

@@ -29,26 +29,24 @@ declare global {
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
     "expect.array.key": boolean
+    "expect.array.uniqueItems": boolean
     "emit.jsonSchema": boolean
     "db.table": string | true
     "db.schema": string
+    "db.patch.strategy": string
     "db.index.plain": ({ name?: string, sort?: string })[]
     "db.index.unique": (string | true)[]
-    "db.index.fulltext": (string | true)[]
+    "db.index.fulltext": ({ name?: string, weight?: number } | string | true)[]
     "db.column": string
     "db.default.value": string
     "db.default.fn": string
     "db.ignore": boolean
     "db.mongo.collection": boolean
-    "db.mongo.autoIndexes": boolean
-    "db.mongo.index.text": number | true
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
     "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
     "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]
     "db.mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
     "db.mongo.search.filter": ({ indexName: string })[]
-    "db.mongo.patch.strategy": string
-    "db.mongo.array.uniqueItems": boolean
   }
   type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
 }

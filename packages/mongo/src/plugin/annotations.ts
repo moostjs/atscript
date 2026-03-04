@@ -1,4 +1,3 @@
-// eslint-disable max-lines
 import type { TAnnotationsTree, TMessages } from '@atscript/core'
 import {
   AnnotationSpec,
@@ -6,7 +5,6 @@ import {
   isStructure,
   isRef,
   isPrimitive,
-  isArray,
 } from '@atscript/core'
 
 const analyzers = [
@@ -35,6 +33,10 @@ const analyzers = [
  * Annotations removed (now in core):
  * - `@mongo.index.plain` → use `@db.index.plain`
  * - `@mongo.index.unique` → use `@db.index.unique`
+ * - `@db.mongo.index.text` → use `@db.index.fulltext` (with optional weight arg)
+ * - `@db.mongo.patch.strategy` → use `@db.patch.strategy`
+ * - `@db.mongo.array.uniqueItems` → use `@expect.array.uniqueItems`
+ * - `@db.mongo.autoIndexes` → removed (use explicit syncIndexes() calls)
  */
 export const annotations: TAnnotationsTree = {
   collection: new AnnotationSpec({
@@ -103,39 +105,6 @@ export const annotations: TAnnotationsTree = {
       }
     },
   }),
-
-  autoIndexes: new AnnotationSpec({
-    description:
-      'Switch on/off the automatic index creation. Works with as-mongo moost controller.\n\nDefault: true',
-    nodeType: ['interface'],
-    argument: {
-      name: 'type',
-      type: 'boolean',
-      description: 'On/Off the automatic index creation',
-    },
-  }),
-
-  index: {
-    text: new AnnotationSpec({
-      description:
-        'Creates a **legacy MongoDB text index** for full-text search with optional **weight** specification.\n\n' +
-        'Use this when you need per-field weight control. For simple full-text indexing without ' +
-        'weights, use the generic `@db.index.fulltext` instead.\n\n' +
-        '**Example:**\n' +
-        '```atscript\n' +
-        '@db.mongo.index.text 5\n' +
-        'bio: string\n' +
-        '```\n',
-      nodeType: ['prop'],
-      argument: {
-        optional: true,
-        name: 'weight',
-        type: 'number',
-        description:
-          'Field importance in search results (higher = more relevant). Defaults to `1`.',
-      },
-    }),
-  },
 
   search: {
     dynamic: new AnnotationSpec({
@@ -317,108 +286,4 @@ export const annotations: TAnnotationsTree = {
     }),
   },
 
-  patch: {
-    strategy: new AnnotationSpec({
-      description:
-        'Defines the **patching strategy** for updating MongoDB documents.\n\n' +
-        '- **"replace"** → The field or object will be **fully replaced**.\n' +
-        '- **"merge"** → The field or object will be **merged recursively** (applies only to objects, not arrays).\n\n' +
-        '**Example:**\n' +
-        '```atscript\n' +
-        '@db.mongo.patch.strategy "merge"\n' +
-        'settings: {\n' +
-        '  notifications: boolean\n' +
-        '  preferences: {\n' +
-        '    theme: string\n' +
-        '  }\n' +
-        '}\n' +
-        '```\n',
-      nodeType: ['prop'],
-      multiple: false,
-      argument: {
-        name: 'strategy',
-        type: 'string',
-        description: 'The **patch strategy** for this field: `"replace"` (default) or `"merge"`.',
-        values: ['replace', 'merge'],
-      },
-      validate(token, args, doc) {
-        const field = token.parentNode!
-        const errors = [] as TMessages
-        const definition = field.getDefinition()
-        if (!definition) {
-          return errors
-        }
-        let wrongType = false
-        if (isRef(definition)) {
-          const def = doc.unwindType(definition.id!, definition.chain)?.def
-          if (!isStructure(def) && !isInterface(def) && !isArray(def)) {
-            wrongType = true
-          }
-        } else if (!isStructure(definition) && !isInterface(definition) && !isArray(definition)) {
-          wrongType = true
-        }
-        if (wrongType) {
-          errors.push({
-            message: `[db.mongo] type of object or array expected when using @db.mongo.patch.strategy`,
-            severity: 1,
-            range: token.range,
-          })
-        }
-        return errors
-      },
-    }),
-  },
-
-  array: {
-    uniqueItems: new AnnotationSpec({
-      description:
-        'Marks an **array field** as containing *globally unique items* when ' +
-        'handling **patch `$insert` operations**.\n\n' +
-        '- Forces the patcher to use **set-semantics** (`$setUnion`) instead of a ' +
-        'plain append, so duplicates are silently skipped.\n' +
-        '- Has **no effect** on `$replace`, `$update`, or `$remove`.\n' +
-        '- If the array\'s element type already defines one or more ' +
-        '`@expect.array.key` properties, *uniqueness is implied* and this annotation ' +
-        'is unnecessary (but harmless).\n\n' +
-        '**Example:**\n' +
-        '```atscript\n' +
-        '@db.mongo.array.uniqueItems\n' +
-        'tags: string[]\n' +
-        '\n' +
-        '// Later in a patch payload …\n' +
-        '{\n' +
-        '  $insert: {\n' +
-        '    tags: ["mongo", "mongo"] // second "mongo" is ignored\n' +
-        '  }\n' +
-        '}\n' +
-        '```\n',
-      nodeType: ['prop'],
-      multiple: false,
-      validate(token, args, doc) {
-        const field = token.parentNode!
-        const errors = [] as TMessages
-        const definition = field.getDefinition()
-        if (!definition) {
-          return errors
-        }
-        let wrongType = false
-        if (isRef(definition)) {
-          const def = doc.unwindType(definition.id!, definition.chain)?.def
-          if (!isArray(def)) {
-            wrongType = true
-          }
-        } else if (!isArray(definition)) {
-          wrongType = true
-        }
-        if (wrongType) {
-          errors.push({
-            message: `[db.mongo] type of array expected when using @db.mongo.array.uniqueItems`,
-            severity: 1,
-            range: token.range,
-          })
-        }
-        return errors
-      },
-    }),
-  },
 }

@@ -9,7 +9,7 @@ export interface IdPlugin {
 export interface UniqueItems {
     str?: string[]
 
-    @db.mongo.array.uniqueItems
+    @expect.array.uniqueItems
     strUnique?: string[]
 
     obj?: {
@@ -17,13 +17,13 @@ export interface UniqueItems {
         b: string
     }[]
 
-    @db.mongo.array.uniqueItems
+    @expect.array.uniqueItems
     objUnique?: {
         a: string
         b: string
     }[]
 
-    @db.mongo.array.uniqueItems
+    @expect.array.uniqueItems
     kObj?: {
         @expect.array.key
         a: string

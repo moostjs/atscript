@@ -37,6 +37,7 @@ export type TDbIndexType = 'plain' | 'unique' | 'fulltext'
 export interface TDbIndexField {
   name: string
   sort: 'asc' | 'desc'
+  weight?: number
 }
 
 export interface TDbIndex {
