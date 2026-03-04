@@ -124,7 +124,6 @@ Atscript provides common-purpose annotations:
 - `@meta.readonly` - Read-only field
 - `@meta.default 'value'` - Default value (string as-is, other types parsed as JSON)
 - `@meta.example 'value'` - Example value (string as-is, other types parsed as JSON)
-- `@expect.array.key` - Key field in arrays for lookups
 
 ### UI Annotations (@ui.\*)
 
@@ -150,6 +149,8 @@ Atscript provides common-purpose annotations:
 - `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
 - `@expect.int` - Must be integer
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
+- `@expect.array.uniqueItems` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality)
+- `@expect.array.key` - Mark a field as a key inside an array of objects (used for lookups and patch operations; does not enforce uniqueness by itself)
 
 All validation annotations (except `@expect.int`) accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
 

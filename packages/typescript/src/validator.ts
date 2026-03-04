@@ -9,7 +9,6 @@ import type {
   TAtscriptTypeObject,
 } from './annotated-type'
 import { isAnnotatedType, isPhantomType } from './annotated-type'
-import { forAnnotatedType } from './traverse'
 
 interface TError {
   path: string
@@ -95,41 +94,55 @@ export class Validator<
 
   /** Validation errors collected during the last {@link validate} call. */
   public errors: TError[] = []
-  protected stackErrors: TError[][] = []
+  protected stackErrors: (TError[] | null)[] = []
   protected stackPath: string[] = []
+  protected cachedPath = ''
   protected context: unknown
 
   protected isLimitExceeded() {
     if (this.stackErrors.length > 0) {
-      return this.stackErrors[this.stackErrors.length - 1].length >= this.opts.errorLimit
+      const top = this.stackErrors[this.stackErrors.length - 1]
+      return top !== null && top.length >= this.opts.errorLimit
     }
     return this.errors.length >= this.opts.errorLimit
   }
 
   protected push(name: string) {
     this.stackPath.push(name)
-    this.stackErrors.push([])
+    this.stackErrors.push(null)
+    this.cachedPath =
+      this.stackPath.length <= 1 ? '' : this.stackPath[1] + (this.stackPath.length > 2 ? '.' + this.stackPath.slice(2).join('.') : '')
   }
 
   protected pop(saveErrors: boolean) {
     this.stackPath.pop()
     const popped = this.stackErrors.pop()
-    if (saveErrors && popped?.length) {
-      popped.forEach(error => {
-        this.error(error.message, error.path, error.details)
-      })
+    if (saveErrors && popped !== null && popped !== undefined && popped.length > 0) {
+      for (let i = 0; i < popped.length; i++) {
+        this.error(popped[i].message, popped[i].path, popped[i].details)
+      }
     }
+    this.cachedPath =
+      this.stackPath.length <= 1 ? '' : this.stackPath[1] + (this.stackPath.length > 2 ? '.' + this.stackPath.slice(2).join('.') : '')
     return popped
   }
 
   protected clear() {
-    this.stackErrors[this.stackErrors.length - 1] = []
+    this.stackErrors[this.stackErrors.length - 1] = null
   }
 
   protected error(message: string, path?: string, details?: TError[]) {
-    const errors = this.stackErrors[this.stackErrors.length - 1] || this.errors
+    let errors = this.stackErrors[this.stackErrors.length - 1]
+    if (!errors) {
+      if (this.stackErrors.length > 0) {
+        errors = []
+        this.stackErrors[this.stackErrors.length - 1] = errors
+      } else {
+        errors = this.errors
+      }
+    }
     const error: TError = {
-      path: path || this.path,
+      path: path || this.cachedPath,
       message,
     }
     if (details?.length) {
@@ -154,9 +167,10 @@ export class Validator<
    * @throws {ValidatorError} When validation fails and `safe` is not `true`.
    */
   public validate<TT = DataType>(value: any, safe?: boolean, context?: unknown): value is TT {
-    this.push('')
     this.errors = []
     this.stackErrors = []
+    this.stackPath = ['']
+    this.cachedPath = ''
     this.context = context
     const passed = this.validateSafe(this.def, value)
     this.pop(!passed)
@@ -178,7 +192,7 @@ export class Validator<
       throw new Error('Can not validate not-annotated type')
     }
     if (typeof this.opts.replace === 'function') {
-      def = this.opts.replace(def, this.path)
+      def = this.opts.replace(def, this.cachedPath)
     }
     if (def.optional && value === undefined) {
       return true
@@ -194,19 +208,30 @@ export class Validator<
   }
 
   protected get path() {
-    return this.stackPath.slice(1).join('.')
+    return this.cachedPath
   }
 
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
-    return forAnnotatedType(def, {
-      final: d => this.validatePrimitive(d, value),
-      phantom: () => true,
-      object: d => this.validateObject(d, value),
-      array: d => this.validateArray(d, value),
-      union: d => this.validateUnion(d, value),
-      intersection: d => this.validateIntersection(d, value),
-      tuple: d => this.validateTuple(d, value),
-    })
+    switch (def.type.kind) {
+      case '': {
+        if (def.type.designType === 'phantom') {
+          return true
+        }
+        return this.validatePrimitive(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>, value)
+      }
+      case 'object':
+        return this.validateObject(def as TAtscriptAnnotatedType<TAtscriptTypeObject>, value)
+      case 'array':
+        return this.validateArray(def as TAtscriptAnnotatedType<TAtscriptTypeArray>, value)
+      case 'union':
+        return this.validateUnion(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
+      case 'intersection':
+        return this.validateIntersection(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
+      case 'tuple':
+        return this.validateTuple(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value)
+      default:
+        throw new Error(`Unknown type kind "${(def.type as { kind: string }).kind}"`)
+    }
   }
 
   protected validateUnion(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
@@ -350,25 +375,26 @@ export class Validator<
     const typeKeys = new Set()
 
     // prepare skipList for this object
-    const skipList = new Set()
+    let skipList: Set<string> | undefined
     if (this.opts.skipList) {
-      const path = this.stackPath.length > 1 ? `${this.path}.` : ''
-      this.opts.skipList.forEach(item => {
+      const path = this.stackPath.length > 1 ? `${this.cachedPath}.` : ''
+      for (const item of this.opts.skipList) {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
+          if (!skipList) skipList = new Set()
           skipList.add(key)
           valueKeys.delete(key)
         }
-      })
+      }
     }
 
     let partialFunctionMatched = false
     if (typeof this.opts.partial === 'function') {
-      partialFunctionMatched = this.opts.partial(def, this.path)
+      partialFunctionMatched = this.opts.partial(def, this.cachedPath)
     }
 
     for (const [key, item] of def.type.props.entries()) {
-      if (skipList.has(key) || isPhantomType(item)) {
+      if ((skipList && skipList.has(key)) || isPhantomType(item)) {
         continue
       }
       typeKeys.add(key)
@@ -405,23 +431,25 @@ export class Validator<
         if (matched.length > 0) {
           // some patterns matched, we have to make sure that
           // at least one type validation passes
+          this.push(key)
           let keyPassed = false
-          for (const { def } of matched) {
-            if (this.validateSafe(def, value[key])) {
-              this.pop(false)
+          for (const { def: propDef } of matched) {
+            if (this.validateSafe(propDef, value[key])) {
               keyPassed = true
               break
             }
+            this.clear()
           }
           if (!keyPassed) {
-            // no type validations passed, we have to save error
-            this.push(key)
+            // no type validations passed, re-validate first to capture error
             this.validateSafe(matched[0].def, value[key])
             this.pop(true)
             passed = false
             if (this.isLimitExceeded()) {
               return false
             }
+          } else {
+            this.pop(false)
           }
         } else if (this.opts.unknownProps !== 'ignore') {
           // no keys matched, no patterns matched:
@@ -566,7 +594,7 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: number
   ): boolean {
-    const int = def.metadata.get('expect.int') as { message?: string } | true | undefined
+    const int = def.metadata.get('expect.int')
     if (int && value % 1 !== 0) {
       const message =
         typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`

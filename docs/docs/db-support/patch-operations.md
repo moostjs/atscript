@@ -111,6 +111,19 @@ interface OrderItem {
 
 With `@expect.array.key` on `productId`, the patch operations `$upsert`, `$update`, and `$remove` will match elements by their `productId` value.
 
+::: tip @expect.array.key vs @expect.array.uniqueItems
+`@expect.array.key` **identifies** which fields form an element's identity — it's used by patch operations to locate elements, but does **not** enforce uniqueness during validation.
+
+To also **enforce** that no two elements share the same key values, add `@expect.array.uniqueItems` on the array field:
+
+```atscript
+@expect.array.uniqueItems   // reject duplicates during validation
+items: OrderItem[]
+```
+
+`@expect.array.uniqueItems` works with both primitive arrays (e.g., `string[]` — checked by deep equality) and object arrays (checked by key fields if defined, otherwise by deep equality).
+:::
+
 ## Native vs Decomposed Patches
 
 How patches are executed depends on the database adapter:

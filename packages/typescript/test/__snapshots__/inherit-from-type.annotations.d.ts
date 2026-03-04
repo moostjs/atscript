@@ -27,13 +27,15 @@ declare global {
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
+    "expect.array.uniqueItems": boolean
     "expect.array.key": boolean
     "emit.jsonSchema": boolean
+    "db.patch.strategy": string
     "db.table": string | true
     "db.schema": string
     "db.index.plain": ({ name?: string, sort?: string })[]
     "db.index.unique": (string | true)[]
-    "db.index.fulltext": (string | true)[]
+    "db.index.fulltext": ({ name?: string, weight?: number })[]
     "db.column": string
     "db.default.value": string
     "db.default.fn": string

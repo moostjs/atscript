@@ -228,14 +228,26 @@ export const expectAnnotations: TAnnotationsTree = {
   array: {
     uniqueItems: new AnnotationSpec({
       description:
-        'Marks an **array field** as containing *unique items*.\n\n' +
-        '- Enforces set-semantics: duplicate items are rejected during validation.\n' +
-        '- If the array\'s element type defines `@expect.array.key` properties, ' +
-        'uniqueness is checked by those keys; otherwise by deep equality.\n\n' +
-        '**Example:**\n' +
+        'Enforces **unique items** in an array field.\n\n' +
+        'Works with both **primitive arrays** and **object arrays**:\n\n' +
+        '- **Primitive arrays** (`string[]`, `number[]`) — duplicates are detected by deep equality.\n' +
+        '- **Object arrays** — if the element type defines `@expect.array.key` properties, ' +
+        'uniqueness is checked by those keys only; otherwise by deep equality of the whole object.\n\n' +
+        'Unlike `@expect.array.key` (which only *identifies* key fields for lookup/patch operations), ' +
+        '`@expect.array.uniqueItems` actively *enforces* uniqueness during validation.\n\n' +
+        '**Examples:**\n' +
         '```atscript\n' +
+        '// Primitive array — no duplicates allowed\n' +
         '@expect.array.uniqueItems\n' +
         'tags: string[]\n' +
+        '\n' +
+        '// Object array with keys — unique by key fields\n' +
+        '@expect.array.uniqueItems\n' +
+        'items: {\n' +
+        '    @expect.array.key\n' +
+        '    id: string\n' +
+        '    value: number\n' +
+        '}[]\n' +
         '```\n',
       nodeType: ['prop'],
       multiple: false,
@@ -268,17 +280,21 @@ export const expectAnnotations: TAnnotationsTree = {
 
     key: new AnnotationSpec({
       description:
-        'Marks a **key field** inside an array. This annotation is used to identify unique fields within an array that can be used as **lookup keys**.\n\n' +
-        '\n\n**Example:**\n' +
+        'Marks a **key field** inside an array of objects. Key fields *identify* elements ' +
+        'for lookup and patch operations (`$upsert`, `$update`, `$remove`).\n\n' +
+        '`@expect.array.key` does **not** enforce uniqueness by itself — ' +
+        'it only declares which fields form the element identity. ' +
+        'To enforce that no two elements share the same key, also add `@expect.array.uniqueItems` ' +
+        'on the array field.\n\n' +
+        'Multiple key fields form a **composite key** (all must match for elements to be considered equal).\n\n' +
+        '**Example:**\n' +
         '```atscript\n' +
-        'export interface User {\n' +
-        '  id: string\n' +
-        '  profiles: {\n' +
+        '@expect.array.uniqueItems    // enforce uniqueness by key\n' +
+        'profiles: {\n' +
         '    @expect.array.key\n' +
         '    profileId: string\n' +
         '    name: string\n' +
-        '  }[]\n' +
-        '}\n' +
+        '}[]\n' +
         '```\n',
       nodeType: ['prop', 'type'],
       multiple: false,

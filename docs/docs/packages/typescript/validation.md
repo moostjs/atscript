@@ -118,6 +118,8 @@ Annotations from `.as` files are enforced automatically during validation. See t
 | `@expect.max`       | number          | Maximum value                                                          |
 | `@expect.int`       | number          | Must be integer                                                        |
 | `@expect.pattern`   | string          | Regex match (multiple patterns supported)                              |
+| `@expect.array.uniqueItems` | array  | No duplicate items (by key fields if defined, otherwise deep equality) |
+| `@expect.array.key` | property in array element | Marks a key field for lookups and patch operations (does not enforce uniqueness alone) |
 
 All validation annotations (except `@expect.int`) support an optional custom error message as the last argument:
 
