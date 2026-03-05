@@ -38,7 +38,7 @@ export declare class UsersTable {
     "status": string
     "bio"?: string
   }
-  static __pk: number
+  static __pk: number | string
 }
 
 /**

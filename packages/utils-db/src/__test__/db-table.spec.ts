@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import type { FilterExpr, Uniquery } from '@uniqu/core'
+import type { FilterExpr } from '@uniqu/core'
 
 import { AtscriptDbTable } from '../db-table'
 import { BaseDbAdapter } from '../base-adapter'
 import type {
+  DbQuery,
   TDbInsertResult,
   TDbInsertManyResult,
   TDbUpdateResult,
@@ -59,20 +59,20 @@ class MockAdapter extends BaseDbAdapter {
   }
 
   async findOne(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Record<string, unknown> | null> {
     this.record('findOne', query)
     return { id: 1, name: 'test' }
   }
 
   async findMany(
-    query: Uniquery
+    query: DbQuery
   ): Promise<Array<Record<string, unknown>>> {
     this.record('findMany', query)
     return [{ id: 1, name: 'test' }]
   }
 
-  async count(query: Uniquery): Promise<number> {
+  async count(query: DbQuery): Promise<number> {
     this.record('count', query)
     return 42
   }
@@ -193,8 +193,8 @@ describe('AtscriptDbTable', () => {
     })
 
     it('should extract unique props from single-field unique indexes', () => {
-      // uniqueProps uses physical names (resolved via @db.column)
-      expect(table.uniqueProps.has('email_address')).toBe(true)
+      // uniqueProps uses logical names (matching flatMap keys)
+      expect(table.uniqueProps.has('email')).toBe(true)
     })
 
     it('should return ID descriptor', () => {
@@ -401,10 +401,6 @@ describe('AtscriptDbTable — embedded objects', () => {
   let adapter: MockAdapter
   let table: AtscriptDbTable
 
-  beforeAll(async () => {
-    await prepareFixtures()
-  })
-
   beforeEach(() => {
     adapter = new MockAdapter()
     table = new AtscriptDbTable(ProfileTable, adapter)
@@ -486,16 +482,18 @@ describe('AtscriptDbTable — embedded objects', () => {
 
   // ── Write flattening ───────────────────────────────────────────────────
 
+  const baseProfileInput = {
+    id: 1,
+    name: 'Alice',
+    contact: { email: 'alice@x.com', phone: '555' },
+    preferences: { theme: 'dark', lang: 'en' },
+    tags: ['admin', 'user'],
+    settings: { notifications: { email: true, sms: false } },
+  }
+
   describe('write flattening', () => {
     it('should flatten nested objects to __-separated keys on insert', async () => {
-      await table.insertOne({
-        id: 1,
-        name: 'Alice',
-        contact: { email: 'alice@x.com', phone: '555' },
-        preferences: { theme: 'dark', lang: 'en' },
-        tags: ['admin', 'user'],
-        settings: { notifications: { email: true, sms: false } },
-      } as any)
+      await table.insertOne({ ...baseProfileInput } as any)
 
       const call = adapter.calls.find(c => c.method === 'insertOne')!
       const data = call.args[0] as Record<string, unknown>
@@ -513,14 +511,7 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should JSON-stringify @db.json fields on insert', async () => {
-      await table.insertOne({
-        id: 1,
-        name: 'Alice',
-        contact: { email: 'alice@x.com' },
-        preferences: { theme: 'dark', lang: 'en' },
-        tags: ['admin'],
-        settings: { notifications: { email: true, sms: false } },
-      } as any)
+      await table.insertOne({ ...baseProfileInput } as any)
 
       const call = adapter.calls.find(c => c.method === 'insertOne')!
       const data = call.args[0] as Record<string, unknown>
@@ -529,14 +520,7 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should JSON-stringify array fields on insert', async () => {
-      await table.insertOne({
-        id: 1,
-        name: 'Alice',
-        contact: { email: 'alice@x.com' },
-        preferences: { theme: 'dark', lang: 'en' },
-        tags: ['admin', 'user'],
-        settings: { notifications: { email: true, sms: false } },
-      } as any)
+      await table.insertOne({ ...baseProfileInput } as any)
 
       const call = adapter.calls.find(c => c.method === 'insertOne')!
       const data = call.args[0] as Record<string, unknown>
@@ -549,12 +533,9 @@ describe('AtscriptDbTable — embedded objects', () => {
       // (validation rejects null for a required object field)
       table.flatMap // trigger flatten
       const prepared = (table as any)._prepareForWrite({
-        id: 1,
-        name: 'Alice',
+        ...baseProfileInput,
         contact: null,
-        preferences: { theme: 'dark', lang: 'en' },
         tags: [],
-        settings: { notifications: { email: true, sms: false } },
       })
 
       expect(prepared.contact__email).toBeNull()
@@ -564,18 +545,20 @@ describe('AtscriptDbTable — embedded objects', () => {
 
   // ── Read reconstruction ─────────────────────────────────────────────────
 
+  const baseFlatRow = {
+    id: 1,
+    name: 'Alice',
+    contact__email: 'alice@x.com',
+    contact__phone: '555',
+    preferences: '{"theme":"dark","lang":"en"}',
+    tags: '["admin","user"]',
+    settings__notifications__email: 1,
+    settings__notifications__sms: 0,
+  }
+
   describe('read reconstruction', () => {
     it('should reconstruct nested objects from __-separated columns', async () => {
-      adapter.findOne = async (_q: Uniquery) => ({
-        id: 1,
-        name: 'Alice',
-        contact__email: 'alice@x.com',
-        contact__phone: '555',
-        preferences: '{"theme":"dark","lang":"en"}',
-        tags: '["admin","user"]',
-        settings__notifications__email: 1,
-        settings__notifications__sms: 0,
-      })
+      adapter.findOne = async () => ({ ...baseFlatRow })
 
       const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
 
@@ -584,16 +567,7 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should parse JSON fields from strings', async () => {
-      adapter.findOne = async (_q: Uniquery) => ({
-        id: 1,
-        name: 'Alice',
-        contact__email: 'a@x.com',
-        contact__phone: null,
-        preferences: '{"theme":"dark","lang":"en"}',
-        tags: '["admin","user"]',
-        settings__notifications__email: 1,
-        settings__notifications__sms: 0,
-      })
+      adapter.findOne = async () => ({ ...baseFlatRow, contact__email: 'a@x.com', contact__phone: null })
 
       const result = await table.findOne({ filter: { id: 1 }, controls: {} }) as any
 
@@ -602,9 +576,8 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should reconstruct null parent when all children are null', async () => {
-      adapter.findOne = async (_q: Uniquery) => ({
-        id: 1,
-        name: 'Alice',
+      adapter.findOne = async () => ({
+        ...baseFlatRow,
         contact__email: null,
         contact__phone: null,
         preferences: null,
@@ -621,9 +594,9 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should reconstruct findMany results', async () => {
-      adapter.findMany = async (_q: Uniquery) => [
-        { id: 1, name: 'A', contact__email: 'a@x.com', contact__phone: null, preferences: '{}', tags: '[]', settings__notifications__email: 1, settings__notifications__sms: 0 },
-        { id: 2, name: 'B', contact__email: 'b@x.com', contact__phone: '555', preferences: '{}', tags: '[]', settings__notifications__email: 0, settings__notifications__sms: 1 },
+      adapter.findMany = async () => [
+        { ...baseFlatRow, id: 1, name: 'A', contact__email: 'a@x.com', contact__phone: null, preferences: '{}', tags: '[]' },
+        { ...baseFlatRow, id: 2, name: 'B', contact__email: 'b@x.com', contact__phone: '555', preferences: '{}', tags: '[]', settings__notifications__sms: 1 },
       ]
 
       const results = await table.findMany({ filter: {}, controls: {} }) as any[]
@@ -643,7 +616,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findOne')!
-      const query = call.args[0] as Uniquery
+      const query = call.args[0] as DbQuery
       expect(query.filter).toHaveProperty('contact__email', 'alice@x.com')
       expect(query.filter).not.toHaveProperty('contact.email')
     })
@@ -655,7 +628,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
+      const query = call.args[0] as DbQuery
       const orFilters = (query.filter as any).$or
       expect(orFilters[0]).toHaveProperty('contact__email')
       expect(orFilters[1]).toHaveProperty('contact__phone')
@@ -668,7 +641,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
+      const query = call.args[0] as DbQuery
       expect(query.controls?.$sort).toHaveProperty('contact__email')
     })
 
@@ -679,7 +652,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findMany')!
-      const query = call.args[0] as Uniquery
+      const query = call.args[0] as DbQuery
       // "contact" is an intermediate parent — should be stripped
       expect(query.controls?.$sort).not.toHaveProperty('contact')
       // "name" is a leaf — should remain
@@ -741,7 +714,7 @@ describe('AtscriptDbTable — embedded objects', () => {
       } as any)
 
       const call = adapter.calls.find(c => c.method === 'findOne')!
-      const query = call.args[0] as Uniquery
+      const query = call.args[0] as DbQuery
       expect(query.filter).toHaveProperty('name', 'Alice')
     })
   })

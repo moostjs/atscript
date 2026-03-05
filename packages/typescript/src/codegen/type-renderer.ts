@@ -401,7 +401,8 @@ export class TypeRenderer extends BaseRenderer {
    *
    * - **Single PK** (one `@meta.id`) → `static __pk: <scalar type>`
    * - **Compound PK** (multiple `@meta.id`) → `static __pk: { field1: Type1; field2: Type2 }`
-   * - **No PK** → no `__pk` emitted
+   * - **No PK** → no `__pk` emitted (unless unique indexes exist)
+   * - **Unique indexes** (`@db.index.unique`) → appended as union members
    * - **Mongo collection** → always includes `string` (ObjectId) in the union;
    *   if no `@meta.id` fields, `__pk` is just `string`
    */
@@ -421,6 +422,8 @@ export class TypeRenderer extends BaseRenderer {
 
     const structNode = struct as SemanticStructureNode
     const pkProps: Array<{ name: string; prop: SemanticPropNode }> = []
+    // Collect unique index annotations grouped by index name to detect compound indexes
+    const uniqueByIndex = new Map<string, Array<{ name: string; prop: SemanticPropNode }>>()
     for (const [name, prop] of structNode.props) {
       if (prop.token('identifier')?.pattern) {
         continue
@@ -432,9 +435,31 @@ export class TypeRenderer extends BaseRenderer {
       if (prop.countAnnotations('meta.id') > 0) {
         pkProps.push({ name, prop })
       }
+      if (prop.annotations) {
+        for (const ann of prop.annotations) {
+          if (ann.name === 'db.index.unique') {
+            // Index name is the first arg, or the field name itself for unnamed indexes
+            const indexName = ann.args[0]?.value ?? name
+            let group = uniqueByIndex.get(indexName)
+            if (!group) {
+              group = []
+              uniqueByIndex.set(indexName, group)
+            }
+            group.push({ name, prop })
+          }
+        }
+      }
+    }
+    // Only single-field unique indexes contribute to __pk (compound indexes need multiple fields)
+    const uniqueProps: Array<{ name: string; prop: SemanticPropNode }> = []
+    const pkNames = new Set(pkProps.map(p => p.name))
+    for (const fields of uniqueByIndex.values()) {
+      if (fields.length === 1 && !pkNames.has(fields[0].name)) {
+        uniqueProps.push(fields[0])
+      }
     }
 
-    if (pkProps.length === 0 && !isMongoCollection) {
+    if (pkProps.length === 0 && uniqueProps.length === 0 && !isMongoCollection) {
       return
     }
 
@@ -448,19 +473,35 @@ export class TypeRenderer extends BaseRenderer {
       mongoIdType ??= 'string'
     }
 
+    // Collect unique prop rendered types (deduplicated)
+    const uniqueTypes: string[] = []
+    const seenTypes = new Set<string>()
+    for (const { prop } of uniqueProps) {
+      const rendered = this.renderTypeDefString(prop.getDefinition()).trim()
+      if (!seenTypes.has(rendered)) {
+        seenTypes.add(rendered)
+        uniqueTypes.push(rendered)
+      }
+    }
+
     // Flush any pending content on the current line (e.g. closing `}` from renderFlat's pop())
     this.writeln()
 
-    if (pkProps.length === 0) {
-      // Mongo collection with no @meta.id — _id type only
-      this.writeln(`static __pk: ${mongoIdType}`)
+    const uniqueSuffix = uniqueTypes.length > 0 ? ' | ' + uniqueTypes.join(' | ') : ''
+
+    if (pkProps.length === 0 && !isMongoCollection) {
+      // No PK, only unique indexes
+      this.writeln(`static __pk: ${uniqueTypes.join(' | ')}`)
+    } else if (pkProps.length === 0) {
+      // Mongo collection with no @meta.id — _id type + unique indexes
+      this.writeln(`static __pk: ${mongoIdType}${uniqueSuffix}`)
     } else if (pkProps.length === 1) {
       this.write('static __pk: ')
       if (isMongoCollection) {
         this.write(`${mongoIdType} | `)
       }
-      const renderedDef = this.renderTypeDefString(pkProps[0].prop.getDefinition())
-      renderedDef.split('\n').forEach(l => this.writeln(l))
+      const renderedDef = this.renderTypeDefString(pkProps[0].prop.getDefinition()).trim()
+      this.writeln(`${renderedDef}${uniqueSuffix}`)
     } else {
       this.write('static __pk: ')
       if (isMongoCollection) {
@@ -473,6 +514,7 @@ export class TypeRenderer extends BaseRenderer {
         renderedDef.split('\n').forEach(l => this.writeln(l))
       }
       this.pop()
+      this.writeln(uniqueSuffix)
     }
   }
 

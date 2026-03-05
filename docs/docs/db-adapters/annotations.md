@@ -82,17 +82,42 @@ Arguments: `name?` (optional index name — auto-generated if omitted), `sort?` 
 
 ## `@db.index.unique`
 
-Creates a unique index, enforcing that no two records share the same value.
+Creates a unique index, enforcing that no two records share the same value. The index name is **optional** — when omitted, it is auto-generated from the field name:
 
 ```atscript
 @db.table 'users'
 export interface User {
-    @db.index.unique 'email_idx'
+    @db.index.unique
+    email: string.email
+
+    @db.index.unique
+    username: string
+
+    name: string
+}
+// → Two separate unique indexes (auto-named from field names)
+```
+
+You can also pass an explicit name: `@db.index.unique 'email_idx'`. An explicit name is only **required** when creating compound unique indexes.
+
+To create a **compound unique index** (uniqueness enforced across the combination of fields), pass the **same index name** on multiple fields:
+
+```atscript
+@db.table 'tenants'
+export interface TenantUser {
+    @db.index.unique 'tenant_email'
+    tenantId: string
+
+    @db.index.unique 'tenant_email'
     email: string.email
 
     name: string
 }
+// → One compound unique index on (tenantId, email)
+// Each tenantId can have the same email only once
 ```
+
+Single-field unique indexes participate in [`findById` resolution](./tables#find-by-id) and contribute to the [`__pk` type](./tables#pk-type). Compound unique indexes do not, since they cannot be resolved from a single scalar value.
 
 ## `@db.index.fulltext`
 

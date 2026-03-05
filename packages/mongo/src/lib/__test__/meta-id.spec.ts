@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb'
-import { describe, it, expect, beforeAll, vi } from 'vitest'
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 
 import { AsMongo } from '../as-mongo'
 import { buildMongoFilter } from '../mongo-filter'
@@ -7,8 +7,14 @@ import { prepareFixtures } from './test-utils'
 
 const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
 
+const HEX_A = 'a'.repeat(24)
+const HEX_B = 'b'.repeat(24)
+const HEX_C = 'c'.repeat(24)
+const HEX_D = 'd'.repeat(24)
+
 describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
   beforeAll(prepareFixtures)
+  afterEach(() => vi.restoreAllMocks())
 
   describe('TodoCollection (ObjectId _id + numeric @meta.id with increment)', () => {
     let table: ReturnType<typeof mongo.getTable>
@@ -65,11 +71,10 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
     })
 
     it('prepareId should convert string to ObjectId for _id', () => {
-      const hexStr = 'a'.repeat(24)
       const fieldType = table.flatMap.get('_id')!
-      const result = adapter.prepareId(hexStr, fieldType)
+      const result = adapter.prepareId(HEX_A, fieldType)
       expect(result).toBeInstanceOf(ObjectId)
-      expect(result.toString()).toBe(hexStr)
+      expect(result.toString()).toBe(HEX_A)
     })
 
     it('prepareId should convert string to number for id field', () => {
@@ -80,47 +85,41 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
 
     describe('findById', () => {
       it('should find by ObjectId string (_id primary key path)', async () => {
-        const hexStr = 'a'.repeat(24)
-        const expectedDoc = { _id: new ObjectId(hexStr), id: 1, title: 'test', completed: false }
+        const expectedDoc = { _id: new ObjectId(HEX_A), id: 1, title: 'test', completed: false }
 
         const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
-        const result = await table.findById(hexStr)
+        const result = await table.findById(HEX_A)
 
         expect(findOneSpy).toHaveBeenCalledOnce()
         const query = findOneSpy.mock.calls[0][0]
         // The filter should have _id as ObjectId (check via toString)
         expect(query.filter._id).toBeDefined()
-        expect(query.filter._id.toString()).toBe(hexStr)
+        expect(query.filter._id.toString()).toBe(HEX_A)
         expect(result).toEqual(expectedDoc)
 
-        findOneSpy.mockRestore()
       })
 
-      it('should fallback to unique prop for numeric id string', async () => {
+      it('should resolve numeric id string to unique prop', async () => {
         const expectedDoc = { _id: new ObjectId(), id: 5, title: 'test', completed: false }
 
         const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
 
-        // "5" is not a valid ObjectId → prepareId throws → pkValid = false → fallback to uniqueProps
+        // "5" is not a valid ObjectId → PK skipped; "5" is numeric → coerced to number for unique id field
         const result = await table.findById('5')
 
         expect(findOneSpy).toHaveBeenCalledOnce()
         const query = findOneSpy.mock.calls[0][0]
-        // Should use $or with unique props, id coerced to number
-        expect(query.filter.$or).toBeDefined()
-        expect(query.filter.$or).toEqual([{ id: 5 }])
+        // Only unique prop matches (PK failed ObjectId parse, string incompatible with number)
+        expect(query.filter).toEqual({ id: 5 })
         expect(result).toEqual(expectedDoc)
 
-        findOneSpy.mockRestore()
       })
 
       it('should return null when not found', async () => {
-        const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(null)
+        vi.spyOn(adapter, 'findOne').mockResolvedValue(null)
 
-        const result = await table.findById('b'.repeat(24))
+        const result = await table.findById(HEX_B)
         expect(result).toBeNull()
-
-        findOneSpy.mockRestore()
       })
     })
   })
@@ -155,33 +154,34 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
     })
 
     describe('findById', () => {
-      it('should find by ObjectId string (_id primary key path)', async () => {
-        const hexStr = 'c'.repeat(24)
-        const expectedDoc = { _id: new ObjectId(hexStr), code: 'X1', name: 'Item' }
+      it('should query both PK and unique prop for ObjectId-compatible string', async () => {
+        const expectedDoc = { _id: new ObjectId(HEX_C), code: 'X1', name: 'Item' }
 
         const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
-        const result = await table.findById(hexStr)
+        const result = await table.findById(HEX_C)
 
         const query = findOneSpy.mock.calls[0][0]
-        expect(query.filter._id).toBeDefined()
-        expect(query.filter._id.toString()).toBe(hexStr)
+        // Both _id (ObjectId) and code (string) are type-compatible → $or
+        expect(query.filter.$or).toBeDefined()
+        expect(query.filter.$or[0]._id).toBeDefined()
+        expect(query.filter.$or[0]._id.toString()).toBe(HEX_C)
+        expect(query.filter.$or[1]).toEqual({ code: HEX_C })
         expect(result).toEqual(expectedDoc)
 
-        findOneSpy.mockRestore()
       })
 
-      it('should fallback to unique prop for string code', async () => {
+      it('should resolve non-ObjectId string to unique prop', async () => {
         const expectedDoc = { _id: new ObjectId(), code: 'ABC', name: 'Item' }
 
         const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
-        // "ABC" is not a valid ObjectId → fallback to uniqueProps
+        // "ABC" is not a valid ObjectId → PK skipped; code: string matches
         const result = await table.findById('ABC')
 
         const query = findOneSpy.mock.calls[0][0]
-        expect(query.filter.$or).toEqual([{ code: 'ABC' }])
+        // Only unique prop matches (PK failed ObjectId parse)
+        expect(query.filter).toEqual({ code: 'ABC' })
         expect(result).toEqual(expectedDoc)
 
-        findOneSpy.mockRestore()
       })
     })
   })
@@ -206,18 +206,16 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
 
     describe('findById', () => {
       it('should find by ObjectId string', async () => {
-        const hexStr = 'd'.repeat(24)
-        const expectedDoc = { _id: new ObjectId(hexStr), name: 'Test' }
+        const expectedDoc = { _id: new ObjectId(HEX_D), name: 'Test' }
 
         const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
-        const result = await table.findById(hexStr)
+        const result = await table.findById(HEX_D)
 
         const query = findOneSpy.mock.calls[0][0]
         expect(query.filter._id).toBeDefined()
-        expect(query.filter._id.toString()).toBe(hexStr)
+        expect(query.filter._id.toString()).toBe(HEX_D)
         expect(result).toEqual(expectedDoc)
 
-        findOneSpy.mockRestore()
       })
 
       it('should return null for invalid ObjectId (no unique fallback)', async () => {
@@ -230,27 +228,26 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
         expect(result).toBeNull()
         expect(findOneSpy).not.toHaveBeenCalled()
 
-        findOneSpy.mockRestore()
       })
     })
   })
 
   describe('buildMongoFilter with ObjectId', () => {
     it('should preserve ObjectId as leaf value in equality filter', () => {
-      const oid = new ObjectId('a'.repeat(24))
+      const oid = new ObjectId(HEX_A)
       const result = buildMongoFilter({ _id: oid } as any)
       expect(result).toEqual({ _id: oid })
       expect(result._id).toBeInstanceOf(ObjectId)
     })
 
     it('should handle ObjectId in $or filter', () => {
-      const oid = new ObjectId('b'.repeat(24))
+      const oid = new ObjectId(HEX_B)
       const result = buildMongoFilter({ $or: [{ _id: oid }, { id: 5 }] } as any)
       expect(result.$or).toEqual([{ _id: oid }, { id: 5 }])
     })
 
     it('should handle mixed ObjectId and primitive filters', () => {
-      const oid = new ObjectId('c'.repeat(24))
+      const oid = new ObjectId(HEX_C)
       const result = buildMongoFilter({ _id: oid, name: 'test' } as any)
       // Two equality conditions → $and
       expect(result.$and).toEqual([{ _id: oid }, { name: 'test' }])

@@ -100,6 +100,104 @@ const total = await users.count({
 
 See [Queries & Filters](./queries) for the full filter syntax.
 
+### Find by ID
+
+`findById` locates a record by its primary key or any single-field unique index. Rather than querying only the primary key, it collects **all type-compatible identifiers** into a single `$or` filter:
+
+```typescript
+const user = await users.findById('alice@example.com')
+```
+
+#### How ID Resolution Works
+
+Given a schema like:
+
+```atscript
+@db.table 'users'
+export interface User {
+    @meta.id
+    id: number
+    @db.index.unique
+    email: string
+    name: string
+}
+```
+
+When you call `findById('alice@example.com')`:
+
+1. **Primary key (`id: number`)** — The string `'alice@example.com'` is not compatible with `number`, so `id` is skipped
+2. **Unique index (`email: string`)** — The string is compatible with `string`, so `email` is included
+3. **Result** — `{ email: 'alice@example.com' }`
+
+When you call `findById(42)`:
+
+1. **Primary key (`id: number`)** — `42` is compatible with `number`, so `id` is included
+2. **Unique index (`email: string`)** — `42` is not compatible with `string`, so `email` is skipped
+3. **Result** — `{ id: 42 }`
+
+When you call `findById('42')`:
+
+1. **Primary key (`id: number`)** — The string `'42'` is numeric, so it is coerced to `42` and `id` is included
+2. **Unique index (`email: string`)** — The string is compatible with `string`, so `email` is included
+3. **Result** — `{ $or: [{ id: 42 }, { email: '42' }] }`
+
+#### Which Fields Participate
+
+- **Primary key** — Fields annotated with `@meta.id`. Composite primary keys (multiple `@meta.id` fields) require an object argument instead of a scalar.
+- **Single-field unique indexes** — Fields with `@db.index.unique`. Compound unique indexes (multiple fields sharing the same index name) are excluded since they cannot be resolved from a single scalar value.
+
+#### Type Compatibility Rules
+
+| Field Type | Compatible Values |
+| ---------- | ----------------- |
+| `string`   | Strings only |
+| `number`   | Numbers, or strings that are valid numbers (e.g., `'42'`) |
+| `boolean`  | Booleans only |
+| `object`   | Non-null objects only |
+
+Fields that fail the type check are silently skipped. If no fields are compatible, `findById` returns `null` without querying the database.
+
+#### MongoDB ObjectId Behavior
+
+For MongoDB collections, `_id` fields typed as `mongo.objectId` have additional handling — string values are converted to `ObjectId` instances via `prepareId()`. If the string is not a valid 24-character hex string, the `_id` field is skipped and the remaining unique indexes are tried.
+
+#### `deleteOne` with Scalar ID
+
+`deleteOne` supports the same ID resolution as `findById` — pass a scalar value to delete by primary key or unique index:
+
+```typescript
+// Delete by scalar ID (uses same resolution as findById)
+await users.deleteOne(1)
+
+// Delete by filter object (classic usage)
+await users.deleteMany({ status: 'deleted' })
+```
+
+### `__pk` Type
+
+Interfaces with `@db.table` get a `__pk` static property in the generated `.d.ts` file. It is a union of the primary key type and all single-field unique index types, enabling type-safe `findById` and `deleteOne` calls:
+
+```typescript
+// Generated .d.ts:
+declare class User {
+  id: number
+  email: string
+  name: string
+  static __pk: number | string  // number (from id) | string (from email)
+}
+```
+
+Use the `PrimaryKeyOf<T>` utility type to extract the `__pk` type:
+
+```typescript
+import type { PrimaryKeyOf } from '@atscript/utils-db'
+
+type UserPK = PrimaryKeyOf<typeof User>
+// → number | string
+```
+
+Compound unique indexes do **not** contribute to `__pk` — only single-field unique indexes are included.
+
 ### Update
 
 ```typescript
@@ -136,8 +234,8 @@ await users.replaceMany(
 ### Delete
 
 ```typescript
-// Delete by primary key
-await users.deleteOne({ id: 1 })
+// Delete by scalar ID (resolved via primary key + unique indexes)
+await users.deleteOne(1)
 
 // Delete many by filter
 await users.deleteMany({ status: 'deleted' })

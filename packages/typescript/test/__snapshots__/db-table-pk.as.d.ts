@@ -55,7 +55,8 @@ export declare class CompoundPk {
   static __pk: {
     userId: string
     orderId: number
-  }}
+  }
+}
 
 /**
  * Atscript interface **NoPk**
@@ -127,7 +128,8 @@ export declare class MongoCompoundPk {
   static __pk: string | {
     userId: string
     orderId: number
-  }}
+  }
+}
 
 /**
  * Atscript interface **MongoNoPk**
@@ -173,5 +175,79 @@ export declare class MongoIdAsMetaId {
     "name": string
   }
   static __pk: string
+}
+
+/**
+ * Atscript interface **PkWithUnique**
+ * @see {@link ./db-table-pk.as:60:18}
+ */
+export declare class PkWithUnique {
+  id: number
+  email: string
+  name: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof PkWithUnique, PkWithUnique>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof PkWithUnique>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "email": string
+    "name": string
+  }
+  static __pk: number | string
+}
+
+/**
+ * Atscript interface **UniqueOnly**
+ * @see {@link ./db-table-pk.as:69:18}
+ */
+export declare class UniqueOnly {
+  name: string
+  code: string
+  num: number
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof UniqueOnly, UniqueOnly>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof UniqueOnly>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "name": string
+    "code": string
+    "num": number
+  }
+  static __pk: string | number
+}
+
+/**
+ * Atscript interface **CompoundUnique**
+ * @see {@link ./db-table-pk.as:78:18}
+ */
+export declare class CompoundUnique {
+  id: number
+  tenantId: string
+  email: string
+  slug: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof CompoundUnique, CompoundUnique>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof CompoundUnique>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "tenantId": string
+    "email": string
+    "slug": string
+  }
+  static __pk: number | string
 }
 // prettier-ignore-end

@@ -51,6 +51,32 @@ export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
   return 'string'
 }
 
+/**
+ * Checks whether an id value is type-compatible with a field's design type.
+ * Used by `findById` to skip primary-key lookup when the id clearly can't match,
+ * falling through to unique-property search instead.
+ */
+function isIdCompatible(id: unknown, fieldType: TAtscriptAnnotatedType): boolean {
+  const dt = resolveDesignType(fieldType)
+  switch (dt) {
+    case 'number': {
+      if (typeof id === 'number') { return true }
+      if (typeof id === 'string') { return id !== '' && !Number.isNaN(Number(id)) }
+      return false
+    }
+    case 'boolean': {
+      return typeof id === 'boolean'
+    }
+    case 'object':
+    case 'array': {
+      return typeof id === 'object' && id !== null
+    }
+    default: { // 'string' and unknown design types
+      return typeof id === 'string'
+    }
+  }
+}
+
 /** Coerces a storage value (0/1/null) back to a JS boolean. */
 function toBool(value: unknown): unknown {
   if (value === null || value === undefined) { return value }
@@ -439,26 +465,14 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Deletes a single record by primary key value.
+   * Deletes a single record by any type-compatible identifier — primary key
+   * or single-field unique index. Uses the same resolution logic as `findById`.
    */
   public async deleteOne(id: IdType): Promise<TDbDeleteResult> {
     this._flatten()
-    const pkFields = this.primaryKeys
-    if (pkFields.length === 0) {
-      throw new Error('No primary key defined — cannot delete by ID')
-    }
-    const filter: FilterExpr = {}
-    if (pkFields.length === 1) {
-      const field = pkFields[0]
-      const fieldType = this.flatMap.get(field)
-      filter[field] = fieldType ? this.adapter.prepareId(id, fieldType) : id
-    } else {
-      // Composite key: id must be an object
-      const idObj = id as Record<string, unknown>
-      for (const field of pkFields) {
-        const fieldType = this.flatMap.get(field)
-        filter[field] = fieldType ? this.adapter.prepareId(idObj[field], fieldType) : idObj[field]
-      }
+    const filter = this._resolveIdFilter(id)
+    if (!filter) {
+      return { deletedCount: 0 }
     }
     return this.adapter.deleteOne(this._translateFilter(filter))
   }
@@ -568,79 +582,29 @@ export class AtscriptDbTable<
   // ── Find by ID ──────────────────────────────────────────────────────────
 
   /**
-   * Finds a single record by primary key or unique property.
+   * Finds a single record by any type-compatible identifier — primary key
+   * or single-field unique index.
    *
-   * 1. Tries primary key lookup (single or composite).
-   * 2. Falls back to unique properties if PK validation fails.
+   * Collects all fields whose type matches the given id into an `$or` query.
+   * For example, if PK is `id: string` and there is a unique `email: string`,
+   * calling `findById('value')` queries `{ $or: [{ id: 'value' }, { email: 'value' }] }`.
    *
-   * @param id - Primary key value (scalar for single PK, object for composite).
+   * @param id - Identifier value (scalar for single PK, object for composite).
    * @param controls - Optional query controls ($select, etc.).
    */
   public async findById(
-    id: unknown,
+    id: IdType,
     controls?: UniqueryControls<FlatType>
   ): Promise<DataType | null> {
     this._flatten()
-    const pkFields = this.primaryKeys
-
-    if (pkFields.length === 0) {
-      throw new Error('No primary key defined — cannot find by ID')
+    const filter = this._resolveIdFilter(id)
+    if (!filter) {
+      return null
     }
-
-    // Try primary key lookup
-    const filter: FilterExpr = {}
-    let pkValid = true
-
-    if (pkFields.length === 1) {
-      const field = pkFields[0]
-      const fieldType = this.flatMap.get(field)
-      try {
-        filter[field] = fieldType ? this.adapter.prepareId(id, fieldType) : id
-      } catch {
-        pkValid = false
-      }
-    } else if (typeof id !== 'object' || id === null) {
-      // Composite key: id must be an object
-      pkValid = false
-    } else {
-      const idObj = id as Record<string, unknown>
-      for (const field of pkFields) {
-        const fieldType = this.flatMap.get(field)
-        try {
-          filter[field] = fieldType ? this.adapter.prepareId(idObj[field], fieldType) : idObj[field]
-        } catch {
-          pkValid = false
-          break
-        }
-      }
-    }
-
-    if (pkValid) {
-      return await this.findOne({
-        filter,
-        controls: controls || {},
-      } as Uniquery<FlatType>)
-    }
-
-    // Fallback: try unique properties
-    if (this.uniqueProps.size > 0) {
-      const orFilters: FilterExpr[] = []
-      for (const prop of this.uniqueProps) {
-        const fieldType = this.flatMap.get(prop)
-        try {
-          const prepared = fieldType ? this.adapter.prepareId(id, fieldType) : id
-          orFilters.push({ [prop]: prepared } as FilterExpr)
-        } catch {
-          // skip this prop if id can't be coerced to its type
-        }
-      }
-      return await this.findOne({
-        filter: { $or: orFilters },
-        controls: controls || {},
-      } as Uniquery<FlatType>)
-    }
-
-    return null
+    return await this.findOne({
+      filter,
+      controls: controls || {},
+    } as Uniquery<FlatType>)
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -930,7 +894,15 @@ export class AtscriptDbTable<
   }
 
   private _finalizeIndexes(): void {
-    // Always resolve index field names to physical names.
+    // Collect single-field unique indexes BEFORE resolving to physical names,
+    // so that uniqueProps stores logical names (matching flatMap keys).
+    for (const index of this._indexes.values()) {
+      if (index.type === 'unique' && index.fields.length === 1) {
+        this._uniqueProps.add(index.fields[0].name)
+      }
+    }
+
+    // Resolve index field names to physical names for adapter use.
     // Uses _pathToPhysical when available (covers both @db.column and __ flattening),
     // falls back to _columnMap for @db.column-only cases.
     for (const index of this._indexes.values()) {
@@ -938,12 +910,6 @@ export class AtscriptDbTable<
         field.name = this._pathToPhysical.get(field.name)
           ?? this._columnMap.get(field.name)
           ?? field.name
-      }
-    }
-
-    for (const index of this._indexes.values()) {
-      if (index.type === 'unique' && index.fields.length === 1) {
-        this._uniqueProps.add(index.fields[0].name)
       }
     }
   }
@@ -1326,6 +1292,76 @@ export class AtscriptDbTable<
       }
     }
     return result
+  }
+
+  /**
+   * Resolves an id value into a filter expression by collecting all
+   * type-compatible identifiers — primary key(s) and single-field unique
+   * indexes — into an `$or` filter.
+   *
+   * For composite primary keys the id must be an object with matching fields.
+   * Returns `null` if the id cannot be matched to any field.
+   */
+  protected _resolveIdFilter(id: unknown): FilterExpr | null {
+    const orFilters: FilterExpr[] = []
+
+    // Try single PK or composite PK
+    const pkFields = this.primaryKeys
+    if (pkFields.length === 1) {
+      const filter = this._tryFieldFilter(pkFields[0], id)
+      if (filter) { orFilters.push(filter) }
+    } else if (pkFields.length > 1 && typeof id === 'object' && id !== null) {
+      const idObj = id as Record<string, unknown>
+      const compositeFilter: FilterExpr = {}
+      let valid = true
+      for (const field of pkFields) {
+        const fieldType = this.flatMap.get(field)
+        if (fieldType && !isIdCompatible(idObj[field], fieldType)) {
+          valid = false
+          break
+        }
+        try {
+          compositeFilter[field] = fieldType
+            ? this.adapter.prepareId(idObj[field], fieldType)
+            : idObj[field]
+        } catch {
+          valid = false
+          break
+        }
+      }
+      if (valid) {
+        orFilters.push(compositeFilter)
+      }
+    }
+
+    // Try single-field unique indexes
+    for (const prop of this.uniqueProps) {
+      const filter = this._tryFieldFilter(prop, id)
+      if (filter) { orFilters.push(filter) }
+    }
+
+    if (orFilters.length === 0) {
+      return null
+    }
+    if (orFilters.length === 1) {
+      return orFilters[0]
+    }
+    return { $or: orFilters } as FilterExpr
+  }
+
+  /**
+   * Attempts to build a single-field filter `{ field: preparedId }`.
+   * Returns `null` if the id is type-incompatible or can't be coerced.
+   */
+  private _tryFieldFilter(field: string, id: unknown): FilterExpr | null {
+    const fieldType = this.flatMap.get(field)
+    if (fieldType && !isIdCompatible(id, fieldType)) { return null }
+    try {
+      const prepared = fieldType ? this.adapter.prepareId(id, fieldType) : id
+      return { [field]: prepared } as FilterExpr
+    } catch {
+      return null
+    }
   }
 
   /**

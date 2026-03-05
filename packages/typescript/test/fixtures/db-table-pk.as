@@ -55,3 +55,33 @@ export interface MongoIdAsMetaId {
     _id: string
     name: string
 }
+
+@db.table 'pk_with_unique'
+export interface PkWithUnique {
+    @meta.id
+    id: number
+    @db.index.unique 'email_idx'
+    email: string
+    name: string
+}
+
+@db.table 'unique_only'
+export interface UniqueOnly {
+    name: string
+    @db.index.unique 'code_idx'
+    code: string
+    @db.index.unique 'num_idx'
+    num: number
+}
+
+@db.table 'compound_unique'
+export interface CompoundUnique {
+    @meta.id
+    id: number
+    @db.index.unique 'tenant_email'
+    tenantId: string
+    @db.index.unique 'tenant_email'
+    email: string
+    @db.index.unique 'slug_idx'
+    slug: string
+}
