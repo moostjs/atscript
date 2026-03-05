@@ -34,7 +34,7 @@ export class PluginManager {
       const raw = await this.config()
       this._docConfig = {}
       if (raw?.primitives) {
-        this._docConfig.primitives = this._docConfig.primitives || new Map()
+        this._docConfig.primitives = new Map()
         for (const [key, value] of Object.entries(raw.primitives)) {
           this._docConfig.primitives.set(
             key,
@@ -43,8 +43,7 @@ export class PluginManager {
         }
       }
       if (raw?.annotations) {
-        this._docConfig.annotations = this._docConfig.annotations || {}
-        Object.assign(this._docConfig.annotations, raw.annotations)
+        this._docConfig.annotations = { ...raw.annotations }
       }
       this._docConfig.unknownAnnotation = raw?.unknownAnnotation
     }
@@ -53,22 +52,14 @@ export class PluginManager {
 
   async config(config: TAtscriptConfig = this.cfg): Promise<TAtscriptConfig> {
     if (!this._config) {
-      const processed = new Set<string>()
       config = defu(config, getDefaultAtscriptConfig())
-      const filtered = this.plugins.filter(plugin => !processed.has(plugin.name))
-      let i = 0
-      while (processed.size !== filtered.length) {
-        i++
-        for (const plugin of filtered) {
-          if (processed.has(plugin.name)) {
-            continue
-          }
-          config = defu(await plugin.config?.(config), config)
-          processed.add(plugin.name)
+      const seen = new Set<string>()
+      for (const plugin of this.plugins) {
+        if (seen.has(plugin.name)) {
+          continue
         }
-        if (i > 100) {
-          throw new Error(`Too many iterations in config`)
-        }
+        seen.add(plugin.name)
+        config = defu(await plugin.config?.(config), config)
       }
       this._config = config
     }
@@ -76,10 +67,10 @@ export class PluginManager {
   }
 
   async resolve(id: string) {
-    let newId = id as string | undefined
+    let newId: string | undefined = id
     for (const plugin of this.plugins) {
       if (plugin.resolve) {
-        newId = await plugin.resolve(id)
+        newId = (await plugin.resolve(newId!)) ?? newId
       }
     }
     return newId
@@ -95,8 +86,7 @@ export class PluginManager {
         }
       }
     }
-    const content = await readFile(filePath, 'utf8')
-    return content.toString()
+    return readFile(filePath, 'utf8')
   }
 
   async onDocument(doc: AtscriptDoc) {
@@ -108,16 +98,14 @@ export class PluginManager {
   }
 
   async render(doc: AtscriptDoc, format: TAtscriptRenderFormat) {
+    const source = doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id
     const files: TOutputWithSource[] = []
     for (const plugin of this.plugins) {
       if (plugin.render) {
         const newFiles = await plugin.render(doc, format)
         if (newFiles?.length > 0) {
           files.push(
-            ...newFiles.map(f => ({
-              ...f,
-              source: doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id,
-            }))
+            ...newFiles.map(f => ({ ...f, source }))
           )
         }
       }

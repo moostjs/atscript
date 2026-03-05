@@ -177,19 +177,18 @@ export class AtscriptRepo {
     }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
-      const globalPathToConfig = configFile
-      if (!this.configFiles.has(globalPathToConfig)) {
+      if (!this.configFiles.has(configFile)) {
         const rawConfigPromise = loadConfig(configFile, this.configFormat)
-        this.configFiles.set(globalPathToConfig, rawConfigPromise)
+        this.configFiles.set(configFile, rawConfigPromise)
       }
-      const rawConfig = await this.configFiles.get(globalPathToConfig)!
+      const rawConfig = await this.configFiles.get(configFile)!
       if (!rawConfig.rootDir) {
         rawConfig.rootDir = path.dirname(configFile)
       }
       const manager = new PluginManager(rawConfig)
       await manager.getDocConfig()
       return {
-        file: globalPathToConfig,
+        file: configFile,
         manager,
         dependants: new Set(),
       }
@@ -221,13 +220,14 @@ export class AtscriptRepo {
     let atscript = this.atscripts.get(id)
     if (atscript) {
       if (text) {
-        atscript.then(d => {
+        atscript = atscript.then(d => {
           d.update(text)
           return d
         })
+        this.atscripts.set(id, atscript)
       }
     } else {
-      atscript = this._openDocument(id, text)
+      atscript = this._openDocument(id, text) as Promise<AtscriptDoc>
       atscript.catch(() => {
         this.atscripts.delete(id)
       })

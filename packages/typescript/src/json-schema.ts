@@ -19,7 +19,7 @@ export type TJsonSchema = Record<string, any>
  */
 function detectDiscriminator(
   items: TAtscriptAnnotatedType[]
-): { propertyName: string; mapping: Record<string, string> } | null {
+): { propertyName: string; indexMapping: Record<string, number> } | null {
   if (items.length < 2) {
     return null
   }
@@ -41,11 +41,11 @@ function detectDiscriminator(
   }
 
   // Filter candidates: must exist with a const value in ALL items, all values must be distinct
-  const validCandidates: Array<{ propertyName: string; mapping: Record<string, string> }> = []
+  let result: { propertyName: string; indexMapping: Record<string, number> } | null = null
 
   for (const candidate of candidates) {
     const values = new Set<string | number | boolean>()
-    const mapping: Record<string, string> = {}
+    const indexMapping: Record<string, number> = {}
     let valid = true
 
     for (let i = 0; i < items.length; i++) {
@@ -61,20 +61,19 @@ function detectDiscriminator(
         break
       }
       values.add(val)
-      mapping[String(val)] = `#/oneOf/${i}`
+      indexMapping[String(val)] = i
     }
 
     if (valid) {
-      validCandidates.push({ propertyName: candidate, mapping })
+      // More than one qualifying prop → ambiguous, no discriminator
+      if (result) {
+        return null
+      }
+      result = { propertyName: candidate, indexMapping }
     }
   }
 
-  // Exactly one qualifying prop → use it as discriminator
-  if (validCandidates.length === 1) {
-    return validCandidates[0]
-  }
-
-  return null
+  return result
 }
 
 /**
@@ -96,7 +95,7 @@ function detectDiscriminator(
  */
 export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
   const defs: Record<string, TJsonSchema> = {}
-  let isRoot = true
+  let hasDefs = false
 
   const buildObject = (d: TAtscriptAnnotatedType): TJsonSchema => {
     const properties: Record<string, TJsonSchema> = {}
@@ -119,15 +118,15 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
 
   const build = (def: TAtscriptAnnotatedType): TJsonSchema => {
     // Extract named object types into $defs (unless root level)
-    if (def.id && def.type.kind === 'object' && !isRoot) {
+    if (def.id && def.type.kind === 'object' && def !== type) {
       const name = def.id
       if (!defs[name]) {
+        hasDefs = true
         defs[name] = {} // placeholder to prevent infinite recursion
         defs[name] = buildObject(def)
       }
       return { $ref: `#/$defs/${name}` }
     }
-    isRoot = false
 
     const meta = def.metadata
     return forAnnotatedType(def, {
@@ -153,16 +152,12 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         const disc = detectDiscriminator(d.type.items)
         if (disc) {
           const oneOf = d.type.items.map(build)
-          // Update mapping to use $ref paths when items were extracted to $defs
           const mapping: Record<string, string> = {}
-          for (const [val, origPath] of Object.entries(disc.mapping)) {
-            const idx = Number.parseInt(origPath.split('/').pop()!, 10)
+          for (const [val, idx] of Object.entries(disc.indexMapping)) {
             const item = d.type.items[idx]
-            if (item.id && defs[item.id]) {
-              mapping[val] = `#/$defs/${item.id}`
-            } else {
-              mapping[val] = origPath
-            }
+            mapping[val] = item.id && defs[item.id]
+              ? `#/$defs/${item.id}`
+              : `#/oneOf/${idx}`
           }
           return {
             oneOf,
@@ -230,7 +225,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
   }
 
   const schema = build(type)
-  if (Object.keys(defs).length > 0) {
+  if (hasDefs) {
     return { ...schema, $defs: defs }
   }
   return schema
@@ -271,6 +266,9 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
         return resolved.get(refName)!
       }
       if (defsSource[refName]) {
+        // Insert placeholder before recursion to handle circular $refs
+        const placeholder = defineAnnotatedType().designType('any').$type
+        resolved.set(refName, placeholder)
         const type = convert(defsSource[refName])
         resolved.set(refName, type)
         return type

@@ -3,9 +3,10 @@ import {
   type TAtscriptTypeDef,
   type TAtscriptTypeFinal,
   type TMetadataMap,
+  createAnnotatedTypeNode,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
-import { Validator, type TValidatorOptions } from './validator'
+import type { Validator } from './validator'
 
 // ---------------------------------------------------------------------------
 // Serialized format types (plain JSON-safe mirrors of runtime types)
@@ -283,21 +284,10 @@ function deserializeNode(data: TSerializedAnnotatedTypeInner): TAtscriptAnnotate
   const metadata = new Map(Object.entries(data.metadata)) as TMetadataMap<AtscriptMetadata>
   const type = deserializeTypeDef(data.type)
 
-  const result: TAtscriptAnnotatedType = {
-    __is_atscript_annotated_type: true,
-    type,
-    metadata,
-    validator(opts?: Partial<TValidatorOptions>) {
-      return new Validator(this as TAtscriptAnnotatedType, opts)
-    },
-  }
-
-  if (data.optional) {
-    result.optional = true
-  }
-  if (data.id) {
-    result.id = data.id
-  }
+  const result = createAnnotatedTypeNode(type, metadata, {
+    optional: data.optional || undefined,
+    id: data.id || undefined,
+  })
 
   return result
 }

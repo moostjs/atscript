@@ -225,7 +225,6 @@ export class AtscriptDoc {
         )
       }
     }
-    0
   }
 
   /**
@@ -670,14 +669,14 @@ export class AtscriptDoc {
     this.blocksIndex.add(block)
     block.blockType = 'import'
     block.fromPath = from.text
+    this.tokensIndex.add(from)
+    from.fromPath = from.text
     imports.forEach(t => {
       t.imported = true
       t.fromPath = from.text
       this.registerDefinition(t, true)
       this.tokensIndex.add(t)
-      this.tokensIndex.add(from)
       this.importedDefs.set(t.text, from)
-      from.fromPath = from.text
     })
   }
 
@@ -781,7 +780,7 @@ export class AtscriptDoc {
   getUnusedTokens() {
     const refSet = new Set<string>(this.referred.filter(r => !r.imported).map(r => r.text))
     const tokens = [] as Token[]
-    for (const [key, token] of Array.from(this.registry.definitions.entries())) {
+    for (const [key, token] of this.registry.definitions) {
       if (!refSet.has(key) && !this.exports.has(key)) {
         tokens.push(token)
       }
@@ -836,7 +835,7 @@ export class AtscriptDoc {
         { l: lines[n - 3], i: n - 3 },
         { l: lines[n - 2], i: n - 2 },
         { l: lines[n - 1], i: n - 1 },
-      ].filter(Boolean)
+      ].filter(r => r.l !== undefined)
       const nl = String(n).length + 1
       for (const { l, i } of renderLines) {
         const prefix = `${c.dim + c.cyan}${`0${i}`.slice(-nl)} | ${c.reset}`
@@ -1116,16 +1115,7 @@ export class AtscriptDoc {
       if (left.config.type === right.config.type) {
         return [left]
       }
-      const never = new SemanticRefNode()
-      never.saveToken(
-        new Token({
-          text: 'never',
-          type: 'identifier',
-          getRange: () => zeroRange,
-        }),
-        'identifier'
-      )
-      return [never]
+      return [createSyntheticRef('never')]
     }
     if ((isStructure(left) || isInterface(left)) && (isStructure(right) || isInterface(right))) {
       // merging objects
@@ -1148,16 +1138,7 @@ export class AtscriptDoc {
         const prop = new SemanticPropNode()
         prop.saveToken((leftProp || rightProp)!.token('identifier')!, 'identifier')
         if (isPrimitive(mergedDef)) {
-          const name = mergedDef.id!
-          mergedDef = new SemanticRefNode()
-          mergedDef.saveToken(
-            new Token({
-              text: name,
-              type: 'identifier',
-              getRange: () => zeroRange,
-            }),
-            'identifier'
-          )
+          mergedDef = createSyntheticRef(mergedDef.id!)
         }
         prop.define(mergedDef)
         prop.annotations = this.mergeNodesAnnotations(leftProp?.annotations, rightProp?.annotations)
@@ -1176,21 +1157,11 @@ export class AtscriptDoc {
       }
       const mergedStructure = new SemanticStructureNode()
       mergedStructure.setProps(mergedProps)
-      this.resolveAnnotation
       mergedStructure.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
       return [mergedStructure]
     }
     // all other cases are not supported, returning never
-    const never = new SemanticRefNode()
-    never.saveToken(
-      new Token({
-        text: 'never',
-        type: 'identifier',
-        getRange: () => zeroRange,
-      }),
-      'identifier'
-    )
-    return [never]
+    return [createSyntheticRef('never')]
   }
 
   /**
@@ -1237,4 +1208,17 @@ const zeroRange = {
     line: 0,
     character: 0,
   },
+}
+
+function createSyntheticRef(name: string): SemanticRefNode {
+  const ref = new SemanticRefNode()
+  ref.saveToken(
+    new Token({
+      text: name,
+      type: 'identifier',
+      getRange: () => zeroRange,
+    }),
+    'identifier'
+  )
+  return ref
 }

@@ -2,6 +2,33 @@ import { Validator, type TValidatorOptions } from './validator'
 
 // eslint-disable max-lines
 
+const COMPLEX_KINDS = new Set(['union', 'intersection', 'tuple'])
+const NON_PRIMITIVE_KINDS = new Set(['array', 'object'])
+
+/** Shared validator method reused by all annotated type nodes. */
+function validatorMethod(this: TAtscriptAnnotatedType, opts?: Partial<TValidatorOptions>) {
+  return new Validator(this, opts)
+}
+
+/**
+ * Creates a minimal annotated type node from a type def and metadata map.
+ * Centralises the shape so callers never duplicate the boilerplate.
+ */
+export function createAnnotatedTypeNode(
+  type: TAtscriptTypeDef,
+  metadata: TMetadataMap<AtscriptMetadata>,
+  opts?: { id?: string; optional?: boolean },
+): TAtscriptAnnotatedType {
+  return {
+    __is_atscript_annotated_type: true,
+    type,
+    metadata,
+    validator: validatorMethod,
+    id: opts?.id,
+    optional: opts?.optional,
+  }
+}
+
 /** Type definition for union, intersection, or tuple types. */
 export interface TAtscriptTypeComplex<DataType = unknown> {
   kind: 'union' | 'intersection' | 'tuple'
@@ -180,39 +207,26 @@ export function cloneRefProp(parentType: TAtscriptTypeDef, propName: string): vo
   const clonedType = cloneTypeDef(existing.type)
   objType.props.set(
     propName as any,
-    {
-      __is_atscript_annotated_type: true,
-      type: clonedType,
-      metadata: new Map(existing.metadata),
+    createAnnotatedTypeNode(clonedType, new Map(existing.metadata) as TMetadataMap<AtscriptMetadata>, {
       id: existing.id,
       optional: existing.optional,
-      validator(opts?: Partial<TValidatorOptions>) {
-        return new Validator(this as TAtscriptAnnotatedType, opts)
-      },
-    } as TAtscriptAnnotatedType
+    })
   )
 }
 
 function cloneTypeDef(type: TAtscriptTypeDef): TAtscriptTypeDef {
   if (type.kind === 'object') {
     const obj = type as TAtscriptTypeObject
+    const props = new Map<string, TAtscriptAnnotatedType>()
+    for (const [k, v] of obj.props) {
+      props.set(k, createAnnotatedTypeNode(v.type, new Map(v.metadata) as TMetadataMap<AtscriptMetadata>, {
+        id: v.id,
+        optional: v.optional,
+      }))
+    }
     return {
       kind: 'object',
-      props: new Map(
-        Array.from(obj.props.entries()).map(([k, v]) => [
-          k,
-          {
-            __is_atscript_annotated_type: true,
-            type: v.type,
-            metadata: new Map(v.metadata),
-            id: v.id,
-            optional: v.optional,
-            validator(opts?: Partial<TValidatorOptions>) {
-              return new Validator(this as TAtscriptAnnotatedType, opts)
-            },
-          } as TAtscriptAnnotatedType,
-        ])
-      ),
+      props,
       propsPatterns: [...obj.propsPatterns],
       tags: new Set(obj.tags),
     } as TAtscriptTypeDef
@@ -261,7 +275,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     Omit<TAtscriptTypeArray, 'kind'> &
     Omit<TAtscriptTypeObject, 'kind'>
   type.kind = kind
-  if (['union', 'intersection', 'tuple'].includes(kind)) {
+  if (COMPLEX_KINDS.has(kind)) {
     type.items = []
   }
   if (kind === 'object') {
@@ -270,30 +284,17 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
   }
   type.tags = new Set()
   const metadata = (base?.metadata || new Map<string, unknown>()) as TMetadataMap<AtscriptMetadata>
-  if (base) {
-    Object.assign(base, {
-      __is_atscript_annotated_type: true,
-      metadata,
-      type,
-      validator(opts?: Partial<TValidatorOptions>) {
-        return new Validator(this as TAtscriptAnnotatedType, opts)
-      },
-    })
-  } else {
-    base = {
-      __is_atscript_annotated_type: true,
-      metadata,
-      type,
-      validator(opts?: Partial<TValidatorOptions>) {
-        return new Validator(this as TAtscriptAnnotatedType, opts)
-      },
-    }
+  const payload = {
+    __is_atscript_annotated_type: true as const,
+    metadata,
+    type,
+    validator: validatorMethod,
   }
+  base = base ? Object.assign(base, payload) : payload
   const handle = {
     $type: base as TAtscriptAnnotatedType,
     $def: type,
     $metadata: metadata,
-    _existingObject: undefined as TAtscriptAnnotatedType | undefined,
     tags(...tags: string[]) {
       for (const tag of tags) {
         this.$def.tags.add(tag as AtscriptPrimitiveTags)
@@ -337,38 +338,26 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       return this
     },
     refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]) {
+      if (!isAnnotatedType(type)) {
+        throw new Error(`${type} is not annotated type`)
+      }
       let newBase = type
       const typeName = type.name || 'Unknown'
-      if (isAnnotatedType(newBase)) {
-        let keys = ''
-        for (const c of chain || []) {
-          keys += `["${c}"]`
+      if (chain) {
+        for (let i = 0; i < chain.length; i++) {
+          const c = chain[i]
           if (newBase.type.kind === 'object' && newBase.type.props.has(c)) {
-            newBase = newBase.type.props.get(c)!
+            newBase = newBase.type.props.get(c) as TAtscriptAnnotatedType
           } else {
+            const keys = chain.slice(0, i + 1).map(k => `["${k}"]`).join('')
             throw new Error(`Can't find prop ${typeName}${keys}`)
           }
         }
-        if (!newBase && keys) {
-          throw new Error(`Can't find prop ${typeName}${keys}`)
-        } else if (!newBase) {
-          throw new Error(`"${typeName}" is not annotated type`)
-        }
-        // Metadata is NOT copied from the referenced type at runtime.
-        // Type-level annotations are emitted at build time by the code generator,
-        // making metadata resolution independent of declaration order.
-        this.$type = {
-          __is_atscript_annotated_type: true,
-          type: newBase.type,
-          metadata,
-          id: newBase.id,
-          validator(opts?: Partial<TValidatorOptions>) {
-            return new Validator(this as TAtscriptAnnotatedType, opts)
-          },
-        }
-      } else {
-        throw new Error(`${type} is not annotated type`)
       }
+      // Metadata is NOT copied from the referenced type at runtime.
+      // Type-level annotations are emitted at build time by the code generator,
+      // making metadata resolution independent of declaration order.
+      this.$type = createAnnotatedTypeNode(newBase.type, metadata, { id: newBase.id })
       return this
     },
     annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {
@@ -404,7 +393,6 @@ export interface TAnnotatedTypeHandle {
     Omit<TAtscriptTypeArray, 'kind'> &
     Omit<TAtscriptTypeObject<string>, 'kind'>
   $metadata: TMetadataMap<AtscriptMetadata>
-  _existingObject: TAtscriptAnnotatedType | undefined
   tags(...tags: string[]): TAnnotatedTypeHandle
   designType(value: TAtscriptTypeFinal['designType']): TAnnotatedTypeHandle
   value(value: string | number | boolean): TAnnotatedTypeHandle
@@ -436,13 +424,13 @@ export function isPhantomType(def: TAtscriptAnnotatedType): boolean {
  * whose members are all primitives.
  */
 export function isAnnotatedTypeOfPrimitive(t: TAtscriptAnnotatedType) {
-  if (['array', 'object'].includes(t.type.kind)) {
+  if (NON_PRIMITIVE_KINDS.has(t.type.kind)) {
     return false
   }
   if (!t.type.kind) {
     return true
   }
-  if (['union', 'tuple', 'intersection'].includes(t.type.kind)) {
+  if (COMPLEX_KINDS.has(t.type.kind)) {
     for (const item of (t.type as TAtscriptTypeComplex).items) {
       if (!isAnnotatedTypeOfPrimitive(item)) {
         return false

@@ -439,7 +439,7 @@ export class TypeRenderer extends BaseRenderer {
         for (const ann of prop.annotations) {
           if (ann.name === 'db.index.unique') {
             // Index name is the first arg, or the field name itself for unnamed indexes
-            const indexName = ann.args[0]?.value ?? name
+            const indexName = ann.args[0]?.text ?? name
             let group = uniqueByIndex.get(indexName)
             if (!group) {
               group = []
@@ -487,7 +487,7 @@ export class TypeRenderer extends BaseRenderer {
     // Flush any pending content on the current line (e.g. closing `}` from renderFlat's pop())
     this.writeln()
 
-    const uniqueSuffix = uniqueTypes.length > 0 ? ' | ' + uniqueTypes.join(' | ') : ''
+    const uniqueSuffix = uniqueTypes.length > 0 ? ` | ${uniqueTypes.join(' | ')}` : ''
 
     if (pkProps.length === 0 && !isMongoCollection) {
       // No PK, only unique indexes

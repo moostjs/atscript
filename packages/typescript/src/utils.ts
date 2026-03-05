@@ -3,6 +3,7 @@ import type { TAtscriptAnnotatedType, TAtscriptDataType } from './annotated-type
 export {
   annotate,
   cloneRefProp,
+  createAnnotatedTypeNode,
   defineAnnotatedType,
   isAnnotatedType,
   isAnnotatedTypeOfPrimitive,

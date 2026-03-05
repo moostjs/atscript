@@ -303,7 +303,7 @@ export class AsDbController<
     const select = this.transformProjection(parsed.controls.$select)
 
     return this.returnOne(
-      this.table.findById(id, { $select: select } as UniqueryControls<any>) as Promise<DataType | null>
+      this.table.findById(id as any, { $select: select } as UniqueryControls<any>) as Promise<DataType | null>
     )
   }
 
