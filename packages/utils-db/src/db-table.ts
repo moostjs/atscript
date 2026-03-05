@@ -133,6 +133,7 @@ export class AtscriptDbTable<
   protected _columnMap = new Map<string, string>()
   protected _defaults = new Map<string, TDbDefaultValue>()
   protected _ignoredFields = new Set<string>()
+  protected _navFields = new Set<string>()
   protected _uniqueProps = new Set<string>()
 
   // ── Embedded object mapping ──────────────────────────────────────────────
@@ -271,6 +272,12 @@ export class AtscriptDbTable<
   public get ignoredFields(): ReadonlySet<string> {
     this._flatten()
     return this._ignoredFields
+  }
+
+  /** Navigational fields (`@db.rel.to` / `@db.rel.from`) — not stored as columns. */
+  public get navFields(): ReadonlySet<string> {
+    this._flatten()
+    return this._navFields
   }
 
   /** Single-field unique index properties. */
@@ -730,6 +737,13 @@ export class AtscriptDbTable<
 
     // @db.ignore
     if (metadata.has('db.ignore')) {
+      this._ignoredFields.add(fieldName)
+    }
+
+    // @db.rel.to / @db.rel.from → navigational field, not a stored column
+    // Keys are checked as strings since the annotation specs are defined in Phase 2.
+    if (metadata.has('db.rel.to' as keyof AtscriptMetadata) || metadata.has('db.rel.from' as keyof AtscriptMetadata)) {
+      this._navFields.add(fieldName)
       this._ignoredFields.add(fieldName)
     }
 

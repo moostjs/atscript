@@ -20,6 +20,7 @@ export class SemanticStructureNode extends SemanticGroup {
   public setProps(props: SemanticPropNode[]) {
     this.nodes = props
     for (const prop of props) {
+      prop.ownerNode = this
       this.props.set(prop.id!, prop)
     }
   }
@@ -48,6 +49,7 @@ export class SemanticStructureNode extends SemanticGroup {
         doc.registerMessage(token, 'Non-prop node')
         continue
       }
+      node.ownerNode = this
       this.props.set(name, node)
     }
   }
@@ -87,6 +89,7 @@ export class SemanticStructureNode extends SemanticGroup {
     } else {
       prop.define(opts.type)
     }
+    prop.ownerNode = this
     this.nodes.push(prop)
     this.props.set(opts.name, prop)
   }

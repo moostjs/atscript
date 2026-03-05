@@ -17,7 +17,7 @@ function validatorMethod(this: TAtscriptAnnotatedType, opts?: Partial<TValidator
 export function createAnnotatedTypeNode(
   type: TAtscriptTypeDef,
   metadata: TMetadataMap<AtscriptMetadata>,
-  opts?: { id?: string; optional?: boolean },
+  opts?: { id?: string; optional?: boolean; ref?: { type: () => TAtscriptAnnotatedType; field: string } },
 ): TAtscriptAnnotatedType {
   return {
     __is_atscript_annotated_type: true,
@@ -26,6 +26,7 @@ export function createAnnotatedTypeNode(
     validator: validatorMethod,
     id: opts?.id,
     optional: opts?.optional,
+    ref: opts?.ref,
   }
 }
 
@@ -148,6 +149,7 @@ export interface TAtscriptAnnotatedType<
   metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
   id?: string
+  ref?: { type: () => TAtscriptAnnotatedType; field: string }
 }
 
 /** An annotated type that is also a class constructor (i.e. a generated interface class). */
@@ -357,7 +359,10 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       // Metadata is NOT copied from the referenced type at runtime.
       // Type-level annotations are emitted at build time by the code generator,
       // making metadata resolution independent of declaration order.
-      this.$type = createAnnotatedTypeNode(newBase.type, metadata, { id: newBase.id })
+      this.$type = createAnnotatedTypeNode(newBase.type, metadata, {
+        id: newBase.id,
+        ref: chain && chain.length > 0 ? { type: () => type, field: chain.join('.') } : undefined,
+      })
       return this
     },
     annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {

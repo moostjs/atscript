@@ -16,6 +16,7 @@ export class SemanticNode {
   public annotations?: TAnnotationTokens[]
   public annotationsCounter?: Map<string, number>
   public __typeId?: number
+  public ownerNode?: SemanticNode
 
   registerAtDocument(doc: AtscriptDoc): void {
     if (this.definition) {
@@ -101,6 +102,7 @@ export class SemanticNode {
 
   define(node: SemanticNode) {
     this.definition = node
+    node.ownerNode = this
     return this
   }
 
