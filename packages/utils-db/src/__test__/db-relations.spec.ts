@@ -120,10 +120,10 @@ class InMemoryAdapter extends BaseDbAdapter {
 
   private _matchFilter(row: Record<string, unknown>, filter: Record<string, unknown>): boolean {
     if ('$and' in filter) {
-      return (filter.$and as Record<string, unknown>[]).every(f => this._matchFilter(row, f))
+      return (filter.$and as Array<Record<string, unknown>>).every(f => this._matchFilter(row, f))
     }
     if ('$or' in filter) {
-      return (filter.$or as Record<string, unknown>[]).some(f => this._matchFilter(row, f))
+      return (filter.$or as Array<Record<string, unknown>>).some(f => this._matchFilter(row, f))
     }
     return Object.entries(filter).every(([key, condition]) => {
       if (typeof condition === 'object' && condition !== null) {

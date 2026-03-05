@@ -312,7 +312,7 @@ function deserializeNode(data: TSerializedAnnotatedTypeInner): TAtscriptAnnotate
 }
 
 function deserializeTypeDef(t: TSerializedTypeDef): TAtscriptTypeDef {
-  const tags = new Set(t.tags) as Set<AtscriptPrimitiveTags>
+  const tags = ('tags' in t ? new Set(t.tags) : new Set()) as Set<AtscriptPrimitiveTags>
 
   switch (t.kind) {
     case '': {

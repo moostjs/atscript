@@ -1692,7 +1692,7 @@ export class AtscriptDbTable<
       // WithRelation is a Uniquery — pass filter + controls directly
       const filter = withRel.filter && Object.keys(withRel.filter).length > 0
         ? withRel.filter : undefined
-      const relQuery: TRelationQuery = { filter, controls: withRel.controls || {} }
+      const relQuery: TRelationQuery = { filter, controls: (withRel.controls || {}) as Record<string, unknown> }
 
       if (relation.direction === 'to') {
         tasks.push(this._loadToRelation(rows, { relName, relation, targetTable, relQuery }))

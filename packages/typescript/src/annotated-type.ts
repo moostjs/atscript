@@ -397,7 +397,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
           configurable: true,
         })
       } else {
-        throw new Error(`${type} is not annotated type`)
+        throw new TypeError(`${type} is not annotated type`)
       }
       return this
     },

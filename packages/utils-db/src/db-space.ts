@@ -64,9 +64,9 @@ export class DbSpace {
         type,
         adapter as any,
         logger || this.logger,
-        (t) => this.getTable(t)
+        (t) => this.getTable(t) as any
       )
-      this._tables.set(type, table)
+      this._tables.set(type, table as AtscriptDbTable)
     }
     return table
   }

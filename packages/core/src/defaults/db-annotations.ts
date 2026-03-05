@@ -21,7 +21,7 @@ import { findFKFieldsPointingTo } from './db-utils'
 function getDbTableOwner(token: Token): SemanticNode | undefined {
   const field = token.parentNode!
   const struct = field.ownerNode
-  if (!struct || !isStructure(struct)) return undefined
+  if (!struct || !isStructure(struct)) { return undefined }
   const iface = struct.ownerNode
   return (iface && isInterface(iface)) ? iface : struct
 }
@@ -40,7 +40,7 @@ function getParentStruct(token: Token): SemanticStructureNode | undefined {
  */
 function getParentTypeName(token: Token): string | undefined {
   const struct = getParentStruct(token)
-  if (!struct) return undefined
+  if (!struct) { return undefined }
   const iface = struct.ownerNode
   return (iface && isInterface(iface)) ? iface.id! : struct.id
 }
@@ -51,8 +51,8 @@ function getParentTypeName(token: Token): string | undefined {
  */
 function getNavTargetTypeName(field: SemanticNode): string | undefined {
   let def = field.getDefinition()
-  if (isArray(def)) def = def?.getDefinition()
-  if (isRef(def)) return def.id!
+  if (isArray(def)) { def = def?.getDefinition() }
+  if (isRef(def)) { return def.id! }
   return undefined
 }
 
@@ -61,7 +61,7 @@ function getNavTargetTypeName(field: SemanticNode): string | undefined {
  */
 function getAnnotationAlias(prop: SemanticNode, annotationName: string): string | undefined {
   const annotations = prop.annotations?.filter(a => a.name === annotationName)
-  if (!annotations || annotations.length === 0) return undefined
+  if (!annotations || annotations.length === 0) { return undefined }
   return annotations[0].args.length > 0 ? annotations[0].args[0].text : undefined
 }
 
@@ -129,10 +129,10 @@ function refActionAnnotation(name: 'onDelete' | 'onUpdate'): AnnotationSpec {
           const annotationName = `db.rel.${name}`
           let count = 0
           for (const [, prop] of struct.props) {
-            if (prop.countAnnotations('db.rel.FK') === 0) continue
-            if (prop.countAnnotations(annotationName) === 0) continue
+            if (prop.countAnnotations('db.rel.FK') === 0) { continue }
+            if (prop.countAnnotations(annotationName) === 0) { continue }
             const propFkAlias = getAnnotationAlias(prop, 'db.rel.FK')
-            if (propFkAlias === fkAlias) count++
+            if (propFkAlias === fkAlias) { count++ }
           }
           if (count > 1) {
             errors.push({
@@ -592,16 +592,16 @@ export const dbAnnotations: TAnnotationsTree = {
           if (struct) {
             let sameTargetCount = 0
             for (const [, prop] of struct.props) {
-              if (prop.countAnnotations('db.rel.FK') === 0) continue
+              if (prop.countAnnotations('db.rel.FK') === 0) { continue }
               const def = prop.getDefinition()
-              if (!def || !isRef(def)) continue
+              if (!def || !isRef(def)) { continue }
               const r = def as SemanticRefNode
-              if (!r.hasChain) continue
+              if (!r.hasChain) { continue }
               if (r.id === refTypeName) {
                 // Check if this FK also has no alias
                 const fkAnnotations = prop.annotations?.filter(a => a.name === 'db.rel.FK')
                 const hasAlias = fkAnnotations?.some(a => a.args.length > 0)
-                if (!hasAlias) sameTargetCount++
+                if (!hasAlias) { sameTargetCount++ }
               }
             }
             if (sameTargetCount > 1) {
@@ -697,8 +697,8 @@ export const dbAnnotations: TAnnotationsTree = {
           // T6: Duplicate .to with same alias/target
           const fieldName = field.id
           for (const [name, prop] of struct.props) {
-            if (name === fieldName) continue
-            if (prop.countAnnotations('db.rel.to') === 0) continue
+            if (name === fieldName) { continue }
+            if (prop.countAnnotations('db.rel.to') === 0) { continue }
             const propAlias = getAnnotationAlias(prop, 'db.rel.to')
             if ((alias || undefined) === (propAlias || undefined)) {
               const otherTarget = getNavTargetTypeName(prop)
@@ -815,8 +815,8 @@ export const dbAnnotations: TAnnotationsTree = {
         if (struct) {
           const fieldName = field.id
           for (const [name, prop] of struct.props) {
-            if (name === fieldName) continue
-            if (prop.countAnnotations('db.rel.from') === 0) continue
+            if (name === fieldName) { continue }
+            if (prop.countAnnotations('db.rel.from') === 0) { continue }
             const propAlias = getAnnotationAlias(prop, 'db.rel.from')
             if ((alias || undefined) === (propAlias || undefined)) {
               const otherTarget = getNavTargetTypeName(prop)
