@@ -36,4 +36,20 @@ export interface ArraysCollection {
         value: string
         attribute: string
     }[]
+
+    singleKey: {
+        @expect.array.key
+        id: string
+        value: string
+        label?: string
+    }[]
+
+    @expect.array.uniqueItems
+    uniquePrimitive: string[]
+
+    @expect.array.uniqueItems
+    uniqueObjects: {
+        name: string
+        score: number
+    }[]
 }

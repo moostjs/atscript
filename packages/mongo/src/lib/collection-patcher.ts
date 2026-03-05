@@ -7,6 +7,7 @@ import type {
   Validator,
 } from '@atscript/typescript/utils'
 import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
+import { getKeyProps } from '@atscript/utils-db'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 
 import { validateMongoIdPlugin } from './validate-plugins'
@@ -48,27 +49,7 @@ export class CollectionPatcher {
     private payload: any
   ) {}
 
-  /**
-   * Extract a set of *key properties* (annotated with `@expect.array.key`) from an
-   * array‐of‐objects type definition. These keys uniquely identify an element
-   * inside the array and are later used for `$update`, `$remove` and `$upsert`.
-   *
-   * @param def Atscript array type
-   * @returns Set of property names marked as keys; empty set if none
-   */
-  static getKeyProps(def: TAtscriptAnnotatedType<TAtscriptTypeArray>) {
-    if (def.type.of.type.kind === 'object') {
-      const objType = def.type.of.type
-      const keyProps = new Set<string>()
-      for (const [key, val] of objType.props.entries()) {
-        if (val.metadata.get('expect.array.key')) {
-          keyProps.add(key)
-        }
-      }
-      return keyProps
-    }
-    return new Set<string>()
-  }
+  static getKeyProps = getKeyProps
 
   /**
    * Build a runtime *Validator* that understands the extended patch payload.
@@ -178,6 +159,9 @@ export class CollectionPatcher {
   /** MongoDB *update* document being built. */
   private updatePipeline = [] as Document[]
 
+  /** Current `$set` stage being populated. */
+  private currentSetStage: Document | null = null
+
   /** Additional *options* (mainly `arrayFilters`). */
   private optionsObj = {} as UpdateOptions
 
@@ -217,20 +201,13 @@ export class CollectionPatcher {
    * @private
    */
   private _set(key: string, val: any) {
-    for (const pipe of this.updatePipeline) {
-      if (!pipe.$set) {
-        pipe.$set = {}
-      }
-      if (!pipe.$set[key]) {
-        pipe.$set[key] = val
-        return
-      }
+    if (this.currentSetStage && !(key in this.currentSetStage.$set)) {
+      this.currentSetStage.$set[key] = val
+      return
     }
-    this.updatePipeline.push({
-      $set: {
-        [key]: val,
-      },
-    })
+    // Key collision or no current stage — start a new $set stage
+    this.currentSetStage = { $set: { [key]: val } }
+    this.updatePipeline.push(this.currentSetStage)
   }
 
   /**
@@ -249,10 +226,10 @@ export class CollectionPatcher {
       // @ts-expect-error
       const topLevelArray = flatType?.metadata?.get('db.mongo.__topLevelArray') as boolean | undefined
       if (typeof value === 'object' && topLevelArray) {
-        this.parseArrayPatch(key, value)
+        this.parseArrayPatch(key, value, flatType!)
       } else if (
         typeof value === 'object' &&
-        this.collection.flatMap.get(key)?.metadata?.get('db.patch.strategy') === 'merge'
+        flatType?.metadata?.get('db.patch.strategy') === 'merge'
       ) {
         this.flattenPayload(value, key)
       } else if (key !== '_id') {
@@ -270,8 +247,7 @@ export class CollectionPatcher {
    * @param value Payload slice for that field
    * @private
    */
-  private parseArrayPatch(key: string, value: any) {
-    const flatType = this.collection.flatMap.get(key)
+  private parseArrayPatch(key: string, value: any, flatType: TAtscriptAnnotatedType) {
     const toRemove = value.$remove as any[] | undefined
     const toReplace = value.$replace as any[] | undefined
     const toInsert = value.$insert as any[] | undefined
@@ -279,15 +255,16 @@ export class CollectionPatcher {
     const toUpdate = value.$update as any[] | undefined
 
     const keyProps =
-      flatType?.type.kind === 'array'
-        ? CollectionPatcher.getKeyProps(flatType as TAtscriptAnnotatedType<TAtscriptTypeArray>)
+      flatType.type.kind === 'array'
+        ? getKeyProps(flatType as TAtscriptAnnotatedType<TAtscriptTypeArray>)
         : new Set<string>()
+    const keys = keyProps.size > 0 ? [...keyProps] : []
 
-    this._remove(key, toRemove, keyProps)
+    this._remove(key, toRemove, keys, flatType)
     this._replace(key, toReplace)
-    this._insert(key, toInsert, keyProps)
-    this._upsert(key, toUpsert, keyProps)
-    this._update(key, toUpdate, keyProps)
+    this._insert(key, toInsert, keys, flatType)
+    this._upsert(key, toUpsert, keys, flatType)
+    this._update(key, toUpdate, keys, flatType)
   }
 
   /**
@@ -302,12 +279,8 @@ export class CollectionPatcher {
    * @param right Base token for *right* expression (e.g. `"$$this"`)
    */
   private _keysEqual(keys: string[], left: string, right: string): any {
-    return (
-      keys
-        .map(k => ({ $eq: [`${left}.${k}`, `${right}.${k}`] }))
-        // @ts-expect-error
-        .reduce((acc, cur) => (acc ? { $and: [acc, cur] } : cur))
-    )
+    const eqs = keys.map(k => ({ $eq: [`${left}.${k}`, `${right}.${k}`] }))
+    return eqs.length === 1 ? eqs[0] : { $and: eqs }
   }
 
   // ---------------------------------------------------------------------------
@@ -332,15 +305,15 @@ export class CollectionPatcher {
    * - plain append      → $concatArrays
    * - unique / keyed    → delegate to _upsert (insert-or-update)
    */
-  private _insert(key: string, input: any[] | undefined, keyProps: Set<string>) {
+  private _insert(key: string, input: any[] | undefined, keys: string[], flatType: TAtscriptAnnotatedType) {
     if (!input?.length) {
       return
     }
 
-    const uniqueItems = this.collection.flatMap.get(key)?.metadata?.has('expect.array.uniqueItems')
+    const uniqueItems = flatType.metadata?.has('expect.array.uniqueItems')
 
-    if (uniqueItems || keyProps.size > 0) {
-      this._upsert(key, input, keyProps)
+    if (uniqueItems || keys.length > 0) {
+      this._upsert(key, input, keys, flatType)
     } else {
       // classic `$push ... $each`  →  $concatArrays
       this._set(key, {
@@ -357,14 +330,13 @@ export class CollectionPatcher {
    * - keyed  → remove existing matching by key(s) then append candidate
    * - unique → $setUnion (deep equality)
    */
-  private _upsert(key: string, input: any[] | undefined, keyProps: Set<string>) {
+  private _upsert(key: string, input: any[] | undefined, keys: string[], _flatType: TAtscriptAnnotatedType) {
     if (!input?.length) {
       return
     }
 
     // ── keyed upsert ──────────────────────────────────────────────────────────
-    if (keyProps.size > 0) {
-      const keys = [...keyProps]
+    if (keys.length > 0) {
       this._set(key, {
         $reduce: {
           input, // literal payload
@@ -402,16 +374,14 @@ export class CollectionPatcher {
    * - keyed       → map array and merge / replace matching element(s)
    * - non-keyed   → behave like `$addToSet` (insert only when not present)
    */
-  private _update(key: string, input: any[] | undefined, keyProps: Set<string>) {
+  private _update(key: string, input: any[] | undefined, keys: string[], flatType: TAtscriptAnnotatedType) {
     if (!input?.length) {
       return
     }
 
-    if (keyProps.size > 0) {
-      const mergeStrategy =
-        this.collection.flatMap.get(key)?.metadata?.get('db.patch.strategy') === 'merge'
+    if (keys.length > 0) {
+      const mergeStrategy = flatType.metadata?.get('db.patch.strategy') === 'merge'
 
-      const keys = [...keyProps]
       // sequentially apply each patch item
       this._set(key, {
         $reduce: {
@@ -447,13 +417,12 @@ export class CollectionPatcher {
    * - keyed     → filter out any element whose key set matches a payload item
    * - non-keyed → deep equality remove (`$setDifference`)
    */
-  private _remove(key: string, input: any[] | undefined, keyProps: Set<string>) {
+  private _remove(key: string, input: any[] | undefined, keys: string[], _flatType: TAtscriptAnnotatedType) {
     if (!input?.length) {
       return
     }
 
-    if (keyProps.size > 0) {
-      const keys = [...keyProps]
+    if (keys.length > 0) {
       this._set(key, {
         $let: {
           vars: { rem: input },

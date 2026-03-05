@@ -38,6 +38,16 @@ export declare class ArraysCollection {
     value: string
     attribute: string
   }[]
+  singleKey: {
+    id: string
+    value: string
+    label?: string
+  }[]
+  uniquePrimitive: string[]
+  uniqueObjects: {
+    name: string
+    score: number
+  }[]
   _id: string /* objectId */
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof ArraysCollection, ArraysCollection>
@@ -68,6 +78,14 @@ export declare class ArraysCollection {
     "withoutKeyMerge.key": string
     "withoutKeyMerge.value": string
     "withoutKeyMerge.attribute": string
+    "singleKey": never
+    "singleKey.id": string
+    "singleKey.value": string
+    "singleKey.label"?: string
+    "uniquePrimitive": string[]
+    "uniqueObjects": never
+    "uniqueObjects.name": string
+    "uniqueObjects.score": number
     "_id": string /* objectId */
   }
   static __pk: string /* objectId */

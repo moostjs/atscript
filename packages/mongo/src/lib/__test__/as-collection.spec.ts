@@ -1169,3 +1169,627 @@ describe('[mongo] AsCollection with arrays', () => {
     expect(result[2]).toEqual({})
   })
 })
+
+describe('[mongo] CollectionPatcher — $upsert', () => {
+  beforeAll(prepareFixtures)
+
+  it('[OBJECT_WITH_KEY] upsert keyed array', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withKey: {
+        $upsert: [
+          { key1: '1', key2: '2', value: 'new', attribute: 'attr' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "withKey": {
+              "$reduce": {
+                "in": {
+                  "$let": {
+                    "in": {
+                      "$concatArrays": [
+                        {
+                          "$filter": {
+                            "as": "el",
+                            "cond": {
+                              "$not": {
+                                "$and": [
+                                  {
+                                    "$eq": [
+                                      "$$el.key1",
+                                      "$$cand.key1",
+                                    ],
+                                  },
+                                  {
+                                    "$eq": [
+                                      "$$el.key2",
+                                      "$$cand.key2",
+                                    ],
+                                  },
+                                ],
+                              },
+                            },
+                            "input": "$$acc",
+                          },
+                        },
+                        [
+                          "$$cand",
+                        ],
+                      ],
+                    },
+                    "vars": {
+                      "acc": "$$value",
+                      "cand": "$$this",
+                    },
+                  },
+                },
+                "initialValue": {
+                  "$ifNull": [
+                    "$withKey",
+                    [],
+                  ],
+                },
+                "input": [
+                  {
+                    "attribute": "attr",
+                    "key1": "1",
+                    "key2": "2",
+                    "value": "new",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[OBJECT_WITHOUT_KEY] upsert without keys uses $setUnion', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withoutKey: {
+        $upsert: [
+          { key: 'a', value: 'b', attribute: 'c' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "withoutKey": {
+              "$setUnion": [
+                {
+                  "$ifNull": [
+                    "$withoutKey",
+                    [],
+                  ],
+                },
+                [
+                  {
+                    "attribute": "c",
+                    "key": "a",
+                    "value": "b",
+                  },
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[PRIMITIVE] upsert without keys uses $setUnion', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $upsert: ['x', 'y'],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "primitive": {
+              "$setUnion": [
+                {
+                  "$ifNull": [
+                    "$primitive",
+                    [],
+                  ],
+                },
+                [
+                  "x",
+                  "y",
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+})
+
+describe('[mongo] CollectionPatcher — single key', () => {
+  beforeAll(prepareFixtures)
+
+  it('[SINGLE_KEY] upsert produces bare $eq (no $and wrapper)', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      singleKey: {
+        $upsert: [
+          { id: '1', value: 'a' },
+        ],
+      },
+    }).updateFilter
+
+    // Single key should produce { $eq: [...] } instead of { $and: [{ $eq: [...] }] }
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "singleKey": {
+              "$reduce": {
+                "in": {
+                  "$let": {
+                    "in": {
+                      "$concatArrays": [
+                        {
+                          "$filter": {
+                            "as": "el",
+                            "cond": {
+                              "$not": {
+                                "$eq": [
+                                  "$$el.id",
+                                  "$$cand.id",
+                                ],
+                              },
+                            },
+                            "input": "$$acc",
+                          },
+                        },
+                        [
+                          "$$cand",
+                        ],
+                      ],
+                    },
+                    "vars": {
+                      "acc": "$$value",
+                      "cand": "$$this",
+                    },
+                  },
+                },
+                "initialValue": {
+                  "$ifNull": [
+                    "$singleKey",
+                    [],
+                  ],
+                },
+                "input": [
+                  {
+                    "id": "1",
+                    "value": "a",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[SINGLE_KEY] update produces bare $eq', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      singleKey: {
+        $update: [
+          { id: '1', value: 'updated' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "singleKey": {
+              "$reduce": {
+                "in": {
+                  "$map": {
+                    "as": "el",
+                    "in": {
+                      "$cond": [
+                        {
+                          "$eq": [
+                            "$$el.id",
+                            "$$this.id",
+                          ],
+                        },
+                        "$$this",
+                        "$$el",
+                      ],
+                    },
+                    "input": "$$value",
+                  },
+                },
+                "initialValue": {
+                  "$ifNull": [
+                    "$singleKey",
+                    [],
+                  ],
+                },
+                "input": [
+                  {
+                    "id": "1",
+                    "value": "updated",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[SINGLE_KEY] remove produces bare $eq', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      singleKey: {
+        $remove: [
+          { id: '1' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "singleKey": {
+              "$let": {
+                "in": {
+                  "$filter": {
+                    "as": "el",
+                    "cond": {
+                      "$not": {
+                        "$anyElementTrue": {
+                          "$map": {
+                            "as": "r",
+                            "in": {
+                              "$eq": [
+                                "$$el.id",
+                                "$$r.id",
+                              ],
+                            },
+                            "input": "$$rem",
+                          },
+                        },
+                      },
+                    },
+                    "input": {
+                      "$ifNull": [
+                        "$singleKey",
+                        [],
+                      ],
+                    },
+                  },
+                },
+                "vars": {
+                  "rem": [
+                    {
+                      "id": "1",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      ]
+    `)
+  })
+})
+
+describe('[mongo] CollectionPatcher — uniqueItems', () => {
+  beforeAll(prepareFixtures)
+
+  it('[UNIQUE_PRIMITIVE] $insert delegates to $setUnion', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      uniquePrimitive: {
+        $insert: ['a', 'b'],
+      },
+    }).updateFilter
+
+    // uniqueItems + $insert should use $setUnion (not $concatArrays)
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "uniquePrimitive": {
+              "$setUnion": [
+                {
+                  "$ifNull": [
+                    "$uniquePrimitive",
+                    [],
+                  ],
+                },
+                [
+                  "a",
+                  "b",
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[UNIQUE_OBJECTS] $insert delegates to $setUnion', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      uniqueObjects: {
+        $insert: [{ name: 'a', score: 1 }],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "uniqueObjects": {
+              "$setUnion": [
+                {
+                  "$ifNull": [
+                    "$uniqueObjects",
+                    [],
+                  ],
+                },
+                [
+                  {
+                    "name": "a",
+                    "score": 1,
+                  },
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+})
+
+describe('[mongo] CollectionPatcher — withoutKeyMerge', () => {
+  beforeAll(prepareFixtures)
+
+  it('[WITHOUT_KEY_MERGE] $update uses $setUnion (no keys)', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withoutKeyMerge: {
+        $update: [
+          { key: '1', value: 'a', attribute: 'x' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "withoutKeyMerge": {
+              "$setUnion": [
+                {
+                  "$ifNull": [
+                    "$withoutKeyMerge",
+                    [],
+                  ],
+                },
+                [
+                  {
+                    "attribute": "x",
+                    "key": "1",
+                    "value": "a",
+                  },
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+
+  it('[WITHOUT_KEY_MERGE] $remove uses $setDifference', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withoutKeyMerge: {
+        $remove: [
+          { key: '1', value: 'a', attribute: 'x' },
+        ],
+      },
+    }).updateFilter
+
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "withoutKeyMerge": {
+              "$setDifference": [
+                {
+                  "$ifNull": [
+                    "$withoutKeyMerge",
+                    [],
+                  ],
+                },
+                [
+                  {
+                    "attribute": "x",
+                    "key": "1",
+                    "value": "a",
+                  },
+                ],
+              ],
+            },
+          },
+        },
+      ]
+    `)
+  })
+})
+
+describe('[mongo] CollectionPatcher — edge cases', () => {
+  beforeAll(prepareFixtures)
+
+  it('empty array operations are no-ops', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+
+    // $insert with empty array
+    const insertResult = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $insert: [],
+      },
+    }).updateFilter
+    expect(insertResult).toEqual([])
+
+    // $remove with empty array
+    const removeResult = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $remove: [],
+      },
+    }).updateFilter
+    expect(removeResult).toEqual([])
+
+    // $upsert with empty array
+    const upsertResult = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $upsert: [],
+      },
+    }).updateFilter
+    expect(upsertResult).toEqual([])
+
+    // $update with empty array
+    const updateResult = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $update: [],
+      },
+    }).updateFilter
+    expect(updateResult).toEqual([])
+  })
+
+  it('multiple operations on same array create separate pipeline stages', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      withKey: {
+        $remove: [{ key1: 'old', key2: 'old' }],
+        $insert: [{ key1: 'new', key2: 'new', value: 'v', attribute: 'a' }],
+      },
+    }).updateFilter
+
+    // $remove and $insert (→upsert) on same key should produce separate $set stages
+    expect(result).toHaveLength(2)
+    expect(result[0].$set).toHaveProperty('withKey')
+    expect(result[1].$set).toHaveProperty('withKey')
+  })
+
+  it('multiple array fields in one patch', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $replace: ['a', 'b'],
+      },
+      withoutKey: {
+        $replace: [{ key: '1', value: 'v' }],
+      },
+    }).updateFilter
+
+    // Both fields should appear in the same $set stage (no key collision)
+    expect(result).toMatchInlineSnapshot(`
+      [
+        {
+          "$set": {
+            "primitive": [
+              "a",
+              "b",
+            ],
+            "withoutKey": [
+              {
+                "key": "1",
+                "value": "v",
+              },
+            ],
+          },
+        },
+      ]
+    `)
+  })
+
+  it('filter contains prepared _id', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const id = new ObjectId()
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: id,
+      primitive: { $replace: ['x'] },
+    })
+
+    expect(result.filter).toEqual({ _id: id })
+  })
+
+  it('filter contains prepared string _id', async () => {
+    const { MinimalCollectionString } = await import('./fixtures/simple-collection.as.js')
+    const id = 'a'.repeat(24)
+    const result = prepareUpdate(mongo, MinimalCollectionString, {
+      _id: id,
+      name: 'test',
+    })
+
+    expect(result.filter).toEqual({ _id: id })
+  })
+
+  it('mixed scalar fields and array operations', async () => {
+    const { ArraysCollection } = await import('./fixtures/arrays-collection.as.js')
+    const result = prepareUpdate(mongo, ArraysCollection, {
+      _id: new ObjectId(),
+      primitive: {
+        $replace: ['a'],
+      },
+      singleKey: {
+        $upsert: [{ id: '1', value: 'v' }],
+      },
+    }).updateFilter
+
+    // Different array fields should coexist in one $set stage
+    expect(result).toHaveLength(1)
+    expect(result[0].$set).toHaveProperty('primitive')
+    expect(result[0].$set).toHaveProperty('singleKey')
+  })
+})

@@ -139,6 +139,56 @@ $("object", ArraysCollection)
       .annotate("db.patch.strategy", "merge")
       .$type
   ).prop(
+    "singleKey",
+    $("array")
+      .of($("object")
+          .prop(
+            "id",
+            $().designType("string")
+              .tags("string")
+              .annotate("expect.array.key", { })
+              .$type
+          ).prop(
+            "value",
+            $().designType("string")
+              .tags("string")
+              .$type
+          ).prop(
+            "label",
+            $().designType("string")
+              .tags("string")
+              .optional()
+              .$type
+          )
+          .$type)
+      .$type
+  ).prop(
+    "uniquePrimitive",
+    $("array")
+      .of($().designType("string")
+          .tags("string")
+          .$type)
+      .annotate("expect.array.uniqueItems", { })
+      .$type
+  ).prop(
+    "uniqueObjects",
+    $("array")
+      .of($("object")
+          .prop(
+            "name",
+            $().designType("string")
+              .tags("string")
+              .$type
+          ).prop(
+            "score",
+            $().designType("number")
+              .tags("number")
+              .$type
+          )
+          .$type)
+      .annotate("expect.array.uniqueItems", { })
+      .$type
+  ).prop(
     "_id",
     $().designType("string")
       .tags("objectId", "mongo")

@@ -424,6 +424,7 @@ export default defineConfig({
           text: 'MongoDB',
           items: [
             { text: 'Guide', link: '/db-adapters/mongodb' },
+            { text: 'Patch Pipelines', link: '/db-adapters/mongodb-patches' },
             { text: 'Annotations', link: '/db-adapters/mongodb-annotations' },
             { text: 'Search & Vectors', link: '/db-adapters/mongodb-search' },
           ],

@@ -105,25 +105,20 @@ function decomposeArrayPatch(
   // that the adapter's updateOne can interpret.
   // Adapters without native patch support get a simplified view.
   if (value.$insert !== undefined) {
-    // Best-effort: store as a concat instruction
     update[`${key}.__$insert`] = value.$insert
   }
   if (value.$upsert !== undefined) {
     update[`${key}.__$upsert`] = value.$upsert
-    if (keyProps.size > 0) {
-      update[`${key}.__$keys`] = [...keyProps]
-    }
   }
   if (value.$update !== undefined) {
     update[`${key}.__$update`] = value.$update
-    if (keyProps.size > 0) {
-      update[`${key}.__$keys`] = [...keyProps]
-    }
   }
   if (value.$remove !== undefined) {
     update[`${key}.__$remove`] = value.$remove
-    if (keyProps.size > 0) {
-      update[`${key}.__$keys`] = [...keyProps]
-    }
+  }
+
+  // Store key props once if any keyed operation is present
+  if (keyProps.size > 0 && (value.$upsert !== undefined || value.$update !== undefined || value.$remove !== undefined)) {
+    update[`${key}.__$keys`] = [...keyProps]
   }
 }

@@ -4,7 +4,7 @@
 DB Adapters are experimental. APIs may change at any moment.
 :::
 
-When updating records that contain arrays, simple field replacement isn't always sufficient. Atscript's DB layer supports structured patch operations that let you insert, update, upsert, and remove individual array elements.
+When updating records that contain arrays, simple field replacement isn't always sufficient. Atscript's DB layer defines structured patch operations that let you insert, update, upsert, and remove individual array elements. Currently, **only MongoDB supports the full set of patch operators** — see [Adapter Support](#adapter-support) for details.
 
 ## Array Patch Operators
 
@@ -124,22 +124,43 @@ items: OrderItem[]
 `@expect.array.uniqueItems` works with both primitive arrays (e.g., `string[]` — checked by deep equality) and object arrays (checked by key fields if defined, otherwise by deep equality).
 :::
 
-## Native vs Decomposed Patches
+## Adapter Support
 
-How patches are executed depends on the database adapter:
+::: warning Not all adapters support all patch operators
+Array patch operations beyond `$replace` are **currently only supported by MongoDB**. Check the support matrix below before using patch operators.
+:::
 
-- **Native patch** — If the adapter supports native array operations (e.g., MongoDB's `$push`, `$pull`, `$set`), the patch is passed directly to the adapter. The adapter's `supportsNativePatch()` returns `true`.
+| Operator | MongoDB | SQLite / Relational (embedded JSON) | Relational (child tables) |
+|----------|---------|-------------------------------------|---------------------------|
+| `$replace` | Yes | Yes | _Planned_ |
+| `$insert` | Yes | No | _Planned_ |
+| `$upsert` | Yes | No | _Planned_ |
+| `$update` | Yes | No | _Planned_ |
+| `$remove` | Yes | No | _Planned_ |
 
-- **Decomposed patch** — If the adapter doesn't support native array operations (e.g., SQLite), patches are decomposed into flat update operations using `decomposePatch()`. This converts the structured patch into a format the adapter can execute.
+### MongoDB (native patches)
 
-```typescript
-import { decomposePatch } from '@atscript/utils-db'
+MongoDB supports all five patch operators natively. The adapter translates them into aggregation pipeline expressions (`$reduce`, `$filter`, `$concatArrays`, `$setUnion`, `$setDifference`) executed atomically in a single `updateOne` call. See [MongoDB Patch Pipelines](./mongodb-patches) for implementation details.
 
-// Converts patch operators into flat update data
-const flatData = decomposePatch(payload, table)
-```
+### Relational adapters — embedded JSON columns
 
-## Patch Types
+Relational adapters like SQLite store arrays as JSON columns. In this mode, only **`$replace`** is supported — it replaces the entire JSON value. The granular operators (`$insert`, `$upsert`, `$update`, `$remove`) are **not supported** because the adapter has no way to manipulate individual elements within a JSON column.
+
+If you need granular array operations on a relational database, use `$replace` with the full updated array, or wait for child table support (see below).
+
+### Relational adapters — child tables (planned)
+
+In the future, relational adapters will support arrays modeled as **child tables** (one-to-many relations with foreign keys). In this mode, all five patch operators will be supported and translated into standard SQL DML:
+
+- `$insert` → `INSERT INTO child_table ...`
+- `$upsert` → `INSERT ... ON CONFLICT DO UPDATE`
+- `$update` → `UPDATE child_table WHERE key = ...`
+- `$remove` → `DELETE FROM child_table WHERE key = ...`
+- `$replace` → `DELETE all + INSERT`
+
+This feature is not yet implemented.
+
+## TypeScript Types
 
 ```typescript
 import type { TArrayPatch, TDbPatch } from '@atscript/utils-db'

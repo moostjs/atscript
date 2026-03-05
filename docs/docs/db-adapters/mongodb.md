@@ -299,6 +299,7 @@ const collection = adapter.collection
 ## See Also
 
 - [Core Annotations](./annotations) -- `@db.table`, `@db.index.*`, `@db.default.*`, `@db.json`
+- [MongoDB Patch Operations](./mongodb-patches) -- Array patch pipelines, merge/replace strategies
 - [MongoDB Annotations](./mongodb-annotations) -- `@db.mongo.collection`, `@db.mongo.search.*`
 - [Search & Vectors](./mongodb-search) -- Atlas Search and vector search indexes
 - [DB Tables](./tables) -- `AtscriptDbTable` API reference
