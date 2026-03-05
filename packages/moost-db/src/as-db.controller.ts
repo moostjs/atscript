@@ -1,7 +1,6 @@
-import type { Validator } from '@atscript/typescript/utils'
 import {
-  ValidatorError,
   serializeAnnotatedType,
+  type Validator,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
 } from '@atscript/typescript/utils'
@@ -11,6 +10,7 @@ import { Inject, Moost, Param, type TConsoleBase } from 'moost'
 import { parseUrl } from '@uniqu/url'
 
 import { TABLE_DEF } from './decorators'
+import { UseValidationErrorTransform } from './validation-interceptor'
 import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/controls.dto.as'
 
 /**
@@ -25,6 +25,7 @@ import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/con
  * export class MyController extends AsDbController<typeof MyType> {}
  * ```
  */
+@UseValidationErrorTransform()
 export class AsDbController<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
@@ -104,15 +105,13 @@ export class AsDbController<
     controls: Record<string, unknown>,
     type: 'query' | 'pages' | 'getOne'
   ): string | undefined {
-    const validators = {
-      query: this.queryControlsValidator,
-      pages: this.pagesControlsValidator,
-      getOne: this.getOneControlsValidator,
-    } as const
-    try {
-      validators[type]?.validate(controls)
-    } catch (error) {
-      return (error as Error).message
+    const v = type === 'query'
+      ? this.queryControlsValidator
+      : type === 'pages'
+        ? this.pagesControlsValidator
+        : this.getOneControlsValidator
+    if (!v.validate(controls, true)) {
+      return v.errors[0]?.message || 'Invalid controls'
     }
     return undefined
   }
@@ -183,8 +182,8 @@ export class AsDbController<
   // ── Helpers ────────────────────────────────────────────────────────────
 
   protected parseQueryString(url: string) {
-    const qs = url.split('?').slice(1).join('?')
-    return parseUrl(qs)
+    const idx = url.indexOf('?')
+    return parseUrl(idx >= 0 ? url.slice(idx + 1) : '')
   }
 
   protected async returnOne(
@@ -241,9 +240,9 @@ export class AsDbController<
     | {
         data: DataType[]
         page: number
-        size: number
-        totalPages: number
-        totalDocuments: number
+        itemsPerPage: number
+        pages: number
+        count: number
       }
     | HttpError
   > {
@@ -278,9 +277,9 @@ export class AsDbController<
     return {
       data: result.data,
       page,
-      size,
-      totalPages: Math.ceil(result.count / size),
-      totalDocuments: result.count,
+      itemsPerPage: size,
+      pages: Math.ceil(result.count / size),
+      count: result.count,
     }
   }
 
@@ -291,7 +290,7 @@ export class AsDbController<
   async getOne(
     @Param('id') id: string,
     @Url() url: string
-  ): Promise<DataType | HttpError | ValidatorError> {
+  ): Promise<DataType | HttpError> {
     const parsed = this.parseQueryString(url)
 
     if (Object.keys(parsed.filter).length > 0) {
@@ -313,24 +312,17 @@ export class AsDbController<
    */
   @Post('')
   async insert(@Body() payload: unknown): Promise<HttpError | unknown> {
-    const validator = this.table.getValidator('insert')
     const arr = Array.isArray(payload) ? payload : [payload]
-
-    for (const item of arr) {
-      if (!validator.validate(item)) {
-        return new HttpError(400, 'Validation failed')
-      }
-    }
 
     if (arr.length === 1) {
       const data = await this.onWrite('insert', arr[0])
       if (data === undefined) { return new HttpError(500, 'Not saved') }
-      return this.table.insertOne(data as any)
+      return await this.table.insertOne(data as any)
     }
 
     const data = await this.onWrite('insertMany', arr)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
-    return this.table.insertMany(data as any)
+    return await this.table.insertMany(data as any)
   }
 
   /**
@@ -338,14 +330,9 @@ export class AsDbController<
    */
   @Put('')
   async replace(@Body() payload: unknown): Promise<HttpError | unknown> {
-    const validator = this.table.getValidator('update')
-    if (!validator.validate(payload)) {
-      return new HttpError(400, 'Validation failed')
-    }
-
     const data = await this.onWrite('replace', payload)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
-    return this.table.replaceOne(data as any)
+    return await this.table.replaceOne(data as any)
   }
 
   /**
@@ -353,14 +340,9 @@ export class AsDbController<
    */
   @Patch('')
   async update(@Body() payload: unknown): Promise<HttpError | unknown> {
-    const validator = this.table.getValidator('patch')
-    if (!validator.validate(payload)) {
-      return new HttpError(400, 'Validation failed')
-    }
-
     const data = await this.onWrite('update', payload)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
-    return this.table.updateOne(data as any)
+    return await this.table.updateOne(data as any)
   }
 
   /**

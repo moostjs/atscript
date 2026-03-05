@@ -1,10 +1,10 @@
 # Queries & Filters
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
-`AtscriptDbTable` uses a MongoDB-style filter syntax for queries. Filters and controls are wrapped in a `Uniquery` object — a canonical query format provided by [`@uniqu/core`](https://github.com/niceguymissing/uniqu).
+`AtscriptDbTable` uses a MongoDB-style filter syntax for queries. Filters and controls are wrapped in a `Uniquery` object — a canonical query format provided by [`@uniqu/core`](https://github.com/moostjs/uniqu).
 
 ## Uniquery Format
 
@@ -296,7 +296,51 @@ Sorting by a parent object path (e.g., `$sort: { contact: 1 }`) is silently igno
 Dot-notation paths work only for **flattened** nested fields (those stored as separate `__`-separated columns). Sub-paths of `@db.json` fields cannot be queried at the generic layer — the data is stored as a single JSON string.
 :::
 
-See [Embedded Objects](./db-table#embedded-objects) for how nested objects are stored.
+See [Embedded Objects](./tables#embedded-objects) for how nested objects are stored.
+
+## Insights
+
+Every `Uniquery` can carry **insights** — a `Map<string, Set<InsightOp>>` that records which fields were mentioned and which operators were used on them. This is computed automatically when parsing URL queries via `@uniqu/url`, or you can compute it manually with `computeInsights()`.
+
+```typescript
+import { getInsights, computeInsights } from '@uniqu/core'
+
+// From a parsed URL query (insights are pre-computed)
+const query = parseUrl('age>=18&$select=name,email&$order=-createdAt')
+const insights = getInsights(query)
+// insights → Map {
+//   'age'       → Set { '$gte' },
+//   'name'      → Set { '$select' },
+//   'email'     → Set { '$select' },
+//   'createdAt' → Set { '$order' },
+// }
+
+// From a manually built query (computed on demand)
+const insights2 = computeInsights(
+  { status: 'active', age: { $gte: 18 } },
+  { $select: ['name'], $sort: { createdAt: -1 } }
+)
+```
+
+### Insight Operators
+
+| Operator | Source |
+|----------|--------|
+| `$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte` | Filter comparisons |
+| `$in`, `$nin` | Filter set operators |
+| `$regex`, `$exists` | Filter pattern/existence checks |
+| `$select` | `controls.$select` fields |
+| `$order` | `controls.$sort` fields |
+
+### Use Cases
+
+Insights let you answer "which fields did this query touch?" without walking the filter tree yourself. Common uses:
+
+- **Field validation** — reject queries that reference unknown or forbidden fields (the CRUD controller does this automatically)
+- **Access control** — restrict which fields certain roles can filter or select
+- **Audit logging** — record which fields were queried
+
+See [CRUD Customization — Field-Level Access Control](./crud-http-customization#field-level-access-control) for a practical example.
 
 ## Filter & Query Types
 

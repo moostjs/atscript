@@ -17,7 +17,7 @@ Add `MongoPlugin()` to your `atscript.config.ts`:
 ```typescript
 import { defineConfig } from '@atscript/core'
 import { ts } from '@atscript/typescript'
-import { MongoPlugin } from '@atscript/mongo'
+import { MongoPlugin } from '@atscript/mongo/plugin'
 
 export default defineConfig({
   rootDir: 'src',

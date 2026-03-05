@@ -60,15 +60,9 @@ function mongoIndexKey(type: TMongoIndex['type'], name: string) {
   return `${INDEX_PREFIX}${type}__${cleanName}`
 }
 
-// ── Native calls ─────────────────────────────────────────────────────────────
-
-export type MongoNativeCalls = {
-  aggregate: { args: Document[]; result: AggregationCursor }
-}
-
 // ── Adapter ──────────────────────────────────────────────────────────────────
 
-export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
+export class MongoAdapter extends BaseDbAdapter {
   private _collection?: Collection<any>
 
   /** MongoDB-specific indexes (search, vector) — separate from table.indexes. */
@@ -79,6 +73,9 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
 
   /** Cached search index lookup. */
   protected _searchIndexesMap?: Map<string, TMongoIndex>
+
+  /** Physical field names with @db.default.fn "increment". */
+  protected _incrementFields = new Set<string>()
 
   constructor(
     protected readonly db: Db,
@@ -100,19 +97,6 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     return this.collection.aggregate(pipeline)
   }
 
-  override nativeCall<K extends keyof MongoNativeCalls & string>(
-    name: K,
-    opts: MongoNativeCalls[K]['args']
-  ): MongoNativeCalls[K]['result'] {
-    switch (name) {
-      case 'aggregate': {
-        return this.aggregate(opts as Document[]) as MongoNativeCalls[K]['result']
-      }
-      default: {
-        throw new Error(`Unknown native call: ${name}`)
-      }
-    }
-  }
 
   // ── ID handling ──────────────────────────────────────────────────────────
 
@@ -191,8 +175,12 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     return table.createValidator({
       plugins: this.getValidatorPlugins(),
       replace: (type, path) => {
-        // Only make ObjectId primary keys optional (auto-generated)
+        // Make ObjectId primary keys optional (auto-generated)
         if (path === '_id' && (type.type.tags as Set<string>)?.has('objectId')) {
+          return { ...type, optional: true }
+        }
+        // Make fields with defaults optional (applied before write)
+        if (table.defaults.has(path)) {
           return { ...type, optional: true }
         }
         return type
@@ -252,9 +240,18 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
     type: TAtscriptAnnotatedType,
     metadata: TMetadataMap<AtscriptMetadata>
   ): void {
-    // In MongoDB, _id is always the primary key
-    if (field === '_id') {
-      this._table.addPrimaryKey('_id')
+    // @meta.id on non-_id fields → unique index (not primary key in MongoDB)
+    // Remove from primaryKeys (generic layer adds it), register as unique field for findById fallback
+    if (field !== '_id' && metadata.has('meta.id')) {
+      this._table.removePrimaryKey(field)
+      this._addMongoIndexField('unique', '__pk', field)
+      this._table.addUniqueField(field)
+    }
+    // @db.default.fn "increment" → track for auto-increment on insert
+    const defaultFn = metadata.get('db.default.fn') as string | undefined
+    if (defaultFn === 'increment') {
+      const physicalName = (metadata.get('db.column') as string | undefined) ?? field
+      this._incrementFields.add(physicalName)
     }
     // @db.index.fulltext → MongoDB text index (adapter-level, with weight)
     for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
@@ -287,6 +284,10 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
   }
 
   override onAfterFlatten(): void {
+    // MongoDB _id is always the primary key — hardcode it unconditionally
+    // (can't rely on onFieldScanned since _id may be a virtual prop injected by @db.mongo.collection)
+    this._table.addPrimaryKey('_id')
+
     // Associate vector filter fields with their vector indexes
     for (const [key, value] of this._vectorFilters.entries()) {
       const index = this._mongoIndexes.get(key)
@@ -502,11 +503,51 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
   // ── CRUD implementation ──────────────────────────────────────────────────
 
   async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
+    if (this._incrementFields.size > 0) {
+      const fields = this._fieldsNeedingIncrement(data)
+      if (fields.length > 0) {
+        const maxValues = await this._getMaxValues(fields)
+        for (const physical of fields) {
+          data[physical] = (maxValues.get(physical) ?? 0) + 1
+        }
+      }
+    }
     const result = await this.collection.insertOne(data)
     return { insertedId: result.insertedId }
   }
 
   async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
+    if (this._incrementFields.size > 0) {
+      // Collect all increment fields that any item needs
+      const allFields = new Set<string>()
+      for (const item of data) {
+        for (const f of this._fieldsNeedingIncrement(item)) {
+          allFields.add(f)
+        }
+      }
+
+      if (allFields.size > 0) {
+        const maxValues = await this._getMaxValues([...allFields])
+
+        // Walk items in order (matching SQLite behavior):
+        // no value → ++max; explicit value → keep it, update max if larger
+        for (const item of data) {
+          for (const physical of allFields) {
+            if (item[physical] === undefined || item[physical] === null) {
+              const next = (maxValues.get(physical) ?? 0) + 1
+              item[physical] = next
+              maxValues.set(physical, next)
+            } else if (typeof item[physical] === 'number') {
+              const current = maxValues.get(physical) ?? 0
+              if ((item[physical] as number) > current) {
+                maxValues.set(physical, item[physical] as number)
+              }
+            }
+          }
+        }
+      }
+    }
+
     const result = await this.collection.insertMany(data)
     return {
       insertedCount: result.insertedCount,
@@ -659,80 +700,126 @@ export class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> {
       }
     }
 
-    // ── Sync search indexes ──────────────────────────────────────────
-    const toUpdate = new Set<string>()
-    const existingSearchIndexes = (await this.collection
-      .listSearchIndexes()
-      .toArray()) as TRemoteMongoSearchIndex[]
-
-    for (const remote of existingSearchIndexes) {
-      if (!remote.name.startsWith(INDEX_PREFIX)) { continue }
-      if (indexesToCreate.has(remote.name)) {
-        const local = indexesToCreate.get(remote.name)!
-        const right = remote.latestDefinition
-        switch (local.type) {
-          case 'dynamic_text':
-          case 'search_text': {
-            const left = local.definition
-            if (
-              left.analyzer === right.analyzer &&
-              fieldsMatch(left.mappings!.fields || {}, right.mappings!.fields || {})
-            ) {
-              indexesToCreate.delete(remote.name)
-            } else {
-              toUpdate.add(remote.name)
-            }
-            break
-          }
-          case 'vector': {
-            if (vectorFieldsMatch(local.definition.fields || [], right.fields || [])) {
-              indexesToCreate.delete(remote.name)
-            } else {
-              toUpdate.add(remote.name)
-            }
-            break
-          }
-          default:
-        }
-      } else {
-        if (remote.status !== 'DELETING') {
-          await this.collection.dropSearchIndex(remote.name)
-        }
-      }
-    }
-
-    // ── Create / update ──────────────────────────────────────────────
-    for (const [key, value] of indexesToCreate.entries()) {
+    // ── Create / update regular indexes ─────────────────────────────
+    for (const [key, value] of allIndexes.entries()) {
       switch (value.type) {
         case 'plain': {
+          if (!indexesToCreate.has(key)) { continue }
           await this.collection.createIndex(value.fields, { name: key })
           break
         }
         case 'unique': {
+          if (!indexesToCreate.has(key)) { continue }
           await this.collection.createIndex(value.fields, { name: key, unique: true })
           break
         }
         case 'text': {
+          if (!indexesToCreate.has(key)) { continue }
           await this.collection.createIndex(value.fields, { weights: value.weights, name: key })
-          break
-        }
-        case 'dynamic_text':
-        case 'search_text':
-        case 'vector': {
-          if (toUpdate.has(key)) {
-            await this.collection.updateSearchIndex(key, value.definition)
-          } else {
-            await this.collection.createSearchIndex({
-              name: key,
-              type: value.type === 'vector' ? 'vectorSearch' : 'search',
-              definition: value.definition,
-            })
-          }
           break
         }
         default:
       }
     }
+
+    // ── Sync search indexes (Atlas-only, gracefully skipped on standalone) ──
+    try {
+      const toUpdate = new Set<string>()
+      const existingSearchIndexes = (await this.collection
+        .listSearchIndexes()
+        .toArray()) as TRemoteMongoSearchIndex[]
+
+      for (const remote of existingSearchIndexes) {
+        if (!remote.name.startsWith(INDEX_PREFIX)) { continue }
+        if (indexesToCreate.has(remote.name)) {
+          const local = indexesToCreate.get(remote.name)!
+          const right = remote.latestDefinition
+          switch (local.type) {
+            case 'dynamic_text':
+            case 'search_text': {
+              const left = local.definition
+              if (
+                left.analyzer === right.analyzer &&
+                fieldsMatch(left.mappings!.fields || {}, right.mappings!.fields || {})
+              ) {
+                indexesToCreate.delete(remote.name)
+              } else {
+                toUpdate.add(remote.name)
+              }
+              break
+            }
+            case 'vector': {
+              if (vectorFieldsMatch(local.definition.fields || [], right.fields || [])) {
+                indexesToCreate.delete(remote.name)
+              } else {
+                toUpdate.add(remote.name)
+              }
+              break
+            }
+            default:
+          }
+        } else {
+          if (remote.status !== 'DELETING') {
+            await this.collection.dropSearchIndex(remote.name)
+          }
+        }
+      }
+
+      for (const [key, value] of indexesToCreate.entries()) {
+        switch (value.type) {
+          case 'dynamic_text':
+          case 'search_text':
+          case 'vector': {
+            if (toUpdate.has(key)) {
+              await this.collection.updateSearchIndex(key, value.definition)
+            } else {
+              await this.collection.createSearchIndex({
+                name: key,
+                type: value.type === 'vector' ? 'vectorSearch' : 'search',
+                definition: value.definition,
+              })
+            }
+            break
+          }
+          default:
+        }
+      }
+    } catch {
+      // listSearchIndexes / createSearchIndex / updateSearchIndex are
+      // Atlas-only — silently skip on standalone or in-memory MongoDB.
+    }
+  }
+
+  // ── Auto-increment helpers ────────────────────────────────────────────────
+
+  /** Returns physical field names of increment fields that are undefined in the data. */
+  private _fieldsNeedingIncrement(data: Record<string, unknown>): string[] {
+    const result: string[] = []
+    for (const physical of this._incrementFields) {
+      if (data[physical] === undefined || data[physical] === null) {
+        result.push(physical)
+      }
+    }
+    return result
+  }
+
+  /** Reads current max value for each field via $group aggregation. */
+  private async _getMaxValues(physicalFields: string[]): Promise<Map<string, number>> {
+    const aliases = physicalFields.map(f => [`max__${f.replace(/\./g, '__')}`, f] as const)
+    const group: Record<string, unknown> = { _id: null }
+    for (const [alias, field] of aliases) {
+      group[alias] = { $max: `$${field}` }
+    }
+    const result = await this.collection.aggregate([{ $group: group }]).toArray()
+    const maxMap = new Map<string, number>()
+    if (result.length > 0) {
+      const row = result[0]
+      for (const [alias, field] of aliases) {
+        const val = row[alias]
+        maxMap.set(field, typeof val === 'number' ? val : 0)
+      }
+    }
+    return maxMap
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────

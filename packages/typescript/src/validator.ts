@@ -322,7 +322,10 @@ export class Validator<
         return false
       }
     }
-    if (def.metadata.has('expect.array.uniqueItems')) {
+    const uniqueItems = def.metadata.get('expect.array.uniqueItems') as
+      | { message?: string }
+      | undefined
+    if (uniqueItems) {
       const separator = '▼↩'
       const seen = new Set<string>()
       const keyProps = new Set<string>()
@@ -346,7 +349,7 @@ export class Validator<
         }
         if (seen.has(key)) {
           this.push(String(idx))
-          this.error('Duplicate items are not allowed')
+          this.error(uniqueItems.message || 'Duplicate items are not allowed')
           this.pop(true)
           return false
         }

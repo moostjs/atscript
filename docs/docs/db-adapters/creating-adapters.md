@@ -1,7 +1,7 @@
-# Database Adapters
+# Creating Adapters
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 Database adapters implement the bridge between `AtscriptDbTable` and a specific database engine. The `BaseDbAdapter` abstract class from `@atscript/utils-db` defines the contract that every adapter must fulfill.
@@ -90,6 +90,28 @@ class MyAdapter extends BaseDbAdapter {
 }
 ```
 
+### Method Purpose Reference
+
+| Method | When Called | What to Do |
+|--------|-----------|------------|
+| `insertOne` | After validation, defaults, column mapping | Execute INSERT |
+| `insertMany` | After per-item validation + defaults | Execute batch INSERT |
+| `findOne` | Query with filter + controls | Execute SELECT ... LIMIT 1 |
+| `findMany` | Query with filter + controls | Execute SELECT with sort/limit/skip/select |
+| `count` | Count query | Execute COUNT with filter |
+| `updateOne` | After validation, with filter for PK | Execute UPDATE ... LIMIT 1 |
+| `updateMany` | Bulk update by filter | Execute UPDATE matching filter |
+| `replaceOne` | Full replacement by PK filter | Execute REPLACE or DELETE+INSERT |
+| `replaceMany` | Bulk replace by filter | Execute bulk REPLACE |
+| `deleteOne` | Delete by PK filter | Execute DELETE ... LIMIT 1 |
+| `deleteMany` | Bulk delete by filter | Execute DELETE matching filter |
+| `ensureTable` | Explicit call by user | Create table/collection DDL |
+| `syncIndexes` | Explicit call by user | Diff + create/drop indexes |
+
+::: tip
+Data passed to insert/update methods is **already processed** by `AtscriptDbTable` — defaults applied, `@db.ignore` fields stripped, columns mapped. The adapter only needs to translate to its database's query language.
+:::
+
 ## Adapter Hooks
 
 Adapters can optionally implement hooks that are called during metadata scanning:
@@ -108,7 +130,7 @@ class MyAdapter extends BaseDbAdapter {
 
   // Called after all fields are scanned
   onAfterFlatten(): void {
-    // Post-process metadata
+    // Post-process metadata (e.g., set adapter-specific primary keys)
   }
 
   // Override the table name derived from @db.table
@@ -117,6 +139,15 @@ class MyAdapter extends BaseDbAdapter {
   }
 }
 ```
+
+### Hook Use Cases
+
+| Hook | Purpose | Example |
+|------|---------|---------|
+| `onBeforeFlatten` | Pre-process the type before scanning | MongoDB: read `@db.mongo.search.dynamic` from type metadata |
+| `onFieldScanned` | Process adapter-specific annotations per field | MongoDB: detect `@db.default.fn 'increment'`, register search fields |
+| `onAfterFlatten` | Post-process after all fields are known | MongoDB: hardcode `_id` as primary key, associate vector filters |
+| `getAdapterTableName` | Override table name resolution | Return `undefined` to use the generic `@db.table` name |
 
 ## ID Preparation
 
@@ -130,6 +161,8 @@ class MongoAdapter extends BaseDbAdapter {
   }
 }
 ```
+
+This is called by `findById()` when converting user-provided ID strings into the database's native format.
 
 ## Native Patch Support
 
@@ -168,6 +201,29 @@ When `supportsNestedObjects()` returns `true`:
 - Index field names use dot-notation paths directly
 
 When it returns `false` (the default), the generic `AtscriptDbTable` layer handles all flattening, reconstruction, and query translation. Adapters receive pre-flattened data with physical column names — they never need to know about logical dot-notation paths.
+
+## Validator Plugins
+
+Adapters can inject custom validation plugins:
+
+```typescript
+class MongoAdapter extends BaseDbAdapter {
+  override getValidatorPlugins(): TValidatorPlugin[] {
+    return [validateMongoIdPlugin]
+  }
+
+  override buildInsertValidator(table: AtscriptDbTable): Validator {
+    // Custom insert validator — e.g., make ObjectId PKs optional
+    return table.createValidator({
+      plugins: this.getValidatorPlugins(),
+      replace: (type, path) => {
+        if (path === '_id') return { ...type, optional: true }
+        return type
+      },
+    })
+  }
+}
+```
 
 ## Index Sync Helper
 
@@ -221,8 +277,29 @@ class MyAdapter extends BaseDbAdapter {
 }
 ```
 
+## Accessing the Adapter
+
+Use `table.getAdapter()` to access the underlying adapter for database-specific operations that go beyond the generic CRUD interface:
+
+```typescript
+const adapter = table.getAdapter() as MongoAdapter
+
+// Access the raw MongoDB collection
+const collection = adapter.collection
+await collection.bulkWrite([...])
+
+// Run an aggregation pipeline
+const cursor = adapter.collection.aggregate([
+  { $match: { completed: true } },
+  { $group: { _id: null, count: { $sum: 1 } } },
+])
+```
+
+This is the recommended way to perform native operations — the adapter exposes all database-specific methods and properties directly.
+
 ## Available Adapters
 
 | Adapter | Package | Database |
 |---------|---------|----------|
 | `SqliteAdapter` | `@atscript/db-sqlite` | SQLite (via better-sqlite3 or node:sqlite) |
+| `MongoAdapter` | `@atscript/mongo` | MongoDB |

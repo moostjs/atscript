@@ -1,7 +1,7 @@
 # DB Tables
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 `AtscriptDbTable` is the main entry point for database operations. It reads `@db.*` annotations from an Atscript type and provides a full CRUD interface with validation, column mapping, defaults, and index management.
@@ -10,8 +10,7 @@ DB Integrations are experimental. APIs may change at any moment.
 
 ```typescript
 import { AtscriptDbTable } from '@atscript/utils-db'
-import { SqliteAdapter } from '@atscript/db-sqlite'
-import { BetterSqlite3Driver } from '@atscript/db-sqlite'
+import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import UserMeta from './user.as.js'
 
 const driver = new BetterSqlite3Driver('myapp.db')
@@ -271,7 +270,7 @@ Most `@db.*` annotations work on nested fields:
 
 ### Adapter Behavior
 
-Adapters that handle nested objects natively (like MongoDB) skip flattening entirely — nested objects are passed through as-is. The `supportsNestedObjects()` hook on the adapter controls this. See [Adapters — Nested Object Support](./adapters#nested-object-support).
+Adapters that handle nested objects natively (like MongoDB) skip flattening entirely — nested objects are passed through as-is. The `supportsNestedObjects()` hook on the adapter controls this. See [Adapters — Nested Object Support](./creating-adapters#nested-object-support).
 
 ## Metadata Access
 

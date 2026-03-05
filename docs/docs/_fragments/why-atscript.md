@@ -53,7 +53,7 @@ From this single definition, Atscript generates:
 
 - Types with full type safety in your target language
 - Runtime validators with all constraints
-- Database tables with indexes via the [DB abstraction layer](/db-support/)
+- Database tables with indexes via the [DB abstraction layer](/db-adapters/)
 - JSON Schema for API documentation
 - UI metadata for form generation
 - And more via the plugin system

@@ -1,10 +1,41 @@
-# Quick Start
+# SQLite Adapter
 
 ::: warning Experimental
 The SQLite adapter is experimental. APIs may change at any moment.
 :::
 
-## 1. Define Your Schema
+`@atscript/db-sqlite` provides a SQLite adapter for the Atscript DB abstraction layer. It translates annotation-driven CRUD operations and MongoDB-style filters into SQL queries, with support for swappable SQLite driver implementations.
+
+## Features
+
+- Full CRUD operations (insert, find, update, replace, delete)
+- Automatic table creation from Atscript field descriptors
+- **Embedded object support** — nested objects flattened to `__`-separated columns, `@db.json` for JSON storage
+- Index management (plain and unique indexes)
+- MongoDB-style filter-to-SQL translation with parameterized queries
+- Column mapping, defaults, and field ignoring via `@db.*` annotations
+- Transaction support for bulk operations
+- Swappable driver interface — use `better-sqlite3`, `node:sqlite`, or your own
+
+## Installation
+
+::: code-group
+```bash [pnpm]
+pnpm add @atscript/db-sqlite @atscript/utils-db better-sqlite3
+```
+```bash [npm]
+npm install @atscript/db-sqlite @atscript/utils-db better-sqlite3
+```
+```bash [yarn]
+yarn add @atscript/db-sqlite @atscript/utils-db better-sqlite3
+```
+:::
+
+`better-sqlite3` is an optional peer dependency. You can use any SQLite driver that implements the `TSqliteDriver` interface.
+
+## Quick Start
+
+### 1. Define Your Schema
 
 Create a `.as` file with `@db.*` annotations:
 
@@ -33,7 +64,7 @@ export interface User {
 }
 ```
 
-## 2. Create the Adapter and Table
+### 2. Create the Adapter and Table
 
 ```typescript
 import { AtscriptDbTable } from '@atscript/utils-db'
@@ -52,9 +83,9 @@ await users.ensureTable()
 await users.syncIndexes()
 ```
 
-## 3. Perform CRUD Operations
+### 3. Perform CRUD Operations
 
-### Insert
+#### Insert
 
 ```typescript
 await users.insertOne({
@@ -68,7 +99,7 @@ await users.insertOne({
 // email is stored in 'email_address' column (@db.column)
 ```
 
-### Query
+#### Query
 
 Read operations use the `Uniquery` format — `{ filter, controls }`:
 
@@ -92,7 +123,7 @@ const total = await users.count({
 })
 ```
 
-### Update
+#### Update
 
 ```typescript
 // Partial update by primary key
@@ -105,14 +136,14 @@ await users.updateMany(
 )
 ```
 
-### Delete
+#### Delete
 
 ```typescript
 await users.deleteOne({ id: 1 })
 await users.deleteMany({ status: 'deleted' })
 ```
 
-## 4. Advanced Filters
+## Advanced Filters
 
 The SQLite adapter supports MongoDB-style filters translated to SQL:
 
@@ -138,7 +169,7 @@ await users.findMany({
 })
 ```
 
-## 5. Nested Objects
+## Nested Objects
 
 Nested object fields are automatically flattened into `__`-separated columns. Use `@db.json` to store as a single JSON column instead:
 
@@ -189,7 +220,7 @@ const results = await products.findMany({
 // results[0].metadata → { color: 'red', material: 'plastic' }
 ```
 
-See [Embedded Objects](/db-support/db-table#embedded-objects) for the full flattening strategy.
+See [Embedded Objects](./tables#embedded-objects) for the full flattening strategy.
 
 ## Using a Custom Driver
 
@@ -231,3 +262,20 @@ For testing or transient data, use an in-memory database:
 const driver = new BetterSqlite3Driver(':memory:')
 const adapter = new SqliteAdapter(driver)
 ```
+
+## Limitations
+
+- **Fulltext indexes** are skipped (not supported in basic SQLite)
+- **Schema names** (`@db.schema`) are ignored (SQLite doesn't have schemas)
+- **Nested objects** are flattened into `__`-separated columns by default; `@db.json` and arrays are stored as JSON TEXT
+- **Booleans** are stored as INTEGER (1/0)
+- **Native array patches** are not supported — patches are decomposed into flat updates
+
+## When to Use
+
+The SQLite adapter is a good choice for:
+
+- **Local-first applications** — Embedded database with zero configuration
+- **Development and testing** — Fast setup with in-memory or file-based databases
+- **CLI tools** — Ship a single binary with embedded storage
+- **Prototyping** — Quickly test your Atscript data models before choosing a production database

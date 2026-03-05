@@ -29,11 +29,26 @@
   },
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "plugin": [
+        "dist/plugin.d.ts"
+      ],
+      "": [
+        "dist/index.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.mjs",
+      "require": "./dist/plugin.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -50,5 +65,14 @@
     "@atscript/typescript": "workspace:^",
     "@atscript/utils-db": "workspace:^",
     "mongodb": "^6.17.0"
-  }
+  },
+  "build": [
+    {},
+    {
+      "entries": [
+        "src/plugin.ts"
+      ],
+      "dts": true
+    }
+  ]
 }

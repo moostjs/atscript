@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { ValidatorError } from '@atscript/typescript/utils'
 import { HttpError } from '@moostjs/event-http'
 
 import { AsDbController } from '../as-db.controller'
@@ -168,9 +169,9 @@ describe('AsDbController', () => {
       expect(result).toEqual({
         data: [{ id: '1', name: 'Alice' }],
         page: 1,
-        size: 10,
-        totalPages: 1,
-        totalDocuments: 1,
+        itemsPerPage: 10,
+        pages: 1,
+        count: 1,
       })
     })
 
@@ -181,9 +182,9 @@ describe('AsDbController', () => {
       })
       const result = await controller.pages('/pages?$page=3&$size=5') as any
       expect(result.page).toBe(3)
-      expect(result.size).toBe(5)
-      expect(result.totalPages).toBe(10)
-      expect(result.totalDocuments).toBe(50)
+      expect(result.itemsPerPage).toBe(5)
+      expect(result.pages).toBe(10)
+      expect(result.count).toBe(50)
       // Check skip/limit passed to table
       const call = table.findManyWithCount.mock.calls[0][0]
       expect(call.controls.$skip).toBe(10) // (3-1)*5
@@ -247,11 +248,9 @@ describe('AsDbController', () => {
       expect(result).toEqual({ insertedCount: 2, insertedIds: ['1', '2'] })
     })
 
-    it('should return 400 when validation fails', async () => {
-      table.getValidator.mockReturnValue({ validate: vi.fn().mockReturnValue(false) })
-      const result = await controller.insert({ bad: true })
-      expect(result).toBeInstanceOf(HttpError)
-      expect((result as HttpError).body.statusCode).toBe(400)
+    it('should propagate ValidatorError from table', async () => {
+      table.insertOne.mockRejectedValue(new ValidatorError([{ path: 'name', message: 'required' }]))
+      await expect(controller.insert({ bad: true })).rejects.toBeInstanceOf(ValidatorError)
     })
 
     it('should call onWrite hook', async () => {
@@ -279,11 +278,9 @@ describe('AsDbController', () => {
       expect(result).toEqual({ matchedCount: 1, modifiedCount: 1 })
     })
 
-    it('should return 400 when validation fails', async () => {
-      table.getValidator.mockReturnValue({ validate: vi.fn().mockReturnValue(false) })
-      const result = await controller.replace({ bad: true })
-      expect(result).toBeInstanceOf(HttpError)
-      expect((result as HttpError).body.statusCode).toBe(400)
+    it('should propagate ValidatorError from table', async () => {
+      table.replaceOne.mockRejectedValue(new ValidatorError([{ path: 'id', message: 'required' }]))
+      await expect(controller.replace({ bad: true })).rejects.toBeInstanceOf(ValidatorError)
     })
   })
 

@@ -149,10 +149,43 @@ Atscript provides common-purpose annotations:
 - `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
 - `@expect.int` - Must be integer
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
-- `@expect.array.uniqueItems` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality)
-- `@expect.array.key` - Mark a field as a key inside an array of objects (used for lookups and patch operations; does not enforce uniqueness by itself)
+- `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
+- `@expect.array.key` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself)
 
-All validation annotations (except `@expect.int`) accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
+`@expect.array.key` has compile-time constraints: the field must be `string` or `number`, cannot be optional, and multiple key fields form a **composite key**.
+
+All validation annotations accept an optional custom error message as the last argument (except `@expect.int` and `@expect.array.key`). When validation fails, the custom message is used instead of the default error message.
+
+#### Array Annotations Example
+
+`@expect.array.uniqueItems` and `@expect.array.key` work together to enforce unique array elements by identity fields:
+
+```atscript
+interface Order {
+    @meta.id
+    id: number
+
+    @expect.array.uniqueItems "Duplicate line items"
+    items: OrderItem[]
+}
+
+interface OrderItem {
+    @expect.array.key
+    productId: number
+
+    quantity: number
+    price: number
+}
+```
+
+For primitive arrays, `@expect.array.uniqueItems` checks by deep equality — no `@expect.array.key` needed:
+
+```atscript
+interface Product {
+    @expect.array.uniqueItems "Tags must be unique"
+    tags: string[]
+}
+```
 
 ### Form Validation (@meta.required)
 

@@ -1,7 +1,7 @@
 # Core `@db.*` Annotations
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 Atscript provides a layered annotation system for database integration. Generic annotations under the `@db.*` namespace cover concepts shared across all databases, while database-specific plugins add their own annotations under namespaces like `@db.mongo.*`.
@@ -221,14 +221,14 @@ Array fields (`string[]`, `{ label: string }[]`) are always stored as JSON — n
 `@db.json` on a primitive field (string, number, boolean) has no effect and produces a warning. Most databases cannot index into JSON columns — placing `@db.index.*` on a `@db.json` field also produces a warning.
 :::
 
-See [Embedded Objects](./db-table#embedded-objects) for the full flattening strategy.
+See [Embedded Objects](./tables#embedded-objects) for the full flattening strategy.
 
 ## Database-Specific Extensions
 
 Each database plugin can extend the `@db.*` namespace with its own annotations:
 
-| Plugin | Namespace | Package |
-|--------|-----------|---------|
-| MongoDB | `@db.mongo.*` | `@atscript/mongo` |
+| Plugin | Namespace | Package | Docs |
+|--------|-----------|---------|------|
+| MongoDB | `@db.mongo.*` | `@atscript/mongo` | [MongoDB Annotations](./mongodb-annotations) |
 
 Database-specific annotations are documented in their respective adapter sections.

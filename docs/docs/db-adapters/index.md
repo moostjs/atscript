@@ -1,7 +1,7 @@
-# DB Integrations Guide
+# DB Adapters
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 Atscript provides a database abstraction layer that turns annotated `.as` interfaces into fully functional database tables — with CRUD operations, validation, index management, and more — all driven by annotations.
@@ -14,7 +14,7 @@ The DB integration stack has three layers:
 
 2. **Abstraction layer** (`@atscript/utils-db`) — The `AtscriptDbTable` class reads annotations from your types and provides a unified CRUD interface. The `BaseDbAdapter` abstract class defines what each database driver must implement.
 
-3. **Database adapters** — Concrete adapter packages (like `@atscript/db-sqlite`) implement the `BaseDbAdapter` for a specific database engine.
+3. **Database adapters** — Concrete adapter packages (like `@atscript/db-sqlite` or `@atscript/mongo`) implement the `BaseDbAdapter` for a specific database engine.
 
 ```
 ┌─────────────────────────────────┐
@@ -32,7 +32,7 @@ The DB integration stack has three layers:
 ┌──────────────▼──────────────────┐
 │  BaseDbAdapter (abstract)       │
 │  ├─ SqliteAdapter               │
-│  ├─ MongoAdapter (planned)      │
+│  ├─ MongoAdapter                │
 │  └─ PostgresAdapter (planned)   │
 └─────────────────────────────────┘
 ```
@@ -63,8 +63,7 @@ Use it in TypeScript:
 
 ```typescript
 import { AtscriptDbTable } from '@atscript/utils-db'
-import { SqliteAdapter } from '@atscript/db-sqlite'
-import { BetterSqlite3Driver } from '@atscript/db-sqlite'
+import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import UserMeta from './user.as.js'
 
 // Create adapter and table
@@ -95,14 +94,39 @@ await users.deleteOne({ id: 1 })
 
 ## What's in This Section
 
+### Core Concepts
+
 | Page | Description |
 |------|-------------|
 | [Core Annotations](./annotations) | Reference for all `@db.*` annotations |
-| [DB Tables](./db-table) | Working with `AtscriptDbTable` — the main entry point |
-| [Database Adapters](./adapters) | The `BaseDbAdapter` interface and how to create adapters |
+| [DB Tables](./tables) | Working with `AtscriptDbTable` — the main entry point |
 | [Queries & Filters](./queries) | Filter syntax, sorting, projection, and pagination |
 | [Patch Operations](./patch-operations) | Array-level patch operations (`$insert`, `$upsert`, `$remove`, etc.) |
-| [Future Features](./future-features) | Phase 2 roadmap: relations, views, query expressions |
+
+### Database Guides
+
+| Page | Description |
+|------|-------------|
+| [SQLite Guide](./sqlite) | Install, setup, and use the SQLite adapter |
+| [SQLite API Reference](./sqlite-api) | `SqliteAdapter`, `BetterSqlite3Driver`, `buildWhere` |
+| [MongoDB Guide](./mongodb) | Install, setup, and use the MongoDB adapter |
+| [MongoDB Annotations](./mongodb-annotations) | `@db.mongo.*` annotations and custom primitives |
+| [MongoDB Search & Vectors](./mongodb-search) | Atlas Search and vector search |
+
+### CRUD over HTTP
+
+| Page | Description |
+|------|-------------|
+| [CRUD over HTTP Guide](./crud-http) | Expose database tables as REST endpoints with `@atscript/moost-db` |
+| [URL Query Syntax](./crud-http-query-syntax) | `@uniqu/url` query string format for filtering, sorting, and pagination |
+| [Customization](./crud-http-customization) | Hooks, overrides, and extending the controller |
+
+### Advanced
+
+| Page | Description |
+|------|-------------|
+| [Creating Adapters](./creating-adapters) | The `BaseDbAdapter` interface and how to build custom adapters |
+| [Future Features](./future) | Phase 2 roadmap: relations, views, query expressions |
 
 ## Not an ORM
 
@@ -119,12 +143,12 @@ The database layer is one capability among many. Where an ORM stops at the datab
 | **Multi-database** | Usually one DB engine | Same `.as` file, swap the adapter |
 | **Multi-language** | One language | Designed for any language target |
 
-As the data layer matures (relations, joins, migrations are [on the roadmap](./future-features)), it will cover most ORM capabilities — but it will always be one part of a larger system. Think of it as an **annotation-driven data layer** inside a universal type definition language.
+As the data layer matures (relations, joins, migrations are [on the roadmap](./future)), it will cover most ORM capabilities — but it will always be one part of a larger system. Think of it as an **annotation-driven data layer** inside a universal type definition language.
 
 ## Available Adapters
 
-| Adapter | Package | Status |
-|---------|---------|--------|
-| [SQLite](/db-sqlite/) | `@atscript/db-sqlite` | Experimental |
-| MongoDB | `@atscript/mongo` | Planned |
-| PostgreSQL | — | Planned |
+| Adapter | Package | Database | Status |
+|---------|---------|----------|--------|
+| [SQLite](./sqlite) | `@atscript/db-sqlite` | SQLite (via better-sqlite3 or node:sqlite) | Experimental |
+| [MongoDB](./mongodb) | `@atscript/mongo` | MongoDB | Experimental |
+| PostgreSQL | — | PostgreSQL | Planned |

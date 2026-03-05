@@ -11,26 +11,6 @@ import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteRe
 import type { AtscriptDbTable } from './db-table'
 
 /**
- * Map of adapter-specific native calls.
- * Each key is a call name, and the value defines the argument and return types.
- *
- * @example
- * ```typescript
- * type MongoNativeCalls = {
- *   aggregate: { args: Document[]; result: AggregationCursor }
- * }
- * class MongoAdapter extends BaseDbAdapter<MongoNativeCalls> { ... }
- * ```
- */
-export type TNativeCallMap = Record<string, { args: any; result: any }>
-
-/**
- * Extracts the native call map from an adapter type.
- */
-// oxlint-disable-next-line typescript-eslint/ban-types -- {} means "no native calls"
-export type InferNativeCalls<A> = A extends BaseDbAdapter<infer NC> ? NC : {}
-
-/**
  * Abstract base class for database adapters.
  *
  * Adapter instances are 1:1 with table instances. When an {@link AtscriptDbTable}
@@ -51,11 +31,8 @@ export type InferNativeCalls<A> = A extends BaseDbAdapter<infer NC> ? NC : {}
  * - `this._table.defaults` — default value configurations
  * - `this._table.ignoredFields` — fields excluded from DB
  * - `this._table.uniqueProps` — single-field unique index properties
- *
- * @typeParam NCalls - Map of native adapter-specific calls. Defaults to `{}` (no native calls).
  */
-// oxlint-disable-next-line typescript-eslint/ban-types -- {} means "no native calls"
-export abstract class BaseDbAdapter<NCalls extends TNativeCallMap = {}> {
+export abstract class BaseDbAdapter {
   // ── Table back-reference ──────────────────────────────────────────────────
 
   protected _table!: AtscriptDbTable
@@ -259,28 +236,6 @@ export abstract class BaseDbAdapter<NCalls extends TNativeCallMap = {}> {
         await opts.dropIndex(name)
       }
     }
-  }
-
-  // ── Native calls ─────────────────────────────────────────────────────────
-
-  /**
-   * Executes an adapter-specific native call.
-   * Override in concrete adapters to provide type-safe native operations
-   * that are not part of the generic CRUD interface.
-   *
-   * @example
-   * ```typescript
-   * // In MongoAdapter:
-   * nativeCall(name, opts) {
-   *   if (name === 'aggregate') return this.collection.aggregate(opts)
-   * }
-   *
-   * // Usage via table:
-   * table.nativeCall('aggregate', pipeline) // type-safe args & return
-   * ```
-   */
-  nativeCall<K extends keyof NCalls & string>(name: K, opts: NCalls[K]['args']): NCalls[K]['result'] {
-    throw new Error(`Native call "${name}" is not supported by this adapter`)
   }
 
   // ── Search index metadata ─────────────────────────────────────────────────

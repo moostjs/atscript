@@ -209,16 +209,50 @@ Applied when the value is a valid boolean:
 | ---------------- | ---------------- | ------------------- |
 | `@meta.required` | `value !== true` | `"Must be checked"` |
 
-### Array Length Constraints
+### Array Constraints
 
 Applied at the array level (before element validation):
 
-| Annotation            | Condition          | Default error                                       |
-| --------------------- | ------------------ | --------------------------------------------------- |
-| `@expect.minLength N` | `value.length < N` | `"Expected minimum length of N items, got M items"` |
-| `@expect.maxLength N` | `value.length > N` | `"Expected maximum length of N items, got M items"` |
+| Annotation                    | Condition          | Default error                                       |
+| ----------------------------- | ------------------ | --------------------------------------------------- |
+| `@expect.minLength N`         | `value.length < N` | `"Expected minimum length of N items, got M items"` |
+| `@expect.maxLength N`         | `value.length > N` | `"Expected maximum length of N items, got M items"` |
+| `@expect.array.uniqueItems`   | duplicate found    | `"Duplicate items are not allowed"`                 |
 
 Note: for strings, the messages say "characters"; for arrays, the messages say "items".
+
+**Evaluation order**: `@expect.minLength` first, then `@expect.maxLength`, then `@expect.array.uniqueItems` (before element validation).
+
+#### Unique Items
+
+`@expect.array.uniqueItems` enforces that no two elements in the array are equal. How equality is determined depends on the element type and `@expect.array.key` annotations:
+
+1. **Primitive arrays** (`string[]`, `number[]`) — duplicates are detected by deep equality (JSON serialization).
+2. **Object arrays with `@expect.array.key` fields** — uniqueness is checked by key fields only. Multiple key fields form a composite key.
+3. **Object arrays without key fields** — duplicates are detected by deep equality of the whole object.
+
+`@expect.array.key` is a property-level annotation placed on fields **inside** the array element type. It marks which fields form the element's identity. Constraints:
+
+- The field must be `string` or `number` type
+- The field cannot be optional (`?`)
+- Multiple `@expect.array.key` fields form a **composite key**
+- `@expect.array.key` does **not** enforce uniqueness by itself — it only declares identity fields for lookups and patch operations. Add `@expect.array.uniqueItems` on the array field to enforce uniqueness.
+
+```atscript
+// Primitive array — no duplicates by deep equality
+@expect.array.uniqueItems
+tags: string[]
+
+// Object array — unique by composite key (code + region)
+@expect.array.uniqueItems
+items: {
+    @expect.array.key
+    code: string
+    @expect.array.key
+    region: string
+    quantity: number
+}[]
+```
 
 ### Custom Error Messages
 
@@ -330,6 +364,7 @@ A complete validator implementation must handle:
 - [ ] Pattern property matching for dynamic keys
 - [ ] Array type check and element recursion
 - [ ] Array length constraints (`@expect.minLength`, `@expect.maxLength`)
+- [ ] `@expect.array.uniqueItems` — no duplicate items (by key fields or deep equality)
 - [ ] Union try-all-branches with error aggregation
 - [ ] Intersection all-must-pass with fail-fast
 - [ ] Tuple exact-length positional validation

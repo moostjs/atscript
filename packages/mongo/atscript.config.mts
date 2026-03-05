@@ -1,5 +1,5 @@
 import { defineConfig } from '@atscript/core'
-import { MongoPlugin } from '@atscript/mongo'
+import { MongoPlugin } from '@atscript/mongo/plugin'
 import ts from '@atscript/typescript'
 
 export default defineConfig({

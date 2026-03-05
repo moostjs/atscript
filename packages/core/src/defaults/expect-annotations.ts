@@ -251,6 +251,14 @@ export const expectAnnotations: TAnnotationsTree = {
         '```\n',
       nodeType: ['prop'],
       multiple: false,
+      argument: [
+        {
+          name: 'message',
+          optional: true,
+          type: 'string',
+          description: 'Optional custom error message when duplicate items are found.',
+        },
+      ],
       validate(token, args, doc) {
         const field = token.parentNode!
         const errors = [] as TMessages
@@ -298,6 +306,14 @@ export const expectAnnotations: TAnnotationsTree = {
         '```\n',
       nodeType: ['prop', 'type'],
       multiple: false,
+      argument: [
+        {
+          name: 'message',
+          optional: true,
+          type: 'string',
+          description: 'Optional custom error message (used by @expect.array.uniqueItems when checking key-based uniqueness).',
+        },
+      ],
       validate(token, args, doc) {
         const field = token.parentNode!
         const errors = [] as TMessages

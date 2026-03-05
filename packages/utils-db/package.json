@@ -42,6 +42,6 @@
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
-    "@uniqu/core": "^0.0.1"
+    "@uniqu/core": "^0.0.2"
   }
 }

@@ -28,7 +28,8 @@
 | `@expect.max`       | `maxValue: number`, `message?: string`                  | no       | number        | Maximum value               |
 | `@expect.int`       | _(none)_                                                | no       | number        | Must be integer             |
 | `@expect.pattern`   | `pattern: string`, `flags?: string`, `message?: string` | **yes** (append) | string | Regex validation     |
-| `@expect.array.key` | _(none)_                                                | no       | string, number | Key field in arrays         |
+| `@expect.array.key` | `message?: string`                                      | no       | string, number | Key field in arrays (non-optional, string/number only). Multiple = composite key |
+| `@expect.array.uniqueItems` | `message?: string`                               | no       | array          | No duplicate items (by key fields or deep equality) |
 
 ### `@ui.*` — UI / Presentation Hints
 

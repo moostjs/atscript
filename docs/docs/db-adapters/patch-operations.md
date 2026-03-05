@@ -1,7 +1,7 @@
 # Patch Operations
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 When updating records that contain arrays, simple field replacement isn't always sufficient. Atscript's DB layer supports structured patch operations that let you insert, update, upsert, and remove individual array elements.

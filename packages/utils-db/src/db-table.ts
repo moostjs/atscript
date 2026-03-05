@@ -13,7 +13,7 @@ import {
 
 import type { FilterExpr, UniqueryControls, Uniquery } from '@uniqu/core'
 
-import type { BaseDbAdapter, InferNativeCalls } from './base-adapter'
+import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
@@ -89,7 +89,7 @@ export class AtscriptDbTable<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
   FlatType = FlatOf<T>,
-  A extends BaseDbAdapter<any> = BaseDbAdapter,
+  A extends BaseDbAdapter = BaseDbAdapter,
   IdType = PrimaryKeyOf<T>,
 > {
   /** Resolved table/collection name. */
@@ -207,6 +207,26 @@ export class AtscriptDbTable<
     if (!this._primaryKeys.includes(field)) {
       this._primaryKeys.push(field)
     }
+  }
+
+  /**
+   * Removes a field from the primary key list.
+   * Useful for adapters (e.g., MongoDB) where `@meta.id` fields should be
+   * unique indexes rather than part of the primary key.
+   */
+  public removePrimaryKey(field: string): void {
+    const idx = this._primaryKeys.indexOf(field)
+    if (idx >= 0) {
+      this._primaryKeys.splice(idx, 1)
+    }
+  }
+
+  /**
+   * Registers a field as having a unique constraint.
+   * Used by adapters to ensure `findById` falls back to this field.
+   */
+  public addUniqueField(field: string): void {
+    this._uniqueProps.add(field)
   }
 
   /** Logical → physical column name mapping from `@db.column`. */
@@ -606,7 +626,13 @@ export class AtscriptDbTable<
     if (this.uniqueProps.size > 0) {
       const orFilters: FilterExpr[] = []
       for (const prop of this.uniqueProps) {
-        orFilters.push({ [prop]: id } as FilterExpr)
+        const fieldType = this.flatMap.get(prop)
+        try {
+          const prepared = fieldType ? this.adapter.prepareId(id, fieldType) : id
+          orFilters.push({ [prop]: prepared } as FilterExpr)
+        } catch {
+          // skip this prop if id can't be coerced to its type
+        }
       }
       return await this.findOne({
         filter: { $or: orFilters },
@@ -666,24 +692,6 @@ export class AtscriptDbTable<
   }
 
   // ── Native calls ─────────────────────────────────────────────────────────
-
-  /**
-   * Executes an adapter-specific native call.
-   * Type safety is inferred from the adapter's {@link TNativeCallMap}.
-   *
-   * @example
-   * ```typescript
-   * // With MongoAdapter:
-   * const table = new AtscriptDbTable(type, mongoAdapter)
-   * const cursor = table.nativeCall('aggregate', pipeline) // AggregationCursor
-   * ```
-   */
-  nativeCall<K extends keyof InferNativeCalls<A> & string>(
-    name: K,
-    opts: InferNativeCalls<A>[K]['args']
-  ): InferNativeCalls<A>[K]['result'] {
-    return this.adapter.nativeCall(name, opts)
-  }
 
   // ── Internal: field flattening ────────────────────────────────────────────
 
@@ -950,7 +958,9 @@ export class AtscriptDbTable<
     for (const [field, def] of this._defaults.entries()) {
       if (data[field] === undefined) {
         if (def.kind === 'value') {
-          data[field] = def.value
+          const fieldType = this._flatMap?.get(field)
+          const designType = fieldType?.type.kind === '' && (fieldType.type as { designType: string }).designType
+          data[field] = designType === 'string' ? def.value : JSON.parse(def.value)
         } else if (def.kind === 'fn') {
           switch (def.fn) {
             case 'now': { data[field] = Date.now(); break }
@@ -1355,8 +1365,8 @@ export class AtscriptDbTable<
         return this.createValidator({
           plugins,
           replace: (type, path) => {
-            // Make primary key fields optional for insert (auto-generation)
-            if (this._primaryKeys.includes(path)) {
+            // Make primary key fields and fields with defaults optional for insert
+            if (this._primaryKeys.includes(path) || this._defaults.has(path)) {
               return { ...type, optional: true }
             }
             return type

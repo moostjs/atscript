@@ -53,6 +53,6 @@
     "@atscript/typescript": "workspace:^",
     "@moostjs/event-http": "^0.6.2",
     "moost": "^0.6.2",
-    "@uniqu/core": "^0.0.1"
+    "@uniqu/core": "^0.0.2"
   }
 }

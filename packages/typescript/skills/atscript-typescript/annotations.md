@@ -17,7 +17,7 @@
 | `@meta.required`      | `message?: string`         | Required field. Strings: non-whitespace. Booleans: must be `true`  |
 | `@meta.default`       | `value: string`            | Default value (strings as-is, others parsed as JSON)               |
 | `@meta.example`       | `value: string`            | Example value (strings as-is, others parsed as JSON)               |
-| `@expect.array.key`   | _(none)_                   | Mark field as key inside array (string/number types only)          |
+| `@expect.array.key`   | `message?: string`         | Mark field as key inside array (string/number only, non-optional). Multiple = composite key |
 
 ### `@expect.*` — Validation Constraints
 
@@ -29,6 +29,7 @@
 | `@expect.max`       | `maxValue: number`, `message?: string`                  | number        | Maximum value                                          |
 | `@expect.int`       | _(none)_                                                | number        | Must be integer                                        |
 | `@expect.pattern`   | `pattern: string`, `flags?: string`, `message?: string` | string        | Regex validation. **Multiple allowed** (all must pass) |
+| `@expect.array.uniqueItems` | `message?: string`                             | array         | No duplicate items (by key fields or deep equality)    |
 
 ### `@ui.*` — UI / Presentation Hints
 

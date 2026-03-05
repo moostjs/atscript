@@ -1,6 +1,5 @@
 export { AtscriptDbTable, resolveDesignType } from './db-table'
 export { BaseDbAdapter } from './base-adapter'
-export type { TNativeCallMap, InferNativeCalls } from './base-adapter'
 export { UniquSelect } from './uniqu-select'
 export { decomposePatch } from './patch-decomposer'
 export { getKeyProps } from './patch-types'

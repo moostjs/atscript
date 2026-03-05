@@ -1,4 +1,4 @@
-# API Reference
+# SQLite API Reference
 
 ::: warning Experimental
 The SQLite adapter is experimental. APIs may change at any moment.

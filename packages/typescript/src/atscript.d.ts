@@ -15,6 +15,8 @@ declare global {
     'expect.max': { maxValue: number; message?: string }
     'meta.required': { message?: string } | true
     'expect.int': { message?: string } | true
+    'expect.array.uniqueItems': { message?: string }
+    'expect.array.key': { message?: string }
     'expect.pattern': Array<{ pattern: string; flags?: string; message?: string }>
     'mongo.collection': string
     'mongo.index.plain': Array<string | true>

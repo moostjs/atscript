@@ -121,7 +121,7 @@ Annotations from `.as` files are enforced automatically during validation. See t
 | `@expect.array.uniqueItems` | array  | No duplicate items (by key fields if defined, otherwise deep equality) |
 | `@expect.array.key` | property in array element | Marks a key field for lookups and patch operations (does not enforce uniqueness alone) |
 
-All validation annotations (except `@expect.int`) support an optional custom error message as the last argument:
+All validation annotations accept an optional custom error message as the last argument (except `@expect.int` and `@expect.array.key`):
 
 ```atscript
 interface User {
@@ -140,6 +140,32 @@ interface User {
 ```
 
 When validation fails, the custom message (if provided) is used instead of the default error message.
+
+### Array Uniqueness
+
+`@expect.array.uniqueItems` and `@expect.array.key` work together to enforce unique elements in arrays:
+
+```atscript
+interface Order {
+    @meta.id
+    id: number
+
+    @expect.array.uniqueItems "Duplicate line items"
+    items: OrderItem[]
+}
+
+interface OrderItem {
+    @expect.array.key           // identity field — must be string or number, non-optional
+    productId: number
+
+    quantity: number
+    price: number
+}
+```
+
+- `@expect.array.key` **identifies** which fields form an element's identity — it's used by `@expect.array.uniqueItems` and [patch operations](/db-support/patch-operations), but does **not** enforce uniqueness by itself.
+- `@expect.array.uniqueItems` **enforces** no duplicate items during validation. For object arrays, it checks by key fields if defined; for primitive arrays (e.g., `string[]`), it checks by deep equality.
+- Multiple `@expect.array.key` fields on the same element type form a **composite key**.
 
 Semantic types like `string.email`, `string.required`, and `number.positive` automatically add validation rules through their annotation definitions. The `string.required` primitive implicitly adds `@meta.required`.
 

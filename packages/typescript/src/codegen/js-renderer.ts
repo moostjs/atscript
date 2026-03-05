@@ -422,6 +422,11 @@ export class JsRenderer extends BaseRenderer {
           handle.annotate(a.name as any, true)
           break
         }
+        case 'expect.array.uniqueItems':
+        case 'expect.array.key': {
+          handle.annotate(a.name as any, { message: a.args[0]?.text })
+          break
+        }
         default:
       }
     })

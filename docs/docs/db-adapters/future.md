@@ -1,7 +1,7 @@
 # Future Features
 
 ::: warning Experimental
-DB Integrations are experimental. APIs may change at any moment.
+DB Adapters are experimental. APIs may change at any moment.
 :::
 
 Atscript's database support grows in phases. Phase 1 (current) covers single-table definitions — table names, indexes, column mappings, and defaults. Phase 2 adds relations and foreign keys. Phase 3 adds many-to-many relations, views, and a portable query expression language.

@@ -334,10 +334,12 @@ export default defineConfig({
         ],
       },
       {
-        text: 'DB Integrations',
+        text: 'DB Adapters',
         items: [
-          { text: 'Guide', link: '/db-support/' },
-          { text: 'SQLite', link: '/db-sqlite/' },
+          { text: 'Overview', link: '/db-adapters/' },
+          { text: 'SQLite', link: '/db-adapters/sqlite' },
+          { text: 'MongoDB', link: '/db-adapters/mongodb' },
+          { text: 'CRUD over HTTP', link: '/db-adapters/crud-http' },
         ],
       },
       { text: 'VSCode', link: '/packages/vscode/' },
@@ -400,67 +402,45 @@ export default defineConfig({
         },
       ],
 
-      '/db-support/': [
+      '/db-adapters/': [
         {
-          text: 'DB Annotations',
+          text: 'Overview',
           items: [
-            { text: 'Overview', link: '/db-support/' },
-            { text: 'Core Annotations', link: '/db-support/annotations' },
-            { text: 'Future Features', link: '/db-support/future-features' },
+            { text: 'Architecture', link: '/db-adapters/' },
+            { text: 'Annotations', link: '/db-adapters/annotations' },
+            { text: 'Tables API', link: '/db-adapters/tables' },
+            { text: 'Queries & Filters', link: '/db-adapters/queries' },
+            { text: 'Patch Operations', link: '/db-adapters/patch-operations' },
           ],
         },
         {
-          text: 'Abstraction Layer',
+          text: 'SQLite',
           items: [
-            { text: 'DB Tables', link: '/db-support/db-table' },
-            { text: 'Database Adapters', link: '/db-support/adapters' },
-            { text: 'Queries & Filters', link: '/db-support/queries' },
-            { text: 'Patch Operations', link: '/db-support/patch-operations' },
-          ],
-        },
-      ],
-
-      '/db-sqlite/': [
-        {
-          text: 'SQLite Adapter',
-          items: [
-            { text: 'Overview', link: '/db-sqlite/' },
-            { text: 'Quick Start', link: '/db-sqlite/quick-start' },
-            { text: 'API Reference', link: '/db-sqlite/api-reference' },
-          ],
-        },
-      ],
-
-      '/packages/mongo/': [
-        {
-          text: '@atscript/mongo',
-          items: [
-            { text: 'Overview', link: '/packages/mongo/' },
-            { text: 'Installation', link: '/packages/mongo/installation' },
-            { text: 'Configuration', link: '/packages/mongo/configuration' },
+            { text: 'Guide', link: '/db-adapters/sqlite' },
+            { text: 'API Reference', link: '/db-adapters/sqlite-api' },
           ],
         },
         {
-          text: 'Features',
+          text: 'MongoDB',
           items: [
-            { text: 'Collections', link: '/packages/mongo/collections' },
-            { text: 'Indexes', link: '/packages/mongo/indexes' },
-            { text: 'Search Indexes', link: '/packages/mongo/search-indexes' },
-            { text: 'Patch Strategies', link: '/packages/mongo/patch-strategies' },
-            { text: 'Validation', link: '/packages/mongo/validation' },
+            { text: 'Guide', link: '/db-adapters/mongodb' },
+            { text: 'Annotations', link: '/db-adapters/mongodb-annotations' },
+            { text: 'Search & Vectors', link: '/db-adapters/mongodb-search' },
           ],
         },
         {
-          text: 'Reference',
-          items: [{ text: 'Annotations', link: '/packages/mongo/annotations-reference' }],
-        },
-      ],
-
-      '/packages/moost-db/': [
-        {
-          text: '@atscript/moost-db',
+          text: 'CRUD over HTTP',
           items: [
-            { text: 'Overview', link: '/packages/moost-db/' },
+            { text: 'Guide', link: '/db-adapters/crud-http' },
+            { text: 'URL Query Syntax', link: '/db-adapters/crud-http-query-syntax' },
+            { text: 'Customization', link: '/db-adapters/crud-http-customization' },
+          ],
+        },
+        {
+          text: 'Advanced',
+          items: [
+            { text: 'Creating Adapters', link: '/db-adapters/creating-adapters' },
+            { text: 'Future Features', link: '/db-adapters/future' },
           ],
         },
       ],

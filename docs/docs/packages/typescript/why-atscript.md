@@ -108,4 +108,4 @@ await users.insertOne(user) // Validates and inserts
 ## Next Steps
 
 - [Quick Start](/packages/typescript/quick-start) — create your first .as file
-- [DB Integrations](/db-support/) — use annotations to drive database operations
+- [DB Adapters](/db-adapters/) — use annotations to drive database operations
