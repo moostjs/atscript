@@ -472,13 +472,17 @@ export class JsRenderer extends BaseRenderer {
         const chain = ref.hasChain
           ? `, [${ref.chain.map(c => `"${escapeQuotes(c.text)}"`).join(', ')}]`
           : ''
+        // Always use lazy ref for imported types to avoid circular import/bundle TDZ issues.
+        // Local types use eager ref since they're always defined before use in the same file.
+        const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
+        const isImported = ownerDecl ? ownerDecl.doc !== this.doc : false
+        const refExpr = isImported ? `() => ${ref.id!}` : ref.id!
         this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
-          .writeln(`.refTo(${ref.id!}${chain})`)
+          .writeln(`.refTo(${refExpr}${chain})`)
         // Emit the referenced type's annotations at build time so that
         // metadata is available regardless of declaration order.
         if (!ref.hasChain) {
-          const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
           if (ownerDecl?.node) {
             const typeAnnotations = ownerDecl.doc.evalAnnotationsForNode(ownerDecl.node)
             typeAnnotations?.forEach((an: TAnnotationTokens) => {

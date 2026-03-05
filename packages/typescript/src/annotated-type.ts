@@ -339,30 +339,66 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       }
       return this
     },
-    refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]) {
-      if (!isAnnotatedType(type)) {
-        throw new Error(`${type} is not annotated type`)
-      }
-      let newBase = type
-      const typeName = type.name || 'Unknown'
-      if (chain) {
-        for (let i = 0; i < chain.length; i++) {
-          const c = chain[i]
-          if (newBase.type.kind === 'object' && newBase.type.props.has(c)) {
-            newBase = newBase.type.props.get(c) as TAtscriptAnnotatedType
-          } else {
-            const keys = chain.slice(0, i + 1).map(k => `["${k}"]`).join('')
-            throw new Error(`Can't find prop ${typeName}${keys}`)
+    refTo(type: TAtscriptAnnotatedType & { name?: string } | (() => TAtscriptAnnotatedType & { name?: string }), chain?: string[]) {
+      // Check isAnnotatedType first — ES classes are typeof 'function' but should be treated as eager refs
+      if (isAnnotatedType(type)) {
+        let newBase = type
+        const typeName = type.name || 'Unknown'
+        if (chain) {
+          for (let i = 0; i < chain.length; i++) {
+            const c = chain[i]
+            if (newBase.type.kind === 'object' && newBase.type.props.has(c)) {
+              newBase = newBase.type.props.get(c) as TAtscriptAnnotatedType
+            } else {
+              const keys = chain.slice(0, i + 1).map(k => `["${k}"]`).join('')
+              throw new Error(`Can't find prop ${typeName}${keys}`)
+            }
           }
         }
+        // Metadata is NOT copied from the referenced type at runtime.
+        // Type-level annotations are emitted at build time by the code generator,
+        // making metadata resolution independent of declaration order.
+        this.$type = createAnnotatedTypeNode(newBase.type, metadata, {
+          id: newBase.id,
+          ref: chain && chain.length > 0 ? { type: () => type, field: chain.join('.') } : undefined,
+        })
+      } else if (typeof type === 'function') {
+        // Lazy ref — type will be resolved on first access (avoids circular import/bundle issues)
+        const lazyType = type as () => TAtscriptAnnotatedType & { name?: string }
+        this.$type = createAnnotatedTypeNode({ kind: '' } as TAtscriptTypeDef, metadata, {
+          ref: { type: lazyType, field: chain ? chain.join('.') : '' },
+        })
+        // Patch the type lazily — resolves chain traversal on first access
+        const node = this.$type
+        const placeholder = node.type
+        Object.defineProperty(node, 'type', {
+          get() {
+            const t = lazyType()
+            if (!isAnnotatedType(t)) {
+              // Resolution failed — cache placeholder to avoid re-calling
+              Object.defineProperty(node, 'type', { value: placeholder, writable: false, configurable: true })
+              return placeholder
+            }
+            let target: TAtscriptAnnotatedType = t
+            if (chain) {
+              for (const c of chain) {
+                if (target.type.kind === 'object' && (target.type as TAtscriptTypeObject).props.has(c)) {
+                  target = (target.type as TAtscriptTypeObject).props.get(c) as TAtscriptAnnotatedType
+                } else {
+                  return t.type // chain can't resolve yet — return root type
+                }
+              }
+            }
+            node.id = target.id || t.id
+            // Replace getter with resolved value for zero-overhead subsequent access
+            Object.defineProperty(node, 'type', { value: target.type, writable: false, configurable: true })
+            return target.type
+          },
+          configurable: true,
+        })
+      } else {
+        throw new Error(`${type} is not annotated type`)
       }
-      // Metadata is NOT copied from the referenced type at runtime.
-      // Type-level annotations are emitted at build time by the code generator,
-      // making metadata resolution independent of declaration order.
-      this.$type = createAnnotatedTypeNode(newBase.type, metadata, {
-        id: newBase.id,
-        ref: chain && chain.length > 0 ? { type: () => type, field: chain.join('.') } : undefined,
-      })
       return this
     },
     annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean) {
@@ -407,7 +443,7 @@ export interface TAnnotatedTypeHandle {
   propPattern(pattern: RegExp, value: TAtscriptAnnotatedType): TAnnotatedTypeHandle
   optional(value?: boolean): TAnnotatedTypeHandle
   copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>): TAnnotatedTypeHandle
-  refTo(type: TAtscriptAnnotatedType & { name?: string }, chain?: string[]): TAnnotatedTypeHandle
+  refTo(type: TAtscriptAnnotatedType & { name?: string } | (() => TAtscriptAnnotatedType & { name?: string }), chain?: string[]): TAnnotatedTypeHandle
   annotate(key: keyof AtscriptMetadata, value: any, asArray?: boolean): TAnnotatedTypeHandle
   id(value: string): TAnnotatedTypeHandle
 }

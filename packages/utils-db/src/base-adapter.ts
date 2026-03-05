@@ -6,8 +6,9 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
+import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbTable } from './db-table'
 
 /**
@@ -91,6 +92,43 @@ export abstract class BaseDbAdapter {
    */
   supportsNestedObjects(): boolean {
     return false
+  }
+
+  // ── Relation loading (overridable) ────────────────────────────────────────
+
+  /**
+   * Whether this adapter handles `$with` relation loading natively.
+   * When `true`, the table layer delegates to {@link loadRelations}
+   * instead of using the generic batch-loading strategy.
+   *
+   * Adapters can use this to implement SQL JOINs, MongoDB `$lookup`,
+   * or other DB-native relation loading optimizations.
+   *
+   * Default: `false` — the table layer uses application-level batch loading.
+   */
+  supportsNativeRelations(): boolean {
+    return false
+  }
+
+  /**
+   * Loads relations onto result rows using adapter-native operations.
+   * Only called when {@link supportsNativeRelations} returns `true`.
+   *
+   * The adapter receives the rows to enrich, the `$with` relation specs,
+   * and the table's relation/FK metadata for resolution.
+   *
+   * @param rows - The result rows to enrich (mutable — add relation properties in place).
+   * @param withRelations - The `$with` specs from the query.
+   * @param relations - This table's relation metadata (from `@db.rel.to`/`@db.rel.from`).
+   * @param foreignKeys - This table's FK metadata (from `@db.rel.FK`).
+   */
+  async loadRelations(
+    rows: Array<Record<string, unknown>>,
+    withRelations: WithRelation[],
+    relations: ReadonlyMap<string, TDbRelation>,
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>
+  ): Promise<void> {
+    throw new Error('Native relation loading not supported by this adapter')
   }
 
   /**
@@ -349,4 +387,11 @@ export abstract class BaseDbAdapter {
    * Uses `this._table.tableName`, `this._table.schema`, etc.
    */
   abstract ensureTable(): Promise<void>
+
+  /**
+   * Synchronizes foreign key constraints between Atscript definitions and the database.
+   * Uses `this._table.foreignKeys` for the full FK definitions.
+   * Optional — only relational adapters need to implement this.
+   */
+  async syncForeignKeys?(): Promise<void>
 }

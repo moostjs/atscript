@@ -1,27 +1,40 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import { AtscriptDbTable } from '@atscript/utils-db'
+import { DbSpace } from '@atscript/utils-db'
 import { MongoClient } from 'mongodb'
 
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 import { MongoAdapter } from './mongo-adapter'
 
-export class AsMongo {
+/**
+ * MongoDB database space — extends {@link DbSpace} with MongoDB-specific
+ * features (cached collection list, `Db` access, `MongoAdapter` factory).
+ *
+ * ```typescript
+ * const asMongo = new AsMongo('mongodb://localhost:27017/mydb')
+ * const users = asMongo.getTable(UsersType)
+ * const posts = asMongo.getTable(PostsType)
+ * // Relation loading via $with works automatically
+ * ```
+ */
+export class AsMongo extends DbSpace {
   public readonly client: MongoClient
+
   constructor(
     client: string | MongoClient,
-    protected readonly logger: TGenericLogger = NoopLogger
+    logger: TGenericLogger = NoopLogger
   ) {
-    if (typeof client === 'string') {
-      this.client = new MongoClient(client)
-    } else {
-      this.client = client
-    }
+    const resolvedClient = typeof client === 'string' ? new MongoClient(client) : client
+    // Adapter factory — captures `this` via arrow for lazy db/asMongo access
+    super(() => new MongoAdapter(this.db, this), logger)
+    this.client = resolvedClient
   }
 
   get db() {
     return this.client.db()
   }
+
+  // ── Collection list caching (Mongo-specific) ────────────────────────────
 
   protected collectionsList?: Promise<Set<string>>
 
@@ -40,34 +53,11 @@ export class AsMongo {
     return list.has(name)
   }
 
-  getAdapter<T extends TAtscriptAnnotatedType>(type: T): MongoAdapter {
-    this._ensureCreated(type)
-    return this._adapters.get(type) as MongoAdapter
+  /**
+   * Returns the MongoAdapter for the given type.
+   * Convenience accessor for Mongo-specific adapter operations.
+   */
+  override getAdapter(type: TAtscriptAnnotatedType): MongoAdapter {
+    return super.getAdapter(type) as MongoAdapter
   }
-
-  getTable<T extends TAtscriptAnnotatedType>(
-    type: T,
-    logger?: TGenericLogger
-  ): AtscriptDbTable<T, any, any, any> {
-    this._ensureCreated(type, logger)
-    return this._tables.get(type) as AtscriptDbTable<T, any, any, any>
-  }
-
-  private _ensureCreated(type: TAtscriptAnnotatedType, logger?: TGenericLogger) {
-    if (!this._adapters.has(type)) {
-      const adapter = new MongoAdapter(this.db, this)
-      const table = new AtscriptDbTable(type, adapter as any, logger || this.logger)
-      this._adapters.set(type, adapter)
-      this._tables.set(type, table)
-    }
-  }
-
-  private _adapters = new WeakMap() as TWeakMapOf<MongoAdapter>
-  private _tables = new WeakMap() as TWeakMapOf<AtscriptDbTable>
-}
-
-interface TWeakMapOf<V> {
-  has(key: TAtscriptAnnotatedType): boolean
-  get<T extends TAtscriptAnnotatedType>(key: T): V
-  set<T extends TAtscriptAnnotatedType>(key: T, value: V): void
 }

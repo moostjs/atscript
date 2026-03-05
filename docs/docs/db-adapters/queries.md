@@ -222,6 +222,60 @@ await users.findMany({
 })
 ```
 
+### Relation Loading (`$with`)
+
+Load navigational properties (relations declared with `@db.rel.to` / `@db.rel.from`) alongside query results. Each `$with` entry is a sub-query with its own filter, controls, and nested `$with`:
+
+```typescript
+// Load a single relation
+await posts.findMany({
+  filter: {},
+  controls: {
+    $with: [{ name: 'author' }],
+  },
+})
+
+// Multiple relations
+await posts.findMany({
+  filter: {},
+  controls: {
+    $with: [{ name: 'author' }, { name: 'comments' }],
+  },
+})
+
+// Per-relation filter + controls
+await users.findMany({
+  filter: {},
+  controls: {
+    $with: [{
+      name: 'posts',
+      filter: { status: 'published' },
+      controls: {
+        $sort: { createdAt: -1 },
+        $limit: 5,
+      },
+    }],
+  },
+})
+
+// Nested $with (2+ levels deep)
+await users.findMany({
+  filter: {},
+  controls: {
+    $with: [{
+      name: 'posts',
+      controls: {
+        $with: [{ name: 'comments', controls: { $limit: 10 } }],
+      },
+    }],
+  },
+})
+```
+
+FK fields needed for joining are automatically included in `$select` — you don't need to add them manually.
+
+See [Relations & Foreign Keys](./relations) for how to declare relations in your schema and full `$with` examples.
+
 ## Nested Fields
 
 When your Atscript interface has nested objects, use dot-notation to filter, sort, and select by nested paths. The generic layer translates these paths to physical column names automatically.

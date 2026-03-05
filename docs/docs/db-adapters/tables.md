@@ -241,6 +241,49 @@ await users.deleteOne(1)
 await users.deleteMany({ status: 'deleted' })
 ```
 
+## Relation Loading
+
+Fields annotated with [`@db.rel.to`](./relations#db-rel-to-forward-navigation) or [`@db.rel.from`](./relations#db-rel-from-inverse-navigation) are navigational properties — they have no DB column and are **not loaded by default**. Use the `$with` control to load them:
+
+```typescript
+// Load author for each post
+const posts = await postTable.findMany({
+  filter: {},
+  controls: {
+    $with: [{ name: 'author' }],
+  },
+})
+// posts[0].author → { id: 1, name: 'Alice', ... }
+
+// Multiple relations + nested $with
+const users = await userTable.findMany({
+  filter: {},
+  controls: {
+    $with: [{
+      name: 'posts',
+      filter: { status: 'published' },
+      controls: {
+        $sort: { createdAt: -1 },
+        $limit: 5,
+        $with: [{ name: 'comments' }],
+      },
+    }],
+  },
+})
+```
+
+Each `$with` entry is a sub-query with its own `filter`, `controls` (including nested `$with`), and `$select`. FK fields needed for joining are automatically included in projections.
+
+`findOne` and `findById` also support `$with` via the controls parameter:
+
+```typescript
+const post = await postTable.findById(1, {
+  $with: [{ name: 'author' }, { name: 'comments' }],
+})
+```
+
+See [Relations & Foreign Keys](./relations) for how to declare relations in your schema and full examples.
+
 ## Embedded Objects
 
 Atscript interfaces can contain nested object fields — either inline (`contact: { email: string }`) or named embedded types (`address: Address` where `Address` has no `@db.table`). The DB layer automatically handles these based on the adapter.

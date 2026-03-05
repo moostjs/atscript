@@ -37,6 +37,7 @@ import type { TSqliteDriver } from './types'
 export class SqliteAdapter extends BaseDbAdapter {
   constructor(protected readonly driver: TSqliteDriver) {
     super()
+    driver.exec('PRAGMA foreign_keys = ON')
   }
 
   /** SQLite does not use schemas — override to always exclude schema. */
@@ -200,7 +201,8 @@ export class SqliteAdapter extends BaseDbAdapter {
   async ensureTable(): Promise<void> {
     const sql = buildCreateTable(
       this.resolveTableName(),
-      this._table.fieldDescriptors
+      this._table.fieldDescriptors,
+      this._table.foreignKeys
     )
     this.driver.exec(sql)
   }

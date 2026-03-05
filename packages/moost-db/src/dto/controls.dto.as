@@ -6,6 +6,7 @@ export interface QueryControlsDto {
     $select?: SelectControlDto | string[]
     $search?: string
     $index?: string
+    $with?: WithRelationDto[]
 }
 
 export interface PagesControlsDto {
@@ -17,10 +18,31 @@ export interface PagesControlsDto {
     $select?: SelectControlDto | string[]
     $search?: string
     $index?: string
+    $with?: WithRelationDto[]
 }
 
 export interface GetOneControlsDto {
     $select?: SelectControlDto | string[]
+    $with?: WithRelationDto[]
+}
+
+interface WithRelationDto {
+    name: string
+    filter?: WithFilterDto
+    controls?: WithRelationControlsDto
+    insights?: WithFilterDto
+}
+
+interface WithRelationControlsDto {
+    $skip?: number.int.positive
+    $limit?: number.int.positive
+    $sort?: SortControlDto
+    $select?: SelectControlDto | string[]
+    $with?: WithRelationDto[]
+}
+
+interface WithFilterDto {
+    [*]: string | number | boolean | null | WithFilterDto | WithFilterDto[]
 }
 
 interface SortControlDto {

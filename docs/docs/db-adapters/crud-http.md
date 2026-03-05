@@ -151,7 +151,18 @@ When `$search` is provided and the table has fulltext/search indexes, the contro
 | `$count` | `boolean` | Return count instead of records |
 | `$search` | `string` | Fulltext search term |
 | `$index` | `string` | Name of the search index to use |
+| `$with` | `string` | Load relations (e.g., `$with=author,comments`) |
 | *(other)* | *any* | Filter fields (e.g., `status=active`, `priority=high`) |
+
+**Relation loading:**
+
+```
+GET /posts/query?$with=author,comments
+GET /posts/query?$with=author,comments($limit=5&$sort=-createdAt)
+GET /users/query?$with=posts(status=published&$with=comments(body~=Great))
+```
+
+See [URL Query Syntax — `$with`](./crud-http-query-syntax#with-relation-loading) for the full syntax and [Relations](./relations) for schema setup.
 
 ### `GET /pages` -- Paginated Results
 
@@ -181,6 +192,7 @@ Returns a paginated response object:
 | `$select` | `string` | — | Field projection |
 | `$search` | `string` | — | Fulltext search term |
 | `$index` | `string` | — | Search index name |
+| `$with` | `string` | — | Load relations |
 | *(other)* | *any* | — | Filter fields |
 
 ### `GET /one/:id` -- Single Record
@@ -190,7 +202,7 @@ GET /todos/one/42
 GET /todos/one/69a8c048...
 ```
 
-Looks up the record by primary key. Returns `404` if not found. Supports `$select` in the query string for field projection.
+Looks up the record by primary key. Returns `404` if not found. Supports `$select` for field projection and `$with` for relation loading in the query string.
 
 Filtering is not allowed on this endpoint -- any filter parameters will return a `400` error.
 
@@ -354,6 +366,8 @@ Available hooks:
 ## See Also
 
 - [Core Annotations](./annotations) -- `@db.*` annotation reference
+- [Relations & Foreign Keys](./relations) -- `@db.rel.*` and `$with` loading
 - [DB Tables](./tables) -- `AtscriptDbTable` reference
 - [Queries & Filters](./queries) -- Filter expression syntax
+- [URL Query Syntax](./crud-http-query-syntax) -- Full URL filter and `$with` syntax
 - [Patch Operations](./patch-operations) -- Array-level patch operators

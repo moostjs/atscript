@@ -9,9 +9,10 @@ import {
   type TMetadataMap,
   type Validator,
   type TValidatorOptions,
+  type TValidatorPlugin,
 } from '@atscript/typescript/utils'
 
-import type { FilterExpr, UniqueryControls, Uniquery } from '@uniqu/core'
+import type { FilterExpr, UniqueryControls, Uniquery, WithRelation } from '@uniqu/core'
 
 import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
@@ -25,14 +26,17 @@ import type {
   TDbDefaultValue,
   TDbDeleteResult,
   TDbFieldMeta,
+  TDbForeignKey,
   TDbIndex,
   TDbIndexField,
   TDbInsertManyResult,
   TDbInsertResult,
+  TDbRelation,
   TDbStorageType,
   TDbUpdateResult,
   TIdDescriptor,
   TSearchIndexInfo,
+  TTableResolver,
 } from './types'
 
 const INDEX_PREFIX = 'atscript__'
@@ -83,12 +87,116 @@ function toBool(value: unknown): unknown {
   return !!value
 }
 
+/** Minimal interface for a resolved related table. */
+interface TResolvedTable {
+  findMany(query: unknown): Promise<Array<Record<string, unknown>>>
+  primaryKeys: readonly string[]
+  relations: ReadonlyMap<string, TDbRelation>
+  foreignKeys: ReadonlyMap<string, TDbForeignKey>
+}
+
+/** Per-relation filter + controls bundle. */
+interface TRelationQuery {
+  filter: FilterExpr | undefined
+  controls: Record<string, unknown>
+}
+
+/**
+ * If controls include an array-style $select, ensure the given join fields
+ * are present so that FK matching works after the query returns.
+ */
+function ensureSelectIncludesFields(
+  controls: Record<string, unknown> | undefined,
+  fields: string[]
+): Record<string, unknown> | undefined {
+  if (!controls) { return controls }
+  const sel = controls.$select
+  if (!Array.isArray(sel)) { return controls }
+  const augmented = [...sel]
+  for (const f of fields) {
+    if (!augmented.includes(f)) { augmented.push(f) }
+  }
+  return { ...controls, $select: augmented }
+}
+
+function compositeKey(fields: string[], obj: Record<string, unknown>): string {
+  return fields.map(f => String(obj[f] ?? '')).join('\0')
+}
+
+/** Collects unique non-null values for a field across rows. */
+function collectUniqueValues(rows: Array<Record<string, unknown>>, field: string): unknown[] {
+  const set = new Set<unknown>()
+  for (const row of rows) {
+    const v = row[field]
+    if (v !== null && v !== undefined) { set.add(v) }
+  }
+  return [...set]
+}
+
+interface TAssignOpts {
+  rows: Array<Record<string, unknown>>
+  related: Array<Record<string, unknown>>
+  localField: string
+  remoteField: string
+  relName: string
+}
+
+/** Assigns related items grouped by FK value (one-to-many). */
+function assignGrouped(opts: TAssignOpts): void {
+  const { rows, related, localField, remoteField, relName } = opts
+  const groups = new Map<unknown, Array<Record<string, unknown>>>()
+  for (const item of related) {
+    const key = item[remoteField]
+    let group = groups.get(key)
+    if (!group) {
+      group = []
+      groups.set(key, group)
+    }
+    group.push(item)
+  }
+  for (const row of rows) {
+    row[relName] = groups.get(row[localField]) ?? []
+  }
+}
+
+/** Assigns related items by FK value (many-to-one / one-to-one). */
+function assignSingle(opts: TAssignOpts): void {
+  const { rows, related, localField, remoteField, relName } = opts
+  const index = new Map<unknown, Record<string, unknown>>()
+  for (const item of related) {
+    const key = item[remoteField]
+    if (!index.has(key)) { index.set(key, item) }
+  }
+  for (const row of rows) {
+    row[relName] = index.get(row[localField]) ?? null
+  }
+}
+
 function indexKey(type: string, name: string): string {
   const cleanName = name
     .replace(/[^a-z0-9_.-]/gi, '_')
     .replace(/_+/g, '_')
     .slice(0, 127 - INDEX_PREFIX.length - type.length - 2)
   return `${INDEX_PREFIX}${type}__${cleanName}`
+}
+
+/**
+ * Validator plugin that skips navigational relation fields.
+ * Fields annotated with `@db.rel.to` or `@db.rel.from` are virtual references
+ * to other tables — they have no stored column and should not be validated.
+ */
+const navFieldsValidatorPlugin: TValidatorPlugin = (ctx, def, value) => {
+  if (
+    def.metadata.has('db.rel.to' as keyof AtscriptMetadata) ||
+    def.metadata.has('db.rel.from' as keyof AtscriptMetadata)
+  ) {
+    if (value !== undefined) {
+      ctx.error(`Navigational field is not allowed in input`)
+      return false
+    }
+    return true
+  }
+  return undefined
 }
 
 /**
@@ -135,6 +243,8 @@ export class AtscriptDbTable<
   protected _ignoredFields = new Set<string>()
   protected _navFields = new Set<string>()
   protected _uniqueProps = new Set<string>()
+  protected _foreignKeys = new Map<string, TDbForeignKey>()
+  protected _relations = new Map<string, TDbRelation>()
 
   // ── Embedded object mapping ──────────────────────────────────────────────
 
@@ -167,7 +277,8 @@ export class AtscriptDbTable<
   constructor(
     protected readonly _type: T,
     protected readonly adapter: A,
-    protected readonly logger: TGenericLogger = NoopLogger
+    protected readonly logger: TGenericLogger = NoopLogger,
+    protected readonly _tableResolver?: TTableResolver
   ) {
     if (!isAnnotatedType(_type)) {
       throw new Error('Atscript Annotated Type expected')
@@ -284,6 +395,23 @@ export class AtscriptDbTable<
   public get uniqueProps(): ReadonlySet<string> {
     this._flatten()
     return this._uniqueProps
+  }
+
+  /** Foreign key constraints from `@db.rel.FK` annotations. */
+  public get foreignKeys(): ReadonlyMap<string, TDbForeignKey> {
+    this._flatten()
+    return this._foreignKeys
+  }
+
+  /** Navigational relation metadata from `@db.rel.to` / `@db.rel.from`. */
+  public get relations(): ReadonlyMap<string, TDbRelation> {
+    this._flatten()
+    return this._relations
+  }
+
+  /** The underlying database adapter instance. */
+  public get dbAdapter(): A {
+    return this.adapter
   }
 
   /** Precomputed logical dot-path → physical column name map. */
@@ -491,9 +619,15 @@ export class AtscriptDbTable<
     query: Uniquery<FlatType>
   ): Promise<DataType | null> {
     this._flatten()
+    const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
     const result = await this.adapter.findOne(translatedQuery)
-    return result ? this._reconstructFromRead(result) as DataType : null
+    if (!result) { return null }
+    const row = this._reconstructFromRead(result)
+    if (withRelations?.length) {
+      await this._loadRelations([row], withRelations)
+    }
+    return row as DataType
   }
 
   /**
@@ -503,9 +637,14 @@ export class AtscriptDbTable<
     query: Uniquery<FlatType>
   ): Promise<DataType[]> {
     this._flatten()
+    const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
     const results = await this.adapter.findMany(translatedQuery)
-    return results.map(row => this._reconstructFromRead(row)) as DataType[]
+    const rows = results.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
+    return rows as DataType[]
   }
 
   /**
@@ -527,10 +666,15 @@ export class AtscriptDbTable<
     query: Uniquery<FlatType>
   ): Promise<{ data: DataType[]; count: number }> {
     this._flatten()
+    const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const result = await this.adapter.findManyWithCount(translated)
+    const rows = result.data.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
     return {
-      data: result.data.map(row => this._reconstructFromRead(row)) as DataType[],
+      data: rows as DataType[],
       count: result.count,
     }
   }
@@ -560,9 +704,14 @@ export class AtscriptDbTable<
     indexName?: string
   ): Promise<DataType[]> {
     this._flatten()
+    const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const results = await this.adapter.search(text, translated, indexName)
-    return results.map(row => this._reconstructFromRead(row)) as DataType[]
+    const rows = results.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
+    return rows as DataType[]
   }
 
   /**
@@ -578,10 +727,15 @@ export class AtscriptDbTable<
     indexName?: string
   ): Promise<{ data: DataType[]; count: number }> {
     this._flatten()
+    const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const result = await this.adapter.searchWithCount(text, translated, indexName)
+    const rows = result.data.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
     return {
-      data: result.data.map(row => this._reconstructFromRead(row)) as DataType[],
+      data: rows as DataType[],
       count: result.count,
     }
   }
@@ -677,10 +831,17 @@ export class AtscriptDbTable<
       topLevelArrayTag: this.adapter.getTopLevelArrayTag?.() ?? 'db.__topLevelArray',
       excludePhantomTypes: true,
       onField: (path, type, metadata) => {
-        this._scanGenericAnnotations(path, metadata)
+        this._scanGenericAnnotations(path, type, metadata)
         this.adapter.onFieldScanned?.(path, type, metadata)
       },
     })
+
+    // Strip entries nested under navigational relation fields (e.g. "projects.status"
+    // when "projects" is @db.rel.from). These are traversed by flattenAnnotatedType but
+    // are not stored columns — their defaults, indexes, etc. must be discarded.
+    if (this._navFields.size > 0) {
+      this._purgeNavFieldDescendants()
+    }
 
     // Classify fields and build path maps (before finalizing indexes)
     if (!this._nestedObjects) {
@@ -710,6 +871,7 @@ export class AtscriptDbTable<
    */
   private _scanGenericAnnotations(
     fieldName: string,
+    fieldType: TAtscriptAnnotatedType,
     metadata: TMetadataMap<AtscriptMetadata>
   ): void {
     // @meta.id → primary key (no-arg annotation: metadata.has checks existence)
@@ -741,10 +903,62 @@ export class AtscriptDbTable<
     }
 
     // @db.rel.to / @db.rel.from → navigational field, not a stored column
-    // Keys are checked as strings since the annotation specs are defined in Phase 2.
     if (metadata.has('db.rel.to' as keyof AtscriptMetadata) || metadata.has('db.rel.from' as keyof AtscriptMetadata)) {
       this._navFields.add(fieldName)
       this._ignoredFields.add(fieldName)
+
+      const direction = metadata.has('db.rel.to' as keyof AtscriptMetadata) ? 'to' as const : 'from' as const
+      const raw = metadata.get(`db.rel.${direction}` as keyof AtscriptMetadata)
+      const alias = (raw === true ? undefined : raw) as string | undefined
+      const isArr = fieldType.type.kind === 'array'
+      const elementType = isArr
+        ? (fieldType.type as unknown as { of: TAtscriptAnnotatedType }).of
+        : fieldType
+      // Resolve ref to get the actual target type (e.g., Project class from refTo(() => Project))
+      const resolveTarget = () => elementType?.ref?.type() ?? elementType
+      this._relations.set(fieldName, {
+        direction,
+        alias,
+        targetType: resolveTarget,
+        isArray: isArr,
+      })
+    }
+
+    // @db.rel.FK → foreign key constraint metadata
+    if (metadata.has('db.rel.FK' as keyof AtscriptMetadata)) {
+      const raw = metadata.get('db.rel.FK' as keyof AtscriptMetadata)
+      const alias = (raw === true ? undefined : raw) as string | undefined
+      if (fieldType.ref) {
+        const refTarget = fieldType.ref.type()
+        const targetTable = (refTarget?.metadata?.get('db.table' as keyof AtscriptMetadata) as string) || refTarget?.id || ''
+        const targetField = fieldType.ref.field
+        const key = alias || `__auto_${fieldName}`
+        const existing = this._foreignKeys.get(key)
+        if (existing) {
+          existing.fields.push(fieldName)
+          existing.targetFields.push(targetField)
+        } else {
+          this._foreignKeys.set(key, {
+            fields: [fieldName],
+            targetTable,
+            targetFields: [targetField],
+            alias,
+          })
+        }
+      }
+    }
+
+    // @db.rel.onDelete / @db.rel.onUpdate → referential actions on FK
+    const onDelete = metadata.get('db.rel.onDelete' as keyof AtscriptMetadata) as string | undefined
+    const onUpdate = metadata.get('db.rel.onUpdate' as keyof AtscriptMetadata) as string | undefined
+    if (onDelete || onUpdate) {
+      for (const fk of this._foreignKeys.values()) {
+        if (fk.fields.includes(fieldName)) {
+          if (onDelete) { fk.onDelete = onDelete as TDbForeignKey['onDelete'] }
+          if (onUpdate) { fk.onUpdate = onUpdate as TDbForeignKey['onUpdate'] }
+          break
+        }
+      }
     }
 
     // @db.index.plain
@@ -780,6 +994,40 @@ export class AtscriptDbTable<
           `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
         )
       }
+    }
+  }
+
+  /**
+   * Removes entries nested under nav field prefixes from all internal maps.
+   * Called after flattening to discard defaults/indexes/column mappings that
+   * were registered for fields inside navigational relations.
+   */
+  private _purgeNavFieldDescendants(): void {
+    const isUnderNav = (path: string) => {
+      for (const nav of this._navFields) {
+        if (path.startsWith(`${nav}.`)) { return true }
+      }
+      return false
+    }
+
+    for (const key of this._defaults.keys()) {
+      if (isUnderNav(key)) { this._defaults.delete(key) }
+    }
+    for (const key of this._columnMap.keys()) {
+      if (isUnderNav(key)) { this._columnMap.delete(key) }
+    }
+    for (const key of this._jsonFields) {
+      if (isUnderNav(key)) { this._jsonFields.delete(key) }
+    }
+    this._primaryKeys = this._primaryKeys.filter(k => !isUnderNav(k))
+
+    // Purge index fields that reference nav-descendant paths
+    for (const [, index] of this._indexes) {
+      index.fields = index.fields.filter(f => !isUnderNav(f.name))
+    }
+    // Remove empty indexes
+    for (const [name, index] of this._indexes) {
+      if (index.fields.length === 0) { this._indexes.delete(name) }
     }
   }
 
@@ -1181,6 +1429,7 @@ export class AtscriptDbTable<
         filter: query.filter,
         controls: {
           ...controls,
+          $with: undefined, // $with is handled by the table layer, not passed to adapters
           $select: controls?.$select
             ? new UniquSelect(controls.$select, this._allPhysicalFields)
             : undefined,
@@ -1227,7 +1476,7 @@ export class AtscriptDbTable<
   private _translateControls(controls: UniqueryControls): DbControls {
     if (!controls) { return {} }
 
-    const result: DbControls = { ...controls, $select: undefined }
+    const result: DbControls = { ...controls, $select: undefined, $with: undefined }
 
     if (controls.$sort) {
       const translated: Record<string, unknown> = {}
@@ -1399,13 +1648,266 @@ export class AtscriptDbTable<
     return filter
   }
 
+  // ── Internal: relation loading ($with) ────────────────────────────────────
+
+  /**
+   * Loads related data for `$with` relations and attaches them to the result rows.
+   * Uses batch queries (IN filters) to avoid N+1.
+   */
+  private async _loadRelations(
+    rows: Array<Record<string, unknown>>,
+    withRelations: WithRelation[]
+  ): Promise<void> {
+    if (rows.length === 0 || withRelations.length === 0) { return }
+
+    // Let the adapter handle relation loading if it supports it natively
+    if (this.adapter.supportsNativeRelations()) {
+      return this.adapter.loadRelations(rows, withRelations, this._relations, this._foreignKeys)
+    }
+
+    // Fallback: application-level batch loading (requires a table resolver)
+    if (!this._tableResolver) { return }
+
+    const tasks: Array<Promise<void>> = []
+
+    for (const withRel of withRelations) {
+      const relName = withRel.name
+      // Only handle top-level relations (dot-notation nesting handled recursively)
+      if (relName.includes('.')) { continue }
+
+      const relation = this._relations.get(relName)
+      if (!relation) {
+        throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...this._relations.keys()].join(', ') || '(none)'}`)
+      }
+
+      const targetType = relation.targetType()
+      if (!targetType) { continue }
+
+      const targetTable = this._tableResolver(targetType)
+      if (!targetTable) {
+        this.logger.warn(`Could not resolve table for relation "${relName}" — skipping`)
+        continue
+      }
+
+      // WithRelation is a Uniquery — pass filter + controls directly
+      const filter = withRel.filter && Object.keys(withRel.filter).length > 0
+        ? withRel.filter : undefined
+      const relQuery: TRelationQuery = { filter, controls: withRel.controls || {} }
+
+      if (relation.direction === 'to') {
+        tasks.push(this._loadToRelation(rows, { relName, relation, targetTable, relQuery }))
+      } else {
+        tasks.push(this._loadFromRelation(rows, { relName, relation, targetTable, relQuery }))
+      }
+    }
+
+    await Promise.all(tasks)
+  }
+
+  /**
+   * Loads a `@db.rel.to` relation (FK is on this table).
+   * Collects FK values from rows → batch query target → assign back.
+   */
+  private async _loadToRelation(
+    rows: Array<Record<string, unknown>>,
+    opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery }
+  ): Promise<void> {
+    const { relName, relation, targetTable, relQuery } = opts
+    // Find the FK that connects this relation to the target
+    const fkEntry = this._findFKForRelation(relation)
+    if (!fkEntry) { return }
+
+    const { localFields, targetFields } = fkEntry
+
+    // Simple case: single-field FK
+    if (localFields.length === 1) {
+      const localField = localFields[0]
+      const targetField = targetFields[0]
+
+      // Collect unique FK values
+      const fkValues = collectUniqueValues(rows, localField)
+      if (fkValues.length === 0) {
+        // All FK values are null — assign null to all rows
+        for (const row of rows) { row[relName] = null }
+        return
+      }
+
+      // Query target table
+      const inFilter = { [targetField]: { $in: fkValues } }
+      const targetFilter = relQuery.filter
+        ? { $and: [inFilter, relQuery.filter] }
+        : inFilter
+
+      const controls = ensureSelectIncludesFields(relQuery.controls, targetFields)
+      const related = await targetTable.findMany({ filter: targetFilter, controls })
+
+      assignSingle({ rows, related, localField, remoteField: targetField, relName })
+    } else {
+      // Composite FK — match on all fields
+      const related = await this._queryCompositeFK(rows, { localFields, targetFields, targetTable, relQuery })
+
+      const index = new Map<string, Record<string, unknown>>()
+      for (const item of related) {
+        index.set(compositeKey(targetFields, item), item)
+      }
+
+      for (const row of rows) {
+        row[relName] = index.get(compositeKey(localFields, row)) ?? null
+      }
+    }
+  }
+
+  /**
+   * Loads a `@db.rel.from` relation (FK is on the target table).
+   * Collects PK values from rows → batch query target by its FK → assign back.
+   */
+  private async _loadFromRelation(
+    rows: Array<Record<string, unknown>>,
+    opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery }
+  ): Promise<void> {
+    const { relName, relation, targetTable, relQuery } = opts
+    // Find the FK on the target table that points back to this table
+    const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
+    if (!remoteFK) {
+      this.logger.warn(`Could not find FK on target table for relation "${relName}"`)
+      return
+    }
+
+    const localFields = remoteFK.targetFields  // our PK fields
+    const remoteFields = remoteFK.fields         // FK fields on target table
+
+    if (localFields.length === 1) {
+      const localField = localFields[0]
+      const remoteField = remoteFields[0]
+
+      const pkValues = collectUniqueValues(rows, localField)
+      if (pkValues.length === 0) { return }
+
+      const inFilter = { [remoteField]: { $in: pkValues } }
+      const targetFilter = relQuery.filter
+        ? { $and: [inFilter, relQuery.filter] }
+        : inFilter
+
+      const controls = ensureSelectIncludesFields(relQuery.controls, remoteFields)
+      const related = await targetTable.findMany({ filter: targetFilter, controls })
+
+      if (relation.isArray) {
+        assignGrouped({ rows, related, localField, remoteField, relName })
+      } else {
+        assignSingle({ rows, related, localField, remoteField, relName })
+      }
+    } else {
+      // Composite FK
+      const related = await this._queryCompositeFK(rows, { localFields, targetFields: remoteFields, targetTable, relQuery })
+
+      if (relation.isArray) {
+        const groups = new Map<string, Array<Record<string, unknown>>>()
+        for (const item of related) {
+          const key = compositeKey(remoteFields, item)
+          let group = groups.get(key)
+          if (!group) {
+            group = []
+            groups.set(key, group)
+          }
+          group.push(item)
+        }
+        for (const row of rows) {
+          row[relName] = groups.get(compositeKey(localFields, row)) ?? []
+        }
+      } else {
+        const index = new Map<string, Record<string, unknown>>()
+        for (const item of related) {
+          const key = compositeKey(remoteFields, item)
+          if (!index.has(key)) { index.set(key, item) }
+        }
+        for (const row of rows) {
+          row[relName] = index.get(compositeKey(localFields, row)) ?? null
+        }
+      }
+    }
+  }
+
+  /**
+   * Finds the FK entry that connects a `@db.rel.to` relation to its target.
+   */
+  private _findFKForRelation(relation: TDbRelation): { localFields: string[]; targetFields: string[] } | undefined {
+    for (const fk of this._foreignKeys.values()) {
+      if (relation.alias) {
+        if (fk.alias === relation.alias) {
+          return { localFields: fk.fields, targetFields: fk.targetFields }
+        }
+      } else if (fk.targetTable === this._resolveRelationTargetTable(relation)) {
+        return { localFields: fk.fields, targetFields: fk.targetFields }
+      }
+    }
+    return undefined
+  }
+
+  private _resolveRelationTargetTable(relation: TDbRelation): string {
+    const targetType = relation.targetType()
+    return (targetType?.metadata?.get('db.table' as keyof AtscriptMetadata) as string) || targetType?.id || ''
+  }
+
+  /**
+   * Finds a FK on a remote table that points back to this table.
+   */
+  private _findRemoteFK(
+    targetTable: TResolvedTable,
+    thisTableName: string,
+    alias?: string
+  ): TDbForeignKey | undefined {
+    for (const fk of targetTable.foreignKeys.values()) {
+      if (alias && fk.alias === alias && fk.targetTable === thisTableName) { return fk }
+      if (!alias && fk.targetTable === thisTableName) { return fk }
+    }
+    return undefined
+  }
+
+  /**
+   * Batch query for composite FK — collects all unique field combinations from rows
+   * and queries target with $or filter.
+   */
+  private _queryCompositeFK(
+    rows: Array<Record<string, unknown>>,
+    opts: { localFields: string[]; targetFields: string[]; targetTable: TResolvedTable; relQuery: TRelationQuery }
+  ): Promise<Array<Record<string, unknown>>> {
+    const { localFields, targetFields, targetTable, relQuery } = opts
+    const seen = new Set<string>()
+    const orFilters: Array<Record<string, unknown>> = []
+
+    for (const row of rows) {
+      const key = compositeKey(localFields, row)
+      if (seen.has(key)) { continue }
+      seen.add(key)
+
+      const condition: Record<string, unknown> = {}
+      let valid = true
+      for (let i = 0; i < localFields.length; i++) {
+        const val = row[localFields[i]]
+        if (val === null || val === undefined) { valid = false; break }
+        condition[targetFields[i]] = val
+      }
+      if (valid) { orFilters.push(condition) }
+    }
+
+    if (orFilters.length === 0) { return Promise.resolve([]) }
+
+    const baseFilter = orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
+    const targetFilter = relQuery.filter ? { $and: [baseFilter, relQuery.filter] } : baseFilter
+
+    return targetTable.findMany({ filter: targetFilter, controls: relQuery.controls })
+  }
+
   // ── Internal: validator building ──────────────────────────────────────────
 
   /**
    * Builds a validator for a given purpose with adapter plugins.
    */
   protected _buildValidator(purpose: string): Validator<T, DataType> {
-    const plugins = this.adapter.getValidatorPlugins()
+    const plugins = [
+      ...this.adapter.getValidatorPlugins(),
+      navFieldsValidatorPlugin,
+    ]
 
     switch (purpose) {
       case 'insert': {

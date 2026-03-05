@@ -1,4 +1,4 @@
-import type { TDbFieldMeta, DbControls, UniquSelect } from '@atscript/utils-db'
+import type { TDbFieldMeta, TDbForeignKey, TDbReferentialAction, DbControls, UniquSelect } from '@atscript/utils-db'
 
 import type { TSqlFragment } from './filter-builder'
 
@@ -101,7 +101,8 @@ export function buildDelete(
  */
 export function buildCreateTable(
   table: string,
-  fields: readonly TDbFieldMeta[]
+  fields: readonly TDbFieldMeta[],
+  foreignKeys?: ReadonlyMap<string, TDbForeignKey>
 ): string {
   const colDefs: string[] = []
   const primaryKeys = fields.filter(f => f.isPrimaryKey)
@@ -132,7 +133,29 @@ export function buildCreateTable(
     colDefs.push(`PRIMARY KEY (${pkCols})`)
   }
 
+  // Foreign key constraints
+  if (foreignKeys) {
+    for (const fk of foreignKeys.values()) {
+      const localCols = fk.fields.map(f => `"${esc(f)}"`).join(', ')
+      const targetCols = fk.targetFields.map(f => `"${esc(f)}"`).join(', ')
+      let constraint = `FOREIGN KEY (${localCols}) REFERENCES "${esc(fk.targetTable)}" (${targetCols})`
+      if (fk.onDelete) { constraint += ` ON DELETE ${refActionToSql(fk.onDelete)}` }
+      if (fk.onUpdate) { constraint += ` ON UPDATE ${refActionToSql(fk.onUpdate)}` }
+      colDefs.push(constraint)
+    }
+  }
+
   return `CREATE TABLE IF NOT EXISTS "${esc(table)}" (${colDefs.join(', ')})`
+}
+
+function refActionToSql(action: TDbReferentialAction): string {
+  switch (action) {
+    case 'cascade': { return 'CASCADE' }
+    case 'restrict': { return 'RESTRICT' }
+    case 'setNull': { return 'SET NULL' }
+    case 'setDefault': { return 'SET DEFAULT' }
+    default: { return 'NO ACTION' }
+  }
 }
 
 /**

@@ -26,10 +26,11 @@ export class SemanticStructureNode extends SemanticGroup {
   }
 
   registerAtDocument(doc: AtscriptDoc): void {
-    super.registerAtDocument(doc)
     const block = this.token('identifier')!
     block.blockType = 'structure'
     doc.blocksIndex.add(block)
+    // Pre-populate ownerNode and props so annotation validation can
+    // traverse prop → structure → interface and discover sibling FK fields
     for (const node of this.nodes) {
       const token = node.token('identifier')
       if (!token) {
@@ -52,6 +53,7 @@ export class SemanticStructureNode extends SemanticGroup {
       node.ownerNode = this
       this.props.set(name, node)
     }
+    super.registerAtDocument(doc)
   }
 
   addVirtualProp(opts: {

@@ -41,6 +41,11 @@ declare global {
     "db.default.fn": string
     "db.json": boolean
     "db.ignore": boolean
+    "db.rel.FK": string | true
+    "db.rel.to": string | true
+    "db.rel.from": string | true
+    "db.rel.onDelete": string
+    "db.rel.onUpdate": string
     "db.mongo.collection": boolean
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
     "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]

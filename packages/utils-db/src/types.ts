@@ -11,6 +11,7 @@ export type {
   FieldOpsFor,
   UniqueryControls,
   Uniquery,
+  WithRelation,
 } from '@uniqu/core'
 
 // ── Resolved query types (adapter-facing) ──────────────────────────────────
@@ -130,4 +131,54 @@ export interface TDbFieldMeta {
    * Undefined for non-flattened fields.
    */
   flattenedFrom?: string
+}
+
+// ── Foreign Key Types ────────────────────────────────────────────────────
+
+export type TDbReferentialAction = 'cascade' | 'restrict' | 'noAction' | 'setNull' | 'setDefault'
+
+export interface TDbForeignKey {
+  /** FK field names on this table (local columns). */
+  fields: string[]
+  /** Target table name (from the chain ref's type @db.table annotation). */
+  targetTable: string
+  /** Target field names on the referenced table. */
+  targetFields: string[]
+  /** Alias grouping FK fields (if any). */
+  alias?: string
+  /** Referential action on delete. */
+  onDelete?: TDbReferentialAction
+  /** Referential action on update. */
+  onUpdate?: TDbReferentialAction
+}
+
+// ── Table Resolver ───────────────────────────────────────────────────────
+
+/**
+ * Callback that resolves an annotated type to a queryable table instance.
+ * Required for `$with` relation loading — each table needs to query related tables.
+ *
+ * Typically provided by the driver/registry (e.g. `AsMongo.getTable`, `AsSqlite.getTable`).
+ */
+export type TTableResolver = (type: TAtscriptAnnotatedType) => Pick<AtscriptDbTableLike, 'findMany' | 'primaryKeys' | 'relations' | 'foreignKeys'> | undefined
+
+/** Minimal table interface used by the table resolver. Avoids circular dependency with AtscriptDbTable. */
+export interface AtscriptDbTableLike {
+  findMany(query: unknown): Promise<Array<Record<string, unknown>>>
+  primaryKeys: readonly string[]
+  relations: ReadonlyMap<string, TDbRelation>
+  foreignKeys: ReadonlyMap<string, TDbForeignKey>
+}
+
+// ── Relation Types ───────────────────────────────────────────────────────
+
+export interface TDbRelation {
+  /** Direction: 'to' (FK is local) or 'from' (FK is remote). */
+  direction: 'to' | 'from'
+  /** The alias used for pairing (if any). */
+  alias?: string
+  /** Target type's annotated type reference. */
+  targetType: () => TAtscriptAnnotatedType
+  /** Whether this is an array relation (one-to-many). */
+  isArray: boolean
 }

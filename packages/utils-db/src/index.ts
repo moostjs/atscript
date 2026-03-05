@@ -1,5 +1,7 @@
 export { AtscriptDbTable, resolveDesignType } from './db-table'
 export { BaseDbAdapter } from './base-adapter'
+export { DbSpace } from './db-space'
+export type { TAdapterFactory } from './db-space'
 export { UniquSelect } from './uniqu-select'
 export { decomposePatch } from './patch-decomposer'
 export { getKeyProps } from './patch-types'
@@ -24,7 +26,12 @@ export type {
   TDbStorageType,
   TDbIndexType,
   TDbDefaultFn,
+  TDbForeignKey,
+  TDbReferentialAction,
+  TDbRelation,
   TSearchIndexInfo,
+  TTableResolver,
+  WithRelation,
 } from './types'
 export type { TGenericLogger } from './logger'
 export { NoopLogger } from './logger'

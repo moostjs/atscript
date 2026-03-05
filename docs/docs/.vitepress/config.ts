@@ -408,6 +408,7 @@ export default defineConfig({
           items: [
             { text: 'Architecture', link: '/db-adapters/' },
             { text: 'Annotations', link: '/db-adapters/annotations' },
+            { text: 'Relations', link: '/db-adapters/relations' },
             { text: 'Tables API', link: '/db-adapters/tables' },
             { text: 'Queries & Filters', link: '/db-adapters/queries' },
             { text: 'Patch Operations', link: '/db-adapters/patch-operations' },

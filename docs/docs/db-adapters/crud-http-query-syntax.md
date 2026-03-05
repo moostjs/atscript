@@ -128,6 +128,7 @@ Control keywords start with `$` and configure query behavior:
 | `$index` | -- | `$index=my_search_idx` | Named search index |
 | `$page` | -- | `$page=3` | Page number (for `/pages` endpoint) |
 | `$size` | -- | `$size=25` | Items per page (for `/pages` endpoint) |
+| `$with` | -- | `$with=author,comments` | Load relations ([details](#with-relation-loading)) |
 
 ### `$select` Modes
 
@@ -158,6 +159,66 @@ Result: `{ $sort: { createdAt: -1, name: 1 } }`
 | `null` | `null` | `deleted=null` |
 | `'quoted'` | `string` | `name='John Doe'` |
 | Bare word | `string` | `status=active` |
+
+## `$with` — Relation Loading {#with-relation-loading}
+
+Load navigational properties declared with [`@db.rel.to` / `@db.rel.from`](./relations). Comma-separated names load multiple relations. Parentheses scope filters and controls to a specific relation.
+
+### Basic
+
+```
+$with=author
+```
+
+Load the `author` relation for each result.
+
+### Multiple Relations
+
+```
+$with=author,comments
+```
+
+Load both `author` and `comments`.
+
+### Nested Relations
+
+```
+$with=posts($with=comments)
+```
+
+Load posts, and for each post load its comments.
+
+### With Filter
+
+```
+$with=posts(status=published)
+```
+
+Only load posts where `status` is `published`.
+
+### With Controls
+
+```
+$with=posts($sort=-createdAt&$limit=5)
+```
+
+Load the 5 most recent posts, sorted by creation date.
+
+### Combined (Multi-Level)
+
+```
+$with=posts(status=published&$sort=-createdAt&$with=comments(body~=Great))
+```
+
+Load published posts (newest first), and for each post load comments whose body matches "Great".
+
+### With Projection
+
+```
+$with=posts($select=title,createdAt&$with=comments($select=body))
+```
+
+Load posts with only `title` and `createdAt`, and their comments with only `body`. FK fields needed for joining are included automatically.
 
 ## Complete Examples
 
@@ -201,8 +262,25 @@ GET /users/query?$select=-password,-secret
 
 All users, excluding password and secret fields.
 
+### Loading relations
+
+```
+GET /posts/query?$with=author,comments&$sort=-createdAt&$limit=10
+```
+
+Latest 10 posts with author and comments loaded.
+
+### Filtered nested relations
+
+```
+GET /users/query?$with=posts(status=published&$sort=-createdAt&$limit=5&$with=comments($limit=3))
+```
+
+All users with their 5 most recent published posts, each with up to 3 comments.
+
 ## See Also
 
 - [CRUD over HTTP](./crud-http) -- REST endpoint reference
 - [Queries & Filters](./queries) -- Programmatic filter syntax
+- [Relations & Foreign Keys](./relations) -- Declaring relations in your schema
 - [Customization](./crud-http-customization) -- Hooks and overrides

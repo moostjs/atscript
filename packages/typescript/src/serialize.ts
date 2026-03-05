@@ -58,11 +58,17 @@ export interface TSerializedTypeComplex {
   tags: string[]
 }
 
+export interface TSerializedTypeRef {
+  kind: '$ref'
+  id: string
+}
+
 export type TSerializedTypeDef =
   | TSerializedTypeFinal
   | TSerializedTypeObject
   | TSerializedTypeArray
   | TSerializedTypeComplex
+  | TSerializedTypeRef
 
 // ---------------------------------------------------------------------------
 // Serialization options
@@ -121,7 +127,8 @@ export function serializeAnnotatedType(
   type: TAtscriptAnnotatedType,
   options?: TSerializeOptions
 ): TSerializedAnnotatedType {
-  const result = serializeNode(type, [], options) as TSerializedAnnotatedType
+  const visited = new Set<string>()
+  const result = serializeNode(type, [], options, visited) as TSerializedAnnotatedType
   result.$v = SERIALIZE_VERSION
   return result
 }
@@ -129,10 +136,21 @@ export function serializeAnnotatedType(
 function serializeNode(
   def: TAtscriptAnnotatedType,
   path: string[],
-  options: TSerializeOptions | undefined
+  options: TSerializeOptions | undefined,
+  visited: Set<string>
 ): TSerializedAnnotatedTypeInner {
+  // Cycle detection: if this named type was already serialized, emit a $ref
+  if (def.id && visited.has(def.id)) {
+    return {
+      type: { kind: '$ref' as const, id: def.id },
+      metadata: {},
+      ...(def.optional ? { optional: true } : {}),
+      id: def.id,
+    }
+  }
+  if (def.id) { visited.add(def.id) }
   const result: TSerializedAnnotatedTypeInner = {
-    type: serializeTypeDef(def, path, options),
+    type: serializeTypeDef(def, path, options, visited),
     metadata: serializeMetadata(def.metadata, path, def.type.kind, options),
   }
   if (def.optional) {
@@ -147,7 +165,8 @@ function serializeNode(
 function serializeTypeDef(
   def: TAtscriptAnnotatedType,
   path: string[],
-  options: TSerializeOptions | undefined
+  options: TSerializeOptions | undefined,
+  visited: Set<string>
 ): TSerializedTypeDef {
   return forAnnotatedType<TSerializedTypeDef>(def, {
     phantom(d) {
@@ -171,11 +190,11 @@ function serializeTypeDef(
     object(d) {
       const props: Record<string, TSerializedAnnotatedTypeInner> = {}
       for (const [key, val] of d.type.props.entries()) {
-        props[key] = serializeNode(val, [...path, key], options)
+        props[key] = serializeNode(val, [...path, key], options, visited)
       }
       const propsPatterns = d.type.propsPatterns.map(pp => ({
         pattern: { source: pp.pattern.source, flags: pp.pattern.flags },
-        def: serializeNode(pp.def, path, options),
+        def: serializeNode(pp.def, path, options, visited),
       }))
       return {
         kind: 'object' as const,
@@ -187,28 +206,28 @@ function serializeTypeDef(
     array(d) {
       return {
         kind: 'array' as const,
-        of: serializeNode(d.type.of, path, options),
+        of: serializeNode(d.type.of, path, options, visited),
         tags: Array.from(d.type.tags),
       }
     },
     union(d) {
       return {
         kind: 'union' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options)),
+        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
         tags: Array.from(d.type.tags),
       }
     },
     intersection(d) {
       return {
         kind: 'intersection' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options)),
+        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
         tags: Array.from(d.type.tags),
       }
     },
     tuple(d) {
       return {
         kind: 'tuple' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options)),
+        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
         tags: Array.from(d.type.tags),
       }
     },
@@ -329,6 +348,10 @@ function deserializeTypeDef(t: TSerializedTypeDef): TAtscriptTypeDef {
         items: t.items.map(item => deserializeNode(item)),
         tags,
       }
+    }
+    case '$ref': {
+      // Circular reference — return a minimal placeholder
+      return { kind: 'object', props: new Map(), propsPatterns: [], tags }
     }
     default: {
       throw new Error(`Unknown serialized type kind "${(t as any).kind}"`)

@@ -29,6 +29,11 @@ This means a single `.as` file can describe a data model that works with multipl
 | `@db.default.fn` | field | `fn` (string) | Database function for default value |
 | `@db.ignore` | field | — | Exclude field from database operations |
 | `@db.json` | field | — | Force a field to be stored as a single JSON column |
+| `@db.rel.FK` | field | `alias?` (string) | Declares a foreign key constraint |
+| `@db.rel.to` | field | `alias?` (string) | Forward navigational property (FK is local) |
+| `@db.rel.from` | field | `alias?` (string) | Inverse navigational property (FK is remote) |
+| `@db.rel.onDelete` | field | `action` (string) | Referential action on delete |
+| `@db.rel.onUpdate` | field | `action` (string) | Referential action on update |
 
 ::: tip Primary Keys
 Primary keys are declared with `@meta.id` (from the `@meta.*` namespace, not `@db.*`). See [Primary Keys](#primary-keys) below.
@@ -247,6 +252,10 @@ Array fields (`string[]`, `{ label: string }[]`) are always stored as JSON — n
 :::
 
 See [Embedded Objects](./tables#embedded-objects) for the full flattening strategy.
+
+## Relations (`@db.rel.*`)
+
+The `@db.rel.*` namespace declares foreign keys, navigational properties, and referential actions. See [Relations & Foreign Keys](./relations) for full documentation.
 
 ## Database-Specific Extensions
 

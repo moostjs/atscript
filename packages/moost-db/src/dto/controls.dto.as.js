@@ -36,6 +36,39 @@ export class GetOneControlsDto {
 }
 
 
+class WithRelationDto {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "WithRelationDto"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
+
+class WithRelationControlsDto {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "WithRelationControlsDto"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
+
+class WithFilterDto {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "WithFilterDto"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
+
 class SortControlDto {
   static __is_atscript_annotated_type = true
   static type = {}
@@ -111,6 +144,14 @@ $("object", QueryControlsDto)
       .tags("string")
       .optional()
       .$type
+  ).prop(
+    "$with",
+    $("array")
+      .of($()
+          .refTo(WithRelationDto)
+          .$type)
+      .optional()
+      .$type
   )
 
 $("object", PagesControlsDto)
@@ -159,6 +200,14 @@ $("object", PagesControlsDto)
       .tags("string")
       .optional()
       .$type
+  ).prop(
+    "$with",
+    $("array")
+      .of($()
+          .refTo(WithRelationDto)
+          .$type)
+      .optional()
+      .$type
   )
 
 $("object", GetOneControlsDto)
@@ -174,6 +223,113 @@ $("object", GetOneControlsDto)
               .$type)
           .$type)
       .optional()
+      .$type
+  ).prop(
+    "$with",
+    $("array")
+      .of($()
+          .refTo(WithRelationDto)
+          .$type)
+      .optional()
+      .$type
+  )
+
+$("object", WithRelationDto)
+  .prop(
+    "name",
+    $().designType("string")
+      .tags("string")
+      .$type
+  ).prop(
+    "filter",
+    $()
+      .refTo(WithFilterDto)
+      .optional()
+      .$type
+  ).prop(
+    "controls",
+    $()
+      .refTo(WithRelationControlsDto)
+      .optional()
+      .$type
+  ).prop(
+    "insights",
+    $()
+      .refTo(WithFilterDto)
+      .optional()
+      .$type
+  )
+
+$("object", WithRelationControlsDto)
+  .prop(
+    "$skip",
+    $().designType("number")
+      .tags("positive", "int", "number")
+      .annotate("expect.int", true)
+      .annotate("expect.min", { minValue: 0,  })
+      .optional()
+      .$type
+  ).prop(
+    "$limit",
+    $().designType("number")
+      .tags("positive", "int", "number")
+      .annotate("expect.int", true)
+      .annotate("expect.min", { minValue: 0,  })
+      .optional()
+      .$type
+  ).prop(
+    "$sort",
+    $()
+      .refTo(SortControlDto)
+      .optional()
+      .$type
+  ).prop(
+    "$select",
+    $("union")
+      .item($()
+          .refTo(SelectControlDto)
+          .$type)
+      .item($("array")
+          .of($().designType("string")
+              .tags("string")
+              .$type)
+          .$type)
+      .optional()
+      .$type
+  ).prop(
+    "$with",
+    $("array")
+      .of($()
+          .refTo(WithRelationDto)
+          .$type)
+      .optional()
+      .$type
+  )
+
+$("object", WithFilterDto)
+  .propPattern(
+    /./,
+    $("union")
+      .item($().designType("string")
+          .tags("string")
+          .$type)
+      .item($().designType("number")
+          .tags("number")
+          .$type)
+      .item($().designType("boolean")
+          .tags("boolean")
+          .$type)
+      .item($().designType("null")
+          .tags("null")
+          .$type)
+      .item($()
+          .refTo(WithFilterDto)
+          .$type)
+      .item($("array")
+          .of($()
+              .refTo(WithFilterDto)
+              .$type)
+          .$type)
       .$type
   )
 

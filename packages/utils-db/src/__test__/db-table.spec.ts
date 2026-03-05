@@ -13,6 +13,11 @@ import type {
 
 import { prepareFixtures } from './test-utils'
 
+// Helper to build WithRelation objects (Uniquery & { name })
+function withRel(name: string, opts?: { filter?: any; controls?: any }): any {
+  return { name, filter: opts?.filter ?? {}, controls: opts?.controls ?? {} }
+}
+
 // Populated by beforeAll after fixtures are compiled
 let UsersTable: any
 let NoTableAnnotation: any
@@ -716,6 +721,256 @@ describe('AtscriptDbTable — embedded objects', () => {
       const call = adapter.calls.find(c => c.method === 'findOne')!
       const query = call.args[0] as DbQuery
       expect(query.filter).toHaveProperty('name', 'Alice')
+    })
+  })
+
+  // ── $with relation loading ──────────────────────────────────────────────
+
+  describe('$with relation loading', () => {
+    let mainAdapter: MockAdapter
+    let mainTable: AtscriptDbTable
+
+    // Mock target table for "to" relations (e.g., author lookup)
+    const mockTargetTable = {
+      findMany: vi.fn(),
+      primaryKeys: ['id'] as readonly string[],
+      relations: new Map(),
+      foreignKeys: new Map(),
+    }
+
+    // Mock target table for "from" relations (e.g., posts by author)
+    const mockFromTargetTable = {
+      findMany: vi.fn(),
+      primaryKeys: ['id'] as readonly string[],
+      relations: new Map(),
+      foreignKeys: new Map([
+        ['__auto_authorId', {
+          fields: ['authorId'],
+          targetTable: 'users',
+          targetFields: ['id'],
+        }],
+      ]),
+    }
+
+    const tableResolver = vi.fn().mockReturnValue(mockTargetTable)
+
+    beforeEach(() => {
+      mainAdapter = new MockAdapter()
+      mainTable = new AtscriptDbTable(UsersTable, mainAdapter, undefined, tableResolver)
+
+      // Inject FK metadata: this table has a FK "authorId" → target "authors" table
+      const tbl = mainTable as any
+      tbl._foreignKeys.set('__auto_authorId', {
+        fields: ['authorId'],
+        targetTable: 'authors',
+        targetFields: ['id'],
+      })
+
+      // Inject relation metadata
+      tbl._relations.set('author', {
+        direction: 'to',
+        alias: undefined,
+        targetType: () => ({ id: 'Author', metadata: new Map([['db.table', 'authors']]) }),
+        isArray: false,
+      })
+
+      tbl._relations.set('posts', {
+        direction: 'from',
+        alias: undefined,
+        targetType: () => ({ id: 'Post', metadata: new Map([['db.table', 'posts']]) }),
+        isArray: true,
+      })
+
+      tableResolver.mockReset()
+      mockTargetTable.findMany.mockReset()
+      mockFromTargetTable.findMany.mockReset()
+    })
+
+    it('should load a "to" relation (many-to-one)', async () => {
+      // Main adapter returns rows with FK values
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'alice@test.com', authorId: 10, status: 'active', createdAt: 0 },
+        { id: 2, name: 'Bob', email_address: 'bob@test.com', authorId: 20, status: 'active', createdAt: 0 },
+        { id: 3, name: 'Carol', email_address: 'carol@test.com', authorId: 10, status: 'active', createdAt: 0 },
+      ]
+
+      tableResolver.mockReturnValue(mockTargetTable)
+      mockTargetTable.findMany.mockResolvedValue([
+        { id: 10, name: 'Author A' },
+        { id: 20, name: 'Author B' },
+      ])
+
+      const results = await mainTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('author')] },
+      } as any)
+
+      expect(results).toHaveLength(3)
+      expect((results[0] as any).author).toEqual({ id: 10, name: 'Author A' })
+      expect((results[1] as any).author).toEqual({ id: 20, name: 'Author B' })
+      expect((results[2] as any).author).toEqual({ id: 10, name: 'Author A' })
+
+      // Should batch into a single $in query
+      expect(mockTargetTable.findMany).toHaveBeenCalledTimes(1)
+      const call = mockTargetTable.findMany.mock.calls[0][0]
+      expect(call.filter).toHaveProperty('id')
+      expect(call.filter.id.$in).toEqual(expect.arrayContaining([10, 20]))
+    })
+
+    it('should load a "from" relation (one-to-many)', async () => {
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'alice@test.com', status: 'active', createdAt: 0 },
+        { id: 2, name: 'Bob', email_address: 'bob@test.com', status: 'active', createdAt: 0 },
+      ]
+
+      tableResolver.mockReturnValue(mockFromTargetTable)
+      mockFromTargetTable.findMany.mockResolvedValue([
+        { id: 100, title: 'Post A', authorId: 1 },
+        { id: 101, title: 'Post B', authorId: 1 },
+        { id: 102, title: 'Post C', authorId: 2 },
+      ])
+
+      const results = await mainTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('posts')] },
+      } as any)
+
+      expect(results).toHaveLength(2)
+      expect((results[0] as any).posts).toHaveLength(2)
+      expect((results[0] as any).posts[0]).toEqual({ id: 100, title: 'Post A', authorId: 1 })
+      expect((results[1] as any).posts).toHaveLength(1)
+      expect((results[1] as any).posts[0]).toEqual({ id: 102, title: 'Post C', authorId: 2 })
+    })
+
+    it('should assign null for "to" relation when FK is null', async () => {
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'a@x.com', authorId: null, status: 'active', createdAt: 0 },
+      ]
+
+      tableResolver.mockReturnValue(mockTargetTable)
+      mockTargetTable.findMany.mockResolvedValue([])
+
+      const results = await mainTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('author')] },
+      } as any)
+
+      expect((results[0] as any).author).toBeNull()
+    })
+
+    it('should assign empty array for "from" relation with no matches', async () => {
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'a@x.com', status: 'active', createdAt: 0 },
+      ]
+
+      tableResolver.mockReturnValue(mockFromTargetTable)
+      mockFromTargetTable.findMany.mockResolvedValue([])
+
+      const results = await mainTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('posts')] },
+      } as any)
+
+      expect((results[0] as any).posts).toEqual([])
+    })
+
+    it('should pass per-relation filter and controls to target query', async () => {
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'a@x.com', authorId: 10, status: 'active', createdAt: 0 },
+      ]
+
+      tableResolver.mockReturnValue(mockTargetTable)
+      mockTargetTable.findMany.mockResolvedValue([
+        { id: 10, name: 'Author A' },
+      ])
+
+      await mainTable.findMany({
+        filter: {},
+        controls: {
+          $with: [withRel('author', {
+            filter: { active: true },
+            controls: { $sort: { name: 1 }, $limit: 5 },
+          })],
+        },
+      } as any)
+
+      const call = mockTargetTable.findMany.mock.calls[0][0]
+      // Filter should be $and of $in + per-relation filter
+      expect(call.filter.$and).toBeDefined()
+      expect(call.filter.$and[1]).toEqual({ active: true })
+      expect(call.controls.$sort).toEqual({ name: 1 })
+      expect(call.controls.$limit).toBe(5)
+    })
+
+    it('should throw for unknown relations in $with', async () => {
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'a@x.com', status: 'active', createdAt: 0 },
+      ]
+
+      const tbl = new AtscriptDbTable(UsersTable, mainAdapter, undefined, tableResolver)
+
+      await expect(
+        tbl.findMany({
+          filter: {},
+          controls: { $with: [withRel('nonexistent')] },
+        } as any)
+      ).rejects.toThrow('Unknown relation "nonexistent"')
+    })
+
+    it('should not load relations when no table resolver is provided', async () => {
+      const noResolverTable = new AtscriptDbTable(UsersTable, mainAdapter)
+      const tbl = noResolverTable as any
+      tbl._relations.set('author', {
+        direction: 'to',
+        alias: undefined,
+        targetType: () => ({ id: 'Author', metadata: new Map() }),
+        isArray: false,
+      })
+
+      mainAdapter.findMany = async () => [
+        { id: 1, name: 'Alice', email_address: 'a@x.com', authorId: 10, status: 'active', createdAt: 0 },
+      ]
+
+      const results = await noResolverTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('author')] },
+      } as any)
+
+      // Should return results without relation data (no resolver)
+      expect((results[0] as any).author).toBeUndefined()
+    })
+
+    it('should strip $with from translated query before passing to adapter', async () => {
+      const findManySpy = vi.fn().mockResolvedValue([])
+      mainAdapter.findMany = findManySpy
+
+      await mainTable.findMany({
+        filter: {},
+        controls: { $with: [withRel('author')] },
+      } as any)
+
+      expect(findManySpy).toHaveBeenCalledTimes(1)
+      const query = findManySpy.mock.calls[0][0]
+      // $with should be undefined (stripped) — not the original array
+      expect(query.controls.$with).toBeUndefined()
+    })
+
+    it('should work with findOne', async () => {
+      mainAdapter.findOne = async () => ({
+        id: 1, name: 'Alice', email_address: 'a@x.com', authorId: 10, status: 'active', createdAt: 0,
+      })
+
+      tableResolver.mockReturnValue(mockTargetTable)
+      mockTargetTable.findMany.mockResolvedValue([
+        { id: 10, name: 'Author A' },
+      ])
+
+      const result = await mainTable.findOne({
+        filter: { id: 1 },
+        controls: { $with: [withRel('author')] },
+      } as any) as any
+
+      expect(result.author).toEqual({ id: 10, name: 'Author A' })
     })
   })
 })

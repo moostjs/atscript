@@ -61,6 +61,7 @@ export function flattenAnnotatedType(
 ): Map<string, TAtscriptAnnotatedType> {
   const flatMap = new Map<string, TAtscriptAnnotatedType>()
   const skipPhantom = !!options?.excludePhantomTypes
+  const visitedIds = new Set<string>()
 
   function addFieldToFlatMap(name: string, def: TAtscriptAnnotatedType) {
     const existing = flatMap.get(name) as
@@ -113,6 +114,16 @@ export function flattenAnnotatedType(
   }
 
   function flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
+    // Cycle detection: if this type has an id we've already visited, treat as leaf
+    const typeId = def.id
+    if (typeId && visitedIds.has(typeId)) {
+      addFieldToFlatMap(prefix || '', def)
+      if (prefix) {
+        options?.onField?.(prefix, def, def.metadata)
+      }
+      return
+    }
+    if (typeId) { visitedIds.add(typeId) }
     switch (def.type.kind) {
       case 'object': {
         addFieldToFlatMap(prefix || '', def)
