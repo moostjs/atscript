@@ -1,3 +1,20 @@
+## [0.1.32](https://github.com/moostjs/atscript/compare/v0.1.31...v0.1.32) (2026-03-05)
+
+
+### Bug Fixes
+
+* fix tests ([bd0953d](https://github.com/moostjs/atscript/commit/bd0953df596ea2a58b904fab67ca674d6e2aa84a))
+* **LSP:** fix props usage list ([7bdb85b](https://github.com/moostjs/atscript/commit/7bdb85b8ad9fad95a4d793a6ff530f6375364c34))
+
+
+### Features
+
+* add generic moost db controller ([20ba118](https://github.com/moostjs/atscript/commit/20ba118a05298d943da8fa117a23c3b886153c1a))
+* add primary key type safety ([9f97c19](https://github.com/moostjs/atscript/commit/9f97c1975bca7f4d66ed485ff35276161849840a))
+* implement moost db controller ([fbfd8ed](https://github.com/moostjs/atscript/commit/fbfd8edf594bd1e5325380be90e06a791d67b5c9))
+
+
+
 ## [0.1.31](https://github.com/moostjs/atscript/compare/v0.1.30...v0.1.31) (2026-03-03)
 
 
