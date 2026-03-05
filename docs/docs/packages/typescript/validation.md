@@ -163,7 +163,7 @@ interface OrderItem {
 }
 ```
 
-- `@expect.array.key` **identifies** which fields form an element's identity — it's used by `@expect.array.uniqueItems` and [patch operations](/db-support/patch-operations), but does **not** enforce uniqueness by itself.
+- `@expect.array.key` **identifies** which fields form an element's identity — it's used by `@expect.array.uniqueItems` and [patch operations](/db-adapters/patch-operations), but does **not** enforce uniqueness by itself.
 - `@expect.array.uniqueItems` **enforces** no duplicate items during validation. For object arrays, it checks by key fields if defined; for primitive arrays (e.g., `string[]`), it checks by deep equality.
 - Multiple `@expect.array.key` fields on the same element type form a **composite key**.
 
