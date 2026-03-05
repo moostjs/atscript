@@ -45,7 +45,7 @@
     "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
-    "@prostojs/parser": "^0.5.11",
+    "@prostojs/parser": "^0.6.0",
     "defu": "^6.1.4",
     "glob": "^13.0.2",
     "rolldown": "1.0.0-rc.4"

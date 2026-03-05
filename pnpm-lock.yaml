@@ -193,8 +193,8 @@ importers:
   packages/core:
     dependencies:
       '@prostojs/parser':
-        specifier: ^0.5.11
-        version: 0.5.11
+        specifier: ^0.6.0
+        version: 0.6.0
       defu:
         specifier: ^6.1.4
         version: 6.1.4
@@ -1547,6 +1547,9 @@ packages:
 
   '@prostojs/parser@0.5.11':
     resolution: {integrity: sha512-apV1PUbnu7EAsn0/QGE5unyNmqe+o3tCcsa3lYOsplXV55u43ax3vQ/4jxVUOrcF13vKkYkhR4jl6111kHHxpA==}
+
+  '@prostojs/parser@0.6.0':
+    resolution: {integrity: sha512-/sm+StB0O/HKNRWKGVQPtEy1bLIC8EgQekxMkK9lHPKmS7iQITfb/AqPTOSO70GNV5b1CNpiOJNZqc7pyGl6PA==}
 
   '@prostojs/router@0.3.3':
     resolution: {integrity: sha512-DOKbC+FckKv4Z0D6NxQEIp+/gTbpEfP599KGT9jIeF2yjMXdt4DHSqvlhuChBIyVh34AEYjwUmGC+DQJXIVhkg==}
@@ -5419,6 +5422,8 @@ snapshots:
   '@prostojs/parser@0.5.11':
     dependencies:
       '@prostojs/tree': 0.3.0
+
+  '@prostojs/parser@0.6.0': {}
 
   '@prostojs/router@0.3.3':
     dependencies:

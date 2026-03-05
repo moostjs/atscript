@@ -1,7 +1,6 @@
-import type { ProstoParserNodeContext } from '@prostojs/parser'
-import { BasicNode } from '@prostojs/parser'
+import type { ParsedNode } from '@prostojs/parser'
+import { Node } from '@prostojs/parser'
 
-import { toVsCodeRange } from '../../parser/utils'
 import type { TLexicalToken } from '../types'
 import { AIdentifierToken } from './a-identifier.token'
 import { BlockToken } from './block.token'
@@ -23,51 +22,65 @@ export const tokens = {
   number: NumberToken,
   text: TextToken,
   regexp: RegExpToken,
-  root: undefined as unknown as BasicNode<TLexicalToken>,
+  root: undefined as unknown as Node<TLexicalToken>,
 }
 
-export const root = new BasicNode<TLexicalToken>({
-  label: 'root',
-  skipToken: /\s/u,
-}).addRecognizes(
-  ...tokens.comments,
-  tokens.block,
-  tokens.aIdentifier,
-  tokens.identifier,
-  tokens.text,
-  tokens.number,
-  tokens.punctuation
-)
+export const root = new Node<TLexicalToken>({
+  name: 'root',
+  skip: /\s/u,
+  eofClose: true,
+  recognizes: [
+    ...commentNodes.all,
+    BlockToken,
+    AIdentifierToken,
+    IdentifierToken,
+    TextToken,
+    NumberToken,
+    PunctuationToken,
+  ],
+})
 
 tokens.root = root
 
-BlockToken.addRecognizes(
-  tokens.regexp,
-  ...tokens.comments,
-  tokens.block,
-  tokens.aIdentifier,
-  tokens.identifier,
-  tokens.text,
-  tokens.number,
-  tokens.punctuation
+BlockToken.recognize(
+  RegExpToken,
+  ...commentNodes.all,
+  BlockToken,
+  AIdentifierToken,
+  IdentifierToken,
+  TextToken,
+  NumberToken,
+  PunctuationToken,
 )
 
-export const mapContent = (content: ProstoParserNodeContext['content']) =>
-  content.map(item => {
+/**
+ * Recursively extract TLexicalToken[] from a ParsedNode tree.
+ * Replaces the v0.5 mapContent('children', callback) + global loop.
+ *
+ * v0.6 Position has { offset, line, column }.
+ * line is 1-based, column is 1-based.
+ * VSCode expects 0-based line, 0-based character.
+ */
+export function extractTokens(node: ParsedNode): TLexicalToken[] {
+  return node.content.map(item => {
     if (typeof item === 'string') {
       return {
         type: 'unknown',
         text: item,
       } as TLexicalToken
     }
-    const data = item.getCustomData<TLexicalToken>()
-    data.getRange = () =>
-      toVsCodeRange(item.startPos, item.endPos, data.startOffset, data.endOffset)
+    const data = item.data as TLexicalToken
+    data.getRange = () => ({
+      start: {
+        line: item.start.line - 1,
+        character: item.start.column - 1 + (data.startOffset ?? 0),
+      },
+      end: {
+        line: item.end.line - 1,
+        character: item.end.column - 1 + (data.endOffset ?? 0),
+      },
+    })
+    data.children = extractTokens(item)
     return data
   })
-
-for (const node of Object.values(tokens)) {
-  if (node instanceof BasicNode) {
-    node.popsAtEOFSource(true).mapContent('children', mapContent)
-  }
 }

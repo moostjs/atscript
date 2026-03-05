@@ -1,16 +1,15 @@
-import { BasicNode } from '@prostojs/parser'
+import { Node } from '@prostojs/parser'
 
 import type { TLexicalToken } from '../types'
 
 /**
  * Annotation (@) Identifier node
  */
-export const AIdentifierToken = new BasicNode<TLexicalToken>({
-  icon: '@',
-  tokens: [/@[\p{ID_Continue}$.]*/u, /[^\p{ID_Continue}$.]/u],
-  tokenOE: '-eject',
+export const AIdentifierToken = new Node<TLexicalToken>({
+  name: 'annotation',
+  start: { token: /@[\p{ID_Continue}$.]*/u },
+  end: { token: /[^\p{ID_Continue}$.]/u, eject: true },
+  eofClose: true,
+  data: { type: 'annotation' as const, text: '' } as TLexicalToken,
+  mapContent: 'text',
 })
-  .mapContent('text', 'join-clear')
-  .onMatch(context => {
-    context.customData.type = 'annotation'
-  })

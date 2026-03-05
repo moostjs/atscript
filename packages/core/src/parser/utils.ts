@@ -1,29 +1,10 @@
 import path from 'path'
 import { URL } from 'url'
 
-/* eslint-disable sonarjs/no-nested-template-literals */
-/* eslint-disable max-params */
-import type { ProstoParserNodeContext } from '@prostojs/parser'
-
-export function toVsCodeRange(
-  start: ProstoParserNodeContext['startPos'],
-  end: ProstoParserNodeContext['endPos'],
-  startOffset = 0,
-  endOffset = 0
-) {
-  return {
-    start: {
-      line: start.row - 1,
-      character: start.col + startOffset,
-    },
-    end: {
-      line: end.row - 1,
-      character: end.col + endOffset,
-    },
-  }
+export type TVsCodeRange = {
+  start: { line: number; character: number }
+  end: { line: number; character: number }
 }
-
-export type TVsCodeRange = ReturnType<typeof toVsCodeRange>
 
 export function resolveAtscriptFromPath(from: string, id: string) {
   return `file://${path.join(id.slice(7).split('/').slice(0, -1).join('/'), from)}.as`

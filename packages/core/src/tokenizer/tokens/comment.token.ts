@@ -1,34 +1,24 @@
-import { BasicNode } from '@prostojs/parser'
+import { Node } from '@prostojs/parser'
 
 import type { TLexicalToken } from '../types'
 
-const inline = new BasicNode<TLexicalToken>({
-  // label only for tree view
-  label: 'inline-comment',
-  // icon only for tree view
-  icon: '“',
-  // start/end tokens
-  tokens: ['//', /$/mu],
-  // Omit/Eject options for tokens
-  tokenOE: 'omit-omit',
+const inline = new Node<TLexicalToken>({
+  name: 'inline-comment',
+  start: { token: '//', omit: true },
+  end: { token: /$/mu, omit: true },
+  eofClose: true,
+  data: { type: 'comment' as const, text: '' } as TLexicalToken,
+  mapContent: 'text',
 })
-  .mapContent('text', 'join-clear')
-  .popsAtEOFSource(true)
-  .onMatch(context => {
-    context.customData.type = 'comment'
-  })
 
-const block = new BasicNode<TLexicalToken>({
-  label: 'block-comment',
-  icon: '“',
-  tokens: ['/*', '*/'],
-  tokenOE: 'omit-omit',
+const block = new Node<TLexicalToken>({
+  name: 'block-comment',
+  start: { token: '/*', omit: true },
+  end: { token: '*/', omit: true },
+  eofClose: true,
+  data: { type: 'comment' as const, text: '' } as TLexicalToken,
+  mapContent: 'text',
 })
-  .mapContent('text', 'join-clear')
-  .popsAtEOFSource(true)
-  .onMatch(context => {
-    context.customData.type = 'comment'
-  })
 
 /**
  * Block and inline comments

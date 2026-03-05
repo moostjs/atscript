@@ -1,9 +1,11 @@
-import { mapContent, root } from './tokens'
+import { printTree } from '@prostojs/parser'
+
+import { extractTokens, root } from './tokens'
 
 export function tokenize(source: string, debug = false) {
-  const tokens = root.parse(source)
+  const result = root.parse(source)
   if (debug) {
-    console.log(tokens.toTree())
+    console.log(printTree(result))
   }
-  return mapContent(tokens.content)
+  return extractTokens(result)
 }

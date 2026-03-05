@@ -1,17 +1,15 @@
-import { BasicNode } from '@prostojs/parser'
+import { Node } from '@prostojs/parser'
 
 import type { TLexicalToken } from '../types'
 
 /**
  * Number node
  */
-export const NumberToken = new BasicNode<TLexicalToken>({
-  icon: 'N',
-  // tokens: [/\d[\p{ID_Continue}$]*/u, /[^\p{ID_Continue}$]/u],
-  tokens: [/[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?/u, /[^\d]/u],
-  tokenOE: '-eject',
+export const NumberToken = new Node<TLexicalToken>({
+  name: 'number',
+  start: { token: /[-+]?(?:\d*\.\d+|\d+)(?:[eE][-+]?\d+)?/u },
+  end: { token: /[^\d]/u, eject: true },
+  eofClose: true,
+  data: { type: 'number' as const, text: '' } as TLexicalToken,
+  mapContent: 'text',
 })
-  .mapContent('text', 'join-clear')
-  .onMatch(context => {
-    context.customData.type = 'number'
-  })
