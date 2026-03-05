@@ -203,6 +203,24 @@ export class AtscriptDoc {
       this.registerMessages(annotationSpec.validate(mainToken, args || [], this))
       annotationSpec.modify(mainToken, args || [], this)
       this.resolvedAnnotations.push(mainToken)
+      // Track ref-typed arguments for import resolution
+      const specArgs = annotationSpec.arguments
+      for (let i = 0; i < (args?.length ?? 0); i++) {
+        const argSpec = specArgs[i]
+        if (argSpec?.type === 'ref' && args?.[i]) {
+          const refToken = args[i]
+          const dotIdx = refToken.text.indexOf('.')
+          if (dotIdx > 0) {
+            // For chain refs like "User.status", only the type name needs import tracking
+            const typeToken = refToken.clone({ text: refToken.text.slice(0, dotIdx) })
+            typeToken.isReference = true
+            this.referred.push(typeToken)
+          } else {
+            refToken.isReference = true
+            this.referred.push(refToken)
+          }
+        }
+      }
     } else {
       let severity: 0 | 1 | 2 = 0
       switch (this.config.unknownAnnotation) {

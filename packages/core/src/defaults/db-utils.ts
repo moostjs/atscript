@@ -8,6 +8,57 @@ import {
   type SemanticRefNode,
   type SemanticStructureNode,
 } from '../parser/nodes'
+import type { Token } from '../parser/token'
+import type { TMessages } from '../parser/types'
+
+/**
+ * Validate a ref annotation argument against the document's type registry.
+ * Returns diagnostic messages for unknown types or fields.
+ */
+export function validateRefArgument(
+  token: Token,
+  doc: AtscriptDoc,
+  options?: { requireDbTable?: boolean }
+): TMessages {
+  const messages: TMessages = []
+  const text = token.text
+  const [typeName, ...chain] = text.split('.')
+
+  const decl = doc.getDeclarationOwnerNode(typeName)
+  if (!decl) {
+    messages.push({
+      severity: 1,
+      message: `Unknown type '${typeName}'.`,
+      range: token.range,
+    })
+    return messages
+  }
+
+  if (chain.length > 0) {
+    const unwound = doc.unwindType(typeName, chain)
+    if (!unwound) {
+      messages.push({
+        severity: 1,
+        message: `Field '${chain.join('.')}' does not exist on type '${typeName}'.`,
+        range: token.range,
+      })
+      return messages
+    }
+  }
+
+  if (options?.requireDbTable && decl.node) {
+    const hasDbTable = decl.node.countAnnotations('db.table') > 0
+    if (!hasDbTable) {
+      messages.push({
+        severity: 1,
+        message: `Type '${typeName}' must have @db.table annotation.`,
+        range: token.range,
+      })
+    }
+  }
+
+  return messages
+}
 
 export interface TFKFieldMatch {
   name: string

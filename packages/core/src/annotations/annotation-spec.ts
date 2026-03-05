@@ -18,7 +18,7 @@ import type { TLexicalToken } from '../tokenizer/types'
 export interface TAnnotationArgument {
   optional?: boolean
   name: string
-  type: 'string' | 'number' | 'boolean'
+  type: 'string' | 'number' | 'boolean' | 'ref'
   description?: string
   values?: string[]
 }
@@ -65,7 +65,7 @@ export class AnnotationSpec {
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   private validateType(
     tokenType: TLexicalToken['type'],
-    type: 'string' | 'number' | 'boolean'
+    type: TAnnotationArgument['type']
   ): string | undefined {
     // tokenType:
     //   identifier
@@ -80,6 +80,9 @@ export class AnnotationSpec {
       }
       case 'boolean': {
         return tokenType === 'identifier' ? undefined : 'boolean expected.'
+      }
+      case 'ref': {
+        return tokenType === 'identifier' ? undefined : 'type reference expected.'
       }
       default: {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -243,7 +246,7 @@ export class AnnotationSpec {
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  protected getDefaultValueForType(name: string, type: 'string' | 'number' | 'boolean'): string {
+  protected getDefaultValueForType(name: string, type: TAnnotationArgument['type']): string {
     switch (type) {
       case 'string': {
         return name
@@ -253,6 +256,9 @@ export class AnnotationSpec {
       }
       case 'boolean': {
         return 'true'
+      }
+      case 'ref': {
+        return 'TypeName'
       }
       default: {
         return ''

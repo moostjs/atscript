@@ -757,6 +757,23 @@ export class JsRenderer extends BaseRenderer {
     }
   }
 
+  private emitRefValue(text: string): string {
+    const dotIdx = text.indexOf('.')
+    if (dotIdx === -1) {
+      return `() => ${text}`
+    }
+    const typeName = text.slice(0, dotIdx)
+    const field = text.slice(dotIdx + 1)
+    return `{ type: () => ${typeName}, field: "${escapeQuotes(field)}" }`
+  }
+
+  private emitArgValue(aSpec: { type: string }, argToken: { text: string; type: string }): string {
+    if (aSpec.type === 'ref') {
+      return this.emitRefValue(argToken.text)
+    }
+    return aSpec.type === 'string' ? `"${escapeQuotes(argToken.text)}"` : argToken.text
+  }
+
   private computeAnnotationValue(
     node: SemanticNode,
     an: TAnnotationTokens
@@ -773,9 +790,7 @@ export class JsRenderer extends BaseRenderer {
           let i = 0
           for (const aSpec of spec.arguments) {
             if (an.args[i]) {
-              targetValue += `${wrapProp(aSpec.name)}: ${
-                aSpec.type === 'string' ? `"${escapeQuotes(an.args[i]?.text)}"` : an.args[i]?.text
-              }${i === length - 1 ? '' : ', '} `
+              targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i])}${i === length - 1 ? '' : ', '} `
             }
             i++
           }
@@ -783,8 +798,7 @@ export class JsRenderer extends BaseRenderer {
         } else {
           const aSpec = spec.arguments[0]
           if (an.args[0]) {
-            targetValue =
-              aSpec.type === 'string' ? `"${escapeQuotes(an.args[0]?.text)}"` : an.args[0]?.text
+            targetValue = this.emitArgValue(aSpec, an.args[0])
           } else {
             targetValue = 'true'
           }

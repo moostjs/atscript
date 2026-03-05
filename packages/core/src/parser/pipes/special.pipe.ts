@@ -112,7 +112,10 @@ export function annotations() {
     argument: [
       { node: ['number', 'text'] },
       { node: 'identifier', text: ['true', 'false', 'undefined', 'null'] },
+      { node: 'identifier' },
     ] as TExpect[],
+    dot: { node: 'punctuation', text: '.' } as TExpect,
+    ident: { node: 'identifier' } as TExpect,
     comma: { node: 'punctuation', text: ',' } as TExpect,
     end: { node: 'punctuation', text: [';', '\n'] } as TExpect,
   }
@@ -134,9 +137,24 @@ export function annotations() {
           ni.move()
         }
         while (ni.satisfies(...opts.argument)) {
-          addArgument(new Token(ni.$))
+          let argToken = new Token(ni.$)
           ni.accepted()
           ni.move()
+          // Chain ref continuation: consume .identifier segments for ref args
+          if (argToken.type === 'identifier' && !['true', 'false', 'undefined', 'null'].includes(argToken.text)) {
+            let chainText = argToken.text
+            while (ni.satisfies(opts.dot) && ni.next()?.satisfies(opts.ident)) {
+              ni.accepted()
+              ni.move()
+              chainText += '.' + ni.$!.text
+              ni.accepted()
+              ni.move()
+            }
+            if (chainText !== argToken.text) {
+              argToken = argToken.clone({ text: chainText })
+            }
+          }
+          addArgument(argToken)
           if (ni.satisfies(opts.comma)) {
             ni.accepted()
             ni.move()

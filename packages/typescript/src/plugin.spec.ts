@@ -907,4 +907,38 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/db-table-pk.as.d.ts')
     )
   })
+
+  it('must render ref annotation arguments as lazy getters', async () => {
+    const refAnnotation = new AnnotationSpec({
+      argument: { name: 'target', type: 'ref' },
+    })
+    const refAnnotationMultiArg = new AnnotationSpec({
+      argument: [
+        { name: 'target', type: 'ref' },
+        { name: 'label', type: 'string' },
+      ],
+    })
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/ref-annotation.as'],
+      plugins: [tsPlugin()],
+      annotations: {
+        ...annotations,
+        some: {
+          ref: refAnnotation,
+          refMulti: refAnnotationMultiArg,
+        },
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('ref-annotation.as.js')
+    // Simple ref: PostTag → () => PostTag
+    expect(out[0].content).toContain('() => PostTag')
+    // Chain ref: User.name → { type: () => User, field: "name" }
+    expect(out[0].content).toContain('{ type: () => User, field: "name" }')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/ref-annotation.js')
+    )
+  })
 })
