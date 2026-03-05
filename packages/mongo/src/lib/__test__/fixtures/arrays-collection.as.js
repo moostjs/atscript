@@ -41,13 +41,13 @@ $("object", ArraysCollection)
             "key1",
             $().designType("string")
               .tags("string")
-              .annotate("expect.array.key", true)
+              .annotate("expect.array.key", { })
               .$type
           ).prop(
             "key2",
             $().designType("string")
               .tags("string")
-              .annotate("expect.array.key", true)
+              .annotate("expect.array.key", { })
               .$type
           ).prop(
             "value",
@@ -70,13 +70,13 @@ $("object", ArraysCollection)
             "key1",
             $().designType("string")
               .tags("string")
-              .annotate("expect.array.key", true)
+              .annotate("expect.array.key", { })
               .$type
           ).prop(
             "key2",
             $().designType("string")
               .tags("string")
-              .annotate("expect.array.key", true)
+              .annotate("expect.array.key", { })
               .$type
           ).prop(
             "value",

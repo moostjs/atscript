@@ -50,7 +50,7 @@ $("object", UniqueItems)
       .of($().designType("string")
           .tags("string")
           .$type)
-      .annotate("expect.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", { })
       .optional()
       .$type
   ).prop(
@@ -87,7 +87,7 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("expect.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", { })
       .optional()
       .$type
   ).prop(
@@ -98,7 +98,7 @@ $("object", UniqueItems)
             "a",
             $().designType("string")
               .tags("string")
-              .annotate("expect.array.key", true)
+              .annotate("expect.array.key", { })
               .$type
           ).prop(
             "b",
@@ -107,7 +107,7 @@ $("object", UniqueItems)
               .$type
           )
           .$type)
-      .annotate("expect.array.uniqueItems", true)
+      .annotate("expect.array.uniqueItems", { })
       .optional()
       .$type
   ).prop(

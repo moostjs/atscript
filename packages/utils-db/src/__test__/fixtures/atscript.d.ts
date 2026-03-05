@@ -27,8 +27,8 @@ declare global {
     "expect.max": { maxValue: number, message?: string }
     "expect.int": boolean
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
-    "expect.array.uniqueItems": boolean
-    "expect.array.key": boolean
+    "expect.array.uniqueItems": { message?: string }
+    "expect.array.key": { message?: string }
     "emit.jsonSchema": boolean
     "db.patch.strategy": string
     "db.table": string | true
