@@ -1,3 +1,13 @@
+## [0.1.33](https://github.com/moostjs/atscript/compare/v0.1.32...v0.1.33) (2026-03-05)
+
+
+### Bug Fixes
+
+* add unique indexes to __pk type ([7feb54e](https://github.com/moostjs/atscript/commit/7feb54e6b3572645ddae07c880359b382cb62710))
+* improve mongo __pk type ([958a4c6](https://github.com/moostjs/atscript/commit/958a4c6bb5252449a4e75da9a79658a77baf7256))
+
+
+
 ## [0.1.32](https://github.com/moostjs/atscript/compare/v0.1.31...v0.1.32) (2026-03-05)
 
 
