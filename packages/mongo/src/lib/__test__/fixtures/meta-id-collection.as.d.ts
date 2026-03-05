@@ -32,7 +32,7 @@ export declare class TodoCollection {
     "completed": boolean
     "_id": string /* objectId */
   }
-  static __pk: number
+  static __pk: string /* objectId */ | number
 }
 
 /**
@@ -56,6 +56,6 @@ export declare class ItemCollection {
     "name": string
     "_id": string /* objectId */
   }
-  static __pk: string
+  static __pk: string /* objectId */ | string
 }
 // prettier-ignore-end

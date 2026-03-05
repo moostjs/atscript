@@ -25,7 +25,9 @@ export declare class IdPlugin {
   static toExampleData?: () => any
   static __flat: {
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 
 /**
  * Atscript interface **UniqueItems**
@@ -68,5 +70,7 @@ export declare class UniqueItems {
     "kObj.a"?: string
     "kObj.b"?: string
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 // prettier-ignore-end

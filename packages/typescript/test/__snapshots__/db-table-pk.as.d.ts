@@ -76,4 +76,102 @@ export declare class NoPk {
     "name": string
     "value": number
   }}
+
+/**
+ * Atscript interface **MongoSinglePk**
+ * @see {@link ./db-table-pk.as:25:18}
+ */
+export declare class MongoSinglePk {
+  id: number
+  name: string
+  _id: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MongoSinglePk, MongoSinglePk>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MongoSinglePk>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "name": string
+    "_id": string
+  }
+  static __pk: string | number
+}
+
+/**
+ * Atscript interface **MongoCompoundPk**
+ * @see {@link ./db-table-pk.as:34:18}
+ */
+export declare class MongoCompoundPk {
+  userId: string
+  orderId: number
+  amount: number
+  _id: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MongoCompoundPk, MongoCompoundPk>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MongoCompoundPk>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "userId": string
+    "orderId": number
+    "amount": number
+    "_id": string
+  }
+  static __pk: string | {
+    userId: string
+    orderId: number
+  }}
+
+/**
+ * Atscript interface **MongoNoPk**
+ * @see {@link ./db-table-pk.as:45:18}
+ */
+export declare class MongoNoPk {
+  name: string
+  value: number
+  _id: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MongoNoPk, MongoNoPk>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MongoNoPk>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "name": string
+    "value": number
+    "_id": string
+  }
+  static __pk: string
+}
+
+/**
+ * Atscript interface **MongoIdAsMetaId**
+ * @see {@link ./db-table-pk.as:53:18}
+ */
+export declare class MongoIdAsMetaId {
+  _id: string
+  name: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof MongoIdAsMetaId, MongoIdAsMetaId>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof MongoIdAsMetaId>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "_id": string
+    "name": string
+  }
+  static __pk: string
+}
 // prettier-ignore-end

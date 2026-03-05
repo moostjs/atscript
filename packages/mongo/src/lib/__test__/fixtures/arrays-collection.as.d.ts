@@ -69,5 +69,7 @@ export declare class ArraysCollection {
     "withoutKeyMerge.value": string
     "withoutKeyMerge.attribute": string
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 // prettier-ignore-end

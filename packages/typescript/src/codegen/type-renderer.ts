@@ -402,8 +402,12 @@ export class TypeRenderer extends BaseRenderer {
    * - **Single PK** (one `@meta.id`) → `static __pk: <scalar type>`
    * - **Compound PK** (multiple `@meta.id`) → `static __pk: { field1: Type1; field2: Type2 }`
    * - **No PK** → no `__pk` emitted
+   * - **Mongo collection** → always includes `string` (ObjectId) in the union;
+   *   if no `@meta.id` fields, `__pk` is just `string`
    */
   private renderPk(node: SemanticInterfaceNode) {
+    const isMongoCollection = !!node.annotations?.some(a => a.name === 'db.mongo.collection')
+
     let struct: SemanticNode | undefined
     if (node.hasExtends) {
       struct = this.doc.resolveInterfaceExtends(node)
@@ -415,9 +419,14 @@ export class TypeRenderer extends BaseRenderer {
       return
     }
 
+    const structNode = struct as SemanticStructureNode
     const pkProps: Array<{ name: string; prop: SemanticPropNode }> = []
-    for (const [name, prop] of (struct as SemanticStructureNode).props) {
+    for (const [name, prop] of structNode.props) {
       if (prop.token('identifier')?.pattern) {
+        continue
+      }
+      // For mongo collections, skip _id — it's represented separately via its actual type in the union
+      if (isMongoCollection && name === '_id') {
         continue
       }
       if (prop.countAnnotations('meta.id') > 0) {
@@ -425,19 +434,38 @@ export class TypeRenderer extends BaseRenderer {
       }
     }
 
-    if (pkProps.length === 0) {
+    if (pkProps.length === 0 && !isMongoCollection) {
       return
+    }
+
+    // Resolve the _id field type for mongo collections
+    let mongoIdType: string | undefined
+    if (isMongoCollection) {
+      const idProp = structNode.props.get('_id')
+      if (idProp) {
+        mongoIdType = this.renderTypeDefString(idProp.getDefinition()).trim()
+      }
+      mongoIdType ??= 'string'
     }
 
     // Flush any pending content on the current line (e.g. closing `}` from renderFlat's pop())
     this.writeln()
 
-    if (pkProps.length === 1) {
+    if (pkProps.length === 0) {
+      // Mongo collection with no @meta.id — _id type only
+      this.writeln(`static __pk: ${mongoIdType}`)
+    } else if (pkProps.length === 1) {
       this.write('static __pk: ')
+      if (isMongoCollection) {
+        this.write(`${mongoIdType} | `)
+      }
       const renderedDef = this.renderTypeDefString(pkProps[0].prop.getDefinition())
       renderedDef.split('\n').forEach(l => this.writeln(l))
     } else {
       this.write('static __pk: ')
+      if (isMongoCollection) {
+        this.write(`${mongoIdType} | `)
+      }
       this.blockln('{}')
       for (const { name, prop } of pkProps) {
         this.write(wrapProp(name), ': ')

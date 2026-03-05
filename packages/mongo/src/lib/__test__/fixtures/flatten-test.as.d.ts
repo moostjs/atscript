@@ -56,5 +56,7 @@ export declare class FlattenTest {
     "complexArray.field1": string | number
     "complexArray.field2": string
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 // prettier-ignore-end

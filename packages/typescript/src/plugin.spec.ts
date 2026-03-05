@@ -890,7 +890,16 @@ describe('ts-plugin', () => {
       rootDir: wd,
       entries: ['test/fixtures/db-table-pk.as'],
       plugins: [tsPlugin()],
-      annotations,
+      annotations: {
+        ...annotations,
+        db: {
+          mongo: {
+            collection: new AnnotationSpec({
+              nodeType: ['interface'],
+            }),
+          },
+        },
+      },
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].fileName).toBe('db-table-pk.as.d.ts')

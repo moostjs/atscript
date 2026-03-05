@@ -72,7 +72,9 @@ export declare class SimpleCollection {
     "nested.nested2.c"?: number
     "nested.nested2.d"?: string
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 
 /**
  * Atscript interface **MinimalCollection**
@@ -92,7 +94,9 @@ export declare class MinimalCollection {
   static __flat: {
     "name": string
     "_id": string /* objectId */
-  }}
+  }
+  static __pk: string /* objectId */
+}
 
 /**
  * Atscript interface **MinimalCollectionString**
@@ -112,5 +116,7 @@ export declare class MinimalCollectionString {
   static __flat: {
     "_id": string
     "name": string
-  }}
+  }
+  static __pk: string
+}
 // prettier-ignore-end
