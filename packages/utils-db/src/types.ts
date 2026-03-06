@@ -173,12 +173,14 @@ export interface AtscriptDbTableLike {
 // ── Relation Types ───────────────────────────────────────────────────────
 
 export interface TDbRelation {
-  /** Direction: 'to' (FK is local) or 'from' (FK is remote). */
-  direction: 'to' | 'from'
+  /** Direction: 'to' (FK is local), 'from' (FK is remote), or 'via' (M:N junction). */
+  direction: 'to' | 'from' | 'via'
   /** The alias used for pairing (if any). */
   alias?: string
   /** Target type's annotated type reference. */
   targetType: () => TAtscriptAnnotatedType
   /** Whether this is an array relation (one-to-many). */
   isArray: boolean
+  /** Junction type reference for 'via' (M:N) relations. */
+  viaType?: () => TAtscriptAnnotatedType
 }

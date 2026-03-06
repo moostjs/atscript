@@ -46,12 +46,12 @@ declare global {
     "db.rel.from": string | true
     "db.rel.onDelete": string
     "db.rel.onUpdate": string
-    "db.rel.via": ref
-    "db.rel.filter": query
+    "db.rel.via": import("@atscript/typescript/utils").AtscriptRef
+    "db.rel.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.name": string
-    "db.view.for": ref
-    "db.view.joins": ({ target: ref, condition: query })[]
-    "db.view.filter": query
+    "db.view.for": import("@atscript/typescript/utils").AtscriptRef
+    "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
+    "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.materialized": boolean
     "db.mongo.collection": boolean
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }

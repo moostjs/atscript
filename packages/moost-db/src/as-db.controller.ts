@@ -1,166 +1,43 @@
-import {
-  serializeAnnotatedType,
-  type Validator,
-  type TAtscriptAnnotatedType,
-  type TAtscriptDataType,
+import type {
+  TAtscriptAnnotatedType,
+  TAtscriptDataType,
 } from '@atscript/typescript/utils'
-import type { AtscriptDbTable, FilterExpr, UniqueryControls, Uniquery } from '@atscript/utils-db'
-import { Body, Delete, Get, HttpError, Patch, Post, Put, Url } from '@moostjs/event-http'
-import { Inject, Moost, Param, type TConsoleBase } from 'moost'
-import { parseUrl } from '@uniqu/url'
+import type { AtscriptDbTable } from '@atscript/utils-db'
+import { Body, Delete, HttpError, Patch, Post, Put } from '@moostjs/event-http'
+import { Inherit, Inject, Moost, Param } from 'moost'
 
+import { AsDbReadableController } from './as-db-readable.controller'
 import { TABLE_DEF } from './decorators'
-import { UseValidationErrorTransform } from './validation-interceptor'
-import { GetOneControlsDto, PagesControlsDto, QueryControlsDto } from './dto/controls.dto.as'
 
 /**
- * Generic database controller for Moost that works with any `AtscriptDbTable` +
- * `BaseDbAdapter`. All CRUD routes through the generic table layer — no
- * adapter-specific imports.
+ * Full CRUD database controller for Moost that works with any `AtscriptDbTable` +
+ * `BaseDbAdapter`. Extends {@link AsDbReadableController} with write operations.
  *
  * Subclass and provide the table via DI:
  * ```ts
- * ‎@Provide(TABLE_DEF, () => driver.getTable(MyType))
- * ‎@TableController(MyType)
- * export class MyController extends AsDbController<typeof MyType> {}
+ * ‎@TableController(usersTable)
+ * export class UsersController extends AsDbController<typeof UserModel> {}
  * ```
  */
-@UseValidationErrorTransform()
+@Inherit()
 export class AsDbController<
   T extends TAtscriptAnnotatedType = TAtscriptAnnotatedType,
   DataType = TAtscriptDataType<T>,
-> {
-  /** Reference to the underlying table. */
-  protected table: AtscriptDbTable<T>
-
-  /** Application-scoped logger. */
-  protected logger: TConsoleBase
-
-  /** Cached serialized type definition (static, computed once). */
-  private _serializedType: ReturnType<typeof serializeAnnotatedType>
-
-  /** Cached search index list (static, computed once). */
-  private _searchIndexes: ReturnType<AtscriptDbTable<T>['getSearchIndexes']>
+> extends AsDbReadableController<T, DataType> {
+  /** Reference to the underlying table (typed for write access). */
+  protected get table(): AtscriptDbTable<T> {
+    return this.readable as AtscriptDbTable<T>
+  }
 
   constructor(
     @Inject(TABLE_DEF)
     table: AtscriptDbTable<T>,
     app: Moost
   ) {
-    this.table = table
-    this._serializedType = serializeAnnotatedType(table.type)
-    this._searchIndexes = table.getSearchIndexes()
-    this.logger = app.getLogger(`db [${table.tableName}]`)
-    this.logger.info('Initializing table controller')
-    try {
-      const p = this.init()
-      if (p instanceof Promise) {
-        p.catch(error => {
-          this.logger.error(error)
-        })
-      }
-    } catch (error) {
-      this.logger.error(error)
-      throw error
-    }
-  }
-
-  /**
-   * One-time initialization hook. Override to seed data, register watchers, etc.
-   */
-  protected init(): void | Promise<void> {
-    // no-op by default — index sync is the app's responsibility
-  }
-
-  // ── Lazily built validators ────────────────────────────────────────────
-
-  private _queryControlsValidator?: Validator<any>
-  private _pagesControlsValidator?: Validator<any>
-  private _getOneControlsValidator?: Validator<any>
-
-  protected get queryControlsValidator() {
-    if (!this._queryControlsValidator) {
-      this._queryControlsValidator = QueryControlsDto.validator()
-    }
-    return this._queryControlsValidator
-  }
-
-  protected get pagesControlsValidator() {
-    if (!this._pagesControlsValidator) {
-      this._pagesControlsValidator = PagesControlsDto.validator()
-    }
-    return this._pagesControlsValidator
-  }
-
-  protected get getOneControlsValidator() {
-    if (!this._getOneControlsValidator) {
-      this._getOneControlsValidator = GetOneControlsDto.validator()
-    }
-    return this._getOneControlsValidator
-  }
-
-  // ── Validation ─────────────────────────────────────────────────────────
-
-  protected validateControls(
-    controls: Record<string, unknown>,
-    type: 'query' | 'pages' | 'getOne'
-  ): string | undefined {
-    const v = type === 'query'
-      ? this.queryControlsValidator
-      : type === 'pages'
-        ? this.pagesControlsValidator
-        : this.getOneControlsValidator
-    if (!v.validate(controls, true)) {
-      return v.errors[0]?.message || 'Invalid controls'
-    }
-    return undefined
-  }
-
-  protected validateInsights(
-    insights: Map<string, unknown>
-  ): string | undefined {
-    for (const key of insights.keys()) {
-      if (!this.table.flatMap.has(key)) {
-        return `Unknown field "${key}"`
-      }
-    }
-    return undefined
-  }
-
-  protected validateParsed(
-    parsed: Uniquery,
-    type: 'query' | 'pages' | 'getOne'
-  ): HttpError | undefined {
-    const controlsError = this.validateControls(parsed.controls as unknown as Record<string, unknown>, type)
-    if (controlsError) {
-      return new HttpError(400, controlsError)
-    }
-    if (parsed.insights) {
-      const insightsError = this.validateInsights(parsed.insights as Map<string, unknown>)
-      if (insightsError) {
-        return new HttpError(400, insightsError)
-      }
-    }
-    return undefined
+    super(table, app)
   }
 
   // ── Hooks (overridable) ────────────────────────────────────────────────
-
-  /**
-   * Transform filter before querying. Override to add tenant filtering, etc.
-   */
-  protected transformFilter(filter: FilterExpr): FilterExpr {
-    return filter
-  }
-
-  /**
-   * Transform projection before querying.
-   */
-  protected transformProjection(
-    projection?: UniqueryControls['$select']
-  ): UniqueryControls['$select'] | undefined {
-    return projection
-  }
 
   /**
    * Intercepts write operations. Return `undefined` to abort.
@@ -179,133 +56,7 @@ export class AsDbController<
     return id
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────
-
-  protected parseQueryString(url: string) {
-    const idx = url.indexOf('?')
-    return parseUrl(idx >= 0 ? url.slice(idx + 1) : '')
-  }
-
-  protected async returnOne(
-    result: Promise<DataType | null>
-  ): Promise<DataType | HttpError> {
-    const item = await result
-    if (!item) {
-      return new HttpError(404)
-    }
-    return item
-  }
-
-  // ── REST Endpoints ─────────────────────────────────────────────────────
-
-  /**
-   * **GET /query** — returns an array of records or a count.
-   */
-  @Get('query')
-  async query(@Url() url: string): Promise<DataType[] | number | HttpError> {
-    const parsed = this.parseQueryString(url)
-
-    const error = this.validateParsed(parsed, 'query')
-    if (error) { return error }
-
-    const controls = parsed.controls
-    const filter = this.transformFilter(parsed.filter)
-    const select = this.transformProjection(controls.$select)
-
-    if (controls.$count) {
-      return this.table.count({ filter, controls: { ...controls, $select: select } } as Uniquery<any>)
-    }
-
-    const searchTerm = controls.$search as string | undefined
-    const indexName = controls.$index as string | undefined
-
-    if (searchTerm && this.table.isSearchable()) {
-      return this.table.search(searchTerm, {
-        filter,
-        controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-      } as Uniquery<any>, indexName) as Promise<DataType[]>
-    }
-
-    return this.table.findMany({
-      filter,
-      controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-    } as Uniquery<any>) as Promise<DataType[]>
-  }
-
-  /**
-   * **GET /pages** — returns paginated records with metadata.
-   */
-  @Get('pages')
-  async pages(@Url() url: string): Promise<
-    | {
-        data: DataType[]
-        page: number
-        itemsPerPage: number
-        pages: number
-        count: number
-      }
-    | HttpError
-  > {
-    const parsed = this.parseQueryString(url)
-
-    const error = this.validateParsed(parsed, 'pages')
-    if (error) { return error }
-
-    const controls = parsed.controls as PagesControlsDto & Record<string, unknown>
-    const page = Math.max(Number(controls.$page || 1), 1)
-    const size = Math.max(Number(controls.$size || 10), 1)
-    const skip = (page - 1) * size
-
-    const filter = this.transformFilter(parsed.filter)
-    const select = this.transformProjection(controls.$select)
-
-    const searchTerm = controls.$search as string | undefined
-    const indexName = controls.$index as string | undefined
-
-    const query = {
-      filter,
-      controls: { ...controls, $select: select, $skip: skip, $limit: size },
-    }
-
-    let result: { data: DataType[]; count: number }
-    if (searchTerm && this.table.isSearchable()) {
-      result = await this.table.searchWithCount(searchTerm, query as Uniquery<any>, indexName) as { data: DataType[]; count: number }
-    } else {
-      result = await this.table.findManyWithCount(query as Uniquery<any>) as { data: DataType[]; count: number }
-    }
-
-    return {
-      data: result.data,
-      page,
-      itemsPerPage: size,
-      pages: Math.ceil(result.count / size),
-      count: result.count,
-    }
-  }
-
-  /**
-   * **GET /one/:id** — retrieves a single record by ID or unique property.
-   */
-  @Get('one/:id')
-  async getOne(
-    @Param('id') id: string,
-    @Url() url: string
-  ): Promise<DataType | HttpError> {
-    const parsed = this.parseQueryString(url)
-
-    if (Object.keys(parsed.filter).length > 0) {
-      return new HttpError(400, 'Filtering is not allowed for "one" endpoint')
-    }
-
-    const error = this.validateParsed(parsed, 'getOne')
-    if (error) { return error }
-
-    const select = this.transformProjection(parsed.controls.$select)
-
-    return this.returnOne(
-      this.table.findById(id as any, { $select: select } as UniqueryControls<any>) as Promise<DataType | null>
-    )
-  }
+  // ── Write Endpoints ─────────────────────────────────────────────────────
 
   /**
    * **POST /** — inserts one or many records.
@@ -358,17 +109,5 @@ export class AsDbController<
       return new HttpError(404)
     }
     return result
-  }
-
-  /**
-   * **GET /meta** — returns table metadata for UI.
-   */
-  @Get('meta')
-  meta() {
-    return {
-      searchable: this.table.isSearchable(),
-      searchIndexes: this._searchIndexes,
-      type: this._serializedType,
-    }
   }
 }

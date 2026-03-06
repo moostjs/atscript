@@ -31,6 +31,12 @@ export function validateRefArgument(
 
   const decl = doc.getDeclarationOwnerNode(typeName)
   if (!decl) {
+    // If the type is imported but deps aren't loaded yet (e.g. during parse),
+    // skip validation — it will be checked when deps are available.
+    const regDef = doc.registry.definitions.get(typeName)
+    if (regDef?.imported) {
+      return messages
+    }
     messages.push({
       severity: 1,
       message: `Unknown type '${typeName}'.`,

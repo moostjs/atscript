@@ -18,7 +18,7 @@ export declare class Comment {
   id: number
   body: string
   createdAt?: number /* timestamp.created */
-  postId: Post["id"]
+  postId: number /* id */
   post?: Post
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Comment, Comment>
@@ -32,8 +32,57 @@ export declare class Comment {
     "id": number
     "body": string
     "createdAt"?: number /* timestamp.created */
-    "postId": Post["id"]
-    "post"?: Post
+    "postId": number /* id */
+    "post"?: never
+    "post.id"?: number
+    "post.title"?: string
+    "post.status"?: string
+    "post.createdAt"?: number /* timestamp.created */
+    "post.authorId"?: Author["id"]
+    "post.author"?: never
+    "post.author.id"?: number
+    "post.author.name"?: string
+    "post.author.createdAt"?: number /* timestamp.created */
+    "post.author.posts"?: never
+    "post.author.posts.id"?: number
+    "post.author.posts.title"?: string
+    "post.author.posts.status"?: string
+    "post.author.posts.createdAt"?: number /* timestamp.created */
+    "post.author.posts.authorId"?: Author["id"]
+    "post.author.posts.author"?: {
+      id: number
+      name: string
+      createdAt?: number /* timestamp.created */
+      posts?: Post[]
+    }
+    "post.author.posts.comments"?: never
+    "post.author.posts.comments.id"?: number
+    "post.author.posts.comments.body"?: string
+    "post.author.posts.comments.createdAt"?: number /* timestamp.created */
+    "post.author.posts.comments.postId"?: number /* id */
+    "post.author.posts.comments.post"?: {
+      id: number
+      title: string
+      status: string
+      createdAt?: number /* timestamp.created */
+      authorId: Author["id"]
+      author?: Author
+      comments?: Comment[]
+    }
+    "post.comments"?: never
+    "post.comments.id"?: number
+    "post.comments.body"?: string
+    "post.comments.createdAt"?: number /* timestamp.created */
+    "post.comments.postId"?: number /* id */
+    "post.comments.post"?: {
+      id: number
+      title: string
+      status: string
+      createdAt?: number /* timestamp.created */
+      authorId: Author["id"]
+      author?: Author
+      comments?: Comment[]
+    }
   }
   static __pk: number
 }

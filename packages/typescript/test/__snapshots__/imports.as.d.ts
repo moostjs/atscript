@@ -16,7 +16,7 @@ import { TPrimitive, TNumber } from "./type.as"
  * @see {@link ./imports.as:5:18}
  */
 export declare class People {
-  groupName: TPrimitive
+  groupName: string
   size: TNumber
   users: User[]
   static __is_atscript_annotated_type: true

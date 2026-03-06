@@ -1,5 +1,7 @@
 import { walkFilter, type FilterExpr, type FilterVisitor } from '@uniqu/core'
 
+import { esc as escapeIdent } from './sql-builder'
+
 export interface TSqlFragment {
   sql: string
   params: unknown[]
@@ -135,13 +137,6 @@ function regexToLike(pattern: string): string {
   return `%${core}%`
 }
 
-/**
- * Escapes a SQL identifier to prevent injection.
- * Doubles any embedded double-quotes.
- */
-function escapeIdent(name: string): string {
-  return name.replace(/"/g, '""')
-}
 
 /**
  * Converts a JS value to a SQLite-bindable parameter.

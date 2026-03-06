@@ -1,10 +1,15 @@
-export { AtscriptDbTable, resolveDesignType } from './db-table'
+export { AtscriptDbReadable, resolveDesignType } from './db-readable'
+export { AtscriptDbTable } from './db-table'
+export { AtscriptDbView } from './db-view'
+export type { TViewColumnMapping } from './db-view'
 export { BaseDbAdapter } from './base-adapter'
 export { DbSpace } from './db-space'
 export type { TAdapterFactory } from './db-space'
 export { UniquSelect } from './uniqu-select'
 export { decomposePatch } from './patch-decomposer'
 export { getKeyProps } from './patch-types'
+export { translateQueryTree } from './query-tree'
+export type { TViewPlan, TViewJoin, AtscriptQueryNode, AtscriptQueryFieldRef, AtscriptQueryComparison, AtscriptRef } from './query-tree'
 
 export type { TArrayPatch, TDbPatch } from './patch-types'
 export type {

@@ -9,22 +9,25 @@ import type { FilterExpr } from '@uniqu/core'
 import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
+import type { AtscriptDbReadable } from './db-readable'
 import type { AtscriptDbTable } from './db-table'
+import type { TGenericLogger } from './logger'
+import { NoopLogger } from './logger'
 
 /**
  * Abstract base class for database adapters.
  *
- * Adapter instances are 1:1 with table instances. When an {@link AtscriptDbTable}
- * is created with an adapter, it calls {@link registerTable} to establish a
- * bidirectional relationship:
+ * Adapter instances are 1:1 with readable instances (tables or views).
+ * When an {@link AtscriptDbReadable} is created with an adapter, it calls
+ * {@link registerReadable} to establish a bidirectional relationship:
  *
  * ```
- * AtscriptDbTable ──delegates CRUD──▶ BaseDbAdapter
- *                 ◀──reads metadata── (via this._table)
+ * AtscriptDbReadable ──delegates ops──▶ BaseDbAdapter
+ *                    ◀──reads metadata── (via this._table)
  * ```
  *
  * Adapter authors can access all computed metadata through `this._table`:
- * - `this._table.tableName` — resolved table/collection name
+ * - `this._table.tableName` — resolved table/collection/view name
  * - `this._table.flatMap` — all fields as dot-notation paths
  * - `this._table.indexes` — computed index definitions
  * - `this._table.primaryKeys` — primary key field names
@@ -32,19 +35,44 @@ import type { AtscriptDbTable } from './db-table'
  * - `this._table.defaults` — default value configurations
  * - `this._table.ignoredFields` — fields excluded from DB
  * - `this._table.uniqueProps` — single-field unique index properties
+ * - `this._table.isView` — whether this is a view (vs a table)
  */
 export abstract class BaseDbAdapter {
-  // ── Table back-reference ──────────────────────────────────────────────────
+  // ── Table/view back-reference ─────────────────────────────────────────────
 
-  protected _table!: AtscriptDbTable
+  protected _table!: AtscriptDbReadable
+
+  /** Logger instance — set via {@link registerReadable} from the readable's logger. */
+  protected logger: TGenericLogger = NoopLogger
+
+  /** When true, adapter logs DB calls via `logger.debug`. Off by default. */
+  protected _verbose = false
 
   /**
-   * Called by {@link AtscriptDbTable} constructor. Gives the adapter access to
-   * the table's computed metadata for internal use in query rendering, index
-   * sync, etc.
+   * Called by {@link AtscriptDbReadable} constructor. Gives the adapter access
+   * to the readable's computed metadata for internal use in query rendering,
+   * index sync, etc.
    */
-  registerTable(table: AtscriptDbTable): void {
-    this._table = table
+  registerReadable(readable: AtscriptDbReadable, logger?: TGenericLogger): void {
+    this._table = readable
+    if (logger) { this.logger = logger }
+  }
+
+  /**
+   * Enables or disables verbose (debug-level) logging for this adapter.
+   * When disabled, no log strings are constructed — zero overhead.
+   */
+  setVerbose(enabled: boolean): void {
+    this._verbose = enabled
+  }
+
+  /**
+   * Logs a debug message if verbose mode is enabled.
+   * Adapters call this to log DB operations with zero overhead when disabled.
+   */
+  protected _log(...args: unknown[]): void {
+    if (!this._verbose) { return }
+    this.logger.debug(...args)
   }
 
   // ── Validation hooks (overridable) ────────────────────────────────────────

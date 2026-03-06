@@ -45,14 +45,15 @@ $("object", Post)
   ).prop(
     "authorId",
     $()
-      .refTo(Author, ["id"])
+      .refTo(() => Author, ["id"])
       .annotate("db.rel.FK", true)
       .annotate("db.rel.onDelete", "cascade")
       .$type
   ).prop(
     "author",
     $()
-      .refTo(Author)
+      .refTo(() => Author)
+      .annotate("db.table", "authors")
       .annotate("db.rel.to", true)
       .optional()
       .$type
@@ -60,7 +61,8 @@ $("object", Post)
     "comments",
     $("array")
       .of($()
-          .refTo(Comment)
+          .refTo(() => Comment)
+          .annotate("db.table", "comments")
           .$type)
       .annotate("db.rel.from", true)
       .optional()

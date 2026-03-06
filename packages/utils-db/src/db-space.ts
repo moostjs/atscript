@@ -1,13 +1,15 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
 import { AtscriptDbTable } from './db-table'
+import { AtscriptDbView } from './db-view'
+import type { AtscriptDbReadable } from './db-readable'
 import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 
 /**
- * Adapter factory function. Called once per table to create a fresh adapter instance.
- * Each table gets its own adapter (1:1 relationship required by BaseDbAdapter).
+ * Adapter factory function. Called once per table/view to create a fresh adapter instance.
+ * Each readable gets its own adapter (1:1 relationship required by BaseDbAdapter).
  */
 export type TAdapterFactory = () => BaseDbAdapter
 
@@ -18,36 +20,44 @@ interface TWeakMapOf<V> {
 }
 
 /**
- * A database space — a registry of tables sharing the same adapter type and driver.
+ * A database space — a registry of tables and views sharing the same adapter type and driver.
  *
  * `DbSpace` solves the cross-table discovery problem: when table A has a relation
  * to table B, it needs to find and query table B. The space acts as the registry
  * that makes this possible via the table resolver callback.
  *
- * Each table gets its own adapter instance (created by the factory), but all
- * tables share the same space and can discover each other for `$with` relation loading.
+ * Each table/view gets its own adapter instance (created by the factory), but all
+ * share the same space and can discover each other for `$with` relation loading.
  *
  * ```typescript
  * // SQLite
  * const driver = new BetterSqlite3Driver(':memory:')
  * const db = new DbSpace(() => new SqliteAdapter(driver))
  * const users = db.getTable(UsersType)
- * const posts = db.getTable(PostsType)
- * // posts.findMany({ filter: {}, controls: { $with: [{ name: 'author' }] } })
- * // → automatically resolves UsersType via the space
- *
- * // MongoDB
- * const client = new MongoClient(uri)
- * const db = new DbSpace(() => new MongoAdapter(client.db()))
+ * const activeUsers = db.getView(ActiveUsersType)
  * ```
  */
 export class DbSpace {
-  private _tables = new WeakMap() as TWeakMapOf<AtscriptDbTable>
+  private _readables = new WeakMap() as TWeakMapOf<AtscriptDbReadable>
 
   constructor(
     protected readonly adapterFactory: TAdapterFactory,
     protected readonly logger: TGenericLogger = NoopLogger
   ) {}
+
+  /**
+   * Auto-detects whether the type is a table or view and returns the
+   * appropriate instance. Uses `@db.view.for` presence to distinguish.
+   */
+  get<T extends TAtscriptAnnotatedType>(
+    type: T,
+    logger?: TGenericLogger
+  ): AtscriptDbReadable<T> {
+    if (type.metadata.has('db.view.for' as keyof AtscriptMetadata)) {
+      return this.getView(type, logger)
+    }
+    return this.getTable(type, logger)
+  }
 
   /**
    * Returns the table for the given annotated type.
@@ -57,51 +67,86 @@ export class DbSpace {
     type: T,
     logger?: TGenericLogger
   ): AtscriptDbTable<T> {
-    let table = this._tables.get(type) as AtscriptDbTable<T> | undefined
-    if (!table) {
+    let readable = this._readables.get(type) as AtscriptDbTable<T> | undefined
+    if (!readable) {
       const adapter = this.adapterFactory()
-      table = new AtscriptDbTable<T>(
+      readable = new AtscriptDbTable<T>(
         type,
         adapter as any,
         logger || this.logger,
-        (t) => this.getTable(t) as any
+        (t) => this.get(t) as any
       )
-      this._tables.set(type, table as AtscriptDbTable)
+      this._readables.set(type, readable as AtscriptDbReadable)
     }
-    return table
+    return readable as AtscriptDbTable<T>
+  }
+
+  /**
+   * Returns the view for the given annotated type.
+   * Creates the view + adapter on first access, caches for subsequent calls.
+   */
+  getView<T extends TAtscriptAnnotatedType>(
+    type: T,
+    logger?: TGenericLogger
+  ): AtscriptDbView<T> {
+    let readable = this._readables.get(type) as AtscriptDbView<T> | undefined
+    if (!readable) {
+      const adapter = this.adapterFactory()
+      readable = new AtscriptDbView<T>(
+        type,
+        adapter as any,
+        logger || this.logger,
+        (t) => this.get(t) as any
+      )
+      this._readables.set(type, readable as AtscriptDbReadable)
+    }
+    return readable as AtscriptDbView<T>
   }
 
   /**
    * Returns the adapter for the given annotated type.
-   * Creates the table + adapter on first access if needed.
+   * Creates the table/view + adapter on first access if needed.
    */
   getAdapter(type: TAtscriptAnnotatedType): BaseDbAdapter {
-    const table = this.getTable(type)
-    return table.dbAdapter
+    const readable = this.get(type)
+    return readable.dbAdapter
   }
 
   /**
-   * Ensures all registered tables exist in the database.
-   * Must be called after all `getTable()` calls so that tables are registered.
+   * Ensures all registered tables and views exist in the database.
+   * Tables are created first (in order), then views.
    *
-   * @param types - The annotated types whose tables to create.
+   * @param types - The annotated types whose tables/views to create.
    */
   async ensureAll(types: TAtscriptAnnotatedType[]): Promise<void> {
+    // Tables first (order matters for FK constraints)
     for (const type of types) {
-      const table = this.getTable(type)
-      await table.ensureTable()
+      const readable = this.get(type)
+      if (readable instanceof AtscriptDbTable) {
+        await readable.ensureTable()
+      }
+    }
+    // Views after all tables exist (adapter.ensureTable detects views)
+    for (const type of types) {
+      const readable = this.get(type)
+      if (readable instanceof AtscriptDbView) {
+        await readable.dbAdapter.ensureTable()
+      }
     }
   }
 
   /**
    * Synchronizes indexes for all specified tables.
+   * Views are skipped.
    *
    * @param types - The annotated types whose indexes to sync.
    */
   async syncAllIndexes(types: TAtscriptAnnotatedType[]): Promise<void> {
     for (const type of types) {
-      const table = this.getTable(type)
-      await table.syncIndexes()
+      const readable = this.get(type)
+      if (readable instanceof AtscriptDbTable) {
+        await readable.syncIndexes()
+      }
     }
   }
 }

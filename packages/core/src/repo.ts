@@ -9,7 +9,6 @@ import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AtscriptDoc } from './document'
 import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
-import type { TMessages } from './parser/types'
 import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 
@@ -67,9 +66,14 @@ export class AtscriptRepo {
   }
 
   async getUsedAnnotations() {
+    const ANNOTATION_TYPE_MAP: Record<string, string> = {
+      ref: 'import("@atscript/typescript/utils").AtscriptRef',
+      query: 'import("@atscript/typescript/utils").AtscriptQueryNode',
+    }
+    const mapArgType = (t: string) => ANNOTATION_TYPE_MAP[t] || t
     type TAnnotationValue = {
       optional?: boolean
-      type: 'string' | 'number' | 'boolean' | 'unknown'
+      type: string
     }
     type TAnnotationValueObj = { type: 'object'; props: Record<string, TAnnotationValue> }
     type TUsedAnnotation = {
@@ -90,7 +94,7 @@ export class AtscriptRepo {
           const o = { type: 'object', props: {} } as TAnnotationValueObj
           for (const a of spec.arguments) {
             o.props[a.name] = {
-              type: a.type,
+              type: mapArgType(a.type),
               optional: a.optional,
             }
           }
@@ -98,7 +102,7 @@ export class AtscriptRepo {
         } else if (spec.config.argument) {
           // argument.type
           types.push({
-            type: spec.config.argument.type,
+            type: mapArgType(spec.config.argument.type),
             optional: spec.config.argument.optional,
           })
         } else {
@@ -279,15 +283,13 @@ export class AtscriptRepo {
   ): Promise<AtscriptDoc | undefined> {
     const forId = resolveAtscriptFromPath(from.text, atscript.id)
     if (forId === atscript.id) {
-      const messages = atscript.getDiagMessages()
-      messages.push({
+      atscript.registerMessages([{
         severity: 1,
         message: '"import" cannot import itself',
         range: from.range,
-      })
+      }])
       return
     }
-    const errors = [] as TMessages
     let external: AtscriptDoc | undefined
     try {
       external = await this.openDocument(forId)
@@ -295,23 +297,19 @@ export class AtscriptRepo {
       await this.checkImports(external, checked)
       for (const token of imports) {
         if (!external.exports.has(token.text)) {
-          errors.push({
+          atscript.registerMessages([{
             severity: 1,
             message: `"${from.text}" has no exported member "${token.text}"`,
             range: token.range,
-          })
+          }])
         }
       }
     } catch (error) {
-      errors.push({
+      atscript.registerMessages([{
         severity: 1,
         message: `"${from.text}" not found`,
         range: from.range,
-      })
-    }
-    if (errors.length > 0) {
-      const messages = atscript.getDiagMessages()
-      messages.push(...errors)
+      }])
     }
     return external
   }

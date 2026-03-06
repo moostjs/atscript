@@ -19,18 +19,18 @@ $("object", People)
   .prop(
     "groupName",
     $()
-      .refTo(TPrimitive)
+      .refTo(() => TPrimitive)
       .$type
   ).prop(
     "size",
     $()
-      .refTo(TNumber)
+      .refTo(() => TNumber)
       .$type
   ).prop(
     "users",
     $("array")
       .of($()
-          .refTo(User)
+          .refTo(() => User)
           .$type)
       .$type
   )

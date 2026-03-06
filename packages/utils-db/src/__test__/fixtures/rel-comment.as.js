@@ -38,14 +38,15 @@ $("object", Comment)
   ).prop(
     "postId",
     $()
-      .refTo(Post, ["id"])
+      .refTo(() => Post, ["id"])
       .annotate("db.rel.FK", true)
       .annotate("db.rel.onDelete", "cascade")
       .$type
   ).prop(
     "post",
     $()
-      .refTo(Post)
+      .refTo(() => Post)
+      .annotate("db.table", "posts")
       .annotate("db.rel.to", true)
       .optional()
       .$type

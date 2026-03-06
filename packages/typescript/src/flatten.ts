@@ -86,8 +86,19 @@ export function flattenAnnotatedType(
   }
 
   function flattenArray(def: TAtscriptAnnotatedType, name: string) {
+    // Cycle detection for lazy refs resolved inside arrays
+    const resolvedId = def.id
+    if (resolvedId) {
+      if (visitedIds.has(resolvedId)) { return }
+      visitedIds.add(resolvedId)
+    }
     switch (def.type.kind) {
       case 'object': {
+        // Re-check id after lazy resolution (type getter may have set it)
+        if (!resolvedId && def.id) {
+          if (visitedIds.has(def.id)) { return }
+          visitedIds.add(def.id)
+        }
         const items = Array.from(def.type.props.entries())
         for (const [key, value] of items) {
           if (skipPhantom && isPhantomType(value)) {
@@ -115,7 +126,7 @@ export function flattenAnnotatedType(
 
   function flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
     // Cycle detection: if this type has an id we've already visited, treat as leaf
-    const typeId = def.id
+    let typeId = def.id
     if (typeId && visitedIds.has(typeId)) {
       addFieldToFlatMap(prefix || '', def)
       if (prefix) {
@@ -124,7 +135,20 @@ export function flattenAnnotatedType(
       return
     }
     if (typeId) { visitedIds.add(typeId) }
-    switch (def.type.kind) {
+    const kind = def.type.kind
+    // Re-check id after accessing .type (lazy refs resolve id on first .type access)
+    if (!typeId && def.id) {
+      typeId = def.id
+      if (visitedIds.has(typeId)) {
+        addFieldToFlatMap(prefix || '', def)
+        if (prefix) {
+          options?.onField?.(prefix, def, def.metadata)
+        }
+        return
+      }
+      visitedIds.add(typeId)
+    }
+    switch (kind) {
       case 'object': {
         addFieldToFlatMap(prefix || '', def)
         for (const [key, value] of def.type.props.entries()) {

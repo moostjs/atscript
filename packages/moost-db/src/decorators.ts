@@ -1,11 +1,18 @@
-import type { AtscriptDbTable } from '@atscript/utils-db'
+import type { AtscriptDbTable, AtscriptDbReadable } from '@atscript/utils-db'
 import { Controller, Provide, ApplyDecorators, Inherit } from 'moost'
+
+/**
+ * DI token under which the {@link AtscriptDbReadable} instance
+ * is exposed to the readable controller's constructor via `@Inject`.
+ */
+export const READABLE_DEF = '__atscript_db_readable_def'
 
 /**
  * DI token under which the {@link AtscriptDbTable} instance
  * is exposed to the controller's constructor via `@Inject`.
+ * Points to the same token as READABLE_DEF for backward compatibility.
  */
-export const TABLE_DEF = '__atscript_db_table_def'
+export const TABLE_DEF = READABLE_DEF
 
 /**
  * Combines the boilerplate needed to turn an {@link AsDbController}
@@ -36,3 +43,37 @@ export const TableController = (
     Controller(prefix || table.tableName),
     Inherit()
   )
+
+/**
+ * Combines the boilerplate needed to turn an {@link AsDbReadableController}
+ * subclass into a fully wired HTTP controller for a given `@db.view` or `@db.table` model.
+ *
+ * @param readable  The {@link AtscriptDbReadable} instance (table or view).
+ * @param prefix    Optional route prefix. Defaults to `readable.tableName`.
+ *
+ * @example
+ * ```ts
+ * ‎@ReadableController(activeTasksView)
+ * export class ActiveTasksController extends AsDbReadableController<typeof ActiveTasks> {}
+ * ```
+ */
+export const ReadableController = (
+  readable: AtscriptDbReadable,
+  prefix?: string
+) =>
+  ApplyDecorators(
+    Provide(READABLE_DEF, () => readable),
+    Controller(prefix || readable.tableName),
+    Inherit()
+  )
+
+/**
+ * Alias for {@link ReadableController} — use with view-backed controllers.
+ *
+ * @example
+ * ```ts
+ * ‎@ViewController(activeTasksView)
+ * export class ActiveTasksController extends AsDbReadableController<typeof ActiveTasks> {}
+ * ```
+ */
+export const ViewController = ReadableController

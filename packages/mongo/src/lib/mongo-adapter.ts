@@ -210,6 +210,7 @@ export class MongoAdapter extends BaseDbAdapter {
     const mongoFilter = buildMongoFilter(filter)
     const patcher = new CollectionPatcher(this.getPatcherContext(), patch)
     const { updateFilter, updateOptions } = patcher.preparePatch()
+    this._log('updateOne (patch)', mongoFilter, updateFilter)
     const result = await this.collection.updateOne(mongoFilter, updateFilter, updateOptions)
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
@@ -416,6 +417,7 @@ export class MongoAdapter extends BaseDbAdapter {
     else { pipeline.push({ $limit: 1000 }) }
     if (controls.$select) { pipeline.push({ $project: controls.$select.asProjection }) }
 
+    this._log('aggregate (search)', pipeline)
     return this.collection.aggregate(pipeline).toArray()
   }
 
@@ -447,6 +449,7 @@ export class MongoAdapter extends BaseDbAdapter {
       },
     ]
 
+    this._log('aggregate (searchWithCount)', pipeline)
     const result = await this.collection.aggregate(pipeline).toArray()
     return {
       data: result[0]?.data || [],
@@ -474,6 +477,7 @@ export class MongoAdapter extends BaseDbAdapter {
       },
     ]
 
+    this._log('aggregate (findManyWithCount)', pipeline)
     const result = await this.collection.aggregate(pipeline).toArray()
     return {
       data: result[0]?.data || [],
@@ -494,6 +498,7 @@ export class MongoAdapter extends BaseDbAdapter {
   async ensureCollectionExists(): Promise<void> {
     const exists = await this.collectionExists()
     if (!exists) {
+      this._log('createCollection', this._table.tableName)
       await this.db.createCollection(this._table.tableName, {
         comment: 'Created by Atscript Mongo Adapter',
       })
@@ -512,6 +517,7 @@ export class MongoAdapter extends BaseDbAdapter {
         }
       }
     }
+    this._log('insertOne', data)
     const result = await this.collection.insertOne(data)
     return { insertedId: result.insertedId }
   }
@@ -548,6 +554,7 @@ export class MongoAdapter extends BaseDbAdapter {
       }
     }
 
+    this._log('insertMany', `${data.length} docs`)
     const result = await this.collection.insertMany(data)
     return {
       insertedCount: result.insertedCount,
@@ -558,18 +565,21 @@ export class MongoAdapter extends BaseDbAdapter {
   async findOne(query: DbQuery): Promise<Record<string, unknown> | null> {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
+    this._log('findOne', filter, opts)
     return this.collection.findOne(filter, opts)
   }
 
   async findMany(query: DbQuery): Promise<Array<Record<string, unknown>>> {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
+    this._log('findMany', filter, opts)
     // eslint-disable-next-line unicorn/no-array-method-this-argument -- MongoDB Collection.find, not Array.find
     return this.collection.find(filter, opts).toArray()
   }
 
   async count(query: DbQuery): Promise<number> {
     const filter = buildMongoFilter(query.filter)
+    this._log('countDocuments', filter)
     return this.collection.countDocuments(filter)
   }
 
@@ -578,6 +588,7 @@ export class MongoAdapter extends BaseDbAdapter {
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
+    this._log('updateOne', mongoFilter, { $set: data })
     const result = await this.collection.updateOne(mongoFilter, { $set: data })
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
@@ -587,12 +598,14 @@ export class MongoAdapter extends BaseDbAdapter {
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
+    this._log('replaceOne', mongoFilter, data)
     const result = await this.collection.replaceOne(mongoFilter, data)
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
   async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
     const mongoFilter = buildMongoFilter(filter)
+    this._log('deleteOne', mongoFilter)
     const result = await this.collection.deleteOne(mongoFilter)
     return { deletedCount: result.deletedCount }
   }
@@ -602,6 +615,7 @@ export class MongoAdapter extends BaseDbAdapter {
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
+    this._log('updateMany', mongoFilter, { $set: data })
     const result = await this.collection.updateMany(mongoFilter, { $set: data })
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
@@ -612,12 +626,14 @@ export class MongoAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     // MongoDB has no native replaceMany; use updateMany with $set
     const mongoFilter = buildMongoFilter(filter)
+    this._log('replaceMany', mongoFilter, { $set: data })
     const result = await this.collection.updateMany(mongoFilter, { $set: data })
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
   async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     const mongoFilter = buildMongoFilter(filter)
+    this._log('deleteMany', mongoFilter)
     const result = await this.collection.deleteMany(mongoFilter)
     return { deletedCount: result.deletedCount }
   }
@@ -689,6 +705,7 @@ export class MongoAdapter extends BaseDbAdapter {
             ) {
               indexesToCreate.delete(remote.name)
             } else {
+              this._log('dropIndex', remote.name)
               await this.collection.dropIndex(remote.name)
             }
             break
@@ -696,6 +713,7 @@ export class MongoAdapter extends BaseDbAdapter {
           default:
         }
       } else {
+        this._log('dropIndex', remote.name)
         await this.collection.dropIndex(remote.name)
       }
     }
@@ -705,16 +723,19 @@ export class MongoAdapter extends BaseDbAdapter {
       switch (value.type) {
         case 'plain': {
           if (!indexesToCreate.has(key)) { continue }
+          this._log('createIndex', key, value.fields)
           await this.collection.createIndex(value.fields, { name: key })
           break
         }
         case 'unique': {
           if (!indexesToCreate.has(key)) { continue }
+          this._log('createIndex (unique)', key, value.fields)
           await this.collection.createIndex(value.fields, { name: key, unique: true })
           break
         }
         case 'text': {
           if (!indexesToCreate.has(key)) { continue }
+          this._log('createIndex (text)', key, value.fields)
           await this.collection.createIndex(value.fields, { weights: value.weights, name: key })
           break
         }
@@ -760,6 +781,7 @@ export class MongoAdapter extends BaseDbAdapter {
           }
         } else {
           if (remote.status !== 'DELETING') {
+            this._log('dropSearchIndex', remote.name)
             await this.collection.dropSearchIndex(remote.name)
           }
         }
@@ -771,8 +793,10 @@ export class MongoAdapter extends BaseDbAdapter {
           case 'search_text':
           case 'vector': {
             if (toUpdate.has(key)) {
+              this._log('updateSearchIndex', key, value.definition)
               await this.collection.updateSearchIndex(key, value.definition)
             } else {
+              this._log('createSearchIndex', key, value.type)
               await this.collection.createSearchIndex({
                 name: key,
                 type: value.type === 'vector' ? 'vectorSearch' : 'search',

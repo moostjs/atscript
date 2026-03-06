@@ -31,7 +31,34 @@ export declare class Author {
     "id": number
     "name": string
     "createdAt"?: number /* timestamp.created */
-    "posts"?: Post[]
+    "posts"?: never
+    "posts.id"?: number
+    "posts.title"?: string
+    "posts.status"?: string
+    "posts.createdAt"?: number /* timestamp.created */
+    "posts.authorId"?: number /* id */
+    "posts.author"?: never
+    "posts.author.id"?: number
+    "posts.author.name"?: string
+    "posts.author.createdAt"?: number /* timestamp.created */
+    "posts.author.posts"?: Post[]
+    "posts.comments"?: never
+    "posts.comments.id"?: number
+    "posts.comments.body"?: string
+    "posts.comments.createdAt"?: number /* timestamp.created */
+    "posts.comments.postId"?: number /* id */
+    "posts.comments.post"?: never
+    "posts.comments.post.id"?: number
+    "posts.comments.post.title"?: string
+    "posts.comments.post.status"?: string
+    "posts.comments.post.createdAt"?: number /* timestamp.created */
+    "posts.comments.post.authorId"?: number /* id */
+    "posts.comments.post.author"?: never
+    "posts.comments.post.author.id"?: number
+    "posts.comments.post.author.name"?: string
+    "posts.comments.post.author.createdAt"?: number /* timestamp.created */
+    "posts.comments.post.author.posts"?: Post[]
+    "posts.comments.post.comments"?: Comment[]
   }
   static __pk: number
 }

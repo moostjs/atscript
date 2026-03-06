@@ -1,4 +1,5 @@
 import type { TDbFieldMeta, TDbForeignKey, TDbReferentialAction, DbControls, UniquSelect } from '@atscript/utils-db'
+import type { AtscriptQueryNode, AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/utils-db'
 
 import type { TSqlFragment } from './filter-builder'
 
@@ -191,7 +192,7 @@ function buildProjection(select?: UniquSelect): string {
   return sql || '*'
 }
 
-function esc(name: string): string {
+export function esc(name: string): string {
   return name.replace(/"/g, '""')
 }
 
@@ -199,10 +200,92 @@ function esc(name: string): string {
  * Converts a JS value to a SQLite-compatible value.
  * Objects and arrays are stored as JSON strings.
  */
-function toSqliteValue(value: unknown): unknown {
+export function toSqliteValue(value: unknown): unknown {
   if (value === undefined) { return null }
   if (value === null) { return null }
   if (typeof value === 'object') { return JSON.stringify(value) }
   if (typeof value === 'boolean') { return value ? 1 : 0 }
   return value
+}
+
+// ── View DDL ──────────────────────────────────────────────────────────────
+
+/**
+ * Builds a CREATE VIEW IF NOT EXISTS statement from a view plan and column mappings.
+ *
+ * @param viewName - The view name.
+ * @param plan - Resolved view plan (entry table, joins, filter).
+ * @param columns - Column mappings (view column → source table.column).
+ * @param resolveFieldRef - Resolves a query field ref to `"table"."column"` SQL.
+ */
+export function buildCreateView(
+  viewName: string,
+  plan: TViewPlan,
+  columns: TViewColumnMapping[],
+  resolveFieldRef: (ref: AtscriptQueryFieldRef) => string,
+): string {
+  // SELECT columns
+  const selectCols = columns.map(c =>
+    `"${esc(c.sourceTable)}"."${esc(c.sourceColumn)}" AS "${esc(c.viewColumn)}"`
+  ).join(', ')
+
+  // FROM entry table
+  let sql = `CREATE VIEW IF NOT EXISTS "${esc(viewName)}" AS SELECT ${selectCols} FROM "${esc(plan.entryTable)}"`
+
+  // JOINs
+  for (const join of plan.joins) {
+    const onClause = queryNodeToSql(join.condition, resolveFieldRef)
+    sql += ` JOIN "${esc(join.targetTable)}" ON ${onClause}`
+  }
+
+  // WHERE filter
+  if (plan.filter) {
+    const whereClause = queryNodeToSql(plan.filter, resolveFieldRef)
+    sql += ` WHERE ${whereClause}`
+  }
+
+  return sql
+}
+
+const queryOpToSql: Record<string, string> = {
+  $eq: '=', $ne: '!=', $gt: '>', $gte: '>=', $lt: '<', $lte: '<=',
+}
+
+/**
+ * Renders an AtscriptQueryNode tree to raw SQL (no parameters — for DDL use only).
+ */
+function queryNodeToSql(
+  node: AtscriptQueryNode,
+  resolveFieldRef: (ref: AtscriptQueryFieldRef) => string,
+): string {
+  if ('$and' in node) {
+    const children = (node as { $and: AtscriptQueryNode[] }).$and
+    return children.map(n => queryNodeToSql(n, resolveFieldRef)).join(' AND ')
+  }
+  if ('$or' in node) {
+    const children = (node as { $or: AtscriptQueryNode[] }).$or
+    return `(${children.map(n => queryNodeToSql(n, resolveFieldRef)).join(' OR ')})`
+  }
+  if ('$not' in node) {
+    return `NOT (${queryNodeToSql((node as { $not: AtscriptQueryNode }).$not, resolveFieldRef)})`
+  }
+
+  // Comparison
+  const comp = node as { left: AtscriptQueryFieldRef; op: string; right?: unknown }
+  const leftSql = resolveFieldRef(comp.left)
+  const sqlOp = queryOpToSql[comp.op] || '='
+
+  // Field-to-field comparison
+  if (comp.right && typeof comp.right === 'object' && 'field' in (comp.right as object)) {
+    return `${leftSql} ${sqlOp} ${resolveFieldRef(comp.right as AtscriptQueryFieldRef)}`
+  }
+
+  // Value comparison
+  if (comp.right === null || comp.right === undefined) {
+    return comp.op === '$ne' ? `${leftSql} IS NOT NULL` : `${leftSql} IS NULL`
+  }
+  if (typeof comp.right === 'string') {
+    return `${leftSql} ${sqlOp} '${comp.right.replace(/'/g, "''")}'`
+  }
+  return `${leftSql} ${sqlOp} ${comp.right}`
 }

@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import { BaseDbAdapter } from '@atscript/utils-db'
+import { BaseDbAdapter, AtscriptDbView } from '@atscript/utils-db'
 import type {
   TDbDeleteResult,
   TDbIndex,
@@ -12,10 +12,13 @@ import type { DbQuery, FilterExpr } from '@atscript/utils-db'
 import { buildWhere } from './filter-builder'
 import {
   buildCreateTable,
+  buildCreateView,
   buildDelete,
   buildInsert,
   buildSelect,
   buildUpdate,
+  esc,
+  toSqliteValue,
 } from './sql-builder'
 import type { TSqliteDriver } from './types'
 
@@ -37,7 +40,7 @@ import type { TSqliteDriver } from './types'
 export class SqliteAdapter extends BaseDbAdapter {
   constructor(protected readonly driver: TSqliteDriver) {
     super()
-    driver.exec('PRAGMA foreign_keys = ON')
+    this.driver.exec('PRAGMA foreign_keys = ON')
   }
 
   /** SQLite does not use schemas — override to always exclude schema. */
@@ -56,6 +59,7 @@ export class SqliteAdapter extends BaseDbAdapter {
 
   async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
     const { sql, params } = buildInsert(this.resolveTableName(), data)
+    this._log(sql, params)
     const result = this.driver.run(sql, params)
     return { insertedId: result.lastInsertRowid }
   }
@@ -64,15 +68,19 @@ export class SqliteAdapter extends BaseDbAdapter {
     data: Array<Record<string, unknown>>
   ): Promise<TDbInsertManyResult> {
     const ids: unknown[] = []
+    this._log('BEGIN')
     this.driver.exec('BEGIN')
     try {
       for (const row of data) {
         const { sql, params } = buildInsert(this.resolveTableName(), row)
+        this._log(sql, params)
         const result = this.driver.run(sql, params)
         ids.push(result.lastInsertRowid)
       }
+      this._log('COMMIT')
       this.driver.exec('COMMIT')
     } catch (error) {
+      this._log('ROLLBACK')
       this.driver.exec('ROLLBACK')
       throw error
     }
@@ -91,6 +99,7 @@ export class SqliteAdapter extends BaseDbAdapter {
       where,
       controls
     )
+    this._log(sql, params)
     return this.driver.get(sql, params)
   }
 
@@ -99,6 +108,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   ): Promise<Array<Record<string, unknown>>> {
     const where = buildWhere(query.filter)
     const { sql, params } = buildSelect(this.resolveTableName(), where, query.controls)
+    this._log(sql, params)
     return this.driver.all(sql, params)
   }
 
@@ -106,6 +116,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const where = buildWhere(query.filter)
     const tableName = this.resolveTableName()
     const sql = `SELECT COUNT(*) as cnt FROM "${esc(tableName)}" WHERE ${where.sql}`
+    this._log(sql, where.params)
     const row = this.driver.get<{ cnt: number }>(sql, where.params)
     return row?.cnt ?? 0
   }
@@ -129,7 +140,9 @@ export class SqliteAdapter extends BaseDbAdapter {
     }
 
     const sql = `UPDATE "${esc(tableName)}" SET ${setClauses.join(', ')} WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
-    const result = this.driver.run(sql, [...setParams, ...where.params])
+    const allParams = [...setParams, ...where.params]
+    this._log(sql, allParams)
+    const result = this.driver.run(sql, allParams)
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
@@ -139,6 +152,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     const where = buildWhere(filter)
     const { sql, params } = buildUpdate(this.resolveTableName(), data, where)
+    this._log(sql, params)
     const result = this.driver.run(sql, params)
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
@@ -152,17 +166,22 @@ export class SqliteAdapter extends BaseDbAdapter {
     // DELETE old row, then INSERT the new one
     const where = buildWhere(filter)
     const tableName = this.resolveTableName()
+    this._log('BEGIN')
     this.driver.exec('BEGIN')
     try {
       const delSql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
+      this._log(delSql, where.params)
       const delResult = this.driver.run(delSql, where.params)
       if (delResult.changes > 0) {
         const { sql, params } = buildInsert(tableName, data)
+        this._log(sql, params)
         this.driver.run(sql, params)
       }
+      this._log('COMMIT')
       this.driver.exec('COMMIT')
       return { matchedCount: delResult.changes, modifiedCount: delResult.changes }
     } catch (error) {
+      this._log('ROLLBACK')
       this.driver.exec('ROLLBACK')
       throw error
     }
@@ -175,6 +194,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     // For replaceMany we do a full UPDATE (set all columns)
     const where = buildWhere(filter)
     const { sql, params } = buildUpdate(this.resolveTableName(), data, where)
+    this._log(sql, params)
     const result = this.driver.run(sql, params)
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
@@ -185,6 +205,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const where = buildWhere(filter)
     const tableName = this.resolveTableName()
     const sql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
+    this._log(sql, where.params)
     const result = this.driver.run(sql, where.params)
     return { deletedCount: result.changes }
   }
@@ -192,6 +213,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     const where = buildWhere(filter)
     const { sql, params } = buildDelete(this.resolveTableName(), where)
+    this._log(sql, params)
     const result = this.driver.run(sql, params)
     return { deletedCount: result.changes }
   }
@@ -199,11 +221,27 @@ export class SqliteAdapter extends BaseDbAdapter {
   // ── Schema ─────────────────────────────────────────────────────────────────
 
   async ensureTable(): Promise<void> {
+    if (this._table instanceof AtscriptDbView) {
+      return this.ensureView()
+    }
     const sql = buildCreateTable(
       this.resolveTableName(),
       this._table.fieldDescriptors,
       this._table.foreignKeys
     )
+    this._log(sql)
+    this.driver.exec(sql)
+  }
+
+  async ensureView(): Promise<void> {
+    const view = this._table as AtscriptDbView
+    const sql = buildCreateView(
+      this.resolveTableName(),
+      view.viewPlan,
+      view.getViewColumnMappings(),
+      ref => view.resolveFieldRef(ref),
+    )
+    this._log(sql)
     this.driver.exec(sql)
   }
 
@@ -221,26 +259,16 @@ export class SqliteAdapter extends BaseDbAdapter {
         const cols = index.fields
           .map(f => `"${esc(f.name)}" ${f.sort === 'desc' ? 'DESC' : 'ASC'}`)
           .join(', ')
-        this.driver.exec(
-          `CREATE ${unique}INDEX IF NOT EXISTS "${esc(index.key)}" ON "${esc(tableName)}" (${cols})`
-        )
+        const sql = `CREATE ${unique}INDEX IF NOT EXISTS "${esc(index.key)}" ON "${esc(tableName)}" (${cols})`
+        this._log(sql)
+        this.driver.exec(sql)
       },
       dropIndex: async (name: string) => {
-        this.driver.exec(`DROP INDEX IF EXISTS "${esc(name)}"`)
+        const sql = `DROP INDEX IF EXISTS "${esc(name)}"`
+        this._log(sql)
+        this.driver.exec(sql)
       },
       shouldSkipType: (type) => type === 'fulltext',
     })
   }
-}
-
-function esc(name: string): string {
-  return name.replace(/"/g, '""')
-}
-
-function toSqliteValue(value: unknown): unknown {
-  if (value === undefined) { return null }
-  if (value === null) { return null }
-  if (typeof value === 'object') { return JSON.stringify(value) }
-  if (typeof value === 'boolean') { return value ? 1 : 0 }
-  return value
 }

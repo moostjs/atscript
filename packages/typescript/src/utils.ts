@@ -58,6 +58,8 @@ export { throwFeatureDisabled } from './throw-disabled'
 export { flattenAnnotatedType } from './flatten'
 export type { TFlattenOptions } from './flatten'
 
+export type { AtscriptRef, AtscriptQueryNode, AtscriptQueryFieldRef, AtscriptQueryComparison } from './query-types'
+
 export { serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION } from './serialize'
 export type {
   TSerializedAnnotatedType,

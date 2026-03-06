@@ -51,7 +51,14 @@ export async function build(config: Partial<TAtscriptConfigInput>) {
     documents.push(await repo.openDocument(`file://${entry}`))
   }
 
-  return new BuildRepo(rootDir, repo, documents.filter(Boolean) as AtscriptDoc[])
+  const docs = documents.filter(Boolean) as AtscriptDoc[]
+
+  // Load all dependencies upfront so cross-file annotation validation works
+  for (const doc of docs) {
+    await repo.checkDoc(doc)
+  }
+
+  return new BuildRepo(rootDir, repo, docs)
 }
 
 export class BuildRepo {
@@ -68,7 +75,6 @@ export class BuildRepo {
   async diagnostics() {
     const docMessages = new Map<string, TMessages>()
     for (const document of this.docs) {
-      await this.repo.checkDoc(document)
       docMessages.set(document.id, document.getDiagMessages())
     }
     return docMessages
