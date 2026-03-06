@@ -179,6 +179,10 @@ export interface AtscriptDbWritable {
     payload: Record<string, unknown>,
     opts?: { maxDepth?: number; _depth?: number }
   ): Promise<TDbInsertResult>
+  insertMany(
+    payloads: Array<Record<string, unknown>>,
+    opts?: { maxDepth?: number; _depth?: number }
+  ): Promise<TDbInsertManyResult>
 }
 
 /**

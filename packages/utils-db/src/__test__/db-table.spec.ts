@@ -309,9 +309,9 @@ describe('AtscriptDbTable', () => {
       } as any)
 
       const insertCall = adapter.calls[0]
-      expect(insertCall.method).toBe('insertOne')
+      expect(insertCall.method).toBe('insertMany')
       // displayName should be stripped (@db.ignore)
-      expect(insertCall.args[0].displayName).toBeUndefined()
+      expect(insertCall.args[0][0].displayName).toBeUndefined()
     })
 
     it('should map column names on insert', async () => {
@@ -325,8 +325,8 @@ describe('AtscriptDbTable', () => {
 
       const insertCall = adapter.calls[0]
       // email should be mapped to email_address (@db.column)
-      expect(insertCall.args[0].email_address).toBe('test@example.com')
-      expect(insertCall.args[0].email).toBeUndefined()
+      expect(insertCall.args[0][0].email_address).toBe('test@example.com')
+      expect(insertCall.args[0][0].email).toBeUndefined()
     })
 
     it('should apply default values on insert when field is missing', async () => {
@@ -339,7 +339,7 @@ describe('AtscriptDbTable', () => {
 
       const insertCall = adapter.calls[0]
       // status should get default value "active" (@db.default.value)
-      expect(insertCall.args[0].status).toBe('active')
+      expect(insertCall.args[0][0].status).toBe('active')
     })
   })
 
@@ -500,8 +500,8 @@ describe('AtscriptDbTable — embedded objects', () => {
     it('should flatten nested objects to __-separated keys on insert', async () => {
       await table.insertOne({ ...baseProfileInput } as any)
 
-      const call = adapter.calls.find(c => c.method === 'insertOne')!
-      const data = call.args[0] as Record<string, unknown>
+      const call = adapter.calls.find(c => c.method === 'insertMany')!
+      const data = call.args[0][0] as Record<string, unknown>
 
       // Flattened contact
       expect(data.contact__email).toBe('alice@x.com')
@@ -518,8 +518,8 @@ describe('AtscriptDbTable — embedded objects', () => {
     it('should JSON-stringify @db.json fields on insert', async () => {
       await table.insertOne({ ...baseProfileInput } as any)
 
-      const call = adapter.calls.find(c => c.method === 'insertOne')!
-      const data = call.args[0] as Record<string, unknown>
+      const call = adapter.calls.find(c => c.method === 'insertMany')!
+      const data = call.args[0][0] as Record<string, unknown>
 
       expect(data.preferences).toBe(JSON.stringify({ theme: 'dark', lang: 'en' }))
     })
@@ -527,8 +527,8 @@ describe('AtscriptDbTable — embedded objects', () => {
     it('should JSON-stringify array fields on insert', async () => {
       await table.insertOne({ ...baseProfileInput } as any)
 
-      const call = adapter.calls.find(c => c.method === 'insertOne')!
-      const data = call.args[0] as Record<string, unknown>
+      const call = adapter.calls.find(c => c.method === 'insertMany')!
+      const data = call.args[0][0] as Record<string, unknown>
 
       expect(data.tags).toBe(JSON.stringify(['admin', 'user']))
     })

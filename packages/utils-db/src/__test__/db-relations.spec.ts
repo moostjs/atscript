@@ -657,4 +657,195 @@ describe('AtscriptDbTable — Relations', () => {
       ).resolves.toBeDefined()
     })
   })
+
+  // ── Batch nested creation ─────────────────────────────────────────────
+
+  describe('batch nested creation (insertMany)', () => {
+    let db: DbSpace
+
+    beforeEach(() => {
+      db = new DbSpace(() => new InMemoryAdapter())
+      db.getTable(Author)
+      db.getTable(Post)
+      db.getTable(Comment)
+    })
+
+    it('should batch-create TO dependencies across multiple items', async () => {
+      const postTable = db.getTable(Post)
+      const result = await postTable.insertMany([
+        { title: 'Post A', author: { name: 'Alice' } },
+        { title: 'Post B', author: { name: 'Bob' } },
+        { title: 'Post C', author: { name: 'Carol' } },
+      ] as any)
+
+      expect(result.insertedCount).toBe(3)
+      expect(result.insertedIds).toHaveLength(3)
+
+      // Verify authors were created
+      const authorTable = db.getTable(Author)
+      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      expect(authors).toHaveLength(3)
+
+      // Verify FK wiring — load posts with author relation
+      const posts = await postTable.findMany({
+        filter: {},
+        controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
+      })
+      expect(posts[0].author).toBeDefined()
+      expect((posts[0].author as any).name).toBe('Alice')
+      expect((posts[1].author as any).name).toBe('Bob')
+      expect((posts[2].author as any).name).toBe('Carol')
+    })
+
+    it('should batch-create FROM dependents across multiple items', async () => {
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.insertMany([
+        { name: 'Alice', posts: [{ title: 'P1' }, { title: 'P2' }] },
+        { name: 'Bob', posts: [{ title: 'P3' }] },
+      ] as any)
+
+      expect(result.insertedCount).toBe(2)
+
+      // Verify posts were created with correct FKs
+      const postTable = db.getTable(Post)
+      const allPosts = await postTable.findMany({ filter: {}, controls: {} })
+      expect(allPosts).toHaveLength(3)
+
+      // Load authors with posts
+      const authors = await authorTable.findMany({
+        filter: {},
+        controls: { $with: [{ name: 'posts', filter: {}, controls: {} }] },
+      })
+      expect((authors[0].posts as any[]).map((p: any) => p.title).sort()).toEqual(['P1', 'P2'])
+      expect((authors[1].posts as any[]).map((p: any) => p.title)).toEqual(['P3'])
+    })
+
+    it('should handle mixed items — some with nav data, some without', async () => {
+      // Pre-create an author for the third post
+      const authorTable = db.getTable(Author)
+      await authorTable.insertOne({ name: 'Pre-existing' } as any)
+
+      const postTable = db.getTable(Post)
+      const result = await postTable.insertMany([
+        { title: 'Post A', author: { name: 'Alice' } },
+        { title: 'Post B', author: { name: 'Bob' } },
+        { title: 'Post C', authorId: 1 }, // uses pre-existing author
+      ] as any)
+
+      expect(result.insertedCount).toBe(3)
+
+      const posts = await postTable.findMany({
+        filter: {},
+        controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
+      })
+      expect((posts[0].author as any).name).toBe('Alice')
+      expect((posts[1].author as any).name).toBe('Bob')
+      expect((posts[2].author as any).name).toBe('Pre-existing')
+    })
+
+    it('should handle deep nesting (3 levels) via insertMany', async () => {
+      const authorTable = db.getTable(Author)
+      await authorTable.insertMany([
+        {
+          name: 'Alice',
+          posts: [
+            { title: 'P1', comments: [{ body: 'C1' }, { body: 'C2' }] },
+            { title: 'P2', comments: [{ body: 'C3' }] },
+          ],
+        },
+        {
+          name: 'Bob',
+          posts: [
+            { title: 'P3', comments: [{ body: 'C4' }, { body: 'C5' }, { body: 'C6' }] },
+          ],
+        },
+      ] as any)
+
+      // Verify all levels were created
+      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      expect(authors).toHaveLength(2)
+
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: {}, controls: {} })
+      expect(posts).toHaveLength(3)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: {}, controls: {} })
+      expect(comments).toHaveLength(6)
+
+      // Verify FK chain: load authors → posts → comments
+      const fullAuthors = await authorTable.findMany({
+        filter: {},
+        controls: {
+          $with: [{
+            name: 'posts',
+            filter: {},
+            controls: {
+              $with: [{ name: 'comments', filter: {}, controls: {} }],
+            },
+          }],
+        },
+      })
+
+      const alicePosts = fullAuthors[0].posts as any[]
+      expect(alicePosts).toHaveLength(2)
+      expect(alicePosts[0].comments).toHaveLength(2)
+      expect(alicePosts[1].comments).toHaveLength(1)
+
+      const bobPosts = fullAuthors[1].posts as any[]
+      expect(bobPosts).toHaveLength(1)
+      expect(bobPosts[0].comments).toHaveLength(3)
+    })
+
+    it('should respect maxDepth limit', async () => {
+      const authorTable = db.getTable(Author)
+      // depth=0, maxDepth=1: authors created, posts created (depth 1), but comments at depth 2 skipped
+      await authorTable.insertMany([
+        {
+          name: 'Alice',
+          posts: [
+            { title: 'P1', comments: [{ body: 'should not be created' }] },
+          ],
+        },
+      ] as any, { maxDepth: 1 })
+
+      const posts = await (db.getTable(Post)).findMany({ filter: {}, controls: {} })
+      expect(posts).toHaveLength(1)
+
+      const comments = await (db.getTable(Comment)).findMany({ filter: {}, controls: {} })
+      expect(comments).toHaveLength(0)
+    })
+
+    it('should work with plain insertMany (no nav data)', async () => {
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.insertMany([
+        { name: 'Alice' },
+        { name: 'Bob' },
+        { name: 'Carol' },
+      ] as any)
+
+      expect(result.insertedCount).toBe(3)
+      expect(result.insertedIds).toHaveLength(3)
+
+      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      expect(authors).toHaveLength(3)
+    })
+
+    it('should work with insertOne (delegates to insertMany)', async () => {
+      const postTable = db.getTable(Post)
+      const result = await postTable.insertOne({
+        title: 'Single post',
+        author: { name: 'Alice' },
+      } as any)
+
+      expect(result.insertedId).toBeDefined()
+
+      const posts = await postTable.findMany({
+        filter: {},
+        controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
+      })
+      expect(posts).toHaveLength(1)
+      expect((posts[0].author as any).name).toBe('Alice')
+    })
+  })
 })
