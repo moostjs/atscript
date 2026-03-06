@@ -46,6 +46,13 @@ declare global {
     "db.rel.from": string | true
     "db.rel.onDelete": string
     "db.rel.onUpdate": string
+    "db.rel.via": ref
+    "db.rel.filter": query
+    "db.view.name": string
+    "db.view.for": ref
+    "db.view.joins": ({ target: ref, condition: query })[]
+    "db.view.filter": query
+    "db.view.materialized": boolean
     "db.mongo.collection": boolean
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
     "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]

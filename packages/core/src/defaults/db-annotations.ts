@@ -12,7 +12,7 @@ import {
 } from '../parser/nodes'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
-import { findFKFieldsPointingTo } from './db-utils'
+import { findFKFieldsPointingTo, hasAnyViewAnnotation, validateQueryScope, validateRefArgument } from './db-utils'
 
 /**
  * Traverse from annotation token → prop → structure → interface
@@ -217,6 +217,19 @@ export const dbAnnotations: TAnnotationsTree = {
       name: 'name',
       type: 'string',
       description: 'Table/collection name. If omitted, derived from interface name.',
+    },
+    validate(token, _args, _doc) {
+      const errors = [] as TMessages
+      const owner = token.parentNode!
+      // VW6: Cannot be both @db.table and @db.view
+      if (hasAnyViewAnnotation(owner)) {
+        errors.push({
+          message: 'An interface cannot be both a @db.table and a @db.view',
+          severity: 1,
+          range: token.range,
+        })
+      }
+      return errors
     },
   }),
 
@@ -884,5 +897,380 @@ export const dbAnnotations: TAnnotationsTree = {
 
     onDelete: refActionAnnotation('onDelete'),
     onUpdate: refActionAnnotation('onUpdate'),
+
+    via: new AnnotationSpec({
+      description:
+        'Declares a many-to-many navigational property through an explicit junction table. ' +
+        '`@db.rel.via` is self-sufficient — no `@db.rel.from` pairing is needed.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.rel.via PostTag\n' +
+        'tags: Tag[]\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: {
+        name: 'junction',
+        type: 'ref',
+        description: 'The junction table type (must have @db.table and @db.rel.FK fields pointing to both sides).',
+      },
+      validate(token, args, doc) {
+        const errors = [] as TMessages
+        const field = token.parentNode!
+
+        // V6: Cannot coexist with .to or .from
+        if (field.countAnnotations('db.rel.to') > 0 || field.countAnnotations('db.rel.from') > 0) {
+          errors.push({
+            message: '@db.rel.via is self-sufficient — cannot be combined with @db.rel.to or @db.rel.from',
+            severity: 1,
+            range: token.range,
+          })
+        }
+
+        // V1: Must be on an array field
+        const definition = field.getDefinition()
+        if (!isArray(definition)) {
+          errors.push({
+            message: '@db.rel.via requires an array type (e.g. Tag[])',
+            severity: 1,
+            range: token.range,
+          })
+        }
+
+        if (!args[0]) { return errors }
+
+        const junctionName = args[0].text
+
+        // V2: Junction type must have @db.table (via validateRefArgument)
+        errors.push(...validateRefArgument(args[0], doc, { requireDbTable: true }))
+        if (errors.length > 0) { return errors }
+
+        // Resolve junction type for FK checks
+        const junctionUnwound = doc.unwindType(junctionName)
+        if (!junctionUnwound) { return errors }
+        const junctionDef = junctionUnwound.def
+        if (!isInterface(junctionDef)) { return errors }
+
+        // Get this type name and target type name
+        const thisTypeName = getParentTypeName(token)
+        const targetTypeName = getNavTargetTypeName(field)
+        if (!thisTypeName || !targetTypeName) { return errors }
+
+        // V3: Junction must have FK pointing to this type
+        const fksToThis = findFKFieldsPointingTo(junctionUnwound.doc, junctionDef, thisTypeName)
+        if (fksToThis.length === 0) {
+          errors.push({
+            message: `Junction '${junctionName}' has no @db.rel.FK pointing to '${thisTypeName}'`,
+            severity: 1,
+            range: args[0].range,
+          })
+        } else if (fksToThis.length > 1) {
+          // V5: Multiple FKs to same type
+          errors.push({
+            message: `Junction '${junctionName}' has multiple @db.rel.FK pointing to '${thisTypeName}' — not supported`,
+            severity: 1,
+            range: args[0].range,
+          })
+        }
+
+        // V4: Junction must have FK pointing to target type
+        // (skip if this === target, e.g. self-referencing M:N — the same FKs serve both)
+        if (targetTypeName !== thisTypeName) {
+          const fksToTarget = findFKFieldsPointingTo(junctionUnwound.doc, junctionDef, targetTypeName)
+          if (fksToTarget.length === 0) {
+            errors.push({
+              message: `Junction '${junctionName}' has no @db.rel.FK pointing to '${targetTypeName}'`,
+              severity: 1,
+              range: args[0].range,
+            })
+          } else if (fksToTarget.length > 1) {
+            // V5: Multiple FKs to same type
+            errors.push({
+              message: `Junction '${junctionName}' has multiple @db.rel.FK pointing to '${targetTypeName}' — not supported`,
+              severity: 1,
+              range: args[0].range,
+            })
+          }
+        }
+
+        return errors
+      },
+    }),
+
+    filter: new AnnotationSpec({
+      description:
+        'Applies a filter to a navigational property, restricting which related records are loaded.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.rel.from\n' +
+        '@db.rel.filter `Post.published = true`\n' +
+        'publishedPosts: Post[]\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: {
+        name: 'condition',
+        type: 'query',
+        description: 'Filter expression restricting which related records are loaded.',
+      },
+      validate(token, args, doc) {
+        const errors = [] as TMessages
+        const field = token.parentNode!
+
+        const hasTo = field.countAnnotations('db.rel.to') > 0
+        const hasFrom = field.countAnnotations('db.rel.from') > 0
+        const hasVia = field.countAnnotations('db.rel.via') > 0
+
+        // FL1: Must be on a navigational field
+        if (!hasTo && !hasFrom && !hasVia) {
+          errors.push({
+            message: '@db.rel.filter is only valid on navigational fields (@db.rel.to, @db.rel.from, or @db.rel.via)',
+            severity: 1,
+            range: token.range,
+          })
+          return errors
+        }
+
+        if (!args[0]?.queryNode) { return errors }
+
+        // Determine scope based on nav type
+        const targetTypeName = getNavTargetTypeName(field)
+        if (!targetTypeName) { return errors }
+
+        const allowedTypes: string[] = [targetTypeName]
+        if (hasVia) {
+          // For .via, also allow junction type
+          const viaAnnotations = field.annotations?.filter(a => a.name === 'db.rel.via')
+          if (viaAnnotations?.[0]?.args[0]) {
+            allowedTypes.push(viaAnnotations[0].args[0].text)
+          }
+        }
+
+        // FL2/FL3: Validate query scope
+        errors.push(...validateQueryScope(args[0], allowedTypes, targetTypeName, doc))
+
+        return errors
+      },
+    }),
+  },
+
+  view: {
+    name: new AnnotationSpec({
+      description:
+        'Overrides the view name in the database. If omitted, the adapter derives it from the interface name.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.view.name "active_premium_users"\n' +
+        '@db.view.for User\n' +
+        'export interface ActivePremiumUser { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'name',
+        type: 'string',
+        description: 'The view name in the database.',
+      },
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        // VW6: Cannot be both @db.table and @db.view
+        if (owner.countAnnotations('db.table') > 0) {
+          errors.push({
+            message: 'An interface cannot be both a @db.table and a @db.view',
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+
+    for: new AnnotationSpec({
+      description:
+        'Specifies the entry/primary table for a computed view. Required for views that map fields via chain refs.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.view.for Order\n' +
+        '@db.view.filter `Order.status = \'active\'`\n' +
+        'export interface ActiveOrderDetails { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'entry',
+        type: 'ref',
+        description: 'The primary/entry table type (must have @db.table).',
+      },
+      validate(token, args, doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        // VW6: Cannot be both @db.table and @db.view
+        if (owner.countAnnotations('db.table') > 0) {
+          errors.push({
+            message: 'An interface cannot be both a @db.table and a @db.view',
+            severity: 1,
+            range: token.range,
+          })
+        }
+        // Entry type must be @db.table
+        if (args[0]) {
+          errors.push(...validateRefArgument(args[0], doc, { requireDbTable: true }))
+        }
+        return errors
+      },
+    }),
+
+    joins: new AnnotationSpec({
+      description:
+        'Declares an explicit join for a view. Use when no `@db.rel.*` path exists between the entry table and the target.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.view.for Order\n' +
+        '@db.view.joins Warehouse, `Warehouse.regionId = Order.regionId`\n' +
+        'export interface OrderWarehouse { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: [
+        {
+          name: 'target',
+          type: 'ref',
+          description: 'The table type to join (must have @db.table).',
+        },
+        {
+          name: 'condition',
+          type: 'query',
+          description: 'Join condition expression.',
+        },
+      ],
+      validate(token, args, doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+
+        // VW1: Must be on a @db.view interface
+        if (!hasAnyViewAnnotation(owner) && !args[0]) {
+          errors.push({
+            message: '@db.view.joins is only valid on @db.view interfaces',
+            severity: 1,
+            range: token.range,
+          })
+          return errors
+        }
+
+        // Validate join target is @db.table
+        if (args[0]) {
+          errors.push(...validateRefArgument(args[0], doc, { requireDbTable: true }))
+        }
+
+        // VJ3: Must have @db.view.for
+        const forAnnotations = owner.annotations?.filter(a => a.name === 'db.view.for')
+        const entryTypeName = forAnnotations?.[0]?.args[0]?.text
+        if (!entryTypeName) {
+          errors.push({
+            message: '@db.view.joins requires @db.view.for to identify the entry table',
+            severity: 1,
+            range: token.range,
+          })
+          return errors
+        }
+
+        // VJ1/VJ2: Validate query scope — only join target and entry table allowed
+        if (args[1]?.queryNode && args[0]) {
+          const joinTargetName = args[0].text
+          errors.push(...validateQueryScope(args[1], [joinTargetName, entryTypeName], null, doc))
+        }
+
+        return errors
+      },
+    }),
+
+    filter: new AnnotationSpec({
+      description:
+        'WHERE clause for a view, filtering which rows are included.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.view.for User\n' +
+        '@db.view.filter `User.status = \'active\' and User.age >= 18`\n' +
+        'export interface ActiveUser { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'condition',
+        type: 'query',
+        description: 'Filter expression for the view WHERE clause.',
+      },
+      validate(token, args, doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+
+        // VW2: Must be on a @db.view interface
+        if (!hasAnyViewAnnotation(owner) && !args[0]) {
+          errors.push({
+            message: '@db.view.filter is only valid on @db.view interfaces',
+            severity: 1,
+            range: token.range,
+          })
+          return errors
+        }
+
+        if (!args[0]?.queryNode) { return errors }
+
+        // VF3: Must have @db.view.for
+        const forAnnotations = owner.annotations?.filter(a => a.name === 'db.view.for')
+        const entryTypeName = forAnnotations?.[0]?.args[0]?.text
+        if (!entryTypeName) {
+          errors.push({
+            message: '@db.view.filter requires @db.view.for to identify the entry table',
+            severity: 1,
+            range: token.range,
+          })
+          return errors
+        }
+
+        // Collect all joined tables for scope
+        const allowedTypes = [entryTypeName]
+        const joinsAnnotations = owner.annotations?.filter(a => a.name === 'db.view.joins')
+        if (joinsAnnotations) {
+          for (const join of joinsAnnotations) {
+            if (join.args[0]) {
+              allowedTypes.push(join.args[0].text)
+            }
+          }
+        }
+
+        // VF1/VF2: Validate query scope
+        errors.push(...validateQueryScope(args[0], allowedTypes, entryTypeName, doc))
+
+        return errors
+      },
+    }),
+
+    materialized: new AnnotationSpec({
+      description:
+        'Marks a view as materialized (precomputed, stored on disk). ' +
+        'Supported by PostgreSQL, CockroachDB, Oracle, SQL Server (indexed views), Snowflake. ' +
+        'Not applicable to MySQL, SQLite, MongoDB.\n\n' +
+        '**Example:**\n' +
+        '```atscript\n' +
+        '@db.view.materialized\n' +
+        '@db.view.for User\n' +
+        '@db.view.filter `User.status = \'active\'`\n' +
+        'export interface ActiveUsers { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+
+        // VW3: Must be on a @db.view interface
+        if (!hasAnyViewAnnotation(owner)) {
+          errors.push({
+            message: '@db.view.materialized is only valid on @db.view interfaces',
+            severity: 1,
+            range: token.range,
+          })
+        }
+
+        return errors
+      },
+    }),
   },
 }

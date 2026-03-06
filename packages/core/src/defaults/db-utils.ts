@@ -1,10 +1,15 @@
 import type { AtscriptDoc } from '../document'
 import {
   isInterface,
+  isQueryComparison,
+  isQueryLogical,
   isRef,
   isStructure,
   type SemanticInterfaceNode,
+  type SemanticNode,
   type SemanticPropNode,
+  type SemanticQueryExprNode,
+  type SemanticQueryFieldRefNode,
   type SemanticRefNode,
   type SemanticStructureNode,
 } from '../parser/nodes'
@@ -138,4 +143,94 @@ export function findFKFieldsPointingTo(
   }
 
   return results
+}
+
+const viewAnnotationNames = [
+  'db.view.name',
+  'db.view.for',
+  'db.view.joins',
+  'db.view.filter',
+  'db.view.materialized',
+]
+
+/**
+ * Check if a node has any @db.view.* annotation.
+ */
+export function hasAnyViewAnnotation(node: SemanticNode): boolean {
+  return viewAnnotationNames.some(name => node.countAnnotations(name) > 0)
+}
+
+/**
+ * Validate that all type refs in a query expression are within the allowed scope.
+ *
+ * @param queryToken - The query arg token (must have .queryNode)
+ * @param allowedTypes - Type names allowed as qualified refs
+ * @param unqualifiedTarget - Type name for resolving unqualified refs, or null to disallow them
+ * @param doc - The document for type lookups
+ */
+export function validateQueryScope(
+  queryToken: Token,
+  allowedTypes: string[],
+  unqualifiedTarget: string | null,
+  doc: AtscriptDoc,
+): TMessages {
+  const errors: TMessages = []
+  const queryNode = queryToken.queryNode
+  if (!queryNode) { return errors }
+
+  function walkFieldRef(ref: SemanticQueryFieldRefNode): void {
+    if (ref.typeRef) {
+      // Qualified ref: check type is in scope
+      const typeName = ref.typeRef.text
+      if (!allowedTypes.includes(typeName)) {
+        errors.push({
+          message: `Query references '${typeName}' which is not in scope — expected ${allowedTypes.map(t => `'${t}'`).join(' or ')}`,
+          severity: 1,
+          range: ref.typeRef.range,
+        })
+      }
+    } else if (unqualifiedTarget === null) {
+      // Unqualified refs not allowed in this context
+      errors.push({
+        message: `Unqualified field reference '${ref.fieldRef.text}' — use qualified form (e.g., Type.${ref.fieldRef.text})`,
+        severity: 1,
+        range: ref.fieldRef.range,
+      })
+    } else {
+      // Validate unqualified ref against the target type
+      const unwound = doc.unwindType(unqualifiedTarget)
+      if (unwound) {
+        const targetDef = unwound.def
+        if (isInterface(targetDef) || isStructure(targetDef)) {
+          const struct = isInterface(targetDef)
+            ? targetDef.getDefinition() as SemanticStructureNode | undefined
+            : targetDef
+          if (struct && isStructure(struct) && !struct.props.has(ref.fieldRef.text)) {
+            errors.push({
+              message: `Field '${ref.fieldRef.text}' does not exist on '${unqualifiedTarget}'`,
+              severity: 1,
+              range: ref.fieldRef.range,
+            })
+          }
+        }
+      }
+    }
+  }
+
+  function walkExpr(expr: SemanticQueryExprNode): void {
+    if (isQueryLogical(expr)) {
+      for (const operand of expr.operands) {
+        walkExpr(operand)
+      }
+    } else if (isQueryComparison(expr)) {
+      walkFieldRef(expr.left)
+      // right can also be a field ref (ref-to-ref comparison)
+      if (expr.right && 'fieldRef' in expr.right) {
+        walkFieldRef(expr.right as SemanticQueryFieldRefNode)
+      }
+    }
+  }
+
+  walkExpr(queryNode.expression)
+  return errors
 }
