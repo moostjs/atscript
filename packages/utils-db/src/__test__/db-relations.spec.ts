@@ -641,12 +641,12 @@ describe('AtscriptDbTable — Relations', () => {
       }
     })
 
-    it('should reject insert when nav fields are present in payload', async () => {
+    it('should strip nav fields from payload and insert successfully', async () => {
       const adapter = new InMemoryAdapter()
       const table = new AtscriptDbTable(Author, adapter)
-      await expect(
-        table.insertOne({ name: 'Charlie', posts: [{ title: 'junk' }] } as any)
-      ).rejects.toThrow('Navigational field is not allowed in input')
+      // Nav fields are silently stripped (no write resolver → no nested creation)
+      const result = await table.insertOne({ name: 'Charlie', posts: [{ title: 'junk' }] } as any)
+      expect(result.insertedId).toBeDefined()
     })
 
     it('should accept insert when nav fields are undefined', async () => {

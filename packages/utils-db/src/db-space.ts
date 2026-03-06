@@ -74,7 +74,11 @@ export class DbSpace {
         type,
         adapter as any,
         logger || this.logger,
-        (t) => this.get(t) as any
+        (t) => this.get(t) as any,
+        (t) => {
+          const resolved = this.get(t)
+          return resolved instanceof AtscriptDbTable ? resolved as any : undefined
+        }
       )
       this._readables.set(type, readable as AtscriptDbReadable)
     }

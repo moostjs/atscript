@@ -33,6 +33,7 @@ import type {
   TIdDescriptor,
   TSearchIndexInfo,
   TTableResolver,
+  TWriteTableResolver,
 } from './types'
 
 /**
@@ -234,6 +235,7 @@ export class AtscriptDbReadable<
   protected _uniqueProps = new Set<string>()
   protected _foreignKeys = new Map<string, TDbForeignKey>()
   protected _relations = new Map<string, TDbRelation>()
+  protected _writeTableResolver?: TWriteTableResolver
 
   // ── Embedded object mapping ──────────────────────────────────────────────
 
@@ -1662,7 +1664,7 @@ export class AtscriptDbReadable<
   /**
    * Finds the FK entry that connects a `@db.rel.to` relation to its target.
    */
-  private _findFKForRelation(relation: TDbRelation): { localFields: string[]; targetFields: string[] } | undefined {
+  protected _findFKForRelation(relation: TDbRelation): { localFields: string[]; targetFields: string[] } | undefined {
     for (const fk of this._foreignKeys.values()) {
       if (relation.alias) {
         if (fk.alias === relation.alias) {
@@ -1683,8 +1685,8 @@ export class AtscriptDbReadable<
   /**
    * Finds a FK on a remote table that points back to this table.
    */
-  private _findRemoteFK(
-    targetTable: TResolvedTable,
+  protected _findRemoteFK(
+    targetTable: { foreignKeys: ReadonlyMap<string, TDbForeignKey> },
     thisTableName: string,
     alias?: string
   ): TDbForeignKey | undefined {

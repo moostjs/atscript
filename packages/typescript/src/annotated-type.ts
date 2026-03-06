@@ -389,7 +389,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
                 }
               }
             }
-            node.id = target.id || t.id
+            node.id = chain ? target.id : (target.id || t.id)
             // Replace getter with resolved value for zero-overhead subsequent access
             Object.defineProperty(node, 'type', { value: target.type, writable: false, configurable: true })
             return target.type

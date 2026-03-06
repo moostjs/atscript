@@ -21,6 +21,7 @@ import type {
   TDbInsertResult,
   TDbUpdateResult,
   TTableResolver,
+  TWriteTableResolver,
 } from './types'
 
 export { resolveDesignType } from './db-readable'
@@ -29,17 +30,14 @@ export { resolveDesignType } from './db-readable'
  * Validator plugin that skips navigational relation fields.
  * Fields annotated with `@db.rel.to` or `@db.rel.from` are virtual references
  * to other tables — they have no stored column and should not be validated.
+ * Nested creation strips these fields before they reach the adapter.
  */
-const navFieldsValidatorPlugin: TValidatorPlugin = (ctx, def, value) => {
+const navFieldsValidatorPlugin: TValidatorPlugin = (_ctx, def) => {
   if (
     def.metadata.has('db.rel.to' as keyof AtscriptMetadata) ||
     def.metadata.has('db.rel.from' as keyof AtscriptMetadata)
   ) {
-    if (value !== undefined) {
-      ctx.error(`Navigational field is not allowed in input`)
-      return false
-    }
-    return true
+    return true // Skip — nested creation or ignored
   }
   return undefined
 }
@@ -78,9 +76,13 @@ export class AtscriptDbTable<
     _type: T,
     adapter: A,
     logger?: TGenericLogger,
-    _tableResolver?: TTableResolver
+    _tableResolver?: TTableResolver,
+    _writeTableResolver?: TWriteTableResolver
   ) {
     super(_type, adapter, logger, _tableResolver)
+    if (_writeTableResolver) {
+      this._writeTableResolver = _writeTableResolver
+    }
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -105,17 +107,45 @@ export class AtscriptDbTable<
   /**
    * Inserts a single record.
    * Applies defaults, validates, prepares ID, maps columns, strips ignored fields.
+   *
+   * Supports **nested creation**: if the payload includes data for navigation
+   * fields (`@db.rel.to` / `@db.rel.from`), related records are created
+   * automatically. TO dependencies are created first (their PK becomes our FK),
+   * FROM dependents are created after (they receive our PK as their FK).
+   * Recursive up to `maxDepth` (default 3).
    */
   public async insertOne(
-    payload: Partial<DataType> & Record<string, unknown>
+    payload: Partial<DataType> & Record<string, unknown>,
+    opts?: { maxDepth?: number; _depth?: number }
   ): Promise<TDbInsertResult> {
     this._flatten()
     const data = this._applyDefaults({ ...payload })
+    const maxDepth = opts?.maxDepth ?? 3
+    const depth = opts?._depth ?? 0
+
+    // Phase 1: Create TO dependencies (they must exist before we can set our FK)
+    const hasNestedData = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
+    if (hasNestedData) {
+      await this._insertNestedTo(data, maxDepth, depth)
+    }
+
+    // Strip nav fields before validation (FROM data preserved in original payload)
+    for (const navField of this._navFields) {
+      delete data[navField]
+    }
+
     const validator = this.getValidator('insert')
     if (!validator.validate(data)) {
       throw new Error('Validation failed for insert')
     }
-    return this.adapter.insertOne(this._prepareForWrite(data))
+    const result = await this.adapter.insertOne(this._prepareForWrite(data))
+
+    // Phase 2: Create FROM dependents (they need our PK)
+    if (hasNestedData) {
+      await this._insertNestedFrom(payload as Record<string, unknown>, result.insertedId, maxDepth, depth)
+    }
+
+    return result
   }
 
   /**
@@ -406,6 +436,77 @@ export class AtscriptDbTable<
       }
     }
     return result
+  }
+
+  // ── Internal: nested creation ────────────────────────────────────────────
+
+  /**
+   * Creates TO dependencies before the main insert.
+   * For each `@db.rel.to` nav field with an object value, inserts the
+   * related record first and sets the FK on the main payload.
+   */
+  private async _insertNestedTo(
+    data: Record<string, unknown>,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'to') continue
+      const nested = data[navField]
+      if (!nested || typeof nested !== 'object' || Array.isArray(nested)) continue
+
+      const targetType = relation.targetType()
+      const targetTable = this._writeTableResolver!(targetType)
+      if (!targetTable) continue
+
+      const fk = this._findFKForRelation(relation)
+      if (!fk) continue
+
+      const result = await targetTable.insertOne(
+        nested as Record<string, unknown>,
+        { maxDepth, _depth: depth + 1 }
+      )
+
+      // Set FK field(s) on main payload
+      if (fk.localFields.length === 1) {
+        data[fk.localFields[0]] = result.insertedId
+      }
+      delete data[navField]
+    }
+  }
+
+  /**
+   * Creates FROM dependents after the main insert.
+   * For each `@db.rel.from` nav field with an array value, inserts each
+   * child with the FK set to the parent's insertedId.
+   */
+  private async _insertNestedFrom(
+    originalPayload: Record<string, unknown>,
+    parentId: unknown,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'from') continue
+      const children = originalPayload[navField]
+      if (!Array.isArray(children) || children.length === 0) continue
+
+      const targetType = relation.targetType()
+      const targetTable = this._writeTableResolver!(targetType)
+      if (!targetTable) continue
+
+      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
+      if (!remoteFK) continue
+
+      const promises = children.map((child) => {
+        const childData = { ...(child as Record<string, unknown>) }
+        if (remoteFK.fields.length === 1) {
+          childData[remoteFK.fields[0]] = parentId
+        }
+        return targetTable.insertOne(childData, { maxDepth, _depth: depth + 1 })
+      })
+      await Promise.all(promises)
+    }
   }
 
   // ── Internal: validator building ──────────────────────────────────────────

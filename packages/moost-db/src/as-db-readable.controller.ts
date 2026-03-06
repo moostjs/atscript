@@ -279,9 +279,10 @@ export class AsDbReadableController<
     if (error) { return error }
 
     const select = this.transformProjection(parsed.controls.$select)
+    const controls = { ...parsed.controls, $select: select }
 
     return this.returnOne(
-      this.readable.findById(id as any, { $select: select } as UniqueryControls<any>) as Promise<DataType | null>
+      this.readable.findById(id as any, { controls } as any) as Promise<DataType | null>
     )
   }
 

@@ -171,6 +171,22 @@ export interface AtscriptDbTableLike {
   foreignKeys: ReadonlyMap<string, TDbForeignKey>
 }
 
+// ── Write Table Resolver ─────────────────────────────────────────────────
+
+/** Minimal writable table interface for nested creation. */
+export interface AtscriptDbWritable {
+  insertOne(
+    payload: Record<string, unknown>,
+    opts?: { maxDepth?: number; _depth?: number }
+  ): Promise<TDbInsertResult>
+}
+
+/**
+ * Callback that resolves an annotated type to a writable table instance.
+ * Used for nested creation — inserting related records inline.
+ */
+export type TWriteTableResolver = (type: TAtscriptAnnotatedType) => (AtscriptDbTableLike & AtscriptDbWritable) | undefined
+
 // ── Relation Types ───────────────────────────────────────────────────────
 
 export interface TDbRelation {

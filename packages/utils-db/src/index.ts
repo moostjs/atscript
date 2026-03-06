@@ -37,6 +37,8 @@ export type {
   TDbRelation,
   TSearchIndexInfo,
   TTableResolver,
+  TWriteTableResolver,
+  AtscriptDbWritable,
   WithRelation,
   TypedWithRelation,
   OwnPropsOf,
