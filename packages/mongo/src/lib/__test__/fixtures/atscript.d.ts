@@ -36,11 +36,13 @@ declare global {
     "db.index.plain": ({ name?: string, sort?: string })[]
     "db.index.unique": (string | true)[]
     "db.index.fulltext": ({ name?: string, weight?: number })[]
-    "db.column": string
+    "db.column.name": string
+    "db.column.from": string
     "db.default.value": string
     "db.default.fn": string
     "db.json": boolean
     "db.ignore": boolean
+    "db.sync.method": string
     "db.rel.FK": string | true
     "db.rel.to": string | true
     "db.rel.from": string | true
@@ -54,6 +56,7 @@ declare global {
     "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.materialized": boolean
     "db.mongo.collection": boolean
+    "db.mongo.capped": { size: number, max?: number }
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
     "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
     "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]

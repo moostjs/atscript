@@ -47,7 +47,7 @@ $("object", UsersTable)
     $().designType("string")
       .tags("string")
       .annotate("db.index.unique", "email_idx", true)
-      .annotate("db.column", "email_address")
+      .annotate("db.column.name", "email_address")
       .$type
   ).prop(
     "name",

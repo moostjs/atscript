@@ -34,8 +34,8 @@ export { resolveDesignType } from './db-readable'
  */
 const navFieldsValidatorPlugin: TValidatorPlugin = (_ctx, def) => {
   if (
-    def.metadata.has('db.rel.to' as keyof AtscriptMetadata) ||
-    def.metadata.has('db.rel.from' as keyof AtscriptMetadata)
+    def.metadata.has('db.rel.to') ||
+    def.metadata.has('db.rel.from')
   ) {
     return true // Skip — nested creation or ignored
   }

@@ -159,36 +159,6 @@ describe('DbSpace', () => {
     expect(resolved.primaryKeys).toBeDefined()
   })
 
-  it('should call ensureTable on all types via ensureAll', async () => {
-    const adapters: MockAdapter[] = []
-    const space = new DbSpace(() => {
-      const a = new MockAdapter()
-      adapters.push(a)
-      return a
-    })
-
-    await space.ensureAll([UsersTable, ProfileTable])
-
-    expect(adapters).toHaveLength(2)
-    expect(adapters[0].calls.some(c => c.method === 'ensureTable')).toBe(true)
-    expect(adapters[1].calls.some(c => c.method === 'ensureTable')).toBe(true)
-  })
-
-  it('should call syncIndexes on all types via syncAllIndexes', async () => {
-    const adapters: MockAdapter[] = []
-    const space = new DbSpace(() => {
-      const a = new MockAdapter()
-      adapters.push(a)
-      return a
-    })
-
-    await space.syncAllIndexes([UsersTable, ProfileTable])
-
-    expect(adapters).toHaveLength(2)
-    expect(adapters[0].calls.some(c => c.method === 'syncIndexes')).toBe(true)
-    expect(adapters[1].calls.some(c => c.method === 'syncIndexes')).toBe(true)
-  })
-
   it('should pass custom logger to tables', () => {
     const logger = { warn: vi.fn(), info: vi.fn(), error: vi.fn(), debug: vi.fn() }
     const space = new DbSpace(() => new MockAdapter(), logger as any)

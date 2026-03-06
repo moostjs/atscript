@@ -222,6 +222,9 @@ export class AtscriptDbReadable<
   /** Database schema/namespace from `@db.schema` (if set). */
   public readonly schema: string | undefined
 
+  /** Sync method from `@db.sync.method` ('drop' | 'recreate' | undefined). */
+  protected readonly _syncMethod: 'drop' | 'recreate' | undefined
+
   // ── Lazy-computed field analysis ──────────────────────────────────────────
 
   protected _flatMap?: Map<string, TAtscriptAnnotatedType>
@@ -229,6 +232,7 @@ export class AtscriptDbReadable<
   protected _indexes = new Map<string, TDbIndex>()
   protected _primaryKeys: string[] = []
   protected _columnMap = new Map<string, string>()
+  protected _columnFromMap = new Map<string, string>()
   protected _defaults = new Map<string, TDbDefaultValue>()
   protected _ignoredFields = new Set<string>()
   protected _navFields = new Set<string>()
@@ -276,7 +280,7 @@ export class AtscriptDbReadable<
 
     const adapterName = adapter.getAdapterTableName?.(_type)
     const dbTable = _type.metadata.get('db.table') as string | undefined
-    const dbViewName = _type.metadata.get('db.view.name' as keyof AtscriptMetadata) as string | undefined
+    const dbViewName = _type.metadata.get('db.view.name') as string | undefined
     const fallbackName = _type.id || ''
 
     this.tableName = adapterName || dbTable || dbViewName || fallbackName
@@ -285,6 +289,7 @@ export class AtscriptDbReadable<
     }
 
     this.schema = _type.metadata.get('db.schema') as string | undefined
+    this._syncMethod = _type.metadata.get('db.sync.method') as 'drop' | 'recreate' | undefined
 
     this._nestedObjects = adapter.supportsNestedObjects()
 
@@ -355,7 +360,18 @@ export class AtscriptDbReadable<
     this._uniqueProps.add(field)
   }
 
-  /** Logical → physical column name mapping from `@db.column`. */
+  /** Sync method for structural changes: 'drop' (lossy), 'recreate' (lossless), or undefined (manual). */
+  public get syncMethod(): 'drop' | 'recreate' | undefined {
+    return this._syncMethod
+  }
+
+  /** Returns the `__`-separated parent prefix for a dot-separated path, or empty string for top-level paths. */
+  protected _flattenedPrefix(path: string): string {
+    const lastDot = path.lastIndexOf('.')
+    return lastDot >= 0 ? path.substring(0, lastDot).replace(/\./g, '__') + '__' : ''
+  }
+
+  /** Logical → physical column name mapping from `@db.column.name`. */
   public get columnMap(): ReadonlyMap<string, string> {
     this._flatten()
     return this._columnMap
@@ -470,6 +486,13 @@ export class AtscriptDbReadable<
           ? (this._columnMap.get(path) ?? path)
           : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
 
+        // Compute renamedFrom (old physical name from @db.column.from)
+        const fromLocal = this._columnFromMap.get(path)
+        let renamedFrom: string | undefined
+        if (fromLocal) {
+          renamedFrom = isFlattened ? this._flattenedPrefix(path) + fromLocal : fromLocal
+        }
+
         this._fieldDescriptors.push({
           path,
           type,
@@ -481,6 +504,7 @@ export class AtscriptDbReadable<
           defaultValue: this._defaults.get(path),
           storage,
           flattenedFrom: isFlattened ? path : undefined,
+          renamedFrom,
         })
       }
       Object.freeze(this._fieldDescriptors)
@@ -708,10 +732,16 @@ export class AtscriptDbReadable<
       this._primaryKeys.push(fieldName)
     }
 
-    // @db.column → column mapping
-    const column = metadata.get('db.column') as string | undefined
+    // @db.column.name → column mapping
+    const column = metadata.get('db.column.name') as string | undefined
     if (column) {
       this._columnMap.set(fieldName, column)
+    }
+
+    // @db.column.from → rename mapping
+    const columnFrom = metadata.get('db.column.from') as string | undefined
+    if (columnFrom) {
+      this._columnFromMap.set(fieldName, columnFrom)
     }
 
     // @db.default.value or @db.default.fn
@@ -732,18 +762,18 @@ export class AtscriptDbReadable<
     }
 
     // @db.rel.to / @db.rel.from / @db.rel.via → navigational field, not a stored column
-    if (metadata.has('db.rel.to' as keyof AtscriptMetadata) || metadata.has('db.rel.from' as keyof AtscriptMetadata) || metadata.has('db.rel.via' as keyof AtscriptMetadata)) {
+    if (metadata.has('db.rel.to') || metadata.has('db.rel.from') || metadata.has('db.rel.via')) {
       this._navFields.add(fieldName)
       this._ignoredFields.add(fieldName)
 
-      const direction = metadata.has('db.rel.to' as keyof AtscriptMetadata)
+      const direction = metadata.has('db.rel.to')
         ? 'to' as const
-        : metadata.has('db.rel.from' as keyof AtscriptMetadata)
+        : metadata.has('db.rel.from')
           ? 'from' as const
           : 'via' as const
       const raw = direction === 'via'
-        ? metadata.get('db.rel.via' as keyof AtscriptMetadata)
-        : metadata.get(`db.rel.${direction}` as keyof AtscriptMetadata)
+        ? metadata.get('db.rel.via')
+        : metadata.get(`db.rel.${direction}`)
       const alias = (raw === true || typeof raw === 'function' ? undefined : raw) as string | undefined
       const isArr = fieldType.type.kind === 'array'
       const elementType = isArr
@@ -760,12 +790,12 @@ export class AtscriptDbReadable<
     }
 
     // @db.rel.FK → foreign key constraint metadata
-    if (metadata.has('db.rel.FK' as keyof AtscriptMetadata)) {
-      const raw = metadata.get('db.rel.FK' as keyof AtscriptMetadata)
+    if (metadata.has('db.rel.FK')) {
+      const raw = metadata.get('db.rel.FK')
       const alias = (raw === true ? undefined : raw) as string | undefined
       if (fieldType.ref) {
         const refTarget = fieldType.ref.type()
-        const targetTable = (refTarget?.metadata?.get('db.table' as keyof AtscriptMetadata) as string) || refTarget?.id || ''
+        const targetTable = (refTarget?.metadata?.get('db.table') as string) || refTarget?.id || ''
         const targetField = fieldType.ref.field
         const key = alias || `__auto_${fieldName}`
         const existing = this._foreignKeys.get(key)
@@ -784,8 +814,8 @@ export class AtscriptDbReadable<
     }
 
     // @db.rel.onDelete / @db.rel.onUpdate → referential actions on FK
-    const onDelete = metadata.get('db.rel.onDelete' as keyof AtscriptMetadata) as string | undefined
-    const onUpdate = metadata.get('db.rel.onUpdate' as keyof AtscriptMetadata) as string | undefined
+    const onDelete = metadata.get('db.rel.onDelete') as string | undefined
+    const onUpdate = metadata.get('db.rel.onUpdate') as string | undefined
     if (onDelete || onUpdate) {
       for (const fk of this._foreignKeys.values()) {
         if (fk.fields.includes(fieldName)) {
@@ -928,12 +958,12 @@ export class AtscriptDbReadable<
       }
     }
 
-    // J4: @db.column on a flattened parent is invalid
+    // J4: @db.column.name on a flattened parent is invalid
     for (const parentPath of this._flattenedParents) {
       if (this._columnMap.has(parentPath)) {
         throw new Error(
-          `@db.column cannot rename a flattened object field "${parentPath}" — ` +
-          `apply @db.column to individual nested fields, or use @db.json to store as a single column`
+          `@db.column.name cannot rename a flattened object field "${parentPath}" — ` +
+          `apply @db.column.name to individual nested fields, or use @db.json to store as a single column`
         )
       }
     }
@@ -945,8 +975,14 @@ export class AtscriptDbReadable<
       if (this._findAncestorInSet(path, this._jsonFields) !== undefined) { continue }
 
       const isFlattened = this._findAncestorInSet(path, this._flattenedParents) !== undefined
-      const physicalName = this._columnMap.get(path)
-        ?? (isFlattened ? path.replace(/\./g, '__') : path)
+      const columnOverride = this._columnMap.get(path)
+      let physicalName: string
+      if (columnOverride) {
+        // For flattened fields, prepend parent prefix: 'address.zip' with override 'zip_code' → 'address__zip_code'
+        physicalName = isFlattened ? this._flattenedPrefix(path) + columnOverride : columnOverride
+      } else {
+        physicalName = isFlattened ? path.replace(/\./g, '__') : path
+      }
 
       this._pathToPhysical.set(path, physicalName)
       this._physicalToPath.set(physicalName, path)
@@ -1679,7 +1715,7 @@ export class AtscriptDbReadable<
 
   private _resolveRelationTargetTable(relation: TDbRelation): string {
     const targetType = relation.targetType()
-    return (targetType?.metadata?.get('db.table' as keyof AtscriptMetadata) as string) || targetType?.id || ''
+    return (targetType?.metadata?.get('db.table') as string) || targetType?.id || ''
   }
 
   /**

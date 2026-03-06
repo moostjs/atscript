@@ -15,8 +15,10 @@ export function computeColumnDiff(
 ): TColumnDiff {
   const existingByName = new Map(existing.map(c => [c.name, c]))
   const desiredByName = new Map<string, TDbFieldMeta>()
+  const renamedOldNames = new Set<string>()
 
   const added: TDbFieldMeta[] = []
+  const renamed: TColumnDiff['renamed'] = []
   const typeChanged: TColumnDiff['typeChanged'] = []
 
   for (const field of desired) {
@@ -24,19 +26,27 @@ export function computeColumnDiff(
     desiredByName.set(field.physicalName, field)
 
     const existingCol = existingByName.get(field.physicalName)
-    if (!existingCol) {
-      added.push(field)
-    } else if (typeMapper) {
-      const expectedType = typeMapper(field.designType)
-      if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
-        typeChanged.push({ field, existingType: existingCol.type })
+    if (existingCol) {
+      // Column exists with current name — check type
+      if (typeMapper) {
+        const expectedType = typeMapper(field.designType)
+        if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
+          typeChanged.push({ field, existingType: existingCol.type })
+        }
       }
+    } else if (field.renamedFrom && existingByName.has(field.renamedFrom)) {
+      // Column exists under old name → rename
+      renamed.push({ field, oldName: field.renamedFrom })
+      renamedOldNames.add(field.renamedFrom)
+    } else {
+      added.push(field)
     }
   }
 
+  // Exclude renamed old names from "removed"
   const removed: TExistingColumn[] = existing.filter(
-    c => !desiredByName.has(c.name)
+    c => !desiredByName.has(c.name) && !renamedOldNames.has(c.name)
   )
 
-  return { added, removed, typeChanged }
+  return { added, removed, renamed, typeChanged }
 }

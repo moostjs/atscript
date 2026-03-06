@@ -107,7 +107,7 @@ export interface TDbFieldMeta {
   path: string
   /** The annotated type for this field. */
   type: TAtscriptAnnotatedType
-  /** Physical column/field name (from @db.column, __-separated for flattened, or same as path). */
+  /** Physical column/field name (from @db.column.name, __-separated for flattened, or same as path). */
   physicalName: string
   /** Resolved design type: 'string', 'number', 'boolean', 'object', 'json', etc. */
   designType: string
@@ -132,6 +132,8 @@ export interface TDbFieldMeta {
    * Undefined for non-flattened fields.
    */
   flattenedFrom?: string
+  /** Old physical column name from @db.column.from (for rename migration). */
+  renamedFrom?: string
 }
 
 // ── Foreign Key Types ────────────────────────────────────────────────────
@@ -167,12 +169,14 @@ export interface TExistingColumn {
 export interface TColumnDiff {
   added: TDbFieldMeta[]
   removed: TExistingColumn[]
+  renamed: Array<{ field: TDbFieldMeta; oldName: string }>
   typeChanged: Array<{ field: TDbFieldMeta; existingType: string }>
 }
 
 /** Result of applying column diff to the database. */
 export interface TSyncColumnResult {
   added: string[]
+  renamed: string[]
 }
 
 // ── Table Resolver ───────────────────────────────────────────────────────

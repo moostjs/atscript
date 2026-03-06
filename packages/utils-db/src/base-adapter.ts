@@ -490,4 +490,18 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters implement this.
    */
   syncColumns?(diff: TColumnDiff): Promise<TSyncColumnResult>
+
+  /**
+   * Recreates the table losslessly: create temp → copy data → drop old → rename.
+   * Used by `@db.sync.method "recreate"` when structural changes can't be ALTER'd.
+   * Optional — only relational adapters implement this.
+   */
+  recreateTable?(): Promise<void>
+
+  /**
+   * Drops the table entirely.
+   * Used by `@db.sync.method "drop"` for tables with ephemeral data.
+   * Optional — only relational adapters implement this.
+   */
+  dropTable?(): Promise<void>
 }

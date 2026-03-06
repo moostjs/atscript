@@ -28,12 +28,16 @@ export interface TSyncTableResult {
   tableName: string
   created: boolean
   columnsAdded: string[]
+  columnsRenamed: string[]
+  recreated: boolean
+  errors: string[]
 }
 
 export interface TSyncResult {
   status: 'up-to-date' | 'synced' | 'synced-by-peer'
   schemaHash: string
   tables?: TSyncTableResult[]
+  removedTables?: string[]
 }
 
 // ── SchemaSync ────────────────────────────────────────────────────────────
@@ -127,10 +131,22 @@ export class SchemaSync {
         await readable.dbAdapter.ensureTable()
       }
 
-      // 8. Write new hash
+      // 8. Track tables — detect removed tables
+      const previousTables = await this.readTableList()
+      const currentTableNames = tables.map(t => t.tableName)
+      const currentTableSet = new Set(currentTableNames)
+      const removedTables = previousTables.filter(t => !currentTableSet.has(t))
+      await this.writeTableList(currentTableNames)
+
+      // 9. Write new hash
       await this.writeHash(hash)
 
-      return { status: 'synced', schemaHash: hash, tables: tableResults }
+      return {
+        status: 'synced',
+        schemaHash: hash,
+        tables: tableResults,
+        removedTables: removedTables.length > 0 ? removedTables : undefined,
+      }
     } finally {
       // 9. Always release lock
       await this.releaseLock(podId)
@@ -142,8 +158,14 @@ export class SchemaSync {
   private async syncTable(readable: AtscriptDbReadable): Promise<TSyncTableResult> {
     const adapter = readable.dbAdapter
     const tableName = readable.tableName
-    let created = false
-    let columnsAdded: string[] = []
+    const result: TSyncTableResult = {
+      tableName,
+      created: false,
+      columnsAdded: [],
+      columnsRenamed: [],
+      recreated: false,
+      errors: [],
+    }
 
     // Ensure table exists
     await adapter.ensureTable()
@@ -153,21 +175,40 @@ export class SchemaSync {
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0) {
         // Table was just created — no diff needed
-        created = true
+        result.created = true
       } else {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
-        if (diff.added.length > 0) {
-          const result = await adapter.syncColumns(diff)
-          columnsAdded = result.added
-        }
+
+        // Handle type changes — may require recreation
         if (diff.typeChanged.length > 0) {
-          for (const change of diff.typeChanged) {
-            this.logger.warn?.(
-              `[schema-sync] Column type change detected: ${tableName}.${change.field.physicalName} ` +
-              `(expected ${change.field.designType}, got ${change.existingType}). Manual migration required.`
-            )
+          const syncMethod = readable.syncMethod
+          if (syncMethod === 'drop' && adapter.dropTable) {
+            await adapter.dropTable()
+            await adapter.ensureTable()
+            result.recreated = true
+          } else if (syncMethod === 'recreate' && adapter.recreateTable) {
+            await adapter.recreateTable()
+            result.recreated = true
+          } else {
+            for (const change of diff.typeChanged) {
+              const msg = `Type change on ${tableName}.${change.field.physicalName} ` +
+                `(${change.existingType} → ${change.field.designType}). ` +
+                `Add @db.sync.method "recreate" or "drop", or migrate manually.`
+              this.logger.error?.(
+                `[schema-sync] ${msg}`
+              )
+              result.errors.push(msg)
+            }
           }
         }
+
+        // Handle renames and adds (skip if table was recreated — columns are already correct)
+        if (!result.recreated && (diff.added.length > 0 || diff.renamed.length > 0)) {
+          const syncResult = await adapter.syncColumns(diff)
+          result.columnsAdded = syncResult.added
+          result.columnsRenamed = syncResult.renamed
+        }
+
         if (diff.removed.length > 0) {
           for (const col of diff.removed) {
             this.logger.warn?.(
@@ -187,7 +228,7 @@ export class SchemaSync {
       await adapter.syncForeignKeys()
     }
 
-    return { tableName, created, columnsAdded }
+    return result
   }
 
   // ── Control table ─────────────────────────────────────────────────────
@@ -201,27 +242,40 @@ export class SchemaSync {
     await this.controlTable.ensureTable()
   }
 
-  private async readHash(): Promise<string | null> {
+  private async readControlValue(key: string): Promise<string | null> {
     const row = await this.controlTable!.findOne({
-      filter: { key: { $eq: 'schema_version' } },
+      filter: { key: { $eq: key } },
       controls: {},
     })
     return (row as Record<string, unknown> | null)?.value as string | null ?? null
   }
 
-  private async writeHash(hash: string): Promise<void> {
-    const existing = await this.readHash()
+  private async writeControlValue(key: string, value: string): Promise<void> {
+    const existing = await this.readControlValue(key)
     if (existing !== null) {
-      await this.controlTable!.replaceOne({
-        key: 'schema_version',
-        value: hash,
-      } as any)
+      await this.controlTable!.replaceOne({ key, value } as any)
     } else {
-      await this.controlTable!.insertOne({
-        key: 'schema_version',
-        value: hash,
-      } as any)
+      await this.controlTable!.insertOne({ key, value } as any)
     }
+  }
+
+  private async readHash(): Promise<string | null> {
+    return this.readControlValue('schema_version')
+  }
+
+  private async writeHash(hash: string): Promise<void> {
+    await this.writeControlValue('schema_version', hash)
+  }
+
+  // ── Table tracking ──────────────────────────────────────────────────
+
+  private async readTableList(): Promise<string[]> {
+    const value = await this.readControlValue('synced_tables')
+    return value ? JSON.parse(value) : []
+  }
+
+  private async writeTableList(names: string[]): Promise<void> {
+    await this.writeControlValue('synced_tables', JSON.stringify(names.sort()))
   }
 
   // ── Distributed lock ──────────────────────────────────────────────────

@@ -53,7 +53,7 @@ export class DbSpace {
     type: T,
     logger?: TGenericLogger
   ): AtscriptDbReadable<T> {
-    if (type.metadata.has('db.view.for' as keyof AtscriptMetadata)) {
+    if (type.metadata.has('db.view.for')) {
       return this.getView(type, logger)
     }
     return this.getTable(type, logger)
@@ -116,41 +116,4 @@ export class DbSpace {
     return readable.dbAdapter
   }
 
-  /**
-   * Ensures all registered tables and views exist in the database.
-   * Tables are created first (in order), then views.
-   *
-   * @param types - The annotated types whose tables/views to create.
-   */
-  async ensureAll(types: TAtscriptAnnotatedType[]): Promise<void> {
-    // Tables first (order matters for FK constraints)
-    for (const type of types) {
-      const readable = this.get(type)
-      if (readable instanceof AtscriptDbTable) {
-        await readable.ensureTable()
-      }
-    }
-    // Views after all tables exist (adapter.ensureTable detects views)
-    for (const type of types) {
-      const readable = this.get(type)
-      if (readable instanceof AtscriptDbView) {
-        await readable.dbAdapter.ensureTable()
-      }
-    }
-  }
-
-  /**
-   * Synchronizes indexes for all specified tables.
-   * Views are skipped.
-   *
-   * @param types - The annotated types whose indexes to sync.
-   */
-  async syncAllIndexes(types: TAtscriptAnnotatedType[]): Promise<void> {
-    for (const type of types) {
-      const readable = this.get(type)
-      if (readable instanceof AtscriptDbTable) {
-        await readable.syncIndexes()
-      }
-    }
-  }
 }

@@ -266,6 +266,17 @@ export class SqliteAdapter extends BaseDbAdapter {
   async syncColumns(diff: TColumnDiff): Promise<TSyncColumnResult> {
     const tableName = this.resolveTableName()
     const added: string[] = []
+    const renamed: string[] = []
+
+    // Renames first (before adds, in case a renamed column is referenced)
+    for (const { field, oldName } of diff.renamed ?? []) {
+      const ddl = `ALTER TABLE "${esc(tableName)}" RENAME COLUMN "${esc(oldName)}" TO "${esc(field.physicalName)}"`
+      this._log(ddl)
+      this.driver.exec(ddl)
+      renamed.push(field.physicalName)
+    }
+
+    // Adds
     for (const field of diff.added) {
       const sqlType = field.isPrimaryKey && (field.designType === 'number' || field.designType === 'integer')
         ? 'INTEGER'
@@ -279,7 +290,43 @@ export class SqliteAdapter extends BaseDbAdapter {
       this.driver.exec(ddl)
       added.push(field.physicalName)
     }
-    return { added }
+
+    return { added, renamed }
+  }
+
+  async recreateTable(): Promise<void> {
+    const tableName = this.resolveTableName()
+    const tempName = `${tableName}__tmp_${Date.now()}`
+
+    // 1. Create new table with temp name
+    const createSql = buildCreateTable(tempName, this._table.fieldDescriptors, this._table.foreignKeys)
+    this._log(createSql)
+    this.driver.exec(createSql)
+
+    // 2. Get columns that exist in both old and new
+    const oldCols = (await this.getExistingColumns()).map(c => c.name)
+    const newCols = this._table.fieldDescriptors.filter(f => !f.ignored).map(f => f.physicalName)
+    const oldColSet = new Set(oldCols)
+    const commonCols = newCols.filter(c => oldColSet.has(c))
+
+    if (commonCols.length > 0) {
+      // 3. Copy data
+      const cols = commonCols.map(c => `"${esc(c)}"`).join(', ')
+      const copySql = `INSERT INTO "${esc(tempName)}" (${cols}) SELECT ${cols} FROM "${esc(tableName)}"`
+      this._log(copySql)
+      this.driver.exec(copySql)
+    }
+
+    // 4. Drop old, rename new
+    this.driver.exec(`DROP TABLE "${esc(tableName)}"`)
+    this.driver.exec(`ALTER TABLE "${esc(tempName)}" RENAME TO "${esc(tableName)}"`)
+  }
+
+  async dropTable(): Promise<void> {
+    const tableName = this.resolveTableName()
+    const ddl = `DROP TABLE IF EXISTS "${esc(tableName)}"`
+    this._log(ddl)
+    this.driver.exec(ddl)
   }
 
   async syncIndexes(): Promise<void> {

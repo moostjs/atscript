@@ -334,21 +334,50 @@ export const dbAnnotations: TAnnotationsTree = {
     }),
   },
 
-  column: new AnnotationSpec({
-    description:
-      'Overrides the physical column/document-field name in the database.' +
-      '\n\n**Example:**\n' +
-      '```atscript\n' +
-      '@db.column "first_name"\n' +
-      'firstName: string\n' +
-      '```\n',
-    nodeType: ['prop'],
-    argument: {
-      name: 'name',
-      type: 'string',
-      description: 'The actual column/field name in the DB.',
-    },
-  }),
+  column: {
+    name: new AnnotationSpec({
+      description:
+        'Overrides the physical column name in the database. ' +
+        'For nested (flattened) fields, the parent prefix is still prepended automatically.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.column.name "first_name"\n' +
+        'firstName: string\n' +
+        '// → physical column: first_name\n' +
+        '\n' +
+        '// Nested:\n' +
+        'address: {\n' +
+        '  @db.column.name "zip_code"\n' +
+        '  zip: string\n' +
+        '}\n' +
+        '// → physical column: address__zip_code\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: {
+        name: 'name',
+        type: 'string',
+        description: 'The column/field name (without parent prefix for nested fields).',
+      },
+    }),
+
+    from: new AnnotationSpec({
+      description:
+        'Specifies the previous local field name for column rename migration. ' +
+        'The sync engine generates ALTER TABLE RENAME COLUMN instead of drop+add.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.column.from "zip"\n' +
+        'postalCode: string\n' +
+        '// Renames address__zip → address__postalCode\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: {
+        name: 'oldName',
+        type: 'string',
+        description: 'The old local field name (parent prefix is reconstructed automatically).',
+      },
+    }),
+  },
 
   default: {
     value: new AnnotationSpec({
@@ -494,6 +523,29 @@ export const dbAnnotations: TAnnotationsTree = {
       return errors
     },
   }),
+
+  sync: {
+    method: new AnnotationSpec({
+      description:
+        'Controls how the sync engine handles structural changes that cannot be applied via ALTER TABLE.' +
+        '\n\n' +
+        '- `"recreate"` — lossless: create temp table, copy data, drop old, rename.\n' +
+        '- `"drop"` — lossy: drop table entirely and create from scratch.\n\n' +
+        'Without this annotation, structural changes fail with an error requiring manual intervention.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.sync.method "drop"\n' +
+        'interface Logs { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'method',
+        type: 'string',
+        description: 'Sync method: "drop" (lossy) or "recreate" (lossless with data copy).',
+        values: ['drop', 'recreate'],
+      },
+    }),
+  },
 
   rel: {
     FK: new AnnotationSpec({

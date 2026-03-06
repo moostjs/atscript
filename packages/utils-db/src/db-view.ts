@@ -55,7 +55,7 @@ export class AtscriptDbView<
     super(_type, adapter, logger, _tableResolver)
 
     // Validate: must have @db.view.for
-    if (!_type.metadata.has('db.view.for' as keyof AtscriptMetadata)) {
+    if (!_type.metadata.has('db.view.for')) {
       throw new Error('@db.view.for annotation is required for views')
     }
   }
@@ -80,17 +80,17 @@ export class AtscriptDbView<
     const metadata = this._type.metadata
 
     // Resolve entry type from @db.view.for (AtscriptRef)
-    const forRef = metadata.get('db.view.for' as keyof AtscriptMetadata) as AtscriptRef
+    const forRef = metadata.get('db.view.for') as AtscriptRef
     const entryType = typeof forRef === 'function'
       ? forRef
       : forRef.type
     const entryTypeResolved = entryType()
-    const entryTable = (entryTypeResolved?.metadata?.get('db.table' as keyof AtscriptMetadata) as string)
+    const entryTable = (entryTypeResolved?.metadata?.get('db.table') as string)
       || entryTypeResolved?.id
       || ''
 
     // Resolve joins from @db.view.joins (array of { target: AtscriptRef, condition: AtscriptQueryNode })
-    const rawJoins = metadata.get('db.view.joins' as keyof AtscriptMetadata) as
+    const rawJoins = metadata.get('db.view.joins') as
       Array<{ target: AtscriptRef; condition: AtscriptQueryNode }> | undefined
 
     const joins: TViewJoin[] = []
@@ -101,7 +101,7 @@ export class AtscriptDbView<
           ? targetRef
           : targetRef.type
         const targetTypeResolved = targetType()
-        const targetTable = (targetTypeResolved?.metadata?.get('db.table' as keyof AtscriptMetadata) as string)
+        const targetTable = (targetTypeResolved?.metadata?.get('db.table') as string)
           || targetTypeResolved?.id
           || ''
 
@@ -114,10 +114,10 @@ export class AtscriptDbView<
     }
 
     // Resolve filter from @db.view.filter
-    const filter = metadata.get('db.view.filter' as keyof AtscriptMetadata) as AtscriptQueryNode | undefined
+    const filter = metadata.get('db.view.filter') as AtscriptQueryNode | undefined
 
     // Resolve materialized flag
-    const materialized = metadata.has('db.view.materialized' as keyof AtscriptMetadata)
+    const materialized = metadata.has('db.view.materialized')
 
     this._viewPlan = {
       entryType,
@@ -141,7 +141,7 @@ export class AtscriptDbView<
       return `"${plan.entryTable}"."${ref.field}"`
     }
     const resolved = ref.type()
-    const table = (resolved?.metadata?.get('db.table' as keyof AtscriptMetadata) as string)
+    const table = (resolved?.metadata?.get('db.table') as string)
       || resolved?.id || ''
     return `"${table}"."${ref.field}"`
   }
@@ -159,7 +159,7 @@ export class AtscriptDbView<
     for (const [fieldName, fieldType] of this._type.type.props.entries()) {
       if (fieldType.ref) {
         const resolved = fieldType.ref.type()
-        const sourceTable = (resolved?.metadata?.get('db.table' as keyof AtscriptMetadata) as string)
+        const sourceTable = (resolved?.metadata?.get('db.table') as string)
           || resolved?.id || ''
         const sourceColumn = fieldType.ref.field || fieldName
         mappings.push({ viewColumn: fieldName, sourceTable, sourceColumn })

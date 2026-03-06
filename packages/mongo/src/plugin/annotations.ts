@@ -106,6 +106,41 @@ export const annotations: TAnnotationsTree = {
     },
   }),
 
+  capped: new AnnotationSpec({
+    description:
+      'Creates a **capped collection** with a fixed maximum size.\n\n' +
+      '- Capped collections have fixed size and maintain insertion order.\n' +
+      '- Ideal for logs, event streams, and cache-like data.\n' +
+      '- Changing the cap size requires dropping and recreating the collection — use `@db.sync.method "drop"` to allow this.\n\n' +
+      '**Example:**\n' +
+      '```atscript\n' +
+      '@db.table "logs"\n' +
+      '@db.mongo.collection\n' +
+      '@db.mongo.capped 10485760, 10000\n' +
+      '@db.sync.method "drop"\n' +
+      'export interface LogEntry {\n' +
+      '    message: string\n' +
+      '    timestamp: number\n' +
+      '}\n' +
+      '```\n',
+    nodeType: ['interface'],
+    multiple: false,
+    argument: [
+      {
+        optional: false,
+        name: 'size',
+        type: 'number',
+        description: 'Maximum size of the collection in **bytes**.',
+      },
+      {
+        optional: true,
+        name: 'max',
+        type: 'number',
+        description: 'Maximum number of documents in the collection. If omitted, only the byte size limit applies.',
+      },
+    ],
+  }),
+
   search: {
     dynamic: new AnnotationSpec({
       description:

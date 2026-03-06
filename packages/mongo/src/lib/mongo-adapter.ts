@@ -78,6 +78,9 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Physical field names with @db.default.fn "increment". */
   protected _incrementFields = new Set<string>()
 
+  /** Capped collection options from @db.mongo.capped. */
+  protected _cappedOptions?: { size: number; max?: number }
+
   constructor(
     protected readonly db: Db,
     protected readonly asMongo?: AsMongo
@@ -259,6 +262,15 @@ export class MongoAdapter extends BaseDbAdapter {
 
   override onBeforeFlatten(type: TAtscriptAnnotatedType): void {
     const typeMeta = type.metadata
+
+    // @db.mongo.capped → store for ensureCollectionExists
+    const capped = typeMeta.get('db.mongo.capped') as
+      | { size: number; max?: number }
+      | undefined
+    if (capped) {
+      this._cappedOptions = { size: capped.size, max: capped.max }
+    }
+
     const dynamicText = typeMeta.get('db.mongo.search.dynamic') as any
     if (dynamicText) {
       this._setSearchIndex('dynamic_text', '_', {
@@ -291,7 +303,7 @@ export class MongoAdapter extends BaseDbAdapter {
     // @db.default.fn "increment" → track for auto-increment on insert
     const defaultFn = metadata.get('db.default.fn') as string | undefined
     if (defaultFn === 'increment') {
-      const physicalName = (metadata.get('db.column') as string | undefined) ?? field
+      const physicalName = (metadata.get('db.column.name') as string | undefined) ?? field
       this._incrementFields.add(physicalName)
     }
     // @db.index.fulltext → MongoDB text index (adapter-level, with weight)
@@ -539,9 +551,17 @@ export class MongoAdapter extends BaseDbAdapter {
     const exists = await this.collectionExists()
     if (!exists) {
       this._log('createCollection', this._table.tableName)
-      await this.db.createCollection(this._table.tableName, {
+      const opts: Record<string, unknown> = {
         comment: 'Created by Atscript Mongo Adapter',
-      })
+      }
+      if (this._cappedOptions) {
+        opts.capped = true
+        opts.size = this._cappedOptions.size
+        if (this._cappedOptions.max != null) {
+          opts.max = this._cappedOptions.max
+        }
+      }
+      await this.db.createCollection(this._table.tableName, opts)
     }
   }
 
@@ -682,6 +702,12 @@ export class MongoAdapter extends BaseDbAdapter {
 
   async ensureTable(): Promise<void> {
     return this.ensureCollectionExists()
+  }
+
+  async dropTable(): Promise<void> {
+    this._log('drop', this._table.tableName)
+    await this.collection.drop()
+    this._collection = undefined
   }
 
   async syncIndexes(): Promise<void> {

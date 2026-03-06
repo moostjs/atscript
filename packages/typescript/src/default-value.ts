@@ -51,7 +51,7 @@ function resolveValue(
 
   if (mode === 'db') {
     // Try @db.default.value first (static value, parsed like meta.default)
-    const dbValue = prop.metadata.get('db.default.value' as keyof AtscriptMetadata) as
+    const dbValue = prop.metadata.get('db.default.value') as
       | string
       | undefined
     if (dbValue !== undefined) {
@@ -62,7 +62,7 @@ function resolveValue(
       return undefined
     }
     // Fall back to @db.default.fn (return function name as-is)
-    const dbFn = prop.metadata.get('db.default.fn' as keyof AtscriptMetadata) as
+    const dbFn = prop.metadata.get('db.default.fn') as
       | string
       | undefined
     if (dbFn !== undefined) {
@@ -73,7 +73,7 @@ function resolveValue(
 
   // 'default' or 'example'
   const metaKey = mode === 'default' ? 'meta.default' : 'meta.example'
-  const rawStr = prop.metadata.get(metaKey as keyof AtscriptMetadata) as string | undefined
+  const rawStr = prop.metadata.get(metaKey) as string | undefined
   if (rawStr === undefined) {
     return undefined
   }

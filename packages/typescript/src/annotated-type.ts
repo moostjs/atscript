@@ -417,11 +417,18 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
  * Atscript Metadata Map with typed setters/getters
  */
 export interface TMetadataMap<O extends object> extends Map<keyof O, O[keyof O]> {
-  // Get returns O[K] for exactly that key (plus undefined if key not present)
+  // Typed overload: returns O[K] for a known key
   get<K extends keyof O>(key: K): O[K] | undefined
+  // Untyped overload: accepts any string key (for cross-package access where AtscriptMetadata may not include all keys)
+  get(key: string): unknown
 
   // Set enforces that the value must match O[K]
   set<K extends keyof O>(key: K, value: O[K]): this
+
+  // Typed overload
+  has<K extends keyof O>(key: K): boolean
+  // Untyped overload
+  has(key: string): boolean
 }
 
 /** Fluent builder handle returned by {@link defineAnnotatedType}. */
