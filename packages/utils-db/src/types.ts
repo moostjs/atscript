@@ -153,6 +153,28 @@ export interface TDbForeignKey {
   onUpdate?: TDbReferentialAction
 }
 
+// ── Schema Sync Types ────────────────────────────────────────────────────
+
+/** Describes an existing column in the database (from introspection). */
+export interface TExistingColumn {
+  name: string
+  type: string
+  notnull: boolean
+  pk: boolean
+}
+
+/** Result of comparing desired schema against existing database columns. */
+export interface TColumnDiff {
+  added: TDbFieldMeta[]
+  removed: TExistingColumn[]
+  typeChanged: Array<{ field: TDbFieldMeta; existingType: string }>
+}
+
+/** Result of applying column diff to the database. */
+export interface TSyncColumnResult {
+  added: string[]
+}
+
 // ── Table Resolver ───────────────────────────────────────────────────────
 
 /**

@@ -6,6 +6,9 @@ import type {
   TDbInsertManyResult,
   TDbInsertResult,
   TDbUpdateResult,
+  TExistingColumn,
+  TColumnDiff,
+  TSyncColumnResult,
 } from '@atscript/utils-db'
 import type { DbQuery, FilterExpr } from '@atscript/utils-db'
 
@@ -19,6 +22,7 @@ import {
   buildUpdate,
   esc,
   toSqliteValue,
+  sqliteTypeFromDesignType,
 } from './sql-builder'
 import type { TSqliteDriver } from './types'
 
@@ -246,6 +250,38 @@ export class SqliteAdapter extends BaseDbAdapter {
     this.driver.exec(sql)
   }
 
+  async getExistingColumns(): Promise<TExistingColumn[]> {
+    const tableName = this.resolveTableName()
+    const rows = this.driver.all<{ name: string; type: string; notnull: number; pk: number }>(
+      `PRAGMA table_info("${esc(tableName)}")`
+    )
+    return rows.map(r => ({
+      name: r.name,
+      type: r.type,
+      notnull: r.notnull === 1,
+      pk: r.pk > 0,
+    }))
+  }
+
+  async syncColumns(diff: TColumnDiff): Promise<TSyncColumnResult> {
+    const tableName = this.resolveTableName()
+    const added: string[] = []
+    for (const field of diff.added) {
+      const sqlType = field.isPrimaryKey && (field.designType === 'number' || field.designType === 'integer')
+        ? 'INTEGER'
+        : sqliteTypeFromDesignType(field.designType)
+      let ddl = `ALTER TABLE "${esc(tableName)}" ADD COLUMN "${esc(field.physicalName)}" ${sqlType}`
+      // SQLite: NOT NULL requires a DEFAULT value for ADD COLUMN
+      if (!field.optional && !field.isPrimaryKey) {
+        ddl += ` NOT NULL DEFAULT ${defaultValueForType(field.designType)}`
+      }
+      this._log(ddl)
+      this.driver.exec(ddl)
+      added.push(field.physicalName)
+    }
+    return { added }
+  }
+
   async syncIndexes(): Promise<void> {
     const tableName = this.resolveTableName()
 
@@ -271,5 +307,15 @@ export class SqliteAdapter extends BaseDbAdapter {
       },
       shouldSkipType: (type) => type === 'fulltext',
     })
+  }
+}
+
+/** Returns a safe SQLite DEFAULT literal for a given design type. */
+function defaultValueForType(designType: string): string {
+  switch (designType) {
+    case 'number':
+    case 'integer': { return '0' }
+    case 'boolean': { return '0' }
+    default: { return "''" }
   }
 }

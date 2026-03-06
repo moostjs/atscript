@@ -1,0 +1,41 @@
+import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
+
+import type { DbSpace } from './db-space'
+import { SchemaSync } from './schema-sync'
+import type { TSyncOptions, TSyncResult } from './schema-sync'
+
+/**
+ * Synchronizes database schema with distributed locking.
+ * Safe to call from multiple concurrent processes/pods.
+ *
+ * ```typescript
+ * import { syncSchema } from '@atscript/utils-db/sync'
+ *
+ * const db = new DbSpace(() => new SqliteAdapter(driver))
+ * await syncSchema(db, [UsersType, PostsType, CommentsType])
+ * ```
+ *
+ * The function:
+ * 1. Creates an `__atscript_control` table for lock coordination
+ * 2. Computes a schema hash — skips entirely if nothing changed
+ * 3. Acquires a distributed lock so only one process syncs
+ * 4. Creates tables, adds new columns, syncs indexes
+ * 5. Stores the new hash and releases the lock
+ *
+ * @param space - The DbSpace containing the adapter factory.
+ * @param types - Atscript annotated types to synchronize.
+ * @param opts - Lock TTL, wait timeout, force mode, etc.
+ */
+export async function syncSchema(
+  space: DbSpace,
+  types: TAtscriptAnnotatedType[],
+  opts?: TSyncOptions
+): Promise<TSyncResult> {
+  const sync = new SchemaSync(space)
+  return sync.run(types, opts)
+}
+
+export type { TSyncOptions, TSyncResult, TSyncTableResult } from './schema-sync'
+export { computeColumnDiff } from './column-diff'
+export { computeTableSnapshot, computeSchemaHash } from './schema-hash'
+export type { TTableSnapshot } from './schema-hash'

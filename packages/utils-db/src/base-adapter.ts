@@ -8,7 +8,7 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './db-readable'
@@ -476,4 +476,18 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters need to implement this.
    */
   async syncForeignKeys?(): Promise<void>
+
+  /**
+   * Returns existing columns from the database via introspection.
+   * Used by schema sync for column diffing.
+   * Optional — schema-less adapters (MongoDB) skip this.
+   */
+  getExistingColumns?(): Promise<TExistingColumn[]>
+
+  /**
+   * Applies column diff (ALTER TABLE ADD COLUMN, etc.).
+   * The generic layer computes the diff; adapters execute DB-specific DDL.
+   * Optional — only relational adapters implement this.
+   */
+  syncColumns?(diff: TColumnDiff): Promise<TSyncColumnResult>
 }

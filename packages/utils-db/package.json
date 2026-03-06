@@ -30,9 +30,19 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
     },
+    "./sync": {
+      "types": "./dist/sync.d.ts",
+      "import": "./dist/sync.mjs",
+      "require": "./dist/sync.cjs"
+    },
     "./package.json": "./package.json"
   },
+  "build": [
+    { "entries": ["src/index.ts"] },
+    { "entries": ["src/sync.ts"] }
+  ],
   "scripts": {
+    "before-build": "node ../typescript/cli.cjs -f js",
     "pub": "pnpm publish --access public",
     "test": "vitest"
   },
