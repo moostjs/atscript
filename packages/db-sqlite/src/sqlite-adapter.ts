@@ -43,6 +43,24 @@ export class SqliteAdapter extends BaseDbAdapter {
     this.driver.exec('PRAGMA foreign_keys = ON')
   }
 
+  // ── Transaction primitives ────────────────────────────────────────────────
+
+  protected override async _beginTransaction(): Promise<unknown> {
+    this._log('BEGIN')
+    this.driver.exec('BEGIN')
+    return undefined
+  }
+
+  protected override async _commitTransaction(): Promise<void> {
+    this._log('COMMIT')
+    this.driver.exec('COMMIT')
+  }
+
+  protected override async _rollbackTransaction(): Promise<void> {
+    this._log('ROLLBACK')
+    this.driver.exec('ROLLBACK')
+  }
+
   /** SQLite does not use schemas — override to always exclude schema. */
   override resolveTableName(): string {
     return super.resolveTableName(false)
@@ -67,24 +85,16 @@ export class SqliteAdapter extends BaseDbAdapter {
   async insertMany(
     data: Array<Record<string, unknown>>
   ): Promise<TDbInsertManyResult> {
-    const ids: unknown[] = []
-    this._log('BEGIN')
-    this.driver.exec('BEGIN')
-    try {
+    return this.withTransaction(async () => {
+      const ids: unknown[] = []
       for (const row of data) {
         const { sql, params } = buildInsert(this.resolveTableName(), row)
         this._log(sql, params)
         const result = this.driver.run(sql, params)
         ids.push(result.lastInsertRowid)
       }
-      this._log('COMMIT')
-      this.driver.exec('COMMIT')
-    } catch (error) {
-      this._log('ROLLBACK')
-      this.driver.exec('ROLLBACK')
-      throw error
-    }
-    return { insertedCount: ids.length, insertedIds: ids }
+      return { insertedCount: ids.length, insertedIds: ids }
+    })
   }
 
   // ── CRUD: Read ─────────────────────────────────────────────────────────────
@@ -163,12 +173,9 @@ export class SqliteAdapter extends BaseDbAdapter {
     filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    // DELETE old row, then INSERT the new one
-    const where = buildWhere(filter)
-    const tableName = this.resolveTableName()
-    this._log('BEGIN')
-    this.driver.exec('BEGIN')
-    try {
+    return this.withTransaction(async () => {
+      const where = buildWhere(filter)
+      const tableName = this.resolveTableName()
       const delSql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
       this._log(delSql, where.params)
       const delResult = this.driver.run(delSql, where.params)
@@ -177,14 +184,8 @@ export class SqliteAdapter extends BaseDbAdapter {
         this._log(sql, params)
         this.driver.run(sql, params)
       }
-      this._log('COMMIT')
-      this.driver.exec('COMMIT')
       return { matchedCount: delResult.changes, modifiedCount: delResult.changes }
-    } catch (error) {
-      this._log('ROLLBACK')
-      this.driver.exec('ROLLBACK')
-      throw error
-    }
+    })
   }
 
   async replaceMany(

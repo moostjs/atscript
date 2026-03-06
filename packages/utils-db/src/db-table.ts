@@ -136,32 +136,34 @@ export class AtscriptDbTable<
     const depth = opts?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
 
-    // Clone + apply defaults (keep originals for FROM phase)
-    const items = payloads.map(p => this._applyDefaults({ ...p }))
+    return this.adapter.withTransaction(async () => {
+      // Clone + apply defaults (keep originals for FROM phase)
+      const items = payloads.map(p => this._applyDefaults({ ...p }))
 
-    // Phase 1: Batch TO dependencies (they must exist before we can set our FKs)
-    if (canNest) {
-      await this._batchInsertNestedTo(items, maxDepth, depth)
-    }
+      // Phase 1: Batch TO dependencies (they must exist before we can set our FKs)
+      if (canNest) {
+        await this._batchInsertNestedTo(items, maxDepth, depth)
+      }
 
-    // Strip nav fields, validate, prepare
-    const validator = this.getValidator('insert')
-    const prepared: Array<Record<string, unknown>> = []
-    for (const data of items) {
-      for (const navField of this._navFields) { delete data[navField] }
-      if (!validator.validate(data)) { throw new Error('Validation failed for insert') }
-      prepared.push(this._prepareForWrite(data))
-    }
+      // Strip nav fields, validate, prepare
+      const validator = this.getValidator('insert')
+      const prepared: Array<Record<string, unknown>> = []
+      for (const data of items) {
+        for (const navField of this._navFields) { delete data[navField] }
+        if (!validator.validate(data)) { throw new Error('Validation failed for insert') }
+        prepared.push(this._prepareForWrite(data))
+      }
 
-    // Phase 2: Batch main insert
-    const result = await this.adapter.insertMany(prepared)
+      // Phase 2: Batch main insert
+      const result = await this.adapter.insertMany(prepared)
 
-    // Phase 3: Batch FROM dependents (they need our PKs)
-    if (canNest) {
-      await this._batchInsertNestedFrom(payloads, result.insertedIds, maxDepth, depth)
-    }
+      // Phase 3: Batch FROM dependents (they need our PKs)
+      if (canNest) {
+        await this._batchInsertNestedFrom(payloads, result.insertedIds, maxDepth, depth)
+      }
 
-    return result
+      return result
+    })
   }
 
   /**

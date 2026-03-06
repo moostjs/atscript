@@ -19,6 +19,7 @@ import {
 } from '@atscript/utils-db'
 import type {
   AggregationCursor,
+  ClientSession,
   Collection,
   Db,
   Document,
@@ -84,6 +85,45 @@ export class MongoAdapter extends BaseDbAdapter {
     super()
   }
 
+  // ── Transaction primitives ────────────────────────────────────────────────
+
+  private get _client() { return this.asMongo?.client }
+
+  /** Whether transaction support has been detected as unavailable (standalone MongoDB). */
+  private _txDisabled = false
+
+  protected override async _beginTransaction(): Promise<unknown> {
+    if (this._txDisabled || !this._client) { return undefined }
+    try {
+      const session = this._client.startSession()
+      session.startTransaction()
+      return session
+    } catch {
+      this._txDisabled = true
+      return undefined
+    }
+  }
+
+  protected override async _commitTransaction(state: unknown): Promise<void> {
+    if (!state) { return }
+    const session = state as ClientSession
+    try { await session.commitTransaction() } finally { session.endSession() }
+  }
+
+  protected override async _rollbackTransaction(state: unknown): Promise<void> {
+    if (!state) { return }
+    const session = state as ClientSession
+    try { await session.abortTransaction() } finally { session.endSession() }
+  }
+
+  private static readonly _noSession: Record<string, never> = Object.freeze({}) as Record<string, never>
+
+  /** Returns `{ session }` opts if inside a transaction, empty object otherwise. */
+  protected _getSessionOpts(): { session: ClientSession } | Record<string, never> {
+    const session = this._getTransactionState() as ClientSession | undefined
+    return session ? { session } : MongoAdapter._noSession
+  }
+
   // ── Collection access ────────────────────────────────────────────────────
 
   get collection(): Collection<any> {
@@ -94,7 +134,7 @@ export class MongoAdapter extends BaseDbAdapter {
   }
 
   aggregate(pipeline: Document[]): AggregationCursor {
-    return this.collection.aggregate(pipeline)
+    return this.collection.aggregate(pipeline, this._getSessionOpts())
   }
 
 
@@ -211,7 +251,7 @@ export class MongoAdapter extends BaseDbAdapter {
     const patcher = new CollectionPatcher(this.getPatcherContext(), patch)
     const { updateFilter, updateOptions } = patcher.preparePatch()
     this._log('updateOne (patch)', mongoFilter, updateFilter)
-    const result = await this.collection.updateOne(mongoFilter, updateFilter, updateOptions)
+    const result = await this.collection.updateOne(mongoFilter, updateFilter, { ...updateOptions, ...this._getSessionOpts() })
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
@@ -418,7 +458,7 @@ export class MongoAdapter extends BaseDbAdapter {
     if (controls.$select) { pipeline.push({ $project: controls.$select.asProjection }) }
 
     this._log('aggregate (search)', pipeline)
-    return this.collection.aggregate(pipeline).toArray()
+    return this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
   }
 
   override async searchWithCount(
@@ -450,7 +490,7 @@ export class MongoAdapter extends BaseDbAdapter {
     ]
 
     this._log('aggregate (searchWithCount)', pipeline)
-    const result = await this.collection.aggregate(pipeline).toArray()
+    const result = await this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
     return {
       data: result[0]?.data || [],
       count: result[0]?.meta[0]?.count || 0,
@@ -478,7 +518,7 @@ export class MongoAdapter extends BaseDbAdapter {
     ]
 
     this._log('aggregate (findManyWithCount)', pipeline)
-    const result = await this.collection.aggregate(pipeline).toArray()
+    const result = await this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
     return {
       data: result[0]?.data || [],
       count: result[0]?.meta[0]?.count || 0,
@@ -518,7 +558,7 @@ export class MongoAdapter extends BaseDbAdapter {
       }
     }
     this._log('insertOne', data)
-    const result = await this.collection.insertOne(data)
+    const result = await this.collection.insertOne(data, this._getSessionOpts())
     return { insertedId: result.insertedId }
   }
 
@@ -555,7 +595,7 @@ export class MongoAdapter extends BaseDbAdapter {
     }
 
     this._log('insertMany', `${data.length} docs`)
-    const result = await this.collection.insertMany(data)
+    const result = await this.collection.insertMany(data, this._getSessionOpts())
     return {
       insertedCount: result.insertedCount,
       insertedIds: Object.values(result.insertedIds),
@@ -566,7 +606,7 @@ export class MongoAdapter extends BaseDbAdapter {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
     this._log('findOne', filter, opts)
-    return this.collection.findOne(filter, opts)
+    return this.collection.findOne(filter, { ...opts, ...this._getSessionOpts() })
   }
 
   async findMany(query: DbQuery): Promise<Array<Record<string, unknown>>> {
@@ -574,13 +614,13 @@ export class MongoAdapter extends BaseDbAdapter {
     const opts = this._buildFindOptions(query.controls)
     this._log('findMany', filter, opts)
     // eslint-disable-next-line unicorn/no-array-method-this-argument -- MongoDB Collection.find, not Array.find
-    return this.collection.find(filter, opts).toArray()
+    return this.collection.find(filter, { ...opts, ...this._getSessionOpts() }).toArray()
   }
 
   async count(query: DbQuery): Promise<number> {
     const filter = buildMongoFilter(query.filter)
     this._log('countDocuments', filter)
-    return this.collection.countDocuments(filter)
+    return this.collection.countDocuments(filter, this._getSessionOpts())
   }
 
   async updateOne(
@@ -589,7 +629,7 @@ export class MongoAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('updateOne', mongoFilter, { $set: data })
-    const result = await this.collection.updateOne(mongoFilter, { $set: data })
+    const result = await this.collection.updateOne(mongoFilter, { $set: data }, this._getSessionOpts())
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
@@ -599,14 +639,14 @@ export class MongoAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('replaceOne', mongoFilter, data)
-    const result = await this.collection.replaceOne(mongoFilter, data)
+    const result = await this.collection.replaceOne(mongoFilter, data, this._getSessionOpts())
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
   async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('deleteOne', mongoFilter)
-    const result = await this.collection.deleteOne(mongoFilter)
+    const result = await this.collection.deleteOne(mongoFilter, this._getSessionOpts())
     return { deletedCount: result.deletedCount }
   }
 
@@ -616,7 +656,7 @@ export class MongoAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('updateMany', mongoFilter, { $set: data })
-    const result = await this.collection.updateMany(mongoFilter, { $set: data })
+    const result = await this.collection.updateMany(mongoFilter, { $set: data }, this._getSessionOpts())
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
@@ -627,14 +667,14 @@ export class MongoAdapter extends BaseDbAdapter {
     // MongoDB has no native replaceMany; use updateMany with $set
     const mongoFilter = buildMongoFilter(filter)
     this._log('replaceMany', mongoFilter, { $set: data })
-    const result = await this.collection.updateMany(mongoFilter, { $set: data })
+    const result = await this.collection.updateMany(mongoFilter, { $set: data }, this._getSessionOpts())
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 
   async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('deleteMany', mongoFilter)
-    const result = await this.collection.deleteMany(mongoFilter)
+    const result = await this.collection.deleteMany(mongoFilter, this._getSessionOpts())
     return { deletedCount: result.deletedCount }
   }
 
@@ -834,7 +874,7 @@ export class MongoAdapter extends BaseDbAdapter {
     for (const [alias, field] of aliases) {
       group[alias] = { $max: `$${field}` }
     }
-    const result = await this.collection.aggregate([{ $group: group }]).toArray()
+    const result = await this.collection.aggregate([{ $group: group }], this._getSessionOpts()).toArray()
     const maxMap = new Map<string, number>()
     if (result.length > 0) {
       const row = result[0]

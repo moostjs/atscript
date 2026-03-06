@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import type {
   TAtscriptAnnotatedType,
   TMetadataMap,
@@ -13,6 +15,11 @@ import type { AtscriptDbReadable } from './db-readable'
 import type { AtscriptDbTable } from './db-table'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
+
+// ── Transaction context ─────────────────────────────────────────────────────
+
+interface TxContext { state: unknown }
+const txStorage = new AsyncLocalStorage<TxContext>()
 
 /**
  * Abstract base class for database adapters.
@@ -74,6 +81,53 @@ export abstract class BaseDbAdapter {
     if (!this._verbose) { return }
     this.logger.debug(...args)
   }
+
+  // ── Transaction support ──────────────────────────────────────────────────
+
+  /**
+   * Runs `fn` inside a database transaction. Nested calls (from related tables
+   * within the same async chain) reuse the existing transaction automatically.
+   *
+   * The generic layer handles nesting detection via `AsyncLocalStorage`.
+   * Adapters override `_beginTransaction`, `_commitTransaction`, and
+   * `_rollbackTransaction` to provide raw DB-specific transaction primitives.
+   */
+  async withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (txStorage.getStore()) { return fn() }
+
+    const ctx: TxContext = { state: undefined }
+    ctx.state = await this._beginTransaction()
+    return txStorage.run(ctx, async () => {
+      try {
+        const result = await fn()
+        await this._commitTransaction(ctx.state)
+        return result
+      } catch (error) {
+        try { await this._rollbackTransaction(ctx.state) } catch { /* preserve original error */ }
+        throw error
+      }
+    })
+  }
+
+  /**
+   * Returns the opaque transaction state from the current async context.
+   * Adapters use this to retrieve DB-specific state (e.g., MongoDB `ClientSession`).
+   */
+  protected _getTransactionState(): unknown {
+    return txStorage.getStore()?.state
+  }
+
+  /**
+   * Starts a raw transaction. Returns opaque state stored in the async context.
+   * Override in adapters that support transactions.
+   */
+  protected async _beginTransaction(): Promise<unknown> { return undefined }
+
+  /** Commits the raw transaction. Override in adapters that support transactions. */
+  protected async _commitTransaction(_state: unknown): Promise<void> {}
+
+  /** Rolls back the raw transaction. Override in adapters that support transactions. */
+  protected async _rollbackTransaction(_state: unknown): Promise<void> {}
 
   // ── Validation hooks (overridable) ────────────────────────────────────────
 

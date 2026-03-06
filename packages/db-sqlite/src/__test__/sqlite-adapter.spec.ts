@@ -579,3 +579,71 @@ describe('SqliteAdapter — embedded objects', () => {
     })
   })
 })
+
+// ── Transaction support ───────────────────────────────────────────────────
+
+describe('SqliteAdapter — transactions', () => {
+  let driver: BetterSqlite3Driver
+  let adapter: SqliteAdapter
+  let table: AtscriptDbTable
+
+  beforeAll(async () => {
+    await prepareFixtures()
+  })
+
+  beforeEach(async () => {
+    const fixtures = await import('./fixtures/test-table.as.js')
+    driver = new BetterSqlite3Driver(':memory:')
+    adapter = new SqliteAdapter(driver)
+    table = new AtscriptDbTable(fixtures.UsersTable, adapter)
+    await table.ensureTable()
+    await table.syncIndexes()
+  })
+
+  afterEach(() => {
+    driver.close()
+  })
+
+  it('should nest withTransaction calls without double-BEGIN', async () => {
+    const adapter2 = new SqliteAdapter(driver)
+    const fixtures = await import('./fixtures/test-table.as.js')
+    const table2 = new AtscriptDbTable(fixtures.UsersTable, adapter2)
+
+    const result = await adapter.withTransaction(async () => {
+      await table.insertOne({ name: 'User A', email: 'a@test.com', createdAt: 1000, status: 'active' } as any)
+      await adapter2.withTransaction(async () => {
+        await table2.insertOne({ name: 'User B', email: 'b@test.com', createdAt: 1000, status: 'active' } as any)
+      })
+      return 'done'
+    })
+
+    expect(result).toBe('done')
+    const count = await table.count({ filter: {}, controls: {} })
+    expect(count).toBe(2)
+  })
+
+  it('should rollback all records on error', async () => {
+    await table.insertOne({ name: 'Existing', email: 'exists@test.com', createdAt: 1000, status: 'active' } as any)
+
+    try {
+      await adapter.withTransaction(async () => {
+        await table.insertOne({ name: 'Will rollback', email: 'rollback@test.com', createdAt: 1000, status: 'active' } as any)
+        throw new Error('Intentional failure')
+      })
+    } catch {
+      // expected
+    }
+
+    const count = await table.count({ filter: {}, controls: {} })
+    expect(count).toBe(1)
+  })
+
+  it('should commit on success', async () => {
+    await adapter.withTransaction(async () => {
+      await table.insertOne({ name: 'Committed', email: 'committed@test.com', createdAt: 1000, status: 'active' } as any)
+    })
+
+    const count = await table.count({ filter: {}, controls: {} })
+    expect(count).toBe(1)
+  })
+})

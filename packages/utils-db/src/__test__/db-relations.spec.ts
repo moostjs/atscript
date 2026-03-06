@@ -848,4 +848,99 @@ describe('AtscriptDbTable — Relations', () => {
       expect((posts[0].author as any).name).toBe('Alice')
     })
   })
+
+  // ── Transaction wrapping ────────────────────────────────────────────────
+
+  describe('transaction wrapping', () => {
+    it('should wrap insertMany with nested creation in withTransaction', async () => {
+      const txLog: string[] = []
+
+      class TxTrackingAdapter extends InMemoryAdapter {
+        protected override async _beginTransaction(): Promise<unknown> {
+          txLog.push('begin')
+          return 'tx-state'
+        }
+        protected override async _commitTransaction(state: unknown): Promise<void> {
+          txLog.push(`commit:${state}`)
+        }
+        protected override async _rollbackTransaction(state: unknown): Promise<void> {
+          txLog.push(`rollback:${state}`)
+        }
+      }
+
+      const space = new DbSpace(() => new TxTrackingAdapter())
+      const authorTable = space.getTable(Author) as AtscriptDbTable
+
+      await authorTable.insertMany([
+        { name: 'Tx Author 1', posts: [{ title: 'Tx Post 1' }] },
+        { name: 'Tx Author 2', posts: [{ title: 'Tx Post 2' }] },
+      ])
+
+      // Only ONE begin/commit pair — nested calls reuse the transaction
+      expect(txLog).toEqual(['begin', 'commit:tx-state'])
+    })
+
+    it('should rollback on error during nested creation', async () => {
+      const txLog: string[] = []
+      // Shared counter across all adapter instances from the factory
+      const shared = { callCount: 0 }
+
+      class FailingInsertAdapter extends InMemoryAdapter {
+        protected override async _beginTransaction(): Promise<unknown> {
+          txLog.push('begin')
+          return 'tx'
+        }
+        protected override async _commitTransaction(): Promise<void> {
+          txLog.push('commit')
+        }
+        protected override async _rollbackTransaction(): Promise<void> {
+          txLog.push('rollback')
+        }
+        override async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
+          shared.callCount++
+          // Fail on the second insertMany call (the main table insert, after TO deps)
+          if (shared.callCount === 2) {
+            throw new Error('Simulated insert failure')
+          }
+          return super.insertMany(data)
+        }
+      }
+
+      const space = new DbSpace(() => new FailingInsertAdapter())
+      const postTable = space.getTable(Post) as AtscriptDbTable
+
+      await expect(
+        postTable.insertOne({ title: 'Will fail', author: { name: 'Ghost' } })
+      ).rejects.toThrow('Simulated insert failure')
+
+      // Transaction was started and rolled back
+      expect(txLog).toEqual(['begin', 'rollback'])
+    })
+
+    it('should not start a transaction for plain insertMany without nesting', async () => {
+      const txLog: string[] = []
+
+      class TxTrackingAdapter extends InMemoryAdapter {
+        protected override async _beginTransaction(): Promise<unknown> {
+          txLog.push('begin')
+          return undefined
+        }
+        protected override async _commitTransaction(): Promise<void> {
+          txLog.push('commit')
+        }
+        protected override async _rollbackTransaction(): Promise<void> {
+          txLog.push('rollback')
+        }
+      }
+
+      const space = new DbSpace(() => new TxTrackingAdapter())
+      const authorTable = space.getTable(Author) as AtscriptDbTable
+
+      // Plain insert without nav data still wraps in withTransaction
+      await authorTable.insertMany([{ name: 'Plain 1' }, { name: 'Plain 2' }])
+
+      // Transaction is still started (wraps the whole operation)
+      expect(txLog).toEqual(['begin', 'commit'])
+    })
+  })
 })
