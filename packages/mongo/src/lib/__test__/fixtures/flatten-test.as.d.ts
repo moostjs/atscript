@@ -57,6 +57,22 @@ export declare class FlattenTest {
     "complexArray.field2": string
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "level0": string
+    "nested": never
+    "nested.level1": string
+    "nested.array1": never
+    "nested.array1.level2": string
+    "nested.array1.array2": never
+    "nested.array1.array2.level3": string
+    "array0": never
+    "array0.level1": string
+    "complexArray": never
+    "complexArray.field1": string | number
+    "complexArray.field2": string
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 // prettier-ignore-end

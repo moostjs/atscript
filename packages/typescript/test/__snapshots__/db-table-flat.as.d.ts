@@ -79,7 +79,27 @@ export declare class MyEntity {
     "optional"?: number
     "metadata": string
     "items": string
-  }}
+  }
+  static __ownProps: {
+    "id": string
+    "name": string
+    "address": never
+    "address.street": string
+    "address.city": string
+    "address.zip"?: string
+    "tags": string[]
+    "contacts": never
+    "contacts.name": string
+    "contacts.email": string
+    "home": never
+    "home.street": string
+    "home.city": string
+    "home.zip"?: string
+    "optional"?: number
+    "metadata": string
+    "items": string
+  }
+}
 
 /**
  * Atscript interface **NonDbInterface**

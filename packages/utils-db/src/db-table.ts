@@ -1,6 +1,8 @@
 import {
   type FlatOf,
   type PrimaryKeyOf,
+  type OwnPropsOf,
+  type NavPropsOf,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type Validator,
@@ -64,7 +66,9 @@ export class AtscriptDbTable<
   FlatType = FlatOf<T>,
   A extends BaseDbAdapter = BaseDbAdapter,
   IdType = PrimaryKeyOf<T>,
-> extends AtscriptDbReadable<T, DataType, FlatType, A, IdType> {
+  OwnProps = OwnPropsOf<T>,
+  NavType extends Record<string, unknown> = NavPropsOf<T>,
+> extends AtscriptDbReadable<T, DataType, FlatType, A, IdType, OwnProps, NavType> {
 
   // ── Validators ────────────────────────────────────────────────────────────
 

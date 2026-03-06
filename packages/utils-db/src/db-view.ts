@@ -1,6 +1,8 @@
 import type {
   FlatOf,
   PrimaryKeyOf,
+  OwnPropsOf,
+  NavPropsOf,
   TAtscriptAnnotatedType,
   TAtscriptDataType,
   AtscriptRef,
@@ -39,7 +41,9 @@ export class AtscriptDbView<
   FlatType = FlatOf<T>,
   A extends BaseDbAdapter = BaseDbAdapter,
   IdType = PrimaryKeyOf<T>,
-> extends AtscriptDbReadable<T, DataType, FlatType, A, IdType> {
+  OwnProps = OwnPropsOf<T>,
+  NavType extends Record<string, unknown> = NavPropsOf<T>,
+> extends AtscriptDbReadable<T, DataType, FlatType, A, IdType, OwnProps, NavType> {
   private _viewPlan?: TViewPlan
 
   constructor(

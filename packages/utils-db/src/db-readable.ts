@@ -3,6 +3,8 @@ import {
   isAnnotatedType,
   type FlatOf,
   type PrimaryKeyOf,
+  type OwnPropsOf,
+  type NavPropsOf,
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type TAtscriptTypeObject,
@@ -32,6 +34,28 @@ import type {
   TSearchIndexInfo,
   TTableResolver,
 } from './types'
+
+/**
+ * Extracts nav prop names from a query's `$with` array.
+ * Returns `never` when `$with` is absent → all nav props stripped from response.
+ */
+type ExtractWith<Q> =
+  Q extends { controls: { $with: Array<{ name: infer N extends string }> } } ? N : never
+
+/**
+ * Computes the response type for a query:
+ * - Strips all nav props from the base DataType
+ * - Adds back only the nav props requested via `$with`
+ *
+ * When no `$with` is provided, result is `Omit<DataType, keyof NavType>`.
+ * When `$with: [{ name: 'author' }]`, result includes `author` from DataType.
+ * When the query type is not a literal (e.g. a variable typed as `Uniquery`),
+ * falls back to `DataType` (all nav props optional, as declared).
+ */
+export type DbResponse<Data, Nav, Q> =
+  [keyof Nav] extends [never]
+    ? Data
+    : Omit<Data, keyof Nav & string> & Pick<Data, ExtractWith<Q> & keyof Data & string>
 
 const INDEX_PREFIX = 'atscript__'
 
@@ -188,6 +212,8 @@ export class AtscriptDbReadable<
   FlatType = FlatOf<T>,
   A extends BaseDbAdapter = BaseDbAdapter,
   IdType = PrimaryKeyOf<T>,
+  OwnProps = OwnPropsOf<T>,
+  NavType extends Record<string, unknown> = NavPropsOf<T>,
 > {
   /** Resolved table/collection/view name. */
   public readonly tableName: string
@@ -473,10 +499,12 @@ export class AtscriptDbReadable<
 
   /**
    * Finds a single record matching the query.
+   * The return type automatically excludes nav props unless they are
+   * explicitly requested via `$with`.
    */
-  public async findOne(
-    query: Uniquery<FlatType>
-  ): Promise<DataType | null> {
+  public async findOne<Q extends Uniquery<OwnProps, NavType>>(
+    query: Q
+  ): Promise<DbResponse<DataType, NavType, Q> | null> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
@@ -486,15 +514,17 @@ export class AtscriptDbReadable<
     if (withRelations?.length) {
       await this._loadRelations([row], withRelations)
     }
-    return row as DataType
+    return row as DbResponse<DataType, NavType, Q>
   }
 
   /**
    * Finds all records matching the query.
+   * The return type automatically excludes nav props unless they are
+   * explicitly requested via `$with`.
    */
-  public async findMany(
-    query: Uniquery<FlatType>
-  ): Promise<DataType[]> {
+  public async findMany<Q extends Uniquery<OwnProps, NavType>>(
+    query: Q
+  ): Promise<DbResponse<DataType, NavType, Q>[]> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
@@ -503,24 +533,24 @@ export class AtscriptDbReadable<
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
-    return rows as DataType[]
+    return rows as DbResponse<DataType, NavType, Q>[]
   }
 
   /**
    * Counts records matching the query.
    */
-  public async count(query?: Uniquery<FlatType>): Promise<number> {
+  public async count(query?: Uniquery<OwnProps, NavType>): Promise<number> {
     this._flatten()
-    query ??= { filter: {}, controls: {} } as Uniquery<FlatType>
+    query ??= { filter: {}, controls: {} } as Uniquery<OwnProps, NavType>
     return this.adapter.count(this._translateQuery(query as Uniquery))
   }
 
   /**
    * Finds records and total count in a single logical call.
    */
-  public async findManyWithCount(
-    query: Uniquery<FlatType>
-  ): Promise<{ data: DataType[]; count: number }> {
+  public async findManyWithCount<Q extends Uniquery<OwnProps, NavType>>(
+    query: Q
+  ): Promise<{ data: DbResponse<DataType, NavType, Q>[]; count: number }> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -530,7 +560,7 @@ export class AtscriptDbReadable<
       await this._loadRelations(rows, withRelations)
     }
     return {
-      data: rows as DataType[],
+      data: rows as DbResponse<DataType, NavType, Q>[],
       count: result.count,
     }
   }
@@ -550,11 +580,11 @@ export class AtscriptDbReadable<
   /**
    * Full-text search with query translation and result reconstruction.
    */
-  public async search(
+  public async search<Q extends Uniquery<OwnProps, NavType>>(
     text: string,
-    query: Uniquery<FlatType>,
+    query: Q,
     indexName?: string
-  ): Promise<DataType[]> {
+  ): Promise<DbResponse<DataType, NavType, Q>[]> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -563,17 +593,17 @@ export class AtscriptDbReadable<
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
-    return rows as DataType[]
+    return rows as DbResponse<DataType, NavType, Q>[]
   }
 
   /**
    * Full-text search with count for paginated search results.
    */
-  public async searchWithCount(
+  public async searchWithCount<Q extends Uniquery<OwnProps, NavType>>(
     text: string,
-    query: Uniquery<FlatType>,
+    query: Q,
     indexName?: string
-  ): Promise<{ data: DataType[]; count: number }> {
+  ): Promise<{ data: DbResponse<DataType, NavType, Q>[]; count: number }> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -583,7 +613,7 @@ export class AtscriptDbReadable<
       await this._loadRelations(rows, withRelations)
     }
     return {
-      data: rows as DataType[],
+      data: rows as DbResponse<DataType, NavType, Q>[],
       count: result.count,
     }
   }
@@ -593,11 +623,20 @@ export class AtscriptDbReadable<
   /**
    * Finds a single record by any type-compatible identifier — primary key
    * or single-field unique index.
+   * The return type excludes nav props unless `$with` is provided in controls.
+   *
+   * ```typescript
+   * // Without relations — nav props stripped from result
+   * const user = await table.findById('123')
+   *
+   * // With relations — only requested nav props appear
+   * const user = await table.findById('123', { controls: { $with: [{ name: 'posts' }] } })
+   * ```
    */
-  public async findById(
+  public async findById<Q extends { controls?: UniqueryControls<OwnProps, NavType> } = {}>(
     id: IdType,
-    controls?: UniqueryControls<FlatType>
-  ): Promise<DataType | null> {
+    query?: Q
+  ): Promise<DbResponse<DataType, NavType, Q> | null> {
     this._flatten()
     const filter = this._resolveIdFilter(id)
     if (!filter) {
@@ -605,8 +644,8 @@ export class AtscriptDbReadable<
     }
     return await this.findOne({
       filter,
-      controls: controls || {},
-    } as Uniquery<FlatType>)
+      controls: query?.controls || {},
+    } as Uniquery<OwnProps, NavType>) as DbResponse<DataType, NavType, Q> | null
   }
 
   // ── Internal: field flattening ────────────────────────────────────────────

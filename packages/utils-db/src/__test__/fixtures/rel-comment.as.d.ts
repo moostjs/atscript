@@ -84,6 +84,17 @@ export declare class Comment {
       comments?: Comment[]
     }
   }
+  static __ownProps: {
+    "id": number
+    "body": string
+    "createdAt"?: number /* timestamp.created */
+    "postId": number /* id */
+  }
+  
+  static __navProps: {
+    "post"?: Post
+  }
+  
   static __pk: number
 }
 // prettier-ignore-end

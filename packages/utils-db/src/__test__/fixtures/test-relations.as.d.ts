@@ -101,6 +101,19 @@ export declare class Post {
     "comments.post.author.posts.comments"?: Comment[]
     "comments.post.comments"?: Comment[]
   }
+  static __ownProps: {
+    "id": number
+    "title": string
+    "status": string
+    "createdAt"?: number /* timestamp.created */
+    "authorId": number /* id */
+  }
+  
+  static __navProps: {
+    "author"?: Author
+    "comments"?: Comment[]
+  }
+  
   static __pk: number
 }
 // prettier-ignore-end

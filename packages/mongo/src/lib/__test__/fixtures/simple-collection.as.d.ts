@@ -73,6 +73,31 @@ export declare class SimpleCollection {
     "nested.nested2.d"?: string
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "name": string
+    "active": boolean
+    "occupation"?: string
+    "tags"?: string[]
+    "age": number
+    "address": never
+    "address.line1": string
+    "address.line2"?: string
+    "address.city": string
+    "address.state": string
+    "address.zip": string
+    "contacts": never
+    "contacts.email": string
+    "contacts.phone": string
+    "nested"?: never
+    "nested.nested1"?: never
+    "nested.nested1.a"?: number
+    "nested.nested1.b"?: string
+    "nested.nested2"?: never
+    "nested.nested2.c"?: number
+    "nested.nested2.d"?: string
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 
@@ -95,6 +120,11 @@ export declare class MinimalCollection {
     "name": string
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "name": string
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 
@@ -117,6 +147,11 @@ export declare class MinimalCollectionString {
     "_id": string
     "name": string
   }
+  static __ownProps: {
+    "_id": string
+    "name": string
+  }
+  
   static __pk: string
 }
 // prettier-ignore-end

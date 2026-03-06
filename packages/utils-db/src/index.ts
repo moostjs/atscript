@@ -1,4 +1,5 @@
 export { AtscriptDbReadable, resolveDesignType } from './db-readable'
+export type { DbResponse } from './db-readable'
 export { AtscriptDbTable } from './db-table'
 export { AtscriptDbView } from './db-view'
 export type { TViewColumnMapping } from './db-view'
@@ -37,6 +38,9 @@ export type {
   TSearchIndexInfo,
   TTableResolver,
   WithRelation,
+  TypedWithRelation,
+  OwnPropsOf,
+  NavPropsOf,
 } from './types'
 export type { TGenericLogger } from './logger'
 export { NoopLogger } from './logger'

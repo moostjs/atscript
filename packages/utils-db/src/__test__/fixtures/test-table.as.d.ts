@@ -38,6 +38,16 @@ export declare class UsersTable {
     "status": string
     "bio"?: string
   }
+  static __ownProps: {
+    "id": number
+    "email": string
+    "name": string
+    "createdAt": number
+    "displayName"?: string
+    "status": string
+    "bio"?: string
+  }
+  
   static __pk: number | string
 }
 
@@ -86,6 +96,21 @@ export declare class ProfileTable {
     "settings.notifications.sms": boolean
     "displayName"?: string
   }
+  static __ownProps: {
+    "id": number
+    "name": string
+    "contact": never
+    "contact.email": string
+    "contact.phone"?: string
+    "preferences": string
+    "tags": string[]
+    "settings": never
+    "settings.notifications": never
+    "settings.notifications.email": boolean
+    "settings.notifications.sms": boolean
+    "displayName"?: string
+  }
+  
   static __pk: number
 }
 

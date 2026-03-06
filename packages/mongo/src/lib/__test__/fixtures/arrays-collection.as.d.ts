@@ -88,6 +88,38 @@ export declare class ArraysCollection {
     "uniqueObjects.score": number
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "primitive": string[]
+    "primitiveComplex": never
+    "withKey": never
+    "withKey.key1": string
+    "withKey.key2": string
+    "withKey.value": string
+    "withKey.attribute": string
+    "withKeyMerge": never
+    "withKeyMerge.key1": string
+    "withKeyMerge.key2": string
+    "withKeyMerge.value": string
+    "withKeyMerge.attribute": string
+    "withoutKey": never
+    "withoutKey.key": string
+    "withoutKey.value": string
+    "withoutKey.attribute"?: string
+    "withoutKeyMerge": never
+    "withoutKeyMerge.key": string
+    "withoutKeyMerge.value": string
+    "withoutKeyMerge.attribute": string
+    "singleKey": never
+    "singleKey.id": string
+    "singleKey.value": string
+    "singleKey.label"?: string
+    "uniquePrimitive": string[]
+    "uniqueObjects": never
+    "uniqueObjects.name": string
+    "uniqueObjects.score": number
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 // prettier-ignore-end

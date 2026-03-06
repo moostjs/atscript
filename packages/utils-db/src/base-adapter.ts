@@ -40,7 +40,7 @@ import { NoopLogger } from './logger'
 export abstract class BaseDbAdapter {
   // ── Table/view back-reference ─────────────────────────────────────────────
 
-  protected _table!: AtscriptDbReadable
+  protected _table!: AtscriptDbReadable<any, any, any, any, any, any, any>
 
   /** Logger instance — set via {@link registerReadable} from the readable's logger. */
   protected logger: TGenericLogger = NoopLogger
@@ -53,7 +53,7 @@ export abstract class BaseDbAdapter {
    * to the readable's computed metadata for internal use in query rendering,
    * index sync, etc.
    */
-  registerReadable(readable: AtscriptDbReadable, logger?: TGenericLogger): void {
+  registerReadable(readable: AtscriptDbReadable<any, any, any, any, any, any, any>, logger?: TGenericLogger): void {
     this._table = readable
     if (logger) { this.logger = logger }
   }

@@ -60,6 +60,16 @@ export declare class Author {
     "posts.comments.post.author.posts"?: Post[]
     "posts.comments.post.comments"?: Comment[]
   }
+  static __ownProps: {
+    "id": number
+    "name": string
+    "createdAt"?: number /* timestamp.created */
+  }
+  
+  static __navProps: {
+    "posts"?: Post[]
+  }
+  
   static __pk: number
 }
 // prettier-ignore-end

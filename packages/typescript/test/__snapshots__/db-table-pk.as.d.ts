@@ -28,6 +28,11 @@ export declare class SinglePk {
     "id": string
     "name": string
   }
+  static __ownProps: {
+    "id": string
+    "name": string
+  }
+  
   static __pk: string
 }
 
@@ -52,6 +57,12 @@ export declare class CompoundPk {
     "orderId": number
     "amount": number
   }
+  static __ownProps: {
+    "userId": string
+    "orderId": number
+    "amount": number
+  }
+  
   static __pk: {
     userId: string
     orderId: number
@@ -76,7 +87,12 @@ export declare class NoPk {
   static __flat: {
     "name": string
     "value": number
-  }}
+  }
+  static __ownProps: {
+    "name": string
+    "value": number
+  }
+}
 
 /**
  * Atscript interface **MongoSinglePk**
@@ -99,6 +115,12 @@ export declare class MongoSinglePk {
     "name": string
     "_id": string
   }
+  static __ownProps: {
+    "id": number
+    "name": string
+    "_id": string
+  }
+  
   static __pk: string | number
 }
 
@@ -125,6 +147,13 @@ export declare class MongoCompoundPk {
     "amount": number
     "_id": string
   }
+  static __ownProps: {
+    "userId": string
+    "orderId": number
+    "amount": number
+    "_id": string
+  }
+  
   static __pk: string | {
     userId: string
     orderId: number
@@ -152,6 +181,12 @@ export declare class MongoNoPk {
     "value": number
     "_id": string
   }
+  static __ownProps: {
+    "name": string
+    "value": number
+    "_id": string
+  }
+  
   static __pk: string
 }
 
@@ -174,6 +209,11 @@ export declare class MongoIdAsMetaId {
     "_id": string
     "name": string
   }
+  static __ownProps: {
+    "_id": string
+    "name": string
+  }
+  
   static __pk: string
 }
 
@@ -198,6 +238,12 @@ export declare class PkWithUnique {
     "email": string
     "name": string
   }
+  static __ownProps: {
+    "id": number
+    "email": string
+    "name": string
+  }
+  
   static __pk: number | string
 }
 
@@ -222,6 +268,12 @@ export declare class UniqueOnly {
     "code": string
     "num": number
   }
+  static __ownProps: {
+    "name": string
+    "code": string
+    "num": number
+  }
+  
   static __pk: string | number
 }
 
@@ -248,6 +300,13 @@ export declare class CompoundUnique {
     "email": string
     "slug": string
   }
+  static __ownProps: {
+    "id": number
+    "tenantId": string
+    "email": string
+    "slug": string
+  }
+  
   static __pk: number | string
 }
 // prettier-ignore-end

@@ -26,6 +26,10 @@ export declare class IdPlugin {
   static __flat: {
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 
@@ -71,6 +75,21 @@ export declare class UniqueItems {
     "kObj.b"?: string
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "str"?: string[]
+    "strUnique"?: string[]
+    "obj"?: never
+    "obj.a"?: string
+    "obj.b"?: string
+    "objUnique"?: never
+    "objUnique.a"?: string
+    "objUnique.b"?: string
+    "kObj"?: never
+    "kObj.a"?: string
+    "kObj.b"?: string
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */
 }
 // prettier-ignore-end

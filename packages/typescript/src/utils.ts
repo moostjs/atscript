@@ -43,6 +43,20 @@ export type FlatOf<T> = T extends { __flat: infer F } ? F : T extends TAtscriptA
  */
 export type PrimaryKeyOf<T> = T extends { __pk: infer PK } ? PK : unknown
 
+/**
+ * Extracts the own-props flat map from an Atscript annotated type.
+ * `__ownProps` contains only table-owned fields (no navigation property descendants).
+ * Falls back to `FlatOf<T>` for types generated before this feature was added.
+ */
+export type OwnPropsOf<T> = T extends { __ownProps: infer O } ? O : FlatOf<T>
+
+/**
+ * Extracts the navigation property map from an Atscript annotated type.
+ * `__navProps` maps nav prop names to their declared types (e.g., `{ author: Author, comments: Comment[] }`).
+ * Returns `Record<string, never>` when no `__navProps` exists (no nav props or pre-feature type).
+ */
+export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<string, unknown> } ? N : Record<string, never>
+
 export * from './validator'
 
 export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './json-schema'

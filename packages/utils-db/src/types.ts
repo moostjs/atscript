@@ -2,7 +2,7 @@ import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls } from '@uniqu/core'
 import type { UniquSelect } from './uniqu-select'
 
-export type { FlatOf, PrimaryKeyOf } from '@atscript/typescript/utils'
+export type { FlatOf, PrimaryKeyOf, OwnPropsOf, NavPropsOf } from '@atscript/typescript/utils'
 
 // ── Re-export uniqu types as canonical filter/query format ──────────────────
 
@@ -12,6 +12,7 @@ export type {
   UniqueryControls,
   Uniquery,
   WithRelation,
+  TypedWithRelation,
 } from '@uniqu/core'
 
 // ── Resolved query types (adapter-facing) ──────────────────────────────────

@@ -32,6 +32,13 @@ export declare class TodoCollection {
     "completed": boolean
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "id": number
+    "title": string
+    "completed": boolean
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */ | number
 }
 
@@ -56,6 +63,12 @@ export declare class ItemCollection {
     "name": string
     "_id": string /* objectId */
   }
+  static __ownProps: {
+    "code": string
+    "name": string
+    "_id": string /* objectId */
+  }
+  
   static __pk: string /* objectId */ | string
 }
 // prettier-ignore-end

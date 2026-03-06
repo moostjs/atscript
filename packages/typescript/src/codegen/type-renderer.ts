@@ -13,6 +13,7 @@ import type {
 } from '@atscript/core'
 import {
   flattenInterfaceNode,
+  hasNavPropAnnotation,
   isArray,
   isConst,
   isGroup,
@@ -20,6 +21,7 @@ import {
   isPrimitive,
   isRef,
   isStructure,
+  type TFlatFieldDescriptor,
 } from '@atscript/core'
 
 import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
@@ -189,8 +191,10 @@ export class TypeRenderer extends BaseRenderer {
       )
     }
     this.writeln('static toExampleData?: () => any')
-    if (interfaceNode && this.hasDbTable(interfaceNode)) {
+    if (interfaceNode && this.hasDbEntity(interfaceNode)) {
       this.renderFlat(interfaceNode)
+      this.renderOwnProps(interfaceNode)
+      this.renderNavProps(interfaceNode)
       this.renderPk(interfaceNode)
     }
   }
@@ -333,15 +337,14 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   /**
-   * Checks whether an interface has the `@db.table` annotation.
+   * Checks whether an interface is a DB entity (`@db.table` or `@db.view.for`).
    *
-   * NOTE: Only `@db.table` interfaces get the `__flat` static property.
-   * This is intentionally hardcoded — `__flat` exists solely to improve
-   * type-safety for filter expressions and `$select`/`$sort` operations
-   * in the DB layer. Non-DB interfaces have no use for dot-notation path types.
+   * Only DB entities get `__flat`, `__pk`, `__ownProps`, and `__navProps` static properties.
+   * These exist solely to improve type-safety for filter expressions, `$select`/`$sort`,
+   * and `$with` operations in the DB layer.
    */
-  private hasDbTable(node: SemanticInterfaceNode): boolean {
-    return !!node.annotations?.some(a => a.name === 'db.table')
+  private hasDbEntity(node: SemanticInterfaceNode): boolean {
+    return !!node.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view.for')
   }
 
   /**
@@ -360,11 +363,36 @@ export class TypeRenderer extends BaseRenderer {
    * - **Leaf fields** → their original TypeScript type
    */
   private renderFlat(node: SemanticInterfaceNode) {
-    const flatMap = flattenInterfaceNode(this.doc, node)
+    this.renderFlatMap('__flat', flattenInterfaceNode(this.doc, node))
+  }
+
+  /**
+   * Renders the `static __ownProps` property — table-owned fields only (no nav props).
+   */
+  private renderOwnProps(node: SemanticInterfaceNode) {
+    this.renderFlatMap('__ownProps', flattenInterfaceNode(this.doc, node, { skipNavProps: true }), { leadingNewline: true, trailingNewline: true })
+  }
+
+  /**
+   * Shared renderer for flat-map static properties (`__flat`, `__ownProps`).
+   *
+   * Special rendering rules:
+   * - **Intermediate paths** (structures, arrays of structures) → `never`
+   * - **`@db.json` fields** → `string` (stored as serialized JSON in DB)
+   * - **Leaf fields** → their original TypeScript type
+   */
+  private renderFlatMap(
+    propName: string,
+    flatMap: Map<string, TFlatFieldDescriptor>,
+    opts?: { leadingNewline?: boolean; trailingNewline?: boolean }
+  ) {
     if (flatMap.size === 0) {
       return
     }
-    this.write('static __flat: ')
+    if (opts?.leadingNewline) {
+      this.writeln()
+    }
+    this.write(`static ${propName}: `)
     this.blockln('{}')
     for (const [path, descriptor] of flatMap) {
       this.write(`"${escapeQuotes(path)}"`)
@@ -373,12 +401,8 @@ export class TypeRenderer extends BaseRenderer {
       }
       this.write(': ')
       if (descriptor.intermediate) {
-        // Intermediate nodes (structures, arrays of structures, unions of only complex types)
-        // are typed as `never` to prevent meaningless $eq comparisons, while still
-        // appearing in autocomplete for $select and $exists checks.
         this.writeln('never')
       } else if (descriptor.dbJson) {
-        // @db.json fields are stored as JSON strings in the DB
         this.writeln('string')
       } else {
         // Use the original prop definition for rendering (preserves named refs like Address,
@@ -392,20 +416,68 @@ export class TypeRenderer extends BaseRenderer {
         renderedDef.split('\n').forEach(l => this.writeln(l))
       }
     }
-    this.pop()
+    if (opts?.trailingNewline) {
+      this.popln()
+    } else {
+      this.pop()
+    }
   }
 
   /**
-   * Renders the `static __pk` property — the primary key type for type-safe
-   * `deleteOne`/`findById` signatures on `AtscriptDbTable`.
+   * Renders the `static __navProps` property — a map of navigation property names
+   * to their declared TypeScript types.
    *
-   * - **Single PK** (one `@meta.id`) → `static __pk: <scalar type>`
-   * - **Compound PK** (multiple `@meta.id`) → `static __pk: { field1: Type1; field2: Type2 }`
-   * - **No PK** → no `__pk` emitted (unless unique indexes exist)
-   * - **Unique indexes** (`@db.index.unique`) → appended as union members
-   * - **Mongo collection** → always includes `string` (ObjectId) in the union;
-   *   if no `@meta.id` fields, `__pk` is just `string`
+   * This enables type-safe `$with` in queries: `name` is constrained to known
+   * navigation property keys, and nested filter/controls are typed to the target entity.
    */
+  private renderNavProps(node: SemanticInterfaceNode) {
+    let struct: SemanticNode | undefined
+    if (node.hasExtends) {
+      struct = this.doc.resolveInterfaceExtends(node)
+    }
+    if (!struct) {
+      struct = node.getDefinition()
+    }
+    if (!struct || !isStructure(struct)) {
+      return
+    }
+
+    const structNode = struct as SemanticStructureNode
+    const navProps: Array<{ name: string; prop: SemanticPropNode }> = []
+
+    for (const [name, prop] of structNode.props) {
+      if (prop.token('identifier')?.pattern) {
+        continue
+      }
+      if (hasNavPropAnnotation(prop)) {
+        navProps.push({ name, prop })
+      }
+    }
+
+    if (navProps.length === 0) {
+      return
+    }
+
+    this.writeln()
+    this.write('static __navProps: ')
+    this.blockln('{}')
+    for (const { name, prop } of navProps) {
+      this.write(`"${escapeQuotes(name)}"`)
+      if (prop.token('optional')) {
+        this.write('?')
+      }
+      this.write(': ')
+      const propDef = prop.getDefinition()
+      if (propDef) {
+        const renderedDef = this.renderTypeDefString(propDef)
+        renderedDef.split('\n').forEach(l => this.writeln(l))
+      } else {
+        this.writeln('unknown')
+      }
+    }
+    this.popln()
+  }
+
   private renderPk(node: SemanticInterfaceNode) {
     const isMongoCollection = !!node.annotations?.some(a => a.name === 'db.mongo.collection')
 

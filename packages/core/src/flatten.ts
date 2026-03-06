@@ -40,6 +40,11 @@ export interface TFlatFieldDescriptor {
   dbJson?: boolean
 }
 
+export interface TFlattenOptions {
+  /** When true, skip properties annotated with @db.rel.to, @db.rel.from, or @db.rel.via. */
+  skipNavProps?: boolean
+}
+
 /**
  * Flattens an interface node into a map of dot-notation paths to their type descriptors.
  *
@@ -63,7 +68,8 @@ export interface TFlatFieldDescriptor {
  */
 export function flattenInterfaceNode(
   doc: AtscriptDoc,
-  node: SemanticInterfaceNode
+  node: SemanticInterfaceNode,
+  options?: TFlattenOptions
 ): Map<string, TFlatFieldDescriptor> {
   const flatMap = new Map<string, TFlatFieldDescriptor>()
   const stack = new Set<SemanticNode>()
@@ -80,7 +86,7 @@ export function flattenInterfaceNode(
     return flatMap
   }
 
-  walkStructure(doc, struct as SemanticStructureNode, '', false, flatMap, stack)
+  walkStructure(doc, struct as SemanticStructureNode, '', false, flatMap, stack, options)
   return flatMap
 }
 
@@ -98,6 +104,15 @@ function hasDbJsonAnnotation(prop: SemanticPropNode): boolean {
     return false
   }
   return prop.annotations.some(a => a.name === 'db.json')
+}
+
+export function hasNavPropAnnotation(prop: SemanticPropNode): boolean {
+  if (!prop.annotations) {
+    return false
+  }
+  return prop.annotations.some(a =>
+    a.name === 'db.rel.to' || a.name === 'db.rel.from' || a.name === 'db.rel.via'
+  )
 }
 
 export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
@@ -175,7 +190,8 @@ function walkStructure(
   prefix: string,
   parentOptional: boolean,
   flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>
+  stack: Set<SemanticNode>,
+  options?: TFlattenOptions
 ) {
   for (const [name, prop] of struct.props) {
     // Skip pattern properties ([key: string])
@@ -187,6 +203,11 @@ function walkStructure(
 
     // Skip phantom types
     if (isPhantomNode(doc, propDef)) {
+      continue
+    }
+
+    // Skip navigation properties when requested
+    if (options?.skipNavProps && hasNavPropAnnotation(prop)) {
       continue
     }
 
@@ -211,7 +232,7 @@ function walkStructure(
       continue
     }
 
-    walkNode(resolved.doc, resolved.def, path, optional, prop, flatMap, stack)
+    walkNode(resolved.doc, resolved.def, path, optional, prop, flatMap, stack, options)
   }
 }
 
@@ -222,7 +243,8 @@ function walkNode(
   optional: boolean,
   propNode: SemanticPropNode | undefined,
   flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>
+  stack: Set<SemanticNode>,
+  options?: TFlattenOptions
 ) {
   // Circular reference guard (tracks current recursion stack)
   if (stack.has(def)) {
@@ -235,7 +257,7 @@ function walkNode(
     if (isStructure(def)) {
       // Structure is intermediate — add entry typed as never, then recurse sub-paths
       addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
-      walkStructure(doc, def as SemanticStructureNode, path, optional, flatMap, stack)
+      walkStructure(doc, def as SemanticStructureNode, path, optional, flatMap, stack, options)
     } else if (isArray(def)) {
       // Check if array element is a complex type (structure/group/array)
       const elementDef = (def as SemanticArrayNode).getDefinition()
@@ -244,7 +266,7 @@ function walkNode(
       if (isComplexElement) {
         // Array of complex type — intermediate entry, then recurse element sub-paths
         addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
-        walkArrayElement(doc, def as SemanticArrayNode, path, optional, flatMap, stack)
+        walkArrayElement(doc, def as SemanticArrayNode, path, optional, flatMap, stack, options)
       } else {
         // Array of primitive/leaf — leaf entry
         addToFlatMap(flatMap, path, { def, doc, optional, propNode })
@@ -256,7 +278,7 @@ function walkNode(
         const merged = doc.mergeIntersection(def)
         if (merged !== def && isStructure(merged)) {
           addToFlatMap(flatMap, path, { def: merged, doc, optional, propNode, intermediate: true })
-          walkStructure(doc, merged as SemanticStructureNode, path, optional, flatMap, stack)
+          walkStructure(doc, merged as SemanticStructureNode, path, optional, flatMap, stack, options)
         } else {
           addToFlatMap(flatMap, path, { def, doc, optional, propNode })
         }
@@ -285,7 +307,7 @@ function walkNode(
           for (const branch of branches) {
             const resolved = resolveNode(doc, branch)
             if (resolved) {
-              walkBranch(resolved.doc, resolved.def, path, optional, flatMap, stack)
+              walkBranch(resolved.doc, resolved.def, path, optional, flatMap, stack, options)
             }
           }
         } else {
@@ -311,7 +333,8 @@ function walkArrayElement(
   prefix: string,
   parentOptional: boolean,
   flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>
+  stack: Set<SemanticNode>,
+  options?: TFlattenOptions
 ) {
   const elementDef = arrayNode.getDefinition()
   if (!elementDef) {
@@ -323,7 +346,7 @@ function walkArrayElement(
     return
   }
 
-  walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack)
+  walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack, options)
 }
 
 /**
@@ -336,24 +359,25 @@ function walkBranch(
   prefix: string,
   parentOptional: boolean,
   flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>
+  stack: Set<SemanticNode>,
+  options?: TFlattenOptions
 ) {
   if (isStructure(def)) {
-    walkStructure(doc, def as SemanticStructureNode, prefix, parentOptional, flatMap, stack)
+    walkStructure(doc, def as SemanticStructureNode, prefix, parentOptional, flatMap, stack, options)
   } else if (isArray(def)) {
-    walkArrayElement(doc, def as SemanticArrayNode, prefix, parentOptional, flatMap, stack)
+    walkArrayElement(doc, def as SemanticArrayNode, prefix, parentOptional, flatMap, stack, options)
   } else if (isGroup(def) && def.entity !== 'structure') {
     const group = def as SemanticGroup
     if (group.op === '&') {
       const merged = doc.mergeIntersection(def)
       if (isStructure(merged)) {
-        walkStructure(doc, merged as SemanticStructureNode, prefix, parentOptional, flatMap, stack)
+        walkStructure(doc, merged as SemanticStructureNode, prefix, parentOptional, flatMap, stack, options)
       }
     } else if (group.op === '|') {
       for (const branch of group.unwrap()) {
         const resolved = resolveNode(doc, branch)
         if (resolved) {
-          walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack)
+          walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack, options)
         }
       }
     }
