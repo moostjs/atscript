@@ -30,7 +30,7 @@ const stringAnnotation = new AnnotationSpec({
 describe('query annotation arguments', () => {
   describe('tokenizer', () => {
     it('tokenizes backtick content as query token with children', () => {
-      const tokens = tokenize("`status eq 'active'`")
+      const tokens = tokenize("`status = 'active'`")
       const queryToken = tokens.find(t => t.type === 'query')
       expect(queryToken).toBeDefined()
       expect(queryToken!.children).toBeDefined()
@@ -39,14 +39,14 @@ describe('query annotation arguments', () => {
       const children = queryToken!.children!
       expect(children[0].type).toBe('identifier')
       expect(children[0].text).toBe('status')
-      expect(children[1].type).toBe('identifier')
-      expect(children[1].text).toBe('eq')
+      expect(children[1].type).toBe('punctuation')
+      expect(children[1].text).toBe('=')
       expect(children[2].type).toBe('text')
       expect(children[2].text).toBe('active')
     })
 
     it('tokenizes qualified ref inside backticks', () => {
-      const tokens = tokenize("`User.status eq 'active'`")
+      const tokens = tokenize("`User.status = 'active'`")
       const queryToken = tokens.find(t => t.type === 'query')
       const children = queryToken!.children!
       expect(children[0].type).toBe('identifier')
@@ -76,11 +76,23 @@ describe('query annotation arguments', () => {
     })
 
     it('tokenizes number literals in backticks', () => {
-      const tokens = tokenize('`age gte 18`')
+      const tokens = tokenize('`age >= 18`')
       const queryToken = tokens.find(t => t.type === 'query')
       const children = queryToken!.children!
+      expect(children[0].type).toBe('identifier')
+      expect(children[0].text).toBe('age')
+      expect(children[1].type).toBe('punctuation')
+      expect(children[1].text).toBe('>=')
       expect(children[2].type).toBe('number')
       expect(children[2].text).toBe('18')
+    })
+
+    it('tokenizes multi-char symbolic operators', () => {
+      const tokens = tokenize('`a != 1`')
+      const queryToken = tokens.find(t => t.type === 'query')
+      const children = queryToken!.children!
+      expect(children[1].type).toBe('punctuation')
+      expect(children[1].text).toBe('!=')
     })
   })
 
@@ -88,7 +100,7 @@ describe('query annotation arguments', () => {
     it('parses simple comparison', () => {
       const result = parseAtscript(`
 interface User {
-  @some.filter \`status eq 'active'\`
+  @some.filter \`status = 'active'\`
   name: string
 }
 `)
@@ -102,7 +114,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active'\`
+  @some.filter \`status = 'active'\`
   name: string
 }
 `)
@@ -118,7 +130,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active'\`
+  @some.filter \`status = 'active'\`
   name: string
 }
 `)
@@ -127,7 +139,7 @@ interface User {
       expect(queryArg!.queryNode).toBeDefined()
 
       const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
-      expect(expr.operator).toBe('eq')
+      expect(expr.operator).toBe('=')
       expect(expr.left.typeRef).toBeUndefined() // unqualified
       expect(expr.left.fieldRef.text).toBe('status')
     })
@@ -139,7 +151,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`User.status eq 'active'\`
+  @some.filter \`User.status = 'active'\`
   name: string
 }
 `)
@@ -157,7 +169,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active' and age gte 18\`
+  @some.filter \`status = 'active' and age >= 18\`
   name: string
 }
 `)
@@ -174,7 +186,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`role eq 'admin' or role eq 'moderator'\`
+  @some.filter \`role = 'admin' or role = 'moderator'\`
   name: string
 }
 `)
@@ -191,7 +203,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`not status eq 'banned'\`
+  @some.filter \`not (status = 'banned')\`
   name: string
 }
 `)
@@ -208,7 +220,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active' and (plan eq 'premium' or role eq 'admin')\`
+  @some.filter \`status = 'active' and (plan = 'premium' or role = 'admin')\`
   name: string
 }
 `)
@@ -239,22 +251,113 @@ interface User {
       expect('values' in expr.right!).toBe(true)
     })
 
-    it('parses unary operators (isNull, isNotNull)', () => {
+    it('parses not in operator with value list', () => {
       const doc = new AtscriptDoc('test', {
         primitives,
         annotations: { some: { filter: queryAnnotation } },
       })
       doc.update(`
 interface User {
-  @some.filter \`email isNotNull\`
+  @some.filter \`role not in ('admin', 'moderator')\`
   name: string
 }
 `)
       const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
       const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
-      expect(expr.operator).toBe('isNotNull')
+      expect(expr.operator).toBe('not in')
+      expect(expr.left.fieldRef.text).toBe('role')
+      expect('values' in expr.right!).toBe(true)
+    })
+
+    it('parses exists operator', () => {
+      const doc = new AtscriptDoc('test', {
+        primitives,
+        annotations: { some: { filter: queryAnnotation } },
+      })
+      doc.update(`
+interface User {
+  @some.filter \`email exists\`
+  name: string
+}
+`)
+      const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
+      const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
+      expect(expr.operator).toBe('exists')
       expect(expr.left.fieldRef.text).toBe('email')
       expect(expr.right).toBeUndefined()
+    })
+
+    it('parses not exists operator', () => {
+      const doc = new AtscriptDoc('test', {
+        primitives,
+        annotations: { some: { filter: queryAnnotation } },
+      })
+      doc.update(`
+interface User {
+  @some.filter \`email not exists\`
+  name: string
+}
+`)
+      const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
+      const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
+      expect(expr.operator).toBe('not exists')
+      expect(expr.left.fieldRef.text).toBe('email')
+      expect(expr.right).toBeUndefined()
+    })
+
+    it('parses matches operator with regex', () => {
+      const doc = new AtscriptDoc('test', {
+        primitives,
+        annotations: { some: { filter: queryAnnotation } },
+      })
+      doc.update(`
+interface User {
+  @some.filter \`name matches /^admin/i\`
+  name: string
+}
+`)
+      const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
+      const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
+      expect(expr.operator).toBe('matches')
+      expect(expr.left.fieldRef.text).toBe('name')
+      expect(expr.right).toBeDefined()
+    })
+
+    it('parses != operator', () => {
+      const doc = new AtscriptDoc('test', {
+        primitives,
+        annotations: { some: { filter: queryAnnotation } },
+      })
+      doc.update(`
+interface User {
+  @some.filter \`status != 'banned'\`
+  name: string
+}
+`)
+      const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
+      const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
+      expect(expr.operator).toBe('!=')
+      expect(expr.left.fieldRef.text).toBe('status')
+    })
+
+    it('parses < and <= operators', () => {
+      const doc = new AtscriptDoc('test', {
+        primitives,
+        annotations: { some: { filter: queryAnnotation } },
+      })
+      doc.update(`
+interface User {
+  @some.filter \`age < 100 and score <= 50\`
+  name: string
+}
+`)
+      const queryArg = doc.annotations.find(a => a.name === 'some.filter')?.args[0]
+      const expr = queryArg!.queryNode!.expression as SemanticQueryLogicalNode
+      expect(expr.operator).toBe('and')
+      const left = expr.operands[0] as SemanticQueryComparisonNode
+      const right = expr.operands[1] as SemanticQueryComparisonNode
+      expect(left.operator).toBe('<')
+      expect(right.operator).toBe('<=')
     })
 
     it('parses ref-to-ref comparison (join condition)', () => {
@@ -264,14 +367,14 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.joins User, \`Order.userId eq User.id\`
+  @some.joins User, \`Order.userId = User.id\`
   name: string
 }
 `)
       const queryArg = doc.annotations.find(a => a.name === 'some.joins')?.args[1]
       expect(queryArg).toBeDefined()
       const expr = queryArg!.queryNode!.expression as SemanticQueryComparisonNode
-      expect(expr.operator).toBe('eq')
+      expect(expr.operator).toBe('=')
       expect(expr.left.typeRef!.text).toBe('Order')
       expect(expr.left.fieldRef.text).toBe('userId')
       // right is a field ref
@@ -287,7 +390,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`a eq 1 and b eq 2 and c eq 3\`
+  @some.filter \`a = 1 and b = 2 and c = 3\`
   name: string
 }
 `)
@@ -306,7 +409,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active'\`
+  @some.filter \`status = 'active'\`
   name: string
 }
 `)
@@ -339,7 +442,7 @@ interface User {
       const spec = new AnnotationSpec({
         argument: { name: 'filter', type: 'query' },
       })
-      expect(spec.argumentsSnippet).toBe('`${1:field eq value}`')
+      expect(spec.argumentsSnippet).toBe('`${1:field = value}`')
     })
   })
 
@@ -354,7 +457,7 @@ interface User {
   status: string
 }
 interface Order {
-  @some.filter \`User.status eq 'active'\`
+  @some.filter \`User.status = 'active'\`
   name: string
 }
 `)
@@ -369,7 +472,7 @@ interface Order {
       })
       doc.update(`
 interface User {
-  @some.filter \`status eq 'active'\`
+  @some.filter \`status = 'active'\`
   name: string
 }
 `)
@@ -385,7 +488,7 @@ interface User {
       })
       doc.update(`
 interface Order {
-  @some.filter \`Order.userId eq User.id\`
+  @some.filter \`Order.userId = User.id\`
   name: string
 }
 interface User {
@@ -404,7 +507,7 @@ interface User {
       })
       doc.update(`
 interface User {
-  @some.filter \`User.status eq 'active'\`
+  @some.filter \`User.status = 'active'\`
   name: string
 }
 `)

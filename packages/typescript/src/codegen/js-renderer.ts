@@ -35,6 +35,12 @@ import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
+const QUERY_OP_MAP: Record<string, string> = {
+  '=': '$eq', '!=': '$ne', '>': '$gt', '>=': '$gte', '<': '$lt', '<=': '$lte',
+  'in': '$in', 'not in': '$nin', 'matches': '$regex',
+  'exists': '$exists', 'not exists': '$exists',
+}
+
 export class JsRenderer extends BaseRenderer {
   private postAnnotate = [] as SemanticNode[]
   private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
@@ -806,7 +812,8 @@ export class JsRenderer extends BaseRenderer {
 
   private emitQueryComparison(node: SemanticQueryComparisonNode): string {
     const left = this.emitQueryFieldRef(node.left)
-    const parts = [`left: ${left}`, `op: "${node.operator}"`]
+    const mappedOp = QUERY_OP_MAP[node.operator] || node.operator
+    const parts = [`left: ${left}`, `op: "${mappedOp}"`]
     if (node.right) {
       if ('fieldRef' in node.right && (node.right as SemanticQueryFieldRefNode).fieldRef) {
         parts.push(`right: ${this.emitQueryFieldRef(node.right as SemanticQueryFieldRefNode)}`)
@@ -814,10 +821,14 @@ export class JsRenderer extends BaseRenderer {
         const values = (node.right as SemanticQueryValueListNode).values
           .map(v => this.emitQueryLiteral(v))
           .join(', ')
-        parts.push(`right: { value: [${values}] }`)
+        parts.push(`right: [${values}]`)
       } else if ('valueToken' in node.right) {
-        parts.push(`right: { value: ${this.emitQueryLiteral(node.right as SemanticQueryValueNode)} }`)
+        parts.push(`right: ${this.emitQueryLiteral(node.right as SemanticQueryValueNode)}`)
       }
+    } else if (node.operator === 'exists') {
+      parts.push('right: true')
+    } else if (node.operator === 'not exists') {
+      parts.push('right: false')
     }
     return `{ ${parts.join(', ')} }`
   }
@@ -838,8 +849,11 @@ export class JsRenderer extends BaseRenderer {
         return `"${escapeQuotes(token.text)}"`
       case 'number':
         return token.text
-      case 'regexp':
-        return token.text
+      case 'regexp': {
+        // Extract regex source (strip /pattern/flags → "pattern")
+        const match = /^\/(.*)\/[a-z]*$/.exec(token.text)
+        return `"${escapeQuotes(match ? match[1] : token.text)}"`
+      }
       case 'identifier':
         if (token.text === 'true' || token.text === 'false') return token.text
         if (token.text === 'null' || token.text === 'undefined') return 'null'

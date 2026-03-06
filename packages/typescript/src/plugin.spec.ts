@@ -941,4 +941,52 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/ref-annotation.js')
     )
   })
+
+  it('must render query annotation arguments as query tree objects', async () => {
+    const filterAnnotation = new AnnotationSpec({
+      argument: { name: 'filter', type: 'query' },
+    })
+    const joinsAnnotation = new AnnotationSpec({
+      argument: [
+        { name: 'target', type: 'ref' },
+        { name: 'on', type: 'query' },
+      ],
+    })
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/query-annotation.as'],
+      plugins: [tsPlugin()],
+      annotations: {
+        ...annotations,
+        some: {
+          filter: filterAnnotation,
+          joins: joinsAnnotation,
+        },
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('query-annotation.as.js')
+    // Simple comparison — $-prefixed operators
+    expect(out[0].content).toContain('"$eq"')
+    // Qualified ref: User.status → type: () => User
+    expect(out[0].content).toContain('() => User')
+    // AND logical
+    expect(out[0].content).toContain('"$and"')
+    // OR logical
+    expect(out[0].content).toContain('"$or"')
+    // NOT logical
+    expect(out[0].content).toContain('"$not"')
+    // in operator
+    expect(out[0].content).toContain('"$in"')
+    // exists operator
+    expect(out[0].content).toContain('"$exists"')
+    // not in operator
+    expect(out[0].content).toContain('"$nin"')
+    // matches/regex operator
+    expect(out[0].content).toContain('"$regex"')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/query-annotation.js')
+    )
+  })
 })

@@ -264,7 +264,7 @@ export class AnnotationSpec {
         return 'TypeName'
       }
       case 'query': {
-        return 'field eq value'
+        return 'field = value'
       }
       default: {
         return ''

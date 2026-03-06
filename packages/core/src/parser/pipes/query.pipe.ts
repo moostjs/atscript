@@ -13,24 +13,9 @@ import {
 import { Token } from '../token'
 import type { TMessages } from '../types'
 
-const COMPARISON_OPS = new Set<string>([
-  'eq',
-  'neq',
-  'gt',
-  'gte',
-  'lt',
-  'lte',
-  'like',
-  'regex',
-])
-
-const UNARY_OPS = new Set<string>(['isNull', 'isNotNull', 'exists', 'notExists'])
+const SYMBOLIC_OPS = new Set<string>(['=', '!=', '>', '>=', '<', '<='])
 
 const VALUE_KEYWORDS = new Set<string>(['true', 'false', 'null', 'undefined'])
-
-function isOperator(text: string): boolean {
-  return COMPARISON_OPS.has(text) || UNARY_OPS.has(text) || text === 'in'
-}
 
 /**
  * Parse a backtick-delimited query expression from its child tokens.
@@ -166,40 +151,10 @@ function parseComparison(
     return undefined
   }
 
-  // Expect an operator
-  if (ni.$?.type !== 'identifier') {
-    pushError(ni, messages, 'Expected operator after field reference')
-    return undefined
-  }
-
-  const opText = ni.$.text
-
-  // Unary operators
-  if (UNARY_OPS.has(opText)) {
-    ni.move() // consume operator
-    const node = new SemanticQueryComparisonNode()
-    node.left = left
-    node.operator = opText as TQueryOperator
-    return node
-  }
-
-  // 'in' operator with value list
-  if (opText === 'in') {
-    ni.move() // consume 'in'
-    const right = parseValueList(ni, messages)
-    if (!right) {
-      return undefined
-    }
-    const node = new SemanticQueryComparisonNode()
-    node.left = left
-    node.operator = 'in'
-    node.right = right
-    return node
-  }
-
-  // Binary comparison operators
-  if (COMPARISON_OPS.has(opText)) {
-    ni.move() // consume operator
+  // Symbolic operators: =, !=, >, >=, <, <=
+  if (ni.$?.type === 'punctuation' && SYMBOLIC_OPS.has(ni.$.text)) {
+    const opText = ni.$.text as TQueryOperator
+    ni.move()
     const right = parseValueOrFieldRef(ni, messages)
     if (!right) {
       pushError(ni, messages, `Expected value or field reference after "${opText}"`)
@@ -207,12 +162,92 @@ function parseComparison(
     }
     const node = new SemanticQueryComparisonNode()
     node.left = left
-    node.operator = opText as TQueryOperator
+    node.operator = opText
     node.right = right
     return node
   }
 
-  pushError(ni, messages, `Unknown operator "${opText}"`)
+  // Keyword operators
+  if (ni.$?.type === 'identifier') {
+    const opText = ni.$.text
+
+    // 'in' with value list
+    if (opText === 'in') {
+      ni.move()
+      const right = parseValueList(ni, messages)
+      if (!right) {
+        return undefined
+      }
+      const node = new SemanticQueryComparisonNode()
+      node.left = left
+      node.operator = 'in'
+      node.right = right
+      return node
+    }
+
+    // 'matches' with value (regex literal)
+    if (opText === 'matches') {
+      ni.move()
+      const right = parseValueOrFieldRef(ni, messages)
+      if (!right) {
+        pushError(ni, messages, 'Expected value after "matches"')
+        return undefined
+      }
+      const node = new SemanticQueryComparisonNode()
+      node.left = left
+      node.operator = 'matches'
+      node.right = right
+      return node
+    }
+
+    // 'exists' (no right side)
+    if (opText === 'exists') {
+      ni.move()
+      const node = new SemanticQueryComparisonNode()
+      node.left = left
+      node.operator = 'exists'
+      return node
+    }
+
+    // 'not in' / 'not exists' (two-keyword operators after field ref)
+    if (opText === 'not') {
+      return parseNotComparison(ni, messages, left)
+    }
+
+    pushError(ni, messages, `Unknown operator "${opText}"`)
+    return undefined
+  }
+
+  pushError(ni, messages, 'Expected operator after field reference')
+  return undefined
+}
+
+function parseNotComparison(
+  ni: NodeIterator,
+  messages: TMessages,
+  left: SemanticQueryFieldRefNode
+): SemanticQueryComparisonNode | undefined {
+  ni.move() // consume 'not'
+  if (ni.$?.type === 'identifier' && ni.$.text === 'in') {
+    ni.move()
+    const right = parseValueList(ni, messages)
+    if (!right) {
+      return undefined
+    }
+    const node = new SemanticQueryComparisonNode()
+    node.left = left
+    node.operator = 'not in'
+    node.right = right
+    return node
+  }
+  if (ni.$?.type === 'identifier' && ni.$.text === 'exists') {
+    ni.move()
+    const node = new SemanticQueryComparisonNode()
+    node.left = left
+    node.operator = 'not exists'
+    return node
+  }
+  pushError(ni, messages, 'Expected "in" or "exists" after "not"')
   return undefined
 }
 

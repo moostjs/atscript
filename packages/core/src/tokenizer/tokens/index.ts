@@ -8,6 +8,7 @@ import { commentNodes } from './comment.token'
 import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
+import { QueryOperatorToken } from './query-operator.token'
 import { QueryToken } from './query.token'
 import { RegExpToken } from './regexp.token'
 import { TextToken } from './text.node'
@@ -59,6 +60,7 @@ BlockToken.recognize(
 
 QueryToken.recognize(
   RegExpToken,
+  QueryOperatorToken,
   BlockToken,
   IdentifierToken,
   TextToken,
