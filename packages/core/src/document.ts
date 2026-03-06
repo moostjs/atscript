@@ -220,6 +220,10 @@ export class AtscriptDoc {
             this.referred.push(refToken)
           }
         }
+        // Track query expression type refs for import resolution and LSP
+        if (argSpec?.type === 'query' && args?.[i]?.queryNode) {
+          args[i].queryNode!.registerAtDocument(this)
+        }
       }
     } else {
       let severity: 0 | 1 | 2 = 0

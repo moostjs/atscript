@@ -9,6 +9,7 @@ export interface TLexicalToken {
     | 'block'
     | 'unknown'
     | 'regexp'
+    | 'query'
   text: string
   children?: TLexicalToken[]
   startOffset?: number

@@ -10,13 +10,20 @@ import type {
   SemanticNode,
   SemanticPrimitiveNode,
   SemanticPropNode,
+  SemanticQueryComparisonNode,
+  SemanticQueryExprNode,
+  SemanticQueryFieldRefNode,
+  SemanticQueryNode,
+  SemanticQueryValueListNode,
+  SemanticQueryValueNode,
   SemanticRefNode,
   SemanticStructureNode,
   SemanticTypeNode,
   TAnnotationTokens,
+  Token,
   TPrimitiveTypeDef,
 } from '@atscript/core'
-import { isGroup, isInterface, isPrimitive, isRef, isStructure } from '@atscript/core'
+import { isGroup, isInterface, isPrimitive, isQueryLogical, isRef, isStructure } from '@atscript/core'
 
 import {
   defineAnnotatedType,
@@ -767,11 +774,79 @@ export class JsRenderer extends BaseRenderer {
     return `{ type: () => ${typeName}, field: "${escapeQuotes(field)}" }`
   }
 
-  private emitArgValue(aSpec: { type: string }, argToken: { text: string; type: string }): string {
+  private emitArgValue(aSpec: { type: string }, argToken: Token): string {
     if (aSpec.type === 'ref') {
       return this.emitRefValue(argToken.text)
     }
+    if (aSpec.type === 'query' && argToken.queryNode) {
+      return this.emitQueryTree(argToken.queryNode)
+    }
     return aSpec.type === 'string' ? `"${escapeQuotes(argToken.text)}"` : argToken.text
+  }
+
+  private emitQueryTree(queryNode: SemanticQueryNode): string {
+    return this.emitQueryExpr(queryNode.expression)
+  }
+
+  private emitQueryExpr(node: SemanticQueryExprNode): string {
+    if (isQueryLogical(node)) {
+      return this.emitQueryLogical(node)
+    }
+    return this.emitQueryComparison(node as SemanticQueryComparisonNode)
+  }
+
+  private emitQueryLogical(node: import('@atscript/core').SemanticQueryLogicalNode): string {
+    if (node.operator === 'not') {
+      return `{ "$not": ${this.emitQueryExpr(node.operands[0])} }`
+    }
+    const key = node.operator === 'and' ? '$and' : '$or'
+    const items = node.operands.map(op => this.emitQueryExpr(op)).join(', ')
+    return `{ "${key}": [${items}] }`
+  }
+
+  private emitQueryComparison(node: SemanticQueryComparisonNode): string {
+    const left = this.emitQueryFieldRef(node.left)
+    const parts = [`left: ${left}`, `op: "${node.operator}"`]
+    if (node.right) {
+      if ('fieldRef' in node.right && (node.right as SemanticQueryFieldRefNode).fieldRef) {
+        parts.push(`right: ${this.emitQueryFieldRef(node.right as SemanticQueryFieldRefNode)}`)
+      } else if ('values' in node.right && (node.right as SemanticQueryValueListNode).values) {
+        const values = (node.right as SemanticQueryValueListNode).values
+          .map(v => this.emitQueryLiteral(v))
+          .join(', ')
+        parts.push(`right: { value: [${values}] }`)
+      } else if ('valueToken' in node.right) {
+        parts.push(`right: { value: ${this.emitQueryLiteral(node.right as SemanticQueryValueNode)} }`)
+      }
+    }
+    return `{ ${parts.join(', ')} }`
+  }
+
+  private emitQueryFieldRef(node: SemanticQueryFieldRefNode): string {
+    const parts: string[] = []
+    if (node.typeRef) {
+      parts.push(`type: () => ${node.typeRef.text}`)
+    }
+    parts.push(`field: "${escapeQuotes(node.fieldRef.text)}"`)
+    return `{ ${parts.join(', ')} }`
+  }
+
+  private emitQueryLiteral(node: SemanticQueryValueNode): string {
+    const token = node.valueToken
+    switch (token.type) {
+      case 'text':
+        return `"${escapeQuotes(token.text)}"`
+      case 'number':
+        return token.text
+      case 'regexp':
+        return token.text
+      case 'identifier':
+        if (token.text === 'true' || token.text === 'false') return token.text
+        if (token.text === 'null' || token.text === 'undefined') return 'null'
+        return token.text
+      default:
+        return token.text
+    }
   }
 
   private computeAnnotationValue(

@@ -89,3 +89,21 @@ export function isPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode 
 export function isAnnotate(node?: SemanticNode): node is SemanticAnnotateNode {
   return node?.entity === 'annotate'
 }
+
+export {
+  SemanticQueryNode,
+  SemanticQueryLogicalNode,
+  SemanticQueryComparisonNode,
+  SemanticQueryFieldRefNode,
+  SemanticQueryValueNode,
+  SemanticQueryValueListNode,
+} from './query-nodes'
+export type { SemanticQueryExprNode, TQueryOperator, TQueryLogicalOperator } from './query-nodes'
+
+export function isQueryLogical(node?: SemanticNode): node is import('./query-nodes').SemanticQueryLogicalNode {
+  return (node as import('./query-nodes').SemanticQueryLogicalNode)?.operands !== undefined
+}
+
+export function isQueryComparison(node?: SemanticNode): node is import('./query-nodes').SemanticQueryComparisonNode {
+  return (node as import('./query-nodes').SemanticQueryComparisonNode)?.left !== undefined
+}

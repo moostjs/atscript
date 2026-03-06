@@ -16,6 +16,7 @@ import { Token } from '../token'
 import type { TExpect, TTarget } from '../types'
 import type { TPipe } from './core.pipe'
 import { runPipes, runPipesOnce } from './core.pipe'
+import { parseQueryExpression } from './query.pipe'
 
 export function refWithChain() {
   const s = {
@@ -113,6 +114,7 @@ export function annotations() {
       { node: ['number', 'text'] },
       { node: 'identifier', text: ['true', 'false', 'undefined', 'null'] },
       { node: 'identifier' },
+      { node: 'query' },
     ] as TExpect[],
     dot: { node: 'punctuation', text: '.' } as TExpect,
     ident: { node: 'identifier' } as TExpect,
@@ -152,6 +154,13 @@ export function annotations() {
             }
             if (chainText !== argToken.text) {
               argToken = argToken.clone({ text: chainText })
+            }
+          }
+          // Parse query expression from backtick token children
+          if (argToken.type === 'query') {
+            const queryNode = parseQueryExpression(argToken.children, ni.messages, argToken)
+            if (queryNode) {
+              argToken.queryNode = queryNode
             }
           }
           addArgument(argToken)

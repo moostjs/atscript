@@ -18,7 +18,7 @@ import type { TLexicalToken } from '../tokenizer/types'
 export interface TAnnotationArgument {
   optional?: boolean
   name: string
-  type: 'string' | 'number' | 'boolean' | 'ref'
+  type: 'string' | 'number' | 'boolean' | 'ref' | 'query'
   description?: string
   values?: string[]
 }
@@ -56,7 +56,7 @@ export class AnnotationSpec {
       .map((arg, index) => {
         const placeholderIndex = index + 1 // Snippet placeholders are 1-based
         const defaultValue = this.getDefaultValueForType(arg.name, arg.type)
-        const quote = arg.type === 'string' ? `'` : ''
+        const quote = arg.type === 'string' ? `'` : arg.type === 'query' ? '`' : ''
         return `${quote}\${${placeholderIndex}:${defaultValue}}${quote}`
       })
       .join(', ')
@@ -83,6 +83,9 @@ export class AnnotationSpec {
       }
       case 'ref': {
         return tokenType === 'identifier' ? undefined : 'type reference expected.'
+      }
+      case 'query': {
+        return tokenType === 'query' ? undefined : 'query expression expected (use backticks).'
       }
       default: {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -259,6 +262,9 @@ export class AnnotationSpec {
       }
       case 'ref': {
         return 'TypeName'
+      }
+      case 'query': {
+        return 'field eq value'
       }
       default: {
         return ''

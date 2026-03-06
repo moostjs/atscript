@@ -24,6 +24,7 @@ export type TNodeEntity =
   | 'import'
   | 'primitive'
   | 'annotate'
+  | 'query'
 
 export interface TAnnotationTokens {
   name: string

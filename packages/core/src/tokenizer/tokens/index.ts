@@ -8,6 +8,7 @@ import { commentNodes } from './comment.token'
 import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
+import { QueryToken } from './query.token'
 import { RegExpToken } from './regexp.token'
 import { TextToken } from './text.node'
 
@@ -22,6 +23,7 @@ export const tokens = {
   number: NumberToken,
   text: TextToken,
   regexp: RegExpToken,
+  query: QueryToken,
   root: undefined as unknown as Node<TLexicalToken>,
 }
 
@@ -32,6 +34,7 @@ export const root = new Node<TLexicalToken>({
   recognizes: [
     ...commentNodes.all,
     BlockToken,
+    QueryToken,
     AIdentifierToken,
     IdentifierToken,
     TextToken,
@@ -46,7 +49,17 @@ BlockToken.recognize(
   RegExpToken,
   ...commentNodes.all,
   BlockToken,
+  QueryToken,
   AIdentifierToken,
+  IdentifierToken,
+  TextToken,
+  NumberToken,
+  PunctuationToken,
+)
+
+QueryToken.recognize(
+  RegExpToken,
+  BlockToken,
   IdentifierToken,
   TextToken,
   NumberToken,

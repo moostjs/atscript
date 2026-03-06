@@ -93,4 +93,9 @@ export class Token {
    * Block type
    */
   public blockType?: 'structure' | 'type' | 'import' | 'annotate'
+
+  /**
+   * Parsed query expression tree (for query-type annotation arguments)
+   */
+  public queryNode?: import('./nodes/query-nodes').SemanticQueryNode
 }
