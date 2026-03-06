@@ -10,3 +10,12 @@ export * from './plugin'
 export * from './build'
 export * from './flatten'
 export { findFKFieldsPointingTo, validateRefArgument, type TFKFieldMatch } from './defaults/db-utils'
+export {
+  getQueryScope,
+  resolveQueryFieldRef,
+  getQueryCompletionScope,
+  getFieldsForType,
+  analyzeQueryCursorContext,
+  type TQueryScope,
+  type TQueryCursorContext,
+} from './defaults/db-query-lsp'

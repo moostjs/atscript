@@ -28,7 +28,22 @@ export class SemanticQueryNode extends SemanticNode {
   }
 
   override registerAtDocument(doc: AtscriptDoc): void {
+    this.propagateQueryArgToken(this.expression)
     this.expression.registerAtDocument(doc)
+  }
+
+  private propagateQueryArgToken(expr: SemanticQueryExprNode): void {
+    if ('left' in expr) {
+      (expr as SemanticQueryComparisonNode).left.queryArgToken = this.sourceToken
+      const right = (expr as SemanticQueryComparisonNode).right
+      if (right && 'fieldRef' in right) {
+        (right as SemanticQueryFieldRefNode).queryArgToken = this.sourceToken
+      }
+    } else if ('operands' in expr) {
+      for (const operand of (expr as SemanticQueryLogicalNode).operands) {
+        this.propagateQueryArgToken(operand)
+      }
+    }
   }
 }
 
@@ -65,6 +80,7 @@ export class SemanticQueryComparisonNode extends SemanticNode {
 export class SemanticQueryFieldRefNode extends SemanticNode {
   typeRef?: Token
   fieldRef!: Token
+  queryArgToken?: Token
 
   constructor() {
     super('query-field-ref' as 'query')
@@ -73,10 +89,13 @@ export class SemanticQueryFieldRefNode extends SemanticNode {
   override registerAtDocument(doc: AtscriptDoc): void {
     if (this.typeRef) {
       this.typeRef.isReference = true
+      this.typeRef.parentNode = this
       doc.referred.push(this.typeRef)
       doc.tokensIndex.add(this.typeRef)
     }
+    this.fieldRef.parentNode = this
     doc.tokensIndex.add(this.fieldRef)
+    doc.queryFieldRefs.push(this)
   }
 }
 

@@ -20,14 +20,19 @@ import {
   isPhantomNode,
   isPrimitive,
   isProp,
+  isQueryFieldRef,
   isRef,
   isStructure,
   DEFAULT_FORMAT,
   PluginManager,
   resolveAtscriptFromPath,
   resolveConfigFile,
+  getQueryScope,
+  resolveQueryFieldRef,
+  getQueryCompletionScope,
+  analyzeQueryCursorContext,
 } from '@atscript/core'
-import type { TextDocument } from 'vscode-languageserver-textdocument'
+import { TextDocument } from 'vscode-languageserver-textdocument'
 import type {
   CompletionItem,
   createConnection,
@@ -114,6 +119,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
+
       const atscript = await this.openDocument(params.textDocument.uri)
       return atscript.getToDefinitionAt(params.position.line, params.position.character)
     })
@@ -122,11 +128,25 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
-      const atscript = await this.openDocument(params.textDocument.uri)
-      return atscript.getUsageListAt(params.position.line, params.position.character)?.map(r => ({
-        uri: r.uri,
-        range: r.range,
-      }))
+
+      const [atscript] = await Promise.all([this.openDocument(params.textDocument.uri), this.currentCheck])
+      const refs = atscript.getUsageListAt(params.position.line, params.position.character)
+      if (!refs) { return undefined }
+      const results = refs.map(r => ({ uri: r.uri, range: r.range }))
+      if (params.context.includeDeclaration) {
+        const defLocations = atscript.getToDefinitionAt(params.position.line, params.position.character)
+        if (defLocations) {
+          for (const loc of defLocations) {
+            results.push({ uri: loc.targetUri, range: loc.targetSelectionRange })
+          }
+        } else {
+          const token = atscript.tokensIndex.at(params.position.line, params.position.character)
+          if (token && (token.isDefinition || isProp(token.parentNode))) {
+            results.push({ uri: atscript.id, range: token.range })
+          }
+        }
+      }
+      return results
     })
 
     connection.onRenameRequest(async params => {
@@ -141,22 +161,29 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!token) {
         return null // No token found at the cursor
       }
-      const references = atscript.usageListFor(token)
+      const references: Array<{ uri: string; range: Token['range']; token: Token }> =
+        atscript.usageListFor(token) ?? []
 
-      if (!references || references.length === 0) {
-        return null // No references found
-      }
-
-      const def = token.isDefinition
-        ? { uri: atscript.id, token }
-        : atscript.getDefinitionFor(token)
-
-      if (def?.token) {
+      // Add the definition token to the rename set
+      const defLocations = atscript.getToDefinitionAt(position.line, position.character)
+      if (defLocations) {
+        for (const loc of defLocations) {
+          references.push({
+            uri: loc.targetUri,
+            range: loc.targetSelectionRange,
+            token,
+          })
+        }
+      } else if (token.isDefinition || isProp(token.parentNode)) {
         references.push({
-          uri: def.uri,
-          range: def.token.range,
+          uri: atscript.id,
+          range: token.range,
           token,
         })
+      }
+
+      if (references.length === 0) {
+        return null
       }
 
       // Build a response with edits for each reference
@@ -173,6 +200,18 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         })
       })
 
+      // Apply edits to our internal documents immediately so diagnostics update
+      // without waiting for didChange notifications (which may not fire for WorkspaceEdit)
+      for (const uri of Object.keys(changes)) {
+        const textDoc = this.documents.get(uri)
+        if (textDoc) {
+          const newText = TextDocument.applyEdits(textDoc, changes[uri]!)
+          const doc = await this.openDocument(uri)
+          doc.update(newText)
+          await this.checkDoc(doc, true)
+        }
+      }
+
       return { changes }
     })
 
@@ -182,6 +221,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
+
       const { textDocument, position, context } = params
       const document = documents.get(textDocument.uri)
       if (!document) {
@@ -274,6 +314,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
               kind: CompletionItemKind.Value,
             },
           ]
+        }
+        if (arg?.type === 'query') {
+          return this.getQueryCompletions(document, position, atscript, aContext!)
         }
       }
 
@@ -420,6 +463,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!params.textDocument.uri.endsWith('.as')) {
         return
       }
+
       const { textDocument, position } = params
       const document = documents.get(textDocument.uri)
       if (!document) {
@@ -429,6 +473,37 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const token = atscript.tokensIndex.at(position.line, position.character)
       if (!token) {
         return
+      }
+      // Query field ref hover (inside backtick expressions)
+      if (isQueryFieldRef(token.parentNode)) {
+        const fieldRefNode = token.parentNode
+        const queryArgToken = fieldRefNode.queryArgToken
+        if (queryArgToken) {
+          const scope = getQueryScope(queryArgToken, atscript)
+          if (scope) {
+            if (token === fieldRefNode.typeRef) {
+              const unwound = atscript.unwindType(token.text)
+              const docs = unwound?.def?.documentation || unwound?.node?.documentation
+              if (docs) {
+                return {
+                  contents: { kind: 'markdown', value: docs },
+                  range: token.range,
+                } as Hover
+              }
+            }
+            if (token === fieldRefNode.fieldRef) {
+              const resolved = resolveQueryFieldRef(fieldRefNode, atscript, scope)
+              if (resolved?.prop) {
+                const typeName = fieldRefNode.typeRef?.text || scope.unqualifiedTarget || ''
+                const doc = resolved.prop.documentation || `Property of \`${typeName}\``
+                return {
+                  contents: { kind: 'markdown', value: doc },
+                  range: token.range,
+                } as Hover
+              }
+            }
+          }
+        }
       }
       if (isRef(token.parentNode)) {
         const unwound = atscript.unwindType(token.parentNode.id!, token.parentNode.chain)
@@ -631,6 +706,22 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         }
       }
     }
+    // If cursor is inside a query arg (backtick expression), the tokensIndex returns
+    // an inner query token instead of the backtick arg token. Find the actual query arg.
+    if (currentAnnotation) {
+      for (const arg of currentAnnotation.args) {
+        if (
+          arg.queryNode &&
+          arg.range.start.line <= position.line &&
+          arg.range.end.line >= position.line &&
+          (arg.range.start.line < position.line || arg.range.start.character <= position.character) &&
+          (arg.range.end.line > position.line || arg.range.end.character >= position.character)
+        ) {
+          argToken = arg
+          break
+        }
+      }
+    }
     const annotationSpec = atscript.resolveAnnotation(annotationToken.text.slice(1))
     return {
       atscript,
@@ -777,6 +868,116 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         newText: isDirectory ? `${path}/` : path,
       },
     })) as CompletionItem[]
+  }
+
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
+  getQueryCompletions(
+    document: TextDocument,
+    position: Position,
+    atscript: AtscriptDoc,
+    aContext: { annotationToken: Token; argToken?: Token; currentIndex: number; annotationSpec?: { arguments: { type: string }[] } },
+  ): CompletionItem[] | undefined {
+    try {
+      const text = document.getText()
+      const offset = document.offsetAt(position)
+
+      // Find the backtick token containing cursor
+      const queryArgToken = aContext.argToken
+      if (!queryArgToken) { return undefined }
+
+      const scope = getQueryCompletionScope(queryArgToken, atscript)
+      if (!scope) { return undefined }
+
+      // Extract text inside backticks up to cursor
+      const textBefore = text.slice(0, offset)
+      const backtickPos = textBefore.lastIndexOf('`')
+      if (backtickPos < 0) { return undefined }
+      const textInQuery = textBefore.slice(backtickPos + 1)
+
+      const context = analyzeQueryCursorContext(textInQuery)
+
+      switch (context.type) {
+        case 'field-start': {
+          const items: CompletionItem[] = []
+          for (const typeName of scope.typeNames) {
+            items.push({
+              label: typeName,
+              kind: CompletionItemKind.Class,
+              detail: 'Type reference',
+              insertText: `${typeName}.`,
+              command: { command: 'editor.action.triggerSuggest', title: 'Trigger Suggest' },
+            })
+          }
+          if (scope.unqualifiedTarget) {
+            for (const prop of scope.getFields(scope.unqualifiedTarget)) {
+              items.push({
+                label: prop.id!,
+                kind: CompletionItemKind.Property,
+                detail: `field of ${scope.unqualifiedTarget}`,
+                documentation: prop.documentation
+                  ? { kind: 'markdown', value: prop.documentation } as MarkupContent
+                  : undefined,
+              })
+            }
+          }
+          return items
+        }
+        case 'after-dot': {
+          const typeName = context.typeName
+          if (typeName && scope.typeNames.includes(typeName)) {
+            return scope.getFields(typeName).map(prop => ({
+              label: prop.id!,
+              kind: CompletionItemKind.Property,
+              detail: `field of ${typeName}`,
+              documentation: prop.documentation
+                ? { kind: 'markdown', value: prop.documentation } as MarkupContent
+                : undefined,
+            }))
+          }
+          return undefined
+        }
+        case 'after-field': {
+          return [
+            { label: '=', kind: CompletionItemKind.Operator },
+            { label: '!=', kind: CompletionItemKind.Operator },
+            { label: '>', kind: CompletionItemKind.Operator },
+            { label: '>=', kind: CompletionItemKind.Operator },
+            { label: '<', kind: CompletionItemKind.Operator },
+            { label: '<=', kind: CompletionItemKind.Operator },
+            { label: 'in', kind: CompletionItemKind.Keyword },
+            { label: 'not in', kind: CompletionItemKind.Keyword },
+            { label: 'matches', kind: CompletionItemKind.Keyword },
+            { label: 'exists', kind: CompletionItemKind.Keyword },
+            { label: 'not exists', kind: CompletionItemKind.Keyword },
+          ]
+        }
+        case 'after-operator': {
+          const items: CompletionItem[] = [
+            { label: 'true', kind: CompletionItemKind.Value },
+            { label: 'false', kind: CompletionItemKind.Value },
+            { label: 'null', kind: CompletionItemKind.Value },
+          ]
+          for (const typeName of scope.typeNames) {
+            items.push({
+              label: typeName,
+              kind: CompletionItemKind.Class,
+              insertText: `${typeName}.`,
+              command: { command: 'editor.action.triggerSuggest', title: 'Trigger Suggest' },
+            })
+          }
+          return items
+        }
+        case 'after-comparison': {
+          return [
+            { label: 'and', kind: CompletionItemKind.Keyword },
+            { label: 'or', kind: CompletionItemKind.Keyword },
+          ]
+        }
+      }
+    } catch (error) {
+      console.error('getQueryCompletions error:', error)
+      return undefined
+    }
   }
 
   triggerChecks() {

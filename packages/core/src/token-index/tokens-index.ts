@@ -39,10 +39,23 @@ export class TokensIndex implements ITokensIndex {
     if (!tokens) {
       return undefined
     }
-    // Find a token that contains the character position
-    return Array.from(tokens).find(
-      t => t.range.start.character <= character && t.range.end.character >= character
-    )
+    // Find the most specific token containing the character position.
+    // Prefer latest start (inner tokens start after their parents),
+    // then narrowest range as tiebreaker.
+    let best: Token | undefined
+    for (const t of tokens) {
+      if (t.range.start.character <= character && t.range.end.character >= character) {
+        if (
+          !best ||
+          t.range.start.character > best.range.start.character ||
+          (t.range.start.character === best.range.start.character &&
+            t.range.end.character < best.range.end.character)
+        ) {
+          best = t
+        }
+      }
+    }
+    return best
   }
 
   /**

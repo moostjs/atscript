@@ -27,7 +27,7 @@ connection.onInitialize(
       // enable completion
       completionProvider: {
         resolveProvider: true,
-        triggerCharacters: ['@', '.', ',', '{', "'", '"'],
+        triggerCharacters: ['@', '.', ',', '{', "'", '"', '`'],
       },
       signatureHelpProvider: {
         triggerCharacters: [',', ' '],

@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { resolveAnnotation } from './annotations'
+import { getQueryScope, resolveQueryFieldRef } from './defaults/db-query-lsp'
 import type { TAnnotationsTree } from './config'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
@@ -22,6 +23,7 @@ import {
   isInterface,
   isPrimitive,
   isProp,
+  isQueryFieldRef,
   isRef,
   isStructure,
   isType,
@@ -109,6 +111,11 @@ export class AtscriptDoc {
   public referred = [] as Token[]
 
   /**
+   * List of query field ref nodes (for find-references support)
+   */
+  public queryFieldRefs = [] as import('./parser/nodes/query-nodes').SemanticQueryFieldRefNode[]
+
+  /**
    * Map of dependencies (documents) by URI
    */
   public readonly dependenciesMap = new Map<string, AtscriptDoc>()
@@ -170,6 +177,7 @@ export class AtscriptDoc {
     this.importedDefs.clear()
     this.messages = []
     this.referred = []
+    this.queryFieldRefs = []
     this.imports.clear()
     this._allMessages = undefined
     this.tokensIndex = new TokensIndex()
@@ -534,6 +542,16 @@ export class AtscriptDoc {
             }
           }
         }
+        // Query field refs: e.g., `status = 'active'` in @db.view.filter
+        for (const qfr of doc.queryFieldRefs) {
+          if (!qfr.queryArgToken || qfr.fieldRef.text !== propName) { continue }
+          const scope = getQueryScope(qfr.queryArgToken, doc)
+          if (!scope) { continue }
+          const resolvedTypeName = qfr.typeRef?.text ?? scope.unqualifiedTarget
+          if (resolvedTypeName === parentName) {
+            refs.push({ uri, range: qfr.fieldRef.range, token: qfr.fieldRef })
+          }
+        }
       }
 
       searchDoc(this, this.id)
@@ -551,7 +569,25 @@ export class AtscriptDoc {
       }
 
       return refs
-    } else {
+    }
+    if (isQueryFieldRef(token.parentNode) && token === token.parentNode.fieldRef) {
+      const fieldRefNode = token.parentNode
+      const queryArgToken = fieldRefNode.queryArgToken
+      if (queryArgToken) {
+        const scope = getQueryScope(queryArgToken, this)
+        if (scope) {
+          const resolved = resolveQueryFieldRef(fieldRefNode, this, scope)
+          if (resolved?.prop) {
+            const propToken = resolved.prop.token('identifier')
+            if (propToken) {
+              return resolved.doc.usageListFor(propToken)
+            }
+          }
+        }
+      }
+      return undefined
+    }
+    {
       const defForToken = this.getDefinitionFor(token)
       if (defForToken?.token?.isDefinition && defForToken.doc) {
         return defForToken.doc.usageListFor(defForToken.token)
@@ -643,6 +679,42 @@ export class AtscriptDoc {
               originSelectionRange: token.range,
             },
           ]
+        }
+        return undefined
+      }
+      // Query field ref tokens (inside backtick expressions)
+      if (isQueryFieldRef(token.parentNode)) {
+        const fieldRefNode = token.parentNode
+        const queryArgToken = fieldRefNode.queryArgToken
+        if (queryArgToken) {
+          const scope = getQueryScope(queryArgToken, this)
+          if (scope) {
+            if (token === fieldRefNode.typeRef) {
+              // Type ref — use existing definition resolution
+              const result = this.getDefinitionFor(token)
+              return result
+                ? [{
+                    targetUri: result.uri,
+                    targetRange: result.token?.range ?? zeroRange,
+                    targetSelectionRange: result.token?.range ?? zeroRange,
+                    originSelectionRange: token.range,
+                  }]
+                : undefined
+            }
+            if (token === fieldRefNode.fieldRef) {
+              // Field ref — resolve to property definition
+              const resolved = resolveQueryFieldRef(fieldRefNode, this, scope)
+              if (resolved?.prop) {
+                const propToken = resolved.prop.token('identifier')
+                return [{
+                  targetUri: resolved.targetUri,
+                  targetRange: propToken?.range ?? zeroRange,
+                  targetSelectionRange: propToken?.range ?? zeroRange,
+                  originSelectionRange: token.range,
+                }]
+              }
+            }
+          }
         }
         return undefined
       }

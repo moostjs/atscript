@@ -211,8 +211,86 @@
             {
               "name": "constant.language.boolean.atscript",
               "match": "\\b(?:true|false|undefined|null)\\b"
-            }
+            },
+            { "include": "#query-expression" }
           ]
+        }
+      ]
+    },
+
+    "query-expression": {
+      "name": "meta.query-expression.atscript",
+      "begin": "`",
+      "end": "`",
+      "beginCaptures": { "0": { "name": "punctuation.definition.query.begin.atscript" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.query.end.atscript" } },
+      "patterns": [
+        {
+          "comment": "Logical keywords: and, or, not",
+          "name": "keyword.operator.logical.atscript",
+          "match": "\\b(?:and|or|not)\\b"
+        },
+        {
+          "comment": "Keyword operators: in, matches, exists",
+          "name": "keyword.operator.query.atscript",
+          "match": "\\b(?:in|matches|exists)\\b"
+        },
+        {
+          "comment": "Symbolic operators: =, !=, >=, <=, >, <",
+          "name": "keyword.operator.comparison.atscript",
+          "match": "!=|>=|<=|[=><]"
+        },
+        {
+          "comment": "Boolean and null constants",
+          "name": "constant.language.atscript",
+          "match": "\\b(?:true|false|null|undefined)\\b"
+        },
+        {
+          "comment": "Numeric constants",
+          "name": "constant.numeric.atscript",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        },
+        {
+          "comment": "Single-quoted string constants",
+          "name": "string.quoted.single.atscript",
+          "begin": "'",
+          "end": "(?:'|(?=`))",
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.atscript" }
+          ]
+        },
+        {
+          "comment": "Double-quoted string constants",
+          "name": "string.quoted.double.atscript",
+          "begin": "\"",
+          "end": "(?:\"|(?=`))",
+          "patterns": [
+            { "match": "\\\\.", "name": "constant.character.escape.atscript" }
+          ]
+        },
+        {
+          "comment": "Qualified field ref: TypeName.fieldName",
+          "match": "\\b([A-Z][A-Za-z0-9_]*)\\s*(\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.atscript" },
+            "2": { "name": "punctuation.accessor.dot.atscript" },
+            "3": { "name": "variable.object.property.atscript" }
+          }
+        },
+        {
+          "comment": "Unqualified field ref (identifiers not matched by keywords above)",
+          "name": "variable.object.property.atscript",
+          "match": "\\b[a-z_][A-Za-z0-9_]*\\b"
+        },
+        {
+          "comment": "Parentheses for grouping",
+          "name": "punctuation.section.parens.atscript",
+          "match": "[()]"
+        },
+        {
+          "comment": "Comma separator",
+          "name": "punctuation.separator.comma.atscript",
+          "match": ","
         }
       ]
     },

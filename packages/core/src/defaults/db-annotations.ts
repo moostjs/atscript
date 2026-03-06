@@ -1175,7 +1175,7 @@ export const dbAnnotations: TAnnotationsTree = {
         // VJ1/VJ2: Validate query scope — only join target and entry table allowed
         if (args[1]?.queryNode && args[0]) {
           const joinTargetName = args[0].text
-          errors.push(...validateQueryScope(args[1], [joinTargetName, entryTypeName], null, doc))
+          errors.push(...validateQueryScope(args[1], [joinTargetName, entryTypeName], entryTypeName, doc))
         }
 
         return errors

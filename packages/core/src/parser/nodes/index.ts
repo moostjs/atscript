@@ -107,3 +107,7 @@ export function isQueryLogical(node?: SemanticNode): node is import('./query-nod
 export function isQueryComparison(node?: SemanticNode): node is import('./query-nodes').SemanticQueryComparisonNode {
   return (node as import('./query-nodes').SemanticQueryComparisonNode)?.left !== undefined
 }
+
+export function isQueryFieldRef(node?: SemanticNode): node is import('./query-nodes').SemanticQueryFieldRefNode {
+  return (node as import('./query-nodes').SemanticQueryFieldRefNode)?.fieldRef !== undefined
+}
