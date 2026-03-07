@@ -136,7 +136,7 @@ export class PluginManager {
       cb(prefix, annotations.$self)
     }
     for (const [key, value] of Object.entries(annotations)) {
-      if (key === '$self') continue
+      if (key === '$self') { continue }
       if (isAnnotationSpec(value)) {
         cb(prefix ? `${prefix}.${key}` : key, value)
       } else {

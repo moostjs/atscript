@@ -225,6 +225,9 @@ export class AtscriptDbReadable<
   /** Sync method from `@db.sync.method` ('drop' | 'recreate' | undefined). */
   protected readonly _syncMethod: 'drop' | 'recreate' | undefined
 
+  /** Previous table/view name from `@db.table.renamed` or `@db.view.renamed`. */
+  public readonly renamedFrom: string | undefined
+
   // ── Lazy-computed field analysis ──────────────────────────────────────────
 
   protected _flatMap?: Map<string, TAtscriptAnnotatedType>
@@ -290,6 +293,8 @@ export class AtscriptDbReadable<
 
     this.schema = _type.metadata.get('db.schema') as string | undefined
     this._syncMethod = _type.metadata.get('db.sync.method') as 'drop' | 'recreate' | undefined
+    this.renamedFrom = (_type.metadata.get('db.table.renamed') as string | undefined)
+      ?? (_type.metadata.get('db.view.renamed') as string | undefined)
 
     this._nestedObjects = adapter.supportsNestedObjects()
 
@@ -371,7 +376,7 @@ export class AtscriptDbReadable<
     return lastDot >= 0 ? `${path.slice(0, lastDot).replace(/\./g, '__')}__` : ''
   }
 
-  /** Logical → physical column name mapping from `@db.column.name`. */
+  /** Logical → physical column name mapping from `@db.column`. */
   public get columnMap(): ReadonlyMap<string, string> {
     this._flatten()
     return this._columnMap
@@ -486,7 +491,7 @@ export class AtscriptDbReadable<
           ? (this._columnMap.get(path) ?? path)
           : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
 
-        // Compute renamedFrom (old physical name from @db.column.from)
+        // Compute renamedFrom (old physical name from @db.column.renamed)
         const fromLocal = this._columnFromMap.get(path)
         let renamedFrom: string | undefined
         if (fromLocal) {
@@ -732,14 +737,14 @@ export class AtscriptDbReadable<
       this._primaryKeys.push(fieldName)
     }
 
-    // @db.column.name → column mapping
-    const column = metadata.get('db.column.name') as string | undefined
+    // @db.column → column mapping
+    const column = metadata.get('db.column') as string | undefined
     if (column) {
       this._columnMap.set(fieldName, column)
     }
 
-    // @db.column.from → rename mapping
-    const columnFrom = metadata.get('db.column.from') as string | undefined
+    // @db.column.renamed → rename mapping
+    const columnFrom = metadata.get('db.column.renamed') as string | undefined
     if (columnFrom) {
       this._columnFromMap.set(fieldName, columnFrom)
     }
@@ -958,12 +963,12 @@ export class AtscriptDbReadable<
       }
     }
 
-    // J4: @db.column.name on a flattened parent is invalid
+    // J4: @db.column on a flattened parent is invalid
     for (const parentPath of this._flattenedParents) {
       if (this._columnMap.has(parentPath)) {
         throw new Error(
-          `@db.column.name cannot rename a flattened object field "${parentPath}" — ` +
-          `apply @db.column.name to individual nested fields, or use @db.json to store as a single column`
+          `@db.column cannot rename a flattened object field "${parentPath}" — ` +
+          `apply @db.column to individual nested fields, or use @db.json to store as a single column`
         )
       }
     }

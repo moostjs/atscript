@@ -182,4 +182,59 @@ export declare class LegacyReportView {
     "total": number
   }
 }
+
+/**
+ * Atscript interface **RenamedTable**
+ * @see {@link ./test-table.as:82:18}
+ */
+export declare class RenamedTable {
+  id: number
+  name: string
+  email: string
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof RenamedTable, RenamedTable>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof RenamedTable>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "name": string
+    "email": string
+  }
+  static __ownProps: {
+    "id": number
+    "name": string
+    "email": string
+  }
+  
+  static __pk: number
+}
+
+/**
+ * Atscript interface **RenamedView**
+ * @see {@link ./test-table.as:93:18}
+ */
+export declare class RenamedView {
+  id: number /* id */
+  name: string /* name */
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof RenamedView, RenamedView>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof RenamedView>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number /* id */
+    "name": string /* name */
+  }
+  static __ownProps: {
+    "id": number /* id */
+    "name": string /* name */
+  }
+}
 // prettier-ignore-end

@@ -525,4 +525,18 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters implement this.
    */
   dropViewByName?(viewName: string): Promise<void>
+
+  /**
+   * Renames a table/collection from `oldName` to the adapter's current table name.
+   * Used by schema sync when `@db.table.renamed` is present.
+   * Optional — only relational adapters implement this.
+   */
+  renameTable?(oldName: string): Promise<void>
+
+  /**
+   * Introspects columns for an arbitrary table name (not the adapter's own table).
+   * Used by schema sync `plan()` to inspect a table under its old name before rename.
+   * Optional — only relational adapters implement this.
+   */
+  getExistingColumnsForTable?(tableName: string): Promise<TExistingColumn[]>
 }

@@ -202,36 +202,68 @@ export const dbAnnotations: TAnnotationsTree = {
     }),
   },
 
-  table: new AnnotationSpec({
-    description:
-      'Marks an interface as a database-persisted entity (table in SQL, collection in MongoDB). ' +
-      'If the name argument is omitted, the adapter derives the table name from the interface name.' +
-      '\n\n**Example:**\n' +
-      '```atscript\n' +
-      '@db.table "users"\n' +
-      'export interface User { ... }\n' +
-      '```\n',
-    nodeType: ['interface'],
-    argument: {
-      optional: true,
-      name: 'name',
-      type: 'string',
-      description: 'Table/collection name. If omitted, derived from interface name.',
-    },
-    validate(token, _args, _doc) {
-      const errors = [] as TMessages
-      const owner = token.parentNode!
-      // VW6: Cannot be both @db.table and @db.view
-      if (hasAnyViewAnnotation(owner)) {
-        errors.push({
-          message: 'An interface cannot be both a @db.table and a @db.view',
-          severity: 1,
-          range: token.range,
-        })
-      }
-      return errors
-    },
-  }),
+  table: {
+    $self: new AnnotationSpec({
+      description:
+        'Marks an interface as a database-persisted entity (table in SQL, collection in MongoDB). ' +
+        'If the name argument is omitted, the adapter derives the table name from the interface name.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.table "users"\n' +
+        'export interface User { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        optional: true,
+        name: 'name',
+        type: 'string',
+        description: 'Table/collection name. If omitted, derived from interface name.',
+      },
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        // VW6: Cannot be both @db.table and @db.view
+        if (hasAnyViewAnnotation(owner)) {
+          errors.push({
+            message: 'An interface cannot be both a @db.table and a @db.view',
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+
+    renamed: new AnnotationSpec({
+      description:
+        'Specifies the previous table name for table rename migration. ' +
+        'The sync engine generates ALTER TABLE RENAME instead of drop+create.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.table "app_users"\n' +
+        '@db.table.renamed "users"\n' +
+        'export interface User { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'oldName',
+        type: 'string',
+        description: 'The previous table/collection name.',
+      },
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        if (owner.countAnnotations('db.table') === 0) {
+          errors.push({
+            message: '@db.table.renamed requires @db.table on the same interface',
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
+  },
 
   schema: new AnnotationSpec({
     description:
@@ -335,19 +367,19 @@ export const dbAnnotations: TAnnotationsTree = {
   },
 
   column: {
-    name: new AnnotationSpec({
+    $self: new AnnotationSpec({
       description:
         'Overrides the physical column name in the database. ' +
         'For nested (flattened) fields, the parent prefix is still prepended automatically.' +
         '\n\n**Example:**\n' +
         '```atscript\n' +
-        '@db.column.name "first_name"\n' +
+        '@db.column "first_name"\n' +
         'firstName: string\n' +
         '// → physical column: first_name\n' +
         '\n' +
         '// Nested:\n' +
         'address: {\n' +
-        '  @db.column.name "zip_code"\n' +
+        '  @db.column "zip_code"\n' +
         '  zip: string\n' +
         '}\n' +
         '// → physical column: address__zip_code\n' +
@@ -360,13 +392,13 @@ export const dbAnnotations: TAnnotationsTree = {
       },
     }),
 
-    from: new AnnotationSpec({
+    renamed: new AnnotationSpec({
       description:
         'Specifies the previous local field name for column rename migration. ' +
         'The sync engine generates ALTER TABLE RENAME COLUMN instead of drop+add.' +
         '\n\n**Example:**\n' +
         '```atscript\n' +
-        '@db.column.from "zip"\n' +
+        '@db.column.renamed "zip"\n' +
         'postalCode: string\n' +
         '// Renames address__zip → address__postalCode\n' +
         '```\n',
@@ -1322,6 +1354,37 @@ export const dbAnnotations: TAnnotationsTree = {
           })
         }
 
+        return errors
+      },
+    }),
+
+    renamed: new AnnotationSpec({
+      description:
+        'Specifies the previous view name for view rename migration. ' +
+        'The sync engine drops the old view and creates the new one.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.view "active_premium_users"\n' +
+        '@db.view.renamed "active_users"\n' +
+        '@db.view.for User\n' +
+        'export interface ActivePremiumUser { ... }\n' +
+        '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'oldName',
+        type: 'string',
+        description: 'The previous view name.',
+      },
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        if (!hasAnyViewAnnotation(owner)) {
+          errors.push({
+            message: '@db.view.renamed requires @db.view on the same interface',
+            severity: 1,
+            range: token.range,
+          })
+        }
         return errors
       },
     }),

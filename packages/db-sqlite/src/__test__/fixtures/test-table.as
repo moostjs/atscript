@@ -5,7 +5,7 @@ export interface UsersTable {
     id: number
 
     @db.index.unique 'email_idx'
-    @db.column.name 'email_address'
+    @db.column 'email_address'
     email: string
 
     @db.index.plain 'name_idx'

@@ -47,6 +47,7 @@ export interface TSyncEntryInit {
   columnsDropped?: string[]
   recreated?: boolean
   errors?: string[]
+  renamedFrom?: string
 }
 
 export class SyncEntry {
@@ -68,6 +69,7 @@ export class SyncEntry {
   readonly columnsDropped: string[]
   readonly recreated: boolean
   readonly errors: string[]
+  readonly renamedFrom?: string
 
   constructor(init: TSyncEntryInit) {
     this.name = init.name
@@ -83,6 +85,7 @@ export class SyncEntry {
     this.columnsDropped = init.columnsDropped ?? []
     this.recreated = init.recreated ?? false
     this.errors = init.errors ?? []
+    this.renamedFrom = init.renamedFrom
   }
 
   /** Whether this entry involves destructive operations */
@@ -151,8 +154,9 @@ export class SyncEntry {
     }
 
     if (this.status === 'alter') {
+      const renameInfo = this.renamedFrom ? ` ${c.yellow(`(renamed from ${this.renamedFrom})`)}` : ''
       return [
-        `  ${c.cyan(`~ ${vp}${label} — alter`)}`,
+        `  ${c.cyan(`~ ${vp}${label} — alter${renameInfo}`)}`,
         ...this.columnsToAdd.map(col =>
           `      ${c.green(`+ ${col.physicalName} (${col.designType}) — add`)}`
         ),
@@ -198,11 +202,12 @@ export class SyncEntry {
     const hasColumnChanges = this.columnsAdded.length > 0 ||
       this.columnsRenamed.length > 0 || this.columnsDropped.length > 0
 
-    if (hasColumnChanges || this.recreated) {
+    if (hasColumnChanges || this.recreated || this.renamedFrom) {
       const rlabel = this.recreated ? 'recreated' : 'altered'
+      const renameInfo = this.renamedFrom ? ` ${c.yellow(`(renamed from ${this.renamedFrom})`)}` : ''
       const color = this.recreated ? c.yellow : c.cyan
       return [
-        `  ${color(`~ ${vp}${label} — ${rlabel}`)}`,
+        `  ${color(`~ ${vp}${label} — ${rlabel}${renameInfo}`)}`,
         ...this.columnsAdded.map(col => `      ${c.green(`+ ${col} — added`)}`),
         ...this.columnsRenamed.map(col => `      ${c.yellow(`~ ${col} — renamed`)}`),
         ...this.columnsDropped.map(col => `      ${c.red(`- ${col} — dropped`)}`),
@@ -341,9 +346,13 @@ export class SchemaSync {
   private async detectRemoved(currentReadables: AtscriptDbReadable[], previous?: Array<{ name: string; isView: boolean; viewType?: 'V' | 'M' | 'E' }>): Promise<SyncEntry[]> {
     previous ??= await this.readTrackedList()
     const currentSet = new Set(currentReadables.map(t => t.tableName))
+    // Build set of old names that are being renamed (not dropped)
+    const renameFromSet = new Set(
+      currentReadables.map(r => r.renamedFrom).filter(Boolean)
+    )
     const removed: SyncEntry[] = []
     for (const entry of previous) {
-      if (!currentSet.has(entry.name)) {
+      if (!currentSet.has(entry.name) && !renameFromSet.has(entry.name)) {
         removed.push(new SyncEntry({
           name: entry.name,
           viewType: entry.viewType,
@@ -403,24 +412,28 @@ export class SchemaSync {
       }
 
       // Sync tables
-      const entries: SyncEntry[] = []
-      for (const readable of tables) {
-        entries.push(await this.syncTable(readable, safe))
-      }
-
-      // Sync managed views
       const allReadables = [...tables, ...views, ...externalViews]
       const previouslyTracked = await this.readTrackedList()
       const trackedNames = new Set(previouslyTracked.map(e => e.name))
+
+      const entries: SyncEntry[] = []
+      for (const readable of tables) {
+        entries.push(await this.syncTable(readable, safe, trackedNames))
+      }
+
+      // Sync managed views
       const removed = await this.detectRemoved(allReadables, previouslyTracked)
 
       for (const readable of views) {
+        const view = readable as AtscriptDbView
+        const renamedFrom = view.renamedFrom
+        const isRenamed = renamedFrom && trackedNames.has(renamedFrom)
+        // Drop old view if renamed (views don't support ALTER VIEW)
+        if (isRenamed) {
+          await this.space.dropViewByName(renamedFrom)
+        }
         await readable.dbAdapter.ensureTable()
-        entries.push(new SyncEntry({
-          name: readable.tableName,
-          status: trackedNames.has(readable.tableName) ? 'in-sync' : 'create',
-          viewType: (readable as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
-        }))
+        entries.push(this.buildViewEntry(view, trackedNames))
       }
 
       // Check external views
@@ -461,16 +474,14 @@ export class SchemaSync {
     await this.ensureControlTable()
 
     // Introspect tables
-    let planEntries = await Promise.all(tables.map(r => this.planTable(r)))
-
-    // Add managed views to plan
     const previouslyTracked = await this.readTrackedList()
     const trackedNames = new Set(previouslyTracked.map(e => e.name))
-    const viewEntries: SyncEntry[] = views.map(v => new SyncEntry({
-      name: v.tableName,
-      status: trackedNames.has(v.tableName) ? 'in-sync' : 'create',
-      viewType: (v as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
-    }))
+    let planEntries = await Promise.all(tables.map(r => this.planTable(r, trackedNames)))
+
+    // Add managed views to plan
+    const viewEntries: SyncEntry[] = views.map(v =>
+      this.buildViewEntry(v as AtscriptDbView, trackedNames)
+    )
 
     // Check external views
     const externalEntries = await Promise.all(externalViews.map(v => this.checkExternalView(v)))
@@ -501,7 +512,7 @@ export class SchemaSync {
     }
   }
 
-  private async planTable(readable: AtscriptDbReadable): Promise<SyncEntry> {
+  private async planTable(readable: AtscriptDbReadable, trackedNames: Set<string>): Promise<SyncEntry> {
     const adapter = readable.dbAdapter
     const name = readable.tableName
     const init: TSyncEntryInit = {
@@ -510,12 +521,23 @@ export class SchemaSync {
       syncMethod: readable.syncMethod,
     }
 
+    // Detect pending rename
+    const renamedFrom = readable.renamedFrom
+    const pendingRename = renamedFrom && trackedNames.has(renamedFrom)
+    if (pendingRename) {
+      init.renamedFrom = renamedFrom
+      init.status = 'alter'
+    }
+
     if (adapter.getExistingColumns) {
-      const existing = await adapter.getExistingColumns()
-      if (existing.length === 0) {
+      // If rename is pending, introspect the old-named table (DB still has old name)
+      const existing = pendingRename && adapter.getExistingColumnsForTable
+        ? await adapter.getExistingColumnsForTable(renamedFrom)
+        : await adapter.getExistingColumns()
+      if (existing.length === 0 && !pendingRename) {
         init.status = 'create'
         init.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
-      } else {
+      } else if (existing.length > 0) {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
         init.columnsToAdd = diff.added
         init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
@@ -538,9 +560,31 @@ export class SchemaSync {
     return new SyncEntry(init)
   }
 
+  // ── View entry builder ──────────────────────────────────────────────
+
+  private buildViewEntry(view: AtscriptDbView, trackedNames: Set<string>): SyncEntry {
+    const viewType = view.viewPlan.materialized ? 'M' as const : 'V' as const
+    const renamedFrom = view.renamedFrom
+    const isRenamed = renamedFrom && trackedNames.has(renamedFrom)
+    let status: TSyncEntryStatus
+    if (isRenamed) {
+      status = 'alter'
+    } else if (trackedNames.has(view.tableName)) {
+      status = 'in-sync'
+    } else {
+      status = 'create'
+    }
+    return new SyncEntry({
+      name: view.tableName,
+      status,
+      viewType,
+      renamedFrom: isRenamed ? renamedFrom : undefined,
+    })
+  }
+
   // ── Table sync ────────────────────────────────────────────────────────
 
-  private async syncTable(readable: AtscriptDbReadable, safe: boolean): Promise<SyncEntry> {
+  private async syncTable(readable: AtscriptDbReadable, safe: boolean, trackedNames: Set<string>): Promise<SyncEntry> {
     const adapter = readable.dbAdapter
     const name = readable.tableName
     const init: TSyncEntryInit = {
@@ -549,12 +593,19 @@ export class SchemaSync {
       syncMethod: readable.syncMethod,
     }
 
+    // Handle table rename first
+    if (readable.renamedFrom && trackedNames.has(readable.renamedFrom) && adapter.renameTable) {
+      await adapter.renameTable(readable.renamedFrom)
+      init.renamedFrom = readable.renamedFrom
+      init.status = 'alter'
+    }
+
     if (adapter.getExistingColumns && adapter.syncColumns) {
       const existing = await adapter.getExistingColumns()
-      if (existing.length === 0) {
+      if (existing.length === 0 && !init.renamedFrom) {
         await adapter.ensureTable()
         init.status = 'create'
-      } else {
+      } else if (existing.length > 0) {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
 
         // Handle type changes

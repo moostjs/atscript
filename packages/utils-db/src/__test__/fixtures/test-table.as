@@ -5,7 +5,7 @@ export interface UsersTable {
     id: number
 
     @db.index.unique 'email_idx'
-    @db.column.name 'email_address'
+    @db.column 'email_address'
     email: string
 
     @db.index.plain 'name_idx'
@@ -75,4 +75,22 @@ export interface ActiveUsersView {
 export interface LegacyReportView {
     id: number
     total: number
+}
+
+@db.table 'app_users'
+@db.table.renamed 'old_users'
+export interface RenamedTable {
+    @meta.id
+    id: number
+    name: string
+    email: string
+}
+
+@db.view 'premium_users'
+@db.view.renamed 'vip_users'
+@db.view.for UsersTable
+@db.view.filter `UsersTable.status = 'active'`
+export interface RenamedView {
+    id: UsersTable.id
+    name: UsersTable.name
 }

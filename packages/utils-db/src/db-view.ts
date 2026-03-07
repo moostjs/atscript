@@ -12,9 +12,7 @@ import type {
 
 import type { BaseDbAdapter } from './base-adapter'
 import { AtscriptDbReadable } from './db-readable'
-import type { TGenericLogger } from './logger'
 import type { TViewPlan, TViewJoin } from './query-tree'
-import type { TTableResolver } from './types'
 
 export interface TViewColumnMapping {
   viewColumn: string
@@ -45,15 +43,6 @@ export class AtscriptDbView<
   NavType extends Record<string, unknown> = NavPropsOf<T>,
 > extends AtscriptDbReadable<T, DataType, FlatType, A, IdType, OwnProps, NavType> {
   private _viewPlan?: TViewPlan
-
-  constructor(
-    _type: T,
-    adapter: A,
-    logger?: TGenericLogger,
-    _tableResolver?: TTableResolver
-  ) {
-    super(_type, adapter, logger, _tableResolver)
-  }
 
   override get isView(): boolean {
     return true

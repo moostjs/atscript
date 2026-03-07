@@ -251,16 +251,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async getExistingColumns(): Promise<TExistingColumn[]> {
-    const tableName = this.resolveTableName()
-    const rows = this.driver.all<{ name: string; type: string; notnull: number; pk: number }>(
-      `PRAGMA table_info("${esc(tableName)}")`
-    )
-    return rows.map(r => ({
-      name: r.name,
-      type: r.type,
-      notnull: r.notnull === 1,
-      pk: r.pk > 0,
-    }))
+    return this.getExistingColumnsForTable(this.resolveTableName())
   }
 
   async syncColumns(diff: TColumnDiff): Promise<TSyncColumnResult> {
@@ -350,6 +341,25 @@ export class SqliteAdapter extends BaseDbAdapter {
     const ddl = `DROP VIEW IF EXISTS "${esc(viewName)}"`
     this._log(ddl)
     this.driver.exec(ddl)
+  }
+
+  async renameTable(oldName: string): Promise<void> {
+    const newName = this.resolveTableName()
+    const ddl = `ALTER TABLE "${esc(oldName)}" RENAME TO "${esc(newName)}"`
+    this._log(ddl)
+    this.driver.exec(ddl)
+  }
+
+  async getExistingColumnsForTable(tableName: string): Promise<TExistingColumn[]> {
+    const rows = this.driver.all<{ name: string; type: string; notnull: number; pk: number }>(
+      `PRAGMA table_info("${esc(tableName)}")`
+    )
+    return rows.map(r => ({
+      name: r.name,
+      type: r.type,
+      notnull: r.notnull === 1,
+      pk: r.pk > 0,
+    }))
   }
 
   async syncIndexes(): Promise<void> {

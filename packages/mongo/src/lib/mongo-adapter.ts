@@ -313,7 +313,7 @@ export class MongoAdapter extends BaseDbAdapter {
     // @db.default.fn "increment" → track for auto-increment on insert
     const defaultFn = metadata.get('db.default.fn') as string | undefined
     if (defaultFn === 'increment') {
-      const physicalName = (metadata.get('db.column.name') as string | undefined) ?? field
+      const physicalName = (metadata.get('db.column') as string | undefined) ?? field
       this._incrementFields.add(physicalName)
     }
     // @db.index.fulltext → MongoDB text index (adapter-level, with weight)

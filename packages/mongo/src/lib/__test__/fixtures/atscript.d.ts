@@ -32,12 +32,13 @@ declare global {
     "emit.jsonSchema": boolean
     "db.patch.strategy": string
     "db.table": string | true
+    "db.table.renamed": string
     "db.schema": string
     "db.index.plain": ({ name?: string, sort?: string })[]
     "db.index.unique": (string | true)[]
     "db.index.fulltext": ({ name?: string, weight?: number })[]
-    "db.column.name": string
-    "db.column.from": string
+    "db.column": string
+    "db.column.renamed": string
     "db.default": string
     "db.default.fn": string
     "db.json": boolean
@@ -55,6 +56,7 @@ declare global {
     "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
     "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.materialized": boolean
+    "db.view.renamed": string
     "db.mongo.collection": boolean
     "db.mongo.capped": { size: number, max?: number }
     "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
