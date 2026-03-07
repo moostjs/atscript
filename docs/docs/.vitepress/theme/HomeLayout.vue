@@ -76,27 +76,6 @@ watch(() => route.path, setupScrollAnimations)
             <section class="section-features">
                 <div class="section-inner">
                     <div class="features-grid">
-                        <a href="/packages/typescript/why-atscript" class="feature-card">
-                            <div class="feature-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-3-3v6m-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
-                            </div>
-                            <h3 class="feature-title">One File, Zero Drift</h3>
-                            <p class="feature-desc">Types, validation, DB schema, and metadata live in a single <code>.as</code> file. Change it once — everything stays in sync.</p>
-                        </a>
-                        <a href="/db-integrations/quick-start" class="feature-card">
-                            <div class="feature-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/></svg>
-                            </div>
-                            <h3 class="feature-title">Schema to Database in Seconds</h3>
-                            <p class="feature-desc">Relations, foreign keys, indexes, views, cascades — all from annotations. Run <code>asc db sync</code> and your tables are ready.</p>
-                        </a>
-                        <a href="/packages/typescript/primitives" class="feature-card">
-                            <div class="feature-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>
-                            </div>
-                            <h3 class="feature-title">Types That Validate</h3>
-                            <p class="feature-desc">Semantic types like <code>string.email</code> carry runtime validation built in.</p>
-                        </a>
                         <a href="/packages/typescript/quick-start" class="feature-card">
                             <div class="feature-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
