@@ -64,6 +64,16 @@ explorations/     - Sandbox/playground for testing features
 
 Before reporting TypeScript errors or trying to fix type issues, always rebuild the project first (`pnpm build` or equivalent). Stale dist files and stale diagnostics have caused false error chasing in multiple sessions.
 
+### Test fixtures: use `.as` files, not `$()` builder
+
+When tests need Atscript types (annotated types with `@db.*`, `@meta.id`, etc.), always use `.as` fixture files compiled via `prepareFixtures()` from `test-utils.ts`. **Do not** hand-write `defineAnnotatedType` (`$()`) builder chains — the builder API is designed for generated code and has subtle behaviors (e.g. `$('object', Class)` resets the type, metadata propagation differs from compiled output, lazy flatten timing) that make hand-written types unreliable in tests.
+
+Pattern:
+1. Create `.as` files in `__test__/fixtures/` (e.g. `rel-task.as`)
+2. Call `await prepareFixtures()` in `beforeAll` — this compiles all `.as` files in the fixtures directory to `.as.js` + `.as.d.ts`
+3. Import compiled types: `const { Task } = await import('./fixtures/rel-task.as.js')`
+4. The `.as.js` files are committed (generated once, updated by `prepareFixtures()` when `.as` files change)
+
 ## Code Conventions
 
 - All packages export ESM (`.mjs`) + CJS (`.cjs`) + types (`.d.ts`)

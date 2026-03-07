@@ -710,6 +710,10 @@ export class MongoAdapter extends BaseDbAdapter {
 
   // ── Schema / Index sync ──────────────────────────────────────────────────
 
+  async tableExists(): Promise<boolean> {
+    return this.collectionExists()
+  }
+
   async ensureTable(): Promise<void> {
     return this.ensureCollectionExists()
   }

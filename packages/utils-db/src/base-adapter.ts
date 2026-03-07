@@ -8,7 +8,7 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './db-readable'
@@ -478,6 +478,13 @@ export abstract class BaseDbAdapter {
   async syncForeignKeys?(): Promise<void>
 
   /**
+   * Checks whether the table/collection already exists in the database.
+   * Used by schema sync to determine create vs in-sync status for
+   * adapters that don't implement column introspection (e.g. MongoDB).
+   */
+  tableExists?(): Promise<boolean>
+
+  /**
    * Returns existing columns from the database via introspection.
    * Used by schema sync for column diffing.
    * Optional — schema-less adapters (MongoDB) skip this.
@@ -539,4 +546,13 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters implement this.
    */
   getExistingColumnsForTable?(tableName: string): Promise<TExistingColumn[]>
+
+  /**
+   * Maps a field's metadata to the adapter's native column type string.
+   * Receives the full field descriptor (design type, annotations, PK status, etc.)
+   * so adapters can produce context-aware types (e.g., `VARCHAR(255)` from maxLength).
+   * Used by schema sync to detect column type changes.
+   * Optional — adapters that don't implement this skip type change detection.
+   */
+  typeMapper?(field: TDbFieldMeta): string
 }

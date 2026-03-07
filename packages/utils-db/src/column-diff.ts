@@ -5,13 +5,15 @@ import type { TDbFieldMeta, TExistingColumn, TColumnDiff } from './types'
  *
  * @param desired - Field descriptors from the Atscript type (after flattening).
  * @param existing - Columns currently in the database (from introspection).
- * @param typeMapper - Optional function to map Atscript design types to DB-native type strings
- *                     (e.g., `sqliteTypeFromDesignType`). Required for type change detection.
+ * @param typeMapper - Optional function to map field metadata to DB-native type strings.
+ *                     Receives the full field meta (design type, annotations, PK status, etc.)
+ *                     so adapters can produce context-aware types (e.g., `VARCHAR(255)` from maxLength).
+ *                     Required for type change detection.
  */
 export function computeColumnDiff(
   desired: readonly TDbFieldMeta[],
   existing: TExistingColumn[],
-  typeMapper?: (designType: string) => string
+  typeMapper?: (field: TDbFieldMeta) => string
 ): TColumnDiff {
   const existingByName = new Map(existing.map(c => [c.name, c]))
   const desiredByName = new Map<string, TDbFieldMeta>()
@@ -29,7 +31,7 @@ export function computeColumnDiff(
     if (existingCol) {
       // Column exists with current name — check type
       if (typeMapper) {
-        const expectedType = typeMapper(field.designType)
+        const expectedType = typeMapper(field)
         if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
           typeChanged.push({ field, existingType: existingCol.type })
         }

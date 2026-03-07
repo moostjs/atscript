@@ -538,7 +538,8 @@ export class SchemaSync {
         init.status = 'create'
         init.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
       } else if (existing.length > 0) {
-        const diff = computeColumnDiff(readable.fieldDescriptors, existing)
+        const typeMapper = adapter.typeMapper?.bind(adapter)
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
         init.columnsToAdd = diff.added
         init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
         init.typeChanges = diff.typeChanged.map(tc => ({
@@ -552,7 +553,19 @@ export class SchemaSync {
           diff.typeChanged.length > 0 ||
           diff.removed.length > 0
         if (hasChanges) { init.status = 'alter' }
+        // Type changes without a sync method → error (sync will fail)
+        if (diff.typeChanged.length > 0 && !readable.syncMethod) {
+          init.status = 'error'
+          init.errors = diff.typeChanged.map(tc =>
+            `Type change on ${name}.${tc.field.physicalName} ` +
+            `(${tc.existingType} → ${tc.field.designType}). ` +
+            `Add @db.sync.method "recreate" or "drop", or migrate manually.`
+          )
+        }
       }
+    } else if (adapter.tableExists) {
+      const exists = await adapter.tableExists()
+      if (!exists) { init.status = 'create' }
     } else {
       init.status = 'create'
     }
@@ -606,7 +619,8 @@ export class SchemaSync {
         await adapter.ensureTable()
         init.status = 'create'
       } else if (existing.length > 0) {
-        const diff = computeColumnDiff(readable.fieldDescriptors, existing)
+        const typeMapper = adapter.typeMapper?.bind(adapter)
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
 
         // Handle type changes
         if (diff.typeChanged.length > 0) {
@@ -632,11 +646,12 @@ export class SchemaSync {
               errors.push(msg)
             }
             init.errors = errors
+            init.status = 'error'
           }
         }
 
-        // Handle renames and adds (skip if table was recreated)
-        if (!init.recreated && (diff.added.length > 0 || diff.renamed.length > 0)) {
+        // Handle renames and adds (skip if table was recreated or errored)
+        if (!init.recreated && init.status !== 'error' && (diff.added.length > 0 || diff.renamed.length > 0)) {
           const syncResult = await adapter.syncColumns(diff)
           init.columnsAdded = syncResult.added
           init.columnsRenamed = syncResult.renamed
@@ -645,8 +660,8 @@ export class SchemaSync {
           }
         }
 
-        // Drop stale columns (unless safe mode or table was recreated)
-        if (!safe && !init.recreated && diff.removed.length > 0 && adapter.dropColumns) {
+        // Drop stale columns (unless safe mode, table was recreated, or errored)
+        if (!safe && !init.recreated && init.status !== 'error' && diff.removed.length > 0 && adapter.dropColumns) {
           const colNames = diff.removed.map(c => c.name)
           await adapter.dropColumns(colNames)
           init.columnsDropped = colNames
@@ -654,7 +669,9 @@ export class SchemaSync {
         }
       }
     } else {
+      const existed = adapter.tableExists ? await adapter.tableExists() : true
       await adapter.ensureTable()
+      if (!existed) { init.status = 'create' }
     }
 
     // Sync indexes

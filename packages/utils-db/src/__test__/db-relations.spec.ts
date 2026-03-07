@@ -5,6 +5,7 @@ import { defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { AtscriptDbTable } from '../db-table'
 import { DbSpace } from '../db-space'
 import { BaseDbAdapter } from '../base-adapter'
+import { prepareFixtures } from './test-utils'
 import type {
   DbQuery,
   TDbInsertResult,
@@ -1126,6 +1127,56 @@ describe('AtscriptDbTable — Relations', () => {
       expect(comments).toHaveLength(0)
     })
 
+    it('should preserve child identity when replacing FROM with same PKs', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      // Post 1 has comments id=1,2. Replace with same PKs but updated body.
+      await postTable.replaceOne({
+        id: 1,
+        title: 'First Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        comments: [
+          { id: 1, body: 'Updated comment 1', postId: 1, createdAt: 3000 },
+          { id: 2, body: 'Updated comment 2', postId: 1, createdAt: 3001 },
+        ],
+      } as any)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: { postId: 1 }, controls: {} }) as any[]
+      expect(comments).toHaveLength(2)
+      // PKs preserved — same ids, updated bodies
+      expect(comments.find((c: any) => c.id === 1).body).toBe('Updated comment 1')
+      expect(comments.find((c: any) => c.id === 2).body).toBe('Updated comment 2')
+    })
+
+    it('should handle mixed FROM replace (keep some, remove orphans, add new)', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      // Post 1 has comments id=1,2. Replace: keep id=1, drop id=2 (orphan), add new.
+      await postTable.replaceOne({
+        id: 1,
+        title: 'First Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        comments: [
+          { id: 1, body: 'Kept and updated', postId: 1, createdAt: 3000 },
+          { body: 'Brand new comment', postId: 1 },
+        ],
+      } as any)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: { postId: 1 }, controls: {} }) as any[]
+      expect(comments).toHaveLength(2)
+      // id=1 preserved with updated body
+      expect(comments.find((c: any) => c.id === 1).body).toBe('Kept and updated')
+      // id=2 deleted (orphan), new comment inserted
+      expect(comments.find((c: any) => c.id === 2)).toBeUndefined()
+      expect(comments.some((c: any) => c.body === 'Brand new comment')).toBe(true)
+    })
+
     it('should bulk-replace multiple records with TO deps', async () => {
       seedAll()
       const postTable = db.getTable(Post)
@@ -1346,6 +1397,167 @@ describe('AtscriptDbTable — Relations', () => {
           author: { name: 'Ghost' },
         } as any)
       ).rejects.toThrow("Cannot patch relation 'author' — source record not found")
+    })
+  })
+
+  // ── VIA (M:N) deep write ─────────────────────────────────────────────
+
+  describe('VIA (M:N) deep write', () => {
+    let ViaTask: any
+    let ViaTag: any
+    let ViaTaskTag: any
+    let db: DbSpace
+
+    beforeAll(async () => {
+      await prepareFixtures()
+      const task = await import('./fixtures/rel-task.as.js')
+      const tag = await import('./fixtures/rel-tag.as.js')
+      const taskTag = await import('./fixtures/rel-task-tag.as.js')
+      ViaTask = task.Task
+      ViaTag = tag.Tag
+      ViaTaskTag = taskTag.TaskTag
+    })
+
+    function createViaDb() {
+      db = new DbSpace(() => new InMemoryAdapter())
+      db.getTable(ViaTag)
+      db.getTable(ViaTask)
+      db.getTable(ViaTaskTag)
+      const tagAdapter = (db.getTable(ViaTag) as any).adapter as InMemoryAdapter
+      const taskAdapter = (db.getTable(ViaTask) as any).adapter as InMemoryAdapter
+      const junctionAdapter = (db.getTable(ViaTaskTag) as any).adapter as InMemoryAdapter
+      return { tagAdapter, taskAdapter, junctionAdapter }
+    }
+
+    it('should insert new tags via VIA relation', async () => {
+      const { tagAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      const result = await taskTable.insertMany([{
+        title: 'Task 1',
+        tags: [{ name: 'alpha' }, { name: 'beta' }],
+      }] as any)
+
+      expect(result.insertedIds).toHaveLength(1)
+
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      expect(tags).toHaveLength(2)
+      expect(tags.map((t: any) => t.name)).toEqual(['alpha', 'beta'])
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(2)
+      expect(junctions[0]).toMatchObject({ taskId: result.insertedIds[0], tagId: tags[0].id })
+      expect(junctions[1]).toMatchObject({ taskId: result.insertedIds[0], tagId: tags[1].id })
+    })
+
+    it('should create junction rows for existing tags (by ID)', async () => {
+      const { tagAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      tagAdapter.seed([{ id: 10, name: 'existing-tag' }])
+
+      const result = await taskTable.insertMany([{
+        title: 'Task 1',
+        tags: [{ id: 10 }],
+      }] as any)
+
+      expect(result.insertedIds).toHaveLength(1)
+
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toMatchObject({ id: 10, name: 'existing-tag' })
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(1)
+      expect(junctions[0]).toMatchObject({ taskId: result.insertedIds[0], tagId: 10 })
+    })
+
+    it('should handle mix of new and existing tags on insert', async () => {
+      const { tagAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      tagAdapter.seed([{ id: 5, name: 'old-tag' }])
+
+      await taskTable.insertMany([{
+        title: 'Task 1',
+        tags: [{ id: 5 }, { name: 'new-tag' }],
+      }] as any)
+
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      expect(tags).toHaveLength(2)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(2)
+      const junctionTagIds = junctions.map((j: any) => j.tagId).sort()
+      expect(junctionTagIds).toContain(5)
+      expect(junctionTagIds).toHaveLength(2)
+    })
+
+    it('should replace VIA: delete old junctions, insert new targets, create new junctions', async () => {
+      const { tagAdapter, taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+      tagAdapter.seed([{ id: 10, name: 'old-tag' }])
+      junctionAdapter.seed([{ id: 100, taskId: 1, tagId: 10 }])
+
+      await taskTable.bulkReplace([{
+        id: 1,
+        title: 'Task 1 Updated',
+        tags: [{ name: 'new-1' }, { name: 'new-2' }],
+      }] as any)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(2)
+      expect(junctions.every((j: any) => j.taskId === 1)).toBe(true)
+
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      const newTags = tags.filter((t: any) => t.name === 'new-1' || t.name === 'new-2')
+      expect(newTags).toHaveLength(2)
+
+      const junctionTagIds = junctions.map((j: any) => j.tagId)
+      for (const nt of newTags) {
+        expect(junctionTagIds).toContain((nt as any).id)
+      }
+    })
+
+    it('should replace VIA with existing tag references (ID only)', async () => {
+      const { tagAdapter, taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+      tagAdapter.seed([{ id: 10, name: 'tag-a' }, { id: 20, name: 'tag-b' }])
+      junctionAdapter.seed([{ id: 100, taskId: 1, tagId: 10 }])
+
+      await taskTable.bulkReplace([{
+        id: 1,
+        title: 'Task 1',
+        tags: [{ id: 20 }],
+      }] as any)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(1)
+      expect(junctions[0]).toMatchObject({ taskId: 1, tagId: 20 })
+
+      const tagB = await tagAdapter.findMany({ filter: { id: 20 }, controls: {} })
+      expect(tagB[0]).toMatchObject({ id: 20, name: 'tag-b' })
+    })
+
+    it('should replace VIA with empty array: removes all junctions', async () => {
+      const { taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+      junctionAdapter.seed([{ id: 100, taskId: 1, tagId: 10 }, { id: 101, taskId: 1, tagId: 20 }])
+
+      await taskTable.bulkReplace([{
+        id: 1,
+        title: 'Task 1',
+        tags: [],
+      }] as any)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(0)
     })
   })
 })

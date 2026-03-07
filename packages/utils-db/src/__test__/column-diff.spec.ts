@@ -49,7 +49,7 @@ describe('computeColumnDiff', () => {
       field({ physicalName: 'count', designType: 'number' }),
     ]
     const existing = [col('count', 'TEXT')]
-    const typeMapper = (dt: string) => dt === 'number' ? 'REAL' : 'TEXT'
+    const typeMapper = (f: TDbFieldMeta) => f.designType === 'number' ? 'REAL' : 'TEXT'
 
     const diff = computeColumnDiff(desired, existing, typeMapper)
     expect(diff.typeChanged.length).toBe(1)

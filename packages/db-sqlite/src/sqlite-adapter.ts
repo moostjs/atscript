@@ -267,9 +267,7 @@ export class SqliteAdapter extends BaseDbAdapter {
 
     // Adds
     for (const field of diff.added) {
-      const sqlType = field.isPrimaryKey && (field.designType === 'number' || field.designType === 'integer')
-        ? 'INTEGER'
-        : sqliteTypeFromDesignType(field.designType)
+      const sqlType = this.typeMapper(field)
       let ddl = `ALTER TABLE "${esc(tableName)}" ADD COLUMN "${esc(field.physicalName)}" ${sqlType}`
       // SQLite: NOT NULL requires a DEFAULT value for ADD COLUMN
       if (!field.optional && !field.isPrimaryKey) {
@@ -346,6 +344,14 @@ export class SqliteAdapter extends BaseDbAdapter {
     const ddl = `ALTER TABLE "${esc(oldName)}" RENAME TO "${esc(newName)}"`
     this._log(ddl)
     this.driver.exec(ddl)
+  }
+
+  typeMapper(field: { designType: string; isPrimaryKey: boolean }): string {
+    // Numeric primary keys must be INTEGER (not REAL) for SQLite rowid alias
+    if (field.isPrimaryKey && (field.designType === 'number' || field.designType === 'integer')) {
+      return 'INTEGER'
+    }
+    return sqliteTypeFromDesignType(field.designType)
   }
 
   async getExistingColumnsForTable(tableName: string): Promise<TExistingColumn[]> {

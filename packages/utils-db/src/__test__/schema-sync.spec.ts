@@ -173,6 +173,59 @@ class MockAdapter extends BaseDbAdapter {
   }
 }
 
+// Schema-less adapter (like MongoDB) — no getExistingColumns/syncColumns
+class SchemalessAdapter extends BaseDbAdapter {
+  tables = new Map<string, Array<Record<string, unknown>>>()
+  private _collections = new Set<string>()
+
+  async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
+    return { insertedId: 1 }
+  }
+  async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
+    return { insertedCount: data.length, insertedIds: [] }
+  }
+  async findOne(): Promise<Record<string, unknown> | null> { return null }
+  async findMany(): Promise<Array<Record<string, unknown>>> { return [] }
+  async count(): Promise<number> { return 0 }
+  async replaceOne(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
+  async updateOne(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
+  async deleteOne(): Promise<TDbDeleteResult> { return { deletedCount: 0 } }
+  async updateMany(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
+  async replaceMany(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
+  async deleteMany(): Promise<TDbDeleteResult> { return { deletedCount: 0 } }
+
+  async tableExists(): Promise<boolean> {
+    return this._collections.has(this._table.tableName)
+  }
+
+  async ensureTable(): Promise<void> {
+    this._collections.add(this._table.tableName)
+  }
+
+  async syncIndexes(): Promise<void> {}
+}
+
+class TypedMockAdapter extends MockAdapter {
+  typeMapper(field: { designType: string }): string {
+    switch (field.designType) {
+      case 'number': return 'REAL'
+      case 'integer': return 'INTEGER'
+      case 'boolean': return 'INTEGER'
+      default: return 'TEXT'
+    }
+  }
+
+  async recreateTable(): Promise<void> {
+    const name = this._table.tableName
+    this.tables.set(name, [])
+  }
+
+  async dropTable(): Promise<void> {
+    const name = this._table.tableName
+    this.tables.delete(name)
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 let sharedTables: Map<string, Array<Record<string, unknown>>>
@@ -181,6 +234,15 @@ function createSpace(): DbSpace {
   sharedTables = new Map()
   return new DbSpace(() => {
     const adapter = new MockAdapter()
+    adapter.tables = sharedTables
+    return adapter
+  })
+}
+
+function createTypedSpace(): DbSpace {
+  sharedTables = new Map()
+  return new DbSpace(() => {
+    const adapter = new TypedMockAdapter()
     adapter.tables = sharedTables
     return adapter
   })
@@ -1048,5 +1110,137 @@ describe('SyncEntry — rename printing', () => {
     const entry = new SyncEntry({ name: 'users', status: 'alter' })
     const lines = entry.print('plan')
     expect(lines[0]).not.toContain('renamed from')
+  })
+})
+
+// ── Type change detection (typeMapper) ──────────────────────────────────
+
+describe('SchemaSync — type change detection', () => {
+  it('should detect type changes in plan when adapter provides typeMapper', async () => {
+    const space = createTypedSpace()
+    const sync = new SchemaSync(space)
+
+    // First sync creates the table
+    await sync.run([UsersTable], { force: true })
+
+    // Simulate existing column with wrong type (createdAt is number → REAL, but DB has TEXT)
+    const adapter = space.get(UsersTable).dbAdapter as TypedMockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'REAL', notnull: true, pk: true },
+      { name: 'email_address', type: 'TEXT', notnull: true, pk: false },
+      { name: 'name', type: 'TEXT', notnull: true, pk: false },
+      { name: 'createdAt', type: 'TEXT', notnull: true, pk: false },
+      { name: 'status', type: 'TEXT', notnull: true, pk: false },
+      { name: 'bio', type: 'TEXT', notnull: false, pk: false },
+    ])
+
+    const plan = await sync.plan([UsersTable], { force: true })
+    const entry = plan.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    // No syncMethod → error
+    expect(entry!.status).toBe('error')
+    expect(entry!.typeChanges.length).toBeGreaterThan(0)
+    expect(entry!.typeChanges.some(tc => tc.column === 'createdAt')).toBe(true)
+  })
+
+  it('should NOT detect type changes when adapter has no typeMapper', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    await sync.run([UsersTable], { force: true })
+
+    const adapter = space.get(UsersTable).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'REAL', notnull: true, pk: true },
+      { name: 'email_address', type: 'TEXT', notnull: true, pk: false },
+      { name: 'name', type: 'TEXT', notnull: true, pk: false },
+      { name: 'createdAt', type: 'TEXT', notnull: true, pk: false },
+      { name: 'status', type: 'TEXT', notnull: true, pk: false },
+      { name: 'bio', type: 'TEXT', notnull: false, pk: false },
+    ])
+
+    const plan = await sync.plan([UsersTable], { force: true })
+    const entry = plan.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.typeChanges).toEqual([])
+  })
+
+  it('should set error status in run() when type changes exist without syncMethod', async () => {
+    const space = createTypedSpace()
+    const sync = new SchemaSync(space)
+
+    await sync.run([UsersTable], { force: true })
+
+    const adapter = space.get(UsersTable).dbAdapter as TypedMockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'REAL', notnull: true, pk: true },
+      { name: 'email_address', type: 'TEXT', notnull: true, pk: false },
+      { name: 'name', type: 'TEXT', notnull: true, pk: false },
+      { name: 'createdAt', type: 'TEXT', notnull: true, pk: false },
+      { name: 'status', type: 'TEXT', notnull: true, pk: false },
+      { name: 'bio', type: 'TEXT', notnull: false, pk: false },
+    ])
+
+    const result = await sync.run([UsersTable], { force: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('error')
+    expect(entry!.errors.length).toBeGreaterThan(0)
+    expect(entry!.errors[0]).toContain('createdAt')
+  })
+})
+
+// ── Schema-less adapter (tableExists without getExistingColumns) ────────
+
+describe('schema-less adapter status consistency', () => {
+  function createSchemalessSpace(): DbSpace {
+    const tables = new Map<string, Array<Record<string, unknown>>>()
+    return new DbSpace(() => {
+      const adapter = new SchemalessAdapter()
+      adapter.tables = tables
+      return adapter
+    })
+  }
+
+  it('run() on fresh DB reports status "create"', async () => {
+    const space = createSchemalessSpace()
+    const sync = new SchemaSync(space)
+    const result = await sync.run([UsersTable], { force: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('create')
+  })
+
+  it('plan() on fresh DB reports status "create"', async () => {
+    const space = createSchemalessSpace()
+    const sync = new SchemaSync(space)
+    const result = await sync.plan([UsersTable])
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('create')
+  })
+
+  it('run() on already-synced DB reports status "in-sync"', async () => {
+    const space = createSchemalessSpace()
+    const sync = new SchemaSync(space)
+    // First run creates the collections
+    await sync.run([UsersTable], { force: true })
+    // Second run should report in-sync
+    const result = await sync.run([UsersTable], { force: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('in-sync')
+  })
+
+  it('plan() on already-synced DB reports status "in-sync"', async () => {
+    const space = createSchemalessSpace()
+    const sync = new SchemaSync(space)
+    // First run creates the collections
+    await sync.run([UsersTable], { force: true })
+    // Plan should now report in-sync
+    const result = await sync.plan([UsersTable])
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('in-sync')
   })
 })

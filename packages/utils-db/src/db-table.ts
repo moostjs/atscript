@@ -35,7 +35,8 @@ export { resolveDesignType } from './db-readable'
 const navFieldsValidatorPlugin: TValidatorPlugin = (_ctx, def) => {
   if (
     def.metadata.has('db.rel.to') ||
-    def.metadata.has('db.rel.from')
+    def.metadata.has('db.rel.from') ||
+    def.metadata.has('db.rel.via')
   ) {
     return true // Skip — nested creation or ignored
   }
@@ -670,7 +671,7 @@ export class AtscriptDbTable<
       const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
       if (!fkToTarget) { continue }
 
-      const targetPKField = (targetTable as any)._primaryKeys?.[0]
+      const targetPKField = targetTable.primaryKeys[0]
       if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
 
       for (let i = 0; i < originals.length; i++) {
@@ -680,16 +681,34 @@ export class AtscriptDbTable<
         const parentPK = parentIds[i]
         if (parentPK === undefined) { continue }
 
-        // a) Insert target records
-        const targetPayloads = targets.map(t => ({ ...(t as Record<string, unknown>) }))
-        const targetResult = await targetTable.insertMany(targetPayloads, { maxDepth, _depth: depth + 1 })
+        // Separate existing targets (have PK) from new targets (need insert)
+        const newTargets: Array<Record<string, unknown>> = []
+        const existingIds: unknown[] = []
+        for (const t of targets) {
+          const rec = t as Record<string, unknown>
+          const pk = rec[targetPKField]
+          if (pk !== undefined && pk !== null) {
+            existingIds.push(pk)
+          } else {
+            newTargets.push({ ...rec })
+          }
+        }
 
-        // b) Insert junction rows linking parent to targets
-        const junctionRows = targetResult.insertedIds.map(targetId => ({
-          [fkToThis.fields[0]]: parentPK,
-          [fkToTarget.fields[0]]: targetId,
-        }))
-        await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
+        // a) Insert only new target records
+        const allTargetIds: unknown[] = [...existingIds]
+        if (newTargets.length > 0) {
+          const targetResult = await targetTable.insertMany(newTargets, { maxDepth, _depth: depth + 1 })
+          allTargetIds.push(...targetResult.insertedIds)
+        }
+
+        // b) Insert junction rows linking parent to all targets
+        if (allTargetIds.length > 0) {
+          const junctionRows = allTargetIds.map(targetId => ({
+            [fkToThis.fields[0]]: parentPK,
+            [fkToTarget.fields[0]]: targetId,
+          }))
+          await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
+        }
       }
     }
   }
@@ -806,22 +825,52 @@ export class AtscriptDbTable<
       const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
       if (!remoteFK) { continue }
 
+      const childPKs = [...targetTable.primaryKeys]
       for (const original of originals) {
         const children = original[navField]
         if (!Array.isArray(children)) { continue }
         const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
         if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
+        const fkField = remoteFK.fields[0]
 
-        // Delete all existing children linked to this parent
-        await targetTable.deleteMany({ [remoteFK.fields[0]]: parentPK })
+        // Wire FK on each child and separate by PK presence
+        const toReplace: Array<Record<string, unknown>> = []
+        const toInsert: Array<Record<string, unknown>> = []
+        const newPKSet = new Set<string>()
+        for (const child of children) {
+          const childData = { ...(child as Record<string, unknown>) }
+          childData[fkField] = parentPK
+          const hasPK = childPKs.length > 0 && childPKs.every(pk => childData[pk] !== undefined)
+          if (hasPK) {
+            newPKSet.add(childPKs.map(pk => String(childData[pk])).join('\0'))
+            toReplace.push(childData)
+          } else {
+            toInsert.push(childData)
+          }
+        }
 
-        // Insert the replacement set
-        if (children.length > 0) {
-          const toInsert = children.map(child => {
-            const childData = { ...(child as Record<string, unknown>) }
-            childData[remoteFK.fields[0]] = parentPK
-            return childData
-          })
+        // Fetch existing children to find orphans
+        const existing = await targetTable.findMany({
+          filter: { [fkField]: parentPK },
+          controls: childPKs.length > 0 ? { $select: [...childPKs] } : {},
+        })
+
+        // Delete orphans (existing children not in the new set)
+        for (const row of existing) {
+          const pkKey = childPKs.map(pk => String(row[pk])).join('\0')
+          if (!newPKSet.has(pkKey)) {
+            const orphanFilter: Record<string, unknown> = {}
+            for (const pk of childPKs) { orphanFilter[pk] = row[pk] }
+            await targetTable.deleteMany(orphanFilter)
+          }
+        }
+
+        // Replace children with PKs (update in place, preserving identity)
+        if (toReplace.length > 0) {
+          await targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
+        }
+        // Insert new children without PKs
+        if (toInsert.length > 0) {
           await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
         }
       }
@@ -852,6 +901,9 @@ export class AtscriptDbTable<
       const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
       if (!fkToTarget) { continue }
 
+      const targetPKField = targetTable.primaryKeys[0]
+      if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
+
       for (const original of originals) {
         const targets = original[navField]
         if (!Array.isArray(targets)) { continue }
@@ -862,20 +914,41 @@ export class AtscriptDbTable<
         // a) Delete existing junction rows
         await junctionTable.deleteMany({ [fkToThis.fields[0]]: parentPK })
 
-        // b) Replace target records
-        if (targets.length > 0) {
-          await targetTable.bulkReplace(
-            targets.map(t => ({ ...(t as Record<string, unknown>) })),
-            { maxDepth, _depth: depth + 1 }
-          )
+        // Separate targets: existing (ID-only ref), replace (ID + data), new (no ID)
+        const toReplace: Array<Record<string, unknown>> = []
+        const toInsert: Array<Record<string, unknown>> = []
+        const existingIds: unknown[] = []
+        for (const t of targets) {
+          const rec = t as Record<string, unknown>
+          const pk = rec[targetPKField]
+          if (pk !== undefined && pk !== null) {
+            const keys = Object.keys(rec).filter(k => k !== targetPKField)
+            if (keys.length > 0) {
+              toReplace.push({ ...rec })
+            }
+            existingIds.push(pk)
+          } else {
+            toInsert.push({ ...rec })
+          }
         }
 
-        // c) Insert new junction rows
-        const targetPKField = (targetTable as any)._primaryKeys?.[0]
-        if (targetPKField && fkToTarget.fields.length === 1 && fkToThis.fields.length === 1) {
-          const junctionRows = targets.map(t => ({
+        // b) Replace target records that have PK + data
+        if (toReplace.length > 0) {
+          await targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
+        }
+
+        // c) Insert new target records and collect their IDs
+        const allTargetIds: unknown[] = [...existingIds]
+        if (toInsert.length > 0) {
+          const insertResult = await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
+          allTargetIds.push(...insertResult.insertedIds)
+        }
+
+        // d) Insert new junction rows
+        if (allTargetIds.length > 0) {
+          const junctionRows = allTargetIds.map(targetId => ({
             [fkToThis.fields[0]]: parentPK,
-            [fkToTarget.fields[0]]: (t as Record<string, unknown>)[targetPKField],
+            [fkToTarget.fields[0]]: targetId,
           }))
           await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
         }
