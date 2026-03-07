@@ -110,17 +110,29 @@ export class SyncEntry {
     return mode === 'plan' ? this.printPlan(c) : this.printResult(c)
   }
 
+  // ── Shared helpers ──────────────────────────────────────────────────
+
+  private labelAndPrefix(c: TSyncColors) {
+    return {
+      label: c.bold(c.underline(this.name)),
+      vp: this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : '',
+    }
+  }
+
+  private printError(c: TSyncColors, label: string, vp: string): string[] {
+    return [
+      `  ${c.red(`✗ ${vp}${label} — error`)}`,
+      ...this.errors.map(err => `      ${c.red(err)}`),
+    ]
+  }
+
   // ── Plan printing ───────────────────────────────────────────────────
 
   private printPlan(c: TSyncColors): string[] {
-    const label = c.bold(c.underline(this.name))
-    const vp = this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : ''
+    const { label, vp } = this.labelAndPrefix(c)
 
     if (this.status === 'error') {
-      return [
-        `  ${c.red(`✗ ${vp}${label} — error`)}`,
-        ...this.errors.map(err => `      ${c.red(err)}`),
-      ]
+      return this.printError(c, label, vp)
     }
 
     if (this.status === 'drop') {
@@ -164,14 +176,10 @@ export class SyncEntry {
   // ── Result printing ─────────────────────────────────────────────────
 
   private printResult(c: TSyncColors): string[] {
-    const label = c.bold(c.underline(this.name))
-    const vp = this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : ''
+    const { label, vp } = this.labelAndPrefix(c)
 
     if (this.status === 'error') {
-      return [
-        `  ${c.red(`✗ ${vp}${label} — error`)}`,
-        ...this.errors.map(err => `      ${c.red(err)}`),
-      ]
+      return this.printError(c, label, vp)
     }
 
     if (this.status === 'drop') {
@@ -330,8 +338,8 @@ export class SchemaSync {
    * Detects tables/views present in the previous sync but absent from the current schema.
    * Returns SyncEntry instances with status 'drop'.
    */
-  private async detectRemoved(currentReadables: AtscriptDbReadable[]): Promise<SyncEntry[]> {
-    const previous = await this.readTrackedList()
+  private async detectRemoved(currentReadables: AtscriptDbReadable[], previous?: Array<{ name: string; isView: boolean; viewType?: 'V' | 'M' | 'E' }>): Promise<SyncEntry[]> {
+    previous ??= await this.readTrackedList()
     const currentSet = new Set(currentReadables.map(t => t.tableName))
     const removed: SyncEntry[] = []
     for (const entry of previous) {
@@ -402,9 +410,9 @@ export class SchemaSync {
 
       // Sync managed views
       const allReadables = [...tables, ...views, ...externalViews]
-      const removed = await this.detectRemoved(allReadables)
       const previouslyTracked = await this.readTrackedList()
       const trackedNames = new Set(previouslyTracked.map(e => e.name))
+      const removed = await this.detectRemoved(allReadables, previouslyTracked)
 
       for (const readable of views) {
         await readable.dbAdapter.ensureTable()
@@ -416,9 +424,8 @@ export class SchemaSync {
       }
 
       // Check external views
-      for (const view of externalViews) {
-        entries.push(await this.checkExternalView(view))
-      }
+      const externalEntries = await Promise.all(externalViews.map(v => this.checkExternalView(v)))
+      entries.push(...externalEntries)
 
       // Drop removed tables/views (unless safe mode) — never drop external views
       if (!safe) {
@@ -476,7 +483,7 @@ export class SchemaSync {
       }
     }
 
-    let removed = await this.detectRemoved(allReadables)
+    let removed = await this.detectRemoved(allReadables, previouslyTracked)
 
     if (safe) {
       // Hide destructive operations in safe mode
@@ -518,10 +525,10 @@ export class SchemaSync {
           toType: tc.field.designType,
         }))
         init.columnsToDrop = diff.removed.map(c => c.name)
-        const hasChanges = (init.columnsToAdd?.length ?? 0) > 0 ||
-          (init.columnsToRename?.length ?? 0) > 0 ||
-          (init.typeChanges?.length ?? 0) > 0 ||
-          (init.columnsToDrop?.length ?? 0) > 0
+        const hasChanges = diff.added.length > 0 ||
+          diff.renamed.length > 0 ||
+          diff.typeChanged.length > 0 ||
+          diff.removed.length > 0
         if (hasChanges) { init.status = 'alter' }
       }
     } else {
