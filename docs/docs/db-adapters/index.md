@@ -51,7 +51,7 @@ export interface User {
     @db.column 'email_address'
     email: string
 
-    @db.default.value 'active'
+    @db.default 'active'
     status: string
 
     @db.ignore

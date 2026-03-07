@@ -9,7 +9,7 @@ export interface Post {
 
     title: string
 
-    @db.default.value 'draft'
+    @db.default 'draft'
     status: string
 
     @db.default.fn 'now'

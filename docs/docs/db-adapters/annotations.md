@@ -25,7 +25,7 @@ This means a single `.as` file can describe a data model that works with multipl
 | `@db.index.unique` | field | `name?` | Unique constraint index |
 | `@db.index.fulltext` | field | `name?` | Fulltext search index |
 | `@db.column` | field | `name` (string) | Override the database column/field name |
-| `@db.default.value` | field | `value` (string) | Static default value |
+| `@db.default` | field | `value` (string) | Static default value |
 | `@db.default.fn` | field | `fn` (string) | Database function for default value |
 | `@db.ignore` | field | — | Exclude field from database operations |
 | `@db.json` | field | — | Force a field to be stored as a single JSON column |
@@ -151,14 +151,14 @@ export interface User {
 }
 ```
 
-## `@db.default.value` / `@db.default.fn`
+## `@db.default` / `@db.default.fn`
 
-Sets default values for fields. `@db.default.value` sets a static string value. `@db.default.fn` specifies a function name for the adapter to resolve (e.g., `'now'`, `'uuid'`, `'increment'`).
+Sets default values for fields. `@db.default` sets a static string value. `@db.default.fn` specifies a function name for the adapter to resolve (e.g., `'now'`, `'uuid'`, `'increment'`).
 
 ```atscript
 @db.table 'posts'
 export interface Post {
-    @db.default.value 'draft'
+    @db.default 'draft'
     status: string
 
     @db.default.fn 'now'

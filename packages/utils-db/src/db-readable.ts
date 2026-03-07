@@ -280,12 +280,12 @@ export class AtscriptDbReadable<
 
     const adapterName = adapter.getAdapterTableName?.(_type)
     const dbTable = _type.metadata.get('db.table') as string | undefined
-    const dbViewName = _type.metadata.get('db.view.name') as string | undefined
+    const dbViewName = _type.metadata.get('db.view') as string | undefined
     const fallbackName = _type.id || ''
 
     this.tableName = adapterName || dbTable || dbViewName || fallbackName
     if (!this.tableName) {
-      throw new Error('@db.table or @db.view.name annotation expected')
+      throw new Error('@db.table or @db.view annotation expected')
     }
 
     this.schema = _type.metadata.get('db.schema') as string | undefined
@@ -744,8 +744,8 @@ export class AtscriptDbReadable<
       this._columnFromMap.set(fieldName, columnFrom)
     }
 
-    // @db.default.value or @db.default.fn
-    const defaultValue = metadata.get('db.default.value') as string | undefined
+    // @db.default or @db.default.fn
+    const defaultValue = metadata.get('db.default') as string | undefined
     const defaultFn = metadata.get('db.default.fn') as string | undefined
     if (defaultValue !== undefined) {
       this._defaults.set(fieldName, { kind: 'value', value: defaultValue })

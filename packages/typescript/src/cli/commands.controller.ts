@@ -177,7 +177,7 @@ export class Commands {
       for (const file of writtenFiles) {
         const mod = await import(/* @vite-ignore */ pathToFileURL(file).href)
         for (const exp of Object.values(mod)) {
-          if (isAnnotatedType(exp) && exp.metadata?.has('db.table')) {
+          if (isAnnotatedType(exp) && (exp.metadata?.has('db.table') || exp.metadata?.has('db.view'))) {
             dbTypes.push(exp)
           }
         }
@@ -189,12 +189,12 @@ export class Commands {
     }
 
     if (dbTypes.length === 0) {
-      console.log(`No types with @db.table found. Nothing to sync.`)
+      console.log(`No types with @db.table or @db.view found. Nothing to sync.`)
       return
     }
 
     console.log(
-      `Found ${__DYE_CYAN__}${dbTypes.length}${__DYE_COLOR_OFF__} table type(s)`
+      `Found ${__DYE_CYAN__}${dbTypes.length}${__DYE_COLOR_OFF__} type(s)`
     )
 
     console.log(`
@@ -223,8 +223,20 @@ ${__DYE_CYAN__}     #############
     // 7. Display plan
     if (plan.status === 'up-to-date') {
       console.log(`${__DYE_GREEN__}${__DYE_BOLD__}Schema is up to date.${__DYE_BOLD_OFF__}${__DYE_COLOR_OFF__}\n`)
-      for (const table of plan.tables) {
-        console.log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${table.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+      const tableEntries = plan.tables.filter(t => !t.viewType)
+      const viewEntries = plan.tables.filter(t => t.viewType)
+      if (tableEntries.length > 0) {
+        console.log(`${__DYE_BOLD__}Tables:${__DYE_BOLD_OFF__}`)
+        for (const t of tableEntries) {
+          console.log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${t.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+        }
+      }
+      if (viewEntries.length > 0) {
+        console.log(`${__DYE_BOLD__}Views:${__DYE_BOLD_OFF__}`)
+        for (const t of viewEntries) {
+          const prefix = `[${t.viewType}]`
+          console.log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${prefix}${t.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+        }
       }
       console.log('')
       return
@@ -330,6 +342,40 @@ ${__DYE_CYAN__}     #############
     return mod.createAdapter(resolvedConnection, options)
   }
 
+  private displayPlanEntry(log: typeof console.log, table: import('@atscript/utils-db/sync').TSyncPlanTable): void {
+    const changes = table.columnsToAdd.length + table.columnsToRename.length +
+      table.typeChanges.length + table.columnsToDrop.length
+
+    if (table.isNew) {
+      log(`  ${__DYE_GREEN__}+ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${table.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — create${__DYE_COLOR_OFF__}`)
+
+      for (const col of table.columnsToAdd) {
+        log(`      ${__DYE_GREEN__}+ ${col.physicalName} (${col.designType})${col.isPrimaryKey ? ' PK' : ''}${col.optional ? ' nullable' : ''} — add${__DYE_COLOR_OFF__}`)
+      }
+      log('')
+    } else if (changes > 0) {
+      log(`  ${__DYE_CYAN__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${table.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — alter${__DYE_COLOR_OFF__}`)
+
+      for (const col of table.columnsToAdd) {
+        log(`      ${__DYE_GREEN__}+ ${col.physicalName} (${col.designType}) — add${__DYE_COLOR_OFF__}`)
+      }
+      for (const r of table.columnsToRename) {
+        log(`      ${__DYE_YELLOW__}~ ${r.from} → ${r.to} — rename${__DYE_COLOR_OFF__}`)
+      }
+      for (const tc of table.typeChanges) {
+        const action = table.syncMethod ? ` — ${table.syncMethod}` : ' — requires migration'
+        log(`      ${__DYE_RED__}! ${tc.column}: ${tc.fromType} → ${tc.toType}${action}${__DYE_COLOR_OFF__}`)
+      }
+      for (const col of table.columnsToDrop) {
+        log(`      ${__DYE_RED__}- ${col} — drop${__DYE_COLOR_OFF__}`)
+      }
+      log('')
+    } else {
+      const prefix = table.viewType ? `[${table.viewType}]` : ''
+      log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${prefix}${table.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+    }
+  }
+
   private displayPlan(plan: import('@atscript/utils-db/sync').TSyncPlan): void {
     const log = console.log
     log('')
@@ -338,44 +384,64 @@ ${__DYE_CYAN__}     #############
     log(`${__DYE_BOLD__}╚══════════════════════════════════════╝${__DYE_BOLD_OFF__}`)
     log('')
 
-    for (const table of plan.tables) {
-      const changes = table.columnsToAdd.length + table.columnsToRename.length +
-        table.typeChanges.length + table.columnsToDrop.length
+    const tableEntries = plan.tables.filter(t => !t.viewType)
+    const viewEntries = plan.tables.filter(t => t.viewType)
 
-      if (table.isNew) {
-        log(`  ${__DYE_GREEN__}+ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${table.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — create${__DYE_COLOR_OFF__}`)
-
-        for (const col of table.columnsToAdd) {
-          log(`      ${__DYE_GREEN__}+ ${col.physicalName} (${col.designType})${col.isPrimaryKey ? ' PK' : ''}${col.optional ? ' nullable' : ''} — add${__DYE_COLOR_OFF__}`)
-        }
-        log('')
-      } else if (changes > 0) {
-        log(`  ${__DYE_CYAN__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${table.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — alter${__DYE_COLOR_OFF__}`)
-
-        for (const col of table.columnsToAdd) {
-          log(`      ${__DYE_GREEN__}+ ${col.physicalName} (${col.designType}) — add${__DYE_COLOR_OFF__}`)
-        }
-        for (const r of table.columnsToRename) {
-          log(`      ${__DYE_YELLOW__}~ ${r.from} → ${r.to} — rename${__DYE_COLOR_OFF__}`)
-        }
-        for (const tc of table.typeChanges) {
-          const action = table.syncMethod ? ` — ${table.syncMethod}` : ' — requires migration'
-          log(`      ${__DYE_RED__}! ${tc.column}: ${tc.fromType} → ${tc.toType}${action}${__DYE_COLOR_OFF__}`)
-        }
-        for (const col of table.columnsToDrop) {
-          log(`      ${__DYE_RED__}- ${col} — drop${__DYE_COLOR_OFF__}`)
-        }
-        log('')
-      } else {
-        log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${table.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+    if (tableEntries.length > 0) {
+      log(`${__DYE_BOLD__}Tables:${__DYE_BOLD_OFF__}`)
+      for (const table of tableEntries) {
+        this.displayPlanEntry(log, table)
+      }
+      for (const t of plan.removedTables) {
+        log(`  ${__DYE_RED__}- ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — drop table${__DYE_COLOR_OFF__}`)
       }
     }
 
-    for (const t of plan.removedTables) {
-      log(`  ${__DYE_RED__}- ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — drop table${__DYE_COLOR_OFF__}`)
+    if (viewEntries.length > 0) {
+      log(`${__DYE_BOLD__}Views:${__DYE_BOLD_OFF__}`)
+      for (const view of viewEntries) {
+        this.displayPlanEntry(log, view)
+      }
     }
 
     log('')
+  }
+
+  private displayResultEntry(log: typeof console.log, t: import('@atscript/utils-db/sync').TSyncTableResult): void {
+    const hasColumnChanges = t.columnsAdded.length > 0 || t.columnsRenamed.length > 0 || t.columnsDropped.length > 0
+
+    if (t.created) {
+      log(`  ${__DYE_GREEN__}+ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — created${__DYE_COLOR_OFF__}`)
+      if (hasColumnChanges) {
+        for (const col of t.columnsAdded) {
+          log(`      ${__DYE_GREEN__}+ ${col} — added${__DYE_COLOR_OFF__}`)
+        }
+      }
+      log('')
+    } else if (hasColumnChanges || t.recreated) {
+      if (t.recreated) {
+        log(`  ${__DYE_YELLOW__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — recreated${__DYE_COLOR_OFF__}`)
+      } else {
+        log(`  ${__DYE_CYAN__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — altered${__DYE_COLOR_OFF__}`)
+      }
+      for (const col of t.columnsAdded) {
+        log(`      ${__DYE_GREEN__}+ ${col} — added${__DYE_COLOR_OFF__}`)
+      }
+      for (const col of t.columnsRenamed) {
+        log(`      ${__DYE_YELLOW__}~ ${col} — renamed${__DYE_COLOR_OFF__}`)
+      }
+      for (const col of t.columnsDropped) {
+        log(`      ${__DYE_RED__}- ${col} — dropped${__DYE_COLOR_OFF__}`)
+      }
+      log('')
+    } else {
+      const prefix = t.viewType ? `[${t.viewType}]` : ''
+      log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${prefix}${t.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+    }
+
+    for (const err of t.errors) {
+      log(`    ${__DYE_RED__}Error: ${err}${__DYE_COLOR_OFF__}`)
+    }
   }
 
   private displayResult(result: import('@atscript/utils-db/sync').TSyncResult): void {
@@ -385,48 +451,26 @@ ${__DYE_CYAN__}     #############
     log('')
 
     if (result.tables) {
-      for (const t of result.tables) {
-        const hasColumnChanges = t.columnsAdded.length > 0 || t.columnsRenamed.length > 0 || t.columnsDropped.length > 0
+      const tableEntries = result.tables.filter(t => !t.viewType)
+      const viewEntries = result.tables.filter(t => t.viewType)
 
-        if (t.created) {
-          log(`  ${__DYE_GREEN__}+ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — created${__DYE_COLOR_OFF__}`)
-          if (hasColumnChanges) {
-    
-            for (const col of t.columnsAdded) {
-              log(`      ${__DYE_GREEN__}+ ${col} — added${__DYE_COLOR_OFF__}`)
-            }
-          }
-          log('')
-        } else if (hasColumnChanges || t.recreated) {
-          if (t.recreated) {
-            log(`  ${__DYE_YELLOW__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — recreated${__DYE_COLOR_OFF__}`)
-          } else {
-            log(`  ${__DYE_CYAN__}~ ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t.tableName}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — altered${__DYE_COLOR_OFF__}`)
-          }
-  
-          for (const col of t.columnsAdded) {
-            log(`      ${__DYE_GREEN__}+ ${col} — added${__DYE_COLOR_OFF__}`)
-          }
-          for (const col of t.columnsRenamed) {
-            log(`      ${__DYE_YELLOW__}~ ${col} — renamed${__DYE_COLOR_OFF__}`)
-          }
-          for (const col of t.columnsDropped) {
-            log(`      ${__DYE_RED__}- ${col} — dropped${__DYE_COLOR_OFF__}`)
-          }
-          log('')
-        } else {
-          log(`  ${__DYE_GREEN__}✓${__DYE_COLOR_OFF__} ${__DYE_BOLD__}${t.tableName}${__DYE_BOLD_OFF__} ${__DYE_DIM__}— in sync${__DYE_DIM_OFF__}`)
+      if (tableEntries.length > 0) {
+        log(`${__DYE_BOLD__}Tables:${__DYE_BOLD_OFF__}`)
+        for (const t of tableEntries) {
+          this.displayResultEntry(log, t)
         }
-
-        for (const err of t.errors) {
-          log(`    ${__DYE_RED__}Error: ${err}${__DYE_COLOR_OFF__}`)
+        if (result.removedTables && result.removedTables.length > 0) {
+          for (const t of result.removedTables) {
+            log(`  ${__DYE_RED__}- ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — dropped${__DYE_COLOR_OFF__}`)
+          }
         }
       }
-    }
 
-    if (result.removedTables && result.removedTables.length > 0) {
-      for (const t of result.removedTables) {
-        log(`  ${__DYE_RED__}- ${__DYE_BOLD__}${__DYE_UNDERSCORE__}${t}${__DYE_UNDERSCORE_OFF__}${__DYE_BOLD_OFF__} — dropped${__DYE_COLOR_OFF__}`)
+      if (viewEntries.length > 0) {
+        log(`${__DYE_BOLD__}Views:${__DYE_BOLD_OFF__}`)
+        for (const t of viewEntries) {
+          this.displayResultEntry(log, t)
+        }
       }
     }
 

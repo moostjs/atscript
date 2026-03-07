@@ -59,7 +59,7 @@
 | `@db.index.unique`  | `name?: string`              | **yes** (append) | prop      | Unique constraint index                  |
 | `@db.index.fulltext`| `name?: string`              | **yes** (append) | prop      | Fulltext search index                    |
 | `@db.column`        | `name: string`               | no              | prop      | Override database column name            |
-| `@db.default.value` | `value: string`              | no              | prop      | Static default value                     |
+| `@db.default`       | `value: string`              | no              | prop      | Static default value                     |
 | `@db.default.fn`    | `fn: string`                 | no              | prop      | Database function for default            |
 | `@db.ignore`        | _(none)_                     | no              | prop      | Exclude field from database              |
 

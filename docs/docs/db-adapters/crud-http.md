@@ -61,10 +61,10 @@ export interface Todo {
 
     description?: string
 
-    @db.default.value 'false'
+    @db.default 'false'
     completed: boolean
 
-    @db.default.value 'medium'
+    @db.default 'medium'
     priority: string
 
     @db.default.fn 'now'
@@ -215,7 +215,7 @@ Content-Type: application/json
 {"title": "Buy milk"}
 ```
 
-Accepts a single object or an array. A single object calls `insertOne`; an array calls `insertMany`. Default values from `@db.default.value` and `@db.default.fn` are applied automatically.
+Accepts a single object or an array. A single object calls `insertOne`; an array calls `insertMany`. Default values from `@db.default` and `@db.default.fn` are applied automatically.
 
 ### `PUT /` -- Replace
 

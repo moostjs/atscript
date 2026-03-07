@@ -79,7 +79,7 @@ All view concerns are scoped under the `@db.view.*` namespace:
 
 | Annotation | Level | Purpose |
 |---|---|---|
-| `@db.view.name` | interface | View name (optional — derived from interface name if omitted) |
+| `@db.view` | interface | View name (optional — derived from interface name if omitted) |
 | `@db.view.for` | interface | Entry/primary table (required for computed views) |
 | `@db.view.joins` | interface | Explicit join — escape hatch for non-relationship joins |
 | `@db.view.filter` | interface | WHERE clause for the view |
@@ -134,7 +134,7 @@ export interface ReviewDetail {
 For complex queries (aggregations, CTEs, window functions) that can't be expressed portably:
 
 ```atscript
-@db.view.name "monthly_stats"
+@db.view "monthly_stats"
 @db.postgres.sql "SELECT date_trunc('month', created_at) AS month, count(*) AS total FROM posts GROUP BY 1"
 export interface MonthlyStats {
     month: string.isoDate
@@ -145,7 +145,7 @@ export interface MonthlyStats {
 #### Materialized Views
 
 ```atscript
-@db.view.name "user_stats"
+@db.view "user_stats"
 @db.view.materialized
 @db.postgres.sql "SELECT user_id, count(*) as post_count FROM posts GROUP BY user_id"
 export interface UserStats {

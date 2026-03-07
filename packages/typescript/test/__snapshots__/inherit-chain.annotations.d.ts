@@ -38,7 +38,7 @@ declare global {
     "db.index.fulltext": ({ name?: string, weight?: number })[]
     "db.column.name": string
     "db.column.from": string
-    "db.default.value": string
+    "db.default": string
     "db.default.fn": string
     "db.json": boolean
     "db.ignore": boolean
@@ -50,7 +50,7 @@ declare global {
     "db.rel.onUpdate": string
     "db.rel.via": import("@atscript/typescript/utils").AtscriptRef
     "db.rel.filter": import("@atscript/typescript/utils").AtscriptQueryNode
-    "db.view.name": string
+    "db.view": string | true
     "db.view.for": import("@atscript/typescript/utils").AtscriptRef
     "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
     "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode

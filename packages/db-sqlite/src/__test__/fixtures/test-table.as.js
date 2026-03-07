@@ -74,7 +74,7 @@ $("object", UsersTable)
     "status",
     $().designType("string")
       .tags("string")
-      .annotate("db.default.value", "active")
+      .annotate("db.default", "active")
       .$type
   ).prop(
     "bio",

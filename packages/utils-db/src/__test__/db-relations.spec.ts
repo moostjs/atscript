@@ -52,7 +52,7 @@ function buildTypes() {
   $('object', PostClass)
     .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
     .prop('title', $().designType('string').tags('string').$type)
-    .prop('status', $().designType('string').tags('string').annotate('db.default.value', 'draft').$type)
+    .prop('status', $().designType('string').tags('string').annotate('db.default', 'draft').$type)
     .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
     .prop('authorId', $().refTo(() => AuthorClass, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
     .prop('author', $().refTo(() => AuthorClass).annotate('db.rel.to', true).optional().$type)

@@ -110,7 +110,7 @@ function refActionAnnotation(name: 'onDelete' | 'onUpdate'): AnnotationSpec {
         }
 
         if (action === 'setDefault' &&
-          field.countAnnotations('db.default.value') === 0 &&
+          field.countAnnotations('db.default') === 0 &&
           field.countAnnotations('db.default.fn') === 0
         ) {
           errors.push({
@@ -380,13 +380,13 @@ export const dbAnnotations: TAnnotationsTree = {
   },
 
   default: {
-    value: new AnnotationSpec({
+    $self: new AnnotationSpec({
       description:
         'Sets a static DB-level default value (used in DDL DEFAULT clause). ' +
         'For string fields the value is used as-is; for other types it is parsed as JSON.' +
         '\n\n**Example:**\n' +
         '```atscript\n' +
-        '@db.default.value "active"\n' +
+        '@db.default "active"\n' +
         'status: string\n' +
         '```\n',
       nodeType: ['prop'],
@@ -1105,20 +1105,21 @@ export const dbAnnotations: TAnnotationsTree = {
   },
 
   view: {
-    name: new AnnotationSpec({
+    $self: new AnnotationSpec({
       description:
-        'Overrides the view name in the database. If omitted, the adapter derives it from the interface name.\n\n' +
+        'Marks an interface as a **database view**. Optionally takes a view name argument.\n\n' +
         '**Example:**\n' +
         '```atscript\n' +
-        '@db.view.name "active_premium_users"\n' +
+        '@db.view "active_premium_users"\n' +
         '@db.view.for User\n' +
         'export interface ActivePremiumUser { ... }\n' +
         '```\n',
       nodeType: ['interface'],
       argument: {
+        optional: true,
         name: 'name',
         type: 'string',
-        description: 'The view name in the database.',
+        description: 'The view name in the database. If omitted, derived from the interface name.',
       },
       validate(token, _args, _doc) {
         const errors = [] as TMessages

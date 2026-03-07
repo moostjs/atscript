@@ -98,6 +98,16 @@ export class MongoAdapter extends BaseDbAdapter {
   protected override async _beginTransaction(): Promise<unknown> {
     if (this._txDisabled || !this._client) { return undefined }
     try {
+      // Transactions require replica set or mongos — check topology
+      const topology = (this._client as any).topology
+      if (topology) {
+        const desc = topology.description ?? topology.s?.description
+        const type = desc?.type
+        if (type === 'Single' || type === 'Unknown') {
+          this._txDisabled = true
+          return undefined
+        }
+      }
       const session = this._client.startSession()
       session.startTransaction()
       return session

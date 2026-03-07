@@ -174,7 +174,7 @@ Compares existing indexes with `@db.index.*` annotations:
 
 When you call `insertOne(payload)`, `AtscriptDbTable` automatically:
 
-1. Applies `@db.default.value` defaults for missing fields
+1. Applies `@db.default` defaults for missing fields
 2. Validates against the Atscript type
 3. Strips `@db.ignore` fields
 4. Maps `@db.column` logical names to physical column names

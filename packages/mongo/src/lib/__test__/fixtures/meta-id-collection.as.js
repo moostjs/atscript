@@ -41,7 +41,7 @@ $("object", TodoCollection)
     "completed",
     $().designType("boolean")
       .tags("boolean")
-      .annotate("db.default.value", "false")
+      .annotate("db.default", "false")
       .$type
   ).prop(
     "_id",

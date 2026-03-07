@@ -152,7 +152,7 @@ export function findFKFieldsPointingTo(
 }
 
 const viewAnnotationNames = [
-  'db.view.name',
+  'db.view',
   'db.view.for',
   'db.view.joins',
   'db.view.filter',

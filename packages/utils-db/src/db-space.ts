@@ -47,13 +47,13 @@ export class DbSpace {
 
   /**
    * Auto-detects whether the type is a table or view and returns the
-   * appropriate instance. Uses `@db.view.for` presence to distinguish.
+   * appropriate instance. Uses `@db.view` or `@db.view.for` presence to distinguish.
    */
   get<T extends TAtscriptAnnotatedType>(
     type: T,
     logger?: TGenericLogger
   ): AtscriptDbReadable<T> {
-    if (type.metadata.has('db.view.for')) {
+    if (type.metadata.has('db.view') || type.metadata.has('db.view.for')) {
       return this.getView(type, logger)
     }
     return this.getTable(type, logger)

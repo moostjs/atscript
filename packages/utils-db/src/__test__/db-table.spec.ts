@@ -182,7 +182,7 @@ describe('AtscriptDbTable', () => {
       expect(table.columnMap.get('email')).toBe('email_address')
     })
 
-    it('should extract defaults from @db.default.value', () => {
+    it('should extract defaults from @db.default', () => {
       const statusDefault = table.defaults.get('status')
       expect(statusDefault).toEqual({ kind: 'value', value: 'active' })
     })
@@ -338,7 +338,7 @@ describe('AtscriptDbTable', () => {
       } as any)
 
       const insertCall = adapter.calls[0]
-      // status should get default value "active" (@db.default.value)
+      // status should get default value "active" (@db.default)
       expect(insertCall.args[0][0].status).toBe('active')
     })
   })

@@ -46,7 +46,7 @@ interface User {
   @db.index.plain "name_idx"
   name: string
 
-  @db.default.value "active"
+  @db.default "active"
   status: string
 
   @db.ignore
@@ -218,7 +218,7 @@ Override these optional methods to process adapter-specific annotations during f
 When you call `insertOne(payload)`, the table automatically:
 
 1. **Flattens** the annotated type (lazy, cached) — extracts all fields, indexes, metadata
-2. **Applies defaults** — fills `@db.default.value` fields that are missing
+2. **Applies defaults** — fills `@db.default` fields that are missing
 3. **Validates** — runs Atscript validators + adapter plugins
 4. **Prepares IDs** — calls `adapter.prepareId()` on primary key fields
 5. **Strips ignored fields** — removes `@db.ignore` fields
@@ -239,7 +239,7 @@ These `@db.*` annotations are defined in `@atscript/core` and processed by `Atsc
 | `@db.schema "name"` | Interface | Database schema/namespace |
 | `@meta.id` | Field | Marks primary key (no args; multiple = composite key) |
 | `@db.column "name"` | Field | Physical column name override |
-| `@db.default.value "val"` | Field | Default value on insert |
+| `@db.default "val"` | Field | Default value on insert |
 | `@db.default.fn "now"` | Field | Default function (`now`, `uuid`, `increment`) |
 | `@db.ignore` | Field | Exclude from database operations |
 | `@db.index.plain "name"` | Field | B-tree index (optional sort: `"name", "desc"`) |

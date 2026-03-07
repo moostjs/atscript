@@ -32,7 +32,7 @@ $("object", Post)
     "status",
     $().designType("string")
       .tags("string")
-      .annotate("db.default.value", "draft")
+      .annotate("db.default", "draft")
       .$type
   ).prop(
     "createdAt",

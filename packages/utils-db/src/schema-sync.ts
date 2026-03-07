@@ -20,6 +20,8 @@ export interface TSyncPlanTable {
   typeChanges: Array<{ column: string; fromType: string; toType: string }>
   columnsToDrop: string[]
   syncMethod?: 'drop' | 'recreate'
+  /** If set, this entry is a view. 'V' = virtual view, 'M' = materialized view. */
+  viewType?: 'V' | 'M'
 }
 
 export interface TSyncPlan {
@@ -52,6 +54,8 @@ export interface TSyncTableResult {
   columnsDropped: string[]
   recreated: boolean
   errors: string[]
+  /** If set, this entry is a view. 'V' = virtual view, 'M' = materialized view. */
+  viewType?: 'V' | 'M'
 }
 
 export interface TSyncResult {
@@ -76,6 +80,7 @@ export class SchemaSync {
 
   /**
    * Resolves types into categorized readables and computes the schema hash.
+   * Both tables and views (virtual + materialized) are tracked and hashed.
    */
   private async resolveAndHash(types: TAtscriptAnnotatedType[]): Promise<{
     tables: AtscriptDbReadable[]
@@ -168,18 +173,30 @@ export class SchemaSync {
       }
 
       // 7. Sync views
+      const viewResults: TSyncTableResult[] = []
       for (const readable of views) {
         await readable.dbAdapter.ensureTable()
+        viewResults.push({
+          tableName: readable.tableName,
+          created: false,
+          columnsAdded: [],
+          columnsRenamed: [],
+          columnsDropped: [],
+          recreated: false,
+          errors: [],
+          viewType: (readable as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
+        })
       }
 
       // 8. Track tables — detect and drop removed tables
-      const removedTables = await this.detectRemovedTables(tables)
+      const allReadables = [...tables, ...views]
+      const removedTables = await this.detectRemovedTables(allReadables)
       if (!safe && removedTables.length > 0) {
         for (const name of removedTables) {
           await this.space.dropTableByName(name)
         }
       }
-      await this.writeTableList(tables.map(t => t.tableName))
+      await this.writeTableList(allReadables.map(t => t.tableName))
 
       // 9. Write new hash
       await this.writeHash(hash)
@@ -187,7 +204,7 @@ export class SchemaSync {
       return {
         status: 'synced',
         schemaHash: hash,
-        tables: tableResults,
+        tables: [...tableResults, ...viewResults],
         removedTables: removedTables.length > 0 ? removedTables : undefined,
       }
     } finally {
@@ -203,21 +220,33 @@ export class SchemaSync {
   async plan(types: TAtscriptAnnotatedType[], opts?: Pick<TSyncOptions, 'force' | 'safe'>): Promise<TSyncPlan> {
     const force = opts?.force ?? false
     const safe = opts?.safe ?? false
-    const { tables, hash } = await this.resolveAndHash(types)
+    const { tables, views, hash } = await this.resolveAndHash(types)
+    const allReadables = [...tables, ...views]
 
     await this.ensureControlTable()
 
     // Always introspect tables so the plan includes all table statuses
     let planTables = await Promise.all(tables.map(r => this.planTable(r)))
 
+    // Add views to plan (views don't have column introspection)
+    const viewPlans: TSyncPlanTable[] = views.map(v => ({
+      tableName: v.tableName,
+      isNew: false,
+      columnsToAdd: [],
+      columnsToRename: [],
+      typeChanges: [],
+      columnsToDrop: [],
+      viewType: (v as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
+    }))
+
     // Quick check — skip if hash matches
     if (!force) {
       const storedHash = await this.readHash()
       if (storedHash === hash) {
-        return { status: 'up-to-date', schemaHash: hash, tables: planTables, removedTables: [] }
+        return { status: 'up-to-date', schemaHash: hash, tables: [...planTables, ...viewPlans], removedTables: [] }
       }
     }
-    let removedTables = await this.detectRemovedTables(tables)
+    let removedTables = await this.detectRemovedTables(allReadables)
 
     if (safe) {
       // Hide destructive operations in safe mode
@@ -228,7 +257,7 @@ export class SchemaSync {
     return {
       status: 'changes-needed',
       schemaHash: hash,
-      tables: planTables,
+      tables: [...planTables, ...viewPlans],
       removedTables,
     }
   }

@@ -337,14 +337,14 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   /**
-   * Checks whether an interface is a DB entity (`@db.table` or `@db.view.for`).
+   * Checks whether an interface is a DB entity (`@db.table` or `@db.view`).
    *
    * Only DB entities get `__flat`, `__pk`, `__ownProps`, and `__navProps` static properties.
    * These exist solely to improve type-safety for filter expressions, `$select`/`$sort`,
    * and `$with` operations in the DB layer.
    */
   private hasDbEntity(node: SemanticInterfaceNode): boolean {
-    return !!node.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view.for')
+    return !!node.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')
   }
 
   /**

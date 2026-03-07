@@ -63,7 +63,7 @@ const bulkResult = await users.insertMany([
 ```
 
 Before inserting, `AtscriptDbTable`:
-1. Applies default values (`@db.default.value` / `@db.default.fn`)
+1. Applies default values (`@db.default` / `@db.default.fn`)
 2. Validates the payload against the Atscript type
 3. Strips `@db.ignore` fields
 4. Maps logical field names to physical column names (`@db.column`)

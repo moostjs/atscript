@@ -7,7 +7,7 @@ export interface TodoCollection {
 
     title: string
 
-    @db.default.value 'false'
+    @db.default 'false'
     completed: boolean
 }
 

@@ -53,7 +53,7 @@ export interface User {
     @db.index.plain 'name_idx'
     name: string
 
-    @db.default.value 'active'
+    @db.default 'active'
     status: string
 
     @db.default.fn 'now'

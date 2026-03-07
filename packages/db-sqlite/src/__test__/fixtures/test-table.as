@@ -19,7 +19,7 @@ export interface UsersTable {
     @db.ignore
     displayName?: string
 
-    @db.default.value 'active'
+    @db.default 'active'
     status: string
 
     @db.index.fulltext 'search_idx'

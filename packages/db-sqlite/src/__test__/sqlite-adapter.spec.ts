@@ -169,7 +169,7 @@ describe('SqliteAdapter + AtscriptDbTable', () => {
       expect(row?.displayName).toBeUndefined()
     })
 
-    it('should apply default values (@db.default.value)', async () => {
+    it('should apply default values (@db.default)', async () => {
       await table.insertOne({
         id: 1,
         email: 'john@example.com',
