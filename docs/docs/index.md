@@ -2,8 +2,8 @@
 layout: home
 
 hero2:
-  text: 'Define once. Generate everything.'
-  tagline: 'Types, validation, database tables, REST APIs — from one .as file.'
+  text: 'Define your data once'
+  tagline: 'Get types, validations, DB, REST API, UI forms for free'
 
 actions:
   - theme: brand

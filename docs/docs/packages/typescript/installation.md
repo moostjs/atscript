@@ -77,6 +77,8 @@ You should see the available command options:
 Options:
   -c, --config <path>    Path to config file
   -f, --format <format>  Output format (dts or js)
+  --noEmit               Only run diagnostics, no file output
+  --skipDiag             Skip diagnostics, always emit
   --help                 Show help
 ```
 

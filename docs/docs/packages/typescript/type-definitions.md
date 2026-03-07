@@ -425,6 +425,9 @@ const withDefaults = createDataFromAnnotatedType(Product, { mode: 'default' })
 
 // Example mode — reads @meta.example annotations
 const withExamples = createDataFromAnnotatedType(Product, { mode: 'example' })
+
+// DB mode — reads @db.default and @db.default.fn annotations
+const withDbDefaults = createDataFromAnnotatedType(Product, { mode: 'db' })
 ```
 
 ### Modes
@@ -434,6 +437,7 @@ const withExamples = createDataFromAnnotatedType(Product, { mode: 'example' })
 | `'empty'`   | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped                          |
 | `'default'` | `@meta.default` annotations                          | Skipped unless annotated                |
 | `'example'` | `@meta.example` annotations                          | Always included                         |
+| `'db'`      | `@db.default` (parsed) or `@db.default.fn` (returns function name string) | Skipped unless annotated |
 | `function`  | Custom resolver callback                             | Skipped unless resolver returns a value |
 
 ### Annotations

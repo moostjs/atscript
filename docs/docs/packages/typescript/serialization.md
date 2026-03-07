@@ -78,7 +78,7 @@ The `processAnnotation` callback receives:
 
 - `key` — annotation name (e.g. `'meta.label'`)
 - `value` — annotation value
-- `path` — property path to the current node (e.g. `['address', 'city']`)
+- `path` — property path as a `string[]` array (e.g. `['address', 'city']`)
 - `kind` — type kind at this node (`''`, `'object'`, `'array'`, etc.)
 
 ## Example: Server-Driven Form Rendering

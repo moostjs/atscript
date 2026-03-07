@@ -8,10 +8,11 @@ Wrap multiple operations in a transaction to ensure they all succeed or all fail
 
 ## Using Transactions
 
-Call `withTransaction()` on any table or adapter:
+Call `withTransaction()` on the adapter:
 
 ```typescript
-await userTable.withTransaction(async () => {
+const adapter = userTable.getAdapter()
+await adapter.withTransaction(async () => {
   await userTable.insertOne({ name: 'Alice', email: 'alice@example.com' })
   await projectTable.insertOne({ title: 'New Project', ownerId: 1 })
   // If projectTable.insertOne fails, the user insert is rolled back too
@@ -27,7 +28,7 @@ const db = new DbSpace(adapterFactory)
 const users = db.getTable(User)
 const projects = db.getTable(Project)
 
-await users.withTransaction(async () => {
+await users.getAdapter().withTransaction(async () => {
   const result = await users.insertOne({ name: 'Alice', email: 'alice@example.com' })
   await projects.insertOne({ title: 'My Project', ownerId: result.insertedId })
 })
@@ -42,10 +43,11 @@ Deep operations ([nested inserts, replaces, and updates](./deep-operations)) are
 Transactions nest automatically. If you call `withTransaction()` inside another transaction, the inner call joins the outer transaction:
 
 ```typescript
-await users.withTransaction(async () => {
+const adapter = users.getAdapter()
+await adapter.withTransaction(async () => {
   await users.insertOne({ name: 'Alice' })
 
-  await users.withTransaction(async () => {
+  await adapter.withTransaction(async () => {
     // This runs inside the same transaction
     await projects.insertOne({ title: 'Project', ownerId: 1 })
   })

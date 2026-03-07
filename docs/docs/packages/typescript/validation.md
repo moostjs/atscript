@@ -116,12 +116,12 @@ Annotations from `.as` files are enforced automatically during validation. See t
 | `@expect.maxLength` | string, array   | Maximum length                                                         |
 | `@expect.min`       | number          | Minimum value                                                          |
 | `@expect.max`       | number          | Maximum value                                                          |
-| `@expect.int`       | number          | Must be integer                                                        |
+| `@expect.int`       | number          | Must be integer (accepts optional custom error message)                |
 | `@expect.pattern`   | string          | Regex match (multiple patterns supported)                              |
 | `@expect.array.uniqueItems` | array  | No duplicate items (by key fields if defined, otherwise deep equality) |
 | `@expect.array.key` | property in array element | Marks a key field for lookups and patch operations (does not enforce uniqueness alone) |
 
-All validation annotations accept an optional custom error message as the last argument (except `@expect.int` and `@expect.array.key`):
+All validation annotations accept an optional custom error message as the last argument (except `@expect.array.key`):
 
 ```atscript
 interface User {
@@ -206,16 +206,15 @@ Plugins intercept validation to add custom logic. A plugin is a function that re
 ```typescript
 import type { TValidatorPlugin } from '@atscript/typescript/utils'
 
-const coerceNumbers: TValidatorPlugin = (ctx, def, value) => {
-  if (def.type.kind === '' && def.type.designType === 'number') {
-    if (typeof value === 'string' && !isNaN(Number(value))) {
-      return undefined // allow default validation to handle coerced value
-    }
+const skipSensitive: TValidatorPlugin = (ctx, def, value) => {
+  // Accept any value for fields marked as sensitive
+  if (def.metadata.get('meta.sensitive')) {
+    return true // accept — skip default validation
   }
   return undefined // fall through to default validation
 }
 
-const validator = Product.validator({ plugins: [coerceNumbers] })
+const validator = Product.validator({ plugins: [skipSensitive] })
 ```
 
 ### External Context

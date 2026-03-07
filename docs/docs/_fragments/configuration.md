@@ -32,7 +32,7 @@ export default defineConfig({
 #### `rootDir`
 
 - **Type:** `string`
-- **Required:** Yes
+- **Default:** Config file's directory (or `process.cwd()` if no config file)
 - **Description:** Root directory containing `.as` files
 
 ```javascript
@@ -151,7 +151,7 @@ plugins: [ts(), MongoPlugin()]
 #### `format`
 
 - **Type:** `string`
-- **Default:** `'dts'`
+- **Default:** Plugin-dependent (the TypeScript plugin defaults to `dts`)
 - **Description:** Output format that plugins should generate
 
 ```javascript

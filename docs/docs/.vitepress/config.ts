@@ -285,7 +285,7 @@ const atscriptGrammar = {
 export default defineConfig({
   title: 'Atscript',
   description:
-    'A universal type and metadata description language for multi-language code generation',
+    'Define your data once — get types, validations, DB, REST API, and UI forms for free',
   lang: 'en-US',
   lastUpdated: true,
   cleanUrls: true,
@@ -302,13 +302,13 @@ export default defineConfig({
     ['link', { rel: 'icon', href: '/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#3c8772' }],
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'Atscript' }],
+    ['meta', { property: 'og:title', content: 'Atscript — Define Your Data Once' }],
     [
       'meta',
       {
         property: 'og:description',
         content:
-          'A universal type and metadata description language for multi-language code generation',
+          'Define your data once — get types, validations, DB, REST API, and UI forms for free',
       },
     ],
   ],
@@ -563,7 +563,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Released under the ISC License.',
+      message: 'Released under the MIT License.',
       copyright: 'Copyright © 2025-present Artem Maltsev',
     },
   },

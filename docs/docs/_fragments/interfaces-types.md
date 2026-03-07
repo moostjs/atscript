@@ -141,7 +141,7 @@ import { Address } from './address'
 @db.table 'users'
 @db.mongo.collection
 export interface User {
-    @meta.id
+    @meta.id                     // multiple @meta.id fields form a composite PK
     _id: mongo.objectId
 
     username: string

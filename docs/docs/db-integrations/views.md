@@ -126,7 +126,10 @@ export interface MonthlyStats {
 ```
 
 ::: info
-Materialized view support depends on your database. SQLite does not support materialized views natively. PostgreSQL and MongoDB do.
+Materialized view support depends on your database:
+- **PostgreSQL** — Native `CREATE MATERIALIZED VIEW` support
+- **MongoDB** — On-demand materialized views via `$merge`/`$out` aggregation stages
+- **SQLite** — Not supported
 :::
 
 ## Querying Views
@@ -138,7 +141,7 @@ import { DbSpace } from '@atscript/utils-db'
 import { ActiveTask } from './schema/active-task.as'
 
 const db = new DbSpace(adapterFactory)
-const activeTasks = db.getReadable(ActiveTask)
+const activeTasks = db.getView(ActiveTask)
 
 // Query the view
 const tasks = await activeTasks.findMany({

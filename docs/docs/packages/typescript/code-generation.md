@@ -106,8 +106,9 @@ The same Product `.as` file generates:
 import {
   defineAnnotatedType as $,
   annotate as $a,
-  buildJsonSchema as $$,
-  createDataFromAnnotatedType as $e,
+  buildJsonSchema as $$,           // only with jsonSchema: 'lazy'
+  createDataFromAnnotatedType as $e, // only with exampleData: true
+  throwFeatureDisabled as $d,       // only with jsonSchema: false (default)
 } from '@atscript/typescript/utils'
 
 export class Product {

@@ -71,6 +71,18 @@ Each primitive extension supports:
 | `expect`        | Implicit validation constraints — merged with parent's `expect`                                               |
 | `extensions`    | Nested sub-extensions (e.g., `number.int.positive`)                                                           |
 | `isContainer`   | If `true`, the primitive cannot be used directly — one of its extensions must be chosen                       |
+| `tags`          | Array of semantic tags (e.g., `['created']`) — inherited from parent, used by DB adapters and runtime tools   |
+| `annotations`   | Implicit annotations applied to any field using this primitive (e.g., `{ 'expect.int': true }`)               |
+
+::: warning isContainer
+When `isContainer: true`, the primitive itself cannot be used as a type — only its extensions are valid:
+
+```atscript
+field: ui             // ✗ Error — ui is a container, must use an extension
+field: ui.action      // ✓ Correct — uses the extension
+```
+
+:::
 
 ::: tip Inheritance
 Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own constraints.

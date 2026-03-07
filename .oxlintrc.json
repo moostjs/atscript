@@ -425,6 +425,7 @@
         ".commitlintrc.js",
         "docs/**/*.ts",
         "docs/**/*.js",
+        "docs/**/*.vue",
         "**/src/index.ts"
       ],
       "env": {
@@ -432,6 +433,16 @@
       },
       "rules": {
         "import/no-default-export": "off"
+      }
+    },
+    {
+      "files": ["docs/**/*.vue"],
+      "globals": {
+        "defineProps": "readonly",
+        "defineEmits": "readonly",
+        "defineExpose": "readonly",
+        "defineSlots": "readonly",
+        "withDefaults": "readonly"
       }
     }
   ]

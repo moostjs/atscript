@@ -129,6 +129,17 @@ export interface Product {
 - Unix timestamp (integer)
 - Typically seconds since epoch
 
+**`number.timestamp.created`**
+
+- Auto-set on creation
+- Implicitly adds `@db.default.fn "now"` and a `created` tag
+- DB adapters use this to automatically set the timestamp when a record is inserted
+
+**`number.timestamp.updated`**
+
+- Auto-updated on every write
+- Adds an `updated` tag that DB adapters recognize for automatic update behavior
+
 ### Boolean Extensions
 
 Boolean types can be extended for specific use cases:

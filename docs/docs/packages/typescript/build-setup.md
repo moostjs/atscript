@@ -85,13 +85,40 @@ export default {
 }
 ```
 
+```javascript [Webpack]
+// webpack.config.js
+import atscript from 'unplugin-atscript/webpack'
+
+export default {
+  plugins: [atscript()],
+}
+```
+
+```javascript [Rspack]
+// rspack.config.js
+import atscript from 'unplugin-atscript/rspack'
+
+export default {
+  plugins: [atscript()],
+}
+```
+
+```javascript [Farm]
+// farm.config.js
+import atscript from 'unplugin-atscript/farm'
+
+export default {
+  plugins: [atscript()],
+}
+```
+
 :::
 
 ## How It Works
 
 1. **Config Discovery** — the plugin finds your `atscript.config.js` by searching upward from each `.as` file
 2. **Plugin Execution** — runs all plugins defined in your configuration
-3. **File Generation** — generates JavaScript output for the bundler (ignores `format` setting)
+3. **File Generation** — generates output based on the `format` setting in your configuration
 4. **Import Resolution** — allows importing `.as` files directly in TypeScript/JavaScript
 
 In development, the plugin compiles on-demand with hot module replacement. In production, it pre-compiles during the build for optimal performance.

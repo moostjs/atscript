@@ -105,6 +105,18 @@ Mark fields for full-text search:
 bio?: string
 ```
 
+You can optionally assign a **weight** to a field — higher weight means more relevant in search results:
+
+```atscript
+@db.index.fulltext 'search_idx', 10
+title: string
+
+@db.index.fulltext 'search_idx', 1
+body?: string
+```
+
+The weight parameter defaults to `1`. It's supported by databases with weighted full-text search (e.g., MongoDB, PostgreSQL).
+
 Full-text indexes are handled differently by each adapter:
 - **SQLite** — Requires FTS5 extension (not auto-managed)
 - **MongoDB** — Creates a text index; also supports Atlas Search via `@db.mongo.search.*`

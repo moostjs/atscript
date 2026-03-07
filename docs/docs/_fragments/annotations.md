@@ -147,14 +147,14 @@ Atscript provides common-purpose annotations:
 - `@expect.maxLength 100, "Custom error message"` - Maximum string/array length (optional message)
 - `@expect.min 0, "Custom error message"` - Minimum number value (optional message)
 - `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
-- `@expect.int` - Must be integer
+- `@expect.int "Custom error message"` - Must be integer (optional message)
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
 - `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
 - `@expect.array.key` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself)
 
 `@expect.array.key` has compile-time constraints: the field must be `string` or `number`, cannot be optional, and multiple key fields form a **composite key**.
 
-All validation annotations accept an optional custom error message as the last argument (except `@expect.int` and `@expect.array.key`). When validation fails, the custom message is used instead of the default error message.
+All validation annotations accept an optional custom error message as the last argument (except `@expect.array.key`). When validation fails, the custom message is used instead of the default error message.
 
 #### Array Annotations Example
 
@@ -203,9 +203,11 @@ Atscript ships a comprehensive set of database annotations for defining tables, 
 - `@db.column`, `@db.json`, `@db.ignore` — Column configuration
 - `@db.default`, `@db.default.fn` — Default values
 - `@db.index.plain`, `@db.index.unique`, `@db.index.fulltext` — Indexes
-- `@db.rel.FK`, `@db.rel.to`, `@db.rel.from`, `@db.rel.via` — Relations
-- `@db.view`, `@db.view.for`, `@db.view.joins`, `@db.view.filter` — Views
+- `@db.rel.FK`, `@db.rel.to`, `@db.rel.from`, `@db.rel.via`, `@db.rel.onDelete`, `@db.rel.onUpdate`, `@db.rel.filter` — Relations
+- `@db.view`, `@db.view.for`, `@db.view.joins`, `@db.view.filter`, `@db.view.materialized`, `@db.view.renamed` — Views
+- `@db.patch.strategy` — Patch behavior for nested objects
 - `@db.sync.method`, `@db.table.renamed`, `@db.column.renamed` — Schema sync
+- `@emit.jsonSchema` — Pre-compute and embed JSON Schema at build time
 
 See the [Annotations Reference](/db-integrations/annotations) for the complete list.
 

@@ -278,7 +278,7 @@ Each `$with` entry is a sub-query with its own `filter`, `controls` (including n
 
 ```typescript
 const post = await postTable.findById(1, {
-  $with: [{ name: 'author' }, { name: 'comments' }],
+  controls: { $with: [{ name: 'author' }, { name: 'comments' }] },
 })
 ```
 

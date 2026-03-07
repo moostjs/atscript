@@ -1332,7 +1332,8 @@ export const dbAnnotations: TAnnotationsTree = {
       description:
         'Marks a view as materialized (precomputed, stored on disk). ' +
         'Supported by PostgreSQL, CockroachDB, Oracle, SQL Server (indexed views), Snowflake. ' +
-        'Not applicable to MySQL, SQLite, MongoDB.\n\n' +
+        'MongoDB supports on-demand materialized views via $merge/$out. ' +
+        'Not applicable to MySQL or SQLite.\n\n' +
         '**Example:**\n' +
         '```atscript\n' +
         '@db.view.materialized\n' +

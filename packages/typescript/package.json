@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/moostjs/atscript/issues"
   },
-  "license": "ISC",
+  "license": "MIT",
   "author": "Artem Maltsev",
   "repository": {
     "type": "git",

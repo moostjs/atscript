@@ -10,7 +10,7 @@ Complete reference for all `@db.*` annotations. These annotations are shipped wi
 
 | Annotation | Target | Description |
 |-----------|--------|-------------|
-| `@db.table 'name'` | interface | Map interface to a database table |
+| `@db.table` / `@db.table 'name'` | interface | Map interface to a database table (name optional — defaults to interface name) |
 | `@db.table.renamed 'oldName'` | interface | Track table rename for [schema sync](./schema-sync) |
 | `@db.schema 'name'` | interface | Assign table to a database schema/namespace |
 
@@ -34,10 +34,14 @@ Complete reference for all `@db.*` annotations. These annotations are shipped wi
 
 | Annotation | Target | Description |
 |-----------|--------|-------------|
-| `@db.index.plain 'name'` | field | Non-unique index |
+| `@db.index.plain` | field | Non-unique index (auto-named) |
+| `@db.index.plain 'name'` | field | Non-unique index with explicit name |
 | `@db.index.plain 'name', 'desc'` | field | Non-unique index with sort direction |
-| `@db.index.unique 'name'` | field | Unique index |
-| `@db.index.fulltext 'name'` | field | Full-text search index |
+| `@db.index.unique` | field | Unique index (auto-named) |
+| `@db.index.unique 'name'` | field | Unique index with explicit name |
+| `@db.index.fulltext` | field | Full-text search index (auto-named) |
+| `@db.index.fulltext 'name'` | field | Full-text search index with explicit name |
+| `@db.index.fulltext 'name', 5` | field | Full-text search index with weight |
 
 Add the same index name to multiple fields for composite indexes.
 
@@ -70,7 +74,7 @@ Add the same index name to multiple fields for composite indexes.
 
 | Annotation | Target | Description |
 |-----------|--------|-------------|
-| `@db.view 'name'` | interface | Declare a database [view](./views) |
+| `@db.view` / `@db.view 'name'` | interface | Declare a database [view](./views) (name optional — defaults to interface name) |
 | `@db.view.for Type` | interface | Entry table for a managed view |
 | `` @db.view.joins Type, `condition` `` | interface | Join another table with a [query condition](./query-expressions) |
 | `` @db.view.filter `condition` `` | interface | WHERE clause for the view |

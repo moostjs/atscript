@@ -23,12 +23,12 @@ const users = db.getTable(User)
 const projects = db.getTable(Project)
 ```
 
-For read-only access (views or tables), use `getReadable()`:
+For views, use `getView()`:
 
 ```typescript
 import { ActiveTask } from './schema/active-task.as'
 
-const activeTasks = db.getReadable(ActiveTask)
+const activeTasks = db.getView(ActiveTask)
 ```
 
 ## Insert
@@ -52,7 +52,7 @@ const result = await users.insertMany([
   { email: 'alice@example.com', name: 'Alice' },
   { email: 'bob@example.com', name: 'Bob' },
 ])
-// result: { insertedCount: 2 }
+// result: { insertedCount: 2, insertedIds: [1, 2] }
 ```
 
 Batch inserts run within a single transaction.
@@ -126,7 +126,7 @@ const result = await userTable.updateOne({
   id: 1,
   name: 'Alice Smith',
 })
-// result: { modifiedCount: 1 }
+// result: { matchedCount: 1, modifiedCount: 1 }
 ```
 
 The primary key field(s) must be included to identify the record.
@@ -140,7 +140,7 @@ const result = await userTable.updateMany(
   { status: 'inactive' },          // filter
   { status: 'archived' },          // data to set
 )
-// result: { modifiedCount: 5 }
+// result: { matchedCount: 5, modifiedCount: 5 }
 ```
 
 ## Replace
