@@ -4,6 +4,7 @@ import { onMounted, nextTick, watch } from 'vue'
 import { useData, useRoute } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import VPButton from 'vitepress/dist/client/theme-default/components/VPButton.vue'
+import SnippetDefine from './snippets/define-example.md'
 import SnippetScattered from './snippets/scattered-ts.md'
 import SnippetUnified from './snippets/unified-as.md'
 
@@ -33,45 +34,6 @@ function setupScrollAnimations() {
 
 onMounted(setupScrollAnimations)
 watch(() => route.path, setupScrollAnimations)
-
-const features = [
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-3-3v6m-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>`,
-        title: 'One File, Zero Drift',
-        details: 'Types, validation, DB schemas, and UI metadata in a single <code>.as</code> file. Change once, everything stays in sync.',
-        link: '/packages/typescript/why-atscript',
-    },
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>`,
-        title: 'Types That Validate',
-        details: "<code>string.email</code> isn't just a type — it's a validator. <code>number.int.positive</code> carries constraints automatically.",
-        link: '/packages/typescript/primitives',
-    },
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M21 6.375c0 2.692-4.03 4.875-9 4.875S3 9.067 3 6.375S7.03 1.5 12 1.5s9 2.183 9 4.875z"/><path fill="currentColor" d="M12 12.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384Q21 10.09 21 10.5v1.875c0 2.692-4.03 4.875-9 4.875S3 15.067 3 12.375V10.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 12.164 9.315 12.75 12 12.75z"/><path fill="currentColor" d="M12 18.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384q.025.333.025.743v1.875c0 2.692-4.03 4.875-9 4.875S3 21.067 3 18.375V16.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 18.164 9.315 18.75 12 18.75z"/></svg>`,
-        title: 'Database From Annotations',
-        details: '<code>@db.table</code>, <code>@db.index.unique</code>, <code>@db.column</code> — your schema creates tables, syncs indexes, and handles CRUD.',
-        link: '/db-support/',
-    },
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z"/></svg>`,
-        title: 'Full Stack From One Source',
-        details: 'TypeScript types, runtime validators, JSON Schema, database tables with indexes — all generated from one <code>.as</code> file.',
-        link: '/packages/typescript/quick-start',
-    },
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>`,
-        title: 'Rich Runtime Metadata',
-        details: 'Labels, descriptions, sensitivity flags, UI hints — all accessible at runtime for forms, docs, and APIs.',
-        link: '/packages/typescript/metadata-export',
-    },
-    {
-        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M41.5 10h-6m-8-4v8m0-4h-22m8 14h-8m16-4v8m22-4h-22m20 14h-6m-8-4v8m0-4h-22"/></svg>`,
-        title: 'Your Rules, Your Plugins',
-        details: 'Add domain-specific annotations that flow through your entire stack. Build plugins for any language, database, or framework.',
-        link: '/plugin-development/',
-    },
-]
 </script>
 
 <template>
@@ -99,9 +61,7 @@ const features = [
                                 />
                             </div>
                         </div>
-
                     </div>
-                    
                     <div class="hero-image">
                         <div class="image-container">
                             <img src="/logo.svg" alt="Atscript" class="image-src" />
@@ -110,36 +70,67 @@ const features = [
                 </div>
             </div>
 
-            <!-- Feature Cards -->
-            <section class="features-section">
-                <div class="features-inner">
+            <!-- Features -->
+            <section class="section-features">
+                <div class="section-inner">
                     <div class="features-grid">
-                        <a
-                            v-for="(f, i) in features"
-                            :key="i"
-                            :href="f.link"
-                            class="feature-card"
-                            :style="{ '--delay': `${i * 0.07}s` }"
-                        >
-                            <div class="feature-icon" v-html="f.icon" />
-                            <div class="feature-body">
-                                <h3 class="feature-title">{{ f.title }}</h3>
-                                <p class="feature-details" v-html="f.details"></p>
+                        <a href="/packages/typescript/why-atscript" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-3-3v6m-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
                             </div>
+                            <h3 class="feature-title">One File, Zero Drift</h3>
+                            <p class="feature-desc">Types, validation, DB schema, and metadata live in a single <code>.as</code> file. Change it once — everything stays in sync.</p>
+                        </a>
+                        <a href="/db-integrations/quick-start" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/></svg>
+                            </div>
+                            <h3 class="feature-title">Schema to Database in Seconds</h3>
+                            <p class="feature-desc">Relations, foreign keys, indexes, views, cascades — all from annotations. Run <code>asc db sync</code> and your tables are ready.</p>
+                        </a>
+                        <a href="/packages/typescript/primitives" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                            </div>
+                            <h3 class="feature-title">Types That Validate</h3>
+                            <p class="feature-desc">Semantic types like <code>string.email</code> carry runtime validation built in.</p>
+                        </a>
+                        <a href="/packages/typescript/quick-start" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+                            </div>
+                            <h3 class="feature-title">Full Stack From One Source</h3>
+                            <p class="feature-desc">TypeScript types, validators, DB tables, REST API — generated from one definition.</p>
+                        </a>
+                        <a href="/packages/typescript/annotations" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>
+                            </div>
+                            <h3 class="feature-title">Rich Runtime Metadata</h3>
+                            <p class="feature-desc">Labels, UI hints, custom annotations — accessible at runtime, not just compile time.</p>
+                        </a>
+                        <a href="/plugin-development/" class="feature-card">
+                            <div class="feature-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743"/></svg>
+                            </div>
+                            <h3 class="feature-title">Your Rules, Your Plugins</h3>
+                            <p class="feature-desc">Extend with custom annotations, primitives, and code generators. Atscript adapts to your stack.</p>
                         </a>
                     </div>
                 </div>
             </section>
 
-            <!-- Before/After: Scattered vs Unified -->
-            <section class="code-section bg-diagonal bg-diagonal-1">
-                <div class="code-section-inner">
-                    <h2 class="section-heading animate-in">You've written this type <span class="heading-hl">three times</span> today.</h2>
-                    <p class="section-subheading animate-in">Once in Drizzle. Once in Zod. Once in your UI config. Atscript replaces all of them.</p>
+            <!-- Section 4: Comparison -->
+            <section class="section-compare bg-diagonal">
+                <div class="section-inner">
+                    <h2 class="section-heading animate-in flex-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M9.599 3.495C9.908 2.655 10.646 2 11.616 2s1.709.654 2.018 1.495a2 2 0 0 1 .834-.177c1.293 0 2.176 1.164 2.176 2.382v.437a2 2 0 0 1 .676-.114c1.293 0 2.176 1.165 2.176 2.382v5.705c.018.709.021 2.63-.828 4.4c-.433.904-1.095 1.784-2.098 2.436c-1.005.654-2.304 1.047-3.96 1.054h-.003c-1.814 0-3.424-.886-4.6-1.784a14 14 0 0 1-2.3-2.241a4 4 0 0 0-.16-.19L3.202 15.23l-.012-.013c-.804-.92-.804-2.375 0-3.295c.85-.973 2.273-.979 3.13-.018l.27.275v-6.48c0-1.217.882-2.381 2.175-2.381c.303 0 .583.064.835.177m-.16 2.198c-.003-.58-.395-.875-.676-.875s-.676.297-.676.882v8.315a.75.75 0 0 1-1.285.525l-1.568-1.6l-.03-.03c-.258-.296-.629-.296-.887 0c-.308.352-.31.958-.005 1.314l2.34 2.547q.125.138.225.266a12.4 12.4 0 0 0 2.04 1.986c1.064.813 2.352 1.477 3.688 1.477c1.413-.006 2.42-.339 3.146-.811c.729-.474 1.225-1.12 1.563-1.827c.69-1.439.698-3.062.68-3.723V8.405c0-.585-.394-.882-.675-.882s-.676.297-.676.882v2.825a.75.75 0 1 1-1.5 0V5.7c0-.585-.395-.882-.676-.882s-.676.297-.676.882v5.53a.75.75 0 1 1-1.5 0V4.382c0-.585-.394-.882-.676-.882c-.281 0-.676.297-.676.882v6.66a.75.75 0 0 1-1.5 0z"/></svg>
+                        <span>No more <span class="hl">scattered</span> definitions</span>
+                    </h2>
                     <div class="comparison-grid animate-in">
                         <div class="comparison-col">
-                            <div class="comparison-label muted-label">Before <span class="file-count">3 files</span></div>
-                            <div class="comparison-block">
+                            <div class="code-label muted-label">Before <span class="file-count">3 files</span></div>
+                            <div class="code-block">
                                 <SnippetScattered />
                             </div>
                         </div>
@@ -148,638 +139,383 @@ const features = [
                                 <path d="M5 12h14M13 5l7 7-7 7" />
                             </svg>
                         </div>
-                        <div class="comparison-col brand-col">
-                            <div class="comparison-label brand-label">After <span class="file-count">1 file</span></div>
-                            <div class="comparison-block brand-block">
+                        <div class="comparison-col">
+                            <div class="code-label brand-label">After <span class="file-count">1 file</span></div>
+                            <div class="code-block brand-block">
                                 <SnippetUnified />
                             </div>
                         </div>
                     </div>
-                    <p class="section-footnote animate-in"><code>@meta.*</code> annotations are built-in. <code>@db.*</code> annotations power real <a href="/db-support/">database integrations</a>. Add your own via the <a href="/plugin-development/">plugin system</a>.</p>
                 </div>
             </section>
 
-            <!-- What You Get strip -->
-            <section class="what-you-get animate-in">
-                <div class="what-you-get-inner">
-                    <div class="wyg-item">
-                        <div class="wyg-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M11.644 1.59a.75.75 0 0 1 .712 0l9.75 5.25a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.712 0l-9.75-5.25a.75.75 0 0 1 0-1.32l9.75-5.25z"/><path fill="currentColor" d="M3.265 10.602l7.668 4.129a2.25 2.25 0 0 0 2.134 0l7.668-4.13 1.37.739a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.71 0l-9.75-5.25a.75.75 0 0 1 0-1.32l1.37-.738z"/><path fill="currentColor" d="M3.265 15.602l7.668 4.129a2.25 2.25 0 0 0 2.134 0l7.668-4.13 1.37.739a.75.75 0 0 1 0 1.32l-9.75 5.25a.75.75 0 0 1-.71 0l-9.75-5.25a.75.75 0 0 1 0-1.32l1.37-.738z"/></svg>
+            <!-- Section 1: Define your data -->
+            <section class="section-define">
+                <div class="section-inner">
+                    <h2 class="section-heading animate-in flex-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><g fill="none"><path stroke="currentColor" stroke-linejoin="round" stroke-width="1.5" d="m16.692 9.803l1.791-1.792a1.764 1.764 0 0 0-2.494-2.494l-1.792 1.791m2.495 2.495l-10.68 10.68a1.764 1.764 0 0 1-2.495-2.494l10.68-10.68m2.495 2.494l-2.495-2.495m3.777 6.714a.026.026 0 0 1 .052 0a3.79 3.79 0 0 0 2.953 2.952c.028.006.028.046 0 .052a3.79 3.79 0 0 0-2.953 2.953c-.006.028-.046.028-.052 0a3.79 3.79 0 0 0-2.953-2.953c-.028-.006-.028-.046 0-.052a3.79 3.79 0 0 0 2.953-2.953Z"/><path fill="currentColor" d="M8.12 3.31c.085-.413.675-.413.76 0a2.32 2.32 0 0 0 1.81 1.81c.413.085.413.675 0 .76a2.32 2.32 0 0 0-1.81 1.81c-.085.413-.675.413-.76 0a2.32 2.32 0 0 0-1.81-1.81c-.413-.085-.413-.675 0-.76a2.32 2.32 0 0 0 1.81-1.81"/></g></svg>
+                        <span>Define your <span class="hl">data</span> once</span>
+                    </h2>
+                    <div class="define-grid animate-in">
+                        <div class="define-code">
+                            <div class="code-label brand-label as-label">
+                                <img src="/logo.svg" alt="Atscript" class="as-file" />
+                                user.as
+                            </div>
+                            <div class="code-block brand-block">
+                                <SnippetDefine />
+                            </div>
                         </div>
-                        <div class="wyg-text">TypeScript Types</div>
-                    </div>
-                    <div class="wyg-sep">+</div>
-                    <div class="wyg-item">
-                        <div class="wyg-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" fill-rule="evenodd" d="M12.516 2.17a.75.75 0 0 0-1.032 0 11.2 11.2 0 0 1-7.877 3.08a.75.75 0 0 0-.722.515A12.74 12.74 0 0 0 2.25 9.75c0 5.942 4.064 10.932 9.563 12.348a.75.75 0 0 0 .374 0c5.499-1.416 9.563-6.406 9.563-12.348c0-1.39-.223-2.73-.635-3.985a.75.75 0 0 0-.722-.516l-.143.001a11.2 11.2 0 0 1-7.734-3.08zm3.927 8.57a.75.75 0 1 0-1.06-1.06L12 13.064l-1.22-1.22a.75.75 0 0 0-1.06 1.06l1.75 1.75a.75.75 0 0 0 1.06 0l3.913-3.913z" clip-rule="evenodd"/></svg>
+                        <div class="define-cards">
+                            <div class="define-card">
+                                <div class="define-card-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                                </div>
+                                <div>
+                                    <div class="define-card-title">Types that validate</div>
+                                    <div class="define-card-desc"><code>string.email</code>, <code>number.int.positive</code> — types carry constraints automatically</div>
+                                </div>
+                            </div>
+                            <div class="define-card">
+                                <div class="define-card-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>
+                                </div>
+                                <div>
+                                    <div class="define-card-title">Rich annotations</div>
+                                    <div class="define-card-desc"><code>@meta.*</code>, <code>@db.*</code>, <code>@expect.*</code> — labels, indexes, constraints, all in one place</div>
+                                </div>
+                            </div>
+                            <div class="define-card">
+                                <div class="define-card-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"/></svg>
+                                </div>
+                                <div>
+                                    <div class="define-card-title">Relations & DB schema</div>
+                                    <div class="define-card-desc">Foreign keys, cascades, indexes, views — your schema <em>is</em> your database</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="wyg-text">Runtime Validators</div>
-                    </div>
-                    <div class="wyg-sep">+</div>
-                    <div class="wyg-item">
-                        <div class="wyg-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M5.625 1.5c-1.036 0-1.875.84-1.875 1.875v17.25c0 1.035.84 1.875 1.875 1.875h12.75c1.035 0 1.875-.84 1.875-1.875V12.75A3.75 3.75 0 0 0 16.5 9h-1.875a1.875 1.875 0 0 1-1.875-1.875V5.25A3.75 3.75 0 0 0 9 1.5H5.625z"/><path fill="currentColor" d="M12.971 1.816A5.23 5.23 0 0 1 14.25 5.25v1.875c0 .207.168.375.375.375H16.5a5.23 5.23 0 0 1 3.434 1.279a9.77 9.77 0 0 0-6.963-6.963z"/></svg>
-                        </div>
-                        <div class="wyg-text">JSON Schema</div>
-                    </div>
-                    <div class="wyg-sep">+</div>
-                    <div class="wyg-item">
-                        <div class="wyg-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M21 6.375c0 2.692-4.03 4.875-9 4.875S3 9.067 3 6.375S7.03 1.5 12 1.5s9 2.183 9 4.875z"/><path fill="currentColor" d="M12 12.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384Q21 10.09 21 10.5v1.875c0 2.692-4.03 4.875-9 4.875S3 15.067 3 12.375V10.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 12.164 9.315 12.75 12 12.75z"/><path fill="currentColor" d="M12 18.75c2.685 0 5.19-.586 7.078-1.609a8.3 8.3 0 0 0 1.897-1.384q.025.333.025.743v1.875c0 2.692-4.03 4.875-9 4.875S3 21.067 3 18.375V16.5q.024-.413.025-.743a8.3 8.3 0 0 0 1.897 1.384C6.81 18.164 9.315 18.75 12 18.75z"/></svg>
-                        </div>
-                        <div class="wyg-text">DB Schemas</div>
-                    </div>
-                    <div class="wyg-sep">+</div>
-                    <div class="wyg-item">
-                        <div class="wyg-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/></svg>
-                        </div>
-                        <div class="wyg-text">Rich Metadata</div>
                     </div>
                 </div>
             </section>
+
+            <!-- Section 2: Generate your data-assets -->
+            <section class="section-generate bg-diagonal">
+                <div class="section-inner">
+                    <h2 class="section-heading animate-in flex-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1"/></svg>
+                        <span>Link your <span class="hl">assets</span> to your model</span>
+                    </h2>
+                    <div class="generate-grid animate-in">
+                        <a href="/packages/typescript/quick-start" class="gen-card">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path fill="currentColor" d="M23.827 8.243a4.4 4.4 0 0 1 2.223 1.281a6 6 0 0 1 .852 1.143c.011.045-1.534 1.083-2.471 1.662c-.034.023-.169-.124-.322-.35a2.01 2.01 0 0 0-1.67-1c-1.077-.074-1.771.49-1.766 1.433a1.3 1.3 0 0 0 .153.666c.237.49.677.784 2.059 1.383c2.544 1.095 3.636 1.817 4.31 2.843a5.16 5.16 0 0 1 .416 4.333a4.76 4.76 0 0 1-3.932 2.815a11 11 0 0 1-2.708-.028a6.53 6.53 0 0 1-3.616-1.884a6.3 6.3 0 0 1-.926-1.371a3 3 0 0 1 .327-.208c.158-.09.756-.434 1.32-.761l1.024-.6l.214.312a4.8 4.8 0 0 0 1.35 1.292a3.3 3.3 0 0 0 3.458-.175a1.545 1.545 0 0 0 .2-1.974c-.276-.395-.84-.727-2.443-1.422a8.8 8.8 0 0 1-3.349-2.055a4.7 4.7 0 0 1-.976-1.777a7.1 7.1 0 0 1-.062-2.268a4.33 4.33 0 0 1 3.644-3.374a9 9 0 0 1 2.691.084m-8.343 1.483l.011 1.454h-4.63v13.148H7.6V11.183H2.97V9.755a14 14 0 0 1 .04-1.466c.017-.023 2.832-.034 6.245-.028l6.211.017Z"/></svg>
+                            </div>
+                            <div class="gen-title">TypeScript Types</div>
+                            <div class="gen-desc">Interfaces + enums, fully typed</div>
+                        </a>
+                        <a href="/packages/typescript/primitives" class="gen-card">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>
+                            </div>
+                            <div class="gen-title">Validators</div>
+                            <div class="gen-desc">Runtime checks from type constraints</div>
+                        </a>
+                        <a href="/db-integrations/" class="gen-card">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/></svg>
+                            </div>
+                            <div class="gen-title">Database Tables</div>
+                            <div class="gen-desc">Relations, indexes, views</div>
+                        </a>
+                        <a href="/db-integrations/crud-http" class="gen-card">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="m37 22l-3 3l-11-11l3-3c1.5-1.5 7-4 11 0s1.5 9.5 0 11m5-16l-5 5M11 26l3-3l11 11l-3 3c-1.5 1.5-7 4-11 0s-1.5-9.5 0-11m12 6l4-4M6 42l5-5m5-12l4-4"/></svg>
+                            </div>
+                            <div class="gen-title">REST API</div>
+                            <div class="gen-desc">8 CRUD endpoints, zero code</div>
+                        </a>
+                        <a href="/packages/typescript/json-schema" class="gen-card">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/></svg>
+                            </div>
+                            <div class="gen-title">JSON Schema</div>
+                            <div class="gen-desc">For OpenAPI, forms, docs</div>
+                        </a>
+                        <div class="gen-card gen-card-soon">
+                            <div class="gen-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25z"/></svg>
+                            </div>
+                            <div class="gen-title">UI Forms</div>
+                            <div class="gen-desc">Coming soon</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Enjoy -->
+            <section class="section-enjoy">
+                <div class="section-inner">
+                    <h2 class="section-heading animate-in flex-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="m11.605 5.782l.23-2.369c.091-.952.98-1.598 1.878-1.366c1.351.35 2.3 1.605 2.3 3.044v3.035c0 .675 0 1.013.146 1.26c.083.141.197.26.333.345c.24.151.567.151 1.22.151h.396c1.703 0 2.554 0 3.078.39c.393.293.67.722.78 1.208c.146.65-.181 1.463-.836 3.087l-.326.81a3.26 3.26 0 0 0-.226 1.48c.232 2.874-2.047 5.295-4.833 5.136l-10.424-.599c-1.139-.065-1.708-.098-2.222-.553c-.515-.455-.612-.924-.805-1.861a14.3 14.3 0 0 1 .055-6.037c.283-1.248 1.475-1.92 2.706-1.76c3.264.42 6.223-2.019 6.55-5.4"/><path d="m7 11.5l-.137.457A15 15 0 0 0 7 21"/></g></svg>
+                        <span>Use with joy</span>
+                    </h2>
+                    <div class="enjoy-grid animate-in">
+                        <div class="enjoy-card">
+                            <div class="enjoy-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-3-3v6m-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z"/></svg>
+                            </div>
+                            <h3 class="enjoy-title">Single source of truth</h3>
+                            <p class="enjoy-desc">Types, validation, DB schema, metadata — defined once. No drift between layers.</p>
+                        </div>
+                        <div class="enjoy-card">
+                            <div class="enjoy-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182"/></svg>
+                            </div>
+                            <h3 class="enjoy-title">Always in sync</h3>
+                            <p class="enjoy-desc">Change your schema — types, validators, database, API all update together. <code>asc db sync</code>, done.</p>
+                        </div>
+                        <div class="enjoy-card">
+                            <div class="enjoy-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
+                            </div>
+                            <h3 class="enjoy-title">Works everywhere</h3>
+                            <p class="enjoy-desc">SQLite, MongoDB today. Same schema, swap one line. Language-agnostic by design.</p>
+                        </div>
+                    </div>
+                    <div class="enjoy-cta animate-in">
+                        <VPButton tag="a" size="medium" theme="brand" text="Quick Start" href="/packages/typescript/quick-start" />
+                        <VPButton tag="a" size="medium" theme="alt" text="DB Quick Start" href="/db-integrations/quick-start" />
+                    </div>
+                </div>
+            </section>
+
         </template>
     </Layout>
 </template>
 
 <style scoped>
+/* ---- Layout ---- */
+.section-inner { max-width: 1152px; margin: 0 auto; }
+.section-heading { font-size: 26px; font-weight: 700; color: var(--vp-c-text-1); margin-bottom: 24px; }
+@media (min-width: 640px) { .section-heading { font-size: 30px; } }
+.hl { color: var(--vp-c-brand-1); }
+.bg-diagonal { position: relative; }
+.bg-diagonal::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: var(--vp-c-bg-soft);
+    clip-path: polygon(0 40px, 100% 0, 100% 100%, 0 calc(100% - 40px));
+}
+
 /* ---- Hero ---- */
 .custom-hero {
-    position: relative;
-    overflow: hidden;
-    margin-top: calc(
-        (var(--vp-nav-height) + var(--vp-layout-top-height, 0px)) * -1
-    );
-    padding: calc(
-            var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 48px
-        )
-        24px 48px;
+    position: relative; overflow: hidden;
+    margin-top: calc((var(--vp-nav-height) + var(--vp-layout-top-height, 0px)) * -1);
+    padding: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 48px) 24px 48px;
 }
-@media (min-width: 640px) {
-    .custom-hero {
-        padding: calc(
-                var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 64px
-            )
-            48px 64px;
-    }
-}
-@media (min-width: 960px) {
-    .custom-hero {
-        padding: calc(
-                var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 64px
-            )
-            64px 64px;
-    }
-}
-.hero-inner {
-    max-width: 1152px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-}
-@media (min-width: 960px) {
-    .hero-inner {
-        flex-direction: row;
-        text-align: left;
-    }
-}
-.hero-main {
-    position: relative;
-    z-index: 10;
-    order: 2;
-    flex-grow: 1;
-    flex-shrink: 0;
-}
-@media (min-width: 960px) {
-    .hero-main {
-        order: 1;
-        width: calc((100% / 3) * 2);
-        max-width: 592px;
-    }
-}
-/* Image area - matches VitePress .image */
-.hero-image {
-    order: 1;
-    margin: -76px -24px -48px;
-}
-@media (min-width: 640px) {
-    .hero-image {
-        margin: -108px -24px -48px;
-    }
-}
-@media (min-width: 960px) {
-    .hero-image {
-        flex-grow: 1;
-        order: 2;
-        margin: 0;
-        min-height: 100%;
-    }
-}
-/* Image container - matches VitePress .image-container */
-.image-container {
-    position: relative;
-    margin: 0 auto;
-    width: 320px;
-    height: 320px;
-}
-@media (min-width: 640px) {
-    .image-container {
-        width: 392px;
-        height: 392px;
-    }
-}
-@media (min-width: 960px) {
-    .image-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        height: 100%;
-        transform: translate(-32px, -32px);
-    }
-}
-/* Logo image - matches VitePress .image-src sizing */
+@media (min-width: 640px) { .custom-hero { padding: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 64px) 48px 64px; } }
+@media (min-width: 960px) { .custom-hero { padding: calc(var(--vp-nav-height) + var(--vp-layout-top-height, 0px) + 64px) 64px 64px; } }
+.hero-inner { max-width: 1152px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
+@media (min-width: 960px) { .hero-inner { flex-direction: row; text-align: left; } }
+.hero-main { position: relative; z-index: 10; order: 2; flex-grow: 1; flex-shrink: 0; }
+@media (min-width: 960px) { .hero-main { order: 1; width: calc((100% / 3) * 2); max-width: 592px; } }
+.hero-image { order: 1; margin: -76px -24px -48px; }
+@media (min-width: 640px) { .hero-image { margin: -108px -24px -48px; } }
+@media (min-width: 960px) { .hero-image { flex-grow: 1; order: 2; margin: 0; min-height: 100%; } }
+.image-container { position: relative; margin: 0 auto; width: 320px; height: 320px; }
+@media (min-width: 640px) { .image-container { width: 392px; height: 392px; } }
+@media (min-width: 960px) { .image-container { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; transform: translate(-32px, -32px); } }
 .image-src {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    max-width: 192px;
-    transform: translate(-50%, -50%);
-    filter: drop-shadow(0 0 40px rgba(71, 26, 236, 0.35))
-           drop-shadow(0 0 80px rgba(71, 26, 236, 0.25))
-           drop-shadow(0 0 120px rgba(71, 26, 236, 0.15));
+    position: absolute; top: 50%; left: 50%; max-width: 192px; transform: translate(-50%, -50%);
+    filter: drop-shadow(0 0 40px rgba(71,26,236,0.35)) drop-shadow(0 0 80px rgba(71,26,236,0.25)) drop-shadow(0 0 120px rgba(71,26,236,0.15));
 }
-:global(.dark) .image-src {
-    filter: drop-shadow(0 0 40px rgba(174, 153, 252, 0.5))
-           drop-shadow(0 0 80px rgba(174, 153, 252, 0.35))
-           drop-shadow(0 0 140px rgba(174, 153, 252, 0.2));
-}
-@media (min-width: 640px) {
-    .image-src {
-        max-width: 256px;
-    }
-}
-@media (min-width: 960px) {
-    .image-src {
-        max-width: 320px;
-    }
-}
-.hero-name {
-    font-size: 84px;
-    font-weight: 600;
-    letter-spacing: -1px;
-    line-height: 1.1;
-    color: var(--vp-c-brand-1);
-    margin-bottom: 8px;
-}
-@media (min-width: 640px) {
-    .hero-name {
-        font-size: 56px;
-    }
-}
-@media (min-width: 960px) {
-    .hero-name {
-        font-size: 84px;
-    }
-}
-.hero-text {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--vp-c-text-1);
-    line-height: 1.3;
-    max-width: 600px;
-    margin: 0 auto 8px;
-}
-@media (min-width: 640px) {
-    .hero-text {
-        font-size: 32px;
-    }
-}
-@media (min-width: 960px) {
-    .hero-text {
-        font-size: 36px;
-        margin: 0 0 8px;
-    }
-}
-.hero-tagline {
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--vp-c-text-2);
-    max-width: 520px;
-    margin: 0 auto;
-    line-height: 1.5;
-}
-@media (min-width: 640px) {
-    .hero-tagline {
-        font-size: 20px;
-    }
-}
-@media (min-width: 960px) {
-    .hero-tagline {
-        margin: 0;
-    }
-}
-.actions {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin: -6px;
-    padding-top: 28px;
-}
-@media (min-width: 960px) {
-    .actions {
-        justify-content: flex-start;
-    }
-}
-.action {
-    flex-shrink: 0;
-    padding: 6px;
-}
+:global(.dark) .image-src { filter: drop-shadow(0 0 40px rgba(174,153,252,0.5)) drop-shadow(0 0 80px rgba(174,153,252,0.35)) drop-shadow(0 0 140px rgba(174,153,252,0.2)); }
+@media (min-width: 640px) { .image-src { max-width: 256px; } }
+@media (min-width: 960px) { .image-src { max-width: 320px; } }
+.hero-name { font-size: 84px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; color: var(--vp-c-brand-1); margin-bottom: 8px; }
+@media (min-width: 640px) { .hero-name { font-size: 56px; } }
+@media (min-width: 960px) { .hero-name { font-size: 84px; } }
+.hero-text { font-size: 20px; font-weight: 700; color: var(--vp-c-text-1); line-height: 1.3; max-width: 600px; margin: 0 auto 8px; }
+@media (min-width: 640px) { .hero-text { font-size: 32px; } }
+@media (min-width: 960px) { .hero-text { font-size: 36px; margin: 0 0 8px; } }
+.hero-tagline { font-size: 16px; font-weight: 500; color: var(--vp-c-text-2); max-width: 520px; margin: 0 auto; line-height: 1.5; }
+@media (min-width: 640px) { .hero-tagline { font-size: 20px; } }
+@media (min-width: 960px) { .hero-tagline { margin: 0; } }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; margin: -6px; padding-top: 28px; }
+@media (min-width: 960px) { .actions { justify-content: flex-start; } }
+.action { flex-shrink: 0; padding: 6px; }
 
-/* ---- Feature Cards ---- */
-.features-section {
-    padding: 0 24px 48px;
+/* ---- Section 1: Define ---- */
+.section-define { padding: 72px 24px 64px; }
+@media (min-width: 640px) { .section-define { padding: 80px 48px 72px; } }
+@media (min-width: 960px) { .section-define { padding: 80px 64px 72px; } }
+.define-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
+@media (min-width: 768px) { .define-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
+.define-code { min-width: 0; }
+.define-cards { display: flex; flex-direction: column; gap: 12px; }
+.define-card {
+    display: flex; align-items: flex-start; gap: 12px; padding: 16px;
+    border-radius: 12px; background: var(--vp-c-bg); border: 1px solid var(--vp-c-divider);
+    transition: border-color 0.25s ease;
 }
-@media (min-width: 640px) {
-    .features-section {
-        padding: 0 48px 48px;
-    }
+.define-card:hover { border-color: var(--vp-c-brand-1); }
+.define-card-icon {
+    flex-shrink: 0; width: 32px; height: 32px; padding: 6px; border-radius: 8px;
+    background: rgba(71,26,236,0.1); color: var(--vp-c-brand-1);
 }
-@media (min-width: 960px) {
-    .features-section {
-        padding: 0 64px 48px;
-    }
-}
-.features-inner {
-    margin: 0 auto;
-    max-width: 1152px;
-}
-.features-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 16px;
-}
-@media (min-width: 640px) {
-    .features-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-@media (min-width: 960px) {
-    .features-grid {
-        grid-template-columns: 1fr 1fr 1fr;
-    }
-}
-.feature-card {
-    display: flex;
-    gap: 16px;
-    padding: 20px;
-    border-radius: 12px;
-    border: 1px solid var(--vp-c-divider);
-    background: var(--vp-c-bg-soft);
-    text-decoration: none;
-    color: inherit;
-    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-                box-shadow 0.25s ease,
-                border-color 0.25s ease;
-    animation: feature-fade-in 0.5s ease both;
-    animation-delay: var(--delay);
-}
-.feature-card:hover {
-    transform: translateY(-4px);
-    border-color: var(--vp-c-brand-1);
-    box-shadow: 0 8px 24px rgba(71, 26, 236, 0.12);
-}
-:global(.dark) .feature-card:hover {
-    box-shadow: 0 8px 24px rgba(174, 153, 252, 0.15);
-}
-@keyframes feature-fade-in {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-.feature-icon {
-    flex-shrink: 0;
-    width: 36px;
-    height: 36px;
-    padding: 6px;
-    border-radius: 8px;
-    background: rgba(71, 26, 236, 0.1);
-    color: var(--vp-c-brand-1);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-                background 0.25s ease;
-}
-:global(.dark) .feature-icon {
-    background: rgba(174, 153, 252, 0.12);
-}
-.feature-card:hover .feature-icon {
-    transform: scale(1.15) rotate(-5deg);
-    background: rgba(71, 26, 236, 0.18);
-}
-:global(.dark) .feature-card:hover .feature-icon {
-    background: rgba(174, 153, 252, 0.22);
-}
-.feature-icon :deep(svg) {
-    width: 100%;
-    height: 100%;
-}
-.feature-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--vp-c-text-1);
-    margin-bottom: 4px;
-    line-height: 1.4;
-}
-.feature-details {
-    font-size: 13px;
-    color: var(--vp-c-text-2);
-    line-height: 1.5;
-    margin: 0;
-}
-.feature-details :deep(code) {
-    font-size: 12px;
+:global(.dark) .define-card-icon { background: rgba(174,153,252,0.12); }
+.define-card-icon svg { width: 100%; height: 100%; }
+.define-card-title { font-size: 14px; font-weight: 600; color: var(--vp-c-text-1); margin-bottom: 2px; }
+.define-card-desc { font-size: 13px; color: var(--vp-c-text-2); line-height: 1.4; }
+.define-card-desc code {
+    font-size: 12px; color: var(--vp-c-brand-1);
+    background: rgba(71,26,236,0.08); padding: 1px 5px; border-radius: 4px;
     font-family: var(--vp-font-family-mono);
-    color: var(--vp-c-brand-1);
-    background: rgba(71, 26, 236, 0.08);
-    padding: 1px 5px;
-    border-radius: 4px;
 }
-:global(.dark) .feature-details :deep(code) {
-    background: rgba(174, 153, 252, 0.12);
-}
+:global(.dark) .define-card-desc code { background: rgba(174,153,252,0.12); }
 
-/* ---- Code Comparison Sections ---- */
-.code-section {
-    padding: 32px 24px;
-    position: relative;
+/* ---- Section 2: Generate ---- */
+.section-generate { padding: 48px 24px; }
+@media (min-width: 640px) { .section-generate { padding: 64px 48px; } }
+@media (min-width: 960px) { .section-generate { padding: 64px 64px; } }
+.generate-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 640px) { .generate-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 960px) { .generate-grid { grid-template-columns: repeat(6, 1fr); gap: 14px; } }
+.gen-card {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    padding: 20px 12px; border-radius: 12px; background: var(--vp-c-bg-soft);
+    border: 1px solid var(--vp-c-divider); text-decoration: none; color: inherit; text-align: center;
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
-@media (min-width: 640px) {
-    .code-section {
-        padding: 64px 48px;
-    }
+.gen-card:hover { border-color: var(--vp-c-brand-1); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(71,26,236,0.1); }
+:global(.dark) .gen-card:hover { box-shadow: 0 4px 16px rgba(174,153,252,0.12); }
+.gen-card-soon { opacity: 0.5; cursor: default; }
+.gen-card-soon:hover { border-color: var(--vp-c-divider); transform: none; box-shadow: none; }
+.gen-icon { width: 36px; height: 36px; padding: 6px; border-radius: 10px; background: rgba(71,26,236,0.1); color: var(--vp-c-brand-1); }
+:global(.dark) .gen-icon { background: rgba(174,153,252,0.12); }
+.gen-icon svg { width: 100%; height: 100%; }
+.gen-title { font-size: 13px; font-weight: 600; color: var(--vp-c-text-1); }
+.gen-desc { font-size: 11px; color: var(--vp-c-text-2); line-height: 1.3; }
+
+/* ---- Section 3: Enjoy ---- */
+.section-enjoy { padding: 72px 24px 64px; }
+@media (min-width: 640px) { .section-enjoy { padding: 80px 48px 72px; } }
+@media (min-width: 960px) { .section-enjoy { padding: 80px 64px 72px; } }
+.enjoy-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .enjoy-grid { grid-template-columns: repeat(3, 1fr); } }
+.enjoy-card {
+    padding: 24px; border-radius: 14px; background: var(--vp-c-bg);
+    border: 1px solid var(--vp-c-divider); transition: border-color 0.25s ease;
 }
-@media (min-width: 960px) {
-    .code-section {
-        padding: 64px 64px;
-    }
+.enjoy-card:hover { border-color: var(--vp-c-brand-1); }
+.enjoy-icon {
+    width: 36px; height: 36px; padding: 6px; border-radius: 10px;
+    background: rgba(71,26,236,0.1); color: var(--vp-c-brand-1); margin-bottom: 12px;
 }
-.bg-diagonal {
-    padding-top: 80px !important;
-    padding-bottom: 80px !important;
+:global(.dark) .enjoy-icon { background: rgba(174,153,252,0.12); }
+.enjoy-icon svg { width: 100%; height: 100%; }
+.enjoy-title { font-size: 16px; font-weight: 600; color: var(--vp-c-text-1); margin-bottom: 6px; }
+.enjoy-desc { font-size: 14px; color: var(--vp-c-text-2); line-height: 1.5; margin: 0; }
+.enjoy-desc code {
+    font-size: 13px; color: var(--vp-c-brand-1);
+    background: rgba(71,26,236,0.08); padding: 1px 5px; border-radius: 4px;
+    font-family: var(--vp-font-family-mono);
 }
-.bg-diagonal::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    background: var(--vp-c-bg-soft);
-}
-.bg-diagonal-1::before {
-    clip-path: polygon(0 50px, 100% 0, 100% 100%, 0 calc(100% - 50px));
-}
-.code-section-inner {
-    max-width: 1152px;
-    margin: 0 auto;
-}
-.section-heading {
-    font-size: 24px;
-    font-weight: 700;
-    color: var(--vp-c-text-1);
-    margin-bottom: 8px;
-}
-@media (min-width: 640px) {
-    .section-heading {
-        font-size: 28px;
-    }
-}
-.heading-hl {
-    color: var(--vp-c-brand-1);
-}
-.section-subheading {
-    font-size: 16px;
-    color: var(--vp-c-text-2);
-    margin-bottom: 24px;
-    max-width: 600px;
-    line-height: 1.5;
-}
-.section-footnote {
-    font-size: 13px;
-    color: var(--vp-c-text-3);
-    margin-top: 16px;
-    line-height: 1.5;
-}
-.section-footnote code {
-    font-size: 12px;
-    color: var(--vp-c-text-2);
-    background: var(--vp-c-bg-soft);
-    padding: 1px 5px;
-    border-radius: 4px;
-}
-.section-footnote a {
-    color: var(--vp-c-brand-1);
-    text-decoration: none;
-}
-.section-footnote a:hover {
-    text-decoration: underline;
-}
-.comparison-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px;
-    align-items: center;
-    min-width: 0;
-}
-.comparison-col {
-    min-width: 0;
-}
-.comparison-arrow {
-    display: flex;
-    justify-content: center;
-    align-self: center;
-    color: var(--vp-c-text-3);
-}
-.comparison-arrow svg {
-    transform: rotate(90deg);
-}
+:global(.dark) .enjoy-desc code { background: rgba(174,153,252,0.12); }
+.enjoy-cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; }
+
+/* ---- Section 4: Comparison ---- */
+.section-compare { padding: 48px 24px 64px; }
+@media (min-width: 640px) { .section-compare { padding: 64px 48px 80px; } }
+@media (min-width: 960px) { .section-compare { padding: 64px 64px 80px; } }
+.comparison-grid { display: grid; grid-template-columns: 1fr; gap: 8px; align-items: center; min-width: 0; }
+.comparison-col { min-width: 0; }
+.comparison-arrow { display: flex; justify-content: center; color: var(--vp-c-text-3); }
+.comparison-arrow svg { transform: rotate(90deg); }
 @media (min-width: 768px) {
-    .comparison-grid {
-        grid-template-columns: 1fr auto 1fr;
-        gap: 16px;
-    }
-    .comparison-arrow svg {
-        transform: rotate(0deg);
-    }
+    .comparison-grid { grid-template-columns: 1fr auto 1fr; gap: 16px; }
+    .comparison-arrow svg { transform: rotate(0deg); }
 }
-.comparison-block {
-    border-radius: 0 0 12px 12px;
-    overflow: hidden;
-    border: 1px solid var(--vp-c-divider);
-    border-top: none;
-    background: var(--vp-c-bg);
+.header-icon {
+    width: 36px; height: 36px;
 }
-:global(.dark) .comparison-block {
-    border-color: rgba(255, 255, 255, 0.06);
+.flex-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
 }
-.comparison-label {
-    padding: 8px 16px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    border-radius: 12px 12px 0 0;
+.as-file {
+    width: 24px; height: 24px;
 }
-.muted-label {
-    background: rgba(128, 128, 128, 0.1);
-    color: var(--vp-c-text-2);
+.as-label {
+    display: flex;
+    gap: 0.5em;
 }
-.brand-label {
-    background: rgba(71, 26, 236, 0.12);
-    color: var(--vp-c-brand-1);
+
+/* ---- Shared code block styles ---- */
+.code-label {
+    padding: 8px 16px; font-size: 13px; font-weight: 600;
+    letter-spacing: 0.5px; text-transform: none; border-radius: 12px 12px 0 0;
 }
-:global(.dark) .brand-label {
-    background: rgba(174, 153, 252, 0.12);
-    color: var(--vp-c-brand-1);
+.muted-label { background: rgba(128,128,128,0.1); color: var(--vp-c-text-2); }
+.brand-label { background: rgba(71,26,236,0.12); color: var(--vp-c-brand-1); }
+:global(.dark) .brand-label { background: rgba(174,153,252,0.12); }
+.file-count { font-weight: 400; font-size: 12px; opacity: 0.7; margin-left: 4px; }
+.code-block {
+    border-radius: 0 0 12px 12px; overflow: hidden;
+    border: 1px solid var(--vp-c-divider); border-top: none; background: var(--vp-c-bg);
 }
-.file-count {
-    font-weight: 400;
-    font-size: 12px;
-    opacity: 0.7;
-    margin-left: 4px;
-}
-.label-link {
-    float: right;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: none;
-    letter-spacing: 0;
-    color: var(--vp-c-brand-1);
-    text-decoration: none;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-}
-.label-link:hover {
-    opacity: 1;
-}
-/* Reset VitePress code block chrome inside comparison */
-.comparison-block :deep(div[class*="language-"]) {
-    margin: 0 !important;
-    border-radius: 0;
-    background: var(--vp-c-bg) !important;
-}
-.comparison-block :deep(button.copy),
-.comparison-block :deep(span.lang),
-.comparison-block :deep(.line-numbers-wrapper) {
-    display: none !important;
-}
-.comparison-block :deep(pre) {
-    padding: 0 !important;
-    margin: 0 !important;
-    overflow-x: auto;
-}
-.comparison-block :deep(code) {
-    display: block;
-    width: fit-content;
-    min-width: 100%;
-    padding: 8px 20px;
-    font-size: 13px;
-}
-.comparison-block :deep(.file-sep) {
-    padding: 4px 16px;
-    font-size: 12px;
-    font-family: var(--vp-font-family-mono);
-    color: var(--vp-c-text-2);
-    background: var(--vp-c-bg-alt);
-    border-top: 1px solid var(--vp-c-divider);
-}
-:global(.dark) .comparison-block :deep(.file-sep) {
-    border-top-color: rgba(255, 255, 255, 0.06);
-}
-.comparison-block :deep(.file-sep:first-child) {
-    border-top: none;
-}
-/* Brand snippet glow */
+:global(.dark) .code-block { border-color: rgba(255,255,255,0.06); }
 .brand-block {
-    box-shadow: 0 0 40px rgba(71, 26, 236, 0.15), 0 0 80px rgba(71, 26, 236, 0.08);
-    border-color: rgba(71, 26, 236, 0.25);
+    box-shadow: 0 0 40px rgba(71,26,236,0.15), 0 0 80px rgba(71,26,236,0.08);
+    border-color: rgba(71,26,236,0.25);
 }
 :global(.dark) .brand-block {
-    box-shadow: 0 0 40px rgba(174, 153, 252, 0.2), 0 0 80px rgba(174, 153, 252, 0.1);
-    border-color: rgba(174, 153, 252, 0.3);
+    box-shadow: 0 0 40px rgba(174,153,252,0.2), 0 0 80px rgba(174,153,252,0.1);
+    border-color: rgba(174,153,252,0.3);
 }
+.code-block :deep(div[class*="language-"]) { margin: 0 !important; border-radius: 0; background: var(--vp-c-bg) !important; }
+.code-block :deep(button.copy), .code-block :deep(span.lang), .code-block :deep(.line-numbers-wrapper) { display: none !important; }
+.code-block :deep(pre) { padding: 0 !important; margin: 0 !important; overflow-x: auto; }
+.code-block :deep(code) { display: block; width: fit-content; min-width: 100%; padding: 8px 20px; font-size: 13px; }
+.code-block :deep(.file-sep) {
+    padding: 4px 16px; font-size: 12px; font-family: var(--vp-font-family-mono);
+    color: var(--vp-c-text-2); background: var(--vp-c-bg-alt); border-top: 1px solid var(--vp-c-divider);
+}
+:global(.dark) .code-block :deep(.file-sep) { border-top-color: rgba(255,255,255,0.06); }
+.code-block :deep(.file-sep:first-child) { border-top: none; }
 
-/* ---- What You Get Strip ---- */
-.what-you-get {
-    padding: 8px 24px 48px;
+
+/* ---- Section 5: Features ---- */
+.section-features { padding: 0 24px 48px; }
+@media (min-width: 640px) { .section-features { padding: 0 48px 64px; } }
+@media (min-width: 960px) { .section-features { padding: 0 64px 64px; } }
+.features-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+@media (min-width: 640px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .features-grid { grid-template-columns: repeat(3, 1fr); } }
+.feature-card {
+    padding: 24px; border-radius: 14px; background: var(--vp-c-bg);
+    border: 1px solid var(--vp-c-divider); text-decoration: none; color: inherit;
+    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
-@media (min-width: 640px) {
-    .what-you-get {
-        padding: 8px 48px 56px;
-    }
+.feature-card:hover { border-color: var(--vp-c-brand-1); transform: translateY(-2px); box-shadow: 0 4px 16px rgba(71,26,236,0.1); }
+:global(.dark) .feature-card:hover { box-shadow: 0 4px 16px rgba(174,153,252,0.12); }
+.feature-icon {
+    width: 36px; height: 36px; padding: 6px; border-radius: 10px;
+    background: rgba(71,26,236,0.1); color: var(--vp-c-brand-1); margin-bottom: 12px;
 }
-.what-you-get-inner {
-    max-width: 900px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 20px 28px;
-    border-radius: 16px;
-    background: linear-gradient(135deg, rgba(71, 26, 236, 0.06) 0%, rgba(71, 26, 236, 0.02) 100%);
-    border: 1px solid rgba(71, 26, 236, 0.15);
-    flex-wrap: wrap;
+:global(.dark) .feature-icon { background: rgba(174,153,252,0.12); }
+.feature-icon svg { width: 100%; height: 100%; }
+.feature-title { font-size: 16px; font-weight: 600; color: var(--vp-c-text-1); margin-bottom: 6px; }
+.feature-desc { font-size: 14px; color: var(--vp-c-text-2); line-height: 1.5; margin: 0; }
+.feature-desc code {
+    font-size: 13px; color: var(--vp-c-brand-1);
+    background: rgba(71,26,236,0.08); padding: 1px 5px; border-radius: 4px;
+    font-family: var(--vp-font-family-mono);
 }
-:global(.dark) .what-you-get-inner {
-    background: linear-gradient(135deg, rgba(174, 153, 252, 0.1) 0%, rgba(174, 153, 252, 0.03) 100%);
-    border-color: rgba(174, 153, 252, 0.2);
-}
-.wyg-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.wyg-icon {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    padding: 4px;
-    border-radius: 6px;
-    background: rgba(71, 26, 236, 0.1);
-    color: var(--vp-c-brand-1);
-}
-:global(.dark) .wyg-icon {
-    background: rgba(174, 153, 252, 0.15);
-}
-.wyg-icon svg {
-    width: 100%;
-    height: 100%;
-}
-.wyg-text {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--vp-c-text-1);
-    white-space: nowrap;
-}
-.wyg-sep {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--vp-c-text-3);
-}
+:global(.dark) .feature-desc code { background: rgba(174,153,252,0.12); }
 
 /* ---- Scroll Animations ---- */
-.animate-in {
-    opacity: 0;
-    transform: translateY(24px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-}
-.animate-in.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
+.animate-in { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+.animate-in.visible { opacity: 1; transform: translateY(0); }
 </style>
