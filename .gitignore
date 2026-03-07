@@ -17,3 +17,4 @@ docs/docs/.vitepress/dist
 docs/docs/.vitepress/cache
 cache
 .specs
+*.local.md

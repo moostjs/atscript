@@ -678,20 +678,20 @@ export class SchemaSync {
     await this.controlTable.ensureTable()
   }
 
-  private async readControlValue(key: string): Promise<string | null> {
+  private async readControlValue(_id: string): Promise<string | null> {
     const row = await this.controlTable!.findOne({
-      filter: { key: { $eq: key } },
+      filter: { _id: { $eq: _id } },
       controls: {},
     })
     return (row as Record<string, unknown> | null)?.value as string | null ?? null
   }
 
-  private async writeControlValue(key: string, value: string): Promise<void> {
-    const existing = await this.readControlValue(key)
+  private async writeControlValue(_id: string, value: string): Promise<void> {
+    const existing = await this.readControlValue(_id)
     if (existing !== null) {
-      await this.controlTable!.replaceOne({ key, value } as any)
+      await this.controlTable!.replaceOne({ _id, value } as any)
     } else {
-      await this.controlTable!.insertOne({ key, value } as any)
+      await this.controlTable!.insertOne({ _id, value } as any)
     }
   }
 
@@ -740,7 +740,7 @@ export class SchemaSync {
     const now = Date.now()
 
     const existing = await this.controlTable!.findOne({
-      filter: { key: { $eq: 'sync_lock' } },
+      filter: { _id: { $eq: 'sync_lock' } },
       controls: {},
     }) as Record<string, unknown> | null
 
@@ -755,7 +755,7 @@ export class SchemaSync {
 
     try {
       await this.controlTable!.insertOne({
-        key: 'sync_lock',
+        _id: 'sync_lock',
         lockedBy: podId,
         lockedAt: now,
         expiresAt: now + ttlMs,
@@ -769,7 +769,7 @@ export class SchemaSync {
   private async releaseLock(podId: string): Promise<void> {
     try {
       const existing = await this.controlTable!.findOne({
-        filter: { key: { $eq: 'sync_lock' } },
+        filter: { _id: { $eq: 'sync_lock' } },
         controls: {},
       }) as Record<string, unknown> | null
 
@@ -786,7 +786,7 @@ export class SchemaSync {
 
     while (Date.now() < deadline) {
       const lock = await this.controlTable!.findOne({
-        filter: { key: { $eq: 'sync_lock' } },
+        filter: { _id: { $eq: 'sync_lock' } },
         controls: {},
       }) as Record<string, unknown> | null
 

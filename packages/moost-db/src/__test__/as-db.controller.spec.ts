@@ -27,6 +27,7 @@ function createMockTable(overrides: Record<string, any> = {}) {
     ]),
     primaryKeys: ['id'],
     uniqueProps: new Set<string>(),
+    indexes: new Map(),
     isSearchable: vi.fn().mockReturnValue(false),
     getSearchIndexes: vi.fn().mockReturnValue([]),
     getValidator: vi.fn().mockReturnValue(mockValidator),
@@ -233,6 +234,72 @@ describe('AsDbController', () => {
     })
   })
 
+  // ── GET /one (composite key) ──────────────────────────────────────
+
+  describe('getOneComposite', () => {
+    it('should call findById with composite PK object from query', async () => {
+      const ctx = createController({ primaryKeys: ['taskId', 'tagId'] })
+      const result = await ctx.controller.getOneComposite(
+        { taskId: '5', tagId: '1' },
+        '/one?taskId=5&tagId=1'
+      )
+      expect(ctx.table.findById).toHaveBeenCalledWith(
+        { taskId: '5', tagId: '1' },
+        expect.any(Object)
+      )
+      expect(result).toEqual({ id: '1', name: 'Alice' })
+    })
+
+    it('should call findById via compound unique index', async () => {
+      const ctx = createController({
+        indexes: new Map([
+          ['email_tenant', { key: 'email_tenant', name: 'email_tenant', type: 'unique', fields: [{ name: 'email', sort: 'asc' }, { name: 'tenantId', sort: 'asc' }] }],
+        ]),
+      })
+      const result = await ctx.controller.getOneComposite(
+        { email: 'alice', tenantId: 'T1' },
+        '/one?email=alice&tenantId=T1'
+      )
+      expect(ctx.table.findById).toHaveBeenCalledWith(
+        { email: 'alice', tenantId: 'T1' },
+        expect.any(Object)
+      )
+      expect(result).toEqual({ id: '1', name: 'Alice' })
+    })
+
+    it('should return 400 when query params match no composite key or unique index', async () => {
+      const ctx = createController({ primaryKeys: ['taskId', 'tagId'] })
+      const result = await ctx.controller.getOneComposite(
+        { taskId: '5' },
+        '/one?taskId=5'
+      )
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(400)
+    })
+
+    it('should return 400 when no composite PK and no compound unique indexes', async () => {
+      const result = await controller.getOneComposite(
+        { id: '123' },
+        '/one?id=123'
+      )
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(400)
+    })
+
+    it('should return 404 when not found', async () => {
+      const ctx = createController({
+        primaryKeys: ['taskId', 'tagId'],
+        findById: vi.fn().mockResolvedValue(null),
+      })
+      const result = await ctx.controller.getOneComposite(
+        { taskId: '5', tagId: '99' },
+        '/one?taskId=5&tagId=99'
+      )
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(404)
+    })
+  })
+
   // ── POST / ────────────────────────────────────────────────────────
 
   describe('insert', () => {
@@ -246,6 +313,14 @@ describe('AsDbController', () => {
       const result = await controller.insert([{ name: 'A' }, { name: 'B' }])
       expect(table.insertMany).toHaveBeenCalledWith([{ name: 'A' }, { name: 'B' }])
       expect(result).toEqual({ insertedCount: 2, insertedIds: ['1', '2'] })
+    })
+
+    it('should use insertMany for single-item array', async () => {
+      table.insertMany.mockResolvedValue({ insertedCount: 1, insertedIds: ['1'] })
+      const result = await controller.insert([{ name: 'Solo' }])
+      expect(table.insertMany).toHaveBeenCalledWith([{ name: 'Solo' }])
+      expect(table.insertOne).not.toHaveBeenCalled()
+      expect(result).toEqual({ insertedCount: 1, insertedIds: ['1'] })
     })
 
     it('should propagate ValidatorError from table', async () => {
@@ -316,6 +391,58 @@ describe('AsDbController', () => {
       const result = await ctx.controller.remove('123')
       expect(result).toBeInstanceOf(HttpError)
       expect((result as HttpError).body.statusCode).toBe(500)
+    })
+  })
+
+  // ── DELETE / (composite key) ───────────────────────────────────────
+
+  describe('removeComposite', () => {
+    it('should delete by composite PK from query params', async () => {
+      const ctx = createController({ primaryKeys: ['taskId', 'tagId'] })
+      const result = await ctx.controller.removeComposite({ taskId: '5', tagId: '1' })
+      expect(ctx.table.deleteOne).toHaveBeenCalledWith({ taskId: '5', tagId: '1' })
+      expect(result).toEqual({ deletedCount: 1 })
+    })
+
+    it('should delete by compound unique index from query params', async () => {
+      const ctx = createController({
+        indexes: new Map([
+          ['email_tenant', { key: 'email_tenant', name: 'email_tenant', type: 'unique', fields: [{ name: 'email', sort: 'asc' }, { name: 'tenantId', sort: 'asc' }] }],
+        ]),
+      })
+      const result = await ctx.controller.removeComposite({ email: 'alice', tenantId: 'T1' })
+      expect(ctx.table.deleteOne).toHaveBeenCalledWith({ email: 'alice', tenantId: 'T1' })
+      expect(result).toEqual({ deletedCount: 1 })
+    })
+
+    it('should return 400 when query params match no composite key or unique index', async () => {
+      const ctx = createController({ primaryKeys: ['taskId', 'tagId'] })
+      const result = await ctx.controller.removeComposite({ taskId: '5' })
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(400)
+    })
+
+    it('should return 400 when no composite PK and no compound unique indexes', async () => {
+      const result = await controller.removeComposite({ id: '123' })
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(400)
+    })
+
+    it('should return 404 when nothing deleted', async () => {
+      const ctx = createController({
+        primaryKeys: ['taskId', 'tagId'],
+        deleteOne: vi.fn().mockResolvedValue({ deletedCount: 0 }),
+      })
+      const result = await ctx.controller.removeComposite({ taskId: '5', tagId: '1' })
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(404)
+    })
+
+    it('should call onRemove hook with id object', async () => {
+      const ctx = createController({ primaryKeys: ['taskId', 'tagId'] })
+      const spy = vi.spyOn(ctx.controller as any, 'onRemove')
+      await ctx.controller.removeComposite({ taskId: '5', tagId: '1' })
+      expect(spy).toHaveBeenCalledWith({ taskId: '5', tagId: '1' })
     })
   })
 

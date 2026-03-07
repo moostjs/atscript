@@ -1304,6 +1304,33 @@ export class AtscriptDbReadable<
       if (filter) { orFilters.push(filter) }
     }
 
+    // Try compound unique indexes when id is an object
+    if (typeof id === 'object' && id !== null && orFilters.length === 0) {
+      const idObj = id as Record<string, unknown>
+      for (const index of this._indexes.values()) {
+        if (index.type !== 'unique' || index.fields.length < 2) { continue }
+        const compoundFilter: FilterExpr = {}
+        let valid = true
+        for (const indexField of index.fields) {
+          const fieldName = indexField.name
+          if (idObj[fieldName] === undefined) { valid = false; break }
+          const fieldType = this.flatMap.get(fieldName)
+          if (fieldType && !isIdCompatible(idObj[fieldName], fieldType)) { valid = false; break }
+          try {
+            compoundFilter[fieldName] = fieldType
+              ? this.adapter.prepareId(idObj[fieldName], fieldType)
+              : idObj[fieldName]
+          } catch {
+            valid = false
+            break
+          }
+        }
+        if (valid) {
+          orFilters.push(compoundFilter)
+        }
+      }
+    }
+
     if (orFilters.length === 0) {
       return null
     }

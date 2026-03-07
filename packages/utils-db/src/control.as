@@ -1,7 +1,7 @@
 @db.table '__atscript_control'
 export interface AtscriptControl {
     @meta.id
-    key: string
+    _id: string
 
     value?: string
 

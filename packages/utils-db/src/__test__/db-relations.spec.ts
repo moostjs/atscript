@@ -1045,6 +1045,87 @@ describe('AtscriptDbTable — Relations', () => {
       expect(posts.find((p: any) => p.id === 2).title).toBe('Replaced Post 2')
     })
 
+    it('should deep-replace FROM dependents with new children (no id)', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await postTable.replaceOne({
+        id: 1,
+        title: 'Updated Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        comments: [
+          { body: 'New comment without id', postId: 1 },
+        ],
+      } as any)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: { postId: 1 }, controls: {} }) as any[]
+      // Old comments (Nice post!, Thanks!) should be deleted, only the new one remains
+      expect(comments).toHaveLength(1)
+      expect(comments[0].body).toBe('New comment without id')
+    })
+
+    it('should remove orphan children when replacing FROM with fewer items', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      // Author 1 has 2 posts (id 1, 2). Replace with only 1.
+      await authorTable.replaceOne({
+        id: 1,
+        name: 'Alice',
+        createdAt: 1000,
+        posts: [
+          { title: 'Only Post', status: 'active', authorId: 1 },
+        ],
+      } as any)
+
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: { authorId: 1 }, controls: {} }) as any[]
+      expect(posts).toHaveLength(1)
+      expect(posts[0].title).toBe('Only Post')
+    })
+
+    it('should add children when replacing FROM with more items', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      // Post 1 has 2 comments. Replace with 3.
+      await postTable.replaceOne({
+        id: 1,
+        title: 'First Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        comments: [
+          { body: 'Comment A', postId: 1 },
+          { body: 'Comment B', postId: 1 },
+          { body: 'Comment C', postId: 1 },
+        ],
+      } as any)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: { postId: 1 }, controls: {} }) as any[]
+      expect(comments).toHaveLength(3)
+      expect(comments.map((c: any) => c.body).sort()).toEqual(['Comment A', 'Comment B', 'Comment C'])
+    })
+
+    it('should remove all children when replacing FROM with empty array', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      // Post 1 has 2 comments. Replace with empty.
+      await postTable.replaceOne({
+        id: 1,
+        title: 'First Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        comments: [],
+      } as any)
+
+      const commentTable = db.getTable(Comment)
+      const comments = await commentTable.findMany({ filter: { postId: 1 }, controls: {} }) as any[]
+      expect(comments).toHaveLength(0)
+    })
+
     it('should bulk-replace multiple records with TO deps', async () => {
       seedAll()
       const postTable = db.getTable(Post)

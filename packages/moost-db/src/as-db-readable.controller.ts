@@ -5,7 +5,7 @@ import {
   type TAtscriptDataType,
 } from '@atscript/typescript/utils'
 import type { AtscriptDbReadable, FilterExpr, UniqueryControls, Uniquery } from '@atscript/utils-db'
-import { Get, HttpError, Url } from '@moostjs/event-http'
+import { Get, HttpError, Query, Url } from '@moostjs/event-http'
 import { Inject, Moost, Param, type TConsoleBase } from 'moost'
 import { parseUrl } from '@uniqu/url'
 
@@ -174,6 +174,38 @@ export class AsDbReadableController<
     return item
   }
 
+  /**
+   * Extracts a composite identifier object from query params.
+   * Tries composite primary key first, then compound unique indexes.
+   */
+  protected extractCompositeId(query: Record<string, string>): Record<string, unknown> | HttpError {
+    // Try composite primary key
+    const pkFields = this.readable.primaryKeys
+    if (pkFields.length > 1) {
+      const idObj: Record<string, unknown> = {}
+      let allPresent = true
+      for (const field of pkFields) {
+        if (query[field] === undefined) { allPresent = false; break }
+        idObj[field] = query[field]
+      }
+      if (allPresent) { return idObj }
+    }
+
+    // Try compound unique indexes
+    for (const index of this.readable.indexes.values()) {
+      if (index.type !== 'unique' || index.fields.length < 2) { continue }
+      const idObj: Record<string, unknown> = {}
+      let allPresent = true
+      for (const indexField of index.fields) {
+        if (query[indexField.name] === undefined) { allPresent = false; break }
+        idObj[indexField.name] = query[indexField.name]
+      }
+      if (allPresent) { return idObj }
+    }
+
+    return new HttpError(400, 'Query params do not match any composite primary key or compound unique index')
+  }
+
   // ── REST Endpoints (read-only) ──────────────────────────────────────────
 
   /**
@@ -283,6 +315,27 @@ export class AsDbReadableController<
 
     return this.returnOne(
       this.readable.findById(id as any, { controls } as any) as Promise<DataType | null>
+    )
+  }
+
+  /**
+   * **GET /one?field1=val1&field2=val2** — retrieves a single record by composite key
+   * (composite primary key or compound unique index).
+   */
+  @Get('one')
+  async getOneComposite(
+    @Query() query: Record<string, string>,
+    @Url() url: string
+  ): Promise<DataType | HttpError> {
+    const idObj = this.extractCompositeId(query)
+    if (idObj instanceof HttpError) { return idObj }
+
+    const parsed = this.parseQueryString(url)
+    const select = this.transformProjection(parsed.controls.$select)
+    const controls = { ...parsed.controls, $select: select }
+
+    return this.returnOne(
+      this.readable.findById(idObj as any, { controls } as any) as Promise<DataType | null>
     )
   }
 

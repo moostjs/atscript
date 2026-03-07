@@ -15,7 +15,7 @@ export class AtscriptControl {
 
 $("object", AtscriptControl)
   .prop(
-    "key",
+    "_id",
     $().designType("string")
       .tags("string")
       .annotate("meta.id", true)

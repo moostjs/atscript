@@ -213,7 +213,7 @@ describe('syncSchema', () => {
     expect(sharedTables.has('users')).toBe(true)
 
     const controlRows = sharedTables.get('__atscript_control')!
-    const versionRow = controlRows.find(r => r.key === 'schema_version')
+    const versionRow = controlRows.find(r => r._id === 'schema_version')
     expect(versionRow).toBeDefined()
     expect(versionRow!.value).toBe(result.schemaHash)
   })
@@ -241,21 +241,21 @@ describe('syncSchema', () => {
     await syncSchema(space, [UsersTable])
 
     const controlRows = sharedTables.get('__atscript_control')!
-    const lockRow = controlRows.find(r => r.key === 'sync_lock')
+    const lockRow = controlRows.find(r => r._id === 'sync_lock')
     expect(lockRow).toBeUndefined()
   })
 
   it('should detect stale locks and clean them up', async () => {
     const space = createSpace()
     sharedTables.set('__atscript_control', [
-      { key: 'sync_lock', lockedBy: 'dead-pod', lockedAt: 0, expiresAt: 1 },
+      { _id: 'sync_lock', lockedBy: 'dead-pod', lockedAt: 0, expiresAt: 1 },
     ])
 
     const result = await syncSchema(space, [UsersTable])
     expect(result.status).toBe('synced')
 
     const controlRows = sharedTables.get('__atscript_control')!
-    const lockRow = controlRows.find(r => r.key === 'sync_lock')
+    const lockRow = controlRows.find(r => r._id === 'sync_lock')
     expect(lockRow).toBeUndefined()
   })
 })
@@ -380,7 +380,7 @@ describe('SchemaSync.run — views', () => {
     await sync.run([UsersTable, ActiveUsersView], { force: true })
 
     const controlRows = sharedTables.get('__atscript_control')!
-    const trackedRow = controlRows.find(r => r.key === 'synced_tables')
+    const trackedRow = controlRows.find(r => r._id === 'synced_tables')
     const tracked = JSON.parse(trackedRow!.value as string) as Array<{ name: string; isView: boolean; viewType?: string }>
 
     const viewEntry = tracked.find(t => t.name === 'active_users')
@@ -542,7 +542,7 @@ describe('SchemaSync.plan', () => {
 
     // Overwrite with old string[] format
     const controlRows = sharedTables.get('__atscript_control')!
-    const trackedRow = controlRows.find(r => r.key === 'synced_tables')
+    const trackedRow = controlRows.find(r => r._id === 'synced_tables')
     trackedRow!.value = JSON.stringify(['users', 'old_table'])
 
     const plan = await sync.plan([UsersTable], { force: true })
@@ -680,7 +680,7 @@ describe('SchemaSync — external views', () => {
     await sync.run([UsersTable, LegacyReportView], { force: true })
 
     const controlRows = sharedTables.get('__atscript_control')!
-    const trackedRow = controlRows.find(r => r.key === 'synced_tables')
+    const trackedRow = controlRows.find(r => r._id === 'synced_tables')
     const tracked = JSON.parse(trackedRow!.value as string) as Array<{ name: string; isView: boolean; viewType?: string }>
 
     const extEntry = tracked.find(t => t.name === 'legacy_report')
@@ -699,7 +699,7 @@ describe('SchemaSync — table rename', () => {
 
     // Simulate previous sync that tracked 'old_users'
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     // Old table exists in DB with columns
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
@@ -731,7 +731,7 @@ describe('SchemaSync — table rename', () => {
 
     // Previous sync had 'old_users' tracked
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
     adapter.setExistingColumns([
@@ -754,7 +754,7 @@ describe('SchemaSync — table rename', () => {
 
     // First sync: set up tracked old_users
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
     adapter.setExistingColumns([
@@ -797,7 +797,7 @@ describe('SchemaSync — table rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     // Old table has fewer columns than RenamedTable schema
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
@@ -826,7 +826,7 @@ describe('SchemaSync.plan — table rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     // Plan uses getExistingColumnsForTable to introspect old name
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
@@ -849,7 +849,7 @@ describe('SchemaSync.plan — table rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
     adapter.setExistingColumnsForTable('old_users', [
@@ -883,7 +883,7 @@ describe('SchemaSync.plan — table rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
+      { _id: 'synced_tables', value: JSON.stringify([{ name: 'old_users', isView: false }]) },
     ])
     const adapter = space.get(RenamedTable).dbAdapter as MockAdapter
     adapter.setExistingColumnsForTable('old_users', [
@@ -908,7 +908,7 @@ describe('SchemaSync — view rename', () => {
 
     // Previous sync tracked 'vip_users' as a virtual view
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([
+      { _id: 'synced_tables', value: JSON.stringify([
         { name: 'users', isView: false },
         { name: 'vip_users', isView: true, viewType: 'V' },
       ]) },
@@ -957,7 +957,7 @@ describe('SchemaSync — view rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([
+      { _id: 'synced_tables', value: JSON.stringify([
         { name: 'users', isView: false },
         { name: 'vip_users', isView: true, viewType: 'V' },
       ]) },
@@ -990,7 +990,7 @@ describe('SchemaSync — view rename', () => {
     const sync = new SchemaSync(space)
 
     sharedTables.set('__atscript_control', [
-      { key: 'synced_tables', value: JSON.stringify([
+      { _id: 'synced_tables', value: JSON.stringify([
         { name: 'users', isView: false },
         { name: 'vip_users', isView: true, viewType: 'V' },
       ]) },

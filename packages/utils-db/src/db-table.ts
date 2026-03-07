@@ -163,6 +163,11 @@ export class AtscriptDbTable<
         await this._batchInsertNestedFrom(payloads, result.insertedIds, maxDepth, depth)
       }
 
+      // Phase 4: Batch VIA relations (insert targets + junction entries)
+      if (canNest) {
+        await this._batchInsertNestedVia(payloads, result.insertedIds, maxDepth, depth)
+      }
+
       return result
     })
   }
@@ -638,6 +643,57 @@ export class AtscriptDbTable<
     }
   }
 
+  /**
+   * Batch-creates VIA (M:N) targets and junction entries after the main insert.
+   * For each `@db.rel.via` relation, collects inline target objects,
+   * batch-inserts them on the target table, then creates junction rows
+   * linking parent PKs to target PKs.
+   */
+  private async _batchInsertNestedVia(
+    originals: Array<Record<string, unknown>>,
+    parentIds: unknown[],
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'via' || !relation.viaType) { continue }
+
+      const targetTable = this._writeTableResolver!(relation.targetType())
+      if (!targetTable) { continue }
+      const junctionTable = this._writeTableResolver!(relation.viaType())
+      if (!junctionTable) { continue }
+
+      const targetTableName = (relation.targetType()?.metadata?.get('db.table') as string) || relation.targetType()?.id || ''
+
+      const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
+      if (!fkToThis) { continue }
+      const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
+      if (!fkToTarget) { continue }
+
+      const targetPKField = (targetTable as any)._primaryKeys?.[0]
+      if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
+
+      for (let i = 0; i < originals.length; i++) {
+        const targets = originals[i][navField]
+        if (!Array.isArray(targets) || targets.length === 0) { continue }
+
+        const parentPK = parentIds[i]
+        if (parentPK === undefined) { continue }
+
+        // a) Insert target records
+        const targetPayloads = targets.map(t => ({ ...(t as Record<string, unknown>) }))
+        const targetResult = await targetTable.insertMany(targetPayloads, { maxDepth, _depth: depth + 1 })
+
+        // b) Insert junction rows linking parent to targets
+        const junctionRows = targetResult.insertedIds.map(targetId => ({
+          [fkToThis.fields[0]]: parentPK,
+          [fkToTarget.fields[0]]: targetId,
+        }))
+        await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
+      }
+    }
+  }
+
   // ── Internal: nav prop checking ─────────────────────────────────────────
 
   /**
@@ -750,23 +806,25 @@ export class AtscriptDbTable<
       const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
       if (!remoteFK) { continue }
 
-      const allChildren: Array<Record<string, unknown>> = []
       for (const original of originals) {
         const children = original[navField]
         if (!Array.isArray(children)) { continue }
-        // Get parent PK value for FK wiring
         const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
-        for (const child of children) {
-          const childData = { ...(child as Record<string, unknown>) }
-          if (remoteFK.fields.length === 1 && parentPK !== undefined) {
+        if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
+
+        // Delete all existing children linked to this parent
+        await targetTable.deleteMany({ [remoteFK.fields[0]]: parentPK })
+
+        // Insert the replacement set
+        if (children.length > 0) {
+          const toInsert = children.map(child => {
+            const childData = { ...(child as Record<string, unknown>) }
             childData[remoteFK.fields[0]] = parentPK
-          }
-          allChildren.push(childData)
+            return childData
+          })
+          await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
         }
       }
-      if (allChildren.length === 0) { continue }
-
-      await targetTable.bulkReplace(allChildren, { maxDepth, _depth: depth + 1 })
     }
   }
 
@@ -917,14 +975,12 @@ export class AtscriptDbTable<
         })
       }
       case 'bulkReplace': {
-        const pluginsNoNav = this.adapter.getValidatorPlugins()
         return this.createValidator({
-          plugins: pluginsNoNav,
+          plugins,
           replace: (type, path) => {
             if (
               this._primaryKeys.includes(path) ||
-              this._defaults.has(path) ||
-              this._navFields.has(path)
+              this._defaults.has(path)
             ) {
               return { ...type, optional: true }
             }

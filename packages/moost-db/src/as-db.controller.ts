@@ -3,7 +3,7 @@ import type {
   TAtscriptDataType,
 } from '@atscript/typescript/utils'
 import type { AtscriptDbTable } from '@atscript/utils-db'
-import { Body, Delete, HttpError, Patch, Post, Put } from '@moostjs/event-http'
+import { Body, Delete, HttpError, Patch, Post, Put, Query } from '@moostjs/event-http'
 import { Inherit, Inject, Moost, Param } from 'moost'
 
 import { AsDbReadableController } from './as-db-readable.controller'
@@ -63,17 +63,15 @@ export class AsDbController<
    */
   @Post('')
   async insert(@Body() payload: unknown): Promise<HttpError | unknown> {
-    const arr = Array.isArray(payload) ? payload : [payload]
-
-    if (arr.length === 1) {
-      const data = await this.onWrite('insert', arr[0])
+    if (Array.isArray(payload)) {
+      const data = await this.onWrite('insertMany', payload)
       if (data === undefined) { return new HttpError(500, 'Not saved') }
-      return await this.table.insertOne(data as any)
+      return await this.table.insertMany(data as any)
     }
 
-    const data = await this.onWrite('insertMany', arr)
+    const data = await this.onWrite('insert', payload)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
-    return await this.table.insertMany(data as any)
+    return await this.table.insertOne(data as any)
   }
 
   /**
@@ -102,6 +100,25 @@ export class AsDbController<
   @Delete(':id')
   async remove(@Param('id') id: string): Promise<HttpError | unknown> {
     const resolvedId = await this.onRemove(id)
+    if (resolvedId === undefined) { return new HttpError(500, 'Not deleted') }
+
+    const result = await this.table.deleteOne(resolvedId as any)
+    if ((result as any).deletedCount < 1) {
+      return new HttpError(404)
+    }
+    return result
+  }
+
+  /**
+   * **DELETE /?field1=val1&field2=val2** — removes a record by composite key
+   * (composite primary key or compound unique index).
+   */
+  @Delete('')
+  async removeComposite(@Query() query: Record<string, string>): Promise<HttpError | unknown> {
+    const idObj = this.extractCompositeId(query)
+    if (idObj instanceof HttpError) { return idObj }
+
+    const resolvedId = await this.onRemove(idObj)
     if (resolvedId === undefined) { return new HttpError(500, 'Not deleted') }
 
     const result = await this.table.deleteOne(resolvedId as any)
