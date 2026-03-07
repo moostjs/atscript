@@ -70,3 +70,9 @@ export interface ActiveUsersView {
     name: UsersTable.name
     email: UsersTable.email
 }
+
+@db.view 'legacy_report'
+export interface LegacyReportView {
+    id: number
+    total: number
+}

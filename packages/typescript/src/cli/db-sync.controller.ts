@@ -91,15 +91,16 @@ export class DbSyncController {
       return
     }
 
-    const hasDestructive = plan.tables.some(t =>
-      t.columnsToDrop.length > 0 || t.typeChanges.length > 0
-    ) || plan.removedTables.length > 0
-
-    const hasChanges = hasDestructive || plan.removedViews.length > 0 || plan.tables.some(t =>
-      t.isNew || t.columnsToAdd.length > 0 || t.columnsToRename.length > 0
-    )
+    const hasDestructive = plan.entries.some(e => e.destructive)
+    const hasChanges = plan.entries.some(e => e.hasChanges)
+    const hasErrors = plan.entries.some(e => e.hasErrors)
 
     this.printer.plan(plan)
+
+    if (hasErrors) {
+      this.logger.error(`Schema has errors. Fix the issues above before syncing.`)
+      process.exit(1)
+    }
 
     if (!hasChanges) {
       if (!dryRun) {
@@ -122,7 +123,7 @@ export class DbSyncController {
         }
       }
     } else {
-      this.logger.log(`\nNo destructive changes, proceeding to sync...\n`)
+      this.logger.log(`No destructive changes, proceeding to sync...`)
     }
 
     const result = await sync.run(dbTypes, { force: true, safe })

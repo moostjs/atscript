@@ -1,3 +1,4 @@
+// oxlint-disable max-classes-per-file
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
 import { AtscriptDbTable } from './db-table'
@@ -10,26 +11,218 @@ import type { TDbFieldMeta } from './types'
 import { computeTableSnapshot, computeSchemaHash } from './schema-hash'
 import { computeColumnDiff } from './column-diff'
 
-// ── Public types ──────────────────────────────────────────────────────────
+// ── Colors ───────────────────────────────────────────────────────────────
 
-export interface TSyncPlanTable {
-  tableName: string
-  isNew: boolean
-  columnsToAdd: TDbFieldMeta[]
-  columnsToRename: Array<{ from: string; to: string }>
-  typeChanges: Array<{ column: string; fromType: string; toType: string }>
-  columnsToDrop: string[]
-  syncMethod?: 'drop' | 'recreate'
-  /** If set, this entry is a view. 'V' = virtual view, 'M' = materialized view. */
-  viewType?: 'V' | 'M'
+export interface TSyncColors {
+  green(s: string): string
+  red(s: string): string
+  cyan(s: string): string
+  yellow(s: string): string
+  bold(s: string): string
+  dim(s: string): string
+  underline(s: string): string
 }
+
+const noColor: TSyncColors = {
+  green: s => s, red: s => s, cyan: s => s, yellow: s => s,
+  bold: s => s, dim: s => s, underline: s => s,
+}
+
+// ── SyncEntry ────────────────────────────────────────────────────────────
+
+export type TSyncEntryStatus = 'create' | 'alter' | 'drop' | 'in-sync' | 'error'
+
+export interface TSyncEntryInit {
+  name: string
+  /** 'V' = virtual view, 'M' = materialized view, 'E' = external view, undefined = table */
+  viewType?: 'V' | 'M' | 'E'
+  status: TSyncEntryStatus
+  syncMethod?: 'drop' | 'recreate'
+  columnsToAdd?: TDbFieldMeta[]
+  columnsToRename?: Array<{ from: string; to: string }>
+  typeChanges?: Array<{ column: string; fromType: string; toType: string }>
+  columnsToDrop?: string[]
+  columnsAdded?: string[]
+  columnsRenamed?: string[]
+  columnsDropped?: string[]
+  recreated?: boolean
+  errors?: string[]
+}
+
+export class SyncEntry {
+  readonly name: string
+  /** 'V' = virtual view, 'M' = materialized view, 'E' = external view, undefined = table */
+  readonly viewType?: 'V' | 'M' | 'E'
+  readonly status: TSyncEntryStatus
+  readonly syncMethod?: 'drop' | 'recreate'
+
+  // Plan fields
+  readonly columnsToAdd: TDbFieldMeta[]
+  readonly columnsToRename: Array<{ from: string; to: string }>
+  readonly typeChanges: Array<{ column: string; fromType: string; toType: string }>
+  readonly columnsToDrop: string[]
+
+  // Result fields
+  readonly columnsAdded: string[]
+  readonly columnsRenamed: string[]
+  readonly columnsDropped: string[]
+  readonly recreated: boolean
+  readonly errors: string[]
+
+  constructor(init: TSyncEntryInit) {
+    this.name = init.name
+    this.viewType = init.viewType
+    this.status = init.status
+    this.syncMethod = init.syncMethod
+    this.columnsToAdd = init.columnsToAdd ?? []
+    this.columnsToRename = init.columnsToRename ?? []
+    this.typeChanges = init.typeChanges ?? []
+    this.columnsToDrop = init.columnsToDrop ?? []
+    this.columnsAdded = init.columnsAdded ?? []
+    this.columnsRenamed = init.columnsRenamed ?? []
+    this.columnsDropped = init.columnsDropped ?? []
+    this.recreated = init.recreated ?? false
+    this.errors = init.errors ?? []
+  }
+
+  /** Whether this entry involves destructive operations */
+  get destructive(): boolean {
+    if (this.status === 'drop') {
+      // Dropping virtual/external views is not destructive
+      return this.viewType !== 'V' && this.viewType !== 'E'
+    }
+    return this.columnsToDrop.length > 0 || this.typeChanges.length > 0
+  }
+
+  /** Whether this entry represents any change (not in-sync) */
+  get hasChanges(): boolean {
+    return this.status !== 'in-sync' && this.status !== 'error'
+  }
+
+  /** Whether this entry has errors */
+  get hasErrors(): boolean {
+    return this.status === 'error' || this.errors.length > 0
+  }
+
+  /** Render this entry for display */
+  print(mode: 'plan' | 'result', colors?: TSyncColors): string[] {
+    const c = colors ?? noColor
+    return mode === 'plan' ? this.printPlan(c) : this.printResult(c)
+  }
+
+  // ── Plan printing ───────────────────────────────────────────────────
+
+  private printPlan(c: TSyncColors): string[] {
+    const label = c.bold(c.underline(this.name))
+    const vp = this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : ''
+
+    if (this.status === 'error') {
+      return [
+        `  ${c.red(`✗ ${vp}${label} — error`)}`,
+        ...this.errors.map(err => `      ${c.red(err)}`),
+      ]
+    }
+
+    if (this.status === 'drop') {
+      const kind = this.viewType ? 'drop view' : 'drop table'
+      return [`  ${c.red(`- ${vp}${label} — ${kind}`)}`]
+    }
+
+    if (this.status === 'create') {
+      return [
+        `  ${c.green(`+ ${vp}${label} — create`)}`,
+        ...this.columnsToAdd.map(col =>
+          `      ${c.green(`+ ${col.physicalName} (${col.designType})${col.isPrimaryKey ? ' PK' : ''}${col.optional ? ' nullable' : ''} — add`)}`
+        ),
+        '',
+      ]
+    }
+
+    if (this.status === 'alter') {
+      return [
+        `  ${c.cyan(`~ ${vp}${label} — alter`)}`,
+        ...this.columnsToAdd.map(col =>
+          `      ${c.green(`+ ${col.physicalName} (${col.designType}) — add`)}`
+        ),
+        ...this.columnsToRename.map(r =>
+          `      ${c.yellow(`~ ${r.from} → ${r.to} — rename`)}`
+        ),
+        ...this.typeChanges.map(tc => {
+          const action = this.syncMethod ? ` — ${this.syncMethod}` : ' — requires migration'
+          return `      ${c.red(`! ${tc.column}: ${tc.fromType} → ${tc.toType}${action}`)}`
+        }),
+        ...this.columnsToDrop.map(col =>
+          `      ${c.red(`- ${col} — drop`)}`
+        ),
+        '',
+      ]
+    }
+
+    return [this.printInSync(c)]
+  }
+
+  // ── Result printing ─────────────────────────────────────────────────
+
+  private printResult(c: TSyncColors): string[] {
+    const label = c.bold(c.underline(this.name))
+    const vp = this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : ''
+
+    if (this.status === 'error') {
+      return [
+        `  ${c.red(`✗ ${vp}${label} — error`)}`,
+        ...this.errors.map(err => `      ${c.red(err)}`),
+      ]
+    }
+
+    if (this.status === 'drop') {
+      const kind = this.viewType ? 'dropped view' : 'dropped table'
+      return [`  ${c.red(`- ${vp}${label} — ${kind}`)}`]
+    }
+
+    if (this.status === 'create') {
+      return [
+        `  ${c.green(`+ ${vp}${label} — created`)}`,
+        ...this.columnsAdded.map(col => `      ${c.green(`+ ${col} — added`)}`),
+        '',
+      ]
+    }
+
+    const hasColumnChanges = this.columnsAdded.length > 0 ||
+      this.columnsRenamed.length > 0 || this.columnsDropped.length > 0
+
+    if (hasColumnChanges || this.recreated) {
+      const rlabel = this.recreated ? 'recreated' : 'altered'
+      const color = this.recreated ? c.yellow : c.cyan
+      return [
+        `  ${color(`~ ${vp}${label} — ${rlabel}`)}`,
+        ...this.columnsAdded.map(col => `      ${c.green(`+ ${col} — added`)}`),
+        ...this.columnsRenamed.map(col => `      ${c.yellow(`~ ${col} — renamed`)}`),
+        ...this.columnsDropped.map(col => `      ${c.red(`- ${col} — dropped`)}`),
+        '',
+      ]
+    }
+
+    const lines = [this.printInSync(c)]
+    if (this.errors.length > 0) {
+      lines.push(...this.errors.map(err => `    ${c.red(`Error: ${err}`)}`))
+    }
+    return lines
+  }
+
+  // ── Shared ──────────────────────────────────────────────────────────
+
+  private printInSync(c: TSyncColors): string {
+    const prefix = this.viewType ? `${c.dim(`[${this.viewType}]`)} ` : ''
+    return `  ${c.green('✓')} ${prefix}${c.bold(this.name)} ${c.dim('— in sync')}`
+  }
+}
+
+// ── Public types ──────────────────────────────────────────────────────────
 
 export interface TSyncPlan {
   status: 'up-to-date' | 'changes-needed'
   schemaHash: string
-  tables: TSyncPlanTable[]
-  removedTables: string[]
-  removedViews: string[]
+  entries: SyncEntry[]
 }
 
 export interface TSyncOptions {
@@ -47,24 +240,10 @@ export interface TSyncOptions {
   safe?: boolean
 }
 
-export interface TSyncTableResult {
-  tableName: string
-  created: boolean
-  columnsAdded: string[]
-  columnsRenamed: string[]
-  columnsDropped: string[]
-  recreated: boolean
-  errors: string[]
-  /** If set, this entry is a view. 'V' = virtual view, 'M' = materialized view. */
-  viewType?: 'V' | 'M'
-}
-
 export interface TSyncResult {
   status: 'up-to-date' | 'synced' | 'synced-by-peer'
   schemaHash: string
-  tables?: TSyncTableResult[]
-  removedTables?: string[]
-  removedViews?: string[]
+  entries: SyncEntry[]
 }
 
 // ── SchemaSync ────────────────────────────────────────────────────────────
@@ -82,49 +261,89 @@ export class SchemaSync {
 
   /**
    * Resolves types into categorized readables and computes the schema hash.
-   * Both tables and views (virtual + materialized) are tracked and hashed.
    */
   private async resolveAndHash(types: TAtscriptAnnotatedType[]): Promise<{
     tables: AtscriptDbReadable[]
     views: AtscriptDbReadable[]
+    externalViews: AtscriptDbView[]
     hash: string
   }> {
     const tables: AtscriptDbReadable[] = []
     const views: AtscriptDbReadable[] = []
+    const externalViews: AtscriptDbView[] = []
     for (const type of types) {
       const readable = this.space.get(type)
       if (readable.isView) {
-        views.push(readable)
+        const view = readable as AtscriptDbView
+        if (view.isExternal) {
+          externalViews.push(view)
+        } else {
+          views.push(readable)
+        }
       } else {
         tables.push(readable)
       }
     }
-    const allReadables = [...tables, ...views]
+    const allReadables = [...tables, ...views, ...externalViews]
 
     const snapshots = allReadables.map(r => computeTableSnapshot(r))
     const hash = computeSchemaHash(snapshots)
 
-    return { tables, views, hash }
+    return { tables, views, externalViews, hash }
+  }
+
+  /**
+   * Checks an external view: verifies it exists in the DB and columns match.
+   * Returns a SyncEntry with status 'in-sync' or 'error'.
+   */
+  private async checkExternalView(view: AtscriptDbView): Promise<SyncEntry> {
+    const adapter = view.dbAdapter
+    const name = view.tableName
+    if (adapter.getExistingColumns) {
+      const existing = await adapter.getExistingColumns()
+      if (existing.length === 0) {
+        return new SyncEntry({
+          name,
+          viewType: 'E',
+          status: 'error',
+          errors: [`External view "${name}" not found in the database`],
+        })
+      }
+      // Check that declared fields exist in the view
+      const existingNames = new Set(existing.map(c => c.name))
+      const missing = view.fieldDescriptors
+        .filter(f => !f.ignored && !existingNames.has(f.physicalName))
+        .map(f => f.physicalName)
+      if (missing.length > 0) {
+        return new SyncEntry({
+          name,
+          viewType: 'E',
+          status: 'error',
+          errors: [`External view "${name}" is missing columns: ${missing.join(', ')}`],
+        })
+      }
+    }
+    return new SyncEntry({ name, viewType: 'E', status: 'in-sync' })
   }
 
   /**
    * Detects tables/views present in the previous sync but absent from the current schema.
+   * Returns SyncEntry instances with status 'drop'.
    */
-  private async detectRemoved(currentReadables: AtscriptDbReadable[]): Promise<{ removedTables: string[]; removedViews: string[] }> {
+  private async detectRemoved(currentReadables: AtscriptDbReadable[]): Promise<SyncEntry[]> {
     const previous = await this.readTrackedList()
     const currentSet = new Set(currentReadables.map(t => t.tableName))
-    const removedTables: string[] = []
-    const removedViews: string[] = []
+    const removed: SyncEntry[] = []
     for (const entry of previous) {
       if (!currentSet.has(entry.name)) {
-        if (entry.isView) {
-          removedViews.push(entry.name)
-        } else {
-          removedTables.push(entry.name)
-        }
+        removed.push(new SyncEntry({
+          name: entry.name,
+          viewType: entry.viewType,
+          status: 'drop',
+        }))
       }
     }
-    return { removedTables, removedViews }
+    return removed
   }
 
   /**
@@ -138,7 +357,7 @@ export class SchemaSync {
     const force = opts?.force ?? false
     const safe = opts?.safe ?? false
 
-    const { tables, views, hash } = await this.resolveAndHash(types)
+    const { tables, views, externalViews, hash } = await this.resolveAndHash(types)
 
     await this.ensureControlTable()
 
@@ -146,23 +365,20 @@ export class SchemaSync {
     if (!force) {
       const storedHash = await this.readHash()
       if (storedHash === hash) {
-        return { status: 'up-to-date', schemaHash: hash }
+        return { status: 'up-to-date', schemaHash: hash, entries: [] }
       }
     }
 
-    // 4. Acquire lock
+    // Acquire lock
     const acquired = await this.tryAcquireLock(podId, lockTtlMs)
     if (!acquired) {
-      // Another pod is syncing — wait for it
       await this.waitForLock(waitTimeoutMs, pollIntervalMs)
 
-      // Re-check hash after lock released
       const storedHash = await this.readHash()
       if (storedHash === hash) {
-        return { status: 'synced-by-peer', schemaHash: hash }
+        return { status: 'synced-by-peer', schemaHash: hash, entries: [] }
       }
 
-      // Retry once
       const retryAcquired = await this.tryAcquireLock(podId, lockTtlMs)
       if (!retryAcquired) {
         throw new Error('Failed to acquire schema sync lock after waiting')
@@ -170,240 +386,234 @@ export class SchemaSync {
     }
 
     try {
-      // 5. Double-check hash (another pod may have finished between our check and lock)
+      // Double-check hash
       if (!force) {
         const storedHash = await this.readHash()
         if (storedHash === hash) {
-          return { status: 'synced-by-peer', schemaHash: hash }
+          return { status: 'synced-by-peer', schemaHash: hash, entries: [] }
         }
       }
 
-      // 6. Sync tables
-      const tableResults: TSyncTableResult[] = []
+      // Sync tables
+      const entries: SyncEntry[] = []
       for (const readable of tables) {
-        const result = await this.syncTable(readable, safe)
-        tableResults.push(result)
+        entries.push(await this.syncTable(readable, safe))
       }
 
-      // 7. Sync views
-      const allReadables = [...tables, ...views]
-      const { removedTables, removedViews } = await this.detectRemoved(allReadables)
+      // Sync managed views
+      const allReadables = [...tables, ...views, ...externalViews]
+      const removed = await this.detectRemoved(allReadables)
       const previouslyTracked = await this.readTrackedList()
       const trackedNames = new Set(previouslyTracked.map(e => e.name))
 
-      const viewResults: TSyncTableResult[] = []
       for (const readable of views) {
         await readable.dbAdapter.ensureTable()
-        viewResults.push({
-          tableName: readable.tableName,
-          created: !trackedNames.has(readable.tableName),
-          columnsAdded: [],
-          columnsRenamed: [],
-          columnsDropped: [],
-          recreated: false,
-          errors: [],
+        entries.push(new SyncEntry({
+          name: readable.tableName,
+          status: trackedNames.has(readable.tableName) ? 'in-sync' : 'create',
           viewType: (readable as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
-        })
+        }))
       }
 
-      // 8. Track tables — detect and drop removed tables/views
+      // Check external views
+      for (const view of externalViews) {
+        entries.push(await this.checkExternalView(view))
+      }
+
+      // Drop removed tables/views (unless safe mode) — never drop external views
       if (!safe) {
-        for (const name of [...removedTables, ...removedViews]) {
-          await this.space.dropTableByName(name)
+        for (const entry of removed) {
+          if (entry.viewType === 'E') { continue }
+          if (entry.viewType) {
+            await this.space.dropViewByName(entry.name)
+          } else {
+            await this.space.dropTableByName(entry.name)
+          }
         }
+        entries.push(...removed.filter(e => e.viewType !== 'E'))
       }
-      await this.writeTrackedList(allReadables)
 
-      // 9. Write new hash
+      await this.writeTrackedList(allReadables)
       await this.writeHash(hash)
 
-      return {
-        status: 'synced',
-        schemaHash: hash,
-        tables: [...tableResults, ...viewResults],
-        removedTables: removedTables.length > 0 ? removedTables : undefined,
-        removedViews: removedViews.length > 0 ? removedViews : undefined,
-      }
+      return { status: 'synced', schemaHash: hash, entries }
     } finally {
-      // 9. Always release lock
       await this.releaseLock(podId)
     }
   }
 
   /**
    * Computes a dry-run plan showing what `run()` would do, without executing any DDL.
-   * Creates the internal control table if needed (harmless), but does not modify user tables.
    */
   async plan(types: TAtscriptAnnotatedType[], opts?: Pick<TSyncOptions, 'force' | 'safe'>): Promise<TSyncPlan> {
     const force = opts?.force ?? false
     const safe = opts?.safe ?? false
-    const { tables, views, hash } = await this.resolveAndHash(types)
-    const allReadables = [...tables, ...views]
+    const { tables, views, externalViews, hash } = await this.resolveAndHash(types)
+    const allReadables = [...tables, ...views, ...externalViews]
 
     await this.ensureControlTable()
 
-    // Always introspect tables so the plan includes all table statuses
-    let planTables = await Promise.all(tables.map(r => this.planTable(r)))
+    // Introspect tables
+    let planEntries = await Promise.all(tables.map(r => this.planTable(r)))
 
-    // Add views to plan (views don't have column introspection)
+    // Add managed views to plan
     const previouslyTracked = await this.readTrackedList()
     const trackedNames = new Set(previouslyTracked.map(e => e.name))
-    const viewPlans: TSyncPlanTable[] = views.map(v => ({
-      tableName: v.tableName,
-      isNew: !trackedNames.has(v.tableName),
-      columnsToAdd: [],
-      columnsToRename: [],
-      typeChanges: [],
-      columnsToDrop: [],
+    const viewEntries: SyncEntry[] = views.map(v => new SyncEntry({
+      name: v.tableName,
+      status: trackedNames.has(v.tableName) ? 'in-sync' : 'create',
       viewType: (v as AtscriptDbView).viewPlan.materialized ? 'M' : 'V',
     }))
+
+    // Check external views
+    const externalEntries = await Promise.all(externalViews.map(v => this.checkExternalView(v)))
 
     // Quick check — skip if hash matches
     if (!force) {
       const storedHash = await this.readHash()
       if (storedHash === hash) {
-        return { status: 'up-to-date', schemaHash: hash, tables: [...planTables, ...viewPlans], removedTables: [], removedViews: [] }
+        return { status: 'up-to-date', schemaHash: hash, entries: [...planEntries, ...viewEntries, ...externalEntries] }
       }
     }
+
     let removed = await this.detectRemoved(allReadables)
 
     if (safe) {
       // Hide destructive operations in safe mode
-      planTables = planTables.map(t => ({ ...t, columnsToDrop: [] }))
-      removed = { removedTables: [], removedViews: [] }
+      planEntries = planEntries.map(e => new SyncEntry({ ...e, columnsToDrop: [] }))
+      removed = []
     }
+
+    // Never include external view drops
+    removed = removed.filter(e => e.viewType !== 'E')
 
     return {
       status: 'changes-needed',
       schemaHash: hash,
-      tables: [...planTables, ...viewPlans],
-      removedTables: removed.removedTables,
-      removedViews: removed.removedViews,
+      entries: [...planEntries, ...viewEntries, ...externalEntries, ...removed],
     }
   }
 
-  private async planTable(readable: AtscriptDbReadable): Promise<TSyncPlanTable> {
+  private async planTable(readable: AtscriptDbReadable): Promise<SyncEntry> {
     const adapter = readable.dbAdapter
-    const tableName = readable.tableName
-    const plan: TSyncPlanTable = {
-      tableName,
-      isNew: false,
-      columnsToAdd: [],
-      columnsToRename: [],
-      typeChanges: [],
-      columnsToDrop: [],
+    const name = readable.tableName
+    const init: TSyncEntryInit = {
+      name,
+      status: 'in-sync',
       syncMethod: readable.syncMethod,
     }
 
-    // Introspect existing columns (read-only — no ensureTable)
     if (adapter.getExistingColumns) {
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0) {
-        // Table doesn't exist yet
-        plan.isNew = true
-        plan.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
+        init.status = 'create'
+        init.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
       } else {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
-        plan.columnsToAdd = diff.added
-        plan.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
-        plan.typeChanges = diff.typeChanged.map(tc => ({
+        init.columnsToAdd = diff.added
+        init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
+        init.typeChanges = diff.typeChanged.map(tc => ({
           column: tc.field.physicalName,
           fromType: tc.existingType,
           toType: tc.field.designType,
         }))
-        plan.columnsToDrop = diff.removed.map(c => c.name)
+        init.columnsToDrop = diff.removed.map(c => c.name)
+        const hasChanges = (init.columnsToAdd?.length ?? 0) > 0 ||
+          (init.columnsToRename?.length ?? 0) > 0 ||
+          (init.typeChanges?.length ?? 0) > 0 ||
+          (init.columnsToDrop?.length ?? 0) > 0
+        if (hasChanges) { init.status = 'alter' }
       }
     } else {
-      // Adapter doesn't support introspection (e.g., MongoDB) — assume table is new if never synced
-      plan.isNew = true
+      init.status = 'create'
     }
 
-    return plan
+    return new SyncEntry(init)
   }
 
   // ── Table sync ────────────────────────────────────────────────────────
 
-  private async syncTable(readable: AtscriptDbReadable, safe: boolean): Promise<TSyncTableResult> {
+  private async syncTable(readable: AtscriptDbReadable, safe: boolean): Promise<SyncEntry> {
     const adapter = readable.dbAdapter
-    const tableName = readable.tableName
-    const result: TSyncTableResult = {
-      tableName,
-      created: false,
-      columnsAdded: [],
-      columnsRenamed: [],
-      columnsDropped: [],
-      recreated: false,
-      errors: [],
+    const name = readable.tableName
+    const init: TSyncEntryInit = {
+      name,
+      status: 'in-sync',
+      syncMethod: readable.syncMethod,
     }
 
-    // Column diff (if adapter supports introspection)
     if (adapter.getExistingColumns && adapter.syncColumns) {
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0) {
-        // Table doesn't exist yet — create it
         await adapter.ensureTable()
-        result.created = true
+        init.status = 'create'
       } else {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
 
-        // Handle type changes — may require recreation
+        // Handle type changes
         if (diff.typeChanged.length > 0) {
           const syncMethod = readable.syncMethod
           if (syncMethod === 'drop' && adapter.dropTable) {
             await adapter.dropTable()
             await adapter.ensureTable()
-            result.recreated = true
+            init.recreated = true
+            init.status = 'alter'
           } else if (syncMethod === 'recreate' && adapter.recreateTable) {
             await adapter.recreateTable()
-            result.recreated = true
+            init.recreated = true
+            init.status = 'alter'
           } else {
+            const errors: string[] = []
             for (const change of diff.typeChanged) {
-              const msg = `Type change on ${tableName}.${change.field.physicalName} ` +
+              const msg = `Type change on ${name}.${change.field.physicalName} ` +
                 `(${change.existingType} → ${change.field.designType}). ` +
                 `Add @db.sync.method "recreate" or "drop", or migrate manually.`
               this.logger.error?.(
                 `[schema-sync] ${msg}`
               )
-              result.errors.push(msg)
+              errors.push(msg)
             }
+            init.errors = errors
           }
         }
 
-        // Handle renames and adds (skip if table was recreated — columns are already correct)
-        if (!result.recreated && (diff.added.length > 0 || diff.renamed.length > 0)) {
+        // Handle renames and adds (skip if table was recreated)
+        if (!init.recreated && (diff.added.length > 0 || diff.renamed.length > 0)) {
           const syncResult = await adapter.syncColumns(diff)
-          result.columnsAdded = syncResult.added
-          result.columnsRenamed = syncResult.renamed
+          init.columnsAdded = syncResult.added
+          init.columnsRenamed = syncResult.renamed
+          if (syncResult.added.length > 0 || (syncResult.renamed?.length ?? 0) > 0) {
+            init.status = 'alter'
+          }
         }
 
         // Drop stale columns (unless safe mode or table was recreated)
-        if (!safe && !result.recreated && diff.removed.length > 0 && adapter.dropColumns) {
+        if (!safe && !init.recreated && diff.removed.length > 0 && adapter.dropColumns) {
           const colNames = diff.removed.map(c => c.name)
           await adapter.dropColumns(colNames)
-          result.columnsDropped = colNames
+          init.columnsDropped = colNames
+          init.status = 'alter'
         }
       }
     } else {
-      // No introspection — just ensure table exists
       await adapter.ensureTable()
     }
 
     // Sync indexes
     await adapter.syncIndexes()
 
-    // Sync foreign keys (if adapter supports it)
+    // Sync foreign keys
     if (adapter.syncForeignKeys) {
       await adapter.syncForeignKeys()
     }
 
-    return result
+    return new SyncEntry(init)
   }
 
   // ── Control table ─────────────────────────────────────────────────────
 
   private async ensureControlTable(): Promise<void> {
     if (!this.controlTable) {
-      // Import the compiled .as type
       const { AtscriptControl } = await import('./control.as.js')
       this.controlTable = this.space.getTable(AtscriptControl)
     }
@@ -437,19 +647,31 @@ export class SchemaSync {
 
   // ── Table tracking ──────────────────────────────────────────────────
 
-  private async readTrackedList(): Promise<Array<{ name: string; isView: boolean }>> {
+  private async readTrackedList(): Promise<Array<{ name: string; isView: boolean; viewType?: 'V' | 'M' | 'E' }>> {
     const value = await this.readControlValue('synced_tables')
     if (!value) { return [] }
     const parsed = JSON.parse(value)
-    // Backwards-compatible: old format was string[], new format is { name, isView }[]
+    // Backwards-compatible: old format was string[], then { name, isView }[]
     if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
       return (parsed as string[]).map(name => ({ name, isView: false }))
     }
-    return parsed
+    // Entries without viewType default to 'V' for views
+    return (parsed as Array<{ name: string; isView: boolean; viewType?: 'V' | 'M' | 'E' }>).map(e => ({
+      ...e,
+      viewType: e.viewType ?? (e.isView ? 'V' : undefined),
+    }))
   }
 
   private async writeTrackedList(readables: AtscriptDbReadable[]): Promise<void> {
-    const entries = readables.map(r => ({ name: r.tableName, isView: r.isView }))
+    const entries = readables.map(r => {
+      const isView = r.isView
+      let viewType: 'V' | 'M' | 'E' | undefined
+      if (isView) {
+        const view = r as AtscriptDbView
+        viewType = view.isExternal ? 'E' : (view.viewPlan.materialized ? 'M' : 'V')
+      }
+      return { name: r.tableName, isView, viewType }
+    })
     entries.sort((a, b) => a.name.localeCompare(b.name))
     await this.writeControlValue('synced_tables', JSON.stringify(entries))
   }
@@ -459,7 +681,6 @@ export class SchemaSync {
   private async tryAcquireLock(podId: string, ttlMs: number): Promise<boolean> {
     const now = Date.now()
 
-    // Check for expired lock and clean it up
     const existing = await this.controlTable!.findOne({
       filter: { key: { $eq: 'sync_lock' } },
       controls: {},
@@ -468,15 +689,12 @@ export class SchemaSync {
     if (existing) {
       const expiresAt = existing.expiresAt as number
       if (expiresAt && expiresAt < now) {
-        // Stale lock — clean up
         await this.controlTable!.deleteOne('sync_lock' as any)
       } else {
-        // Lock is held and not expired
         return false
       }
     }
 
-    // Try to insert lock row
     try {
       await this.controlTable!.insertOne({
         key: 'sync_lock',
@@ -486,7 +704,6 @@ export class SchemaSync {
       } as any)
       return true
     } catch {
-      // Duplicate key — another pod grabbed the lock between our check and insert
       return false
     }
   }
@@ -498,7 +715,6 @@ export class SchemaSync {
         controls: {},
       }) as Record<string, unknown> | null
 
-      // Only release if we own the lock
       if (existing && existing.lockedBy === podId) {
         await this.controlTable!.deleteOne('sync_lock' as any)
       }
@@ -516,11 +732,10 @@ export class SchemaSync {
         controls: {},
       }) as Record<string, unknown> | null
 
-      if (!lock) { return } // Lock released
+      if (!lock) { return }
 
       const expiresAt = lock.expiresAt as number
       if (expiresAt && expiresAt < Date.now()) {
-        // Expired — clean up and return
         await this.controlTable!.deleteOne('sync_lock' as any)
         return
       }

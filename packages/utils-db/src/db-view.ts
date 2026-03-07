@@ -53,15 +53,19 @@ export class AtscriptDbView<
     _tableResolver?: TTableResolver
   ) {
     super(_type, adapter, logger, _tableResolver)
-
-    // Validate: must have @db.view.for
-    if (!_type.metadata.has('db.view.for')) {
-      throw new Error('@db.view.for annotation is required for views')
-    }
   }
 
   override get isView(): boolean {
     return true
+  }
+
+  /**
+   * Whether this is an external view — declared with `@db.view` only,
+   * without `@db.view.for`. External views reference pre-existing DB views
+   * and are not managed (created/dropped) by schema sync.
+   */
+  get isExternal(): boolean {
+    return !this._type.metadata.has('db.view.for')
   }
 
   /**
@@ -75,6 +79,13 @@ export class AtscriptDbView<
   get viewPlan(): TViewPlan {
     if (this._viewPlan) {
       return this._viewPlan
+    }
+
+    if (this.isExternal) {
+      throw new Error(
+        `Cannot compute view plan for external view "${this.tableName}". ` +
+        `External views (declared without @db.view.for) reference pre-existing DB views.`
+      )
     }
 
     const metadata = this._type.metadata

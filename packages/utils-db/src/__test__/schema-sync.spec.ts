@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { DbSpace, BaseDbAdapter } from '../index'
-import { SchemaSync, syncSchema } from '../sync'
+import { SchemaSync, syncSchema, SyncEntry } from '../sync'
 import type {
   TDbInsertResult,
   TDbInsertManyResult,
@@ -18,6 +18,7 @@ import { prepareFixtures } from './test-utils'
 let UsersTable: any
 let ProfileTable: any
 let ActiveUsersView: any
+let LegacyReportView: any
 
 // ── Mock adapter that stores data in memory ──────────────────────────────
 
@@ -138,6 +139,10 @@ class MockAdapter extends BaseDbAdapter {
   async dropTableByName(tableName: string): Promise<void> {
     this.tables.delete(tableName)
   }
+
+  async dropViewByName(viewName: string): Promise<void> {
+    this.tables.delete(viewName)
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -161,6 +166,7 @@ beforeAll(async () => {
   UsersTable = fixtures.UsersTable
   ProfileTable = fixtures.ProfileTable
   ActiveUsersView = fixtures.ActiveUsersView
+  LegacyReportView = fixtures.LegacyReportView
 })
 
 // ── syncSchema (basic run) ───────────────────────────────────────────────
@@ -172,7 +178,7 @@ describe('syncSchema', () => {
 
     expect(result.status).toBe('synced')
     expect(result.schemaHash).toBeTruthy()
-    expect(result.tables).toBeDefined()
+    expect(result.entries.length).toBeGreaterThan(0)
     expect(sharedTables.has('__atscript_control')).toBe(true)
     expect(sharedTables.has('users')).toBe(true)
 
@@ -224,6 +230,83 @@ describe('syncSchema', () => {
   })
 })
 
+// ── SyncEntry ─────────────────────────────────────────────────────────────
+
+describe('SyncEntry', () => {
+  it('should compute destructive=false for external view drops', () => {
+    const entry = new SyncEntry({ name: 'my_ext', viewType: 'E', status: 'drop' })
+    expect(entry.destructive).toBe(false)
+  })
+
+  it('should compute destructive=false for virtual view drops', () => {
+    const entry = new SyncEntry({ name: 'my_view', viewType: 'V', status: 'drop' })
+    expect(entry.destructive).toBe(false)
+  })
+
+  it('should compute destructive=true for materialized view drops', () => {
+    const entry = new SyncEntry({ name: 'my_mat_view', viewType: 'M', status: 'drop' })
+    expect(entry.destructive).toBe(true)
+  })
+
+  it('should compute destructive=true for table drops', () => {
+    const entry = new SyncEntry({ name: 'my_table', status: 'drop' })
+    expect(entry.destructive).toBe(true)
+  })
+
+  it('should compute destructive=true when columns are dropped', () => {
+    const entry = new SyncEntry({ name: 't', status: 'alter', columnsToDrop: ['old_col'] })
+    expect(entry.destructive).toBe(true)
+  })
+
+  it('should compute destructive=false for create/in-sync/alter without drops', () => {
+    expect(new SyncEntry({ name: 't', status: 'create' }).destructive).toBe(false)
+    expect(new SyncEntry({ name: 't', status: 'in-sync' }).destructive).toBe(false)
+    expect(new SyncEntry({ name: 't', status: 'alter' }).destructive).toBe(false)
+  })
+
+  it('should compute hasChanges correctly', () => {
+    expect(new SyncEntry({ name: 't', status: 'create' }).hasChanges).toBe(true)
+    expect(new SyncEntry({ name: 't', status: 'alter' }).hasChanges).toBe(true)
+    expect(new SyncEntry({ name: 't', status: 'drop' }).hasChanges).toBe(true)
+    expect(new SyncEntry({ name: 't', status: 'in-sync' }).hasChanges).toBe(false)
+    expect(new SyncEntry({ name: 't', status: 'error' }).hasChanges).toBe(false)
+  })
+
+  it('should compute hasErrors correctly', () => {
+    expect(new SyncEntry({ name: 't', status: 'error', errors: ['missing'] }).hasErrors).toBe(true)
+    expect(new SyncEntry({ name: 't', status: 'in-sync' }).hasErrors).toBe(false)
+  })
+
+  it('should print error status', () => {
+    const entry = new SyncEntry({ name: 'bad_view', viewType: 'E', status: 'error', errors: ['View not found'] })
+    const lines = entry.print('plan')
+    expect(lines[0]).toContain('bad_view')
+    expect(lines[0]).toContain('error')
+    expect(lines[1]).toContain('View not found')
+  })
+
+  it('should print plan lines without colors', () => {
+    const entry = new SyncEntry({ name: 'users', status: 'drop' })
+    const lines = entry.print('plan')
+    expect(lines[0]).toContain('users')
+    expect(lines[0]).toContain('drop table')
+  })
+
+  it('should print result lines without colors', () => {
+    const entry = new SyncEntry({ name: 'users', status: 'drop' })
+    const lines = entry.print('result')
+    expect(lines[0]).toContain('users')
+    expect(lines[0]).toContain('dropped table')
+  })
+
+  it('should print view drop differently from table drop', () => {
+    const viewEntry = new SyncEntry({ name: 'v', viewType: 'V', status: 'drop' })
+    const tableEntry = new SyncEntry({ name: 't', status: 'drop' })
+    expect(viewEntry.print('plan')[0]).toContain('drop view')
+    expect(tableEntry.print('plan')[0]).toContain('drop table')
+  })
+})
+
 // ── run() — views ────────────────────────────────────────────────────────
 
 describe('SchemaSync.run — views', () => {
@@ -233,13 +316,13 @@ describe('SchemaSync.run — views', () => {
     const result = await sync.run([UsersTable, ActiveUsersView], { force: true })
 
     expect(result.status).toBe('synced')
-    const viewResult = result.tables!.find(t => t.tableName === 'active_users')
-    expect(viewResult).toBeDefined()
-    expect(viewResult!.viewType).toBe('V')
+    const viewEntry = result.entries.find(e => e.name === 'active_users')
+    expect(viewEntry).toBeDefined()
+    expect(viewEntry!.viewType).toBe('V')
 
-    const tableResult = result.tables!.find(t => t.tableName === 'users')
-    expect(tableResult).toBeDefined()
-    expect(tableResult!.viewType).toBeUndefined()
+    const tableEntry = result.entries.find(e => e.name === 'users')
+    expect(tableEntry).toBeDefined()
+    expect(tableEntry!.viewType).toBeUndefined()
   })
 
   it('should mark new views as created on first run', async () => {
@@ -247,8 +330,8 @@ describe('SchemaSync.run — views', () => {
     const sync = new SchemaSync(space)
     const result = await sync.run([UsersTable, ActiveUsersView], { force: true })
 
-    const viewResult = result.tables!.find(t => t.tableName === 'active_users')
-    expect(viewResult!.created).toBe(true)
+    const viewEntry = result.entries.find(e => e.name === 'active_users')
+    expect(viewEntry!.status).toBe('create')
   })
 
   it('should not mark existing views as created on subsequent run', async () => {
@@ -257,8 +340,8 @@ describe('SchemaSync.run — views', () => {
     await sync.run([UsersTable, ActiveUsersView], { force: true })
     const result = await sync.run([UsersTable, ActiveUsersView], { force: true })
 
-    const viewResult = result.tables!.find(t => t.tableName === 'active_users')
-    expect(viewResult!.created).toBe(false)
+    const viewEntry = result.entries.find(e => e.name === 'active_users')
+    expect(viewEntry!.status).toBe('in-sync')
   })
 
   it('should track views with isView flag in control table', async () => {
@@ -268,11 +351,12 @@ describe('SchemaSync.run — views', () => {
 
     const controlRows = sharedTables.get('__atscript_control')!
     const trackedRow = controlRows.find(r => r.key === 'synced_tables')
-    const tracked = JSON.parse(trackedRow!.value as string) as Array<{ name: string; isView: boolean }>
+    const tracked = JSON.parse(trackedRow!.value as string) as Array<{ name: string; isView: boolean; viewType?: string }>
 
     const viewEntry = tracked.find(t => t.name === 'active_users')
     expect(viewEntry).toBeDefined()
     expect(viewEntry!.isView).toBe(true)
+    expect(viewEntry!.viewType).toBe('V')
 
     const tableEntry = tracked.find(t => t.name === 'users')
     expect(tableEntry).toBeDefined()
@@ -286,9 +370,11 @@ describe('SchemaSync.run — views', () => {
     await sync.run([UsersTable, ActiveUsersView], { force: true })
     const result = await sync.run([UsersTable], { force: true })
 
-    expect(result.removedTables).toBeUndefined()
-    expect(result.removedViews).toBeDefined()
-    expect(result.removedViews).toContain('active_users')
+    const drops = result.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(1)
+    expect(drops[0].name).toBe('active_users')
+    expect(drops[0].viewType).toBe('V')
+    expect(drops[0].destructive).toBe(false)
   })
 
   it('should detect removed tables separately from removed views', async () => {
@@ -298,9 +384,11 @@ describe('SchemaSync.run — views', () => {
     await sync.run([UsersTable, ProfileTable, ActiveUsersView], { force: true })
     const result = await sync.run([UsersTable, ActiveUsersView], { force: true })
 
-    expect(result.removedTables).toBeDefined()
-    expect(result.removedTables).toContain('profiles')
-    expect(result.removedViews).toBeUndefined()
+    const drops = result.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(1)
+    expect(drops[0].name).toBe('profiles')
+    expect(drops[0].viewType).toBeUndefined()
+    expect(drops[0].destructive).toBe(true)
   })
 })
 
@@ -315,9 +403,8 @@ describe('SchemaSync.plan', () => {
     const plan = await sync.plan([UsersTable])
 
     expect(plan.status).toBe('up-to-date')
-    expect(plan.tables.length).toBeGreaterThan(0)
-    expect(plan.removedTables).toEqual([])
-    expect(plan.removedViews).toEqual([])
+    expect(plan.entries.length).toBeGreaterThan(0)
+    expect(plan.entries.filter(e => e.status === 'drop')).toEqual([])
   })
 
   it('should return changes-needed for new tables', async () => {
@@ -327,10 +414,10 @@ describe('SchemaSync.plan', () => {
     const plan = await sync.plan([UsersTable], { force: true })
 
     expect(plan.status).toBe('changes-needed')
-    const usersPlan = plan.tables.find(t => t.tableName === 'users')
-    expect(usersPlan).toBeDefined()
-    expect(usersPlan!.isNew).toBe(true)
-    expect(usersPlan!.columnsToAdd.length).toBeGreaterThan(0)
+    const usersEntry = plan.entries.find(e => e.name === 'users')
+    expect(usersEntry).toBeDefined()
+    expect(usersEntry!.status).toBe('create')
+    expect(usersEntry!.columnsToAdd.length).toBeGreaterThan(0)
   })
 
   it('should separate views from tables in plan output', async () => {
@@ -339,36 +426,36 @@ describe('SchemaSync.plan', () => {
 
     const plan = await sync.plan([UsersTable, ActiveUsersView], { force: true })
 
-    const viewPlan = plan.tables.find(t => t.tableName === 'active_users')
-    expect(viewPlan).toBeDefined()
-    expect(viewPlan!.viewType).toBe('V')
+    const viewEntry = plan.entries.find(e => e.name === 'active_users')
+    expect(viewEntry).toBeDefined()
+    expect(viewEntry!.viewType).toBe('V')
 
-    const tablePlan = plan.tables.find(t => t.tableName === 'users')
-    expect(tablePlan).toBeDefined()
-    expect(tablePlan!.viewType).toBeUndefined()
+    const tableEntry = plan.entries.find(e => e.name === 'users')
+    expect(tableEntry).toBeDefined()
+    expect(tableEntry!.viewType).toBeUndefined()
   })
 
-  it('should mark new views as isNew in plan', async () => {
+  it('should mark new views as create in plan', async () => {
     const space = createSpace()
     const sync = new SchemaSync(space)
 
     const plan = await sync.plan([UsersTable, ActiveUsersView], { force: true })
 
-    const viewPlan = plan.tables.find(t => t.tableName === 'active_users')
-    expect(viewPlan).toBeDefined()
-    expect(viewPlan!.isNew).toBe(true)
+    const viewEntry = plan.entries.find(e => e.name === 'active_users')
+    expect(viewEntry).toBeDefined()
+    expect(viewEntry!.status).toBe('create')
   })
 
-  it('should mark existing views as not isNew in plan', async () => {
+  it('should mark existing views as in-sync in plan', async () => {
     const space = createSpace()
     const sync = new SchemaSync(space)
 
     await sync.run([UsersTable, ActiveUsersView], { force: true })
     const plan = await sync.plan([UsersTable, ActiveUsersView], { force: true })
 
-    const viewPlan = plan.tables.find(t => t.tableName === 'active_users')
-    expect(viewPlan).toBeDefined()
-    expect(viewPlan!.isNew).toBe(false)
+    const viewEntry = plan.entries.find(e => e.name === 'active_users')
+    expect(viewEntry).toBeDefined()
+    expect(viewEntry!.status).toBe('in-sync')
   })
 
   it('should detect removed views in plan', async () => {
@@ -379,8 +466,11 @@ describe('SchemaSync.plan', () => {
     const plan = await sync.plan([UsersTable], { force: true })
 
     expect(plan.status).toBe('changes-needed')
-    expect(plan.removedViews).toContain('active_users')
-    expect(plan.removedTables).not.toContain('active_users')
+    const drops = plan.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(1)
+    expect(drops[0].name).toBe('active_users')
+    expect(drops[0].viewType).toBe('V')
+    expect(drops[0].destructive).toBe(false)
   })
 
   it('should detect removed tables in plan', async () => {
@@ -391,8 +481,13 @@ describe('SchemaSync.plan', () => {
     const plan = await sync.plan([UsersTable, ActiveUsersView], { force: true })
 
     expect(plan.status).toBe('changes-needed')
-    expect(plan.removedTables).toContain('profiles')
-    expect(plan.removedViews).toEqual([])
+    const tableDrops = plan.entries.filter(e => e.status === 'drop' && !e.viewType)
+    expect(tableDrops).toHaveLength(1)
+    expect(tableDrops[0].name).toBe('profiles')
+    expect(tableDrops[0].destructive).toBe(true)
+
+    const viewDrops = plan.entries.filter(e => e.status === 'drop' && e.viewType)
+    expect(viewDrops).toHaveLength(0)
   })
 
   it('should hide destructive ops in safe mode', async () => {
@@ -402,10 +497,10 @@ describe('SchemaSync.plan', () => {
     await sync.run([UsersTable, ProfileTable, ActiveUsersView], { force: true })
     const plan = await sync.plan([UsersTable], { force: true, safe: true })
 
-    expect(plan.removedTables).toEqual([])
-    expect(plan.removedViews).toEqual([])
-    for (const t of plan.tables) {
-      expect(t.columnsToDrop).toEqual([])
+    const drops = plan.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(0)
+    for (const e of plan.entries) {
+      expect(e.columnsToDrop).toEqual([])
     }
   })
 
@@ -421,9 +516,12 @@ describe('SchemaSync.plan', () => {
     trackedRow!.value = JSON.stringify(['users', 'old_table'])
 
     const plan = await sync.plan([UsersTable], { force: true })
+    const drops = plan.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(1)
+    expect(drops[0].name).toBe('old_table')
     // Old format entries are treated as tables (not views)
-    expect(plan.removedTables).toContain('old_table')
-    expect(plan.removedViews).toEqual([])
+    expect(drops[0].viewType).toBeUndefined()
+    expect(drops[0].destructive).toBe(true)
   })
 })
 
@@ -451,5 +549,113 @@ describe('SchemaSync.run — safe mode', () => {
     await sync.run([UsersTable], { force: true })
     // profiles should be dropped
     expect(sharedTables.has('profiles')).toBe(false)
+  })
+})
+
+// ── External views ──────────────────────────────────────────────────────
+
+describe('SchemaSync — external views', () => {
+  it('should mark external view as in-sync when it exists in DB', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    // Simulate the view existing in the DB by pre-populating columns
+    const adapter = space.get(LegacyReportView).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'INTEGER', notnull: true, pk: true },
+      { name: 'total', type: 'INTEGER', notnull: true, pk: false },
+    ])
+
+    const result = await sync.run([UsersTable, LegacyReportView], { force: true })
+    const entry = result.entries.find(e => e.name === 'legacy_report')
+    expect(entry).toBeDefined()
+    expect(entry!.viewType).toBe('E')
+    expect(entry!.status).toBe('in-sync')
+  })
+
+  it('should mark external view as error when it does not exist in DB', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    const result = await sync.run([UsersTable, LegacyReportView], { force: true })
+    const entry = result.entries.find(e => e.name === 'legacy_report')
+    expect(entry).toBeDefined()
+    expect(entry!.viewType).toBe('E')
+    expect(entry!.status).toBe('error')
+    expect(entry!.errors[0]).toContain('not found')
+  })
+
+  it('should mark external view as error when columns are missing', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    // View exists but is missing the 'total' column
+    const adapter = space.get(LegacyReportView).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'INTEGER', notnull: true, pk: true },
+    ])
+
+    const result = await sync.run([UsersTable, LegacyReportView], { force: true })
+    const entry = result.entries.find(e => e.name === 'legacy_report')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('error')
+    expect(entry!.errors[0]).toContain('total')
+  })
+
+  it('should check external views in plan', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    // External view exists
+    const adapter = space.get(LegacyReportView).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'INTEGER', notnull: true, pk: true },
+      { name: 'total', type: 'INTEGER', notnull: true, pk: false },
+    ])
+
+    const plan = await sync.plan([UsersTable, LegacyReportView], { force: true })
+    const entry = plan.entries.find(e => e.name === 'legacy_report')
+    expect(entry).toBeDefined()
+    expect(entry!.viewType).toBe('E')
+    expect(entry!.status).toBe('in-sync')
+  })
+
+  it('should never drop external views when removed from schema', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    // First sync with external view
+    const adapter = space.get(LegacyReportView).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'INTEGER', notnull: true, pk: true },
+      { name: 'total', type: 'INTEGER', notnull: true, pk: false },
+    ])
+    await sync.run([UsersTable, LegacyReportView], { force: true })
+
+    // Second sync without external view — should NOT generate a drop entry
+    const result = await sync.run([UsersTable], { force: true })
+    const drops = result.entries.filter(e => e.status === 'drop')
+    expect(drops).toHaveLength(0)
+  })
+
+  it('should track external views with viewType E in control table', async () => {
+    const space = createSpace()
+    const sync = new SchemaSync(space)
+
+    const adapter = space.get(LegacyReportView).dbAdapter as MockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'INTEGER', notnull: true, pk: true },
+      { name: 'total', type: 'INTEGER', notnull: true, pk: false },
+    ])
+    await sync.run([UsersTable, LegacyReportView], { force: true })
+
+    const controlRows = sharedTables.get('__atscript_control')!
+    const trackedRow = controlRows.find(r => r.key === 'synced_tables')
+    const tracked = JSON.parse(trackedRow!.value as string) as Array<{ name: string; isView: boolean; viewType?: string }>
+
+    const extEntry = tracked.find(t => t.name === 'legacy_report')
+    expect(extEntry).toBeDefined()
+    expect(extEntry!.isView).toBe(true)
+    expect(extEntry!.viewType).toBe('E')
   })
 })

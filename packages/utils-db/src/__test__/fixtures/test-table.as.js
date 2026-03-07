@@ -46,6 +46,17 @@ export class ActiveUsersView {
   }
 }
 
+
+export class LegacyReportView {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "LegacyReportView"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
 $("object", UsersTable)
   .prop(
     "id",
@@ -208,5 +219,19 @@ $("object", ActiveUsersView)
   .annotate("db.view", "active_users")
   .annotate("db.view.for", () => UsersTable)
   .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
+
+$("object", LegacyReportView)
+  .prop(
+    "id",
+    $().designType("number")
+      .tags("number")
+      .$type
+  ).prop(
+    "total",
+    $().designType("number")
+      .tags("number")
+      .$type
+  )
+  .annotate("db.view", "legacy_report")
 
 // prettier-ignore-end

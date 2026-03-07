@@ -518,4 +518,11 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters implement this.
    */
   dropTableByName?(tableName: string): Promise<void>
+
+  /**
+   * Drops a view by name (without needing a registered readable).
+   * Used by schema sync to remove views no longer in the schema.
+   * Optional — only relational adapters implement this.
+   */
+  dropViewByName?(viewName: string): Promise<void>
 }

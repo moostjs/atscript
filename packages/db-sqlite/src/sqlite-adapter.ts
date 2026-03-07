@@ -346,6 +346,12 @@ export class SqliteAdapter extends BaseDbAdapter {
     this.driver.exec(ddl)
   }
 
+  async dropViewByName(viewName: string): Promise<void> {
+    const ddl = `DROP VIEW IF EXISTS "${esc(viewName)}"`
+    this._log(ddl)
+    this.driver.exec(ddl)
+  }
+
   async syncIndexes(): Promise<void> {
     const tableName = this.resolveTableName()
 

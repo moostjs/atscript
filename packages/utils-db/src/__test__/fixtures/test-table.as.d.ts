@@ -157,4 +157,29 @@ export declare class ActiveUsersView {
     "email": string /* email */
   }
 }
+
+/**
+ * Atscript interface **LegacyReportView**
+ * @see {@link ./test-table.as:75:18}
+ */
+export declare class LegacyReportView {
+  id: number
+  total: number
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof LegacyReportView, LegacyReportView>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof LegacyReportView>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "total": number
+  }
+  static __ownProps: {
+    "id": number
+    "total": number
+  }
+}
 // prettier-ignore-end
