@@ -194,7 +194,7 @@ export class Validator<
     if (typeof this.opts.replace === 'function') {
       def = this.opts.replace(def, this.cachedPath)
     }
-    if (def.optional && value === undefined) {
+    if (def.optional && (value === undefined || value === null)) {
       return true
     }
 

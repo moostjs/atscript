@@ -147,7 +147,7 @@ describe('DbSpace', () => {
     const space = new DbSpace(() => new MockAdapter())
 
     const users = space.getTable(UsersTable)
-    const profiles = space.getTable(ProfileTable)
+    space.getTable(ProfileTable)
 
     // Access internals to verify resolver is wired
     const resolver = (users as any)._tableResolver

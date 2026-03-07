@@ -168,6 +168,8 @@ describe('serialize round-trip', () => {
       .designType('string')
       .tags('string', 'email', 'uuid').$type
     const serialized = serializeAnnotatedType(original)
+    expect(serialized.type.kind).not.toBe('$ref')
+    if (serialized.type.kind === '$ref') throw new Error('unreachable')
     expect(Array.isArray(serialized.type.tags)).toBe(true)
     expect(serialized.type.tags).toContain('email')
 

@@ -133,7 +133,7 @@ class MockAdapter extends BaseDbAdapter {
         pk: field.isPrimaryKey,
       })
     }
-    return { added }
+    return { added, renamed: [] }
   }
 
   async dropColumns(columns: string[]): Promise<void> {

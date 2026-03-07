@@ -199,16 +199,34 @@ export interface AtscriptDbTableLike {
 
 // ── Write Table Resolver ─────────────────────────────────────────────────
 
-/** Minimal writable table interface for nested creation. */
+/** Minimal writable table interface for nested creation/update. */
 export interface AtscriptDbWritable {
   insertOne(
     payload: Record<string, unknown>,
-    opts?: { maxDepth?: number; _depth?: number }
+    opts?: { maxDepth?: number }
   ): Promise<TDbInsertResult>
   insertMany(
     payloads: Array<Record<string, unknown>>,
     opts?: { maxDepth?: number; _depth?: number }
   ): Promise<TDbInsertManyResult>
+  replaceOne(
+    payload: Record<string, unknown>,
+    opts?: { maxDepth?: number }
+  ): Promise<TDbUpdateResult>
+  bulkReplace(
+    payloads: Array<Record<string, unknown>>,
+    opts?: { maxDepth?: number; _depth?: number }
+  ): Promise<TDbUpdateResult>
+  updateOne(
+    payload: Record<string, unknown>,
+    opts?: { maxDepth?: number }
+  ): Promise<TDbUpdateResult>
+  bulkUpdate(
+    payloads: Array<Record<string, unknown>>,
+    opts?: { maxDepth?: number; _depth?: number }
+  ): Promise<TDbUpdateResult>
+  findOne(query: unknown): Promise<Record<string, unknown> | null>
+  deleteMany(filter: unknown): Promise<TDbDeleteResult>
 }
 
 /**

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   AnnotationSpec,
   AtscriptDoc,
+  SemanticInterfaceNode,
   SemanticPrimitiveNode,
 } from '@atscript/core'
 import type { TAtscriptDocConfig } from '@atscript/core'
@@ -226,7 +227,7 @@ describe('helper methods', () => {
     const { repo } = singleDocRepo('file:///test.as', '')
 
     // Interface props
-    const iface = doc.nodes.find(n => n.entity === 'interface')!
+    const iface = doc.nodes.find(n => n.entity === 'interface')! as SemanticInterfaceNode
     const ifaceProps = repo.getPropsFromDef(iface)
     expect(ifaceProps).toBeDefined()
     expect(ifaceProps!.length).toBe(2)
@@ -242,7 +243,7 @@ describe('helper methods', () => {
   it('propsToCompletionItems maps props correctly and returns undefined for undefined', () => {
     const doc = createDoc('file:///test.as', 'interface User {\n  name: string\n}')
     const { repo } = singleDocRepo('file:///test.as', '')
-    const iface = doc.nodes.find(n => n.entity === 'interface')!
+    const iface = doc.nodes.find(n => n.entity === 'interface')! as SemanticInterfaceNode
     const props = Array.from(iface.props.values())
     const items = repo.propsToCompletionItems(props)
     expect(items).toBeDefined()

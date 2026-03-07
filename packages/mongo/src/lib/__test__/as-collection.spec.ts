@@ -19,9 +19,9 @@ function prepareInsert(mongo: AsMongo, type: any, payload: any) {
   const prepared = [] as any[]
   for (const item of arr) {
     if (v.validate(item)) {
-      const data = { ...item }
+      const data = { ...(item as Record<string, unknown>) }
       if (data._id) {
-        data._id = adapter.prepareIdFromIdType(data._id)
+        data._id = adapter.prepareIdFromIdType(data._id as string)
       } else if (adapter.idType !== 'objectId') {
         throw new Error('Missing "_id" field')
       }
@@ -41,8 +41,8 @@ function prepareReplace(mongo: AsMongo, type: any, payload: any) {
   const adapter = mongo.getAdapter(type)
   const v = table.getValidator('update')!
   if (v.validate(payload)) {
-    const _id = adapter.prepareIdFromIdType(payload._id)
-    const data = { ...payload, _id }
+    const _id = adapter.prepareIdFromIdType((payload as Record<string, unknown>)._id as string)
+    const data = { ...(payload as Record<string, unknown>), _id }
     return {
       toArgs: () => [{ _id }, data, {}] as const,
       filter: { _id },
@@ -137,7 +137,6 @@ describe('[mongo] AsCollection with structures', () => {
       })
     ).toThrowError()
     expect(() =>
-      // @ts-expect-error
       prepareReplace(mongo, MinimalCollection, {
         name: 'John Doe',
       })
@@ -158,7 +157,6 @@ describe('[mongo] AsCollection with structures', () => {
       })
     ).not.toThrowError()
     expect(() =>
-      // @ts-expect-error
       prepareReplace(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
@@ -187,7 +185,6 @@ describe('[mongo] AsCollection with structures', () => {
       })
     ).toThrowError()
     expect(() =>
-      // @ts-expect-error
       prepareUpdate(mongo, MinimalCollection, {
         name: 'John Doe',
       })
@@ -208,7 +205,6 @@ describe('[mongo] AsCollection with structures', () => {
       })
     ).not.toThrowError()
     expect(() =>
-      // @ts-expect-error
       prepareUpdate(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
@@ -473,7 +469,6 @@ describe('[mongo] AsCollection with arrays', () => {
         _id: new ObjectId(),
         withKey: {
           $replace: [
-            // @ts-expect-error
             {
               key1: '1',
               key2: '2',
@@ -526,7 +521,6 @@ describe('[mongo] AsCollection with arrays', () => {
         _id: new ObjectId(),
         withKey: {
           $insert: [
-            // @ts-expect-error
             {
               key1: '1',
               key2: '2',
@@ -938,7 +932,6 @@ describe('[mongo] AsCollection with arrays', () => {
         _id: new ObjectId(),
         withKeyMerge: {
           $replace: [
-            // @ts-expect-error
             {
               key1: '1',
               // missing required props
@@ -987,7 +980,6 @@ describe('[mongo] AsCollection with arrays', () => {
         _id: new ObjectId(),
         withKeyMerge: {
           $insert: [
-            // @ts-expect-error
             {
               key1: '1',
               // missing required props

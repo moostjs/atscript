@@ -14,13 +14,6 @@ const refAnnotation = new AnnotationSpec({
   argument: { name: 'target', type: 'ref' },
 })
 
-const refAnnotationMultiArg = new AnnotationSpec({
-  argument: [
-    { name: 'target', type: 'ref' },
-    { name: 'label', type: 'string' },
-  ],
-})
-
 const stringAnnotation = new AnnotationSpec({
   argument: { name: 'value', type: 'string' },
 })
@@ -36,8 +29,6 @@ interface User {
 `)
       expect(result.messages).toHaveLength(0)
       const node = result.nodes[0]
-      const annotations = node.getDefinition()?.annotations?.[0]?.args
-        ?? node.annotations?.[0]?.args
       // The annotation arg should exist as an identifier
       // Find the annotation on the prop
       expect(result.toString()).toContain('PostTag')

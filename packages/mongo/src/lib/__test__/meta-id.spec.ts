@@ -74,7 +74,7 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
       const fieldType = table.flatMap.get('_id')!
       const result = adapter.prepareId(HEX_A, fieldType)
       expect(result).toBeInstanceOf(ObjectId)
-      expect(result.toString()).toBe(HEX_A)
+      expect((result as ObjectId).toString()).toBe(HEX_A)
     })
 
     it('prepareId should convert string to number for id field', () => {
@@ -93,8 +93,8 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
         expect(findOneSpy).toHaveBeenCalledOnce()
         const query = findOneSpy.mock.calls[0][0]
         // The filter should have _id as ObjectId (check via toString)
-        expect(query.filter._id).toBeDefined()
-        expect(query.filter._id.toString()).toBe(HEX_A)
+        expect((query.filter as any)._id).toBeDefined()
+        expect((query.filter as any)._id.toString()).toBe(HEX_A)
         expect(result).toEqual(expectedDoc)
 
       })
@@ -162,10 +162,11 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
 
         const query = findOneSpy.mock.calls[0][0]
         // Both _id (ObjectId) and code (string) are type-compatible → $or
-        expect(query.filter.$or).toBeDefined()
-        expect(query.filter.$or[0]._id).toBeDefined()
-        expect(query.filter.$or[0]._id.toString()).toBe(HEX_C)
-        expect(query.filter.$or[1]).toEqual({ code: HEX_C })
+        const filter = query.filter as any
+        expect(filter.$or).toBeDefined()
+        expect(filter.$or[0]._id).toBeDefined()
+        expect(filter.$or[0]._id.toString()).toBe(HEX_C)
+        expect(filter.$or[1]).toEqual({ code: HEX_C })
         expect(result).toEqual(expectedDoc)
 
       })
@@ -212,8 +213,8 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
         const result = await table.findById(HEX_D)
 
         const query = findOneSpy.mock.calls[0][0]
-        expect(query.filter._id).toBeDefined()
-        expect(query.filter._id.toString()).toBe(HEX_D)
+        expect((query.filter as any)._id).toBeDefined()
+        expect((query.filter as any)._id.toString()).toBe(HEX_D)
         expect(result).toEqual(expectedDoc)
 
       })

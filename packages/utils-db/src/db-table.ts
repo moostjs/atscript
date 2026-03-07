@@ -110,7 +110,7 @@ export class AtscriptDbTable<
    */
   public async insertOne(
     payload: Partial<DataType> & Record<string, unknown>,
-    opts?: { maxDepth?: number; _depth?: number }
+    opts?: { maxDepth?: number }
   ): Promise<TDbInsertResult> {
     const result = await this.insertMany([payload], opts)
     return { insertedId: result.insertedIds[0] }
@@ -129,11 +129,11 @@ export class AtscriptDbTable<
    */
   public async insertMany(
     payloads: Array<Partial<DataType> & Record<string, unknown>>,
-    opts?: { maxDepth?: number; _depth?: number }
+    opts?: { maxDepth?: number }
   ): Promise<TDbInsertManyResult> {
     this._flatten()
     const maxDepth = opts?.maxDepth ?? 3
-    const depth = opts?._depth ?? 0
+    const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
 
     return this.adapter.withTransaction(async () => {
@@ -168,42 +168,160 @@ export class AtscriptDbTable<
 
   /**
    * Replaces a single record identified by primary key(s).
-   * The payload must include primary key field(s).
+   * Delegates to {@link bulkReplace} for unified nested relation support.
    */
   public async replaceOne(
-    payload: DataType & Record<string, unknown>
+    payload: DataType & Record<string, unknown>,
+    opts?: { maxDepth?: number }
+  ): Promise<TDbUpdateResult> {
+    return this.bulkReplace([payload], opts)
+  }
+
+  /**
+   * Replaces multiple records with deep nested relation support.
+   *
+   * Supports all relation types (TO, FROM, VIA). TO dependencies are
+   * replaced first (their PKs become our FKs), FROM dependents are replaced
+   * after (they receive our PKs as their FKs), VIA relations clear and
+   * re-create junction rows. Fully recursive up to `maxDepth` (default 3).
+   */
+  public async bulkReplace(
+    payloads: Array<DataType & Record<string, unknown>>,
+    opts?: { maxDepth?: number }
   ): Promise<TDbUpdateResult> {
     this._flatten()
-    const validator = this.getValidator('update')
-    if (!validator.validate(payload)) {
-      throw new Error('Validation failed for replace')
-    }
-    const filter = this._extractPrimaryKeyFilter(payload)
-    const data = this._prepareForWrite({ ...payload })
-    return this.adapter.replaceOne(filter, data)
+    const maxDepth = opts?.maxDepth ?? 3
+    const depth = (opts as { _depth?: number })?._depth ?? 0
+    const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
+
+    return this.adapter.withTransaction(async () => {
+      // Phase 0: Setup — check nav props, clone + defaults, validate
+      if (canNest) {
+        this._checkNavProps(payloads, 'replace')
+      }
+      const items = payloads.map(p => this._applyDefaults({ ...p }))
+      const originals = canNest ? payloads.map(p => ({ ...p })) : []
+
+      const validator = this.getValidator('bulkReplace')
+      for (const data of items) {
+        if (!validator.validate(data)) {
+          throw new Error('Validation failed for replace')
+        }
+      }
+
+      // Phase 1: TO dependencies (replace parents)
+      if (canNest) {
+        await this._batchReplaceNestedTo(items, maxDepth, depth)
+      }
+
+      // Phase 2: Main replace — strip nav fields, prepare, replace each
+      let matchedCount = 0
+      let modifiedCount = 0
+      for (const data of items) {
+        for (const navField of this._navFields) { delete data[navField] }
+        const filter = this._extractPrimaryKeyFilter(data)
+        const prepared = this._prepareForWrite(data)
+        const result = await this.adapter.replaceOne(
+          this._translateFilter(filter),
+          prepared
+        )
+        matchedCount += result.matchedCount
+        modifiedCount += result.modifiedCount
+      }
+
+      // Phase 3: FROM dependencies (replace children)
+      if (canNest) {
+        await this._batchReplaceNestedFrom(originals, maxDepth, depth)
+      }
+
+      // Phase 4: VIA dependencies (replace junction records)
+      if (canNest) {
+        await this._batchReplaceNestedVia(originals, maxDepth, depth)
+      }
+
+      return { matchedCount, modifiedCount }
+    })
   }
 
   /**
    * Partially updates a single record identified by primary key(s).
-   * Supports array patch operations (`$replace`, `$insert`, `$upsert`,
-   * `$update`, `$remove`) for top-level array fields.
+   * Delegates to {@link bulkUpdate} for unified nested relation support.
    */
   public async updateOne(
-    payload: Partial<DataType> & Record<string, unknown>
+    payload: Partial<DataType> & Record<string, unknown>,
+    opts?: { maxDepth?: number }
+  ): Promise<TDbUpdateResult> {
+    return this.bulkUpdate([payload], opts)
+  }
+
+  /**
+   * Partially updates multiple records with deep nested relation support.
+   *
+   * Only TO relations (1:1, N:1) are supported for patching. FROM/VIA
+   * relations will error — use {@link bulkReplace} for those.
+   * Recursive up to `maxDepth` (default 3).
+   */
+  public async bulkUpdate(
+    payloads: Array<Partial<DataType> & Record<string, unknown>>,
+    opts?: { maxDepth?: number }
   ): Promise<TDbUpdateResult> {
     this._flatten()
-    const validator = this.getValidator('patch')
-    if (!validator.validate(payload)) {
-      throw new Error('Validation failed for update')
-    }
-    const filter = this._extractPrimaryKeyFilter(payload)
+    const maxDepth = opts?.maxDepth ?? 3
+    const depth = (opts as { _depth?: number })?._depth ?? 0
+    const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
 
-    if (this.adapter.supportsNativePatch()) {
-      return this.adapter.nativePatch(this._translateFilter(filter), payload)
-    }
+    return this.adapter.withTransaction(async () => {
+      // Phase 0: Setup — check nav props (errors on FROM/VIA), validate
+      if (canNest) {
+        this._checkNavProps(payloads, 'patch')
+      }
 
-    const update = decomposePatch(payload, this as AtscriptDbTable)
-    return this.adapter.updateOne(this._translateFilter(filter), this._translatePatchKeys(update))
+      const validator = this.getValidator('bulkUpdate')
+      for (const data of payloads) {
+        if (!validator.validate(data)) {
+          throw new Error('Validation failed for update')
+        }
+      }
+
+      // Phase 1: TO relation patches
+      if (canNest) {
+        await this._batchPatchNestedTo(payloads as Array<Record<string, unknown>>, maxDepth, depth)
+      }
+
+      // Phase 2: Main patch — strip nav fields, decompose, update each
+      let matchedCount = 0
+      let modifiedCount = 0
+      for (const payload of payloads) {
+        const data = { ...payload } as Record<string, unknown>
+        for (const navField of this._navFields) { delete data[navField] }
+        const filter = this._extractPrimaryKeyFilter(data)
+
+        // Strip PK fields from data — they're in the filter, not in the SET clause
+        for (const pk of this._primaryKeys) { delete data[pk] }
+
+        // Skip if nothing left to update (e.g. only nav props + PK in payload)
+        if (Object.keys(data).length === 0) {
+          matchedCount += 1
+          modifiedCount += 0
+          continue
+        }
+
+        let result: TDbUpdateResult
+        if (this.adapter.supportsNativePatch()) {
+          result = await this.adapter.nativePatch(this._translateFilter(filter), data)
+        } else {
+          const update = decomposePatch(data, this as AtscriptDbTable)
+          result = await this.adapter.updateOne(
+            this._translateFilter(filter),
+            this._translatePatchKeys(update)
+          )
+        }
+        matchedCount += result.matchedCount
+        modifiedCount += result.modifiedCount
+      }
+
+      return { matchedCount, modifiedCount }
+    })
   }
 
   /**
@@ -517,6 +635,226 @@ export class AtscriptDbTable<
     }
   }
 
+  // ── Internal: nav prop checking ─────────────────────────────────────────
+
+  /**
+   * Validates nav props in payloads. Errors on null values, missing resolver,
+   * and (in patch mode) unsupported FROM/VIA relations.
+   */
+  private _checkNavProps(
+    payloads: Array<Record<string, unknown>>,
+    mode: 'replace' | 'patch'
+  ): void {
+    for (const payload of payloads) {
+      for (const [navField, relation] of this._relations) {
+        const value = payload[navField]
+        if (value === undefined) { continue }
+        if (value === null) {
+          throw new Error(`Cannot process null navigation property '${navField}'`)
+        }
+        if (!this._writeTableResolver) {
+          throw new Error(`Cannot process nav property '${navField}' — no write table resolver configured`)
+        }
+        if (mode === 'patch') {
+          if (relation.direction === 'from') {
+            throw new Error(`Cannot patch relation '${navField}' — patching 1:N relations not supported. Use replaceOne.`)
+          }
+          if (relation.direction === 'via') {
+            throw new Error(`Cannot patch relation '${navField}' — patching M:N relations not supported. Use replaceOne.`)
+          }
+        }
+      }
+    }
+  }
+
+  // ── Internal: batch nested replace ──────────────────────────────────────
+
+  /**
+   * Batch-replaces TO dependencies before the main replace.
+   * Mirrors {@link _batchInsertNestedTo} but calls bulkReplace.
+   */
+  private async _batchReplaceNestedTo(
+    items: Array<Record<string, unknown>>,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'to') { continue }
+
+      const targetTable = this._writeTableResolver!(relation.targetType())
+      if (!targetTable) { continue }
+      const fk = this._findFKForRelation(relation)
+      if (!fk) { continue }
+
+      const parents: Array<Record<string, unknown>> = []
+      const sourceIndices: number[] = []
+      for (let i = 0; i < items.length; i++) {
+        const nested = items[i][navField]
+        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
+          parents.push(nested as Record<string, unknown>)
+          sourceIndices.push(i)
+        }
+      }
+      if (parents.length === 0) { continue }
+
+      await targetTable.bulkReplace(parents, { maxDepth, _depth: depth + 1 })
+
+      // Wire FK values back from the nested objects' PKs
+      for (let j = 0; j < sourceIndices.length; j++) {
+        if (fk.localFields.length === 1 && fk.targetFields.length === 1) {
+          items[sourceIndices[j]][fk.localFields[0]] = parents[j][fk.targetFields[0]]
+        }
+      }
+    }
+  }
+
+  /**
+   * Batch-replaces FROM dependents after the main replace.
+   * Mirrors {@link _batchInsertNestedFrom} but calls bulkReplace.
+   */
+  private async _batchReplaceNestedFrom(
+    originals: Array<Record<string, unknown>>,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'from') { continue }
+
+      const targetTable = this._writeTableResolver!(relation.targetType())
+      if (!targetTable) { continue }
+      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
+      if (!remoteFK) { continue }
+
+      const allChildren: Array<Record<string, unknown>> = []
+      for (const original of originals) {
+        const children = original[navField]
+        if (!Array.isArray(children)) { continue }
+        // Get parent PK value for FK wiring
+        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        for (const child of children) {
+          const childData = { ...(child as Record<string, unknown>) }
+          if (remoteFK.fields.length === 1 && parentPK !== undefined) {
+            childData[remoteFK.fields[0]] = parentPK
+          }
+          allChildren.push(childData)
+        }
+      }
+      if (allChildren.length === 0) { continue }
+
+      await targetTable.bulkReplace(allChildren, { maxDepth, _depth: depth + 1 })
+    }
+  }
+
+  /**
+   * Handles VIA (M:N) relations during replace.
+   * Deletes existing junction rows, replaces target records, inserts new junction rows.
+   */
+  private async _batchReplaceNestedVia(
+    originals: Array<Record<string, unknown>>,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'via' || !relation.viaType) { continue }
+
+      const targetTable = this._writeTableResolver!(relation.targetType())
+      if (!targetTable) { continue }
+      const junctionTable = this._writeTableResolver!(relation.viaType())
+      if (!junctionTable) { continue }
+
+      const targetTableName = (relation.targetType()?.metadata?.get('db.table') as string) || relation.targetType()?.id || ''
+
+      const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
+      if (!fkToThis) { continue }
+      const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
+      if (!fkToTarget) { continue }
+
+      for (const original of originals) {
+        const targets = original[navField]
+        if (!Array.isArray(targets)) { continue }
+
+        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        if (parentPK === undefined) { continue }
+
+        // a) Delete existing junction rows
+        await junctionTable.deleteMany({ [fkToThis.fields[0]]: parentPK })
+
+        // b) Replace target records
+        if (targets.length > 0) {
+          await targetTable.bulkReplace(
+            targets.map(t => ({ ...(t as Record<string, unknown>) })),
+            { maxDepth, _depth: depth + 1 }
+          )
+        }
+
+        // c) Insert new junction rows
+        const targetPKField = (targetTable as any)._primaryKeys?.[0]
+        if (targetPKField && fkToTarget.fields.length === 1 && fkToThis.fields.length === 1) {
+          const junctionRows = targets.map(t => ({
+            [fkToThis.fields[0]]: parentPK,
+            [fkToTarget.fields[0]]: (t as Record<string, unknown>)[targetPKField],
+          }))
+          await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
+        }
+      }
+    }
+  }
+
+  // ── Internal: batch nested patch ────────────────────────────────────────
+
+  /**
+   * Batch-patches TO dependencies before the main patch.
+   * Reads FK values from DB if not present in the payload.
+   */
+  private async _batchPatchNestedTo(
+    items: Array<Record<string, unknown>>,
+    maxDepth: number,
+    depth: number
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'to') { continue }
+
+      const targetTable = this._writeTableResolver!(relation.targetType())
+      if (!targetTable) { continue }
+      const fk = this._findFKForRelation(relation)
+      if (!fk) { continue }
+
+      const patches: Array<Record<string, unknown>> = []
+      for (const item of items) {
+        const nested = item[navField]
+        if (!nested || typeof nested !== 'object' || Array.isArray(nested)) { continue }
+
+        const patch = { ...(nested as Record<string, unknown>) }
+
+        // Get FK value from payload, or read from DB
+        let fkValue = fk.localFields.length === 1 ? item[fk.localFields[0]] : undefined
+        if (fkValue === undefined) {
+          // Need to read current record to get FK
+          const pkFilter = this._extractPrimaryKeyFilter(item) as FilterExpr<OwnProps>
+          const current = await this.findOne({ filter: pkFilter, controls: {} })
+          if (!current) {
+            throw new Error(`Cannot patch relation '${navField}' — source record not found`)
+          }
+          fkValue = fk.localFields.length === 1 ? (current as Record<string, unknown>)[fk.localFields[0]] : undefined
+        }
+
+        if (fkValue === null || fkValue === undefined) {
+          throw new Error(`Cannot patch relation '${navField}' — foreign key '${fk.localFields[0]}' is null`)
+        }
+
+        // Inject target PK into the nested patch
+        if (fk.targetFields.length === 1) {
+          patch[fk.targetFields[0]] = fkValue
+        }
+
+        patches.push(patch)
+      }
+      if (patches.length === 0) { continue }
+
+      await targetTable.bulkUpdate(patches, { maxDepth, _depth: depth + 1 })
+    }
+  }
+
   // ── Internal: validator building ──────────────────────────────────────────
 
   /**
@@ -551,6 +889,29 @@ export class AtscriptDbTable<
         return this.createValidator({
           plugins,
           partial: true,
+        })
+      }
+      case 'bulkReplace': {
+        const pluginsNoNav = this.adapter.getValidatorPlugins()
+        return this.createValidator({
+          plugins: pluginsNoNav,
+          replace: (type, path) => {
+            if (
+              this._primaryKeys.includes(path) ||
+              this._defaults.has(path) ||
+              this._navFields.has(path)
+            ) {
+              return { ...type, optional: true }
+            }
+            return type
+          },
+        })
+      }
+      case 'bulkUpdate': {
+        const pluginsNoNav = this.adapter.getValidatorPlugins()
+        return this.createValidator({
+          plugins: pluginsNoNav,
+          partial: 'deep',
         })
       }
       default: {

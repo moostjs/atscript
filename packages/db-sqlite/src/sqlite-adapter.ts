@@ -177,19 +177,17 @@ export class SqliteAdapter extends BaseDbAdapter {
     filter: FilterExpr,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    return this.withTransaction(async () => {
-      const where = buildWhere(filter)
-      const tableName = this.resolveTableName()
-      const delSql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
-      this._log(delSql, where.params)
-      const delResult = this.driver.run(delSql, where.params)
-      if (delResult.changes > 0) {
-        const { sql, params } = buildInsert(tableName, data)
-        this._log(sql, params)
-        this.driver.run(sql, params)
-      }
-      return { matchedCount: delResult.changes, modifiedCount: delResult.changes }
-    })
+    const where = buildWhere(filter)
+    const tableName = this.resolveTableName()
+    // Use UPDATE (set all columns) instead of DELETE+INSERT to avoid triggering CASCADE deletes
+    const limitedWhere = {
+      sql: `rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`,
+      params: where.params,
+    }
+    const { sql, params } = buildUpdate(tableName, data, limitedWhere)
+    this._log(sql, params)
+    const result = this.driver.run(sql, params)
+    return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
   async replaceMany(

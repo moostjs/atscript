@@ -69,6 +69,7 @@ describe('SQLite getExistingColumns + syncColumns', () => {
           (f: any) => !f.ignored && f.physicalName !== 'id'
         ),
         removed: [],
+        renamed: [],
         typeChanged: [],
       }
 
@@ -94,6 +95,7 @@ describe('SQLite getExistingColumns + syncColumns', () => {
           (f: any) => !f.ignored && f.physicalName !== 'id'
         ),
         removed: [],
+        renamed: [],
         typeChanged: [],
       }
 

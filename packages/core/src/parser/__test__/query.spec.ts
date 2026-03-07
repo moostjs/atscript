@@ -23,10 +23,6 @@ const queryWithRefAnnotation = new AnnotationSpec({
   ],
 })
 
-const stringAnnotation = new AnnotationSpec({
-  argument: { name: 'value', type: 'string' },
-})
-
 describe('query annotation arguments', () => {
   describe('tokenizer', () => {
     it('tokenizes backtick content as query token with children', () => {

@@ -26,18 +26,21 @@ function buildTypes() {
     static type = {}
     static metadata = new Map()
     static id = 'Author'
+    static validator = () => ({ validate: () => true })
   }
   class PostClass {
     static __is_atscript_annotated_type = true
     static type = {}
     static metadata = new Map()
     static id = 'Post'
+    static validator = () => ({ validate: () => true })
   }
   class CommentClass {
     static __is_atscript_annotated_type = true
     static type = {}
     static metadata = new Map()
     static id = 'Comment'
+    static validator = () => ({ validate: () => true })
   }
 
   // Author: id, name, createdAt, posts (rel.from)
@@ -45,7 +48,7 @@ function buildTypes() {
     .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
     .prop('name', $().designType('string').tags('string').$type)
     .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('posts', $('array').of($().refTo(() => PostClass).$type).annotate('db.rel.from', true).optional().$type)
+    .prop('posts', $('array').of($().refTo(() => PostClass as any).$type).annotate('db.rel.from', true).optional().$type)
     .annotate('db.table', 'authors')
 
   // Post: id, title, status, createdAt, authorId (FK), author (rel.to), comments (rel.from)
@@ -54,9 +57,9 @@ function buildTypes() {
     .prop('title', $().designType('string').tags('string').$type)
     .prop('status', $().designType('string').tags('string').annotate('db.default', 'draft').$type)
     .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('authorId', $().refTo(() => AuthorClass, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
-    .prop('author', $().refTo(() => AuthorClass).annotate('db.rel.to', true).optional().$type)
-    .prop('comments', $('array').of($().refTo(() => CommentClass).$type).annotate('db.rel.from', true).optional().$type)
+    .prop('authorId', $().refTo(() => AuthorClass as any, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
+    .prop('author', $().refTo(() => AuthorClass as any).annotate('db.rel.to', true).optional().$type)
+    .prop('comments', $('array').of($().refTo(() => CommentClass as any).$type).annotate('db.rel.from', true).optional().$type)
     .annotate('db.table', 'posts')
 
   // Comment: id, body, createdAt, postId (FK), post (rel.to)
@@ -64,8 +67,8 @@ function buildTypes() {
     .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
     .prop('body', $().designType('string').tags('string').$type)
     .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('postId', $().refTo(() => PostClass, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
-    .prop('post', $().refTo(() => PostClass).annotate('db.rel.to', true).optional().$type)
+    .prop('postId', $().refTo(() => PostClass as any, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
+    .prop('post', $().refTo(() => PostClass as any).annotate('db.rel.to', true).optional().$type)
     .annotate('db.table', 'comments')
 
   return { Author: AuthorClass, Post: PostClass, Comment: CommentClass }
@@ -101,12 +104,18 @@ class InMemoryAdapter extends BaseDbAdapter {
     return { insertedCount: ids.length, insertedIds: ids }
   }
 
-  async replaceOne(_filter: FilterExpr, _data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    return { matchedCount: 0, modifiedCount: 0 }
+  async replaceOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+    const idx = this._store.findIndex(row => this._matchFilter(row, filter as Record<string, unknown>))
+    if (idx === -1) { return { matchedCount: 0, modifiedCount: 0 } }
+    this._store[idx] = { ...data }
+    return { matchedCount: 1, modifiedCount: 1 }
   }
 
-  async updateOne(_filter: FilterExpr, _data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    return { matchedCount: 0, modifiedCount: 0 }
+  async updateOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+    const idx = this._store.findIndex(row => this._matchFilter(row, filter as Record<string, unknown>))
+    if (idx === -1) { return { matchedCount: 0, modifiedCount: 0 } }
+    Object.assign(this._store[idx], data)
+    return { matchedCount: 1, modifiedCount: 1 }
   }
 
   async deleteOne(_filter: FilterExpr): Promise<TDbDeleteResult> {
@@ -162,8 +171,10 @@ class InMemoryAdapter extends BaseDbAdapter {
     return { matchedCount: 0, modifiedCount: 0 }
   }
 
-  async deleteMany(_filter: FilterExpr): Promise<TDbDeleteResult> {
-    return { deletedCount: 0 }
+  async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
+    const before = this._store.length
+    this._store = this._store.filter(row => !this._matchFilter(row, filter as Record<string, unknown>))
+    return { deletedCount: before - this._store.length }
   }
 
   async syncIndexes(): Promise<void> {}
@@ -354,7 +365,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await postTable.findMany({
         filter: {},
         controls: { $with: [withRel('author')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(3)
       expect(results[0].author).toEqual({ id: 1, name: 'Alice', createdAt: 1000 })
@@ -367,7 +378,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await postTable.findMany({
         filter: { id: 1 },
         controls: { $with: [withRel('comments')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].comments).toHaveLength(2)
@@ -380,7 +391,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await authorTable.findMany({
         filter: { id: 1 },
         controls: { $with: [withRel('posts')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(2)
@@ -393,7 +404,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await commentTable.findMany({
         filter: {},
         controls: { $with: [withRel('post')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(3)
       expect(results[0].post.title).toBe('First Post')
@@ -405,7 +416,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await postTable.findMany({
         filter: {},
         controls: { $with: [withRel('author'), withRel('comments')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(3)
       expect(results[0].author.name).toBe('Alice')
@@ -421,7 +432,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await postTable.findMany({
         filter: { id: 2 },
         controls: { $with: [withRel('comments')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].comments).toEqual([])
@@ -436,7 +447,7 @@ describe('AtscriptDbTable — Relations', () => {
       const results = await postTable.findMany({
         filter: { id: 99 },
         controls: { $with: [withRel('author')] },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].author).toBeNull()
@@ -469,7 +480,7 @@ describe('AtscriptDbTable — Relations', () => {
         controls: {
           $with: [withRel('posts', { controls: { $with: [withRel('comments')] } })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(2)
@@ -501,7 +512,7 @@ describe('AtscriptDbTable — Relations', () => {
           // $select=body should be on comments, not on posts
           $with: [withRel('posts', { controls: { $with: [withRel('comments', { controls: { $select: ['body'] } })] } })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(2)
@@ -518,7 +529,7 @@ describe('AtscriptDbTable — Relations', () => {
           // $select on comments level (correct usage for selecting comment fields)
           $with: [withRel('comments', { controls: { $select: ['body'] } })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].comments).toHaveLength(2)
@@ -534,7 +545,7 @@ describe('AtscriptDbTable — Relations', () => {
         controls: {
           $with: [withRel('posts', { controls: { $limit: 1 } })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(1)
@@ -547,7 +558,7 @@ describe('AtscriptDbTable — Relations', () => {
         controls: {
           $with: [withRel('posts', { filter: { status: 'published' } })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(1)
@@ -566,7 +577,7 @@ describe('AtscriptDbTable — Relations', () => {
             },
           })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(1)
@@ -586,7 +597,7 @@ describe('AtscriptDbTable — Relations', () => {
             },
           })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(2)
@@ -606,7 +617,7 @@ describe('AtscriptDbTable — Relations', () => {
             },
           })],
         },
-      })
+      }) as any[]
 
       expect(results).toHaveLength(1)
       expect(results[0].posts).toHaveLength(2)
@@ -617,7 +628,7 @@ describe('AtscriptDbTable — Relations', () => {
 
     it('should work without $with (no relation loading)', async () => {
       const postTable = db.getTable(Post)
-      const results = await postTable.findMany({ filter: {} })
+      const results = await postTable.findMany({ filter: {} }) as any[]
 
       expect(results).toHaveLength(3)
       expect(results[0]).not.toHaveProperty('author')
@@ -633,7 +644,7 @@ describe('AtscriptDbTable — Relations', () => {
       const table = new AtscriptDbTable(Author, adapter)
       await table.insertOne({ name: 'Charlie' } as any)
 
-      const stored = await adapter.findMany({ filter: {} })
+      const stored = await adapter.findMany({ filter: {}, controls: {} }) as any[]
       expect(stored).toHaveLength(1)
       const keys = Object.keys(stored[0])
       for (const key of keys) {
@@ -683,14 +694,14 @@ describe('AtscriptDbTable — Relations', () => {
 
       // Verify authors were created
       const authorTable = db.getTable(Author)
-      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      const authors = await authorTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(authors).toHaveLength(3)
 
       // Verify FK wiring — load posts with author relation
       const posts = await postTable.findMany({
         filter: {},
         controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
-      })
+      }) as any[]
       expect(posts[0].author).toBeDefined()
       expect((posts[0].author as any).name).toBe('Alice')
       expect((posts[1].author as any).name).toBe('Bob')
@@ -708,14 +719,14 @@ describe('AtscriptDbTable — Relations', () => {
 
       // Verify posts were created with correct FKs
       const postTable = db.getTable(Post)
-      const allPosts = await postTable.findMany({ filter: {}, controls: {} })
+      const allPosts = await postTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(allPosts).toHaveLength(3)
 
       // Load authors with posts
       const authors = await authorTable.findMany({
         filter: {},
         controls: { $with: [{ name: 'posts', filter: {}, controls: {} }] },
-      })
+      }) as any[]
       expect((authors[0].posts as any[]).map((p: any) => p.title).sort()).toEqual(['P1', 'P2'])
       expect((authors[1].posts as any[]).map((p: any) => p.title)).toEqual(['P3'])
     })
@@ -737,7 +748,7 @@ describe('AtscriptDbTable — Relations', () => {
       const posts = await postTable.findMany({
         filter: {},
         controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
-      })
+      }) as any[]
       expect((posts[0].author as any).name).toBe('Alice')
       expect((posts[1].author as any).name).toBe('Bob')
       expect((posts[2].author as any).name).toBe('Pre-existing')
@@ -762,15 +773,15 @@ describe('AtscriptDbTable — Relations', () => {
       ] as any)
 
       // Verify all levels were created
-      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      const authors = await authorTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(authors).toHaveLength(2)
 
       const postTable = db.getTable(Post)
-      const posts = await postTable.findMany({ filter: {}, controls: {} })
+      const posts = await postTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(posts).toHaveLength(3)
 
       const commentTable = db.getTable(Comment)
-      const comments = await commentTable.findMany({ filter: {}, controls: {} })
+      const comments = await commentTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(comments).toHaveLength(6)
 
       // Verify FK chain: load authors → posts → comments
@@ -785,7 +796,7 @@ describe('AtscriptDbTable — Relations', () => {
             },
           }],
         },
-      })
+      }) as any[]
 
       const alicePosts = fullAuthors[0].posts as any[]
       expect(alicePosts).toHaveLength(2)
@@ -809,10 +820,10 @@ describe('AtscriptDbTable — Relations', () => {
         },
       ] as any, { maxDepth: 1 })
 
-      const posts = await (db.getTable(Post)).findMany({ filter: {}, controls: {} })
+      const posts = await (db.getTable(Post)).findMany({ filter: {}, controls: {} }) as any[]
       expect(posts).toHaveLength(1)
 
-      const comments = await (db.getTable(Comment)).findMany({ filter: {}, controls: {} })
+      const comments = await (db.getTable(Comment)).findMany({ filter: {}, controls: {} }) as any[]
       expect(comments).toHaveLength(0)
     })
 
@@ -827,7 +838,7 @@ describe('AtscriptDbTable — Relations', () => {
       expect(result.insertedCount).toBe(3)
       expect(result.insertedIds).toHaveLength(3)
 
-      const authors = await authorTable.findMany({ filter: {}, controls: {} })
+      const authors = await authorTable.findMany({ filter: {}, controls: {} }) as any[]
       expect(authors).toHaveLength(3)
     })
 
@@ -843,7 +854,7 @@ describe('AtscriptDbTable — Relations', () => {
       const posts = await postTable.findMany({
         filter: {},
         controls: { $with: [{ name: 'author', filter: {}, controls: {} }] },
-      })
+      }) as any[]
       expect(posts).toHaveLength(1)
       expect((posts[0].author as any).name).toBe('Alice')
     })
@@ -941,6 +952,308 @@ describe('AtscriptDbTable — Relations', () => {
 
       // Transaction is still started (wraps the whole operation)
       expect(txLog).toEqual(['begin', 'commit'])
+    })
+  })
+
+  // ── Deep replace (bulkReplace) ──────────────────────────────────────────
+
+  describe('deep replace (bulkReplace)', () => {
+    let db: DbSpace
+
+    beforeEach(() => {
+      db = new DbSpace(() => new InMemoryAdapter())
+      db.getTable(Author)
+      db.getTable(Post)
+      db.getTable(Comment)
+    })
+
+    function seedAll() {
+      const authorAdapter = (db.getTable(Author) as any).adapter as InMemoryAdapter
+      authorAdapter.seed([
+        { id: 1, name: 'Alice', createdAt: 1000 },
+        { id: 2, name: 'Bob', createdAt: 1001 },
+      ])
+
+      const postAdapter = (db.getTable(Post) as any).adapter as InMemoryAdapter
+      postAdapter.seed([
+        { id: 1, title: 'First Post', status: 'published', authorId: 1, createdAt: 2000 },
+        { id: 2, title: 'Second Post', status: 'draft', authorId: 1, createdAt: 2001 },
+        { id: 3, title: 'Bobs Post', status: 'published', authorId: 2, createdAt: 2002 },
+      ])
+
+      const commentAdapter = (db.getTable(Comment) as any).adapter as InMemoryAdapter
+      commentAdapter.seed([
+        { id: 1, body: 'Nice post!', postId: 1, createdAt: 3000 },
+        { id: 2, body: 'Thanks!', postId: 1, createdAt: 3001 },
+      ])
+    }
+
+    it('should replace a single record without nav props', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.replaceOne({ id: 1, name: 'Alice Updated', createdAt: 1000 } as any)
+      expect(result.matchedCount).toBe(1)
+
+      const authors = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(authors[0].name).toBe('Alice Updated')
+    })
+
+    it('should deep-replace TO dependency (Post.author)', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await postTable.replaceOne({
+        id: 1,
+        title: 'Updated Post',
+        status: 'published',
+        authorId: 1,
+        createdAt: 2000,
+        author: { id: 1, name: 'Alice Replaced' },
+      } as any)
+
+      const authorTable = db.getTable(Author)
+      const authors = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(authors[0].name).toBe('Alice Replaced')
+    })
+
+    it('should deep-replace FROM dependents (Author.posts)', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      await authorTable.replaceOne({
+        id: 1,
+        name: 'Alice',
+        createdAt: 1000,
+        posts: [
+          { id: 1, title: 'Replaced Post 1', status: 'active', authorId: 1, createdAt: 2000 },
+          { id: 2, title: 'Replaced Post 2', status: 'active', authorId: 1, createdAt: 2001 },
+        ],
+      } as any)
+
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: { authorId: 1 }, controls: {} }) as any[]
+      expect(posts.find((p: any) => p.id === 1).title).toBe('Replaced Post 1')
+      expect(posts.find((p: any) => p.id === 2).title).toBe('Replaced Post 2')
+    })
+
+    it('should bulk-replace multiple records with TO deps', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      const result = await postTable.bulkReplace([
+        { id: 1, title: 'P1 Updated', status: 'x', authorId: 1, createdAt: 2000, author: { id: 1, name: 'Alice V2' } },
+        { id: 3, title: 'P3 Updated', status: 'x', authorId: 2, createdAt: 2002, author: { id: 2, name: 'Bob V2' } },
+      ] as any)
+
+      expect(result.matchedCount).toBe(2)
+
+      const authorTable = db.getTable(Author)
+      const authors = await authorTable.findMany({ filter: {}, controls: {} }) as any[]
+      expect(authors.find((a: any) => a.id === 1).name).toBe('Alice V2')
+      expect(authors.find((a: any) => a.id === 2).name).toBe('Bob V2')
+    })
+
+    it('should error on null nav prop', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await expect(
+        postTable.replaceOne({
+          id: 1,
+          title: 'X',
+          status: 'x',
+          authorId: 1,
+          createdAt: 2000,
+          author: null,
+        } as any)
+      ).rejects.toThrow("Cannot process null navigation property 'author'")
+    })
+
+    it('should wrap replace in a transaction', async () => {
+      const txLog: string[] = []
+
+      class TxAdapter extends InMemoryAdapter {
+        protected override async _beginTransaction(): Promise<unknown> { txLog.push('begin'); return 'tx' }
+        protected override async _commitTransaction(): Promise<void> { txLog.push('commit') }
+        protected override async _rollbackTransaction(): Promise<void> { txLog.push('rollback') }
+      }
+
+      const space = new DbSpace(() => new TxAdapter())
+      const authorTable = space.getTable(Author) as AtscriptDbTable
+      const adapter = (authorTable as any).adapter as TxAdapter
+      adapter.seed([{ id: 1, name: 'Alice', createdAt: 1000 }])
+
+      await authorTable.replaceOne({ id: 1, name: 'Alice V2', createdAt: 1000 } as any)
+      expect(txLog).toEqual(['begin', 'commit'])
+    })
+
+    it('should rollback on error during deep replace', async () => {
+      const txLog: string[] = []
+      let replaceCount = 0
+
+      class FailAdapter extends InMemoryAdapter {
+        protected override async _beginTransaction(): Promise<unknown> { txLog.push('begin'); return 'tx' }
+        protected override async _commitTransaction(): Promise<void> { txLog.push('commit') }
+        protected override async _rollbackTransaction(): Promise<void> { txLog.push('rollback') }
+        override async replaceOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+          replaceCount++
+          if (replaceCount === 2) { throw new Error('Simulated replace failure') }
+          return super.replaceOne(filter, data)
+        }
+      }
+
+      const space = new DbSpace(() => new FailAdapter())
+      const postTable = space.getTable(Post) as AtscriptDbTable
+      const authorTable = space.getTable(Author) as AtscriptDbTable
+      const authorAdapter = (authorTable as any).adapter as FailAdapter
+      authorAdapter.seed([{ id: 1, name: 'Alice', createdAt: 1000 }])
+      const postAdapter = (postTable as any).adapter as FailAdapter
+      postAdapter.seed([{ id: 1, title: 'P1', status: 'x', authorId: 1, createdAt: 2000 }])
+
+      await expect(
+        postTable.replaceOne({
+          id: 1, title: 'Updated', status: 'x', authorId: 1, createdAt: 2000,
+          author: { id: 1, name: 'Alice V2', createdAt: 1000 },
+        } as any)
+      ).rejects.toThrow('Simulated replace failure')
+
+      expect(txLog).toEqual(['begin', 'rollback'])
+    })
+  })
+
+  // ── Deep update (bulkUpdate / PATCH) ────────────────────────────────────
+
+  describe('deep update (bulkUpdate)', () => {
+    let db: DbSpace
+
+    beforeEach(() => {
+      db = new DbSpace(() => new InMemoryAdapter())
+      db.getTable(Author)
+      db.getTable(Post)
+      db.getTable(Comment)
+    })
+
+    function seedAll() {
+      const authorAdapter = (db.getTable(Author) as any).adapter as InMemoryAdapter
+      authorAdapter.seed([
+        { id: 1, name: 'Alice', createdAt: 1000 },
+        { id: 2, name: 'Bob', createdAt: 1001 },
+      ])
+
+      const postAdapter = (db.getTable(Post) as any).adapter as InMemoryAdapter
+      postAdapter.seed([
+        { id: 1, title: 'First Post', status: 'published', authorId: 1, createdAt: 2000 },
+        { id: 2, title: 'Second Post', status: 'draft', authorId: 1, createdAt: 2001 },
+      ])
+    }
+
+    it('should patch a single record without nav props', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.updateOne({ id: 1, name: 'Alice Patched' } as any)
+      expect(result.matchedCount).toBe(1)
+
+      const authors = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(authors[0].name).toBe('Alice Patched')
+    })
+
+    it('should deep-patch TO relation (Post.author)', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await postTable.updateOne({
+        id: 1,
+        author: { name: 'Alice Patched' },
+      } as any)
+
+      const authorTable = db.getTable(Author)
+      const authors = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(authors[0].name).toBe('Alice Patched')
+    })
+
+    it('should read FK from DB when not in payload', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      // authorId is NOT in the payload — must be read from DB
+      await postTable.updateOne({
+        id: 1,
+        author: { name: 'Alice From DB' },
+      } as any)
+
+      const authorTable = db.getTable(Author)
+      const authors = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(authors[0].name).toBe('Alice From DB')
+    })
+
+    it('should use FK from payload when present', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await postTable.updateOne({
+        id: 1,
+        authorId: 2,
+        author: { name: 'Bob Patched' },
+      } as any)
+
+      const authorTable = db.getTable(Author)
+      const bob = await authorTable.findMany({ filter: { id: 2 }, controls: {} }) as any[]
+      expect(bob[0].name).toBe('Bob Patched')
+    })
+
+    it('should error on null FK when patching TO relation', async () => {
+      const postAdapter = (db.getTable(Post) as any).adapter as InMemoryAdapter
+      postAdapter.seed([{ id: 99, title: 'Orphan', status: 'x', authorId: null, createdAt: 5000 }])
+
+      const postTable = db.getTable(Post)
+      await expect(
+        postTable.updateOne({
+          id: 99,
+          author: { name: 'Ghost' },
+        } as any)
+      ).rejects.toThrow("Cannot patch relation 'author' — foreign key 'authorId' is null")
+    })
+
+    it('should error on FROM relation in patch mode', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      await expect(
+        authorTable.updateOne({
+          id: 1,
+          posts: [{ id: 1, title: 'Nope' }],
+        } as any)
+      ).rejects.toThrow("Cannot patch relation 'posts' — patching 1:N relations not supported. Use replaceOne.")
+    })
+
+    it('should error on null nav prop in patch mode', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await expect(
+        postTable.updateOne({
+          id: 1,
+          author: null,
+        } as any)
+      ).rejects.toThrow("Cannot process null navigation property 'author'")
+    })
+
+    it('should bulk-update multiple records with TO deps', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      const result = await postTable.bulkUpdate([
+        { id: 1, authorId: 1, author: { name: 'Alice Bulk' } },
+        { id: 2, authorId: 1, author: { name: 'Alice Bulk2' } },
+      ] as any)
+
+      expect(result.matchedCount).toBe(2)
+
+      // Second patch overwrites the first since they target the same author
+      const authorTable = db.getTable(Author)
+      const alice = await authorTable.findMany({ filter: { id: 1 }, controls: {} }) as any[]
+      expect(alice[0].name).toBe('Alice Bulk2')
+    })
+
+    it('should error when source record not found for FK read', async () => {
+      seedAll()
+      const postTable = db.getTable(Post)
+      await expect(
+        postTable.updateOne({
+          id: 999,
+          author: { name: 'Ghost' },
+        } as any)
+      ).rejects.toThrow("Cannot patch relation 'author' — source record not found")
     })
   })
 })
