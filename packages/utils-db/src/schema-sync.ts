@@ -29,6 +29,7 @@ export interface TSyncPlan {
   schemaHash: string
   tables: TSyncPlanTable[]
   removedTables: string[]
+  removedViews: string[]
 }
 
 export interface TSyncOptions {
@@ -63,6 +64,7 @@ export interface TSyncResult {
   schemaHash: string
   tables?: TSyncTableResult[]
   removedTables?: string[]
+  removedViews?: string[]
 }
 
 // ── SchemaSync ────────────────────────────────────────────────────────────
@@ -91,7 +93,7 @@ export class SchemaSync {
     const views: AtscriptDbReadable[] = []
     for (const type of types) {
       const readable = this.space.get(type)
-      if (readable instanceof AtscriptDbView) {
+      if (readable.isView) {
         views.push(readable)
       } else {
         tables.push(readable)
@@ -106,12 +108,23 @@ export class SchemaSync {
   }
 
   /**
-   * Detects tables present in the previous sync but absent from the current schema.
+   * Detects tables/views present in the previous sync but absent from the current schema.
    */
-  private async detectRemovedTables(currentTables: AtscriptDbReadable[]): Promise<string[]> {
-    const previousTables = await this.readTableList()
-    const currentTableSet = new Set(currentTables.map(t => t.tableName))
-    return previousTables.filter(t => !currentTableSet.has(t))
+  private async detectRemoved(currentReadables: AtscriptDbReadable[]): Promise<{ removedTables: string[]; removedViews: string[] }> {
+    const previous = await this.readTrackedList()
+    const currentSet = new Set(currentReadables.map(t => t.tableName))
+    const removedTables: string[] = []
+    const removedViews: string[] = []
+    for (const entry of previous) {
+      if (!currentSet.has(entry.name)) {
+        if (entry.isView) {
+          removedViews.push(entry.name)
+        } else {
+          removedTables.push(entry.name)
+        }
+      }
+    }
+    return { removedTables, removedViews }
   }
 
   /**
@@ -173,12 +186,17 @@ export class SchemaSync {
       }
 
       // 7. Sync views
+      const allReadables = [...tables, ...views]
+      const { removedTables, removedViews } = await this.detectRemoved(allReadables)
+      const previouslyTracked = await this.readTrackedList()
+      const trackedNames = new Set(previouslyTracked.map(e => e.name))
+
       const viewResults: TSyncTableResult[] = []
       for (const readable of views) {
         await readable.dbAdapter.ensureTable()
         viewResults.push({
           tableName: readable.tableName,
-          created: false,
+          created: !trackedNames.has(readable.tableName),
           columnsAdded: [],
           columnsRenamed: [],
           columnsDropped: [],
@@ -188,15 +206,13 @@ export class SchemaSync {
         })
       }
 
-      // 8. Track tables — detect and drop removed tables
-      const allReadables = [...tables, ...views]
-      const removedTables = await this.detectRemovedTables(allReadables)
-      if (!safe && removedTables.length > 0) {
-        for (const name of removedTables) {
+      // 8. Track tables — detect and drop removed tables/views
+      if (!safe) {
+        for (const name of [...removedTables, ...removedViews]) {
           await this.space.dropTableByName(name)
         }
       }
-      await this.writeTableList(allReadables.map(t => t.tableName))
+      await this.writeTrackedList(allReadables)
 
       // 9. Write new hash
       await this.writeHash(hash)
@@ -206,6 +222,7 @@ export class SchemaSync {
         schemaHash: hash,
         tables: [...tableResults, ...viewResults],
         removedTables: removedTables.length > 0 ? removedTables : undefined,
+        removedViews: removedViews.length > 0 ? removedViews : undefined,
       }
     } finally {
       // 9. Always release lock
@@ -229,9 +246,11 @@ export class SchemaSync {
     let planTables = await Promise.all(tables.map(r => this.planTable(r)))
 
     // Add views to plan (views don't have column introspection)
+    const previouslyTracked = await this.readTrackedList()
+    const trackedNames = new Set(previouslyTracked.map(e => e.name))
     const viewPlans: TSyncPlanTable[] = views.map(v => ({
       tableName: v.tableName,
-      isNew: false,
+      isNew: !trackedNames.has(v.tableName),
       columnsToAdd: [],
       columnsToRename: [],
       typeChanges: [],
@@ -243,22 +262,23 @@ export class SchemaSync {
     if (!force) {
       const storedHash = await this.readHash()
       if (storedHash === hash) {
-        return { status: 'up-to-date', schemaHash: hash, tables: [...planTables, ...viewPlans], removedTables: [] }
+        return { status: 'up-to-date', schemaHash: hash, tables: [...planTables, ...viewPlans], removedTables: [], removedViews: [] }
       }
     }
-    let removedTables = await this.detectRemovedTables(allReadables)
+    let removed = await this.detectRemoved(allReadables)
 
     if (safe) {
       // Hide destructive operations in safe mode
       planTables = planTables.map(t => ({ ...t, columnsToDrop: [] }))
-      removedTables = []
+      removed = { removedTables: [], removedViews: [] }
     }
 
     return {
       status: 'changes-needed',
       schemaHash: hash,
       tables: [...planTables, ...viewPlans],
-      removedTables,
+      removedTables: removed.removedTables,
+      removedViews: removed.removedViews,
     }
   }
 
@@ -417,13 +437,21 @@ export class SchemaSync {
 
   // ── Table tracking ──────────────────────────────────────────────────
 
-  private async readTableList(): Promise<string[]> {
+  private async readTrackedList(): Promise<Array<{ name: string; isView: boolean }>> {
     const value = await this.readControlValue('synced_tables')
-    return value ? JSON.parse(value) : []
+    if (!value) { return [] }
+    const parsed = JSON.parse(value)
+    // Backwards-compatible: old format was string[], new format is { name, isView }[]
+    if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'string') {
+      return (parsed as string[]).map(name => ({ name, isView: false }))
+    }
+    return parsed
   }
 
-  private async writeTableList(names: string[]): Promise<void> {
-    await this.writeControlValue('synced_tables', JSON.stringify(names.sort()))
+  private async writeTrackedList(readables: AtscriptDbReadable[]): Promise<void> {
+    const entries = readables.map(r => ({ name: r.tableName, isView: r.isView }))
+    entries.sort((a, b) => a.name.localeCompare(b.name))
+    await this.writeControlValue('synced_tables', JSON.stringify(entries))
   }
 
   // ── Distributed lock ──────────────────────────────────────────────────

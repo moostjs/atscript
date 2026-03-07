@@ -35,6 +35,17 @@ export class NoTableAnnotation {
   }
 }
 
+
+export class ActiveUsersView {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "ActiveUsersView"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+}
+
 $("object", UsersTable)
   .prop(
     "id",
@@ -176,5 +187,26 @@ $("object", NoTableAnnotation)
       .tags("string")
       .$type
   )
+
+$("object", ActiveUsersView)
+  .prop(
+    "id",
+    $()
+      .refTo(UsersTable, ["id"])
+      .$type
+  ).prop(
+    "name",
+    $()
+      .refTo(UsersTable, ["name"])
+      .$type
+  ).prop(
+    "email",
+    $()
+      .refTo(UsersTable, ["email"])
+      .$type
+  )
+  .annotate("db.view", "active_users")
+  .annotate("db.view.for", () => UsersTable)
+  .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
 
 // prettier-ignore-end

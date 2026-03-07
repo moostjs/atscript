@@ -129,4 +129,32 @@ export declare class NoTableAnnotation {
   /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
   static toExampleData?: () => any
 }
+
+/**
+ * Atscript interface **ActiveUsersView**
+ * @see {@link ./test-table.as:68:18}
+ */
+export declare class ActiveUsersView {
+  id: number /* id */
+  name: string /* name */
+  email: string /* email */
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof ActiveUsersView, ActiveUsersView>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof ActiveUsersView>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number /* id */
+    "name": string /* name */
+    "email": string /* email */
+  }
+  static __ownProps: {
+    "id": number /* id */
+    "name": string /* name */
+    "email": string /* email */
+  }
+}
 // prettier-ignore-end

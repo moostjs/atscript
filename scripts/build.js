@@ -144,42 +144,43 @@ async function generateBundles() {
 async function rolldownPackages(ws) {
   const builds = getBuildOptions(ws)
   for (const { entries, formats, external } of builds) {
+    // Build input map: { name: path } for code-splitting across entries
+    const input = {}
     for (const entry of entries) {
-      const inputOptions = {
-        input: path.join(`packages/${ws}`, entry),
-        external: [...(external || externals.get(ws)), '@atscript/typescript/utils'],
-        define: {
-          __VERSION__: JSON.stringify(pkg.version),
-        },
-        resolve: {
-          preserveSymlinks: false,
-          conditions: ['import', 'module', 'default'],
-          extensions: ['.ts', '.mjs', '.js', '.json'],
-        },
-        plugins: [_dye, swc],
-      }
-      const fileName = entry
-        .split('/')
-        .pop()
-        .replace(/\.\w+$/u, '')
-      const bundle = await rolldown(inputOptions)
-      const created = []
-      for (const f of formats) {
-        const { ext, format } = FORMATS[f]
-        const { output } = await bundle.generate({ format, comments: 'preserve-legal' })
-        const target = `./packages/${ws}/dist/${fileName}${ext}`
-        writeFileSync(target, output[0].code)
-        created.push(target)
-        // Write shared chunks (code-split dependencies)
-        for (let i = 1; i < output.length; i++) {
-          const chunk = output[i]
-          if (chunk.fileName) {
-            const chunkTarget = `./packages/${ws}/dist/${chunk.fileName}`
-            writeFileSync(chunkTarget, chunk.code)
-          }
-        }
-      }
-      done(created.join(' \t'))
+      const name = entry.split('/').pop().replace(/\.\w+$/u, '')
+      input[name] = path.join(`packages/${ws}`, entry)
     }
+    const inputOptions = {
+      input,
+      external: [...(external || externals.get(ws)), '@atscript/typescript/utils'],
+      define: {
+        __VERSION__: JSON.stringify(pkg.version),
+      },
+      resolve: {
+        preserveSymlinks: false,
+        conditions: ['import', 'module', 'default'],
+        extensions: ['.ts', '.mjs', '.js', '.json'],
+      },
+      plugins: [_dye, swc],
+    }
+    const bundle = await rolldown(inputOptions)
+    const created = []
+    for (const f of formats) {
+      const { ext, format } = FORMATS[f]
+      const { output } = await bundle.generate({ format, comments: 'preserve-legal' })
+      for (const chunk of output) {
+        if (chunk.type !== 'chunk') { continue }
+        const chunkTarget = `./packages/${ws}/dist/${chunk.fileName.replace(/\.js$/, ext)}`
+        // Rewrite chunk import paths from .js to the target extension
+        const code = ext === '.js' ? chunk.code : chunk.code.replace(
+          /((?:from|import)\s*\(?["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`
+        ).replace(
+          /(require\(["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`
+        )
+        writeFileSync(chunkTarget, code)
+        if (chunk.isEntry) { created.push(chunkTarget) }
+      }
+    }
+    done(created.join(' \t'))
   }
 }

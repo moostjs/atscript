@@ -61,3 +61,12 @@ export interface ProfileTable {
 export interface NoTableAnnotation {
     name: string
 }
+
+@db.view 'active_users'
+@db.view.for UsersTable
+@db.view.filter `UsersTable.status = 'active'`
+export interface ActiveUsersView {
+    id: UsersTable.id
+    name: UsersTable.name
+    email: UsersTable.email
+}

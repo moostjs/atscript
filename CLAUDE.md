@@ -60,6 +60,10 @@ explorations/     - Sandbox/playground for testing features
 - **Formatting**: oxfmt
 - **TypeScript**: 5.9.x, strict mode, experimental decorators
 
+## Build & Testing
+
+Before reporting TypeScript errors or trying to fix type issues, always rebuild the project first (`pnpm build` or equivalent). Stale dist files and stale diagnostics have caused false error chasing in multiple sessions.
+
 ## Code Conventions
 
 - All packages export ESM (`.mjs`) + CJS (`.cjs`) + types (`.d.ts`)
@@ -87,6 +91,10 @@ Six domain expert agents exist in `.claude/agents/`:
 - `moost-atscript-expert` — Moost framework integration
 - `vscode-extension-expert` — VSCode extension
 - `vitepress-docs-architect` — Documentation site architecture
+
+## Problem Solving
+
+When fixing bugs, always investigate and fix the root cause first. Do not implement workarounds, getters, or shims unless explicitly asked. If the fix seems indirect, ask before proceeding.
 
 ## Important Patterns
 
