@@ -142,7 +142,8 @@ interface User {
       const spec = new AnnotationSpec({
         argument: { name: 'target', type: 'ref' },
       })
-      expect(spec.argumentsSnippet).toBe('${1:TypeName}')
+      const d = '$'
+      expect(spec.argumentsSnippet).toBe(`${d}{1:TypeName}`)
     })
 
     it('snippet for ref type with multiple args', () => {
@@ -152,7 +153,8 @@ interface User {
           { name: 'label', type: 'string' },
         ],
       })
-      expect(spec.argumentsSnippet).toBe("${1:TypeName}, '${2:label}'")
+      const d = '$'
+      expect(spec.argumentsSnippet).toBe(`${d}{1:TypeName}, '${d}{2:label}'`)
     })
   })
 

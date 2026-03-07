@@ -109,7 +109,7 @@ export function buildWhere(filter: FilterExpr): TSqlFragment {
   if (!filter || Object.keys(filter).length === 0) {
     return EMPTY_AND
   }
-  return walkFilter(filter, sqlVisitor)
+  return walkFilter(filter, sqlVisitor) ?? EMPTY_AND
 }
 
 /**

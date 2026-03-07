@@ -6,10 +6,28 @@ import type { AtscriptDbReadable } from './db-readable'
 import type { DbSpace } from './db-space'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
+import type { TDbFieldMeta } from './types'
 import { computeTableSnapshot, computeSchemaHash } from './schema-hash'
 import { computeColumnDiff } from './column-diff'
 
 // ── Public types ──────────────────────────────────────────────────────────
+
+export interface TSyncPlanTable {
+  tableName: string
+  isNew: boolean
+  columnsToAdd: TDbFieldMeta[]
+  columnsToRename: Array<{ from: string; to: string }>
+  typeChanges: Array<{ column: string; fromType: string; toType: string }>
+  columnsToDrop: string[]
+  syncMethod?: 'drop' | 'recreate'
+}
+
+export interface TSyncPlan {
+  status: 'up-to-date' | 'changes-needed'
+  schemaHash: string
+  tables: TSyncPlanTable[]
+  removedTables: string[]
+}
 
 export interface TSyncOptions {
   /** Pod/instance identifier for distributed locking. Default: random UUID. */
@@ -22,6 +40,8 @@ export interface TSyncOptions {
   pollIntervalMs?: number
   /** Force sync even if hash matches. Default: false. */
   force?: boolean
+  /** Safe mode — skip destructive operations (column drops, table drops). Default: false. */
+  safe?: boolean
 }
 
 export interface TSyncTableResult {
@@ -29,6 +49,7 @@ export interface TSyncTableResult {
   created: boolean
   columnsAdded: string[]
   columnsRenamed: string[]
+  columnsDropped: string[]
   recreated: boolean
   errors: string[]
 }
@@ -48,22 +69,19 @@ export class SchemaSync {
 
   constructor(
     private readonly space: DbSpace,
-    private readonly _logger?: TGenericLogger
+    logger?: TGenericLogger
   ) {
-    this.logger = _logger || NoopLogger
+    this.logger = logger || NoopLogger
   }
 
   /**
-   * Runs schema synchronization with distributed locking.
+   * Resolves types into categorized readables and computes the schema hash.
    */
-  async run(types: TAtscriptAnnotatedType[], opts?: TSyncOptions): Promise<TSyncResult> {
-    const podId = opts?.podId ?? crypto.randomUUID()
-    const lockTtlMs = opts?.lockTtlMs ?? 30_000
-    const waitTimeoutMs = opts?.waitTimeoutMs ?? 60_000
-    const pollIntervalMs = opts?.pollIntervalMs ?? 500
-    const force = opts?.force ?? false
-
-    // Resolve all readables via the space (tables first, views after)
+  private async resolveAndHash(types: TAtscriptAnnotatedType[]): Promise<{
+    tables: AtscriptDbReadable[]
+    views: AtscriptDbReadable[]
+    hash: string
+  }> {
     const tables: AtscriptDbReadable[] = []
     const views: AtscriptDbReadable[] = []
     for (const type of types) {
@@ -76,14 +94,37 @@ export class SchemaSync {
     }
     const allReadables = [...tables, ...views]
 
-    // 1. Bootstrap the control table (CREATE TABLE IF NOT EXISTS — safe to race)
-    await this.ensureControlTable()
-
-    // 2. Compute schema hash from all types
     const snapshots = allReadables.map(r => computeTableSnapshot(r))
     const hash = computeSchemaHash(snapshots)
 
-    // 3. Quick check — skip if hash matches
+    return { tables, views, hash }
+  }
+
+  /**
+   * Detects tables present in the previous sync but absent from the current schema.
+   */
+  private async detectRemovedTables(currentTables: AtscriptDbReadable[]): Promise<string[]> {
+    const previousTables = await this.readTableList()
+    const currentTableSet = new Set(currentTables.map(t => t.tableName))
+    return previousTables.filter(t => !currentTableSet.has(t))
+  }
+
+  /**
+   * Runs schema synchronization with distributed locking.
+   */
+  async run(types: TAtscriptAnnotatedType[], opts?: TSyncOptions): Promise<TSyncResult> {
+    const podId = opts?.podId ?? crypto.randomUUID()
+    const lockTtlMs = opts?.lockTtlMs ?? 30_000
+    const waitTimeoutMs = opts?.waitTimeoutMs ?? 60_000
+    const pollIntervalMs = opts?.pollIntervalMs ?? 500
+    const force = opts?.force ?? false
+    const safe = opts?.safe ?? false
+
+    const { tables, views, hash } = await this.resolveAndHash(types)
+
+    await this.ensureControlTable()
+
+    // Quick check — skip if hash matches
     if (!force) {
       const storedHash = await this.readHash()
       if (storedHash === hash) {
@@ -122,7 +163,7 @@ export class SchemaSync {
       // 6. Sync tables
       const tableResults: TSyncTableResult[] = []
       for (const readable of tables) {
-        const result = await this.syncTable(readable)
+        const result = await this.syncTable(readable, safe)
         tableResults.push(result)
       }
 
@@ -131,12 +172,14 @@ export class SchemaSync {
         await readable.dbAdapter.ensureTable()
       }
 
-      // 8. Track tables — detect removed tables
-      const previousTables = await this.readTableList()
-      const currentTableNames = tables.map(t => t.tableName)
-      const currentTableSet = new Set(currentTableNames)
-      const removedTables = previousTables.filter(t => !currentTableSet.has(t))
-      await this.writeTableList(currentTableNames)
+      // 8. Track tables — detect and drop removed tables
+      const removedTables = await this.detectRemovedTables(tables)
+      if (!safe && removedTables.length > 0) {
+        for (const name of removedTables) {
+          await this.space.dropTableByName(name)
+        }
+      }
+      await this.writeTableList(tables.map(t => t.tableName))
 
       // 9. Write new hash
       await this.writeHash(hash)
@@ -153,9 +196,85 @@ export class SchemaSync {
     }
   }
 
+  /**
+   * Computes a dry-run plan showing what `run()` would do, without executing any DDL.
+   * Creates the internal control table if needed (harmless), but does not modify user tables.
+   */
+  async plan(types: TAtscriptAnnotatedType[], opts?: Pick<TSyncOptions, 'force' | 'safe'>): Promise<TSyncPlan> {
+    const force = opts?.force ?? false
+    const safe = opts?.safe ?? false
+    const { tables, hash } = await this.resolveAndHash(types)
+
+    await this.ensureControlTable()
+
+    // Always introspect tables so the plan includes all table statuses
+    let planTables = await Promise.all(tables.map(r => this.planTable(r)))
+
+    // Quick check — skip if hash matches
+    if (!force) {
+      const storedHash = await this.readHash()
+      if (storedHash === hash) {
+        return { status: 'up-to-date', schemaHash: hash, tables: planTables, removedTables: [] }
+      }
+    }
+    let removedTables = await this.detectRemovedTables(tables)
+
+    if (safe) {
+      // Hide destructive operations in safe mode
+      planTables = planTables.map(t => ({ ...t, columnsToDrop: [] }))
+      removedTables = []
+    }
+
+    return {
+      status: 'changes-needed',
+      schemaHash: hash,
+      tables: planTables,
+      removedTables,
+    }
+  }
+
+  private async planTable(readable: AtscriptDbReadable): Promise<TSyncPlanTable> {
+    const adapter = readable.dbAdapter
+    const tableName = readable.tableName
+    const plan: TSyncPlanTable = {
+      tableName,
+      isNew: false,
+      columnsToAdd: [],
+      columnsToRename: [],
+      typeChanges: [],
+      columnsToDrop: [],
+      syncMethod: readable.syncMethod,
+    }
+
+    // Introspect existing columns (read-only — no ensureTable)
+    if (adapter.getExistingColumns) {
+      const existing = await adapter.getExistingColumns()
+      if (existing.length === 0) {
+        // Table doesn't exist yet
+        plan.isNew = true
+        plan.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
+      } else {
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing)
+        plan.columnsToAdd = diff.added
+        plan.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
+        plan.typeChanges = diff.typeChanged.map(tc => ({
+          column: tc.field.physicalName,
+          fromType: tc.existingType,
+          toType: tc.field.designType,
+        }))
+        plan.columnsToDrop = diff.removed.map(c => c.name)
+      }
+    } else {
+      // Adapter doesn't support introspection (e.g., MongoDB) — assume table is new if never synced
+      plan.isNew = true
+    }
+
+    return plan
+  }
+
   // ── Table sync ────────────────────────────────────────────────────────
 
-  private async syncTable(readable: AtscriptDbReadable): Promise<TSyncTableResult> {
+  private async syncTable(readable: AtscriptDbReadable, safe: boolean): Promise<TSyncTableResult> {
     const adapter = readable.dbAdapter
     const tableName = readable.tableName
     const result: TSyncTableResult = {
@@ -163,18 +282,17 @@ export class SchemaSync {
       created: false,
       columnsAdded: [],
       columnsRenamed: [],
+      columnsDropped: [],
       recreated: false,
       errors: [],
     }
-
-    // Ensure table exists
-    await adapter.ensureTable()
 
     // Column diff (if adapter supports introspection)
     if (adapter.getExistingColumns && adapter.syncColumns) {
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0) {
-        // Table was just created — no diff needed
+        // Table doesn't exist yet — create it
+        await adapter.ensureTable()
         result.created = true
       } else {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing)
@@ -209,15 +327,16 @@ export class SchemaSync {
           result.columnsRenamed = syncResult.renamed
         }
 
-        if (diff.removed.length > 0) {
-          for (const col of diff.removed) {
-            this.logger.warn?.(
-              `[schema-sync] Stale column detected: ${tableName}.${col.name}. ` +
-              `Column exists in DB but not in schema.`
-            )
-          }
+        // Drop stale columns (unless safe mode or table was recreated)
+        if (!safe && !result.recreated && diff.removed.length > 0 && adapter.dropColumns) {
+          const colNames = diff.removed.map(c => c.name)
+          await adapter.dropColumns(colNames)
+          result.columnsDropped = colNames
         }
       }
+    } else {
+      // No introspection — just ensure table exists
+      await adapter.ensureTable()
     }
 
     // Sync indexes
@@ -349,7 +468,7 @@ export class SchemaSync {
         return
       }
 
-      await new Promise(resolve => setTimeout(resolve, pollIntervalMs))
+      await new Promise<void>(resolve => { setTimeout(resolve, pollIntervalMs) })
     }
 
     throw new Error(`Schema sync lock wait timed out after ${timeoutMs}ms`)

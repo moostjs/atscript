@@ -170,6 +170,14 @@ async function rolldownPackages(ws) {
         const target = `./packages/${ws}/dist/${fileName}${ext}`
         writeFileSync(target, output[0].code)
         created.push(target)
+        // Write shared chunks (code-split dependencies)
+        for (let i = 1; i < output.length; i++) {
+          const chunk = output[i]
+          if (chunk.fileName) {
+            const chunkTarget = `./packages/${ws}/dist/${chunk.fileName}`
+            writeFileSync(chunkTarget, chunk.code)
+          }
+        }
       }
       done(created.join(' \t'))
     }

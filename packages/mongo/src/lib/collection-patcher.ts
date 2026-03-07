@@ -79,9 +79,7 @@ export class CollectionPatcher {
         }
         if (
           def.type.kind === 'array' &&
-          // @ts-expect-error
           context.flatMap.get(path)?.metadata.get('db.mongo.__topLevelArray') && // only patching top level arrays
-          // @ts-expect-error
           !def.metadata.has('db.mongo.__patchArrayValue')
         ) {
           const defArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
@@ -223,7 +221,6 @@ export class CollectionPatcher {
     for (const [_key, value] of Object.entries(payload)) {
       const key = evalKey(_key)
       const flatType = this.collection.flatMap.get(key)
-      // @ts-expect-error
       const topLevelArray = flatType?.metadata?.get('db.mongo.__topLevelArray') as boolean | undefined
       if (typeof value === 'object' && topLevelArray) {
         this.parseArrayPatch(key, value, flatType!)

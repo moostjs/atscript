@@ -148,7 +148,7 @@ export function annotations() {
             while (ni.satisfies(opts.dot) && ni.next()?.satisfies(opts.ident)) {
               ni.accepted()
               ni.move()
-              chainText += '.' + ni.$!.text
+              chainText += `.${ni.$!.text}`
               ni.accepted()
               ni.move()
             }

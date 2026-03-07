@@ -2,6 +2,18 @@ import type { AnnotationSpec } from '../annotations/annotation-spec'
 import type { TPrimitiveConfig } from '../parser/nodes'
 import type { TAtscriptPlugin, TAtscriptRenderFormat } from '../plugin/types'
 
+export interface TDbConfigDeclarative {
+  adapter: string
+  connection: string | (() => string | Promise<string>)
+  options?: Record<string, unknown>
+  include?: string[]
+  exclude?: string[]
+}
+
+export type TDbConfig =
+  | (() => unknown | Promise<unknown>)
+  | TDbConfigDeclarative
+
 export interface TAtscriptConfigInput {
   rootDir: string
   entries?: string[]
@@ -11,6 +23,7 @@ export interface TAtscriptConfigInput {
   plugins?: TAtscriptPlugin[]
   include?: string[]
   exclude?: string[]
+  db?: TDbConfig
 }
 
 export interface TAtscriptConfigOutput {

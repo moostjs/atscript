@@ -116,4 +116,14 @@ export class DbSpace {
     return readable.dbAdapter
   }
 
+  /**
+   * Drops a table by name. Used by schema sync to remove tables no longer in the schema.
+   * Creates a temporary adapter instance and delegates to its `dropTableByName` method.
+   */
+  async dropTableByName(tableName: string): Promise<void> {
+    const adapter = this.adapterFactory()
+    if (adapter.dropTableByName) {
+      await adapter.dropTableByName(tableName)
+    }
+  }
 }

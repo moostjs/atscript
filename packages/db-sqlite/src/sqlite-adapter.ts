@@ -329,6 +329,23 @@ export class SqliteAdapter extends BaseDbAdapter {
     this.driver.exec(ddl)
   }
 
+  async dropColumns(columns: string[]): Promise<void> {
+    await this.withTransaction(async () => {
+      const tableName = this.resolveTableName()
+      for (const col of columns) {
+        const ddl = `ALTER TABLE "${esc(tableName)}" DROP COLUMN "${esc(col)}"`
+        this._log(ddl)
+        this.driver.exec(ddl)
+      }
+    })
+  }
+
+  async dropTableByName(tableName: string): Promise<void> {
+    const ddl = `DROP TABLE IF EXISTS "${esc(tableName)}"`
+    this._log(ddl)
+    this.driver.exec(ddl)
+  }
+
   async syncIndexes(): Promise<void> {
     const tableName = this.resolveTableName()
 

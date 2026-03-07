@@ -557,7 +557,7 @@ export class MongoAdapter extends BaseDbAdapter {
       if (this._cappedOptions) {
         opts.capped = true
         opts.size = this._cappedOptions.size
-        if (this._cappedOptions.max != null) {
+        if (this._cappedOptions.max !== null && this._cappedOptions.max !== undefined) {
           opts.max = this._cappedOptions.max
         }
       }

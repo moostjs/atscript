@@ -264,8 +264,7 @@ function parseFieldRef(
   ni.move()
 
   // Check for qualified ref: identifier . identifier
-  if (ni.$?.type === 'punctuation' && ni.$.text === '.') {
-    const dotToken = ni.$
+  if ((ni.$?.type as string) === 'punctuation' && ni.$.text === '.') {
     ni.move() // consume '.'
     if (ni.$?.type === 'identifier') {
       const secondToken = new Token(ni.$)
@@ -273,10 +272,10 @@ function parseFieldRef(
 
       // Check for multi-hop chain: Type.field1.field2
       let fieldText = secondToken.text
-      while (ni.$?.type === 'punctuation' && ni.$.text === '.') {
+      while ((ni.$?.type as string) === 'punctuation' && ni.$.text === '.') {
         ni.move() // consume '.'
         if (ni.$?.type === 'identifier') {
-          fieldText += '.' + ni.$.text
+          fieldText += `.${ni.$.text}`
           ni.move()
         } else {
           pushError(ni, messages, 'Expected identifier after "."')

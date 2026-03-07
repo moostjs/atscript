@@ -875,7 +875,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     document: TextDocument,
     position: Position,
     atscript: AtscriptDoc,
-    aContext: { annotationToken: Token; argToken?: Token; currentIndex: number; annotationSpec?: { arguments: { type: string }[] } },
+    aContext: { annotationToken: Token; argToken?: Token; currentIndex: number; annotationSpec?: { arguments: Array<{ type: string }> } },
   ): CompletionItem[] | undefined {
     try {
       const text = document.getText()

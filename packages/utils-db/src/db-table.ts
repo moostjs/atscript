@@ -202,7 +202,7 @@ export class AtscriptDbTable<
       return this.adapter.nativePatch(this._translateFilter(filter), payload)
     }
 
-    const update = decomposePatch(payload, this)
+    const update = decomposePatch(payload, this as AtscriptDbTable)
     return this.adapter.updateOne(this._translateFilter(filter), this._translatePatchKeys(update))
   }
 
@@ -451,14 +451,14 @@ export class AtscriptDbTable<
     depth: number
   ): Promise<void> {
     for (const [navField, relation] of this._relations) {
-      if (relation.direction !== 'to') continue
+      if (relation.direction !== 'to') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) continue
+      if (!targetTable) { continue }
       const fk = this._findFKForRelation(relation)
-      if (!fk) continue
+      if (!fk) { continue }
 
-      const parents: Record<string, unknown>[] = []
+      const parents: Array<Record<string, unknown>> = []
       const sourceIndices: number[] = []
       for (let i = 0; i < items.length; i++) {
         const nested = items[i][navField]
@@ -467,7 +467,7 @@ export class AtscriptDbTable<
           sourceIndices.push(i)
         }
       }
-      if (parents.length === 0) continue
+      if (parents.length === 0) { continue }
 
       const result = await targetTable.insertMany(parents, { maxDepth, _depth: depth + 1 })
 
@@ -492,17 +492,17 @@ export class AtscriptDbTable<
     depth: number
   ): Promise<void> {
     for (const [navField, relation] of this._relations) {
-      if (relation.direction !== 'from') continue
+      if (relation.direction !== 'from') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) continue
+      if (!targetTable) { continue }
       const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-      if (!remoteFK) continue
+      if (!remoteFK) { continue }
 
-      const allChildren: Record<string, unknown>[] = []
+      const allChildren: Array<Record<string, unknown>> = []
       for (let i = 0; i < originals.length; i++) {
         const children = originals[i][navField]
-        if (!Array.isArray(children)) continue
+        if (!Array.isArray(children)) { continue }
         for (const child of children) {
           const childData = { ...(child as Record<string, unknown>) }
           if (remoteFK.fields.length === 1) {
@@ -511,7 +511,7 @@ export class AtscriptDbTable<
           allChildren.push(childData)
         }
       }
-      if (allChildren.length === 0) continue
+      if (allChildren.length === 0) { continue }
 
       await targetTable.insertMany(allChildren, { maxDepth, _depth: depth + 1 })
     }
@@ -531,7 +531,7 @@ export class AtscriptDbTable<
     switch (purpose) {
       case 'insert': {
         if (this.adapter.buildInsertValidator) {
-          return this.adapter.buildInsertValidator(this) as Validator<T, DataType>
+          return this.adapter.buildInsertValidator(this as AtscriptDbTable) as Validator<T, DataType>
         }
         return this.createValidator({
           plugins,
@@ -546,7 +546,7 @@ export class AtscriptDbTable<
       }
       case 'patch': {
         if (this.adapter.buildPatchValidator) {
-          return this.adapter.buildPatchValidator(this) as Validator<T, DataType>
+          return this.adapter.buildPatchValidator(this as AtscriptDbTable) as Validator<T, DataType>
         }
         return this.createValidator({
           plugins,

@@ -69,7 +69,13 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "@atscript/core": "workspace:^"
+    "@atscript/core": "workspace:^",
+    "@atscript/utils-db": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@atscript/utils-db": {
+      "optional": true
+    }
   },
   "build": [
     {},

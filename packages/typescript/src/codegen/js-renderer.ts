@@ -845,21 +845,25 @@ export class JsRenderer extends BaseRenderer {
   private emitQueryLiteral(node: SemanticQueryValueNode): string {
     const token = node.valueToken
     switch (token.type) {
-      case 'text':
+      case 'text': {
         return `"${escapeQuotes(token.text)}"`
-      case 'number':
+      }
+      case 'number': {
         return token.text
+      }
       case 'regexp': {
         // Extract regex source (strip /pattern/flags → "pattern")
         const match = /^\/(.*)\/[a-z]*$/.exec(token.text)
         return `"${escapeQuotes(match ? match[1] : token.text)}"`
       }
-      case 'identifier':
-        if (token.text === 'true' || token.text === 'false') return token.text
-        if (token.text === 'null' || token.text === 'undefined') return 'null'
+      case 'identifier': {
+        if (token.text === 'true' || token.text === 'false') { return token.text }
+        if (token.text === 'null' || token.text === 'undefined') { return 'null' }
         return token.text
-      default:
+      }
+      default: {
         return token.text
+      }
     }
   }
 

@@ -442,7 +442,8 @@ interface User {
       const spec = new AnnotationSpec({
         argument: { name: 'filter', type: 'query' },
       })
-      expect(spec.argumentsSnippet).toBe('`${1:field = value}`')
+      const d = '$'
+      expect(spec.argumentsSnippet).toBe(`\`${d}{1:field = value}\``)
     })
   })
 

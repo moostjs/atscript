@@ -37,5 +37,5 @@ export function buildMongoFilter(filter: FilterExpr): Filter<any> {
   if (!filter || Object.keys(filter).length === 0) {
     return EMPTY
   }
-  return walkFilter(filter, mongoVisitor)
+  return walkFilter(filter, mongoVisitor) ?? EMPTY
 }

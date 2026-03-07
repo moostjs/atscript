@@ -191,7 +191,7 @@ export class AsDbReadableController<
     const select = this.transformProjection(controls.$select)
 
     if (controls.$count) {
-      return this.readable.count({ filter, controls: { ...controls, $select: select } } as Uniquery<any>)
+      return this.readable.count({ filter, controls: { ...controls, $select: select } } as Uniquery<any, any>)
     }
 
     const searchTerm = controls.$search as string | undefined
@@ -201,13 +201,13 @@ export class AsDbReadableController<
       return this.readable.search(searchTerm, {
         filter,
         controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-      } as Uniquery<any>, indexName) as Promise<DataType[]>
+      } as Uniquery<any, any>, indexName) as Promise<DataType[]>
     }
 
     return this.readable.findMany({
       filter,
       controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-    } as Uniquery<any>) as Promise<DataType[]>
+    } as Uniquery<any, any>) as Promise<DataType[]>
   }
 
   /**
@@ -247,9 +247,9 @@ export class AsDbReadableController<
 
     let result: { data: DataType[]; count: number }
     if (searchTerm && this.readable.isSearchable()) {
-      result = await this.readable.searchWithCount(searchTerm, query as Uniquery<any>, indexName) as { data: DataType[]; count: number }
+      result = await this.readable.searchWithCount(searchTerm, query as Uniquery<any, any>, indexName) as { data: DataType[]; count: number }
     } else {
-      result = await this.readable.findManyWithCount(query as Uniquery<any>) as { data: DataType[]; count: number }
+      result = await this.readable.findManyWithCount(query as Uniquery<any, any>) as { data: DataType[]; count: number }
     }
 
     return {

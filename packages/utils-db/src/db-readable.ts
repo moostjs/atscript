@@ -368,7 +368,7 @@ export class AtscriptDbReadable<
   /** Returns the `__`-separated parent prefix for a dot-separated path, or empty string for top-level paths. */
   protected _flattenedPrefix(path: string): string {
     const lastDot = path.lastIndexOf('.')
-    return lastDot >= 0 ? path.substring(0, lastDot).replace(/\./g, '__') + '__' : ''
+    return lastDot >= 0 ? `${path.slice(0, lastDot).replace(/\./g, '__')}__` : ''
   }
 
   /** Logical → physical column name mapping from `@db.column.name`. */
@@ -550,7 +550,7 @@ export class AtscriptDbReadable<
    */
   public async findMany<Q extends Uniquery<OwnProps, NavType>>(
     query: Q
-  ): Promise<DbResponse<DataType, NavType, Q>[]> {
+  ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
@@ -559,7 +559,7 @@ export class AtscriptDbReadable<
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
-    return rows as DbResponse<DataType, NavType, Q>[]
+    return rows as Array<DbResponse<DataType, NavType, Q>>
   }
 
   /**
@@ -576,7 +576,7 @@ export class AtscriptDbReadable<
    */
   public async findManyWithCount<Q extends Uniquery<OwnProps, NavType>>(
     query: Q
-  ): Promise<{ data: DbResponse<DataType, NavType, Q>[]; count: number }> {
+  ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -586,7 +586,7 @@ export class AtscriptDbReadable<
       await this._loadRelations(rows, withRelations)
     }
     return {
-      data: rows as DbResponse<DataType, NavType, Q>[],
+      data: rows as Array<DbResponse<DataType, NavType, Q>>,
       count: result.count,
     }
   }
@@ -610,7 +610,7 @@ export class AtscriptDbReadable<
     text: string,
     query: Q,
     indexName?: string
-  ): Promise<DbResponse<DataType, NavType, Q>[]> {
+  ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -619,7 +619,7 @@ export class AtscriptDbReadable<
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
-    return rows as DbResponse<DataType, NavType, Q>[]
+    return rows as Array<DbResponse<DataType, NavType, Q>>
   }
 
   /**
@@ -629,7 +629,7 @@ export class AtscriptDbReadable<
     text: string,
     query: Q,
     indexName?: string
-  ): Promise<{ data: DbResponse<DataType, NavType, Q>[]; count: number }> {
+  ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
     this._flatten()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
@@ -639,7 +639,7 @@ export class AtscriptDbReadable<
       await this._loadRelations(rows, withRelations)
     }
     return {
-      data: rows as DbResponse<DataType, NavType, Q>[],
+      data: rows as Array<DbResponse<DataType, NavType, Q>>,
       count: result.count,
     }
   }
@@ -659,7 +659,7 @@ export class AtscriptDbReadable<
    * const user = await table.findById('123', { controls: { $with: [{ name: 'posts' }] } })
    * ```
    */
-  public async findById<Q extends { controls?: UniqueryControls<OwnProps, NavType> } = {}>(
+  public async findById<Q extends { controls?: UniqueryControls<OwnProps, NavType> } = Record<string, never>>(
     id: IdType,
     query?: Q
   ): Promise<DbResponse<DataType, NavType, Q> | null> {
@@ -1159,7 +1159,7 @@ export class AtscriptDbReadable<
     if (!this._requiresMappings || this._nestedObjects) {
       const controls = query.controls
       return {
-        filter: query.filter,
+        filter: query.filter as FilterExpr,
         controls: {
           ...controls,
           $with: undefined, // $with is handled by the table layer, not passed to adapters
@@ -1170,7 +1170,7 @@ export class AtscriptDbReadable<
       }
     }
     return {
-      filter: this._translateFilter(query.filter),
+      filter: this._translateFilter(query.filter as FilterExpr),
       controls: query.controls ? this._translateControls(query.controls) : {},
     }
   }
@@ -1369,8 +1369,8 @@ export class AtscriptDbReadable<
       const nested = (withRel.controls || {}) as Record<string, unknown>
       const controls: Record<string, unknown> = { ...nested }
       if (flatRel.$sort && !controls.$sort) { controls.$sort = flatRel.$sort }
-      if (flatRel.$limit != null && controls.$limit == null) { controls.$limit = flatRel.$limit }
-      if (flatRel.$skip != null && controls.$skip == null) { controls.$skip = flatRel.$skip }
+      if (flatRel.$limit !== null && flatRel.$limit !== undefined && (controls.$limit === null || controls.$limit === undefined)) { controls.$limit = flatRel.$limit }
+      if (flatRel.$skip !== null && flatRel.$skip !== undefined && (controls.$skip === null || controls.$skip === undefined)) { controls.$skip = flatRel.$skip }
       if (flatRel.$select && !controls.$select) { controls.$select = flatRel.$select }
       if (flatRel.$with && !controls.$with) { controls.$with = flatRel.$with }
       const relQuery: TRelationQuery = { filter, controls }

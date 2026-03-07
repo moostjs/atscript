@@ -58,7 +58,7 @@ class MockAdapter extends BaseDbAdapter {
             : value
           if (row[key] !== expected) { match = false; break }
         }
-        if (match) return row
+        if (match) { return row }
       }
       return null
     }
@@ -129,6 +129,14 @@ class MockAdapter extends BaseDbAdapter {
       })
     }
     return { added }
+  }
+
+  async dropColumns(columns: string[]): Promise<void> {
+    this._existingColumns = this._existingColumns.filter(c => !columns.includes(c.name))
+  }
+
+  async dropTableByName(tableName: string): Promise<void> {
+    this.tables.delete(tableName)
   }
 }
 

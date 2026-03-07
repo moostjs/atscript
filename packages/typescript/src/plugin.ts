@@ -70,12 +70,12 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
           const multiple = val!.multiple
           const typeLine = Array.from(val!.types)
             .map(t => {
-              if (t.type === 'object') {
+              if (t.type === 'object' && 'props' in t) {
                 return `{ ${Object.entries(t.props)
-                  .map(([k, v]) => `${wrapProp(k)}${v.optional ? '?' : ''}: ${v.type}`)
+                  .map(([k, v]) => `${wrapProp(k)}${(v as { optional?: boolean }).optional ? '?' : ''}: ${(v as { type: string }).type}`)
                   .join(', ')} }`
               } else {
-                return t.optional ? `${t.type} | true` : t.type
+                return ('optional' in t && t.optional) ? `${t.type} | true` : t.type
               }
             })
             .join(' | ')

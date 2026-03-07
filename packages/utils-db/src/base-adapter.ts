@@ -504,4 +504,18 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters implement this.
    */
   dropTable?(): Promise<void>
+
+  /**
+   * Drops one or more columns from the table.
+   * Used by schema sync to remove stale columns no longer in the schema.
+   * Optional — only relational adapters implement this.
+   */
+  dropColumns?(columns: string[]): Promise<void>
+
+  /**
+   * Drops a table by name (without needing a registered readable).
+   * Used by schema sync to remove tables no longer in the schema.
+   * Optional — only relational adapters implement this.
+   */
+  dropTableByName?(tableName: string): Promise<void>
 }

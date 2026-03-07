@@ -113,7 +113,7 @@ export class AtscriptDoc {
   /**
    * List of query field ref nodes (for find-references support)
    */
-  public queryFieldRefs = [] as import('./parser/nodes/query-nodes').SemanticQueryFieldRefNode[]
+  public queryFieldRefs = [] as Array<import('./parser/nodes/query-nodes').SemanticQueryFieldRefNode>
 
   /**
    * Map of dependencies (documents) by URI
