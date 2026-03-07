@@ -17,12 +17,11 @@ docs/docs/
 │   └── theme/             — Custom theme (index.ts, style.css, atscript-grammar.ts)
 ├── _fragments/            — Shared markdown snippets (included via <!--@include: -->)
 ├── index.md               — Homepage
+├── db-integrations/       — DB Integrations docs (23 pages — COMPLETE)
 ├── packages/
 │   ├── typescript/        — TypeScript Guide (18 pages — self-contained, COMPLETE)
-│   ├── mongo/             — MongoDB docs (9 STUB files)
-│   ├── moost-db/       — Moost MongoDB docs (6 STUB files)
-│   ├── moost-validator/   — Moost Validator docs (6 STUB files)
-│   └── vscode/            — VSCode extension docs (7 STUB files)
+│   ├── moost-validator/   — Moost Validator docs (4 pages)
+│   └── vscode/            — VSCode extension docs (4 pages)
 ├── plugin-development/    — Plugin Development Guide (16 STUB files)
 └── public/                — Static assets (logo, images)
 ```
@@ -30,25 +29,23 @@ docs/docs/
 ## Navigation Structure
 
 ```
-TypeScript ▾              VSCode        Plugin Development
-├── Guide                 (top-level)   (top-level)
-├── MongoDB
-└── Moost
-    ├── Moost MongoDB
-    └── Moost Validator
+TypeScript ▾              DB Integrations ▾      VSCode        Plugins ▾
+├── Guide                 ├── Overview           (top-level)   └── Creating a Plugin
+└── Moost Validator       ├── SQLite
+                          ├── MongoDB
+                          └── CRUD over HTTP
 ```
 
 ## Current Coverage
 
-| Section                   | Status   | Pages                                       |
-| ------------------------- | -------- | ------------------------------------------- |
-| packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments) |
-| packages/mongo/           | STUBS    | 9 files, needs content                      |
-| packages/moost-db/     | STUBS    | 6 files, needs content                      |
-| packages/moost-validator/ | STUBS    | 6 files, needs content                      |
-| packages/vscode/          | STUBS    | 7 files, needs content                      |
-| plugin-development/       | STUBS    | 16 files, needs content                     |
-| \_fragments/              | COMPLETE | 7 shared fragments                          |
+| Section                   | Status   | Pages                                        |
+| ------------------------- | -------- | -------------------------------------------- |
+| db-integrations/          | COMPLETE | 23 pages — tables, relations, views, sync    |
+| packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments)  |
+| packages/moost-validator/ | PARTIAL  | 4 pages                                      |
+| packages/vscode/          | PARTIAL  | 4 pages                                      |
+| plugin-development/       | STUBS    | 16 files, needs content                      |
+| \_fragments/              | COMPLETE | 7 shared fragments                           |
 
 ## VitePress Config Key Details
 
@@ -130,9 +127,12 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | Package Source                  | Documentation Location                         |
 | ------------------------------- | ---------------------------------------------- |
 | `packages/core/src/`            | `docs/docs/plugin-development/`                |
+| `packages/core/src/defaults/db-annotations.ts` | `docs/docs/db-integrations/annotations.md` |
 | `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
-| `packages/mongo/src/`           | `docs/docs/packages/mongo/`                    |
-| `packages/moost-db/src/`     | `docs/docs/packages/moost-db/`              |
+| `packages/utils-db/src/`        | `docs/docs/db-integrations/`                   |
+| `packages/db-sqlite/src/`       | `docs/docs/db-integrations/sqlite*.md`         |
+| `packages/mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
+| `packages/moost-db/src/`        | `docs/docs/db-integrations/crud-http*.md`      |
 | `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
 | `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |
 | `packages/vscode/`              | `docs/docs/packages/vscode/`                   |

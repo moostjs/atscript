@@ -194,3 +194,26 @@ interface Product {
 ::: tip Form Validation
 Use `string.required` or `@meta.required` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@meta.required` catches this common form validation gap. For checkboxes, `@meta.required` on a `boolean` field ensures the value is `true` (e.g., "accept terms").
 :::
+
+### Database Annotations (@db.\*)
+
+Atscript ships a comprehensive set of database annotations for defining tables, relations, views, indexes, and more. These are covered in detail in the [DB Integrations](/db-integrations/) documentation:
+
+- `@db.table`, `@db.schema` — Table definitions
+- `@db.column`, `@db.json`, `@db.ignore` — Column configuration
+- `@db.default`, `@db.default.fn` — Default values
+- `@db.index.plain`, `@db.index.unique`, `@db.index.fulltext` — Indexes
+- `@db.rel.FK`, `@db.rel.to`, `@db.rel.from`, `@db.rel.via` — Relations
+- `@db.view`, `@db.view.for`, `@db.view.joins`, `@db.view.filter` — Views
+- `@db.sync.method`, `@db.table.renamed`, `@db.column.renamed` — Schema sync
+
+See the [Annotations Reference](/db-integrations/annotations) for the complete list.
+
+### Special Annotation Argument Types
+
+Some annotations accept special argument types beyond strings and numbers:
+
+- **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Used by `@db.rel.FK` and `@db.view.for` to reference fields on other types.
+- **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Used by `@db.view.filter`, `@db.view.joins`, and `@db.rel.filter` for conditions.
+
+See [Query Expressions](/db-integrations/query-expressions) for the full query syntax.

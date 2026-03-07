@@ -334,12 +334,12 @@ export default defineConfig({
         ],
       },
       {
-        text: 'DB Adapters',
+        text: 'DB Integrations',
         items: [
-          { text: 'Overview', link: '/db-adapters/' },
-          { text: 'SQLite', link: '/db-adapters/sqlite' },
-          { text: 'MongoDB', link: '/db-adapters/mongodb' },
-          { text: 'CRUD over HTTP', link: '/db-adapters/crud-http' },
+          { text: 'Overview', link: '/db-integrations/' },
+          { text: 'SQLite', link: '/db-integrations/sqlite' },
+          { text: 'MongoDB', link: '/db-integrations/mongodb' },
+          { text: 'CRUD over HTTP', link: '/db-integrations/crud-http' },
         ],
       },
       { text: 'VSCode', link: '/packages/vscode/' },
@@ -402,47 +402,80 @@ export default defineConfig({
         },
       ],
 
-      '/db-adapters/': [
+      '/db-integrations/': [
         {
-          text: 'Overview',
+          text: 'Getting Started',
           items: [
-            { text: 'Architecture', link: '/db-adapters/' },
-            { text: 'Annotations', link: '/db-adapters/annotations' },
-            { text: 'Relations', link: '/db-adapters/relations' },
-            { text: 'Tables API', link: '/db-adapters/tables' },
-            { text: 'Queries & Filters', link: '/db-adapters/queries' },
-            { text: 'Patch Operations', link: '/db-adapters/patch-operations' },
+            { text: 'Overview', link: '/db-integrations/' },
+            { text: 'Quick Start', link: '/db-integrations/quick-start' },
+          ],
+        },
+        {
+          text: 'Schema Definition',
+          items: [
+            { text: 'Tables & Fields', link: '/db-integrations/tables' },
+            { text: 'Defaults & Indexes', link: '/db-integrations/defaults-indexes' },
+            { text: 'Annotations Reference', link: '/db-integrations/annotations' },
+          ],
+        },
+        {
+          text: 'Relations',
+          items: [
+            { text: 'Foreign Keys', link: '/db-integrations/foreign-keys' },
+            { text: 'Navigation Properties', link: '/db-integrations/navigation' },
+            { text: 'Deep Operations', link: '/db-integrations/deep-operations' },
+          ],
+        },
+        {
+          text: 'Views',
+          items: [
+            { text: 'Database Views', link: '/db-integrations/views' },
+          ],
+        },
+        {
+          text: 'Working with Data',
+          items: [
+            { text: 'CRUD Operations', link: '/db-integrations/crud' },
+            { text: 'Queries & Filters', link: '/db-integrations/queries' },
+            { text: 'Query Expressions', link: '/db-integrations/query-expressions' },
+            { text: 'Patch Operations', link: '/db-integrations/patch-operations' },
+            { text: 'Transactions', link: '/db-integrations/transactions' },
+          ],
+        },
+        {
+          text: 'Schema Sync',
+          items: [
+            { text: 'Schema Sync & Migrations', link: '/db-integrations/schema-sync' },
           ],
         },
         {
           text: 'SQLite',
           items: [
-            { text: 'Guide', link: '/db-adapters/sqlite' },
-            { text: 'API Reference', link: '/db-adapters/sqlite-api' },
+            { text: 'Guide', link: '/db-integrations/sqlite' },
+            { text: 'API Reference', link: '/db-integrations/sqlite-api' },
           ],
         },
         {
           text: 'MongoDB',
           items: [
-            { text: 'Guide', link: '/db-adapters/mongodb' },
-            { text: 'Patch Pipelines', link: '/db-adapters/mongodb-patches' },
-            { text: 'Annotations', link: '/db-adapters/mongodb-annotations' },
-            { text: 'Search & Vectors', link: '/db-adapters/mongodb-search' },
+            { text: 'Guide', link: '/db-integrations/mongodb' },
+            { text: 'Patch Pipelines', link: '/db-integrations/mongodb-patches' },
+            { text: 'Annotations', link: '/db-integrations/mongodb-annotations' },
+            { text: 'Search & Vectors', link: '/db-integrations/mongodb-search' },
           ],
         },
         {
           text: 'CRUD over HTTP',
           items: [
-            { text: 'Guide', link: '/db-adapters/crud-http' },
-            { text: 'URL Query Syntax', link: '/db-adapters/crud-http-query-syntax' },
-            { text: 'Customization', link: '/db-adapters/crud-http-customization' },
+            { text: 'Guide', link: '/db-integrations/crud-http' },
+            { text: 'URL Query Syntax', link: '/db-integrations/crud-http-query-syntax' },
+            { text: 'Customization', link: '/db-integrations/crud-http-customization' },
           ],
         },
         {
           text: 'Advanced',
           items: [
-            { text: 'Creating Adapters', link: '/db-adapters/creating-adapters' },
-            { text: 'Future Features', link: '/db-adapters/future' },
+            { text: 'Creating Adapters', link: '/db-integrations/creating-adapters' },
           ],
         },
       ],

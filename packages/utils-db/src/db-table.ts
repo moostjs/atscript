@@ -135,6 +135,7 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
+    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this.adapter.withTransaction(async () => {
       // Clone + apply defaults (keep originals for FROM phase)
@@ -193,6 +194,7 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
+    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this.adapter.withTransaction(async () => {
       // Phase 0: Setup — check nav props, clone + defaults, validate
@@ -269,6 +271,7 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
+    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this.adapter.withTransaction(async () => {
       // Phase 0: Setup — check nav props (errors on FROM/VIA), validate
@@ -636,6 +639,28 @@ export class AtscriptDbTable<
   }
 
   // ── Internal: nav prop checking ─────────────────────────────────────────
+
+  /**
+   * Checks if any payload contains navigational data that would be silently
+   * dropped because maxDepth is 0. Only called for top-level (user-facing)
+   * calls, not internal recursive ones.
+   */
+  private _checkDepthOverflow(
+    payloads: Array<Record<string, unknown>>,
+    maxDepth: number,
+  ): void {
+    if (this._navFields.size === 0) { return }
+    for (const payload of payloads) {
+      for (const navField of this._navFields) {
+        if (payload[navField] !== undefined) {
+          throw new Error(
+            `Nested data in '${navField}' exceeds maxDepth (${maxDepth}). ` +
+            `Increase maxDepth or strip nested data before writing.`
+          )
+        }
+      }
+    }
+  }
 
   /**
    * Validates nav props in payloads. Errors on null values, missing resolver,

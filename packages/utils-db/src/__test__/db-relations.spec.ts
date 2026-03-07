@@ -652,12 +652,12 @@ describe('AtscriptDbTable — Relations', () => {
       }
     })
 
-    it('should strip nav fields from payload and insert successfully', async () => {
+    it('should error when nav fields are present but cannot be processed', async () => {
       const adapter = new InMemoryAdapter()
       const table = new AtscriptDbTable(Author, adapter)
-      // Nav fields are silently stripped (no write resolver → no nested creation)
-      const result = await table.insertOne({ name: 'Charlie', posts: [{ title: 'junk' }] } as any)
-      expect(result.insertedId).toBeDefined()
+      await expect(
+        table.insertOne({ name: 'Charlie', posts: [{ title: 'junk' }] } as any)
+      ).rejects.toThrow(/exceeds maxDepth/)
     })
 
     it('should accept insert when nav fields are undefined', async () => {
@@ -810,21 +810,32 @@ describe('AtscriptDbTable — Relations', () => {
 
     it('should respect maxDepth limit', async () => {
       const authorTable = db.getTable(Author)
-      // depth=0, maxDepth=1: authors created, posts created (depth 1), but comments at depth 2 skipped
+      // depth=0, maxDepth=1: authors created, posts created (depth 1),
+      // but comments at depth 2 cause an error
+      await expect(
+        authorTable.insertMany([
+          {
+            name: 'Alice',
+            posts: [
+              { title: 'P1', comments: [{ body: 'should not be created' }] },
+            ],
+          },
+        ] as any, { maxDepth: 1 })
+      ).rejects.toThrow(/exceeds maxDepth/)
+    })
+
+    it('should succeed with maxDepth when nested data fits within limit', async () => {
+      const authorTable = db.getTable(Author)
+      // depth=0, maxDepth=1: authors created, posts created (depth 1), no deeper nesting
       await authorTable.insertMany([
         {
           name: 'Alice',
-          posts: [
-            { title: 'P1', comments: [{ body: 'should not be created' }] },
-          ],
+          posts: [{ title: 'P1' }],
         },
       ] as any, { maxDepth: 1 })
 
       const posts = await (db.getTable(Post)).findMany({ filter: {}, controls: {} }) as any[]
       expect(posts).toHaveLength(1)
-
-      const comments = await (db.getTable(Comment)).findMany({ filter: {}, controls: {} }) as any[]
-      expect(comments).toHaveLength(0)
     })
 
     it('should work with plain insertMany (no nav data)', async () => {
