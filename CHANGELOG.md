@@ -1,3 +1,21 @@
+## [0.1.35](https://github.com/moostjs/atscript/compare/v0.1.34...v0.1.35) (2026-03-07)
+
+
+### Features
+
+* **core:** leaf annotation can be branch ([da59570](https://github.com/moostjs/atscript/commit/da5957015c791718e89376895ea9992f7cf019a4))
+* db sync ([a4ef495](https://github.com/moostjs/atscript/commit/a4ef4954c96c5f5a467e6c32deb574d9acd028f4))
+* **db:** add deep inserts ([03d9632](https://github.com/moostjs/atscript/commit/03d9632e94c8c1495a6dde08ecf26f5739c13922))
+* **db:** add support for batch deep inserts ([cd7b90a](https://github.com/moostjs/atscript/commit/cd7b90a45e6bd28ab8ee5f7d39be22f905ef2597))
+* **db:** add sync in cli ([a971b06](https://github.com/moostjs/atscript/commit/a971b0629d0aa9eafa295f05b25e01059dbd2cb3))
+* **db:** add trasactions ([366b75d](https://github.com/moostjs/atscript/commit/366b75d2088ffa7649ea427f81f802bc8475817d))
+* **db:** phase 3 implemented ([539bfb6](https://github.com/moostjs/atscript/commit/539bfb6c3c93d52df5f9e3b5f6ef1dd6ba1403ad))
+* **db:** schema migrations — column renames, [@db](https://github.com/db).sync.method drop/recreate, table tracking, [@db](https://github.com/db).mongo.capped ([e264deb](https://github.com/moostjs/atscript/commit/e264deb176fcf97b53fdf230a832879a848c090b))
+* deep updates/patches ([5aadc97](https://github.com/moostjs/atscript/commit/5aadc97540ba7f59f326abcda0c3d4053247fb2c))
+* improve typesafe ([b4988ef](https://github.com/moostjs/atscript/commit/b4988efb787b9cf4f72845e522ab9cf46fae354f))
+
+
+
 ## [0.1.34](https://github.com/moostjs/atscript/compare/v0.1.33...v0.1.34) (2026-03-05)
 
 
