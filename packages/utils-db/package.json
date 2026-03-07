@@ -1,6 +1,6 @@
 {
   "name": "@atscript/utils-db",
-  "version": "0.1.34",
+  "version": "0.1.35",
   "description": "Database adapter utilities for atscript.",
   "keywords": [
     "atscript",
@@ -38,7 +38,12 @@
     "./package.json": "./package.json"
   },
   "build": [
-    { "entries": ["src/index.ts", "src/sync.ts"] }
+    {
+      "entries": [
+        "src/index.ts",
+        "src/sync.ts"
+      ]
+    }
   ],
   "scripts": {
     "before-build": "node ../typescript/cli.cjs -f js",
