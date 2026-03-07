@@ -132,11 +132,15 @@ export class PluginManager {
     cb: (name: string, a: AnnotationSpec) => void,
     prefix?: string
   ) {
+    if (annotations.$self && prefix) {
+      cb(prefix, annotations.$self)
+    }
     for (const [key, value] of Object.entries(annotations)) {
+      if (key === '$self') continue
       if (isAnnotationSpec(value)) {
         cb(prefix ? `${prefix}.${key}` : key, value)
       } else {
-        this._loopInAnnotationsSpec(value, cb, prefix ? `${prefix}.${key}` : key)
+        this._loopInAnnotationsSpec(value as TAnnotationsTree, cb, prefix ? `${prefix}.${key}` : key)
       }
     }
   }

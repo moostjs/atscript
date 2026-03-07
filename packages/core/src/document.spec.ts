@@ -537,6 +537,30 @@ describe('document', () => {
     expect(doc.resolveAnnotation('level1')).toBeUndefined()
   })
 
+  it('should resolve annotation spec via $self', () => {
+    const selfSpec = new AnnotationSpec({ description: 'self annotation' })
+    const childSpec = new AnnotationSpec({ description: 'child annotation' })
+    const doc = new AtscriptDoc('file-1.as', {
+      primitives,
+      annotations: {
+        ns: {
+          $self: selfSpec,
+          child: childSpec,
+        },
+      },
+    })
+    // $self makes the namespace itself resolvable
+    expect(doc.resolveAnnotation('ns')).toBe(selfSpec)
+    // Children still resolve normally
+    expect(doc.resolveAnnotation('ns.child')).toBe(childSpec)
+    // Direct $self access via path is rejected
+    expect(doc.resolveAnnotation('ns.$self')).toBeUndefined()
+    // Non-existent children still undefined
+    expect(doc.resolveAnnotation('ns.missing')).toBeUndefined()
+    // Without $self, namespace is still unresolvable
+    expect(doc.resolveAnnotation('other')).toBeUndefined()
+  })
+
   it('should eval annotations for node', () => {
     const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`

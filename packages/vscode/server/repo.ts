@@ -258,20 +258,17 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             }
           }
           const parent = token.parentNode
-          return Object.keys(a).flatMap(key => {
+          return Object.keys(a).filter(k => k !== '$self').flatMap(key => {
             const options = [
               {
                 label: key,
                 kind: CompletionItemKind.Folder,
-                insertText: `${key}.`,
-                command: {
-                  command: 'editor.action.triggerSuggest',
-                  title: 'Trigger Suggest',
-                },
               },
             ] as CompletionItem[]
-            if (isAnnotationSpec(a[key])) {
-              const nodeType = a[key].config.nodeType
+            const child = a[key]
+            const selfSpec = !isAnnotationSpec(child) && child?.$self
+            if (isAnnotationSpec(child)) {
+              const nodeType = child.config.nodeType
               if (nodeType?.length && parent) {
                 // filter out annotations not suitable for the parent node
                 // Annotate block entries are ref nodes referencing props,
@@ -285,12 +282,31 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
               const aName = `@${[...prev, key].join('.')}`
               const documentation = {
                 kind: 'markdown',
-                value: a[key].renderDocs(aName) || '',
+                value: child.renderDocs(aName) || '',
               } as MarkupContent
               options[0].documentation = documentation
               options[0].kind = CompletionItemKind.Value
               options[0].command = undefined
               options[0].insertText = undefined
+            } else if (selfSpec && isAnnotationSpec(selfSpec)) {
+              // Branch with $self: show as both a folder and a leaf value
+              const nodeType = selfSpec.config.nodeType
+              if (nodeType?.length && parent) {
+                const effectiveEntity =
+                  parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
+                if (!nodeType.includes(effectiveEntity)) {
+                  return options
+                }
+              }
+              const aName = `@${[...prev, key].join('.')}`
+              options.push({
+                label: key,
+                kind: CompletionItemKind.Value,
+                documentation: {
+                  kind: 'markdown',
+                  value: selfSpec.renderDocs(aName) || '',
+                } as MarkupContent,
+              } as CompletionItem)
             }
             return options
           })

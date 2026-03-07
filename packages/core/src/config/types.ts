@@ -34,5 +34,6 @@ export interface TAtscriptConfigOutput {
 export type TAtscriptConfig = Partial<TAtscriptConfigInput & TAtscriptConfigOutput>
 
 export interface TAnnotationsTree {
-  [key: string]: AnnotationSpec | TAnnotationsTree
+  $self?: AnnotationSpec
+  [key: string]: AnnotationSpec | TAnnotationsTree | undefined
 }
