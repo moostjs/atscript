@@ -22,6 +22,7 @@ import type {
   TDbInsertManyResult,
   TDbInsertResult,
   TDbUpdateResult,
+  TFkLookupResolver,
   TTableResolver,
   TWriteTableResolver,
 } from './types'
@@ -74,6 +75,7 @@ export class AtscriptDbTable<
   // ── Cascade resolver ─────────────────────────────────────────────────────
 
   protected _cascadeResolver?: TCascadeResolver
+  protected _fkLookupResolver?: TFkLookupResolver
 
   // ── Validators ────────────────────────────────────────────────────────────
 
@@ -98,6 +100,14 @@ export class AtscriptDbTable<
    */
   setCascadeResolver(resolver: TCascadeResolver): void {
     this._cascadeResolver = resolver
+  }
+
+  /**
+   * Sets the FK lookup resolver for application-level FK validation.
+   * Called by DbSpace after table creation.
+   */
+  setFkLookupResolver(resolver: TFkLookupResolver): void {
+    this._fkLookupResolver = resolver
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -170,6 +180,9 @@ export class AtscriptDbTable<
         prepared.push(this._prepareForWrite(data))
       }
 
+      // Validate FK references (application-level, for adapters without native FK support)
+      await this._validateForeignKeys(items)
+
       // Phase 2: Batch main insert
       const result = await this.adapter.insertMany(prepared)
 
@@ -235,6 +248,9 @@ export class AtscriptDbTable<
       if (canNest) {
         await this._batchReplaceNestedTo(items, maxDepth, depth)
       }
+
+      // Validate FK references (application-level, for adapters without native FK support)
+      await this._validateForeignKeys(items)
 
       // Phase 2: Main replace — strip nav fields, prepare, replace each
       let matchedCount = 0
@@ -311,6 +327,9 @@ export class AtscriptDbTable<
         await this._batchPatchNestedTo(payloads as Array<Record<string, unknown>>, maxDepth, depth)
       }
 
+      // Validate FK references (application-level, for adapters without native FK support)
+      await this._validateForeignKeys(payloads as Array<Record<string, unknown>>, true)
+
       // Phase 2: Main patch — strip nav fields, decompose, update each
       let matchedCount = 0
       let modifiedCount = 0
@@ -376,6 +395,7 @@ export class AtscriptDbTable<
     data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this._flatten()
+    await this._validateForeignKeys([data as Record<string, unknown>], true)
     return this.adapter.updateMany(
       this._translateFilter(filter as FilterExpr),
       this._prepareForWrite({ ...data })
@@ -387,6 +407,7 @@ export class AtscriptDbTable<
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this._flatten()
+    await this._validateForeignKeys([data])
     return this.adapter.replaceMany(
       this._translateFilter(filter as FilterExpr),
       this._prepareForWrite({ ...data })
@@ -714,6 +735,85 @@ export class AtscriptDbTable<
     }
     if (orFilters.length === 0) { return undefined }
     return orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
+  }
+
+  // ── Internal: FK validation ─────────────────────────────────────────────
+
+  /**
+   * Validates that all FK field values reference existing records in target tables.
+   * Only runs for adapters without native FK support (e.g. MongoDB).
+   * No-op if the adapter has native FK support or no resolver is set.
+   *
+   * @param items - Records to validate (pre-write, logical field names).
+   * @param partial - If true, only validate FK fields present in the data (for updates).
+   */
+  private async _validateForeignKeys(
+    items: Array<Record<string, unknown>>,
+    partial?: boolean
+  ): Promise<void> {
+    if (this.adapter.supportsNativeForeignKeys() || !this._fkLookupResolver) { return }
+
+    // Build all FK checks, then run in parallel
+    const checks: Array<() => Promise<void>> = []
+
+    for (const [, fk] of this._foreignKeys) {
+      // Collect unique FK values across all items using Sets for O(1) dedup
+      const valueSets: Set<unknown>[] = fk.fields.map(() => new Set<unknown>())
+
+      for (const item of items) {
+        // For partial updates, skip if none of the FK fields are in the payload
+        if (partial && !fk.fields.some(f => f in item)) { continue }
+
+        // Skip if any FK field is null/undefined (nullable FK — no constraint)
+        let allPresent = true
+        const vals: unknown[] = []
+        for (let i = 0; i < fk.fields.length; i++) {
+          const v = item[fk.fields[i]]
+          if (v === null || v === undefined) { allPresent = false; break }
+          vals.push(v)
+        }
+        if (!allPresent) { continue }
+
+        for (let i = 0; i < vals.length; i++) {
+          valueSets[i].add(vals[i])
+        }
+      }
+
+      if (valueSets[0].size === 0) { continue }
+
+      // Resolve target table
+      const target = this._fkLookupResolver(fk.targetTable)
+      if (!target) { continue }
+
+      // Build filter on target table's fields and count matching records
+      const filter: Record<string, unknown> = {}
+      const valueArrays = valueSets.map(s => [...s])
+      for (let i = 0; i < fk.targetFields.length; i++) {
+        filter[fk.targetFields[i]] = valueArrays[i].length === 1
+          ? valueArrays[i][0]
+          : { $in: valueArrays[i] }
+      }
+
+      // For single-field FK: expected = unique values count
+      // For composite FK: also use unique values per field (best we can do with flat filter)
+      const expectedCount = valueArrays[0].length
+
+      checks.push(async () => {
+        const count = await target.count(filter)
+        if (count < expectedCount) {
+          const sample = valueArrays[0].slice(0, 3).join(', ')
+          const suffix = valueArrays[0].length > 3 ? `, ... (${valueArrays[0].length} total)` : ''
+          throw new Error(
+            `FK constraint violation: "${fk.fields.join(', ')}" references ` +
+            `non-existent record in "${fk.targetTable}" (values: ${sample}${suffix})`
+          )
+        }
+      })
+    }
+
+    if (checks.length > 0) {
+      await Promise.all(checks.map(fn => fn()))
+    }
   }
 
   // ── Internal: batch nested creation ──────────────────────────────────────

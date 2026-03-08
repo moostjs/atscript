@@ -6,7 +6,7 @@ import type { AtscriptDbReadable } from './db-readable'
 import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
-import type { TCascadeTarget } from './types'
+import type { TCascadeTarget, TFkLookupTarget } from './types'
 
 /**
  * Adapter factory function. Called once per table/view to create a fresh adapter instance.
@@ -86,6 +86,7 @@ export class DbSpace {
       )
       this._allTables.add(readable as AtscriptDbTable)
       readable.setCascadeResolver((tableName) => this._getCascadeTargets(tableName))
+      readable.setFkLookupResolver((tableName) => this._getFkLookupTarget(tableName))
       this._readables.set(type, readable as AtscriptDbReadable)
     }
     return readable as AtscriptDbTable<T>
@@ -161,5 +162,20 @@ export class DbSpace {
       }
     }
     return targets
+  }
+
+  /**
+   * Resolves a table name to a queryable target for FK validation.
+   * Searches all registered tables for one with the matching table name.
+   */
+  private _getFkLookupTarget(tableName: string): TFkLookupTarget | undefined {
+    for (const table of this._allTables) {
+      if (table.tableName === tableName) {
+        return {
+          count: (filter) => table.count({ filter: filter as any }),
+        }
+      }
+    }
+    return undefined
   }
 }

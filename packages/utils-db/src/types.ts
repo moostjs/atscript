@@ -259,6 +259,22 @@ export interface TCascadeTarget {
  */
 export type TCascadeResolver = (tableName: string) => TCascadeTarget[]
 
+// ── FK Validation Types ──────────────────────────────────────────────────
+
+/**
+ * Minimal interface for querying a target table during FK validation.
+ * Only `count` is needed — we check if the referenced record exists.
+ */
+export interface TFkLookupTarget {
+  count(filter: Record<string, unknown>): Promise<number>
+}
+
+/**
+ * Callback that resolves a table name to a queryable target for FK validation.
+ * Returns undefined if the target table is not registered in the space.
+ */
+export type TFkLookupResolver = (tableName: string) => TFkLookupTarget | undefined
+
 // ── Relation Types ───────────────────────────────────────────────────────
 
 export interface TDbRelation {

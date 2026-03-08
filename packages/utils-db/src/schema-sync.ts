@@ -705,14 +705,22 @@ export class SchemaSync {
     } else {
       const existed = adapter.tableExists ? await adapter.tableExists() : true
       // Detect collection-level option drift (e.g. MongoDB capped size/max)
-      if (existed && !safe && adapter.detectTableOptionDrift && adapter.dropTable) {
+      if (existed && !safe && adapter.detectTableOptionDrift) {
         const drifted = await adapter.detectTableOptionDrift()
         if (drifted) {
-          this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
-          await adapter.dropTable()
-          await adapter.ensureTable()
-          init.status = 'alter'
-          init.recreated = true
+          const syncMethod = readable.syncMethod
+          if (syncMethod === 'recreate' && adapter.recreateTable) {
+            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — recreating with data preservation`)
+            await adapter.recreateTable()
+            init.status = 'alter'
+            init.recreated = true
+          } else if (adapter.dropTable) {
+            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
+            await adapter.dropTable()
+            await adapter.ensureTable()
+            init.status = 'alter'
+            init.recreated = true
+          }
         }
       }
       if (!init.recreated) {

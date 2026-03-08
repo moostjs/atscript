@@ -911,6 +911,35 @@ export class MongoAdapter extends BaseDbAdapter {
     }
   }
 
+  async dropTableByName(tableName: string): Promise<void> {
+    this._log('dropByName', tableName)
+    try {
+      await this.db.collection(tableName).drop()
+    } catch {
+      // Collection may not exist — ignore
+    }
+  }
+
+  async recreateTable(): Promise<void> {
+    const tableName = this._table.tableName
+    this._log('recreateTable', tableName)
+
+    // 1. Dump all documents
+    const docs = await this.db.collection(tableName).find({}).toArray()
+
+    // 2. Drop the collection
+    await this.collection.drop()
+    this._collection = undefined
+
+    // 3. Recreate with current options (e.g. new capped size/max)
+    await this.ensureCollectionExists()
+
+    // 4. Re-insert dumped documents
+    if (docs.length > 0) {
+      await this.collection.insertMany(docs)
+    }
+  }
+
   async syncIndexes(): Promise<void> {
     await this.ensureCollectionExists()
 

@@ -44,6 +44,8 @@ export type {
   AtscriptDbWritable,
   TCascadeTarget,
   TCascadeResolver,
+  TFkLookupResolver,
+  TFkLookupTarget,
   WithRelation,
   TypedWithRelation,
   OwnPropsOf,
