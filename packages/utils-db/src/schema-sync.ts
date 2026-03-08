@@ -94,7 +94,7 @@ export class SyncEntry {
       // Dropping virtual/external views is not destructive
       return this.viewType !== 'V' && this.viewType !== 'E'
     }
-    return this.columnsToDrop.length > 0 || this.typeChanges.length > 0
+    return this.columnsToDrop.length > 0 || this.typeChanges.length > 0 || this.recreated
   }
 
   /** Whether this entry represents any change (not in-sync) */
@@ -498,7 +498,7 @@ export class SchemaSync {
 
     if (safe) {
       // Hide destructive operations in safe mode
-      planEntries = planEntries.map(e => new SyncEntry({ ...e, columnsToDrop: [] }))
+      planEntries = planEntries.map(e => new SyncEntry({ ...e, columnsToDrop: [], typeChanges: [], recreated: false }))
       removed = []
     }
 
@@ -553,14 +553,27 @@ export class SchemaSync {
           diff.typeChanged.length > 0 ||
           diff.removed.length > 0
         if (hasChanges) { init.status = 'alter' }
+        // Rename conflicts → error
+        if (diff.conflicts.length > 0) {
+          init.status = 'error'
+          init.errors = [
+            ...(init.errors ?? []),
+            ...diff.conflicts.map(c =>
+              `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
+            ),
+          ]
+        }
         // Type changes without a sync method → error (sync will fail)
         if (diff.typeChanged.length > 0 && !readable.syncMethod) {
           init.status = 'error'
-          init.errors = diff.typeChanged.map(tc =>
-            `Type change on ${name}.${tc.field.physicalName} ` +
-            `(${tc.existingType} → ${tc.field.designType}). ` +
-            `Add @db.sync.method "recreate" or "drop", or migrate manually.`
-          )
+          init.errors = [
+            ...(init.errors ?? []),
+            ...diff.typeChanged.map(tc =>
+              `Type change on ${name}.${tc.field.physicalName} ` +
+              `(${tc.existingType} → ${tc.field.designType}). ` +
+              `Add @db.sync.method "recreate" or "drop", or migrate manually.`
+            ),
+          ]
         }
       }
     } else if (adapter.tableExists) {
@@ -568,6 +581,15 @@ export class SchemaSync {
       if (!exists) { init.status = 'create' }
     } else {
       init.status = 'create'
+    }
+
+    // Detect collection-level option drift (e.g. MongoDB capped size/max)
+    if (init.status !== 'create' && adapter.detectTableOptionDrift && adapter.dropTable) {
+      const drifted = await adapter.detectTableOptionDrift()
+      if (drifted) {
+        init.status = 'alter'
+        init.recreated = true
+      }
     }
 
     return new SyncEntry(init)
@@ -622,6 +644,18 @@ export class SchemaSync {
         const typeMapper = adapter.typeMapper?.bind(adapter)
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
 
+        // Handle rename conflicts
+        if (diff.conflicts.length > 0) {
+          const errors: string[] = diff.conflicts.map(c =>
+            `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
+          )
+          for (const msg of errors) {
+            this.logger.error?.(`[schema-sync] ${msg}`)
+          }
+          init.errors = [...(init.errors ?? []), ...errors]
+          init.status = 'error'
+        }
+
         // Handle type changes
         if (diff.typeChanged.length > 0) {
           const syncMethod = readable.syncMethod
@@ -670,8 +704,21 @@ export class SchemaSync {
       }
     } else {
       const existed = adapter.tableExists ? await adapter.tableExists() : true
-      await adapter.ensureTable()
-      if (!existed) { init.status = 'create' }
+      // Detect collection-level option drift (e.g. MongoDB capped size/max)
+      if (existed && !safe && adapter.detectTableOptionDrift && adapter.dropTable) {
+        const drifted = await adapter.detectTableOptionDrift()
+        if (drifted) {
+          this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
+          await adapter.dropTable()
+          await adapter.ensureTable()
+          init.status = 'alter'
+          init.recreated = true
+        }
+      }
+      if (!init.recreated) {
+        await adapter.ensureTable()
+        if (!existed) { init.status = 'create' }
+      }
     }
 
     // Sync indexes

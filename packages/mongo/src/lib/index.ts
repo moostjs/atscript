@@ -1,11 +1,15 @@
-import { AsMongo } from './as-mongo'
+import { DbSpace } from '@atscript/utils-db'
+import { MongoClient } from 'mongodb'
+
+import { MongoAdapter } from './mongo-adapter'
 
 export * from './mongo-adapter'
 export * from './mongo-filter'
 export * from './collection-patcher'
-export * from './as-mongo'
 export * from './validate-plugins'
 
-export function createAdapter(connection: string, _options?: Record<string, unknown>): AsMongo {
-  return new AsMongo(connection)
+export function createAdapter(connection: string, _options?: Record<string, unknown>): DbSpace {
+  const client = new MongoClient(connection)
+  const db = client.db()
+  return new DbSpace(() => new MongoAdapter(db, client))
 }

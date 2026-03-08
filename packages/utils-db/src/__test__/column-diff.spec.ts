@@ -99,4 +99,44 @@ describe('computeColumnDiff', () => {
     expect(diff.removed.length).toBe(0)
     expect(diff.typeChanged.length).toBe(0)
   })
+
+  it('should detect rename conflict when target name already exists', () => {
+    // "email" field has renamedFrom: 'name', but 'email' already exists as a column
+    const desired = [
+      field({ physicalName: 'id', isPrimaryKey: true }),
+      field({ physicalName: 'email', renamedFrom: 'name' }),
+    ]
+    const existing = [
+      col('id', 'INTEGER', false, true),
+      col('name'),
+      col('email'),
+    ]
+    const diff = computeColumnDiff(desired, existing)
+
+    expect(diff.conflicts.length).toBe(1)
+    expect(diff.conflicts[0].field.physicalName).toBe('email')
+    expect(diff.conflicts[0].oldName).toBe('name')
+    expect(diff.conflicts[0].conflictsWith).toBe('email')
+    // Should not appear in renamed
+    expect(diff.renamed.length).toBe(0)
+    // 'name' should not appear in removed (it's consumed by the conflict)
+    expect(diff.removed.find(c => c.name === 'name')).toBeUndefined()
+  })
+
+  it('should allow rename when target name does not exist', () => {
+    const desired = [
+      field({ physicalName: 'id', isPrimaryKey: true }),
+      field({ physicalName: 'full_name', renamedFrom: 'name' }),
+    ]
+    const existing = [
+      col('id', 'INTEGER', false, true),
+      col('name'),
+    ]
+    const diff = computeColumnDiff(desired, existing)
+
+    expect(diff.conflicts.length).toBe(0)
+    expect(diff.renamed.length).toBe(1)
+    expect(diff.renamed[0].oldName).toBe('name')
+    expect(diff.renamed[0].field.physicalName).toBe('full_name')
+  })
 })

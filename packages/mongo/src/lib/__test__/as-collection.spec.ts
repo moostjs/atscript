@@ -1,17 +1,17 @@
+import { DbSpace } from '@atscript/utils-db'
 import { ObjectId } from 'mongodb'
 // oxlint-disable max-lines
 import { describe, it, expect, beforeAll } from 'vitest'
 
-import { AsMongo } from '../../lib/as-mongo'
 import { CollectionPatcher } from '../../lib/collection-patcher'
-import { prepareFixtures } from './test-utils'
+import { createTestSpace, prepareFixtures } from './test-utils'
 
-const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
+const mongo = createTestSpace()
 
 /**
  * Helper: validates + prepares insert payload (replaces AsCollection.prepareInsert)
  */
-function prepareInsert(mongo: AsMongo, type: any, payload: any) {
+function prepareInsert(mongo: DbSpace, type: any, payload: any) {
   const table = mongo.getTable(type)
   const adapter = mongo.getAdapter(type)
   const v = table.getValidator('insert')!
@@ -36,7 +36,7 @@ function prepareInsert(mongo: AsMongo, type: any, payload: any) {
 /**
  * Helper: validates + prepares replace payload (replaces AsCollection.prepareReplace)
  */
-function prepareReplace(mongo: AsMongo, type: any, payload: any) {
+function prepareReplace(mongo: DbSpace, type: any, payload: any) {
   const table = mongo.getTable(type)
   const adapter = mongo.getAdapter(type)
   const v = table.getValidator('update')!
@@ -56,7 +56,7 @@ function prepareReplace(mongo: AsMongo, type: any, payload: any) {
 /**
  * Helper: validates + prepares update/patch payload (replaces AsCollection.prepareUpdate)
  */
-function prepareUpdate(mongo: AsMongo, type: any, payload: any) {
+function prepareUpdate(mongo: DbSpace, type: any, payload: any) {
   const table = mongo.getTable(type)
   const adapter = mongo.getAdapter(type)
   const v = table.getValidator('patch')!

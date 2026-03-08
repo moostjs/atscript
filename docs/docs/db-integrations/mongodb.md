@@ -80,33 +80,29 @@ export interface User {
 
 ## Connect and Create Tables
 
-The `AsMongo` class wraps a MongoDB connection and provides table/adapter access. It accepts either a connection string or an existing `MongoClient` instance:
+Create a `DbSpace` with a `MongoAdapter` factory to access tables:
 
 ```typescript
-import { AsMongo } from '@atscript/mongo'
+import { MongoAdapter } from '@atscript/mongo'
+import { DbSpace } from '@atscript/utils-db'
+import { MongoClient } from 'mongodb'
 import { Todo } from './schema/todo.as'
 
-const mongo = new AsMongo('mongodb://localhost:27017/myapp')
-const todos = mongo.getTable(Todo)
+const client = new MongoClient('mongodb://localhost:27017/myapp')
+const db = new DbSpace(() => new MongoAdapter(client.db(), client))
+const todos = db.getTable(Todo)
 
 // Run `npx asc db sync` to create/update collections and indexes
 ```
 
 Use `npx asc db sync` to propagate your schema to the database. See [Schema Sync](./schema-sync) for details.
 
+The second argument (`client`) is optional -- it enables transaction support. If you don't need transactions, `new MongoAdapter(client.db())` is sufficient.
+
 You can also access the underlying `MongoAdapter` directly:
 
 ```typescript
-const adapter = mongo.getAdapter(Todo)
-```
-
-Or use an existing `MongoClient`:
-
-```typescript
-import { MongoClient } from 'mongodb'
-
-const client = new MongoClient('mongodb://localhost:27017/myapp')
-const mongo = new AsMongo(client)
+const adapter = db.getAdapter(Todo)
 ```
 
 ## CRUD Operations
@@ -287,10 +283,10 @@ await adapter.collection.bulkWrite([...])
 await adapter.collection.distinct('status')
 ```
 
-You can also get the adapter via `AsMongo`:
+You can also get the adapter via `DbSpace`:
 
 ```typescript
-const adapter = mongo.getAdapter(Todo)
+const adapter = db.getAdapter(Todo)
 const collection = adapter.collection
 ```
 

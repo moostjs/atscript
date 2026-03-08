@@ -6,6 +6,7 @@ import type { AtscriptDbReadable } from './db-readable'
 import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
+import type { TCascadeTarget } from './types'
 
 /**
  * Adapter factory function. Called once per table/view to create a fresh adapter instance.
@@ -39,6 +40,9 @@ interface TWeakMapOf<V> {
  */
 export class DbSpace {
   private _readables = new WeakMap() as TWeakMapOf<AtscriptDbReadable>
+
+  /** All tables created in this space — used for reverse FK lookup during cascade. */
+  private _allTables = new Set<AtscriptDbTable>()
 
   constructor(
     protected readonly adapterFactory: TAdapterFactory,
@@ -80,6 +84,8 @@ export class DbSpace {
           return resolved instanceof AtscriptDbTable ? resolved as any : undefined
         }
       )
+      this._allTables.add(readable as AtscriptDbTable)
+      readable.setCascadeResolver((tableName) => this._getCascadeTargets(tableName))
       this._readables.set(type, readable as AtscriptDbReadable)
     }
     return readable as AtscriptDbTable<T>
@@ -134,5 +140,26 @@ export class DbSpace {
     if (adapter.dropViewByName) {
       await adapter.dropViewByName(viewName)
     }
+  }
+
+  /**
+   * Finds all child tables with FKs pointing to the given parent table name.
+   * Accesses `table.foreignKeys` which triggers `_flatten()` if needed.
+   */
+  private _getCascadeTargets(tableName: string): TCascadeTarget[] {
+    const targets: TCascadeTarget[] = []
+    for (const table of this._allTables) {
+      for (const fk of table.foreignKeys.values()) {
+        if (fk.targetTable === tableName && fk.onDelete) {
+          targets.push({
+            fk,
+            deleteMany: (filter) => table.deleteMany(filter as any),
+            updateMany: (filter, data) => table.updateMany(filter as any, data as any),
+            count: (filter) => table.count({ filter: filter as any }),
+          })
+        }
+      }
+    }
+    return targets
   }
 }

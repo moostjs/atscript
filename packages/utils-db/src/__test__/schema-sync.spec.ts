@@ -173,35 +173,73 @@ class MockAdapter extends BaseDbAdapter {
   }
 }
 
-// Schema-less adapter (like MongoDB) — no getExistingColumns/syncColumns
+// Schema-less adapter (like MongoDB) — has tableExists but no getExistingColumns/syncColumns
 class SchemalessAdapter extends BaseDbAdapter {
   tables = new Map<string, Array<Record<string, unknown>>>()
-  private _collections = new Set<string>()
+  collections!: Set<string>
+
+  private _getTable(): Array<Record<string, unknown>> {
+    const name = this._table.tableName
+    if (!this.tables.has(name)) { this.tables.set(name, []) }
+    return this.tables.get(name)!
+  }
 
   async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
-    return { insertedId: 1 }
+    this._getTable().push(data)
+    return { insertedId: data[this._table.primaryKeys[0] as string] ?? this._getTable().length }
   }
   async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
-    return { insertedCount: data.length, insertedIds: [] }
+    const ids: unknown[] = []
+    for (const row of data) { ids.push((await this.insertOne(row)).insertedId) }
+    return { insertedCount: ids.length, insertedIds: ids }
   }
-  async findOne(): Promise<Record<string, unknown> | null> { return null }
-  async findMany(): Promise<Array<Record<string, unknown>>> { return [] }
-  async count(): Promise<number> { return 0 }
-  async replaceOne(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
-  async updateOne(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
-  async deleteOne(): Promise<TDbDeleteResult> { return { deletedCount: 0 } }
+  async findOne(query: DbQuery): Promise<Record<string, unknown> | null> {
+    const rows = this._getTable()
+    if (query.filter && typeof query.filter === 'object') {
+      const filter = query.filter as Record<string, unknown>
+      for (const row of rows) {
+        let match = true
+        for (const [key, value] of Object.entries(filter)) {
+          const expected = typeof value === 'object' && value !== null && '$eq' in (value as any)
+            ? (value as any).$eq : value
+          if (row[key] !== expected) { match = false; break }
+        }
+        if (match) { return row }
+      }
+      return null
+    }
+    return rows[0] ?? null
+  }
+  async findMany(): Promise<Array<Record<string, unknown>>> { return this._getTable() }
+  async count(): Promise<number> { return this._getTable().length }
+  async replaceOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+    const rows = this._getTable()
+    const pk = this._table.primaryKeys[0] as string
+    const idx = rows.findIndex(r => r[pk] === (filter as any)[pk])
+    if (idx >= 0) { rows[idx] = data; return { matchedCount: 1, modifiedCount: 1 } }
+    return { matchedCount: 0, modifiedCount: 0 }
+  }
+  async updateOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
+    return this.replaceOne(filter, data)
+  }
+  async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
+    const rows = this._getTable()
+    const pk = this._table.primaryKeys[0] as string
+    const idx = rows.findIndex(r => r[pk] === (filter as any)[pk])
+    if (idx >= 0) { rows.splice(idx, 1); return { deletedCount: 1 } }
+    return { deletedCount: 0 }
+  }
   async updateMany(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
   async replaceMany(): Promise<TDbUpdateResult> { return { matchedCount: 0, modifiedCount: 0 } }
   async deleteMany(): Promise<TDbDeleteResult> { return { deletedCount: 0 } }
 
   async tableExists(): Promise<boolean> {
-    return this._collections.has(this._table.tableName)
+    return this.collections.has(this._table.tableName)
   }
-
   async ensureTable(): Promise<void> {
-    this._collections.add(this._table.tableName)
+    if (!this.tables.has(this._table.tableName)) { this.tables.set(this._table.tableName, []) }
+    this.collections.add(this._table.tableName)
   }
-
   async syncIndexes(): Promise<void> {}
 }
 
@@ -347,6 +385,11 @@ describe('SyncEntry', () => {
 
   it('should compute destructive=true when columns are dropped', () => {
     const entry = new SyncEntry({ name: 't', status: 'alter', columnsToDrop: ['old_col'] })
+    expect(entry.destructive).toBe(true)
+  })
+
+  it('should compute destructive=true when type changes exist', () => {
+    const entry = new SyncEntry({ name: 't', status: 'alter', typeChanges: [{ column: 'age', fromType: 'INTEGER', toType: 'TEXT' }] })
     expect(entry.destructive).toBe(true)
   })
 
@@ -593,6 +636,7 @@ describe('SchemaSync.plan', () => {
     expect(drops).toHaveLength(0)
     for (const e of plan.entries) {
       expect(e.columnsToDrop).toEqual([])
+      expect(e.destructive).toBe(false)
     }
   })
 
@@ -1195,9 +1239,11 @@ describe('SchemaSync — type change detection', () => {
 describe('schema-less adapter status consistency', () => {
   function createSchemalessSpace(): DbSpace {
     const tables = new Map<string, Array<Record<string, unknown>>>()
+    const collections = new Set<string>()
     return new DbSpace(() => {
       const adapter = new SchemalessAdapter()
       adapter.tables = tables
+      adapter.collections = collections
       return adapter
     })
   }
@@ -1240,6 +1286,106 @@ describe('schema-less adapter status consistency', () => {
     // Plan should now report in-sync
     const result = await sync.plan([UsersTable])
     const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('in-sync')
+  })
+
+  it('plan() after run(): all entries are in-sync (E.13 scenario)', async () => {
+    const space = createSchemalessSpace()
+    const sync = new SchemaSync(space)
+    const types = [UsersTable, ProfileTable, ActiveUsersView]
+    await sync.run(types, { force: true })
+    const plan = await sync.plan(types)
+    for (const entry of plan.entries) {
+      expect(entry.status).toBe('in-sync')
+    }
+    expect(plan.entries.every(e => !e.destructive)).toBe(true)
+  })
+})
+
+// ── Table option drift (e.g. MongoDB capped collection resize) ──────────
+
+class DriftableSchemalessAdapter extends SchemalessAdapter {
+  private _drifted = false
+  dropped = false
+
+  setDrifted(drifted: boolean): void { this._drifted = drifted }
+
+  async detectTableOptionDrift(): Promise<boolean> {
+    return this._drifted
+  }
+
+  async dropTable(): Promise<void> {
+    this.tables.delete(this._table.tableName)
+    this.collections.delete(this._table.tableName)
+    this.dropped = true
+  }
+}
+
+describe('table option drift detection', () => {
+  function createDriftableSpace(): { space: DbSpace; adapters: DriftableSchemalessAdapter[] } {
+    const tables = new Map<string, Array<Record<string, unknown>>>()
+    const collections = new Set<string>()
+    const adapters: DriftableSchemalessAdapter[] = []
+    const space = new DbSpace(() => {
+      const adapter = new DriftableSchemalessAdapter()
+      adapter.tables = tables
+      adapter.collections = collections
+      adapters.push(adapter)
+      return adapter
+    })
+    return { space, adapters }
+  }
+
+  it('plan() detects option drift as alter + recreated', async () => {
+    const { space, adapters } = createDriftableSpace()
+    const sync = new SchemaSync(space)
+    // Create the table first
+    await sync.run([UsersTable], { force: true })
+    // Mark as drifted
+    for (const a of adapters) { a.setDrifted(true) }
+    const plan = await sync.plan([UsersTable])
+    const entry = plan.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('alter')
+    expect(entry!.recreated).toBe(true)
+    expect(entry!.destructive).toBe(true)
+  })
+
+  it('run() drops and recreates table when options drift', async () => {
+    const { space, adapters } = createDriftableSpace()
+    const sync = new SchemaSync(space)
+    await sync.run([UsersTable], { force: true })
+    for (const a of adapters) { a.setDrifted(true) }
+    const result = await sync.run([UsersTable], { force: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('alter')
+    expect(entry!.recreated).toBe(true)
+    // Adapter's dropTable was called
+    expect(adapters.some(a => a.dropped)).toBe(true)
+  })
+
+  it('run() with safe mode skips recreation on option drift', async () => {
+    const { space, adapters } = createDriftableSpace()
+    const sync = new SchemaSync(space)
+    await sync.run([UsersTable], { force: true })
+    for (const a of adapters) { a.setDrifted(true) }
+    const result = await sync.run([UsersTable], { force: true, safe: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    expect(entry!.status).toBe('in-sync')
+    // Adapter's dropTable was NOT called
+    expect(adapters.every(a => !a.dropped)).toBe(true)
+  })
+
+  it('plan() with no drift reports in-sync', async () => {
+    const { space } = createDriftableSpace()
+    const sync = new SchemaSync(space)
+    await sync.run([UsersTable], { force: true })
+    // drifted defaults to false
+    const plan = await sync.plan([UsersTable])
+    const entry = plan.entries.find(e => e.name === 'users')
     expect(entry).toBeDefined()
     expect(entry!.status).toBe('in-sync')
   })

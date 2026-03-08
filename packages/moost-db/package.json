@@ -40,7 +40,7 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@uniqu/url": "^0.0.5"
+    "@uniqu/url": "^0.0.6"
   },
   "devDependencies": {
     "@atscript/core": "workspace:^",
@@ -53,6 +53,6 @@
     "@atscript/typescript": "workspace:^",
     "@moostjs/event-http": "^0.6.2",
     "moost": "^0.6.2",
-    "@uniqu/core": "^0.0.5"
+    "@uniqu/core": "^0.0.6"
   }
 }

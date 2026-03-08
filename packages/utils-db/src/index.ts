@@ -42,6 +42,8 @@ export type {
   TTableResolver,
   TWriteTableResolver,
   AtscriptDbWritable,
+  TCascadeTarget,
+  TCascadeResolver,
   WithRelation,
   TypedWithRelation,
   OwnPropsOf,

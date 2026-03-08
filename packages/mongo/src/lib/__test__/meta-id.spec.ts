@@ -1,11 +1,11 @@
 import { ObjectId } from 'mongodb'
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 
-import { AsMongo } from '../as-mongo'
+import { createTestSpace } from './test-utils'
 import { buildMongoFilter } from '../mongo-filter'
 import { prepareFixtures } from './test-utils'
 
-const mongo = new AsMongo('mongodb+srv://dummy:dummy@test.jd1qx.mongodb.net/test?')
+const mongo = createTestSpace()
 
 const HEX_A = 'a'.repeat(24)
 const HEX_B = 'b'.repeat(24)
@@ -229,6 +229,104 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
         expect(result).toBeNull()
         expect(findOneSpy).not.toHaveBeenCalled()
 
+      })
+    })
+  })
+
+  describe('UserNoMongo (no @db.mongo.collection, @meta.id + increment)', () => {
+    let table: ReturnType<typeof mongo.getTable>
+    let adapter: ReturnType<typeof mongo.getAdapter>
+
+    beforeAll(async () => {
+      const { UserNoMongo } = await import('./fixtures/no-mongo-collection.as.js')
+      table = mongo.getTable(UserNoMongo)
+      adapter = mongo.getAdapter(UserNoMongo)
+    })
+
+    it('should keep id as primary key (no explicit _id in schema)', () => {
+      expect(table.primaryKeys).toContain('id')
+      expect(table.primaryKeys).not.toContain('_id')
+    })
+
+    it('should have _id in flatMap (synthetic, for ObjectId resolution)', () => {
+      expect(table.flatMap.has('_id')).toBe(true)
+      const idType = table.flatMap.get('_id')!
+      expect((idType.type.tags as Set<string>).has('objectId')).toBe(true)
+    })
+
+    it('should have id as a unique prop (from @meta.id)', () => {
+      expect(table.uniqueProps.has('id')).toBe(true)
+    })
+
+    it('should track originalMetaIdFields', () => {
+      expect(table.originalMetaIdFields).toEqual(['id'])
+    })
+
+    it('should track id as increment field', () => {
+      expect(adapter['_incrementFields'].has('id')).toBe(true)
+    })
+
+    describe('insertOne should return @meta.id value, not ObjectId', () => {
+      it('should return incremented id as insertedId', async () => {
+        // Mock the collection methods directly
+        const mockCollection = {
+          aggregate: vi.fn().mockReturnValue({
+            toArray: vi.fn().mockResolvedValue([{ max__id: 5 }]),
+          }),
+          insertOne: vi.fn().mockResolvedValue({
+            insertedId: new ObjectId(HEX_A),
+            acknowledged: true,
+          }),
+        }
+        vi.spyOn(adapter, 'collection', 'get').mockReturnValue(mockCollection as any)
+
+        const result = await adapter.insertOne({ email: 'test@test.com', name: 'Test' })
+
+        expect(result.insertedId).toBe(6) // max(5) + 1, NOT an ObjectId
+        vi.restoreAllMocks()
+      })
+    })
+
+    describe('findById with ObjectId string', () => {
+      it('should resolve ObjectId string via _id unique field', async () => {
+        const expectedDoc = { _id: new ObjectId(HEX_A), id: 1, email: 'a@b.com', name: 'Test' }
+        const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
+
+        const result = await table.findById(HEX_A)
+
+        expect(findOneSpy).toHaveBeenCalledOnce()
+        const query = findOneSpy.mock.calls[0][0]
+        const filter = query.filter as any
+        // Should include _id lookup (ObjectId) via unique field
+        expect(filter.$or).toBeDefined()
+        expect(filter.$or.some((f: any) => f._id?.toString() === HEX_A)).toBe(true)
+        expect(result).toEqual(expectedDoc)
+        findOneSpy.mockRestore()
+      })
+
+      it('prepareId should throw for invalid ObjectId on synthetic _id', () => {
+        const idType = table.flatMap.get('_id')!
+        expect(() => adapter.prepareId('5', idType)).toThrow()
+      })
+
+      it('should resolve numeric string to @meta.id unique prop (no _id)', async () => {
+        const expectedDoc = { _id: new ObjectId(), id: 5, email: 'a@b.com', name: 'Test' }
+        const findOneSpy = vi.spyOn(adapter, 'findOne').mockResolvedValue(expectedDoc)
+
+        const result = await table.findById('5')
+
+        const query = findOneSpy.mock.calls[0][0]
+        const filter = query.filter as any
+        // _id should NOT be in the filter (invalid ObjectId '5' is rejected)
+        if (filter.$or) {
+          expect(filter.$or.every((f: any) => !('_id' in f))).toBe(true)
+          // id: 5 should be present (numeric coercion for @meta.id unique prop)
+          expect(filter.$or.some((f: any) => f.id === 5)).toBe(true)
+        } else {
+          expect(filter).toEqual({ id: 5 })
+        }
+        expect(result).toEqual(expectedDoc)
+        findOneSpy.mockRestore()
       })
     })
   })

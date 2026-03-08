@@ -15,7 +15,9 @@ import type { BaseDbAdapter } from './base-adapter'
 import type { TGenericLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
+import { UniquSelect } from './uniqu-select'
 import type {
+  TCascadeResolver,
   TDbDeleteResult,
   TDbInsertManyResult,
   TDbInsertResult,
@@ -69,6 +71,10 @@ export class AtscriptDbTable<
   NavType extends Record<string, unknown> = NavPropsOf<T>,
 > extends AtscriptDbReadable<T, DataType, FlatType, A, IdType, OwnProps, NavType> {
 
+  // ── Cascade resolver ─────────────────────────────────────────────────────
+
+  protected _cascadeResolver?: TCascadeResolver
+
   // ── Validators ────────────────────────────────────────────────────────────
 
   protected readonly validators = new Map<string, Validator<T, DataType>>()
@@ -84,6 +90,14 @@ export class AtscriptDbTable<
     if (_writeTableResolver) {
       this._writeTableResolver = _writeTableResolver
     }
+  }
+
+  /**
+   * Sets the cascade resolver for application-level cascade deletes.
+   * Called by DbSpace after table creation.
+   */
+  setCascadeResolver(resolver: TCascadeResolver): void {
+    this._cascadeResolver = resolver
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -336,12 +350,21 @@ export class AtscriptDbTable<
   /**
    * Deletes a single record by any type-compatible identifier — primary key
    * or single-field unique index. Uses the same resolution logic as `findById`.
+   *
+   * When the adapter does not support native foreign keys (e.g. MongoDB),
+   * cascade and setNull actions are applied before the delete.
    */
   public async deleteOne(id: IdType): Promise<TDbDeleteResult> {
     this._flatten()
     const filter = this._resolveIdFilter(id)
     if (!filter) {
       return { deletedCount: 0 }
+    }
+    if (this._needsCascade()) {
+      return this.adapter.withTransaction(async () => {
+        await this._cascadeBeforeDelete(filter)
+        return this.adapter.deleteOne(this._translateFilter(filter))
+      })
     }
     return this.adapter.deleteOne(this._translateFilter(filter))
   }
@@ -372,6 +395,12 @@ export class AtscriptDbTable<
 
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
     this._flatten()
+    if (this._needsCascade()) {
+      return this.adapter.withTransaction(async () => {
+        await this._cascadeBeforeDelete(filter as FilterExpr)
+        return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
+      })
+    }
     return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
   }
 
@@ -562,6 +591,129 @@ export class AtscriptDbTable<
       }
     }
     return result
+  }
+
+  // ── Internal: cascade delete ─────────────────────────────────────────────
+
+  /**
+   * Whether application-level cascade is needed for deletes.
+   * True when the adapter doesn't handle FK constraints natively
+   * and a cascade resolver is available.
+   */
+  private _needsCascade(): boolean {
+    return !this.adapter.supportsNativeForeignKeys() && !!this._cascadeResolver
+  }
+
+  /**
+   * Applies cascade/setNull actions on child tables before deleting parent records.
+   * Finds all records matching `filter`, extracts their PK values, then for each
+   * child table with a FK pointing to this table:
+   * - `cascade`: recursively deletes child records
+   * - `setNull`: sets FK fields to null
+   * - `restrict`: throws if any children exist
+   *
+   * @param filter - Filter identifying parent records to be deleted (logical field names).
+   */
+  private async _cascadeBeforeDelete(filter: FilterExpr): Promise<void> {
+    const targets = this._cascadeResolver!(this.tableName)
+    if (targets.length === 0) { return }
+
+    // Collect all fields referenced by FK targetFields across all cascade targets.
+    // These are the parent fields that child FKs point to (e.g. 'id' in projectId: Project.id).
+    // In MongoDB, this differs from _primaryKeys ('_id') — the FK references 'id', not '_id'.
+    const neededLogical = new Set<string>()
+    for (const t of targets) {
+      for (const tf of t.fk.targetFields) { neededLogical.add(tf) }
+    }
+
+    // Map logical → physical for the adapter query, then back for FK matching
+    const physicalToLogical = new Map<string, string>()
+    const physicalFields: string[] = []
+    for (const logical of neededLogical) {
+      const physical = this._pathToPhysical.get(logical) ?? this._columnMap.get(logical) ?? logical
+      physicalFields.push(physical)
+      physicalToLogical.set(physical, logical)
+    }
+    const rawRecords = await this.adapter.findMany({
+      filter: this._translateFilter(filter),
+      controls: { $select: new UniquSelect(physicalFields) },
+    })
+    if (rawRecords.length === 0) { return }
+
+    // Map physical column names back to logical for FK matching
+    const records = rawRecords.map(r => {
+      const mapped: Record<string, unknown> = {}
+      for (const [key, val] of Object.entries(r)) {
+        mapped[physicalToLogical.get(key) ?? key] = val
+      }
+      return mapped
+    })
+
+    for (const target of targets) {
+      const action = target.fk.onDelete
+      if (!action || action === 'noAction') { continue }
+
+      // Build child filter: { fkField: { $in: parentPKValues } }
+      // For composite FK: { $or: [{ fk1: pk1, fk2: pk2 }, ...] }
+      const childFilter = this._buildCascadeChildFilter(records, target.fk)
+      if (!childFilter) { continue }
+
+      switch (action) {
+        case 'cascade': {
+          await target.deleteMany(childFilter)
+          break
+        }
+        case 'setNull': {
+          const nullData: Record<string, unknown> = {}
+          for (const f of target.fk.fields) { nullData[f] = null }
+          await target.updateMany(childFilter, nullData)
+          break
+        }
+        case 'restrict': {
+          const count = await target.count(childFilter)
+          if (count > 0) {
+            throw new Error(
+              `Cannot delete from "${this.tableName}" — ${count} child record(s) in ` +
+              `"${target.fk.fields.join(', ')}" reference it (RESTRICT)`
+            )
+          }
+          break
+        }
+      }
+    }
+  }
+
+  /**
+   * Builds a filter for child records whose FK matches the deleted parent's PK values.
+   */
+  private _buildCascadeChildFilter(
+    parentRecords: Array<Record<string, unknown>>,
+    fk: { fields: string[]; targetFields: string[] }
+  ): Record<string, unknown> | undefined {
+    if (fk.fields.length === 1 && fk.targetFields.length === 1) {
+      // Single-field FK: { fkField: { $in: [pk1, pk2, ...] } }
+      const pkField = fk.targetFields[0]
+      const values = parentRecords.map(r => r[pkField]).filter(v => v !== undefined && v !== null)
+      if (values.length === 0) { return undefined }
+      return values.length === 1
+        ? { [fk.fields[0]]: values[0] }
+        : { [fk.fields[0]]: { $in: values } }
+    }
+
+    // Composite FK: { $or: [{ fk1: pk1, fk2: pk2 }, ...] }
+    const orFilters: Array<Record<string, unknown>> = []
+    for (const record of parentRecords) {
+      const condition: Record<string, unknown> = {}
+      let valid = true
+      for (let i = 0; i < fk.fields.length; i++) {
+        const val = record[fk.targetFields[i]]
+        if (val === undefined || val === null) { valid = false; break }
+        condition[fk.fields[i]] = val
+      }
+      if (valid) { orFilters.push(condition) }
+    }
+    if (orFilters.length === 0) { return undefined }
+    return orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
   }
 
   // ── Internal: batch nested creation ──────────────────────────────────────

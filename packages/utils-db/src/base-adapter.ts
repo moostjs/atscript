@@ -176,6 +176,17 @@ export abstract class BaseDbAdapter {
     return false
   }
 
+  /**
+   * Whether this adapter enforces foreign key constraints natively.
+   * When `true`, the generic layer skips application-level cascade/setNull
+   * on delete — the DB engine handles it (e.g. SQLite `ON DELETE CASCADE`).
+   * When `false` (default), the generic layer implements cascade logic
+   * by finding child records and deleting/nullifying them before the parent.
+   */
+  supportsNativeForeignKeys(): boolean {
+    return false
+  }
+
   // ── Relation loading (overridable) ────────────────────────────────────────
 
   /**
@@ -476,6 +487,19 @@ export abstract class BaseDbAdapter {
    * Optional — only relational adapters need to implement this.
    */
   async syncForeignKeys?(): Promise<void>
+
+  /**
+   * Detects whether table/collection-level options have drifted from the schema.
+   * Used by schema sync for adapters where table-level options (e.g. MongoDB capped
+   * collection size/max) can change independently of columns.
+   *
+   * Returns `true` if options have changed and the table needs drop+recreate.
+   * Returns `false` or `undefined` if options are in sync or not applicable.
+   *
+   * This operation is inherently destructive — recreation loses existing data.
+   * Schema sync skips it in safe mode.
+   */
+  detectTableOptionDrift?(): Promise<boolean>
 
   /**
    * Checks whether the table/collection already exists in the database.

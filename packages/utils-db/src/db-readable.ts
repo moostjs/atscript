@@ -234,6 +234,8 @@ export class AtscriptDbReadable<
   protected _fieldDescriptors?: TDbFieldMeta[]
   protected _indexes = new Map<string, TDbIndex>()
   protected _primaryKeys: string[] = []
+  /** Original @meta.id field names as declared by the user (before adapter manipulation). */
+  protected _originalMetaIdFields: string[] = []
   protected _columnMap = new Map<string, string>()
   protected _columnFromMap = new Map<string, string>()
   protected _defaults = new Map<string, TDbDefaultValue>()
@@ -335,6 +337,12 @@ export class AtscriptDbReadable<
   public get primaryKeys(): readonly string[] {
     this._flatten()
     return this._primaryKeys
+  }
+
+  /** Original `@meta.id` field names as declared in the schema (before adapter manipulation). */
+  public get originalMetaIdFields(): readonly string[] {
+    this._flatten()
+    return this._originalMetaIdFields
   }
 
   /**
@@ -735,6 +743,7 @@ export class AtscriptDbReadable<
     // @meta.id → primary key
     if (metadata.has('meta.id')) {
       this._primaryKeys.push(fieldName)
+      this._originalMetaIdFields.push(fieldName)
     }
 
     // @db.column → column mapping
@@ -887,6 +896,7 @@ export class AtscriptDbReadable<
       if (isUnderNav(key)) { this._jsonFields.delete(key) }
     }
     this._primaryKeys = this._primaryKeys.filter(k => !isUnderNav(k))
+    this._originalMetaIdFields = this._originalMetaIdFields.filter(k => !isUnderNav(k))
 
     for (const [, index] of this._indexes) {
       index.fields = index.fields.filter(f => !isUnderNav(f.name))

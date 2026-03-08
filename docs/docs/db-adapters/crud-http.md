@@ -78,11 +78,14 @@ Connect to your database and create the table instance:
 
 ```typescript
 // init-mongo.ts
-import { AsMongo } from '@atscript/mongo'
+import { MongoAdapter } from '@atscript/mongo'
+import { DbSpace } from '@atscript/utils-db'
+import { MongoClient } from 'mongodb'
 import { Todo } from './schema/todo.as'
 
-const mongo = new AsMongo('mongodb://localhost:27017/myapp')
-export const todosTable = mongo.getTable(Todo)
+const client = new MongoClient('mongodb://localhost:27017/myapp')
+const db = new DbSpace(() => new MongoAdapter(client.db(), client))
+export const todosTable = db.getTable(Todo)
 
 await todosTable.ensureTable()
 await todosTable.syncIndexes()
@@ -270,11 +273,14 @@ The same controller class works with any database adapter. Only the table initia
 ::: code-group
 
 ```typescript [MongoDB]
-import { AsMongo } from '@atscript/mongo'
+import { MongoAdapter } from '@atscript/mongo'
+import { DbSpace } from '@atscript/utils-db'
+import { MongoClient } from 'mongodb'
 import { Todo } from './schema/todo.as'
 
-const mongo = new AsMongo('mongodb://localhost:27017/myapp')
-export const todosTable = mongo.getTable(Todo)
+const client = new MongoClient('mongodb://localhost:27017/myapp')
+const db = new DbSpace(() => new MongoAdapter(client.db(), client))
+export const todosTable = db.getTable(Todo)
 
 await todosTable.ensureTable()
 await todosTable.syncIndexes()

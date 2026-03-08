@@ -8,6 +8,7 @@ import type {
 } from '@atscript/typescript/utils'
 import {
   BaseDbAdapter,
+  AtscriptDbView,
   type AtscriptDbTable,
   type DbQuery,
   type FilterExpr,
@@ -16,6 +17,8 @@ import {
   type TDbUpdateResult,
   type TDbDeleteResult,
   type TSearchIndexInfo,
+  type AtscriptQueryFieldRef,
+  type AtscriptQueryNode,
 } from '@atscript/utils-db'
 import type {
   AggregationCursor,
@@ -23,16 +26,16 @@ import type {
   Collection,
   Db,
   Document,
+  MongoClient,
 } from 'mongodb'
 import { ObjectId } from 'mongodb'
-
-import type { AsMongo } from './as-mongo'
 import { CollectionPatcher, type TCollectionPatcherContext } from './collection-patcher'
 import { buildMongoFilter } from './mongo-filter'
 import { validateMongoIdPlugin } from './validate-plugins'
 
 const INDEX_PREFIX = 'atscript__'
 const DEFAULT_INDEX_NAME = 'DEFAULT'
+const JOINED_PREFIX = '__joined_'
 
 // ── Index types ──────────────────────────────────────────────────────────────
 
@@ -81,16 +84,19 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Capped collection options from @db.mongo.capped. */
   protected _cappedOptions?: { size: number; max?: number }
 
+  /** Whether the schema explicitly defines _id (via @db.mongo.collection or manual _id field). */
+  protected _hasExplicitId = false
+
   constructor(
     protected readonly db: Db,
-    protected readonly asMongo?: AsMongo
+    protected readonly client?: MongoClient
   ) {
     super()
   }
 
   // ── Transaction primitives ────────────────────────────────────────────────
 
-  private get _client() { return this.asMongo?.client }
+  private get _client() { return this.client }
 
   /** Whether transaction support has been detected as unavailable (standalone MongoDB). */
   private _txDisabled = false
@@ -303,10 +309,15 @@ export class MongoAdapter extends BaseDbAdapter {
     type: TAtscriptAnnotatedType,
     metadata: TMetadataMap<AtscriptMetadata>
   ): void {
-    // @meta.id on non-_id fields → unique index (not primary key in MongoDB)
-    // Remove from primaryKeys (generic layer adds it), register as unique field for findById fallback
+    // Track _id presence (set by @db.mongo.collection or explicit _id field)
+    if (field === '_id') {
+      this._hasExplicitId = true
+    }
+    // @meta.id on non-_id fields:
+    // - Always add a unique index so findById can resolve by this field
+    // - Only remove from primaryKeys if the schema explicitly defines _id
+    //   (via @db.mongo.collection). Otherwise keep it as PK for replace/update.
     if (field !== '_id' && metadata.has('meta.id')) {
-      this._table.removePrimaryKey(field)
       this._addMongoIndexField('unique', '__pk', field)
       this._table.addUniqueField(field)
     }
@@ -347,9 +358,40 @@ export class MongoAdapter extends BaseDbAdapter {
   }
 
   override onAfterFlatten(): void {
-    // MongoDB _id is always the primary key — hardcode it unconditionally
-    // (can't rely on onFieldScanned since _id may be a virtual prop injected by @db.mongo.collection)
-    this._table.addPrimaryKey('_id')
+    if (this._hasExplicitId) {
+      // Schema defines _id explicitly (via @db.mongo.collection or manual field).
+      // _id is the primary key; remove non-_id @meta.id fields from PKs (they become unique indexes).
+      this._table.addPrimaryKey('_id')
+      for (const field of this._table.originalMetaIdFields) {
+        if (field !== '_id') {
+          this._table.removePrimaryKey(field)
+        }
+      }
+    } else {
+      // Schema does NOT define _id. The user's @meta.id field is the primary key
+      // for replace/update operations. Inject a synthetic _id as unique field so
+      // that findById can resolve ObjectId strings via _resolveIdFilter.
+      this._table.flatMap.set('_id', {
+        __is_atscript_annotated_type: true,
+        type: { kind: '', designType: 'string', tags: new Set(['objectId', 'mongo']) },
+        metadata: new Map(),
+      } as any)
+      this._table.addUniqueField('_id')
+    }
+
+    // Purge fields that are under navigation relation paths
+    // (e.g. 'projects.id' from @db.rel.from projects?: Project[])
+    if (this._table.navFields.size > 0) {
+      const isUnderNav = (path: string) => {
+        for (const nav of this._table.navFields) {
+          if (path.startsWith(`${nav}.`)) { return true }
+        }
+        return false
+      }
+      for (const field of this._incrementFields) {
+        if (isUnderNav(field)) { this._incrementFields.delete(field) }
+      }
+    }
 
     // Associate vector filter fields with their vector indexes
     for (const [key, value] of this._vectorFilters.entries()) {
@@ -550,9 +592,6 @@ export class MongoAdapter extends BaseDbAdapter {
   // ── Collection existence ─────────────────────────────────────────────────
 
   async collectionExists(): Promise<boolean> {
-    if (this.asMongo) {
-      return this.asMongo.collectionExists(this._table.tableName)
-    }
     const cols = await this.db.listCollections({ name: this._table.tableName }).toArray()
     return cols.length > 0
   }
@@ -589,7 +628,8 @@ export class MongoAdapter extends BaseDbAdapter {
     }
     this._log('insertOne', data)
     const result = await this.collection.insertOne(data, this._getSessionOpts())
-    return { insertedId: result.insertedId }
+    const metaIdPhysical = this._getMetaIdPhysical()
+    return { insertedId: metaIdPhysical ? (data[metaIdPhysical] ?? result.insertedId) : result.insertedId }
   }
 
   async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
@@ -626,9 +666,12 @@ export class MongoAdapter extends BaseDbAdapter {
 
     this._log('insertMany', `${data.length} docs`)
     const result = await this.collection.insertMany(data, this._getSessionOpts())
+    const metaIdPhysical = this._getMetaIdPhysical()
     return {
       insertedCount: result.insertedCount,
-      insertedIds: Object.values(result.insertedIds),
+      insertedIds: metaIdPhysical
+        ? data.map((item, i) => item[metaIdPhysical] ?? result.insertedIds[i])
+        : Object.values(result.insertedIds),
     }
   }
 
@@ -714,14 +757,158 @@ export class MongoAdapter extends BaseDbAdapter {
     return this.collectionExists()
   }
 
+  async detectTableOptionDrift(): Promise<boolean> {
+    if (!this._cappedOptions) { return false }
+    const cols = await this.db.listCollections({ name: this._table.tableName }, { nameOnly: false }).toArray()
+    if (cols.length === 0) { return false }
+    const opts = cols[0].options
+    if (!opts?.capped) { return true } // was not capped but should be
+    if (opts.size !== this._cappedOptions.size) { return true }
+    if ((opts.max ?? undefined) !== (this._cappedOptions.max ?? undefined)) { return true }
+    return false
+  }
+
   async ensureTable(): Promise<void> {
+    if (this._table instanceof AtscriptDbView && !this._table.isExternal) {
+      return this._ensureView(this._table as AtscriptDbView)
+    }
     return this.ensureCollectionExists()
+  }
+
+  /**
+   * Creates a MongoDB view from the AtscriptDbView's view plan.
+   * Translates joins → $lookup/$unwind, filter → $match, columns → $project.
+   */
+  private async _ensureView(view: AtscriptDbView): Promise<void> {
+    const exists = await this.collectionExists()
+    if (exists) { return }
+
+    const plan = view.viewPlan
+    const columns = view.getViewColumnMappings()
+    const pipeline: Document[] = []
+
+    // $lookup + $unwind for each join
+    for (const join of plan.joins) {
+      const { localField, foreignField } = this._resolveJoinFields(join.condition, plan.entryTable, join.targetTable)
+      pipeline.push({
+        $lookup: {
+          from: join.targetTable,
+          localField,
+          foreignField,
+          as: `${JOINED_PREFIX}${join.targetTable}`,
+        },
+      })
+      // LEFT JOIN semantics: unwind with preserveNullAndEmptyArrays
+      pipeline.push({
+        $unwind: {
+          path: `$__joined_${join.targetTable}`,
+          preserveNullAndEmptyArrays: true,
+        },
+      })
+    }
+
+    // $match for view filter
+    if (plan.filter) {
+      const matchExpr = this._queryNodeToMatch(plan.filter, plan.entryTable)
+      pipeline.push({ $match: matchExpr })
+    }
+
+    // $project for column mappings
+    const project: Record<string, unknown> = { _id: 0 }
+    for (const col of columns) {
+      if (col.sourceTable === plan.entryTable) {
+        project[col.viewColumn] = `$${col.sourceColumn}`
+      } else {
+        project[col.viewColumn] = `$${JOINED_PREFIX}${col.sourceTable}.${col.sourceColumn}`
+      }
+    }
+    pipeline.push({ $project: project })
+
+    this._log('createView', this._table.tableName, plan.entryTable, pipeline)
+    await this.db.createCollection(this._table.tableName, {
+      viewOn: plan.entryTable,
+      pipeline,
+    })
+  }
+
+  /**
+   * Extracts localField/foreignField from a join condition like `User.id = Task.assigneeId`.
+   * The condition is a comparison node with two field refs.
+   */
+  private _resolveJoinFields(
+    condition: AtscriptQueryNode,
+    entryTable: string,
+    joinTable: string
+  ): { localField: string; foreignField: string } {
+    // Walk through $and if present (single-condition $and wrapper)
+    const comp = '$and' in condition
+      ? (condition as { $and: AtscriptQueryNode[] }).$and[0]
+      : condition
+    const c = comp as { left: AtscriptQueryFieldRef; op: string; right: AtscriptQueryFieldRef }
+
+    const leftTable = c.left.type
+      ? ((c.left.type()?.metadata?.get('db.table') as string) || '')
+      : entryTable
+    // Determine which side is the entry table (local) and which is the join table (foreign)
+    if (leftTable === joinTable) {
+      return { localField: (c.right as AtscriptQueryFieldRef).field, foreignField: c.left.field }
+    }
+    return { localField: c.left.field, foreignField: (c.right as AtscriptQueryFieldRef).field }
+  }
+
+  /**
+   * Translates an AtscriptQueryNode to a MongoDB $match expression.
+   * Field refs are resolved to dot-path references (joined fields use JOINED_PREFIX).
+   */
+  private _queryNodeToMatch(node: AtscriptQueryNode, entryTable: string): Document {
+    if ('$and' in node) {
+      return { $and: (node as { $and: AtscriptQueryNode[] }).$and.map(n => this._queryNodeToMatch(n, entryTable)) }
+    }
+    if ('$or' in node) {
+      return { $or: (node as { $or: AtscriptQueryNode[] }).$or.map(n => this._queryNodeToMatch(n, entryTable)) }
+    }
+    if ('$not' in node) {
+      return { $not: this._queryNodeToMatch((node as { $not: AtscriptQueryNode }).$not, entryTable) }
+    }
+
+    const comp = node as { left: AtscriptQueryFieldRef; op: string; right?: unknown }
+    const fieldPath = this._resolveViewFieldPath(comp.left, entryTable)
+
+    // Field-to-field comparison
+    if (comp.right && typeof comp.right === 'object' && 'field' in (comp.right as object)) {
+      const rightPath = this._resolveViewFieldPath(comp.right as AtscriptQueryFieldRef, entryTable)
+      return { $expr: { [comp.op]: [`$${fieldPath}`, `$${rightPath}`] } }
+    }
+
+    // Value comparison
+    if (comp.op === '$eq') { return { [fieldPath]: comp.right } }
+    if (comp.op === '$ne') { return { [fieldPath]: { $ne: comp.right } } }
+    return { [fieldPath]: { [comp.op]: comp.right } }
+  }
+
+  /**
+   * Resolves a field ref to a MongoDB dot path for view pipeline expressions.
+   */
+  private _resolveViewFieldPath(ref: AtscriptQueryFieldRef, entryTable: string): string {
+    if (!ref.type) { return ref.field }
+    const table = (ref.type()?.metadata?.get('db.table') as string) || ''
+    if (table === entryTable) { return ref.field }
+    return `${JOINED_PREFIX}${table}.${ref.field}`
   }
 
   async dropTable(): Promise<void> {
     this._log('drop', this._table.tableName)
     await this.collection.drop()
     this._collection = undefined
+  }
+
+  async dropViewByName(viewName: string): Promise<void> {
+    this._log('dropView', viewName)
+    try {
+      await this.db.collection(viewName).drop()
+    } catch {
+      // View may not exist — ignore
+    }
   }
 
   async syncIndexes(): Promise<void> {
@@ -892,6 +1079,28 @@ export class MongoAdapter extends BaseDbAdapter {
       // listSearchIndexes / createSearchIndex / updateSearchIndex are
       // Atlas-only — silently skip on standalone or in-memory MongoDB.
     }
+  }
+
+  // ── Meta ID resolution ──────────────────────────────────────────────────
+
+  /** Cached physical name of the single @meta.id field, or null if none/composite. */
+  private _metaIdPhysical: string | null | undefined
+
+  /**
+   * Returns the physical column name of the single @meta.id field (if any).
+   * Used to return the user's logical ID instead of MongoDB's _id on insert.
+   */
+  private _getMetaIdPhysical(): string | null {
+    if (this._metaIdPhysical === undefined) {
+      const fields = this._table.originalMetaIdFields
+      if (fields.length === 1) {
+        const field = fields[0]
+        this._metaIdPhysical = this._table.columnMap.get(field) ?? field
+      } else {
+        this._metaIdPhysical = null
+      }
+    }
+    return this._metaIdPhysical
   }
 
   // ── Auto-increment helpers ────────────────────────────────────────────────

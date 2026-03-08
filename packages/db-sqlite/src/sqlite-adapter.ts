@@ -70,6 +70,11 @@ export class SqliteAdapter extends BaseDbAdapter {
     return super.resolveTableName(false)
   }
 
+  /** SQLite enforces FK constraints natively via PRAGMA foreign_keys. */
+  override supportsNativeForeignKeys(): boolean {
+    return true
+  }
+
   // ── ID preparation ─────────────────────────────────────────────────────────
 
   prepareId(id: unknown, _fieldType: TAtscriptAnnotatedType): unknown {

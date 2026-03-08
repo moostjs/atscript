@@ -159,6 +159,13 @@ describe('AsDbController', () => {
       const call = table.findMany.mock.calls[0][0]
       expect(call.controls.$sort).toEqual({ name: 1 })
     })
+
+    it('should parse hex strings (e.g. ObjectId) in filter values without error', async () => {
+      const result = await controller.query('/query?id=69aca32e434504011457636c')
+      expect(result).not.toBeInstanceOf(HttpError)
+      const call = table.findMany.mock.calls[0][0]
+      expect(call.filter).toEqual({ id: '69aca32e434504011457636c' })
+    })
   })
 
   // ── GET /pages ──────────────────────────────────────────────────────

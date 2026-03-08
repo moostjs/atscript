@@ -171,6 +171,7 @@ export interface TColumnDiff {
   removed: TExistingColumn[]
   renamed: Array<{ field: TDbFieldMeta; oldName: string }>
   typeChanged: Array<{ field: TDbFieldMeta; existingType: string }>
+  conflicts: Array<{ field: TDbFieldMeta; oldName: string; conflictsWith: string }>
 }
 
 /** Result of applying column diff to the database. */
@@ -185,7 +186,7 @@ export interface TSyncColumnResult {
  * Callback that resolves an annotated type to a queryable table instance.
  * Required for `$with` relation loading — each table needs to query related tables.
  *
- * Typically provided by the driver/registry (e.g. `AsMongo.getTable`, `AsSqlite.getTable`).
+ * Typically provided by the driver/registry (e.g. `DbSpace.getTable`).
  */
 export type TTableResolver = (type: TAtscriptAnnotatedType) => Pick<AtscriptDbTableLike, 'findMany' | 'primaryKeys' | 'relations' | 'foreignKeys'> | undefined
 
@@ -234,6 +235,29 @@ export interface AtscriptDbWritable {
  * Used for nested creation — inserting related records inline.
  */
 export type TWriteTableResolver = (type: TAtscriptAnnotatedType) => (AtscriptDbTableLike & AtscriptDbWritable) | undefined
+
+// ── Cascade Types ────────────────────────────────────────────────────────
+
+/**
+ * A child table that may need cascade/setNull processing when a parent is deleted.
+ * Returned by the cascade resolver.
+ */
+export interface TCascadeTarget {
+  /** FK on the child table that references the parent being deleted. */
+  fk: TDbForeignKey
+  /** Delete matching child records (goes through AtscriptDbTable for recursive cascade). */
+  deleteMany(filter: Record<string, unknown>): Promise<TDbDeleteResult>
+  /** Update matching child records (for setNull — sets FK fields to null). */
+  updateMany(filter: Record<string, unknown>, data: Record<string, unknown>): Promise<TDbUpdateResult>
+  /** Count matching child records (for restrict — check existence before delete). */
+  count(filter: Record<string, unknown>): Promise<number>
+}
+
+/**
+ * Callback that finds all child tables with FKs pointing to a given parent table.
+ * Used by AtscriptDbTable to implement application-level cascade deletes.
+ */
+export type TCascadeResolver = (tableName: string) => TCascadeTarget[]
 
 // ── Relation Types ───────────────────────────────────────────────────────
 

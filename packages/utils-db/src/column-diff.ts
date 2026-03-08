@@ -22,6 +22,7 @@ export function computeColumnDiff(
   const added: TDbFieldMeta[] = []
   const renamed: TColumnDiff['renamed'] = []
   const typeChanged: TColumnDiff['typeChanged'] = []
+  const conflicts: TColumnDiff['conflicts'] = []
 
   for (const field of desired) {
     if (field.ignored) { continue }
@@ -29,8 +30,13 @@ export function computeColumnDiff(
 
     const existingCol = existingByName.get(field.physicalName)
     if (existingCol) {
-      // Column exists with current name — check type
-      if (typeMapper) {
+      // Column exists with current name — but if this field also has renamedFrom
+      // pointing to another existing column, the rename target conflicts
+      if (field.renamedFrom && existingByName.has(field.renamedFrom)) {
+        conflicts.push({ field, oldName: field.renamedFrom, conflictsWith: field.physicalName })
+        renamedOldNames.add(field.renamedFrom)
+      } else if (typeMapper) {
+        // Check type
         const expectedType = typeMapper(field)
         if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
           typeChanged.push({ field, existingType: existingCol.type })
@@ -50,5 +56,5 @@ export function computeColumnDiff(
     c => !desiredByName.has(c.name) && !renamedOldNames.has(c.name)
   )
 
-  return { added, removed, renamed, typeChanged }
+  return { added, removed, renamed, typeChanged, conflicts }
 }
