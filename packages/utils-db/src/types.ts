@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls } from '@uniqu/core'
+import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls, WithRelation } from '@uniqu/core'
 import type { UniquSelect } from './uniqu-select'
 
 export type { FlatOf, PrimaryKeyOf, OwnPropsOf, NavPropsOf } from '@atscript/typescript/utils'
@@ -190,11 +190,12 @@ export interface TSyncColumnResult {
  *
  * Typically provided by the driver/registry (e.g. `DbSpace.getTable`).
  */
-export type TTableResolver = (type: TAtscriptAnnotatedType) => Pick<AtscriptDbTableLike, 'findMany' | 'primaryKeys' | 'relations' | 'foreignKeys'> | undefined
+export type TTableResolver = (type: TAtscriptAnnotatedType) => Pick<AtscriptDbTableLike, 'findMany' | 'loadRelations' | 'primaryKeys' | 'relations' | 'foreignKeys'> | undefined
 
 /** Minimal table interface used by the table resolver. Avoids circular dependency with AtscriptDbTable. */
 export interface AtscriptDbTableLike {
   findMany(query: unknown): Promise<Array<Record<string, unknown>>>
+  loadRelations(rows: Array<Record<string, unknown>>, withRelations: WithRelation[]): Promise<void>
   primaryKeys: readonly string[]
   relations: ReadonlyMap<string, TDbRelation>
   foreignKeys: ReadonlyMap<string, TDbForeignKey>

@@ -1368,6 +1368,16 @@ export class AtscriptDbReadable<
   // ── Internal: relation loading ($with) ────────────────────────────────────
 
   /**
+   * Public entry point for relation loading. Used by adapters for nested $with delegation.
+   */
+  public async loadRelations(
+    rows: Array<Record<string, unknown>>,
+    withRelations: WithRelation[]
+  ): Promise<void> {
+    return this._loadRelations(rows, withRelations)
+  }
+
+  /**
    * Loads related data for `$with` relations and attaches them to the result rows.
    */
   protected async _loadRelations(
@@ -1377,7 +1387,7 @@ export class AtscriptDbReadable<
     if (rows.length === 0 || withRelations.length === 0) { return }
 
     if (this.adapter.supportsNativeRelations()) {
-      return this.adapter.loadRelations(rows, withRelations, this._relations, this._foreignKeys)
+      return this.adapter.loadRelations(rows, withRelations, this._relations, this._foreignKeys, this._tableResolver)
     }
 
     if (!this._tableResolver) { return }

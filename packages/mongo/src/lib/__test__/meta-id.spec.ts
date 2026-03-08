@@ -268,10 +268,10 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
 
     describe('insertOne should return @meta.id value, not ObjectId', () => {
       it('should return incremented id as insertedId', async () => {
-        // Mock the collection methods directly
+        // Mock the main collection
         const mockCollection = {
           aggregate: vi.fn().mockReturnValue({
-            toArray: vi.fn().mockResolvedValue([{ max__id: 5 }]),
+            toArray: vi.fn().mockResolvedValue([]),
           }),
           insertOne: vi.fn().mockResolvedValue({
             insertedId: new ObjectId(HEX_A),
@@ -280,9 +280,16 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
         }
         vi.spyOn(adapter, 'collection', 'get').mockReturnValue(mockCollection as any)
 
+        // Mock the counters collection (atomic auto-increment)
+        const mockCounters = {
+          findOneAndUpdate: vi.fn().mockResolvedValue({ _id: 'users.id', seq: 6 }),
+          updateOne: vi.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+        }
+        vi.spyOn(adapter as any, '_countersCollection', 'get').mockReturnValue(mockCounters as any)
+
         const result = await adapter.insertOne({ email: 'test@test.com', name: 'Test' })
 
-        expect(result.insertedId).toBe(6) // max(5) + 1, NOT an ObjectId
+        expect(result.insertedId).toBe(6) // atomic counter returns seq=6, NOT an ObjectId
         vi.restoreAllMocks()
       })
     })

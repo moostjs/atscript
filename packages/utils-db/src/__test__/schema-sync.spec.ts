@@ -246,10 +246,10 @@ class SchemalessAdapter extends BaseDbAdapter {
 class TypedMockAdapter extends MockAdapter {
   typeMapper(field: { designType: string }): string {
     switch (field.designType) {
-      case 'number': return 'REAL'
-      case 'integer': return 'INTEGER'
-      case 'boolean': return 'INTEGER'
-      default: return 'TEXT'
+      case 'number': { return 'REAL' }
+      case 'integer': { return 'INTEGER' }
+      case 'boolean': { return 'INTEGER' }
+      default: { return 'TEXT' }
     }
   }
 

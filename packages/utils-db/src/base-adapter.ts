@@ -8,7 +8,7 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './db-readable'
@@ -214,12 +214,15 @@ export abstract class BaseDbAdapter {
    * @param withRelations - The `$with` specs from the query.
    * @param relations - This table's relation metadata (from `@db.rel.to`/`@db.rel.from`).
    * @param foreignKeys - This table's FK metadata (from `@db.rel.FK`).
+   * @param tableResolver - Optional callback to resolve annotated types to table metadata (needed for FROM/VIA relations).
    */
+  // oxlint-disable-next-line max-params
   async loadRelations(
     rows: Array<Record<string, unknown>>,
     withRelations: WithRelation[],
     relations: ReadonlyMap<string, TDbRelation>,
-    foreignKeys: ReadonlyMap<string, TDbForeignKey>
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>,
+    tableResolver?: TTableResolver
   ): Promise<void> {
     throw new Error('Native relation loading not supported by this adapter')
   }

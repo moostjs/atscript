@@ -17,6 +17,10 @@ import {
   type TDbUpdateResult,
   type TDbDeleteResult,
   type TSearchIndexInfo,
+  type TDbRelation,
+  type TDbForeignKey,
+  type TTableResolver,
+  type WithRelation,
   type AtscriptQueryFieldRef,
   type AtscriptQueryNode,
 } from '@atscript/utils-db'
@@ -226,6 +230,399 @@ export class MongoAdapter extends BaseDbAdapter {
     // @db.mongo.collection may inject _id but doesn't provide a name;
     // the table name comes from @db.table (handled by AtscriptDbTable).
     return undefined
+  }
+
+  // ── Native relation loading ─────────────────────────────────────────────
+
+  override supportsNativeRelations(): boolean {
+    return true
+  }
+
+  // oxlint-disable-next-line max-params -- matches BaseDbAdapter.loadRelations() signature
+  override async loadRelations(
+    rows: Array<Record<string, unknown>>,
+    withRelations: WithRelation[],
+    relations: ReadonlyMap<string, TDbRelation>,
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>,
+    tableResolver?: TTableResolver
+  ): Promise<void> {
+    if (rows.length === 0 || withRelations.length === 0) { return }
+
+    const primaryKeys = this._table.primaryKeys as string[]
+
+    const relMeta: Array<{ name: string; isArray: boolean; relation: TDbRelation; nestedWith?: WithRelation[]; stages: Document[] }> = []
+
+    for (const withRel of withRelations) {
+      if (withRel.name.includes('.')) { continue }
+
+      const relation = relations.get(withRel.name)
+      if (!relation) {
+        throw new Error(`Unknown relation "${withRel.name}" in $with. Available relations: ${[...relations.keys()].join(', ') || '(none)'}`)
+      }
+
+      const lookupResult = this._buildRelationLookup(withRel, relation, foreignKeys, tableResolver)
+      if (!lookupResult) { continue }
+
+      relMeta.push({ name: withRel.name, isArray: lookupResult.isArray, relation, nestedWith: this._extractNestedWith(withRel), stages: lookupResult.stages })
+    }
+
+    if (relMeta.length === 0) { return }
+
+    // If PKs are available in the rows, run $lookup aggregation pipeline
+    const pkMatchFilter = this._buildPKMatchFilter(rows, primaryKeys)
+    if (pkMatchFilter) {
+      const pipeline: Document[] = [{ $match: pkMatchFilter }]
+      for (const meta of relMeta) { pipeline.push(...meta.stages) }
+
+      const results = await this.collection
+        .aggregate(pipeline, this._getSessionOpts())
+        .toArray()
+
+      this._mergeRelationResults(rows, results, primaryKeys, relMeta)
+    } else {
+      // PKs not in rows (e.g. $select excluded them) — set defaults
+      for (const row of rows) {
+        for (const meta of relMeta) {
+          row[meta.name] = meta.isArray ? [] : null
+        }
+      }
+    }
+
+    // Handle nested $with by delegating to target table
+    await this._loadNestedRelations(rows, relMeta, tableResolver)
+  }
+
+  /** Builds a $match filter to re-select source rows by PK. */
+  private _buildPKMatchFilter(
+    rows: Array<Record<string, unknown>>,
+    primaryKeys: string[]
+  ): Document | undefined {
+    if (primaryKeys.length === 1) {
+      const pk = primaryKeys[0]
+      const values = new Set<unknown>()
+      for (const row of rows) {
+        const v = row[pk]
+        if (v !== null && v !== undefined) { values.add(v) }
+      }
+      if (values.size === 0) { return undefined }
+      return { [pk]: { $in: [...values] } }
+    }
+    // Composite PK — build $or filter
+    const seen = new Set<string>()
+    const orFilters: Document[] = []
+    for (const row of rows) {
+      const key = primaryKeys.map(pk => String(row[pk] ?? '')).join('\0')
+      if (seen.has(key)) { continue }
+      seen.add(key)
+      const condition: Document = {}
+      let valid = true
+      for (const pk of primaryKeys) {
+        const val = row[pk]
+        if (val === null || val === undefined) { valid = false; break }
+        condition[pk] = val
+      }
+      if (valid) { orFilters.push(condition) }
+    }
+    if (orFilters.length === 0) { return undefined }
+    return orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
+  }
+
+  /** Dispatches to the correct $lookup builder based on relation direction. */
+  private _buildRelationLookup(
+    withRel: WithRelation,
+    relation: TDbRelation,
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>,
+    tableResolver?: TTableResolver
+  ): { stages: Document[]; isArray: boolean } | undefined {
+    switch (relation.direction) {
+      case 'to': { return this._buildToLookup(withRel, relation, foreignKeys) }
+      case 'from': { return this._buildFromLookup(withRel, relation, tableResolver) }
+      case 'via': { return this._buildViaLookup(withRel, relation, tableResolver) }
+      default: { return undefined }
+    }
+  }
+
+  /** Builds `let` variable bindings and the corresponding `$expr` match for `$lookup`. */
+  private _buildLookupJoin(
+    localFields: string[],
+    remoteFields: string[],
+    varPrefix: string
+  ): { letVars: Record<string, string>; exprMatch: Document } {
+    const letVars = Object.fromEntries(
+      localFields.map((f, i) => [`${varPrefix}${i}`, `$${f}`])
+    )
+    const exprMatch = remoteFields.length === 1
+      ? { $eq: [`$${remoteFields[0]}`, `$$${varPrefix}0`] }
+      : { $and: remoteFields.map((rf, i) => ({ $eq: [`$${rf}`, `$$${varPrefix}${i}`] })) }
+    return { letVars, exprMatch }
+  }
+
+  /** $lookup for TO relations (FK is on this table → target). Always single-valued. */
+  private _buildToLookup(
+    withRel: WithRelation,
+    relation: TDbRelation,
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>
+  ): { stages: Document[]; isArray: boolean } | undefined {
+    const fk = this._findFKForRelationLookup(relation, foreignKeys)
+    if (!fk) { return undefined }
+
+    const innerPipeline = this._buildLookupInnerPipeline(withRel, fk.targetFields)
+    const { letVars, exprMatch } = this._buildLookupJoin(fk.localFields, fk.targetFields, 'fk_')
+
+    const stages: Document[] = [{
+      $lookup: {
+        from: fk.targetTable,
+        let: letVars,
+        pipeline: [{ $match: { $expr: exprMatch } }, ...innerPipeline],
+        as: withRel.name,
+      },
+    }, {
+      $unwind: { path: `$${withRel.name}`, preserveNullAndEmptyArrays: true },
+    }]
+
+    return { stages, isArray: false }
+  }
+
+  /** $lookup for FROM relations (FK is on target → this table). */
+  private _buildFromLookup(
+    withRel: WithRelation,
+    relation: TDbRelation,
+    tableResolver?: TTableResolver
+  ): { stages: Document[]; isArray: boolean } | undefined {
+    const targetType = relation.targetType()
+    if (!targetType || !tableResolver) { return undefined }
+
+    const targetMeta = tableResolver(targetType)
+    if (!targetMeta) { return undefined }
+
+    const remoteFK = this._findRemoteFKFromMeta(targetMeta, this._table.tableName, relation.alias)
+    if (!remoteFK) { return undefined }
+
+    const targetTableName = this._resolveRelTargetTableName(relation)
+    const innerPipeline = this._buildLookupInnerPipeline(withRel, remoteFK.fields)
+    const { letVars, exprMatch } = this._buildLookupJoin(remoteFK.targetFields, remoteFK.fields, 'pk_')
+
+    const stages: Document[] = [{
+      $lookup: {
+        from: targetTableName,
+        let: letVars,
+        pipeline: [{ $match: { $expr: exprMatch } }, ...innerPipeline],
+        as: withRel.name,
+      },
+    }]
+
+    if (!relation.isArray) {
+      stages.push({ $unwind: { path: `$${withRel.name}`, preserveNullAndEmptyArrays: true } })
+    }
+
+    return { stages, isArray: relation.isArray }
+  }
+
+  /** $lookup for VIA relations (M:N through junction table). Always array. */
+  private _buildViaLookup(
+    withRel: WithRelation,
+    relation: TDbRelation,
+    tableResolver?: TTableResolver
+  ): { stages: Document[]; isArray: boolean } | undefined {
+    if (!relation.viaType || !tableResolver) { return undefined }
+
+    const junctionType = relation.viaType()
+    if (!junctionType) { return undefined }
+
+    const junctionMeta = tableResolver(junctionType)
+    if (!junctionMeta) { return undefined }
+
+    const junctionTableName = (junctionType.metadata?.get('db.table') as string) || junctionType.id || ''
+    const targetTableName = this._resolveRelTargetTableName(relation)
+
+    const fkToThis = this._findRemoteFKFromMeta(junctionMeta, this._table.tableName)
+    if (!fkToThis) { return undefined }
+
+    const fkToTarget = this._findRemoteFKFromMeta(junctionMeta, targetTableName)
+    if (!fkToTarget) { return undefined }
+
+    const innerPipeline = this._buildLookupInnerPipeline(withRel, fkToTarget.targetFields)
+    const { letVars, exprMatch } = this._buildLookupJoin(fkToThis.targetFields, fkToThis.fields, 'pk_')
+
+    const stages: Document[] = [{
+      $lookup: {
+        from: junctionTableName,
+        let: letVars,
+        pipeline: [
+          { $match: { $expr: exprMatch } },
+          {
+            $lookup: {
+              from: targetTableName,
+              localField: fkToTarget.fields[0],
+              foreignField: fkToTarget.targetFields[0],
+              pipeline: innerPipeline,
+              as: '__target',
+            },
+          },
+          { $unwind: { path: '$__target', preserveNullAndEmptyArrays: false } },
+          { $replaceRoot: { newRoot: '$__target' } },
+        ],
+        as: withRel.name,
+      },
+    }]
+
+    return { stages, isArray: true }
+  }
+
+  /** Builds inner pipeline stages for relation controls ($sort, $limit, $skip, $select, filter). */
+  private _buildLookupInnerPipeline(
+    withRel: WithRelation,
+    requiredFields: string[]
+  ): Document[] {
+    const pipeline: Document[] = []
+
+    // Merge flat and nested controls (same pattern as db-readable.ts)
+    const flatRel = withRel as Record<string, unknown>
+    const nested = (withRel.controls || {}) as Record<string, unknown>
+    const filter = withRel.filter
+    const sort = (nested.$sort || flatRel.$sort) as Record<string, 1 | -1> | undefined
+    const limit = (nested.$limit ?? flatRel.$limit) as number | undefined
+    const skip = (nested.$skip ?? flatRel.$skip) as number | undefined
+    const select = (nested.$select || flatRel.$select) as string[] | undefined
+
+    // Additional filter on the relation
+    if (filter && Object.keys(filter).length > 0) {
+      pipeline.push({ $match: buildMongoFilter(filter) })
+    }
+
+    if (sort) { pipeline.push({ $sort: sort }) }
+    if (skip) { pipeline.push({ $skip: skip }) }
+    if (limit !== null && limit !== undefined) { pipeline.push({ $limit: limit }) }
+
+    if (select) {
+      const projection: Record<string, 1 | 0> = {}
+      for (const f of select) { projection[f] = 1 }
+      // Ensure required FK/PK fields are in projection
+      for (const f of requiredFields) { projection[f] = 1 }
+      // Suppress _id if not explicitly selected
+      if (!select.includes('_id') && !requiredFields.includes('_id')) {
+        projection['_id'] = 0
+      }
+      pipeline.push({ $project: projection })
+    }
+
+    return pipeline
+  }
+
+  /** Extracts nested $with from a WithRelation's controls. */
+  private _extractNestedWith(withRel: WithRelation): WithRelation[] | undefined {
+    const flatRel = withRel as Record<string, unknown>
+    const nested = (withRel.controls || {}) as Record<string, unknown>
+    const nestedWith = (nested.$with || flatRel.$with) as WithRelation[] | undefined
+    return nestedWith && nestedWith.length > 0 ? nestedWith : undefined
+  }
+
+  /** Post-processes nested $with by delegating to the target table's own relation loading. */
+  private async _loadNestedRelations(
+    rows: Array<Record<string, unknown>>,
+    relMeta: Array<{ name: string; isArray: boolean; relation: TDbRelation; nestedWith?: WithRelation[] }>,
+    tableResolver?: TTableResolver
+  ): Promise<void> {
+    if (!tableResolver) { return }
+
+    const tasks: Array<Promise<void>> = []
+
+    for (const meta of relMeta) {
+      if (!meta.nestedWith || meta.nestedWith.length === 0) { continue }
+
+      const targetType = meta.relation.targetType()
+      if (!targetType) { continue }
+
+      const targetTable = tableResolver(targetType)
+      if (!targetTable) { continue }
+
+      // Collect all sub-rows from this relation across all parent rows
+      const subRows: Array<Record<string, unknown>> = []
+      for (const row of rows) {
+        const val = row[meta.name]
+        if (meta.isArray && Array.isArray(val)) {
+          for (const item of val) { subRows.push(item) }
+        } else if (val && typeof val === 'object') {
+          subRows.push(val as Record<string, unknown>)
+        }
+      }
+
+      if (subRows.length === 0) { continue }
+
+      // Delegate to target table's loadRelations — uses the correct adapter and collection
+      tasks.push(targetTable.loadRelations(subRows, meta.nestedWith))
+    }
+
+    await Promise.all(tasks)
+  }
+
+  /** Merges aggregation results back onto the original rows by PK. */
+  private _mergeRelationResults(
+    rows: Array<Record<string, unknown>>,
+    results: Array<Record<string, unknown>>,
+    primaryKeys: string[],
+    relMeta: Array<{ name: string; isArray: boolean }>
+  ): void {
+    const resultIndex = new Map<string, Record<string, unknown>>()
+    for (const doc of results) {
+      const key = primaryKeys.map(pk => String(doc[pk] ?? '')).join('\0')
+      resultIndex.set(key, doc)
+    }
+
+    for (const row of rows) {
+      const key = primaryKeys.map(pk => String(row[pk] ?? '')).join('\0')
+      const enriched = resultIndex.get(key)
+
+      for (const meta of relMeta) {
+        if (enriched) {
+          const value = enriched[meta.name]
+          if (!meta.isArray && Array.isArray(value)) {
+            row[meta.name] = value[0] ?? null
+          } else {
+            row[meta.name] = value ?? (meta.isArray ? [] : null)
+          }
+        } else {
+          row[meta.name] = meta.isArray ? [] : null
+        }
+      }
+    }
+  }
+
+  /** Finds FK entry for a TO relation from this table's foreignKeys map. */
+  private _findFKForRelationLookup(
+    relation: TDbRelation,
+    foreignKeys: ReadonlyMap<string, TDbForeignKey>
+  ): { localFields: string[]; targetFields: string[]; targetTable: string } | undefined {
+    const targetTableName = this._resolveRelTargetTableName(relation)
+    for (const fk of foreignKeys.values()) {
+      if (relation.alias) {
+        if (fk.alias === relation.alias) {
+          return { localFields: fk.fields, targetFields: fk.targetFields, targetTable: fk.targetTable }
+        }
+      } else if (fk.targetTable === targetTableName) {
+        return { localFields: fk.fields, targetFields: fk.targetFields, targetTable: fk.targetTable }
+      }
+    }
+    return undefined
+  }
+
+  /** Finds a FK on a remote table that points back to the given table name. */
+  private _findRemoteFKFromMeta(
+    target: { foreignKeys: ReadonlyMap<string, TDbForeignKey> },
+    thisTableName: string,
+    alias?: string
+  ): TDbForeignKey | undefined {
+    for (const fk of target.foreignKeys.values()) {
+      if (alias && fk.alias === alias && fk.targetTable === thisTableName) { return fk }
+      if (!alias && fk.targetTable === thisTableName) { return fk }
+    }
+    return undefined
+  }
+
+  /** Resolves the target table/collection name from a relation's target type. */
+  private _resolveRelTargetTableName(relation: TDbRelation): string {
+    const targetType = relation.targetType()
+    return (targetType?.metadata?.get('db.table') as string) || targetType?.id || ''
   }
 
   // ── Insert validator ─────────────────────────────────────────────────────
@@ -620,9 +1017,9 @@ export class MongoAdapter extends BaseDbAdapter {
     if (this._incrementFields.size > 0) {
       const fields = this._fieldsNeedingIncrement(data)
       if (fields.length > 0) {
-        const maxValues = await this._getMaxValues(fields)
+        const nextValues = await this._allocateIncrementValues(fields, 1)
         for (const physical of fields) {
-          data[physical] = (maxValues.get(physical) ?? 0) + 1
+          data[physical] = nextValues.get(physical) ?? 1
         }
       }
     }
@@ -643,24 +1040,7 @@ export class MongoAdapter extends BaseDbAdapter {
       }
 
       if (allFields.size > 0) {
-        const maxValues = await this._getMaxValues([...allFields])
-
-        // Walk items in order (matching SQLite behavior):
-        // no value → ++max; explicit value → keep it, update max if larger
-        for (const item of data) {
-          for (const physical of allFields) {
-            if (item[physical] === undefined || item[physical] === null) {
-              const next = (maxValues.get(physical) ?? 0) + 1
-              item[physical] = next
-              maxValues.set(physical, next)
-            } else if (typeof item[physical] === 'number') {
-              const current = maxValues.get(physical) ?? 0
-              if ((item[physical] as number) > current) {
-                maxValues.set(physical, item[physical] as number)
-              }
-            }
-          }
-        }
+        await this._assignBatchIncrements(data, allFields)
       }
     }
 
@@ -1141,6 +1521,11 @@ export class MongoAdapter extends BaseDbAdapter {
 
   // ── Auto-increment helpers ────────────────────────────────────────────────
 
+  /** Returns the counters collection used for atomic auto-increment. */
+  protected get _countersCollection(): Collection<{ _id: string; seq: number }> {
+    return this.db.collection('__atscript_counters')
+  }
+
   /** Returns physical field names of increment fields that are undefined in the data. */
   private _fieldsNeedingIncrement(data: Record<string, unknown>): string[] {
     const result: string[] = []
@@ -1152,23 +1537,93 @@ export class MongoAdapter extends BaseDbAdapter {
     return result
   }
 
-  /** Reads current max value for each field via $group aggregation. */
-  private async _getMaxValues(physicalFields: string[]): Promise<Map<string, number>> {
-    const aliases = physicalFields.map(f => [`max__${f.replace(/\./g, '__')}`, f] as const)
-    const group: Record<string, unknown> = { _id: null }
-    for (const [alias, field] of aliases) {
-      group[alias] = { $max: `$${field}` }
+  /**
+   * Atomically allocates `count` sequential values for each increment field
+   * using a counter collection. Returns a map of field → first allocated value.
+   */
+  private async _allocateIncrementValues(
+    physicalFields: string[],
+    count: number
+  ): Promise<Map<string, number>> {
+    const counters = this._countersCollection
+    const collectionName = this._table.tableName
+    const result = new Map<string, number>()
+
+    for (const field of physicalFields) {
+      const counterId = `${collectionName}.${field}`
+      const doc = await counters.findOneAndUpdate(
+        { _id: counterId },
+        { $inc: { seq: count } },
+        { upsert: true, returnDocument: 'after', ...this._getSessionOpts() }
+      )
+      const seq = doc?.seq ?? count
+      // If this was a fresh counter (upserted), check if collection already has data
+      // with higher values and re-seed if needed
+      if (seq === count) {
+        const currentMax = await this._getCurrentFieldMax(field)
+        if (currentMax >= seq) {
+          const adjusted = currentMax + count
+          await counters.updateOne(
+            { _id: counterId },
+            { $max: { seq: adjusted } },
+            this._getSessionOpts()
+          )
+          result.set(field, currentMax + 1)
+          continue
+        }
+      }
+      result.set(field, seq - count + 1)
     }
-    const result = await this.collection.aggregate([{ $group: group }], this._getSessionOpts()).toArray()
-    const maxMap = new Map<string, number>()
-    if (result.length > 0) {
-      const row = result[0]
-      for (const [alias, field] of aliases) {
-        const val = row[alias]
-        maxMap.set(field, typeof val === 'number' ? val : 0)
+
+    return result
+  }
+
+  /** Reads current max value for a single field via $group aggregation. */
+  private async _getCurrentFieldMax(field: string): Promise<number> {
+    const alias = `max__${field.replace(/\./g, '__')}`
+    const agg = await this.collection.aggregate(
+      [{ $group: { _id: null, [alias]: { $max: `$${field}` } } }],
+      this._getSessionOpts()
+    ).toArray()
+    if (agg.length > 0) {
+      const val = agg[0][alias]
+      if (typeof val === 'number') { return val }
+    }
+    return 0
+  }
+
+  /** Allocates increment values for a batch of items, assigning in order. */
+  private async _assignBatchIncrements(
+    data: Array<Record<string, unknown>>,
+    allFields: Set<string>
+  ): Promise<void> {
+    // Count how many items need auto-increment per field
+    const fieldCounts = new Map<string, number>()
+    for (const physical of allFields) {
+      let count = 0
+      for (const item of data) {
+        if (item[physical] === undefined || item[physical] === null) { count++ }
+      }
+      if (count > 0) { fieldCounts.set(physical, count) }
+    }
+
+    // Atomically allocate ranges for each field
+    const fieldCounters = new Map<string, number>()
+    for (const [physical, count] of fieldCounts) {
+      const allocated = await this._allocateIncrementValues([physical], count)
+      fieldCounters.set(physical, allocated.get(physical) ?? 1)
+    }
+
+    // Walk items in order: no value → next from allocated range; explicit → keep
+    for (const item of data) {
+      for (const physical of allFields) {
+        if (item[physical] === undefined || item[physical] === null) {
+          const next = fieldCounters.get(physical) ?? 1
+          item[physical] = next
+          fieldCounters.set(physical, next + 1)
+        }
       }
     }
-    return maxMap
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────

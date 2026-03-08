@@ -801,7 +801,7 @@ export class AtscriptDbTable<
       if (excludeTargetTable && fk.targetTable === excludeTargetTable) { continue }
 
       // Collect unique FK values across all items using Sets for O(1) dedup
-      const valueSets: Set<unknown>[] = fk.fields.map(() => new Set<unknown>())
+      const valueSets: Array<Set<unknown>> = fk.fields.map(() => new Set<unknown>())
 
       for (const item of items) {
         // For partial updates, skip if none of the FK fields are in the payload
@@ -810,8 +810,8 @@ export class AtscriptDbTable<
         // Skip if any FK field is null/undefined (nullable FK — no constraint)
         let allPresent = true
         const vals: unknown[] = []
-        for (let i = 0; i < fk.fields.length; i++) {
-          const v = item[fk.fields[i]]
+        for (const field of fk.fields) {
+          const v = item[field]
           if (v === null || v === undefined) { allPresent = false; break }
           vals.push(v)
         }
