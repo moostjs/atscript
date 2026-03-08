@@ -156,4 +156,62 @@ describe('FK Validation', () => {
       comments.insertOne({ body: 'Bad comment', postId: 999 })
     ).rejects.toThrow('FK constraint violation')
   })
+
+  // ── Deep insert FK validation (FROM children) ──────────────────────────
+
+  it('should reject deep insert when FROM child has invalid FK to third table', async () => {
+    const space = createSpace()
+    space.getTable(AuthorType) // register author table
+    const posts = space.getTable(PostType)
+    // Note: CommentType is NOT explicitly registered — it will be lazily resolved
+    // via _writeTableResolver during the nested insert
+
+    seedData()
+
+    // Deep insert: Post with nested Comment that has invalid authorId
+    await expect(
+      posts.insertOne({
+        title: 'Post with bad comment',
+        authorId: 1,
+        comments: [{ body: 'Bad comment', authorId: 999 }],
+      })
+    ).rejects.toThrow('FK constraint violation')
+  })
+
+  it('should allow deep insert when FROM child has valid FK to third table', async () => {
+    const space = createSpace()
+    space.getTable(AuthorType) // register author table
+    const posts = space.getTable(PostType)
+
+    seedData()
+
+    // Deep insert: Post with nested Comment that has valid authorId.
+    // Explicit id so MockAdapter stores it and child FK validation can find it.
+    const result = await posts.insertOne({
+      id: 30,
+      title: 'Post with good comment',
+      authorId: 1,
+      comments: [{ body: 'Good comment', authorId: 1 }],
+    })
+    expect(result.insertedId).toBeDefined()
+  })
+
+  it('should reject deep insert even when FK target table is not pre-registered', async () => {
+    const space = createSpace()
+    // Only register posts — NOT authors or comments
+    const posts = space.getTable(PostType)
+
+    seedData()
+
+    // The Comment table will be lazily resolved, and its FK to authors
+    // should still be validated even though authors table isn't pre-registered.
+    // The _writeTableResolver fallback should resolve the authors table on demand.
+    await expect(
+      posts.insertOne({
+        title: 'Post',
+        authorId: 1,
+        comments: [{ body: 'Bad comment', authorId: 999 }],
+      })
+    ).rejects.toThrow('FK constraint violation')
+  })
 })

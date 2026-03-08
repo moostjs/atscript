@@ -147,6 +147,8 @@ export interface TDbForeignKey {
   targetTable: string
   /** Target field names on the referenced table. */
   targetFields: string[]
+  /** Lazy reference to the target annotated type (for on-demand table resolution). */
+  targetTypeRef?: () => TAtscriptAnnotatedType
   /** Alias grouping FK fields (if any). */
   alias?: string
   /** Referential action on delete. */
@@ -227,7 +229,10 @@ export interface AtscriptDbWritable {
     opts?: { maxDepth?: number; _depth?: number }
   ): Promise<TDbUpdateResult>
   findOne(query: unknown): Promise<Record<string, unknown> | null>
+  count(query: { filter: Record<string, unknown> }): Promise<number>
   deleteMany(filter: unknown): Promise<TDbDeleteResult>
+  /** Pre-validate items (type + FK constraints) without inserting them. */
+  preValidateItems(items: Array<Record<string, unknown>>, opts?: { excludeFkTargetTable?: string }): Promise<void>
 }
 
 /**

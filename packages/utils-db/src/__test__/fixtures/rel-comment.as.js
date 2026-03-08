@@ -2,6 +2,7 @@
 /* eslint-disable */
 /* oxlint-disable */
 import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { Author } from "./rel-author.as"
 import { Post } from "./test-relations.as"
 
 export class Comment {
@@ -41,6 +42,13 @@ $("object", Comment)
       .refTo(() => Post, ["id"])
       .annotate("db.rel.FK", true)
       .annotate("db.rel.onDelete", "cascade")
+      .$type
+  ).prop(
+    "authorId",
+    $()
+      .refTo(() => Author, ["id"])
+      .annotate("db.rel.FK", true)
+      .optional()
       .$type
   ).prop(
     "post",

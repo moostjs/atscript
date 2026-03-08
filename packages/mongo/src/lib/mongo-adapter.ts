@@ -923,20 +923,27 @@ export class MongoAdapter extends BaseDbAdapter {
   async recreateTable(): Promise<void> {
     const tableName = this._table.tableName
     this._log('recreateTable', tableName)
+    const tempName = `${tableName}__tmp_${Date.now()}`
 
-    // 1. Dump all documents
-    const docs = await this.db.collection(tableName).find({}).toArray()
+    // 1. Server-side copy to temp collection (data stays in MongoDB)
+    const source = this.db.collection(tableName)
+    const count = await source.countDocuments()
+    if (count > 0) {
+      await source.aggregate([{ $out: tempName }]).toArray()
+    }
 
-    // 2. Drop the collection
+    // 2. Drop the original collection
     await this.collection.drop()
     this._collection = undefined
 
     // 3. Recreate with current options (e.g. new capped size/max)
     await this.ensureCollectionExists()
 
-    // 4. Re-insert dumped documents
-    if (docs.length > 0) {
-      await this.collection.insertMany(docs)
+    // 4. Copy data back from temp into the recreated collection
+    if (count > 0) {
+      const temp = this.db.collection(tempName)
+      await temp.aggregate([{ $merge: { into: tableName } }]).toArray()
+      await temp.drop()
     }
   }
 

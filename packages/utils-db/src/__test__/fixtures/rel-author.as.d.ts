@@ -47,6 +47,7 @@ export declare class Author {
     "posts.comments.body"?: string
     "posts.comments.createdAt"?: number /* timestamp.created */
     "posts.comments.postId"?: number /* id */
+    "posts.comments.authorId"?: number /* id */
     "posts.comments.post"?: never
     "posts.comments.post.id"?: number
     "posts.comments.post.title"?: string

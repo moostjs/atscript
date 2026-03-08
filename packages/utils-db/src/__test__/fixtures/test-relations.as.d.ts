@@ -58,6 +58,7 @@ export declare class Post {
     "author.posts.comments.body"?: string
     "author.posts.comments.createdAt"?: number /* timestamp.created */
     "author.posts.comments.postId"?: number /* id */
+    "author.posts.comments.authorId"?: number /* id */
     "author.posts.comments.post"?: never
     "author.posts.comments.post.id"?: number
     "author.posts.comments.post.title"?: string
@@ -76,6 +77,7 @@ export declare class Post {
     "comments.body"?: string
     "comments.createdAt"?: number /* timestamp.created */
     "comments.postId"?: number /* id */
+    "comments.authorId"?: number /* id */
     "comments.post"?: never
     "comments.post.id"?: number
     "comments.post.title"?: string

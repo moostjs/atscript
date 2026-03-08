@@ -8,17 +8,19 @@
  */
 
 import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TAtscriptAnnotatedType, TMetadataMap, Validator, TValidatorOptions } from "@atscript/typescript/utils"
+import { Author } from "./rel-author.as"
 import { Post } from "./test-relations.as"
 
 /**
  * Atscript interface **Comment**
- * @see {@link ./rel-comment.as:4:18}
+ * @see {@link ./rel-comment.as:5:18}
  */
 export declare class Comment {
   id: number
   body: string
   createdAt?: number /* timestamp.created */
   postId: number /* id */
+  authorId?: number /* id */
   post?: Post
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof Comment, Comment>
@@ -33,12 +35,13 @@ export declare class Comment {
     "body": string
     "createdAt"?: number /* timestamp.created */
     "postId": number /* id */
+    "authorId"?: number /* id */
     "post"?: never
     "post.id"?: number
     "post.title"?: string
     "post.status"?: string
     "post.createdAt"?: number /* timestamp.created */
-    "post.authorId"?: Author["id"]
+    "post.authorId"?: number /* id */
     "post.author"?: never
     "post.author.id"?: number
     "post.author.name"?: string
@@ -48,7 +51,7 @@ export declare class Comment {
     "post.author.posts.title"?: string
     "post.author.posts.status"?: string
     "post.author.posts.createdAt"?: number /* timestamp.created */
-    "post.author.posts.authorId"?: Author["id"]
+    "post.author.posts.authorId"?: number /* id */
     "post.author.posts.author"?: {
       id: number
       name: string
@@ -60,12 +63,13 @@ export declare class Comment {
     "post.author.posts.comments.body"?: string
     "post.author.posts.comments.createdAt"?: number /* timestamp.created */
     "post.author.posts.comments.postId"?: number /* id */
+    "post.author.posts.comments.authorId"?: number /* id */
     "post.author.posts.comments.post"?: {
       id: number
       title: string
       status: string
       createdAt?: number /* timestamp.created */
-      authorId: Author["id"]
+      authorId: number /* id */
       author?: Author
       comments?: Comment[]
     }
@@ -74,12 +78,13 @@ export declare class Comment {
     "post.comments.body"?: string
     "post.comments.createdAt"?: number /* timestamp.created */
     "post.comments.postId"?: number /* id */
+    "post.comments.authorId"?: number /* id */
     "post.comments.post"?: {
       id: number
       title: string
       status: string
       createdAt?: number /* timestamp.created */
-      authorId: Author["id"]
+      authorId: number /* id */
       author?: Author
       comments?: Comment[]
     }
@@ -89,6 +94,7 @@ export declare class Comment {
     "body": string
     "createdAt"?: number /* timestamp.created */
     "postId": number /* id */
+    "authorId"?: number /* id */
   }
   
   static __navProps: {

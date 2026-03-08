@@ -23,6 +23,7 @@ import type {
   TDbInsertResult,
   TDbUpdateResult,
   TFkLookupResolver,
+  TFkLookupTarget,
   TTableResolver,
   TWriteTableResolver,
 } from './types'
@@ -183,6 +184,13 @@ export class AtscriptDbTable<
       // Validate FK references (application-level, for adapters without native FK support)
       await this._validateForeignKeys(items)
 
+      // Pre-validate FROM children (types + FK constraints) before the main insert.
+      // Catches errors early (before the parent is committed), essential for
+      // adapters without transaction support.
+      if (canNest) {
+        await this._preValidateNestedFrom(payloads as Array<Record<string, unknown>>)
+      }
+
       // Phase 2: Batch main insert
       const result = await this.adapter.insertMany(prepared)
 
@@ -251,6 +259,11 @@ export class AtscriptDbTable<
 
       // Validate FK references (application-level, for adapters without native FK support)
       await this._validateForeignKeys(items)
+
+      // Pre-validate FROM children (types + FK constraints) before the main replace
+      if (canNest) {
+        await this._preValidateNestedFrom(originals)
+      }
 
       // Phase 2: Main replace — strip nav fields, prepare, replace each
       let matchedCount = 0
@@ -740,16 +753,43 @@ export class AtscriptDbTable<
   // ── Internal: FK validation ─────────────────────────────────────────────
 
   /**
+   * Pre-validate items (type validation + FK constraints) without inserting them.
+   * Used by parent tables to validate FROM children before the main insert,
+   * ensuring errors are caught before the parent is committed.
+   *
+   * @param opts.excludeFkTargetTable - Skip FK validation to this table (the parent).
+   */
+  public async preValidateItems(
+    items: Array<Record<string, unknown>>,
+    opts?: { excludeFkTargetTable?: string }
+  ): Promise<void> {
+    this._flatten()
+
+    // Type validation: apply defaults, strip nav fields, run validator
+    const validator = this.getValidator('insert')
+    for (const raw of items) {
+      const data = this._applyDefaults({ ...raw })
+      for (const navField of this._navFields) { delete data[navField] }
+      if (!validator.validate(data)) { throw new Error('Validation failed for insert') }
+    }
+
+    // FK validation
+    await this._validateForeignKeys(items, false, opts?.excludeFkTargetTable)
+  }
+
+  /**
    * Validates that all FK field values reference existing records in target tables.
    * Only runs for adapters without native FK support (e.g. MongoDB).
    * No-op if the adapter has native FK support or no resolver is set.
    *
    * @param items - Records to validate (pre-write, logical field names).
    * @param partial - If true, only validate FK fields present in the data (for updates).
+   * @param excludeTargetTable - Skip FKs referencing this table (for pre-validation of children).
    */
   private async _validateForeignKeys(
     items: Array<Record<string, unknown>>,
-    partial?: boolean
+    partial?: boolean,
+    excludeTargetTable?: string
   ): Promise<void> {
     if (this.adapter.supportsNativeForeignKeys() || !this._fkLookupResolver) { return }
 
@@ -757,6 +797,9 @@ export class AtscriptDbTable<
     const checks: Array<() => Promise<void>> = []
 
     for (const [, fk] of this._foreignKeys) {
+      // Skip FKs that reference the excluded table (e.g. FROM child → parent during pre-validation)
+      if (excludeTargetTable && fk.targetTable === excludeTargetTable) { continue }
+
       // Collect unique FK values across all items using Sets for O(1) dedup
       const valueSets: Set<unknown>[] = fk.fields.map(() => new Set<unknown>())
 
@@ -781,8 +824,14 @@ export class AtscriptDbTable<
 
       if (valueSets[0].size === 0) { continue }
 
-      // Resolve target table
-      const target = this._fkLookupResolver(fk.targetTable)
+      // Resolve target table — try lookup resolver first, then write resolver as fallback
+      let target: TFkLookupTarget | undefined = this._fkLookupResolver(fk.targetTable)
+      if (!target && fk.targetTypeRef && this._writeTableResolver) {
+        const resolved = this._writeTableResolver(fk.targetTypeRef())
+        if (resolved) {
+          target = { count: (filter: Record<string, unknown>) => resolved.count({ filter }) }
+        }
+      }
       if (!target) { continue }
 
       // Build filter on target table's fields and count matching records
@@ -855,6 +904,49 @@ export class AtscriptDbTable<
           items[sourceIndices[j]][fk.localFields[0]] = result.insertedIds[j]
         }
       }
+    }
+  }
+
+  /**
+   * Pre-validates FROM children (type + FK constraints) before the main insert.
+   * Catches errors early before the parent record is committed, essential for
+   * adapters without transaction support.
+   */
+  private async _preValidateNestedFrom(
+    originals: Array<Record<string, unknown>>
+  ): Promise<void> {
+    for (const [navField, relation] of this._relations) {
+      if (relation.direction !== 'from') { continue }
+
+      if (!this._writeTableResolver) { continue }
+      const targetTable = this._writeTableResolver(relation.targetType())
+      if (!targetTable) { continue }
+
+      // Find the FK field(s) on the child that reference this parent table.
+      // These will be auto-filled during the actual insert, so we set placeholder
+      // values to satisfy required-field validation.
+      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
+
+      const allChildren: Array<Record<string, unknown>> = []
+      for (const orig of originals) {
+        const children = orig[navField]
+        if (!Array.isArray(children)) { continue }
+        for (const child of children) {
+          const childData = { ...(child as Record<string, unknown>) }
+          // Set placeholder values for the FK-to-parent fields
+          if (remoteFK) {
+            for (const field of remoteFK.fields) {
+              if (!(field in childData)) { childData[field] = 0 }
+            }
+          }
+          allChildren.push(childData)
+        }
+      }
+      if (allChildren.length === 0) { continue }
+
+      // Validate types + FKs to third tables, excluding the FK back to this
+      // (parent) table since the parent record doesn't exist yet
+      await targetTable.preValidateItems(allChildren, { excludeFkTargetTable: this.tableName })
     }
   }
 

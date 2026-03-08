@@ -821,6 +821,7 @@ export class AtscriptDbReadable<
             fields: [fieldName],
             targetTable,
             targetFields: [targetField],
+            targetTypeRef: fieldType.ref.type,
             alias,
           })
         }
