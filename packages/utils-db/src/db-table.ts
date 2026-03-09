@@ -148,7 +148,7 @@ export class AtscriptDbTable<
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
     if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
-    return this.adapter.withTransaction(async () => {
+    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Clone + apply defaults (keep originals for FROM phase)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
 
@@ -193,7 +193,7 @@ export class AtscriptDbTable<
       }
 
       return result
-    })
+    }))
   }
 
   /**
@@ -225,7 +225,7 @@ export class AtscriptDbTable<
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
     if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
-    return this.adapter.withTransaction(async () => {
+    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — clone + defaults, validate full payload (including nav fields)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
       const originals = canNest ? payloads.map(p => ({ ...p })) : []
@@ -273,7 +273,7 @@ export class AtscriptDbTable<
       }
 
       return { matchedCount, modifiedCount }
-    })
+    }))
   }
 
   /**
@@ -304,7 +304,7 @@ export class AtscriptDbTable<
     const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
     if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
-    return this.adapter.withTransaction(async () => {
+    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — validate full payload (plugin checks nav field constraints)
       const validator = this.getValidator('bulkUpdate')
       const ctx: DbValidationContext = { mode: 'patch' }
@@ -351,7 +351,7 @@ export class AtscriptDbTable<
       }
 
       return { matchedCount, modifiedCount }
-    })
+    }))
   }
 
   /**
@@ -368,12 +368,12 @@ export class AtscriptDbTable<
       return { deletedCount: 0 }
     }
     if (this._needsCascade()) {
-      return this.adapter.withTransaction(async () => {
+      return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
         await this._cascadeBeforeDelete(filter)
         return this.adapter.deleteOne(this._translateFilter(filter))
-      })
+      }))
     }
-    return this.adapter.deleteOne(this._translateFilter(filter))
+    return this._enrichFkViolation(() => this.adapter.deleteOne(this._translateFilter(filter)))
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -384,10 +384,10 @@ export class AtscriptDbTable<
   ): Promise<TDbUpdateResult> {
     this._flatten()
     await this._validateForeignKeys([data as Record<string, unknown>], true)
-    return this.adapter.updateMany(
+    return this._enrichFkViolation(() => this.adapter.updateMany(
       this._translateFilter(filter as FilterExpr),
       this._prepareForWrite({ ...data })
-    )
+    ))
   }
 
   public async replaceMany(
@@ -396,21 +396,21 @@ export class AtscriptDbTable<
   ): Promise<TDbUpdateResult> {
     this._flatten()
     await this._validateForeignKeys([data])
-    return this.adapter.replaceMany(
+    return this._enrichFkViolation(() => this.adapter.replaceMany(
       this._translateFilter(filter as FilterExpr),
       this._prepareForWrite({ ...data })
-    )
+    ))
   }
 
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
     this._flatten()
     if (this._needsCascade()) {
-      return this.adapter.withTransaction(async () => {
+      return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
         await this._cascadeBeforeDelete(filter as FilterExpr)
         return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
-      })
+      }))
     }
-    return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
+    return this._enrichFkViolation(() => this.adapter.deleteMany(this._translateFilter(filter as FilterExpr)))
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -1104,6 +1104,29 @@ export class AtscriptDbTable<
       }
       if (e instanceof DbError) {
         throw new DbError(e.code, AtscriptDbTable._prefixErrorPaths(e.errors, navField))
+      }
+      throw e
+    }
+  }
+
+  /**
+   * Catches `DbError('FK_VIOLATION')` with empty paths (from adapters that
+   * enforce FKs natively but can't report which field failed) and enriches
+   * the error with all FK field names from table metadata.
+   */
+  private async _enrichFkViolation<R>(fn: () => Promise<R>): Promise<R> {
+    try {
+      return await fn()
+    } catch (e) {
+      if (e instanceof DbError && e.code === 'FK_VIOLATION' && e.errors.every(err => !err.path)) {
+        const msg = e.errors[0]?.message ?? e.message
+        const errors: Array<{ path: string; message: string }> = []
+        for (const [, fk] of this._foreignKeys) {
+          for (const field of fk.fields) {
+            errors.push({ path: field, message: msg })
+          }
+        }
+        throw new DbError('FK_VIOLATION', errors.length > 0 ? errors : e.errors)
       }
       throw e
     }

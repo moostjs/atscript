@@ -93,17 +93,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     } catch (e: unknown) {
       if (e instanceof Error) {
         if (e.message.includes('FOREIGN KEY constraint failed')) {
-          // Extract FK field names from table metadata for better error paths
-          const fkFields = this._table?.foreignKeys
-          const errors: Array<{ path: string; message: string }> = []
-          if (fkFields && fkFields.size > 0) {
-            for (const [field] of fkFields) {
-              errors.push({ path: field, message: e.message })
-            }
-          } else {
-            errors.push({ path: '', message: e.message })
-          }
-          throw new DbError('FK_VIOLATION', errors)
+          throw new DbError('FK_VIOLATION', [{ path: '', message: e.message }])
         }
         const uniqueMatch = e.message.match(/UNIQUE constraint failed:\s*\S+\.(\S+)/)
         if (uniqueMatch) {

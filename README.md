@@ -13,8 +13,8 @@ Atscript is language-agnostic by design. Today, TypeScript is the first supporte
 
 ## Planned Direction
 
-- Automated UI forms driven by the same model
-- Table and list views derived from model metadata
+- UI tools for forms driven by live model metadata and schema
+- Table and list tools driven by the same source model
 - A broader model-driven flow from UI to API to TypeScript to DB
 
 ## Start Here
