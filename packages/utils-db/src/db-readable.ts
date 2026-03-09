@@ -64,6 +64,10 @@ const INDEX_PREFIX = 'atscript__'
  * Resolves the design type from an annotated type.
  * Encapsulates the `kind === ''` check and fallback logic that
  * otherwise trips up every adapter author.
+ *
+ * For union types (e.g., from flattened `{...} | {...}` objects):
+ * - If all members resolve to the same type → returns that type (strong type)
+ * - If members disagree → returns `'union'` (out of scope for type management)
  */
 export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
   if (fieldType.type.kind === '') {
@@ -71,6 +75,16 @@ export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
   }
   if (fieldType.type.kind === 'object') { return 'object' }
   if (fieldType.type.kind === 'array') { return 'array' }
+  if (fieldType.type.kind === 'union') {
+    const items = (fieldType.type as { items: TAtscriptAnnotatedType[] }).items
+    if (items.length > 0) {
+      const resolved = items.map(item => resolveDesignType(item))
+      if (resolved.every(type => type === resolved[0])) {
+        return resolved[0]
+      }
+    }
+    return 'union'
+  }
   return 'string'
 }
 

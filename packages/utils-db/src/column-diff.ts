@@ -1,4 +1,5 @@
 import type { TDbFieldMeta, TExistingColumn, TColumnDiff } from './types'
+import { serializeDefaultValue } from './schema-hash'
 
 /**
  * Computes the difference between desired schema fields and existing database columns.
@@ -22,6 +23,8 @@ export function computeColumnDiff(
   const added: TDbFieldMeta[] = []
   const renamed: TColumnDiff['renamed'] = []
   const typeChanged: TColumnDiff['typeChanged'] = []
+  const nullableChanged: TColumnDiff['nullableChanged'] = []
+  const defaultChanged: TColumnDiff['defaultChanged'] = []
   const conflicts: TColumnDiff['conflicts'] = []
 
   for (const field of desired) {
@@ -35,11 +38,30 @@ export function computeColumnDiff(
       if (field.renamedFrom && existingByName.has(field.renamedFrom)) {
         conflicts.push({ field, oldName: field.renamedFrom, conflictsWith: field.physicalName })
         renamedOldNames.add(field.renamedFrom)
-      } else if (typeMapper) {
-        // Check type
-        const expectedType = typeMapper(field)
-        if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
-          typeChanged.push({ field, existingType: existingCol.type })
+      } else {
+        // Check type change (requires typeMapper)
+        if (typeMapper) {
+          const expectedType = typeMapper(field)
+          if (expectedType.toUpperCase() !== existingCol.type.toUpperCase()) {
+            typeChanged.push({ field, existingType: existingCol.type })
+          }
+        }
+
+        // Check nullable change — skip primary keys (SQLite PRAGMA reports notnull=0
+        // for INTEGER PRIMARY KEY even though it enforces non-null on them)
+        if (!field.isPrimaryKey && !existingCol.pk) {
+          const desiredNotNull = !field.optional
+          if (existingCol.notnull !== desiredNotNull) {
+            nullableChanged.push({ field, wasNullable: !existingCol.notnull })
+          }
+        }
+
+        // Check default value change — only when a baseline exists.
+        // When existingCol.dflt_value is undefined, we have no baseline
+        // (e.g., old DDL without DEFAULT clause) and can't detect changes.
+        const desiredDefault = serializeDefaultValue(field.defaultValue)
+        if (existingCol.dflt_value !== undefined && existingCol.dflt_value !== desiredDefault) {
+          defaultChanged.push({ field, oldDefault: existingCol.dflt_value, newDefault: desiredDefault })
         }
       }
     } else if (field.renamedFrom && existingByName.has(field.renamedFrom)) {
@@ -56,5 +78,5 @@ export function computeColumnDiff(
     c => !desiredByName.has(c.name) && !renamedOldNames.has(c.name)
   )
 
-  return { added, removed, renamed, typeChanged, conflicts }
+  return { added, removed, renamed, typeChanged, nullableChanged, defaultChanged, conflicts }
 }

@@ -21,6 +21,7 @@ import {
   buildSelect,
   buildUpdate,
   esc,
+  sqlStringLiteral,
   toSqliteValue,
   sqliteTypeFromDesignType,
 } from './sql-builder'
@@ -274,9 +275,14 @@ export class SqliteAdapter extends BaseDbAdapter {
     for (const field of diff.added) {
       const sqlType = this.typeMapper(field)
       let ddl = `ALTER TABLE "${esc(tableName)}" ADD COLUMN "${esc(field.physicalName)}" ${sqlType}`
-      // SQLite: NOT NULL requires a DEFAULT value for ADD COLUMN
       if (!field.optional && !field.isPrimaryKey) {
-        ddl += ` NOT NULL DEFAULT ${defaultValueForType(field.designType)}`
+        ddl += ' NOT NULL'
+      }
+      // SQLite ADD COLUMN with NOT NULL requires a DEFAULT; also emit explicit @db.default
+      if (field.defaultValue?.kind === 'value') {
+        ddl += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
+      } else if (!field.optional && !field.isPrimaryKey) {
+        ddl += ` DEFAULT ${defaultValueForType(field.designType)}`
       }
       this._log(ddl)
       this.driver.exec(ddl)
@@ -290,28 +296,49 @@ export class SqliteAdapter extends BaseDbAdapter {
     const tableName = this.resolveTableName()
     const tempName = `${tableName}__tmp_${Date.now()}`
 
-    // 1. Create new table with temp name
-    const createSql = buildCreateTable(tempName, this._table.fieldDescriptors, this._table.foreignKeys)
-    this._log(createSql)
-    this.driver.exec(createSql)
+    // Disable FK checks during recreation — referenced tables may be mid-sync
+    this.driver.exec('PRAGMA foreign_keys = OFF')
+    this.driver.exec('PRAGMA legacy_alter_table = ON')
+    try {
+      // 1. Create new table with temp name
+      const createSql = buildCreateTable(tempName, this._table.fieldDescriptors, this._table.foreignKeys)
+      this._log(createSql)
+      this.driver.exec(createSql)
 
-    // 2. Get columns that exist in both old and new
-    const oldCols = (await this.getExistingColumns()).map(c => c.name)
-    const newCols = this._table.fieldDescriptors.filter(f => !f.ignored).map(f => f.physicalName)
-    const oldColSet = new Set(oldCols)
-    const commonCols = newCols.filter(c => oldColSet.has(c))
+      // 2. Get columns that exist in both old and new
+      const oldCols = (await this.getExistingColumns()).map(c => c.name)
+      const newCols = this._table.fieldDescriptors.filter(f => !f.ignored).map(f => f.physicalName)
+      const oldColSet = new Set(oldCols)
+      const commonCols = newCols.filter(c => oldColSet.has(c))
 
-    if (commonCols.length > 0) {
-      // 3. Copy data
-      const cols = commonCols.map(c => `"${esc(c)}"`).join(', ')
-      const copySql = `INSERT INTO "${esc(tempName)}" (${cols}) SELECT ${cols} FROM "${esc(tableName)}"`
-      this._log(copySql)
-      this.driver.exec(copySql)
+      if (commonCols.length > 0) {
+        // 3. Copy data — use COALESCE for columns that became NOT NULL
+        const fieldsByName = new Map(this._table.fieldDescriptors.map(f => [f.physicalName, f]))
+        const colNames = commonCols.map(c => `"${esc(c)}"`).join(', ')
+        const selectExprs = commonCols.map(c => {
+          const field = fieldsByName.get(c)
+          if (field && !field.optional && !field.isPrimaryKey) {
+            const fallback = field.defaultValue?.kind === 'value'
+              ? sqlStringLiteral(field.defaultValue.value)
+              : defaultValueForType(field.designType)
+            return `COALESCE("${esc(c)}", ${fallback}) AS "${esc(c)}"`
+          }
+          return `"${esc(c)}"`
+        }).join(', ')
+        const copySql = `INSERT INTO "${esc(tempName)}" (${colNames}) SELECT ${selectExprs} FROM "${esc(tableName)}"`
+        this._log(copySql)
+        this.driver.exec(copySql)
+      }
+
+      // 4. Rename old table out of the way, rename new into place, drop old
+      const oldName = `${tableName}__old_${Date.now()}`
+      this.driver.exec(`ALTER TABLE "${esc(tableName)}" RENAME TO "${esc(oldName)}"`)
+      this.driver.exec(`ALTER TABLE "${esc(tempName)}" RENAME TO "${esc(tableName)}"`)
+      this.driver.exec(`DROP TABLE IF EXISTS "${esc(oldName)}"`)
+    } finally {
+      this.driver.exec('PRAGMA legacy_alter_table = OFF')
+      this.driver.exec('PRAGMA foreign_keys = ON')
     }
-
-    // 4. Drop old, rename new
-    this.driver.exec(`DROP TABLE "${esc(tableName)}"`)
-    this.driver.exec(`ALTER TABLE "${esc(tempName)}" RENAME TO "${esc(tableName)}"`)
   }
 
   async dropTable(): Promise<void> {
@@ -360,7 +387,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async getExistingColumnsForTable(tableName: string): Promise<TExistingColumn[]> {
-    const rows = this.driver.all<{ name: string; type: string; notnull: number; pk: number }>(
+    const rows = this.driver.all<{ name: string; type: string; notnull: number; pk: number; dflt_value: string | null }>(
       `PRAGMA table_info("${esc(tableName)}")`
     )
     return rows.map(r => ({
@@ -368,6 +395,7 @@ export class SqliteAdapter extends BaseDbAdapter {
       type: r.type,
       notnull: r.notnull === 1,
       pk: r.pk > 0,
+      dflt_value: normalizeSqliteDefault(r.dflt_value),
     }))
   }
 
@@ -407,4 +435,15 @@ function defaultValueForType(designType: string): string {
     case 'boolean': { return '0' }
     default: { return "''" }
   }
+}
+
+/** Normalizes SQLite PRAGMA dflt_value to match serialized format.
+ *  PRAGMA returns `'active'` (SQL-quoted), we store `active` (raw). */
+function normalizeSqliteDefault(value: string | null): string | undefined {
+  if (value == null) { return undefined }
+  // Strip enclosing single quotes from string literals
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1)
+  }
+  return value
 }

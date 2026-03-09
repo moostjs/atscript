@@ -123,6 +123,9 @@ export function buildCreateTable(
     if (!field.optional && !field.isPrimaryKey) {
       def += ' NOT NULL'
     }
+    if (field.defaultValue?.kind === 'value') {
+      def += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
+    }
     colDefs.push(def)
   }
 
@@ -194,6 +197,11 @@ function buildProjection(select?: UniquSelect): string {
 
 export function esc(name: string): string {
   return name.replace(/"/g, '""')
+}
+
+/** Formats a string value as a SQL literal with single-quote escaping. */
+export function sqlStringLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
 }
 
 /**

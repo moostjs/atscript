@@ -23,6 +23,9 @@ import {
   type WithRelation,
   type AtscriptQueryFieldRef,
   type AtscriptQueryNode,
+  type TColumnDiff,
+  type TSyncColumnResult,
+  type TDbFieldMeta,
 } from '@atscript/utils-db'
 import type {
   AggregationCursor,
@@ -1325,6 +1328,72 @@ export class MongoAdapter extends BaseDbAdapter {
       await temp.aggregate([{ $merge: { into: tableName } }]).toArray()
       await temp.drop()
     }
+  }
+
+  // ── Column sync (snapshot-based Path B) ──────────────────────────────────
+
+  async syncColumns(diff: TColumnDiff): Promise<TSyncColumnResult> {
+    const renamed: string[] = []
+    const added: string[] = []
+    const update: Record<string, Record<string, unknown>> = {}
+
+    // Renames — use $rename operator
+    if (diff.renamed.length > 0) {
+      const renameSpec: Record<string, string> = {}
+      for (const r of diff.renamed) {
+        renameSpec[r.oldName] = r.field.physicalName
+        renamed.push(r.field.physicalName)
+      }
+      update.$rename = renameSpec
+    }
+
+    // Adds — use $set with default values
+    if (diff.added.length > 0) {
+      const setSpec: Record<string, unknown> = {}
+      for (const field of diff.added) {
+        const defaultVal = this._resolveSyncDefault(field)
+        if (defaultVal !== undefined) {
+          setSpec[field.physicalName] = defaultVal
+        }
+        added.push(field.physicalName)
+      }
+      if (Object.keys(setSpec).length > 0) {
+        update.$set = setSpec
+      }
+    }
+
+    if (Object.keys(update).length > 0) {
+      await this.collection.updateMany({}, update, this._getSessionOpts())
+    }
+
+    return { added, renamed }
+  }
+
+  async dropColumns(columns: string[]): Promise<void> {
+    if (columns.length === 0) { return }
+    const unsetSpec: Record<string, ''> = {}
+    for (const col of columns) {
+      unsetSpec[col] = ''
+    }
+    await this.collection.updateMany({}, { $unset: unsetSpec }, this._getSessionOpts())
+  }
+
+  async renameTable(oldName: string): Promise<void> {
+    const newName = this.resolveTableName(false)
+    this._log('renameTable', oldName, '→', newName)
+    await this.db.renameCollection(oldName, newName)
+    this._collection = undefined
+  }
+
+  /**
+   * Resolves a field's default value for bulk $set during column sync.
+   * Returns `undefined` if no concrete default can be determined.
+   */
+  private _resolveSyncDefault(field: TDbFieldMeta): unknown {
+    if (!field.defaultValue) { return field.optional ? null : undefined }
+    if (field.defaultValue.kind === 'value') { return field.defaultValue.value }
+    // Function defaults (increment, uuid, now) can't be bulk-applied retroactively
+    return undefined
   }
 
   async syncIndexes(): Promise<void> {

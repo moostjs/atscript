@@ -4,11 +4,13 @@ import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { AtscriptDbTable } from './db-table'
 import { AtscriptDbView } from './db-view'
 import type { AtscriptDbReadable } from './db-readable'
+import type { BaseDbAdapter } from './base-adapter'
 import type { DbSpace } from './db-space'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
-import type { TDbFieldMeta } from './types'
-import { computeTableSnapshot, computeSchemaHash } from './schema-hash'
+import type { TColumnDiff, TDbFieldMeta } from './types'
+import { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns } from './schema-hash'
+import type { TTableSnapshot, TViewSnapshot } from './schema-hash'
 import { computeColumnDiff } from './column-diff'
 
 // ── Colors ───────────────────────────────────────────────────────────────
@@ -41,6 +43,8 @@ export interface TSyncEntryInit {
   columnsToAdd?: TDbFieldMeta[]
   columnsToRename?: Array<{ from: string; to: string }>
   typeChanges?: Array<{ column: string; fromType: string; toType: string }>
+  nullableChanges?: Array<{ column: string; toNullable: boolean }>
+  defaultChanges?: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   columnsToDrop?: string[]
   columnsAdded?: string[]
   columnsRenamed?: string[]
@@ -61,6 +65,8 @@ export class SyncEntry {
   readonly columnsToAdd: TDbFieldMeta[]
   readonly columnsToRename: Array<{ from: string; to: string }>
   readonly typeChanges: Array<{ column: string; fromType: string; toType: string }>
+  readonly nullableChanges: Array<{ column: string; toNullable: boolean }>
+  readonly defaultChanges: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   readonly columnsToDrop: string[]
 
   // Result fields
@@ -79,6 +85,8 @@ export class SyncEntry {
     this.columnsToAdd = init.columnsToAdd ?? []
     this.columnsToRename = init.columnsToRename ?? []
     this.typeChanges = init.typeChanges ?? []
+    this.nullableChanges = init.nullableChanges ?? []
+    this.defaultChanges = init.defaultChanges ?? []
     this.columnsToDrop = init.columnsToDrop ?? []
     this.columnsAdded = init.columnsAdded ?? []
     this.columnsRenamed = init.columnsRenamed ?? []
@@ -167,6 +175,12 @@ export class SyncEntry {
           const action = this.syncMethod ? ` — ${this.syncMethod}` : ' — requires migration'
           return `      ${c.red(`! ${tc.column}: ${tc.fromType} → ${tc.toType}${action}`)}`
         }),
+        ...this.nullableChanges.map(nc =>
+          `      ${c.yellow(`~ ${nc.column} — ${nc.toNullable ? 'nullable' : 'non-nullable'}`)}`
+        ),
+        ...this.defaultChanges.map(dc =>
+          `      ${c.yellow(`~ ${dc.column} — default ${dc.oldDefault ?? 'none'} → ${dc.newDefault ?? 'none'}`)}`
+        ),
         ...this.columnsToDrop.map(col =>
           `      ${c.red(`- ${col} — drop`)}`
         ),
@@ -274,6 +288,7 @@ export class SchemaSync {
 
   /**
    * Resolves types into categorized readables and computes the schema hash.
+   * Passes each adapter's typeMapper for precise type tracking in snapshots.
    */
   private async resolveAndHash(types: TAtscriptAnnotatedType[]): Promise<{
     tables: AtscriptDbReadable[]
@@ -299,7 +314,11 @@ export class SchemaSync {
     }
     const allReadables = [...tables, ...views, ...externalViews]
 
-    const snapshots = allReadables.map(r => computeTableSnapshot(r))
+    const snapshots = allReadables.map(r => {
+      if (r.isView) { return computeViewSnapshot(r as AtscriptDbView) }
+      const tm = r.dbAdapter.typeMapper?.bind(r.dbAdapter)
+      return computeTableSnapshot(r, tm)
+    })
     const hash = computeSchemaHash(snapshots)
 
     return { tables, views, externalViews, hash }
@@ -313,6 +332,7 @@ export class SchemaSync {
     const adapter = view.dbAdapter
     const name = view.tableName
     if (adapter.getExistingColumns) {
+      // Path A: Live introspection (SQLite)
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0) {
         return new SyncEntry({
@@ -333,6 +353,17 @@ export class SchemaSync {
           viewType: 'E',
           status: 'error',
           errors: [`External view "${name}" is missing columns: ${missing.join(', ')}`],
+        })
+      }
+    } else if (adapter.tableExists) {
+      // Path B: Existence check only (MongoDB — no column introspection)
+      const exists = await adapter.tableExists()
+      if (!exists) {
+        return new SyncEntry({
+          name,
+          viewType: 'E',
+          status: 'error',
+          errors: [`External view "${name}" not found in the database`],
         })
       }
     }
@@ -425,15 +456,7 @@ export class SchemaSync {
       const removed = await this.detectRemoved(allReadables, previouslyTracked)
 
       for (const readable of views) {
-        const view = readable as AtscriptDbView
-        const renamedFrom = view.renamedFrom
-        const isRenamed = renamedFrom && trackedNames.has(renamedFrom)
-        // Drop old view if renamed (views don't support ALTER VIEW)
-        if (isRenamed) {
-          await this.space.dropViewByName(renamedFrom)
-        }
-        await readable.dbAdapter.ensureTable()
-        entries.push(this.buildViewEntry(view, trackedNames))
+        entries.push(await this.syncView(readable as AtscriptDbView, trackedNames))
       }
 
       // Check external views
@@ -451,6 +474,31 @@ export class SchemaSync {
           }
         }
         entries.push(...removed.filter(e => e.viewType !== 'E'))
+      }
+
+      // Store per-table snapshots
+      for (const readable of allReadables) {
+        const adapter = readable.dbAdapter
+        const tm = adapter.typeMapper?.bind(adapter)
+        const snapshot = readable.isView
+          ? computeViewSnapshot(readable as AtscriptDbView)
+          : computeTableSnapshot(readable, tm)
+        await this.writeTableSnapshot(readable.tableName, snapshot)
+      }
+
+      // Clean up snapshots for dropped tables/views
+      if (!safe) {
+        for (const entry of removed) {
+          if (entry.viewType === 'E') { continue }
+          await this.deleteTableSnapshot(entry.name)
+        }
+      }
+
+      // Clean up old-name snapshots after renames
+      for (const readable of allReadables) {
+        if (readable.renamedFrom) {
+          await this.deleteTableSnapshot(readable.renamedFrom)
+        }
       }
 
       await this.writeTrackedList(allReadables)
@@ -479,8 +527,8 @@ export class SchemaSync {
     let planEntries = await Promise.all(tables.map(r => this.planTable(r, trackedNames)))
 
     // Add managed views to plan
-    const viewEntries: SyncEntry[] = views.map(v =>
-      this.buildViewEntry(v as AtscriptDbView, trackedNames)
+    const viewEntries: SyncEntry[] = await Promise.all(
+      views.map(v => this.planView(v as AtscriptDbView, trackedNames))
     )
 
     // Check external views
@@ -512,6 +560,14 @@ export class SchemaSync {
     }
   }
 
+  /** Fallback typeMapper for snapshot-based Path B: compares designType directly, skips unions. */
+  private resolveTypeMapper(adapter: BaseDbAdapter): (f: TDbFieldMeta) => string {
+    return adapter.typeMapper?.bind(adapter)
+      ?? ((f: TDbFieldMeta) => f.designType === 'union' ? 'union' : f.designType)
+  }
+
+  // ── Plan table ──────────────────────────────────────────────────────
+
   private async planTable(readable: AtscriptDbReadable, trackedNames: Set<string>): Promise<SyncEntry> {
     const adapter = readable.dbAdapter
     const name = readable.tableName
@@ -530,7 +586,7 @@ export class SchemaSync {
     }
 
     if (adapter.getExistingColumns) {
-      // If rename is pending, introspect the old-named table (DB still has old name)
+      // Path A: Live introspection (SQLite)
       const existing = pendingRename && adapter.getExistingColumnsForTable
         ? await adapter.getExistingColumnsForTable(renamedFrom)
         : await adapter.getExistingColumns()
@@ -540,43 +596,27 @@ export class SchemaSync {
       } else if (existing.length > 0) {
         const typeMapper = adapter.typeMapper?.bind(adapter)
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
-        init.columnsToAdd = diff.added
-        init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
-        init.typeChanges = diff.typeChanged.map(tc => ({
-          column: tc.field.physicalName,
-          fromType: tc.existingType,
-          toType: tc.field.designType,
-        }))
-        init.columnsToDrop = diff.removed.map(c => c.name)
-        const hasChanges = diff.added.length > 0 ||
-          diff.renamed.length > 0 ||
-          diff.typeChanged.length > 0 ||
-          diff.removed.length > 0
-        if (hasChanges) { init.status = 'alter' }
-        // Rename conflicts → error
-        if (diff.conflicts.length > 0) {
-          init.status = 'error'
-          init.errors = [
-            ...(init.errors ?? []),
-            ...diff.conflicts.map(c =>
-              `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
-            ),
-          ]
+        this.populatePlanFromDiff(diff, init, name, readable.syncMethod)
+      }
+    } else if (adapter.syncColumns) {
+      // Path B: Snapshot-based diffing (MongoDB)
+      const snapshotName = pendingRename ? renamedFrom : name
+      const storedSnapshot = await this.readTableSnapshot(snapshotName)
+      if (!storedSnapshot) {
+        if (!pendingRename) {
+          const exists = adapter.tableExists ? await adapter.tableExists() : false
+          if (!exists) {
+            init.status = 'create'
+            init.columnsToAdd = readable.fieldDescriptors.filter(f => !f.ignored)
+          }
         }
-        // Type changes without a sync method → error (sync will fail)
-        if (diff.typeChanged.length > 0 && !readable.syncMethod) {
-          init.status = 'error'
-          init.errors = [
-            ...(init.errors ?? []),
-            ...diff.typeChanged.map(tc =>
-              `Type change on ${name}.${tc.field.physicalName} ` +
-              `(${tc.existingType} → ${tc.field.designType}). ` +
-              `Add @db.sync.method "recreate" or "drop", or migrate manually.`
-            ),
-          ]
-        }
+      } else {
+        const existing = snapshotToExistingColumns(storedSnapshot)
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing, this.resolveTypeMapper(adapter))
+        this.populatePlanFromDiff(diff, init, name, readable.syncMethod)
       }
     } else if (adapter.tableExists) {
+      // Path C: Schema-less, no syncColumns
       const exists = await adapter.tableExists()
       if (!exists) { init.status = 'create' }
     } else {
@@ -595,25 +635,93 @@ export class SchemaSync {
     return new SyncEntry(init)
   }
 
-  // ── View entry builder ──────────────────────────────────────────────
+  /**
+   * Populates plan init from a column diff (shared by Path A and Path B).
+   */
+  private populatePlanFromDiff(
+    diff: TColumnDiff,
+    init: TSyncEntryInit,
+    name: string,
+    syncMethod?: 'drop' | 'recreate'
+  ): void {
+    init.columnsToAdd = diff.added
+    init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
+    init.typeChanges = diff.typeChanged.map(tc => ({
+      column: tc.field.physicalName,
+      fromType: tc.existingType,
+      toType: tc.field.designType,
+    }))
+    init.nullableChanges = diff.nullableChanged.map(nc => ({
+      column: nc.field.physicalName,
+      toNullable: nc.field.optional,
+    }))
+    init.defaultChanges = diff.defaultChanged.map(dc => ({
+      column: dc.field.physicalName,
+      oldDefault: dc.oldDefault,
+      newDefault: dc.newDefault,
+    }))
+    init.columnsToDrop = diff.removed.map(c => c.name)
+    const hasChanges = diff.added.length > 0 ||
+      diff.renamed.length > 0 ||
+      diff.typeChanged.length > 0 ||
+      diff.nullableChanged.length > 0 ||
+      diff.defaultChanged.length > 0 ||
+      diff.removed.length > 0
+    if (hasChanges) { init.status = 'alter' }
+    // Rename conflicts → error
+    if (diff.conflicts.length > 0) {
+      init.status = 'error'
+      init.errors = [
+        ...(init.errors ?? []),
+        ...diff.conflicts.map(c =>
+          `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
+        ),
+      ]
+    }
+    // Type changes without a sync method → error (sync will fail)
+    if (diff.typeChanged.length > 0 && !syncMethod) {
+      init.status = 'error'
+      init.errors = [
+        ...(init.errors ?? []),
+        ...diff.typeChanged.map(tc =>
+          `Type change on ${name}.${tc.field.physicalName} ` +
+          `(${tc.existingType} → ${tc.field.designType}). ` +
+          `Add @db.sync.method "recreate" or "drop", or migrate manually.`
+        ),
+      ]
+    }
+  }
 
-  private buildViewEntry(view: AtscriptDbView, trackedNames: Set<string>): SyncEntry {
+  /** Checks if a tracked view's definition changed since the last stored snapshot. */
+  private async viewDefinitionChanged(view: AtscriptDbView): Promise<boolean> {
+    const storedSnapshot = await this.readTableSnapshot(view.tableName, true)
+    if (!storedSnapshot) { return false }
+    const currentHash = computeTableHash(computeViewSnapshot(view))
+    return computeTableHash(storedSnapshot) !== currentHash
+  }
+
+  // ── Plan view ───────────────────────────────────────────────────────
+
+  private async planView(view: AtscriptDbView, trackedNames: Set<string>): Promise<SyncEntry> {
     const viewType = view.viewPlan.materialized ? 'M' as const : 'V' as const
     const renamedFrom = view.renamedFrom
     const isRenamed = renamedFrom && trackedNames.has(renamedFrom)
     let status: TSyncEntryStatus
+
     if (isRenamed) {
       status = 'alter'
     } else if (trackedNames.has(view.tableName)) {
-      status = 'in-sync'
+      status = await this.viewDefinitionChanged(view) ? 'alter' : 'in-sync'
     } else {
       status = 'create'
     }
+
     return new SyncEntry({
       name: view.tableName,
       status,
       viewType,
       renamedFrom: isRenamed ? renamedFrom : undefined,
+      recreated: status === 'alter' && !isRenamed ? true : undefined,
     })
   }
 
@@ -636,6 +744,7 @@ export class SchemaSync {
     }
 
     if (adapter.getExistingColumns && adapter.syncColumns) {
+      // Path A: Live introspection (SQLite)
       const existing = await adapter.getExistingColumns()
       if (existing.length === 0 && !init.renamedFrom) {
         await adapter.ensureTable()
@@ -643,66 +752,44 @@ export class SchemaSync {
       } else if (existing.length > 0) {
         const typeMapper = adapter.typeMapper?.bind(adapter)
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
+        await this.applyColumnDiff(adapter, readable, diff, init, safe)
+      }
+    } else if (adapter.syncColumns) {
+      // Path B: Snapshot-based diffing (MongoDB)
+      const snapshotName = init.renamedFrom ?? name
+      const storedSnapshot = await this.readTableSnapshot(snapshotName)
+      if (!storedSnapshot) {
+        // First sync or no prior snapshot — just ensure table exists
+        const existed = adapter.tableExists ? await adapter.tableExists() : false
+        await adapter.ensureTable()
+        if (!existed) { init.status = 'create' }
+      } else {
+        const existing = snapshotToExistingColumns(storedSnapshot)
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing, this.resolveTypeMapper(adapter))
+        await this.applyColumnDiff(adapter, readable, diff, init, safe)
+      }
 
-        // Handle rename conflicts
-        if (diff.conflicts.length > 0) {
-          const errors: string[] = diff.conflicts.map(c =>
-            `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
-          )
-          for (const msg of errors) {
-            this.logger.error?.(`[schema-sync] ${msg}`)
-          }
-          init.errors = [...(init.errors ?? []), ...errors]
-          init.status = 'error'
-        }
-
-        // Handle type changes
-        if (diff.typeChanged.length > 0) {
+      // Option drift detection (same logic as Path C)
+      if (init.status !== 'create' && !init.recreated && !safe && adapter.detectTableOptionDrift) {
+        const drifted = await adapter.detectTableOptionDrift()
+        if (drifted) {
           const syncMethod = readable.syncMethod
-          if (syncMethod === 'drop' && adapter.dropTable) {
+          if (syncMethod === 'recreate' && adapter.recreateTable) {
+            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — recreating with data preservation`)
+            await adapter.recreateTable()
+            init.status = 'alter'
+            init.recreated = true
+          } else if (adapter.dropTable) {
+            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
             await adapter.dropTable()
             await adapter.ensureTable()
+            init.status = 'alter'
             init.recreated = true
-            init.status = 'alter'
-          } else if (syncMethod === 'recreate' && adapter.recreateTable) {
-            await adapter.recreateTable()
-            init.recreated = true
-            init.status = 'alter'
-          } else {
-            const errors: string[] = []
-            for (const change of diff.typeChanged) {
-              const msg = `Type change on ${name}.${change.field.physicalName} ` +
-                `(${change.existingType} → ${change.field.designType}). ` +
-                `Add @db.sync.method "recreate" or "drop", or migrate manually.`
-              this.logger.error?.(
-                `[schema-sync] ${msg}`
-              )
-              errors.push(msg)
-            }
-            init.errors = errors
-            init.status = 'error'
           }
-        }
-
-        // Handle renames and adds (skip if table was recreated or errored)
-        if (!init.recreated && init.status !== 'error' && (diff.added.length > 0 || diff.renamed.length > 0)) {
-          const syncResult = await adapter.syncColumns(diff)
-          init.columnsAdded = syncResult.added
-          init.columnsRenamed = syncResult.renamed
-          if (syncResult.added.length > 0 || (syncResult.renamed?.length ?? 0) > 0) {
-            init.status = 'alter'
-          }
-        }
-
-        // Drop stale columns (unless safe mode, table was recreated, or errored)
-        if (!safe && !init.recreated && init.status !== 'error' && diff.removed.length > 0 && adapter.dropColumns) {
-          const colNames = diff.removed.map(c => c.name)
-          await adapter.dropColumns(colNames)
-          init.columnsDropped = colNames
-          init.status = 'alter'
         }
       }
     } else {
+      // Path C: Truly schema-less, no syncColumns
       const existed = adapter.tableExists ? await adapter.tableExists() : true
       // Detect collection-level option drift (e.g. MongoDB capped size/max)
       if (existed && !safe && adapter.detectTableOptionDrift) {
@@ -740,6 +827,135 @@ export class SchemaSync {
     return new SyncEntry(init)
   }
 
+  // ── Column diff application (shared by Path A and Path B) ──────────
+
+  private async applyColumnDiff(
+    adapter: BaseDbAdapter,
+    readable: AtscriptDbReadable,
+    diff: TColumnDiff,
+    init: TSyncEntryInit,
+    safe: boolean
+  ): Promise<void> {
+    const name = readable.tableName
+
+    // Handle rename conflicts
+    if (diff.conflicts.length > 0) {
+      const errors: string[] = diff.conflicts.map(c =>
+        `Column rename conflict on ${name}: cannot rename "${c.oldName}" → "${c.field.physicalName}" because "${c.conflictsWith}" already exists.`
+      )
+      for (const msg of errors) {
+        this.logger.error?.(`[schema-sync] ${msg}`)
+      }
+      init.errors = [...(init.errors ?? []), ...errors]
+      init.status = 'error'
+    }
+
+    // Handle type changes
+    if (diff.typeChanged.length > 0) {
+      const syncMethod = readable.syncMethod
+      if (syncMethod === 'drop' && adapter.dropTable) {
+        await adapter.dropTable()
+        await adapter.ensureTable()
+        init.recreated = true
+        init.status = 'alter'
+      } else if (syncMethod === 'recreate' && adapter.recreateTable) {
+        await adapter.recreateTable()
+        init.recreated = true
+        init.status = 'alter'
+      } else {
+        const errors: string[] = []
+        for (const change of diff.typeChanged) {
+          const msg = `Type change on ${name}.${change.field.physicalName} ` +
+            `(${change.existingType} → ${change.field.designType}). ` +
+            `Add @db.sync.method "recreate" or "drop", or migrate manually.`
+          this.logger.error?.(
+            `[schema-sync] ${msg}`
+          )
+          errors.push(msg)
+        }
+        init.errors = errors
+        init.status = 'error'
+      }
+    }
+
+    // Handle nullable/default changes via table recreation (skip if already recreated or errored)
+    // These require recreating the table for adapters that enforce constraints (e.g., SQLite)
+    // For schema-less adapters (MongoDB), no DB action is needed — snapshot update handles it
+    // Skip in safe mode — recreation could drop columns that should be preserved
+    if (!safe && !init.recreated && init.status !== 'error' &&
+        (diff.nullableChanged.length > 0 || diff.defaultChanged.length > 0)) {
+      if (adapter.recreateTable) {
+        await adapter.recreateTable()
+        init.recreated = true
+        init.status = 'alter'
+      } else {
+        // Schema-less adapter — just mark as alter; snapshot will be updated
+        init.status = 'alter'
+      }
+    } else if (diff.nullableChanged.length > 0 || diff.defaultChanged.length > 0) {
+      init.status = 'alter'
+    }
+
+    // Handle renames and adds (skip if table was recreated or errored)
+    if (!init.recreated && init.status !== 'error' && (diff.added.length > 0 || diff.renamed.length > 0) && adapter.syncColumns) {
+      const syncResult = await adapter.syncColumns(diff)
+      init.columnsAdded = syncResult.added
+      init.columnsRenamed = syncResult.renamed
+      if (syncResult.added.length > 0 || (syncResult.renamed?.length ?? 0) > 0) {
+        init.status = 'alter'
+      }
+    }
+
+    // Drop stale columns (unless safe mode, table was recreated, or errored)
+    if (!safe && !init.recreated && init.status !== 'error' && diff.removed.length > 0 && adapter.dropColumns) {
+      const colNames = diff.removed.map(c => c.name)
+      await adapter.dropColumns(colNames)
+      init.columnsDropped = colNames
+      init.status = 'alter'
+    }
+  }
+
+  // ── View sync ──────────────────────────────────────────────────────
+
+  private async syncView(view: AtscriptDbView, trackedNames: Set<string>): Promise<SyncEntry> {
+    const renamedFrom = view.renamedFrom
+    const isRenamed = renamedFrom && trackedNames.has(renamedFrom)
+
+    // Drop old view if renamed (views don't support ALTER VIEW)
+    if (isRenamed) {
+      await this.space.dropViewByName(renamedFrom)
+    }
+
+    // Check if view definition changed via snapshot comparison
+    let definitionChanged = false
+    if (!isRenamed && trackedNames.has(view.tableName)) {
+      definitionChanged = await this.viewDefinitionChanged(view)
+      if (definitionChanged) {
+        await this.space.dropViewByName(view.tableName)
+      }
+    }
+
+    await view.dbAdapter.ensureTable()
+
+    const viewType = view.viewPlan.materialized ? 'M' as const : 'V' as const
+    let status: TSyncEntryStatus
+    if (isRenamed || definitionChanged) {
+      status = 'alter'
+    } else if (trackedNames.has(view.tableName)) {
+      status = 'in-sync'
+    } else {
+      status = 'create'
+    }
+
+    return new SyncEntry({
+      name: view.tableName,
+      status,
+      viewType,
+      renamedFrom: isRenamed ? renamedFrom : undefined,
+      recreated: definitionChanged || undefined,
+    })
+  }
+
   // ── Control table ─────────────────────────────────────────────────────
 
   private async ensureControlTable(): Promise<void> {
@@ -773,6 +989,25 @@ export class SchemaSync {
 
   private async writeHash(hash: string): Promise<void> {
     await this.writeControlValue('schema_version', hash)
+  }
+
+  // ── Table snapshot storage ────────────────────────────────────────────
+
+  private async readTableSnapshot(tableName: string): Promise<TTableSnapshot | null>
+  private async readTableSnapshot(tableName: string, asView: true): Promise<TViewSnapshot | null>
+  private async readTableSnapshot(tableName: string, _asView?: boolean): Promise<TTableSnapshot | TViewSnapshot | null> {
+    const value = await this.readControlValue(`table_snapshot:${tableName}`)
+    return value ? JSON.parse(value) : null
+  }
+
+  private async writeTableSnapshot(tableName: string, snapshot: TTableSnapshot | TViewSnapshot): Promise<void> {
+    await this.writeControlValue(`table_snapshot:${tableName}`, JSON.stringify(snapshot))
+  }
+
+  private async deleteTableSnapshot(tableName: string): Promise<void> {
+    try {
+      await this.controlTable!.deleteOne(`table_snapshot:${tableName}` as any)
+    } catch { /* best effort */ }
   }
 
   // ── Table tracking ──────────────────────────────────────────────────
@@ -875,4 +1110,24 @@ export class SchemaSync {
 
     throw new Error(`Schema sync lock wait timed out after ${timeoutMs}ms`)
   }
+}
+
+// ── Public snapshot reader ───────────────────────────────────────────────
+
+/**
+ * Reads a stored table snapshot from the control table.
+ * Use this for introspection/test utilities without coupling to control table internals.
+ */
+export async function readStoredSnapshot(space: DbSpace, tableName: string): Promise<TTableSnapshot | null>
+export async function readStoredSnapshot(space: DbSpace, tableName: string, asView: true): Promise<TViewSnapshot | null>
+export async function readStoredSnapshot(space: DbSpace, tableName: string, _asView?: boolean): Promise<TTableSnapshot | TViewSnapshot | null> {
+  const { AtscriptControl } = await import('./control.as.js')
+  const table = space.getTable(AtscriptControl)
+  await table.ensureTable()
+  const row = await table.findOne({
+    filter: { _id: { $eq: `table_snapshot:${tableName}` } },
+    controls: {},
+  })
+  const value = (row as Record<string, unknown> | null)?.value as string | null ?? null
+  return value ? JSON.parse(value) : null
 }

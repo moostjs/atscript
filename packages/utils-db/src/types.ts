@@ -165,6 +165,8 @@ export interface TExistingColumn {
   type: string
   notnull: boolean
   pk: boolean
+  /** Serialized default value (e.g., "'active'", "NULL"). */
+  dflt_value?: string
 }
 
 /** Result of comparing desired schema against existing database columns. */
@@ -173,6 +175,8 @@ export interface TColumnDiff {
   removed: TExistingColumn[]
   renamed: Array<{ field: TDbFieldMeta; oldName: string }>
   typeChanged: Array<{ field: TDbFieldMeta; existingType: string }>
+  nullableChanged: Array<{ field: TDbFieldMeta; wasNullable: boolean }>
+  defaultChanged: Array<{ field: TDbFieldMeta; oldDefault?: string; newDefault?: string }>
   conflicts: Array<{ field: TDbFieldMeta; oldName: string; conflictsWith: string }>
 }
 
