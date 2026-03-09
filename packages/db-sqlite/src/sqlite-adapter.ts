@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import { BaseDbAdapter, AtscriptDbView } from '@atscript/utils-db'
+import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/utils-db'
 import type {
   TDbDeleteResult,
   TDbIndex,
@@ -83,12 +83,46 @@ export class SqliteAdapter extends BaseDbAdapter {
     return id
   }
 
+  /**
+   * Wraps a write operation to catch native SQLite constraint errors
+   * and rethrow as structured `DbError`.
+   */
+  private _wrapConstraintError<R>(fn: () => R): R {
+    try {
+      return fn()
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        if (e.message.includes('FOREIGN KEY constraint failed')) {
+          // Extract FK field names from table metadata for better error paths
+          const fkFields = this._table?.foreignKeys
+          const errors: Array<{ path: string; message: string }> = []
+          if (fkFields && fkFields.size > 0) {
+            for (const [field] of fkFields) {
+              errors.push({ path: field, message: e.message })
+            }
+          } else {
+            errors.push({ path: '', message: e.message })
+          }
+          throw new DbError('FK_VIOLATION', errors)
+        }
+        const uniqueMatch = e.message.match(/UNIQUE constraint failed:\s*\S+\.(\S+)/)
+        if (uniqueMatch) {
+          throw new DbError('CONFLICT', [{ path: uniqueMatch[1], message: e.message }])
+        }
+        if (e.message.includes('UNIQUE constraint failed')) {
+          throw new DbError('CONFLICT', [{ path: '', message: e.message }])
+        }
+      }
+      throw e
+    }
+  }
+
   // ── CRUD: Insert ───────────────────────────────────────────────────────────
 
   async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
     const { sql, params } = buildInsert(this.resolveTableName(), data)
     this._log(sql, params)
-    const result = this.driver.run(sql, params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, params))
     return { insertedId: result.lastInsertRowid }
   }
 
@@ -100,7 +134,7 @@ export class SqliteAdapter extends BaseDbAdapter {
       for (const row of data) {
         const { sql, params } = buildInsert(this.resolveTableName(), row)
         this._log(sql, params)
-        const result = this.driver.run(sql, params)
+        const result = this._wrapConstraintError(() => this.driver.run(sql, params))
         ids.push(result.lastInsertRowid)
       }
       return { insertedCount: ids.length, insertedIds: ids }
@@ -162,7 +196,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const sql = `UPDATE "${esc(tableName)}" SET ${setClauses.join(', ')} WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
     const allParams = [...setParams, ...where.params]
     this._log(sql, allParams)
-    const result = this.driver.run(sql, allParams)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, allParams))
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
@@ -173,7 +207,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const where = buildWhere(filter)
     const { sql, params } = buildUpdate(this.resolveTableName(), data, where)
     this._log(sql, params)
-    const result = this.driver.run(sql, params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, params))
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
@@ -192,7 +226,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     }
     const { sql, params } = buildUpdate(tableName, data, limitedWhere)
     this._log(sql, params)
-    const result = this.driver.run(sql, params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, params))
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
@@ -204,7 +238,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const where = buildWhere(filter)
     const { sql, params } = buildUpdate(this.resolveTableName(), data, where)
     this._log(sql, params)
-    const result = this.driver.run(sql, params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, params))
     return { matchedCount: result.changes, modifiedCount: result.changes }
   }
 
@@ -215,7 +249,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const tableName = this.resolveTableName()
     const sql = `DELETE FROM "${esc(tableName)}" WHERE rowid = (SELECT rowid FROM "${esc(tableName)}" WHERE ${where.sql} LIMIT 1)`
     this._log(sql, where.params)
-    const result = this.driver.run(sql, where.params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, where.params))
     return { deletedCount: result.changes }
   }
 
@@ -223,7 +257,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const where = buildWhere(filter)
     const { sql, params } = buildDelete(this.resolveTableName(), where)
     this._log(sql, params)
-    const result = this.driver.run(sql, params)
+    const result = this._wrapConstraintError(() => this.driver.run(sql, params))
     return { deletedCount: result.changes }
   }
 

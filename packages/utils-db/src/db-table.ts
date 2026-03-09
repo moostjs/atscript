@@ -6,16 +6,18 @@ import {
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type Validator,
-  type TValidatorPlugin,
+  ValidatorError,
 } from '@atscript/typescript/utils'
 
 import type { FilterExpr } from '@uniqu/core'
 
 import type { BaseDbAdapter } from './base-adapter'
+import { DbError } from './db-error'
 import type { TGenericLogger } from './logger'
 import { decomposePatch } from './patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
 import { UniquSelect } from './uniqu-select'
+import { createDbValidatorPlugin, type DbValidationContext } from './db-validator-plugin'
 import type {
   TCascadeResolver,
   TDbDeleteResult,
@@ -29,23 +31,6 @@ import type {
 } from './types'
 
 export { resolveDesignType } from './db-readable'
-
-/**
- * Validator plugin that skips navigational relation fields.
- * Fields annotated with `@db.rel.to` or `@db.rel.from` are virtual references
- * to other tables — they have no stored column and should not be validated.
- * Nested creation strips these fields before they reach the adapter.
- */
-const navFieldsValidatorPlugin: TValidatorPlugin = (_ctx, def) => {
-  if (
-    def.metadata.has('db.rel.to') ||
-    def.metadata.has('db.rel.from') ||
-    def.metadata.has('db.rel.via')
-  ) {
-    return true // Skip — nested creation or ignored
-  }
-  return undefined
-}
 
 /**
  * Generic database table abstraction driven by Atscript `@db.*` annotations.
@@ -167,17 +152,20 @@ export class AtscriptDbTable<
       // Clone + apply defaults (keep originals for FROM phase)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
 
+      // Validate full payload (including nav fields) before any writes
+      const validator = this.getValidator('insert')
+      const ctx: DbValidationContext = { mode: 'insert' }
+      this._validateBatch(validator, items, ctx)
+
       // Phase 1: Batch TO dependencies (they must exist before we can set our FKs)
       if (canNest) {
         await this._batchInsertNestedTo(items, maxDepth, depth)
       }
 
-      // Strip nav fields, validate, prepare
-      const validator = this.getValidator('insert')
+      // Strip nav fields, prepare for write
       const prepared: Array<Record<string, unknown>> = []
       for (const data of items) {
         for (const navField of this._navFields) { delete data[navField] }
-        if (!validator.validate(data)) { throw new Error('Validation failed for insert') }
         prepared.push(this._prepareForWrite(data))
       }
 
@@ -238,19 +226,13 @@ export class AtscriptDbTable<
     if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this.adapter.withTransaction(async () => {
-      // Phase 0: Setup — check nav props, clone + defaults, validate
-      if (canNest) {
-        this._checkNavProps(payloads, 'replace')
-      }
+      // Phase 0: Setup — clone + defaults, validate full payload (including nav fields)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
       const originals = canNest ? payloads.map(p => ({ ...p })) : []
 
       const validator = this.getValidator('bulkReplace')
-      for (const data of items) {
-        if (!validator.validate(data)) {
-          throw new Error('Validation failed for replace')
-        }
-      }
+      const ctx: DbValidationContext = { mode: 'replace' }
+      this._validateBatch(validator, items, ctx)
 
       // Phase 1: TO dependencies (replace parents)
       if (canNest) {
@@ -323,17 +305,10 @@ export class AtscriptDbTable<
     if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this.adapter.withTransaction(async () => {
-      // Phase 0: Setup — check nav props (errors on FROM/VIA), validate
-      if (canNest) {
-        this._checkNavProps(payloads, 'patch')
-      }
-
+      // Phase 0: Setup — validate full payload (plugin checks nav field constraints)
       const validator = this.getValidator('bulkUpdate')
-      for (const data of payloads) {
-        if (!validator.validate(data)) {
-          throw new Error('Validation failed for update')
-        }
-      }
+      const ctx: DbValidationContext = { mode: 'patch' }
+      this._validateBatch(validator, payloads as Array<Record<string, unknown>>, ctx)
 
       // Phase 1: TO relation patches
       if (canNest) {
@@ -583,12 +558,12 @@ export class AtscriptDbTable<
   protected _extractPrimaryKeyFilter(payload: Record<string, unknown>): FilterExpr {
     const pkFields = this.primaryKeys
     if (pkFields.length === 0) {
-      throw new Error('No primary key defined — cannot extract filter')
+      throw new DbError('NOT_FOUND', [{ path: '', message: 'No primary key defined — cannot extract filter' }])
     }
     const filter: FilterExpr = {}
     for (const field of pkFields) {
       if (payload[field] === undefined) {
-        throw new Error(`Missing primary key field "${field}" in payload`)
+        throw new DbError('NOT_FOUND', [{ path: field, message: `Missing primary key field "${field}" in payload` }])
       }
       const fieldType = this.flatMap.get(field)
       filter[field] = fieldType
@@ -706,10 +681,10 @@ export class AtscriptDbTable<
         case 'restrict': {
           const count = await target.count(childFilter)
           if (count > 0) {
-            throw new Error(
-              `Cannot delete from "${this.tableName}" — ${count} child record(s) in ` +
-              `"${target.fk.fields.join(', ')}" reference it (RESTRICT)`
-            )
+            throw new DbError('CONFLICT', [{
+              path: this.tableName,
+              message: `Cannot delete from "${this.tableName}" — ${count} child record(s) in "${target.fk.fields.join(', ')}" reference it (RESTRICT)`,
+            }])
           }
           break
         }
@@ -765,13 +740,11 @@ export class AtscriptDbTable<
   ): Promise<void> {
     this._flatten()
 
-    // Type validation: apply defaults, strip nav fields, run validator
+    // Type validation: apply defaults, validate full payload
     const validator = this.getValidator('insert')
-    for (const raw of items) {
-      const data = this._applyDefaults({ ...raw })
-      for (const navField of this._navFields) { delete data[navField] }
-      if (!validator.validate(data)) { throw new Error('Validation failed for insert') }
-    }
+    const ctx: DbValidationContext = { mode: 'insert' }
+    const prepared = items.map(raw => this._applyDefaults({ ...raw }))
+    this._validateBatch(validator, prepared, ctx)
 
     // FK validation
     await this._validateForeignKeys(items, false, opts?.excludeFkTargetTable)
@@ -852,10 +825,10 @@ export class AtscriptDbTable<
         if (count < expectedCount) {
           const sample = valueArrays[0].slice(0, 3).join(', ')
           const suffix = valueArrays[0].length > 3 ? `, ... (${valueArrays[0].length} total)` : ''
-          throw new Error(
-            `FK constraint violation: "${fk.fields.join(', ')}" references ` +
-            `non-existent record in "${fk.targetTable}" (values: ${sample}${suffix})`
-          )
+          throw new DbError('FK_VIOLATION', [{
+            path: fk.fields.join(', '),
+            message: `FK constraint violation: "${fk.fields.join(', ')}" references non-existent record in "${fk.targetTable}" (values: ${sample}${suffix})`,
+          }])
         }
       })
     }
@@ -984,7 +957,9 @@ export class AtscriptDbTable<
       }
       if (allChildren.length === 0) { continue }
 
-      await targetTable.insertMany(allChildren, { maxDepth, _depth: depth + 1 })
+      await this._wrapNestedError(navField, () =>
+        targetTable.insertMany(allChildren, { maxDepth, _depth: depth + 1 })
+      )
     }
   }
 
@@ -1082,32 +1057,55 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Validates nav props in payloads. Errors on null values, missing resolver,
-   * and (in patch mode) unsupported FROM/VIA relations.
+   * Validates a batch of items using the given validator and context.
+   * Wraps per-item validation errors with array index paths for batch operations.
    */
-  private _checkNavProps(
-    payloads: Array<Record<string, unknown>>,
-    mode: 'replace' | 'patch'
+  private _validateBatch(
+    validator: Validator<T, DataType>,
+    items: Array<Record<string, unknown>>,
+    ctx: DbValidationContext
   ): void {
-    for (const payload of payloads) {
-      for (const [navField, relation] of this._relations) {
-        const value = payload[navField]
-        if (value === undefined) { continue }
-        if (value === null) {
-          throw new Error(`Cannot process null navigation property '${navField}'`)
+    for (let i = 0; i < items.length; i++) {
+      try {
+        validator.validate(items[i] as DataType, false, ctx)
+      } catch (e) {
+        if (e instanceof ValidatorError && items.length > 1) {
+          throw new ValidatorError(e.errors.map(err => ({
+            ...err,
+            path: `[${i}].${err.path}`,
+          })))
         }
-        if (!this._writeTableResolver) {
-          throw new Error(`Cannot process nav property '${navField}' — no write table resolver configured`)
-        }
-        if (mode === 'patch') {
-          if (relation.direction === 'from') {
-            throw new Error(`Cannot patch relation '${navField}' — patching 1:N relations not supported. Use replaceOne.`)
-          }
-          if (relation.direction === 'via') {
-            throw new Error(`Cannot patch relation '${navField}' — patching M:N relations not supported. Use replaceOne.`)
-          }
-        }
+        throw e
       }
+    }
+  }
+
+  /**
+   * Wraps an async nested operation and prefixes error paths with the nav field context.
+   * This ensures errors from child table operations (e.g., FK violations on a comment)
+   * get paths like `comments[0].authorId` instead of just `authorId`.
+   */
+  private static _prefixErrorPaths(
+    errors: Array<{ path: string; message: string }>,
+    prefix: string
+  ): Array<{ path: string; message: string }> {
+    return errors.map(err => ({
+      ...err,
+      path: err.path ? `${prefix}.${err.path}` : prefix,
+    }))
+  }
+
+  private async _wrapNestedError<R>(navField: string, fn: () => Promise<R>): Promise<R> {
+    try {
+      return await fn()
+    } catch (e) {
+      if (e instanceof ValidatorError) {
+        throw new ValidatorError(AtscriptDbTable._prefixErrorPaths(e.errors, navField))
+      }
+      if (e instanceof DbError) {
+        throw new DbError(e.code, AtscriptDbTable._prefixErrorPaths(e.errors, navField))
+      }
+      throw e
     }
   }
 
@@ -1211,11 +1209,15 @@ export class AtscriptDbTable<
 
         // Replace children with PKs (update in place, preserving identity)
         if (toReplace.length > 0) {
-          await targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
+          await this._wrapNestedError(navField, () =>
+            targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
+          )
         }
         // Insert new children without PKs
         if (toInsert.length > 0) {
-          await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
+          await this._wrapNestedError(navField, () =>
+            targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
+          )
         }
       }
     }
@@ -1333,13 +1335,13 @@ export class AtscriptDbTable<
           const pkFilter = this._extractPrimaryKeyFilter(item) as FilterExpr<OwnProps>
           const current = await this.findOne({ filter: pkFilter, controls: {} })
           if (!current) {
-            throw new Error(`Cannot patch relation '${navField}' — source record not found`)
+            throw new DbError('NOT_FOUND', [{ path: navField, message: `Cannot patch relation '${navField}' — source record not found` }])
           }
           fkValue = fk.localFields.length === 1 ? (current as Record<string, unknown>)[fk.localFields[0]] : undefined
         }
 
         if (fkValue === null || fkValue === undefined) {
-          throw new Error(`Cannot patch relation '${navField}' — foreign key '${fk.localFields[0]}' is null`)
+          throw new DbError('FK_VIOLATION', [{ path: fk.localFields[0], message: `Cannot patch relation '${navField}' — foreign key '${fk.localFields[0]}' is null` }])
         }
 
         // Inject target PK into the nested patch
@@ -1359,12 +1361,36 @@ export class AtscriptDbTable<
 
   /**
    * Builds a validator for a given purpose with adapter plugins.
+   *
+   * Uses annotation-based `replace` callback to make `@meta.id` and
+   * `@db.default` fields optional — works at all nesting levels
+   * (including inside nav field target types).
    */
   protected _buildValidator(purpose: string): Validator<T, DataType> {
+    const dbPlugin = createDbValidatorPlugin()
     const plugins = [
       ...this.adapter.getValidatorPlugins(),
-      navFieldsValidatorPlugin,
+      dbPlugin,
     ]
+
+    /**
+     * Forces nav fields non-optional so the plugin handles null/undefined
+     * checks (validator skips optional+null before plugins run).
+     */
+    const forceNavNonOptional = (type: TAtscriptAnnotatedType): TAtscriptAnnotatedType => {
+      if (type.metadata?.has('db.rel.to') || type.metadata?.has('db.rel.from') || type.metadata?.has('db.rel.via')) {
+        return type.optional ? { ...type, optional: false } : type
+      }
+      return type
+    }
+
+    /** Makes PK, defaulted, and FK fields optional; forces nav fields non-optional. */
+    const insertReplace = (type: TAtscriptAnnotatedType) => {
+      if (type.metadata?.has('meta.id') || type.metadata?.has('db.default') || type.metadata?.has('db.default.fn') || type.metadata?.has('db.rel.FK')) {
+        return { ...type, optional: true }
+      }
+      return forceNavNonOptional(type)
+    }
 
     switch (purpose) {
       case 'insert': {
@@ -1373,13 +1399,7 @@ export class AtscriptDbTable<
         }
         return this.createValidator({
           plugins,
-          replace: (type, path) => {
-            // Make primary key fields and fields with defaults optional for insert
-            if (this._primaryKeys.includes(path) || this._defaults.has(path)) {
-              return { ...type, optional: true }
-            }
-            return type
-          },
+          replace: insertReplace,
         })
       }
       case 'patch': {
@@ -1389,27 +1409,20 @@ export class AtscriptDbTable<
         return this.createValidator({
           plugins,
           partial: true,
+          replace: forceNavNonOptional,
         })
       }
       case 'bulkReplace': {
         return this.createValidator({
           plugins,
-          replace: (type, path) => {
-            if (
-              this._primaryKeys.includes(path) ||
-              this._defaults.has(path)
-            ) {
-              return { ...type, optional: true }
-            }
-            return type
-          },
+          replace: insertReplace,
         })
       }
       case 'bulkUpdate': {
-        const pluginsNoNav = this.adapter.getValidatorPlugins()
         return this.createValidator({
-          plugins: pluginsNoNav,
+          plugins,
           partial: 'deep',
+          replace: forceNavNonOptional,
         })
       }
       default: {

@@ -136,6 +136,20 @@ export class AsDbReadableController<
         return new HttpError(400, insightsError)
       }
     }
+    // Validate $with relation names
+    const withRelations = (parsed.controls as Record<string, unknown>).$with as Array<{ name: string }> | undefined
+    if (withRelations?.length) {
+      const relations = this.readable.relations
+      for (const rel of withRelations) {
+        if (!rel.name.includes('.') && !relations.has(rel.name)) {
+          return new HttpError(400, {
+            message: `Unknown relation "${rel.name}" in $with. Available relations: ${[...relations.keys()].join(', ') || '(none)'}`,
+            statusCode: 400,
+            errors: [{ path: '$with', message: `Unknown relation "${rel.name}"` }],
+          })
+        }
+      }
+    }
     return undefined
   }
 

@@ -8,6 +8,7 @@ import type {
 } from '@atscript/typescript/utils'
 import {
   BaseDbAdapter,
+  DbError,
   AtscriptDbView,
   type AtscriptDbTable,
   type DbQuery,
@@ -35,7 +36,7 @@ import type {
   Document,
   MongoClient,
 } from 'mongodb'
-import { ObjectId } from 'mongodb'
+import { MongoServerError, ObjectId } from 'mongodb'
 import { CollectionPatcher, type TCollectionPatcherContext } from './collection-patcher'
 import { buildMongoFilter } from './mongo-filter'
 import { validateMongoIdPlugin } from './validate-plugins'
@@ -1014,6 +1015,22 @@ export class MongoAdapter extends BaseDbAdapter {
     }
   }
 
+  /**
+   * Wraps an async operation to catch MongoDB duplicate key errors
+   * (code 11000) and rethrow as structured `DbError`.
+   */
+  private async _wrapDuplicateKeyError<R>(fn: () => Promise<R>): Promise<R> {
+    try {
+      return await fn()
+    } catch (e: unknown) {
+      if (e instanceof MongoServerError && e.code === 11000) {
+        const field = e.keyPattern ? Object.keys(e.keyPattern)[0] ?? '' : ''
+        throw new DbError('CONFLICT', [{ path: field, message: e.message }])
+      }
+      throw e
+    }
+  }
+
   // ── CRUD implementation ──────────────────────────────────────────────────
 
   async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
@@ -1027,7 +1044,7 @@ export class MongoAdapter extends BaseDbAdapter {
       }
     }
     this._log('insertOne', data)
-    const result = await this.collection.insertOne(data, this._getSessionOpts())
+    const result = await this._wrapDuplicateKeyError(() => this.collection.insertOne(data, this._getSessionOpts()))
     const metaIdPhysical = this._getMetaIdPhysical()
     return { insertedId: metaIdPhysical ? (data[metaIdPhysical] ?? result.insertedId) : result.insertedId }
   }
@@ -1048,7 +1065,7 @@ export class MongoAdapter extends BaseDbAdapter {
     }
 
     this._log('insertMany', `${data.length} docs`)
-    const result = await this.collection.insertMany(data, this._getSessionOpts())
+    const result = await this._wrapDuplicateKeyError(() => this.collection.insertMany(data, this._getSessionOpts()))
     const metaIdPhysical = this._getMetaIdPhysical()
     return {
       insertedCount: result.insertedCount,
@@ -1095,7 +1112,7 @@ export class MongoAdapter extends BaseDbAdapter {
   ): Promise<TDbUpdateResult> {
     const mongoFilter = buildMongoFilter(filter)
     this._log('replaceOne', mongoFilter, data)
-    const result = await this.collection.replaceOne(mongoFilter, data, this._getSessionOpts())
+    const result = await this._wrapDuplicateKeyError(() => this.collection.replaceOne(mongoFilter, data, this._getSessionOpts()))
     return { matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }
   }
 

@@ -1,6 +1,11 @@
 import { ValidatorError } from '@atscript/typescript/utils'
+import { DbError } from '@atscript/utils-db'
 import { HttpError } from '@moostjs/event-http'
 import { defineInterceptor, Intercept, TInterceptorPriority } from 'moost'
+
+const dbErrorCodeToStatus: Record<string, number> = {
+  CONFLICT: 409,
+}
 
 function transformValidationError(error: unknown, reply: (response: unknown) => void) {
   if (error instanceof ValidatorError) {
@@ -8,6 +13,15 @@ function transformValidationError(error: unknown, reply: (response: unknown) => 
       new HttpError(400, {
         message: error.message,
         statusCode: 400,
+        errors: error.errors,
+      })
+    )
+  } else if (error instanceof DbError) {
+    const statusCode = dbErrorCodeToStatus[error.code] ?? 400
+    reply(
+      new HttpError(statusCode, {
+        message: error.message,
+        statusCode,
         errors: error.errors,
       })
     )
