@@ -391,12 +391,12 @@ export class AtscriptDbTable<
       return { deletedCount: 0 }
     }
     if (this._needsCascade()) {
-      return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
+      return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
         await this._cascadeBeforeDelete(filter)
         return this.adapter.deleteOne(this._translateFilter(filter))
       }))
     }
-    return this._enrichFkViolation(() => this.adapter.deleteOne(this._translateFilter(filter)))
+    return this._remapDeleteFkViolation(() => this.adapter.deleteOne(this._translateFilter(filter)))
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -428,12 +428,12 @@ export class AtscriptDbTable<
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
     this._flatten()
     if (this._needsCascade()) {
-      return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
+      return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
         await this._cascadeBeforeDelete(filter as FilterExpr)
         return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
       }))
     }
-    return this._enrichFkViolation(() => this.adapter.deleteMany(this._translateFilter(filter as FilterExpr)))
+    return this._remapDeleteFkViolation(() => this.adapter.deleteMany(this._translateFilter(filter as FilterExpr)))
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -681,12 +681,25 @@ export class AtscriptDbTable<
       return mapped
     })
 
+    // Pass 1: RESTRICT pre-check — block the delete before any side effects
+    for (const target of targets) {
+      if (target.fk.onDelete !== 'restrict') { continue }
+      const childFilter = this._buildCascadeChildFilter(records, target.fk)
+      if (!childFilter) { continue }
+      const count = await target.count(childFilter)
+      if (count > 0) {
+        throw new DbError('CONFLICT', [{
+          path: this.tableName,
+          message: `Cannot delete from "${this.tableName}": ${count} record(s) in "${target.childTable}" (${target.fk.fields.join(', ')}) reference it (RESTRICT)`,
+        }])
+      }
+    }
+
+    // Pass 2: CASCADE / SET NULL — safe to execute now that RESTRICT passed
     for (const target of targets) {
       const action = target.fk.onDelete
-      if (!action || action === 'noAction') { continue }
+      if (!action || action === 'noAction' || action === 'restrict') { continue }
 
-      // Build child filter: { fkField: { $in: parentPKValues } }
-      // For composite FK: { $or: [{ fk1: pk1, fk2: pk2 }, ...] }
       const childFilter = this._buildCascadeChildFilter(records, target.fk)
       if (!childFilter) { continue }
 
@@ -699,16 +712,6 @@ export class AtscriptDbTable<
           const nullData: Record<string, unknown> = {}
           for (const f of target.fk.fields) { nullData[f] = null }
           await target.updateMany(childFilter, nullData)
-          break
-        }
-        case 'restrict': {
-          const count = await target.count(childFilter)
-          if (count > 0) {
-            throw new DbError('CONFLICT', [{
-              path: this.tableName,
-              message: `Cannot delete from "${this.tableName}" — ${count} child record(s) in "${target.fk.fields.join(', ')}" reference it (RESTRICT)`,
-            }])
-          }
           break
         }
       }
@@ -1152,6 +1155,26 @@ export class AtscriptDbTable<
           }
         }
         throw new DbError('FK_VIOLATION', errors.length > 0 ? errors : e.errors)
+      }
+      throw e
+    }
+  }
+
+  /**
+   * Wraps a delete operation: catches native `FK_VIOLATION` errors (e.g. SQLite
+   * RESTRICT) and re-throws as `CONFLICT` (409) with a descriptive message.
+   * During DELETE, an FK violation is always a RESTRICT constraint — cascade and
+   * setNull are handled at the app level or natively without errors.
+   */
+  private async _remapDeleteFkViolation<R>(fn: () => Promise<R>): Promise<R> {
+    try {
+      return await fn()
+    } catch (e) {
+      if (e instanceof DbError && e.code === 'FK_VIOLATION') {
+        throw new DbError('CONFLICT', [{
+          path: this.tableName,
+          message: `Cannot delete from "${this.tableName}": referenced by child records (RESTRICT)`,
+        }])
       }
       throw e
     }

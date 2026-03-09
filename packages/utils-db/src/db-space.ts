@@ -154,6 +154,7 @@ export class DbSpace {
         if (fk.targetTable === tableName && fk.onDelete) {
           targets.push({
             fk,
+            childTable: table.tableName,
             deleteMany: (filter) => table.deleteMany(filter as any),
             updateMany: (filter, data) => table.updateMany(filter as any, data as any),
             count: (filter) => table.count({ filter: filter as any }),

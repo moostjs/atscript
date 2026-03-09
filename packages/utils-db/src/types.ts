@@ -255,6 +255,8 @@ export type TWriteTableResolver = (type: TAtscriptAnnotatedType) => (AtscriptDbT
 export interface TCascadeTarget {
   /** FK on the child table that references the parent being deleted. */
   fk: TDbForeignKey
+  /** Name of the child table that holds this FK. */
+  childTable: string
   /** Delete matching child records (goes through AtscriptDbTable for recursive cascade). */
   deleteMany(filter: Record<string, unknown>): Promise<TDbDeleteResult>
   /** Update matching child records (for setNull — sets FK fields to null). */
