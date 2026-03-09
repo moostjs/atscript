@@ -1,96 +1,274 @@
 <script setup>
-import Carousel from './Carousel.vue'
+import { computed, ref } from 'vue'
 import ValidationAnimation from './ValidationAnimation.vue'
 import AnnotationScroll from './AnnotationScroll.vue'
 import DbRelationsAnimation from './DbRelationsAnimation.vue'
+import PlannedUiPreview from './PlannedUiPreview.vue'
 
-const slides = [
+const tabs = [
     {
-        title: 'Types that validate',
-        desc: '<code>string.email</code>, <code>number.int.positive</code> — types carry constraints automatically',
+        label: 'Validation',
+        status: 'Available today',
+        tone: 'today',
+        title: 'Validation from the model',
+        desc: 'Semantic types and expectations stay on the model, then become runtime checks automatically.',
+        points: [
+            'Use primitives like string.email and number.int.positive instead of duplicating rules in a second schema.',
+            'Keep the source of truth on the model, then validate inputs at runtime from the same definition.',
+        ],
     },
     {
-        title: 'Rich annotations',
-        desc: '<code>@meta.*</code>, <code>@db.*</code>, <code>@expect.*</code> — labels, indexes, constraints, all in one place',
+        label: 'Metadata',
+        status: 'Available today',
+        tone: 'today',
+        title: 'Metadata for tooling',
+        desc: 'App-facing hints stay next to the data model instead of getting buried in UI configuration.',
+        points: [
+            'Annotations like @meta.* keep labels and related hints attached to the type itself.',
+            'That metadata is usable today in runtime tooling and becomes a foundation for future UI automation.',
+        ],
     },
     {
-        title: 'Relations & DB schema',
-        desc: 'Foreign keys, cascades, indexes, views — your schema <em>is</em> your database',
+        label: 'DB + API',
+        status: 'Available today',
+        tone: 'today',
+        title: 'DB and API integrations',
+        desc: 'The same model can feed schema sync, relations, CRUD workflows, and REST integrations.',
+        points: [
+            'Use @db.* annotations and typed relations to drive your data layer from the same source file.',
+            'Keep types, validation, and DB behavior aligned instead of updating them independently.',
+        ],
+    },
+    {
+        label: 'Planned UI',
+        status: 'Planned',
+        tone: 'planned',
+        title: 'Future UI automation',
+        desc: 'The model is being shaped so UI forms and table views can grow from the same metadata later.',
+        points: [
+            'Labels, field hints, validation rules, and structure already live on the model.',
+            'That gives Atscript a clean path toward generated forms and data-table experiences.',
+        ],
     },
 ]
+
+const active = ref(0)
+const current = computed(() => tabs[active.value])
 </script>
 
 <template>
-    <Carousel :count="slides.length" :labels="slides.map(s => s.title)" :interval="8000">
-        <template #default="{ index }">
-            <div class="define-slide">
-                <div class="slide-illustration">
-                    <ValidationAnimation v-if="index === 0" />
-                    <AnnotationScroll v-else-if="index === 1" />
-                    <DbRelationsAnimation v-else-if="index === 2" />
-                </div>
-                <div class="slide-content">
-                    <h3 class="slide-title">{{ slides[index].title }}</h3>
-                    <p class="slide-desc" v-html="slides[index].desc" />
+    <div class="signal-tabs">
+        <div class="signal-tablist" role="tablist" aria-label="Model outputs">
+            <button
+                v-for="(tab, index) in tabs"
+                :key="tab.label"
+                class="signal-tab"
+                :class="{ active: index === active }"
+                :aria-selected="index === active"
+                :tabindex="index === active ? 0 : -1"
+                @click="active = index"
+            >
+                <span class="signal-tab-label">{{ tab.label }}</span>
+                <span class="signal-tab-mini" :class="`signal-mini-${tab.tone}`">{{ tab.tone === 'planned' ? 'Planned' : 'Today' }}</span>
+            </button>
+        </div>
+
+        <div class="signal-panel">
+            <div class="signal-copy">
+                <div class="signal-status" :class="`signal-status-${current.tone}`">{{ current.status }}</div>
+                <h3 class="signal-title">{{ current.title }}</h3>
+                <p class="signal-desc">{{ current.desc }}</p>
+                <div class="signal-points">
+                    <p v-for="point in current.points" :key="point" class="signal-point">{{ point }}</p>
                 </div>
             </div>
-        </template>
-    </Carousel>
+            <div class="signal-visual">
+                <ValidationAnimation v-if="active === 0" />
+                <AnnotationScroll v-else-if="active === 1" />
+                <DbRelationsAnimation v-else-if="active === 2" />
+                <PlannedUiPreview v-else />
+            </div>
+        </div>
+    </div>
 </template>
 
 <style scoped>
-.define-slide {
+.signal-tabs {
     display: flex;
     flex-direction: column;
-    height: 100%;
-    border-radius: 16px;
-    background: var(--vp-c-bg);
+    gap: 16px;
+}
+
+.signal-tablist {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+}
+
+.signal-tablist::-webkit-scrollbar {
+    display: none;
+}
+
+.signal-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
     border: 1px solid var(--vp-c-divider);
-    overflow: hidden;
-    transition: border-color 0.3s ease;
+    border-radius: 999px;
+    background: var(--vp-c-bg);
+    color: var(--vp-c-text-2);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
-.define-slide:hover {
+.signal-tab:hover,
+.signal-tab.active {
     border-color: var(--vp-c-brand-1);
+    color: var(--vp-c-text-1);
+    background: rgba(71, 26, 236, 0.06);
 }
 
-.slide-illustration {
-    flex: 1;
+.signal-tab-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.signal-tab-mini {
+    padding: 3px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.signal-mini-today {
+    background: rgba(43, 170, 196, 0.12);
+    color: #127791;
+}
+
+.signal-mini-planned {
+    background: rgba(217, 119, 6, 0.12);
+    color: #9a4b00;
+}
+
+:global(.dark) .signal-mini-today {
+    background: rgba(43, 170, 196, 0.18);
+    color: #7ddff2;
+}
+
+:global(.dark) .signal-mini-planned {
+    background: rgba(245, 158, 11, 0.18);
+    color: #f6c46b;
+}
+
+.signal-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 22px;
+    border-radius: 18px;
+    border: 1px solid var(--vp-c-divider);
+    background: var(--vp-c-bg);
+}
+
+@media (min-width: 900px) {
+    .signal-panel {
+        grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+        align-items: center;
+    }
+}
+
+.signal-copy {
+    min-width: 0;
+}
+
+.signal-status {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.signal-status-today {
+    background: rgba(43, 170, 196, 0.12);
+    color: #127791;
+}
+
+.signal-status-planned {
+    background: rgba(217, 119, 6, 0.12);
+    color: #9a4b00;
+}
+
+:global(.dark) .signal-status-today {
+    background: rgba(43, 170, 196, 0.18);
+    color: #7ddff2;
+}
+
+:global(.dark) .signal-status-planned {
+    background: rgba(245, 158, 11, 0.18);
+    color: #f6c46b;
+}
+
+.signal-title {
+    margin: 0 0 8px;
+    font-size: 20px;
+    color: var(--vp-c-text-1);
+}
+
+.signal-desc {
+    margin: 0 0 14px;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--vp-c-text-2);
+}
+
+.signal-points {
+    display: grid;
+    gap: 10px;
+}
+
+.signal-point {
+    margin: 0;
+    padding-left: 14px;
+    position: relative;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--vp-c-text-2);
+}
+
+.signal-point::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--vp-c-brand-1);
+}
+
+.signal-visual {
+    min-width: 0;
+    min-height: 250px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px 24px 0;
-    min-height: 180px;
+    padding: 8px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(71, 26, 236, 0.06), rgba(43, 170, 196, 0.06));
 }
 
-.slide-content {
-    padding: 20px 24px 24px;
-}
-
-.slide-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--vp-c-text-1);
-    margin-bottom: 6px;
-}
-
-.slide-desc {
-    font-size: 14px;
-    color: var(--vp-c-text-2);
-    line-height: 1.5;
-    margin: 0;
-}
-
-.slide-desc :deep(code) {
-    font-size: 13px;
-    color: var(--vp-c-brand-1);
-    background: rgba(71, 26, 236, 0.08);
-    padding: 1px 5px;
-    border-radius: 4px;
-    font-family: var(--vp-font-family-mono);
-}
-
-:global(.dark) .slide-desc :deep(code) {
-    background: rgba(174, 153, 252, 0.12);
+:global(.dark) .signal-visual {
+    background: linear-gradient(135deg, rgba(174, 153, 252, 0.1), rgba(43, 170, 196, 0.1));
 }
 </style>

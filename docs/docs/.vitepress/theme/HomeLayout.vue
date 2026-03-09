@@ -4,11 +4,11 @@ import { onMounted, nextTick, watch } from 'vue'
 import { useData, useRoute } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import VPButton from 'vitepress/dist/client/theme-default/components/VPButton.vue'
-import SnippetDefine from './snippets/define-example.md'
 import SnippetScattered from './snippets/scattered-ts.md'
 import SnippetUnified from './snippets/unified-as.md'
-import DefineCarousel from './DefineCarousel.vue'
-import AssetsCarousel from './AssetsCarousel.vue'
+import ValidationAnimation from './ValidationAnimation.vue'
+import DbRelationsAnimation from './DbRelationsAnimation.vue'
+import PlannedUiPreview from './PlannedUiPreview.vue'
 
 const { Layout } = DefaultTheme
 const { frontmatter } = useData()
@@ -132,87 +132,114 @@ watch(() => route.path, setupScrollAnimations)
                 </div>
             </section>
 
-            <!-- Section 1: Define your data -->
-            <section class="section-define">
+            <section class="section-aspect">
                 <div class="section-inner">
-                    <h2 class="section-heading animate-in flex-row">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><g fill="none"><path stroke="currentColor" stroke-linejoin="round" stroke-width="1.5" d="m16.692 9.803l1.791-1.792a1.764 1.764 0 0 0-2.494-2.494l-1.792 1.791m2.495 2.495l-10.68 10.68a1.764 1.764 0 0 1-2.495-2.494l10.68-10.68m2.495 2.494l-2.495-2.495m3.777 6.714a.026.026 0 0 1 .052 0a3.79 3.79 0 0 0 2.953 2.952c.028.006.028.046 0 .052a3.79 3.79 0 0 0-2.953 2.953c-.006.028-.046.028-.052 0a3.79 3.79 0 0 0-2.953-2.953c-.028-.006-.028-.046 0-.052a3.79 3.79 0 0 0 2.953-2.953Z"/><path fill="currentColor" d="M8.12 3.31c.085-.413.675-.413.76 0a2.32 2.32 0 0 0 1.81 1.81c.413.085.413.675 0 .76a2.32 2.32 0 0 0-1.81 1.81c-.085.413-.675.413-.76 0a2.32 2.32 0 0 0-1.81-1.81c-.413-.085-.413-.675 0-.76a2.32 2.32 0 0 0 1.81-1.81"/></g></svg>
-                        <span>Define your <span class="hl">data</span> once</span>
-                    </h2>
-                    <div class="define-grid animate-in">
-                        <div class="define-code">
-                            <div class="code-label brand-label as-label">
-                                <img src="/logo.svg" alt="Atscript" class="as-file" />
-                                user.as
+                    <div class="aspect-grid">
+                        <div class="aspect-copy animate-in">
+                            <div class="aspect-status aspect-status-today">Available today</div>
+                            <h2 class="section-heading">TypeScript + Validation</h2>
+                            <p class="aspect-desc">
+                                Start with one <code>.as</code> model. Atscript turns that model into TypeScript types, runtime metadata,
+                                and validation rules without a second schema layer.
+                            </p>
+                            <div class="aspect-tags">
+                                <span class="aspect-tag">string.email</span>
+                                <span class="aspect-tag">@expect.*</span>
+                                <span class="aspect-tag">User.validator()</span>
+                                <span class="aspect-tag">JSON Schema</span>
                             </div>
-                            <div class="code-block brand-block">
-                                <SnippetDefine />
-                            </div>
+                            <ul class="aspect-list">
+                                <li>Keep type shape and runtime rules on the same model.</li>
+                                <li>Generate runtime metadata and JSON Schema from the same definition.</li>
+                                <li>TypeScript is the first supported plugin and the best place to start today.</li>
+                            </ul>
                         </div>
-                        <DefineCarousel />
+                        <div class="aspect-visual animate-in">
+                            <ValidationAnimation />
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Section 2: Generate your data-assets -->
-            <section class="section-generate bg-diagonal">
+            <section class="section-aspect bg-diagonal">
                 <div class="section-inner">
-                    <h2 class="section-heading animate-in flex-row">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 0 0-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 0 0-5.656-5.656l-1.1 1.1"/></svg>
-                        <span>Link your <span class="hl">assets</span> to your model</span>
-                    </h2>
-                    <div class="animate-in">
-                        <AssetsCarousel />
-                    </div>
-                    <div class="generate-cta animate-in">
-                        <VPButton tag="a" size="medium" theme="brand" text="Get Started" href="/packages/typescript/quick-start" />
+                    <div class="aspect-grid aspect-grid-reverse">
+                        <div class="aspect-copy animate-in">
+                            <div class="aspect-status aspect-status-today">Available today</div>
+                            <h2 class="section-heading">DB + API Integrations</h2>
+                            <p class="aspect-desc">
+                                The same model can drive schema annotations, relations, sync, CRUD helpers, and REST/CRUD integrations
+                                instead of splitting those concerns into separate definitions. SQLite and MongoDB adapters are available today.
+                            </p>
+                            <div class="aspect-tags">
+                                <span class="aspect-tag">@db.table</span>
+                                <span class="aspect-tag">@db.rel.FK</span>
+                                <span class="aspect-tag">schema sync</span>
+                                <span class="aspect-tag">CRUD over HTTP</span>
+                            </div>
+                            <ul class="aspect-list">
+                                <li>Define tables, relations, defaults, and indexes in the model itself.</li>
+                                <li>Keep data-layer behavior aligned with the same types and validation rules.</li>
+                                <li>Use supported SQLite, MongoDB, and Moost-based integrations from one source of truth.</li>
+                            </ul>
+                        </div>
+                        <div class="aspect-visual aspect-visual-plain animate-in">
+                            <DbRelationsAnimation />
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section class="section-roadmap">
+            <section class="section-aspect">
                 <div class="section-inner">
-                    <h2 class="section-heading animate-in flex-row">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.5 12h15m0 0l-4.5-4.5M19.5 12l-4.5 4.5M12 4.5v15"/></svg>
-                        <span>One <span class="hl">.as</span> model, the full data flow</span>
-                    </h2>
-                    <p class="section-copy animate-in">
-                        Atscript is moving toward a model-driven stack where one definition shapes UI, API, TypeScript, and DB behavior.
-                        The current implementation starts with TypeScript and data-layer integrations, then grows outward from the same model.
-                    </p>
-                    <div class="flow-grid animate-in">
-                        <div class="flow-card flow-card-source">
-                            <div class="flow-status flow-status-source">Source</div>
-                            <h3 class="flow-title">One <code>.as</code> model</h3>
-                            <p class="flow-desc">Fields, constraints, metadata, and relations live in one place instead of being duplicated across your stack.</p>
+                    <div class="aspect-grid">
+                        <div class="aspect-copy animate-in">
+                            <div class="aspect-status aspect-status-planned">Planned</div>
+                            <h2 class="section-heading">UI Forms + Table Views</h2>
+                            <p class="aspect-desc">
+                                The long-term direction is one model across UI, API, TypeScript, and DB. The same metadata that powers
+                                runtime tooling today is the basis for automated forms and data-table views later.
+                            </p>
+                            <div class="aspect-tags">
+                                <span class="aspect-tag">@meta.label</span>
+                                <span class="aspect-tag">field hints</span>
+                                <span class="aspect-tag">validation rules</span>
+                                <span class="aspect-tag">table views</span>
+                            </div>
+                            <ul class="aspect-list">
+                                <li>Reuse labels and constraints instead of rewriting them in UI config.</li>
+                                <li>Keep forms and tables aligned with the model as the schema evolves.</li>
+                                <li>Build toward a model-driven data flow from UI to API to TypeScript to DB.</li>
+                            </ul>
                         </div>
-                        <div class="flow-card">
-                            <div class="flow-status flow-status-today">Available today</div>
-                            <h3 class="flow-title">TypeScript</h3>
-                            <p class="flow-desc">Generate types, runtime metadata, validation, and JSON Schema from the same definition.</p>
-                        </div>
-                        <div class="flow-card">
-                            <div class="flow-status flow-status-today">Available today</div>
-                            <h3 class="flow-title">DB + API integrations</h3>
-                            <p class="flow-desc">Drive schema annotations, sync, CRUD helpers, and REST/CRUD integrations from the same model.</p>
-                        </div>
-                        <div class="flow-card">
-                            <div class="flow-status flow-status-planned">Planned</div>
-                            <h3 class="flow-title">UI forms</h3>
-                            <p class="flow-desc">Use labels, validation rules, and UI metadata from your model to automate form generation.</p>
-                        </div>
-                        <div class="flow-card">
-                            <div class="flow-status flow-status-planned">Planned</div>
-                            <h3 class="flow-title">Table views</h3>
-                            <p class="flow-desc">Build table and list UIs from the same source of truth instead of maintaining separate view configs.</p>
+                        <div class="aspect-visual animate-in">
+                            <PlannedUiPreview />
                         </div>
                     </div>
-                    <div class="architecture-note animate-in">
-                        <h3 class="architecture-title">Language-agnostic by design</h3>
-                        <p class="architecture-desc">
-                            Atscript is built so the same core model can be adopted by other language targets over time.
-                            Today, TypeScript is the first supported plugin and the most complete workflow.
+                </div>
+            </section>
+
+            <section class="section-architecture bg-diagonal">
+                <div class="section-inner">
+                    <div class="architecture-block animate-in">
+                        <div class="aspect-status aspect-status-source">Architecture</div>
+                        <h2 class="section-heading">Language-agnostic by design</h2>
+                        <p class="aspect-desc">
+                            Atscript is not built as a TypeScript-only schema DSL. The core model and plugin system are meant to support
+                            other language targets over time, while TypeScript remains the first and most complete implementation today.
                         </p>
+                        <div class="architecture-diagram">
+                            <span class="architecture-node">.as model</span>
+                            <span class="architecture-arrow">-></span>
+                            <span class="architecture-node architecture-node-active">TypeScript plugin today</span>
+                            <span class="architecture-arrow">-></span>
+                            <span class="architecture-node">other targets later</span>
+                        </div>
+                        <ul class="aspect-list architecture-list">
+                            <li>The <code>.as</code> model stays stable as the shared schema layer.</li>
+                            <li>Plugins define code generation and runtime behavior for each target ecosystem.</li>
+                            <li>That lets Atscript grow beyond TypeScript without changing the core modeling idea.</li>
+                        </ul>
                     </div>
                 </div>
             </section>
@@ -288,122 +315,151 @@ watch(() => route.path, setupScrollAnimations)
 @media (min-width: 960px) { .actions { justify-content: flex-start; } }
 .action { flex-shrink: 0; padding: 6px; }
 
-/* ---- Section 1: Define ---- */
-.section-define { padding: 72px 24px 64px; }
-@media (min-width: 640px) { .section-define { padding: 80px 48px 72px; } }
-@media (min-width: 960px) { .section-define { padding: 80px 64px 72px; } }
-.define-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: center; }
-@media (min-width: 768px) { .define-grid { grid-template-columns: 1fr 1fr; gap: 32px; } }
-.define-code { min-width: 0; }
-
-/* ---- Section 2: Generate ---- */
-.section-generate { padding: 48px 24px; }
-@media (min-width: 640px) { .section-generate { padding: 64px 48px; } }
-@media (min-width: 960px) { .section-generate { padding: 64px 64px; } }
-.generate-cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; }
-.section-roadmap { padding: 56px 24px 80px; }
-@media (min-width: 640px) { .section-roadmap { padding: 72px 48px 88px; } }
-@media (min-width: 960px) { .section-roadmap { padding: 72px 64px 96px; } }
-.section-copy {
-    max-width: 760px;
-    margin: -8px 0 28px;
-    font-size: 16px;
-    line-height: 1.7;
-    color: var(--vp-c-text-2);
-}
-.flow-grid {
+/* ---- Aspect Sections ---- */
+.section-aspect { padding: 56px 24px; }
+@media (min-width: 640px) { .section-aspect { padding: 72px 48px; } }
+@media (min-width: 960px) { .section-aspect { padding: 80px 64px; } }
+.aspect-grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 28px;
+    align-items: center;
 }
-@media (min-width: 768px) { .flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (min-width: 1080px) { .flow-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-.flow-card {
+@media (min-width: 900px) {
+    .aspect-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+        gap: 40px;
+    }
+    .aspect-grid-reverse > :first-child { order: 2; }
+    .aspect-grid-reverse > :last-child { order: 1; }
+}
+.aspect-copy {
     min-width: 0;
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid var(--vp-c-divider);
-    background: var(--vp-c-bg);
 }
-.flow-card-source {
-    border-color: rgba(71,26,236,0.28);
-    box-shadow: 0 0 24px rgba(71,26,236,0.08);
-}
-:global(.dark) .flow-card-source {
-    border-color: rgba(174,153,252,0.28);
-    box-shadow: 0 0 24px rgba(174,153,252,0.08);
-}
-.flow-status {
+.aspect-status {
     display: inline-flex;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
     padding: 4px 10px;
     border-radius: 999px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
-.flow-status-source {
-    background: rgba(71,26,236,0.12);
-    color: var(--vp-c-brand-1);
-}
-.flow-status-today {
+.aspect-status-today {
     background: rgba(43,170,196,0.12);
     color: #127791;
 }
-.flow-status-planned {
+.aspect-status-planned {
     background: rgba(217,119,6,0.12);
     color: #9a4b00;
 }
-:global(.dark) .flow-status-today {
+.aspect-status-source {
+    background: rgba(71,26,236,0.12);
+    color: var(--vp-c-brand-1);
+}
+:global(.dark) .aspect-status-today {
     background: rgba(43,170,196,0.18);
     color: #7ddff2;
 }
-:global(.dark) .flow-status-planned {
+:global(.dark) .aspect-status-planned {
     background: rgba(245,158,11,0.18);
     color: #f6c46b;
 }
-.flow-title {
-    margin: 0 0 8px;
-    font-size: 18px;
-    color: var(--vp-c-text-1);
-}
-.flow-title code {
+.aspect-desc {
+    max-width: 640px;
+    margin: -6px 0 18px;
     font-size: 16px;
-    color: var(--vp-c-brand-1);
+    line-height: 1.75;
+    color: var(--vp-c-text-2);
+}
+.aspect-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.aspect-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
     background: rgba(71,26,236,0.08);
-    padding: 2px 6px;
-    border-radius: 6px;
+    color: var(--vp-c-brand-1);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--vp-font-family-mono);
 }
-.flow-desc {
+:global(.dark) .aspect-tag { background: rgba(174,153,252,0.12); }
+.aspect-list {
     margin: 0;
+    padding-left: 20px;
+    display: grid;
+    gap: 10px;
+    color: var(--vp-c-text-2);
     font-size: 14px;
-    line-height: 1.6;
-    color: var(--vp-c-text-2);
+    line-height: 1.65;
 }
-.architecture-note {
-    margin-top: 24px;
-    padding: 24px;
+.aspect-list li::marker {
+    color: var(--vp-c-brand-1);
+}
+.aspect-visual {
+    min-width: 0;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
     border-radius: 18px;
-    border: 1px solid rgba(71,26,236,0.2);
-    background: linear-gradient(135deg, rgba(71,26,236,0.08), rgba(43,170,196,0.08));
+    border: 1px solid var(--vp-c-divider);
+    background: linear-gradient(135deg, rgba(71,26,236,0.05), rgba(43,170,196,0.05));
 }
-:global(.dark) .architecture-note {
-    border-color: rgba(174,153,252,0.22);
-    background: linear-gradient(135deg, rgba(174,153,252,0.12), rgba(43,170,196,0.12));
+:global(.dark) .aspect-visual {
+    background: linear-gradient(135deg, rgba(174,153,252,0.1), rgba(43,170,196,0.1));
 }
-.architecture-title {
-    margin: 0 0 8px;
-    font-size: 20px;
+.aspect-visual-plain {
+    background: var(--vp-c-bg);
+}
+:global(.dark) .aspect-visual-plain {
+    background: var(--vp-c-bg);
+}
+.section-architecture { padding: 56px 24px 88px; }
+@media (min-width: 640px) { .section-architecture { padding: 72px 48px 96px; } }
+@media (min-width: 960px) { .section-architecture { padding: 80px 64px 104px; } }
+.architecture-block {
+    max-width: 860px;
+}
+.architecture-diagram {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin: 22px 0 18px;
+}
+.architecture-node {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--vp-c-divider);
+    background: var(--vp-c-bg);
     color: var(--vp-c-text-1);
+    font-size: 13px;
+    font-weight: 600;
 }
-.architecture-desc {
+.architecture-node-active {
+    border-color: rgba(71,26,236,0.25);
+    background: rgba(71,26,236,0.08);
+    color: var(--vp-c-brand-1);
+}
+:global(.dark) .architecture-node-active { background: rgba(174,153,252,0.12); }
+.architecture-arrow {
+    color: var(--vp-c-text-3);
+    font-weight: 700;
+}
+.architecture-list {
     max-width: 720px;
-    margin: 0;
-    font-size: 15px;
-    line-height: 1.7;
-    color: var(--vp-c-text-2);
 }
 
 /* ---- Section 4: Comparison ---- */
