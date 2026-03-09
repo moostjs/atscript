@@ -285,7 +285,7 @@ const atscriptGrammar = {
 export default defineConfig({
   title: 'Atscript',
   description:
-    'Define your data once — get types, validations, DB, REST API, and UI forms for free',
+    'Define your models once — get TypeScript types, runtime validation, and DB metadata from a single .as model',
   lang: 'en-US',
   lastUpdated: true,
   cleanUrls: true,
@@ -308,7 +308,7 @@ export default defineConfig({
       {
         property: 'og:description',
         content:
-          'Define your data once — get types, validations, DB, REST API, and UI forms for free',
+          'Define your models once — get TypeScript types, runtime validation, and DB metadata from a single .as model',
       },
     ],
   ],
@@ -344,8 +344,8 @@ export default defineConfig({
       },
       { text: 'VSCode', link: '/packages/vscode/' },
       {
-        text: 'Plugins',
-        items: [{ text: 'Creating a Plugin', link: '/plugin-development/' }],
+        text: 'Plugin Dev (Early)',
+        items: [{ text: 'Creating a Plugin (Early)', link: '/plugin-development/' }],
       },
     ],
 

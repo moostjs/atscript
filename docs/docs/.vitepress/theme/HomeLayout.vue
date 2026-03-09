@@ -45,9 +45,11 @@ watch(() => route.path, setupScrollAnimations)
             <div class="custom-hero">
                 <div class="hero-inner">
                     <div class="hero-main">
+                        <p v-if="frontmatter.hero2.kicker" class="hero-kicker">{{ frontmatter.hero2.kicker }}</p>
                         <h1 class="hero-name">Atscript</h1>
                         <p class="hero-text">{{ frontmatter.hero2.text }}</p>
                         <p class="hero-tagline">{{ frontmatter.hero2.tagline }}</p>
+                        <p v-if="frontmatter.hero2.note" class="hero-note">{{ frontmatter.hero2.note }}</p>
                         <div v-if="frontmatter.actions" class="actions">
                             <div
                                 v-for="action in frontmatter.actions"
@@ -80,22 +82,22 @@ watch(() => route.path, setupScrollAnimations)
                             <div class="feature-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7.5 21 3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5"/></svg>
                             </div>
-                            <h3 class="feature-title">Full Stack From One Source</h3>
-                            <p class="feature-desc">TypeScript types, validators, DB tables, REST API — generated from one definition.</p>
+                            <h3 class="feature-title">TypeScript from One Model</h3>
+                            <p class="feature-desc">Start with one <code>.as</code> file and use it for TypeScript types, validators, and runtime metadata.</p>
                         </a>
-                        <a href="/packages/typescript/annotations" class="feature-card">
+                        <a href="/packages/typescript/validation" class="feature-card">
                             <div class="feature-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.1 18.1 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6z"/></svg>
                             </div>
-                            <h3 class="feature-title">Rich Runtime Metadata</h3>
-                            <p class="feature-desc">Labels, UI hints, custom annotations — accessible at runtime, not just compile time.</p>
+                            <h3 class="feature-title">Validation + Runtime Metadata</h3>
+                            <p class="feature-desc">Keep constraints, labels, and other hints on the model instead of scattering them across schemas and UI code.</p>
                         </a>
-                        <a href="/plugin-development/" class="feature-card">
+                        <a href="/db-integrations/" class="feature-card">
                             <div class="feature-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.049.58.025 1.193-.14 1.743"/></svg>
                             </div>
-                            <h3 class="feature-title">Your Rules, Your Plugins</h3>
-                            <p class="feature-desc">Extend with custom annotations, primitives, and code generators. Atscript adapts to your stack.</p>
+                            <h3 class="feature-title">DB Schema and CRUD Integrations</h3>
+                            <p class="feature-desc">Drive tables, relations, schema sync, and REST/CRUD integrations from the same model definition.</p>
                         </a>
                     </div>
                 </div>
@@ -168,6 +170,53 @@ watch(() => route.path, setupScrollAnimations)
                 </div>
             </section>
 
+            <section class="section-roadmap">
+                <div class="section-inner">
+                    <h2 class="section-heading animate-in flex-row">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="header-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.5 12h15m0 0l-4.5-4.5M19.5 12l-4.5 4.5M12 4.5v15"/></svg>
+                        <span>One <span class="hl">.as</span> model, the full data flow</span>
+                    </h2>
+                    <p class="section-copy animate-in">
+                        Atscript is moving toward a model-driven stack where one definition shapes UI, API, TypeScript, and DB behavior.
+                        The current implementation starts with TypeScript and data-layer integrations, then grows outward from the same model.
+                    </p>
+                    <div class="flow-grid animate-in">
+                        <div class="flow-card flow-card-source">
+                            <div class="flow-status flow-status-source">Source</div>
+                            <h3 class="flow-title">One <code>.as</code> model</h3>
+                            <p class="flow-desc">Fields, constraints, metadata, and relations live in one place instead of being duplicated across your stack.</p>
+                        </div>
+                        <div class="flow-card">
+                            <div class="flow-status flow-status-today">Available today</div>
+                            <h3 class="flow-title">TypeScript</h3>
+                            <p class="flow-desc">Generate types, runtime metadata, validation, and JSON Schema from the same definition.</p>
+                        </div>
+                        <div class="flow-card">
+                            <div class="flow-status flow-status-today">Available today</div>
+                            <h3 class="flow-title">DB + API integrations</h3>
+                            <p class="flow-desc">Drive schema annotations, sync, CRUD helpers, and REST/CRUD integrations from the same model.</p>
+                        </div>
+                        <div class="flow-card">
+                            <div class="flow-status flow-status-planned">Planned</div>
+                            <h3 class="flow-title">UI forms</h3>
+                            <p class="flow-desc">Use labels, validation rules, and UI metadata from your model to automate form generation.</p>
+                        </div>
+                        <div class="flow-card">
+                            <div class="flow-status flow-status-planned">Planned</div>
+                            <h3 class="flow-title">Table views</h3>
+                            <p class="flow-desc">Build table and list UIs from the same source of truth instead of maintaining separate view configs.</p>
+                        </div>
+                    </div>
+                    <div class="architecture-note animate-in">
+                        <h3 class="architecture-title">Language-agnostic by design</h3>
+                        <p class="architecture-desc">
+                            Atscript is built so the same core model can be adopted by other language targets over time.
+                            Today, TypeScript is the first supported plugin and the most complete workflow.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
         </template>
     </Layout>
 </template>
@@ -210,6 +259,14 @@ watch(() => route.path, setupScrollAnimations)
 :global(.dark) .image-src { filter: drop-shadow(0 0 40px rgba(174,153,252,0.5)) drop-shadow(0 0 80px rgba(174,153,252,0.35)) drop-shadow(0 0 140px rgba(174,153,252,0.2)); }
 @media (min-width: 640px) { .image-src { max-width: 256px; } }
 @media (min-width: 960px) { .image-src { max-width: 320px; } }
+.hero-kicker {
+    margin: 0 0 12px;
+    color: var(--vp-c-brand-1);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
 .hero-name { font-size: 84px; font-weight: 600; letter-spacing: -1px; line-height: 1.1; color: var(--vp-c-brand-1); margin-bottom: 8px; }
 @media (min-width: 640px) { .hero-name { font-size: 56px; } }
 @media (min-width: 960px) { .hero-name { font-size: 84px; } }
@@ -219,6 +276,14 @@ watch(() => route.path, setupScrollAnimations)
 .hero-tagline { font-size: 16px; font-weight: 500; color: var(--vp-c-text-2); max-width: 520px; margin: 0 auto; line-height: 1.5; }
 @media (min-width: 640px) { .hero-tagline { font-size: 20px; } }
 @media (min-width: 960px) { .hero-tagline { margin: 0; } }
+.hero-note {
+    max-width: 560px;
+    margin: 14px auto 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--vp-c-text-2);
+}
+@media (min-width: 960px) { .hero-note { margin: 14px 0 0; } }
 .actions { display: flex; flex-wrap: wrap; justify-content: center; margin: -6px; padding-top: 28px; }
 @media (min-width: 960px) { .actions { justify-content: flex-start; } }
 .action { flex-shrink: 0; padding: 6px; }
@@ -236,6 +301,110 @@ watch(() => route.path, setupScrollAnimations)
 @media (min-width: 640px) { .section-generate { padding: 64px 48px; } }
 @media (min-width: 960px) { .section-generate { padding: 64px 64px; } }
 .generate-cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; }
+.section-roadmap { padding: 56px 24px 80px; }
+@media (min-width: 640px) { .section-roadmap { padding: 72px 48px 88px; } }
+@media (min-width: 960px) { .section-roadmap { padding: 72px 64px 96px; } }
+.section-copy {
+    max-width: 760px;
+    margin: -8px 0 28px;
+    font-size: 16px;
+    line-height: 1.7;
+    color: var(--vp-c-text-2);
+}
+.flow-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+}
+@media (min-width: 768px) { .flow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1080px) { .flow-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+.flow-card {
+    min-width: 0;
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid var(--vp-c-divider);
+    background: var(--vp-c-bg);
+}
+.flow-card-source {
+    border-color: rgba(71,26,236,0.28);
+    box-shadow: 0 0 24px rgba(71,26,236,0.08);
+}
+:global(.dark) .flow-card-source {
+    border-color: rgba(174,153,252,0.28);
+    box-shadow: 0 0 24px rgba(174,153,252,0.08);
+}
+.flow-status {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.flow-status-source {
+    background: rgba(71,26,236,0.12);
+    color: var(--vp-c-brand-1);
+}
+.flow-status-today {
+    background: rgba(43,170,196,0.12);
+    color: #127791;
+}
+.flow-status-planned {
+    background: rgba(217,119,6,0.12);
+    color: #9a4b00;
+}
+:global(.dark) .flow-status-today {
+    background: rgba(43,170,196,0.18);
+    color: #7ddff2;
+}
+:global(.dark) .flow-status-planned {
+    background: rgba(245,158,11,0.18);
+    color: #f6c46b;
+}
+.flow-title {
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: var(--vp-c-text-1);
+}
+.flow-title code {
+    font-size: 16px;
+    color: var(--vp-c-brand-1);
+    background: rgba(71,26,236,0.08);
+    padding: 2px 6px;
+    border-radius: 6px;
+}
+.flow-desc {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--vp-c-text-2);
+}
+.architecture-note {
+    margin-top: 24px;
+    padding: 24px;
+    border-radius: 18px;
+    border: 1px solid rgba(71,26,236,0.2);
+    background: linear-gradient(135deg, rgba(71,26,236,0.08), rgba(43,170,196,0.08));
+}
+:global(.dark) .architecture-note {
+    border-color: rgba(174,153,252,0.22);
+    background: linear-gradient(135deg, rgba(174,153,252,0.12), rgba(43,170,196,0.12));
+}
+.architecture-title {
+    margin: 0 0 8px;
+    font-size: 20px;
+    color: var(--vp-c-text-1);
+}
+.architecture-desc {
+    max-width: 720px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--vp-c-text-2);
+}
 
 /* ---- Section 4: Comparison ---- */
 .section-compare { padding: 48px 24px 64px; }

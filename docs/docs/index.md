@@ -2,20 +2,16 @@
 layout: home
 
 hero2:
-  text: 'Define your data once'
-  tagline: 'Get types, validations, DB, REST API, UI forms for free'
+  kicker: 'TypeScript first. Language-agnostic by design.'
+  text: 'Define your models once'
+  tagline: 'Get TypeScript types, runtime validation, and DB metadata from a single `.as` model.'
+  note: 'Atscript is built to power a broader model-driven stack over time. Today, TypeScript is the first supported plugin.'
 
 actions:
   - theme: brand
-    text: Quick Start
+    text: Start with TypeScript
     link: /packages/typescript/quick-start
   - theme: alt
-    text: DB Quick Start
+    text: Explore DB Integrations
     link: /db-integrations/quick-start
-  - theme: alt
-    text: Why Atscript?
-    link: /packages/typescript/why-atscript
-  - theme: alt
-    text: View on GitHub
-    link: https://github.com/moostjs/atscript
 ---

@@ -49,24 +49,43 @@ export interface User {
 }
 ```
 
-From this single definition, Atscript generates:
+From this single definition, Atscript can already drive several parts of your stack today, and it is designed to expand further from the same model over time.
 
-- Types with full type safety in your target language
-- Runtime validators with all constraints
-- Database tables with indexes via the [DB abstraction layer](/db-adapters/)
-- JSON Schema for API documentation
-- UI metadata for form generation
-- And more via the plugin system
+## What Atscript Gives You Today
+
+- TypeScript types with full type safety
+- Runtime validators with model-defined constraints
+- JSON Schema and runtime metadata export
+- Database annotations and integrations via [DB Integrations](/db-integrations/)
+- REST/CRUD integrations in the TypeScript ecosystem
+
+## Where the Model Is Going
+
+Atscript is growing toward a wider model-driven workflow where the same `.as` definition can shape:
+
+- UI forms
+- Table and list views
+- API contracts and integrations
+- TypeScript code
+- Database schema and operations
+
+The direction is one model across the full data flow, while keeping the current docs precise about what is already available and what is planned next.
 
 ## Core Design Principles
 
-### 1. Everything is Extensible
+### 1. One Model Across the Stack
+
+- Keep structure, validation, metadata, and data-layer hints in one place
+- Make the model the source of truth instead of generating more duplicated config
+- Grow capabilities outward from the same definition instead of creating new parallel schemas
+
+### 2. Everything Is Extensible
 
 - **Types are extensible**: Create semantic types like `string.email`, `number.positive`
 - **Annotations are extensible**: Add any metadata your project needs
 - **Plugins are powerful**: Generate code for any language or framework
 
-### 2. Annotations for Everything
+### 3. Annotations for Everything
 
 Atscript uses annotations to attach any kind of metadata:
 
@@ -75,13 +94,13 @@ Atscript uses annotations to attach any kind of metadata:
 - `@db.*` - Database configuration (tables, indexes, columns, defaults)
 - `@your.custom` - Whatever your project needs
 
-### 3. Language Agnostic
+### 4. Language-Agnostic by Design
 
-While currently supporting TypeScript/JavaScript, Atscript is designed to be universal:
+The core model and plugin system are built so Atscript can be adopted by different language targets over time. Today, TypeScript is the first supported plugin and the most complete workflow.
 
-- Clean, TypeScript-like syntax that's familiar
-- Plugin system allows any language to be targeted
-- Community can contribute plugins for Python, Go, Rust, etc.
+- Clean, TypeScript-like syntax keeps the model easy to read
+- The plugin system allows other languages to adopt the same model pattern
+- Future language targets can build on the same core concepts instead of reinventing the schema
 
 ## Real-World Benefits
 
@@ -105,11 +124,8 @@ While currently supporting TypeScript/JavaScript, Atscript is designed to be uni
 - **Database from annotations** - Tables, indexes, and CRUD from `@db.*` annotations
 - **Cross-platform** - Same types for backend and frontend
 
-## Who Benefits from Atscript?
+## Who Benefits from Atscript Today?
 
-- **Full-stack developers** tired of maintaining duplicate schemas
-- **Teams** wanting consistency across their codebase
-- **Architects** designing type-safe microservices
-- **Projects** with complex validation requirements
-- **Applications** needing rich metadata for UI generation
-- **Systems** requiring database schema synchronization
+- **TypeScript backend and full-stack teams** tired of maintaining duplicate schemas
+- **Projects** with validation, metadata, and DB rules spread across multiple files
+- **Teams** that want one source of truth today and a more model-driven stack over time

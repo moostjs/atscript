@@ -2,6 +2,10 @@
 
 Atscript plugins extend the language with custom primitives, annotations, and code generators. A plugin is a plain object that implements the `TAtscriptPlugin` interface — a `name` plus optional hooks that participate in the Atscript processing pipeline.
 
+::: warning Early Documentation
+Plugin development is part of Atscript's long-term architecture, but this section is still early and incomplete. If you are new to Atscript, start with the [TypeScript guide](/packages/typescript/) first.
+:::
+
 ## What Plugins Can Do
 
 | Capability                       | Hook           | Example                                     |

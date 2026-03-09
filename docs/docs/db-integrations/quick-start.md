@@ -4,7 +4,15 @@ outline: deep
 
 # Quick Start
 
-This guide walks you through creating a simple database-backed application with Atscript and SQLite.
+This guide shows the next step after the TypeScript quick start: using the same `.as` model to drive a simple SQLite-backed application.
+
+::: tip What You Will Build
+In this guide, you will define one `Todo` model, generate its runtime artifacts, sync the schema into SQLite, and run typed CRUD operations from that same model.
+:::
+
+::: info Recommended Order
+If you are evaluating Atscript for the first time, start with the [TypeScript Quick Start](/packages/typescript/quick-start). This guide builds on that same model-driven workflow for the database layer.
+:::
 
 ## 1. Install Dependencies
 

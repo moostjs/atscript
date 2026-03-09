@@ -1,6 +1,18 @@
 # Atscript for TypeScript
 
-The complete guide to using Atscript with TypeScript. This section is self-contained — everything you need to define types in `.as` files, generate TypeScript code, and use runtime utilities like validation, JSON Schema, and serialization.
+The TypeScript guide is the main place to evaluate Atscript today. TypeScript is the first supported target, and this section covers the most complete workflow for defining `.as` files, generating TypeScript code, and using runtime utilities like validation, JSON Schema, and serialization.
+
+::: tip Start Here
+If you are new to Atscript, start with the [Quick Start](/packages/typescript/quick-start). Atscript is language-agnostic by design, but the TypeScript plugin is the first production implementation today.
+:::
+
+## What You Can Do Today
+
+- Define models once in `.as` files
+- Generate TypeScript types and runtime metadata
+- Validate data from the same model
+- Export JSON Schema
+- Feed the same model into DB integrations
 
 ## What's in This Guide
 

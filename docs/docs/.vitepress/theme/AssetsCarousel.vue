@@ -5,39 +5,58 @@ const cards = [
     {
         href: '/packages/typescript/quick-start',
         title: 'TypeScript Types',
+        status: 'Available today',
+        tone: 'today',
         desc: 'Interfaces, enums, and generics generated straight from your .as definitions. Full autocompletion, zero manual typing.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none"><g clip-path="url(#SVGXv8lpc2Y)"><path fill="currentColor" d="M23.429 0H.57A.57.57 0 0 0 0 .571V23.43a.57.57 0 0 0 .571.571H23.43a.57.57 0 0 0 .571-.571V.57a.57.57 0 0 0-.572-.57m-9.143 12.826h-2.857v8.888H9.143v-8.888H6.286v-1.969h8zm.64 8.38v-2.375s1.298.978 2.855.978s1.497-1.018 1.497-1.158c0-1.477-4.412-1.477-4.412-4.751c0-4.452 6.429-2.695 6.429-2.695l-.08 2.116s-1.078-.719-2.296-.719s-1.657.58-1.657 1.198c0 1.597 4.452 1.438 4.452 4.652c0 4.95-6.788 2.755-6.788 2.755"/></g><defs><clipPath id="SVGXv8lpc2Y"><path fill="#fff" d="M0 0h24v24H0z"/></clipPath></defs></g></svg>`,
     },
     {
         href: '/packages/typescript/primitives',
         title: 'Validators',
+        status: 'Available today',
+        tone: 'today',
         desc: 'Every type carries its own constraints. Emails, URLs, ranges — validated at runtime, no extra schemas needed.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m4.5 12.75 6 6 9-13.5"/></svg>`,
     },
     {
         href: '/db-integrations/',
         title: 'Database Tables',
-        desc: 'Foreign keys, indexes, cascades, views — declared as annotations, synced with one command. SQLite and MongoDB ready.',
+        status: 'Available today',
+        tone: 'today',
+        desc: 'Foreign keys, indexes, cascades, and views declared as annotations, then synced with your database integrations.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/></svg>`,
     },
     {
         href: '/db-integrations/crud-http',
         title: 'REST API',
-        desc: 'Get, list, create, update, delete — eight endpoints wired automatically. Filtering, pagination, and validation included.',
+        status: 'Available today',
+        tone: 'today',
+        desc: 'Expose CRUD and REST integrations from the same model with filtering, pagination, and validation in the workflow.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="m37 22l-3 3l-11-11l3-3c1.5-1.5 7-4 11 0s1.5 9.5 0 11m5-16l-5 5M11 26l3-3l11 11l-3 3c-1.5 1.5-7 4-11 0s-1.5-9.5 0-11m12 6l4-4M6 42l5-5m5-12l4-4"/></svg>`,
     },
     {
         href: '/packages/typescript/json-schema',
         title: 'JSON Schema',
-        desc: 'Feed OpenAPI docs, form generators, or any tool that speaks JSON Schema — exported directly from your model.',
+        status: 'Available today',
+        tone: 'today',
+        desc: 'Feed OpenAPI docs and other JSON Schema-aware tooling straight from your model.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"/></svg>`,
     },
     {
         href: null,
         title: 'UI Forms',
-        desc: 'Auto-generated forms driven by your model — labels, field types, and validation rules, all from one source. Coming soon.',
+        status: 'Planned',
+        tone: 'planned',
+        desc: 'Use labels, field types, and validation rules from the model to automate forms. Planned as part of the full data flow.',
         icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25A2.25 2.25 0 0 1 5.25 3h13.5A2.25 2.25 0 0 1 21 5.25z"/></svg>`,
-        soon: true,
+    },
+    {
+        href: null,
+        title: 'Table Views',
+        status: 'Planned',
+        tone: 'planned',
+        desc: 'Build table and list UIs from the same model instead of maintaining separate view configuration by hand.',
+        icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.75 6.75h16.5m-16.5 5.25h16.5m-16.5 5.25h16.5M8.25 4.5v15m7.5-15v15"/></svg>`,
     },
 ]
 
@@ -144,13 +163,14 @@ onUnmounted(stopTimer)
                 :is="card.href ? 'a' : 'div'"
                 :href="card.href || undefined"
                 class="ac-card"
-                :class="[`ac-${card.position}`, { 'ac-soon': card.soon }]"
+                :class="[`ac-${card.position}`, { 'ac-planned': card.tone === 'planned' }]"
                 @click="card.position === 'center' ? undefined : (card.position === 'left' ? (prev(), stopPermanently()) : card.position === 'right' ? (next(), stopPermanently()) : undefined)"
             >
                 <div class="ac-card-icon">
                     <div class="ac-icon-inner" v-html="card.icon" />
                 </div>
                 <div class="ac-card-body">
+                    <div class="ac-card-status" :class="`ac-status-${card.tone}`">{{ card.status }}</div>
                     <div class="ac-card-title">{{ card.title }}</div>
                     <div class="ac-card-desc">{{ card.desc }}</div>
                 </div>
@@ -322,6 +342,38 @@ onUnmounted(stopTimer)
     text-align: left;
 }
 
+.ac-card-status {
+    display: inline-flex;
+    align-self: flex-start;
+    margin-bottom: 10px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ac-status-today {
+    background: rgba(43, 170, 196, 0.12);
+    color: #127791;
+}
+
+.ac-status-planned {
+    background: rgba(217, 119, 6, 0.12);
+    color: #9a4b00;
+}
+
+:global(.dark) .ac-status-today {
+    background: rgba(43, 170, 196, 0.18);
+    color: #7ddff2;
+}
+
+:global(.dark) .ac-status-planned {
+    background: rgba(245, 158, 11, 0.18);
+    color: #f6c46b;
+}
+
 .ac-card-title {
     font-size: 18px;
     font-weight: 600;
@@ -337,16 +389,16 @@ onUnmounted(stopTimer)
 }
 
 /* Coming soon */
-.ac-soon {
+.ac-planned {
     cursor: default;
 }
 
-.ac-soon .ac-card-icon {
-    opacity: 0.5;
+.ac-planned .ac-card-icon {
+    background: rgba(245, 158, 11, 0.06);
 }
 
-.ac-soon .ac-card-body {
-    opacity: 0.5;
+:global(.dark) .ac-planned .ac-card-icon {
+    background: rgba(245, 158, 11, 0.12);
 }
 
 /* Dots */

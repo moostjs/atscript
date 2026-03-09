@@ -4,7 +4,11 @@ outline: deep
 
 # Database Integrations
 
-Atscript's database layer lets you define tables, relations, views, and constraints directly in `.as` files — then use them at runtime with any supported database.
+Atscript's database layer is the next step after the TypeScript model workflow. Define tables, relations, views, and constraints directly in `.as` files, then use the same model at runtime with supported database integrations.
+
+::: info Start with the Model
+If you are new to Atscript, read the [TypeScript Quick Start](/packages/typescript/quick-start) first. The DB layer builds on the same `.as` model rather than introducing a separate schema system.
+:::
 
 ## How It Works
 

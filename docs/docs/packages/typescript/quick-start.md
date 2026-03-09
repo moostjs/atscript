@@ -1,6 +1,14 @@
 # Quick Start
 
-A minimal working example — from installing Atscript to validating data in TypeScript.
+A minimal working TypeScript example — from defining one `.as` model to validating data from it.
+
+::: tip What You Will Build
+In this guide, you will define one `User` model, generate the TypeScript/runtime artifacts Atscript needs, and validate invalid input against that model.
+:::
+
+::: info Current Scope
+Atscript is language-agnostic by design, but TypeScript is the first supported target today. If you are evaluating Atscript right now, this is the best place to start.
+:::
 
 ## 1. Install
 
@@ -47,9 +55,9 @@ export default defineConfig({
 
 See [Configuration](/packages/typescript/configuration) for all available options and plugin settings.
 
-## 4. Set Up Your Build
+## 4. Set Up Automatic Compilation
 
-Install `unplugin-atscript` and configure your bundler. Here's a Vite example for a Node.js library:
+Install `unplugin-atscript` and configure your bundler when you want `.as` files compiled automatically in your app build. Here's a Vite example for a Node.js library:
 
 ```javascript
 // vite.config.js
@@ -83,6 +91,8 @@ npx asc -f dts
 ```
 
 This generates `.as.d.ts` files for each `.as` file and an `atscript.d.ts` file with annotation type definitions. Run this at least once so TypeScript knows about your annotation types. See [CLI](/packages/typescript/cli) for all options.
+
+If you are just evaluating the core TypeScript flow, this CLI step plus the runtime example below are enough to understand the model.
 
 Add `atscript.d.ts` to your `tsconfig.json`:
 
@@ -153,7 +163,7 @@ Validation errors:
 
 ## Next Steps
 
+- [DB Quick Start](/db-integrations/quick-start) — use the same model to drive your database workflow
 - [Interfaces & Types](/packages/typescript/interfaces-types) — how interfaces and type aliases work in `.as` files
 - [Annotations](/packages/typescript/annotations) — built-in annotations (`@meta.*`, `@expect.*`) and how to define custom ones
 - [Primitives](/packages/typescript/primitives) — semantic type extensions like `string.email`, `number.positive`
-- [Configuration](/packages/typescript/configuration) — custom annotations, primitives, and plugin options
