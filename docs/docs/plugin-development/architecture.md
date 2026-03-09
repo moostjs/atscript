@@ -1,6 +1,12 @@
 # Plugin Architecture
 
-Before building a plugin, it helps to understand how Atscript processes `.as` files and where plugins participate in the pipeline. This page covers the processing flow, the AST structure you'll work with, and the key APIs available to plugins.
+This page is a deeper mental model for plugin authors. If you are building your first plugin, you do not need to absorb every class and node type before you start. Most first plugins only need:
+
+- `config()` to register primitives or annotations
+- `render()` to generate one file per document
+- `buildEnd()` only if you need project-wide output
+
+Come back to this page when you need to inspect documents more deeply or understand how the pipeline fits together.
 
 ## The Processing Pipeline
 
@@ -17,6 +23,17 @@ Every `.as` file passes through these stages:
 ```
 
 Plugins don't modify the parser. Instead, they hook into the pipeline at specific points — contributing primitives and annotations before parsing, post-processing after parsing, and generating output files at the end.
+
+## What Most Plugin Authors Need First
+
+For a practical first plugin, this is the minimum mental model:
+
+1. `config()` runs once and adds primitives or annotations.
+2. Atscript parses `.as` files into an `AtscriptDoc`.
+3. `render(doc, format)` receives that parsed document and can emit files.
+4. `buildEnd(output, format, repo)` is optional and only matters when output depends on multiple files.
+
+That is enough to build annotation plugins, primitive plugins, and many generators without going deeper into parser internals.
 
 ## Key Classes
 
@@ -63,7 +80,7 @@ import {
   isPrimitive,
   isImport,
   isAnnotate,
-} from '@atscript/core/nodes'
+} from '@atscript/core'
 
 if (isInterface(node)) {
   // node is SemanticInterfaceNode

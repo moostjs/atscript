@@ -43,7 +43,7 @@ bun add -D @atscript/core
 ### Optional Packages
 
 - **`unplugin-atscript`** — Build tool integration (Vite, Webpack, Rollup, esbuild). See [Build Setup](/packages/typescript/build-setup).
-- **`@atscript/mongo`** — MongoDB integration with index syncing. See [MongoDB](/db-adapters/mongodb).
+- **`@atscript/mongo`** — MongoDB integration with index syncing. See [MongoDB](/db-integrations/mongodb).
 - **`@atscript/moost-db`** — Generic Moost framework database controller
 - **`@atscript/moost-validator`** — Moost framework validation integration
 

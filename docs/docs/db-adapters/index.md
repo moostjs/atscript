@@ -132,7 +132,7 @@ await users.deleteOne({ id: 1 })
 
 Atscript's data layer is **not** an ORM — it's something broader. An ORM's entire job is mapping objects to database tables. Atscript's job is being the single source of truth for *everything* about your data: types, validation, database schemas, UI metadata, API contracts, and documentation.
 
-The database layer is one capability among many. Where an ORM stops at the database, Atscript keeps going — the same `.as` file that creates your table also generates TypeScript types, runtime validators, JSON Schema, and rich metadata for form generation.
+The database layer is one capability among many. Where an ORM stops at the database, Atscript keeps going — the same `.as` file that creates your table also drives TypeScript types, runtime validators, JSON Schema, and rich metadata for UI tools.
 
 | | Traditional ORM | Atscript |
 |---|---|---|

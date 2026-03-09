@@ -39,6 +39,8 @@ for (const [key, prop] of Product.type.props.entries()) {
 Semantic types like `string.email` or `number.positive` produce tags that are available at runtime:
 
 ```typescript
+import { User } from './user.as'
+
 const emailProp = User.type.props.get('email')
 emailProp?.type.tags // Set { 'email', 'string' }
 ```
@@ -50,6 +52,8 @@ Tags let you make runtime decisions based on semantic types — for example, ren
 For arrays, unions, and nested objects, metadata lives on each nested `TAtscriptAnnotatedType`:
 
 ```typescript
+import { OrderList, StatusUnion, User } from './models.as'
+
 // Array element type
 const itemsType = OrderList.type.of // TAtscriptAnnotatedType for array element
 itemsType.metadata.get('meta.label')
@@ -69,29 +73,26 @@ if (addressProp?.type.kind === 'object') {
 
 Use [`forAnnotatedType()`](/packages/typescript/type-definitions#forAnnotatedType) to traverse nested types generically — see [Type Traversal](/packages/typescript/type-definitions#type-traversal) for recursive walking patterns and practical examples.
 
-## Practical Example: Form Generation
+## Practical Example: Build A Field List
 
 ```typescript
 import { Product } from './product.as'
-import { isPhantomType } from '@atscript/typescript/utils'
-import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
-function buildFormFields(type: TAtscriptAnnotatedType) {
-  if (type.type.kind !== 'object') return []
+function buildFieldList() {
+  if (Product.type.kind !== 'object') return []
 
-  return Array.from(type.type.props.entries()).map(([key, prop]) => ({
+  return Array.from(Product.type.props.entries()).map(([key, prop]) => ({
     name: key,
     label: prop.metadata.get('meta.label') || key,
     required: !prop.optional,
     placeholder: prop.metadata.get('ui.placeholder'),
     sensitive: prop.metadata.get('meta.sensitive') || false,
     readonly: prop.metadata.get('meta.readonly') || false,
-    phantom: isPhantomType(prop), // non-data UI elements
   }))
 }
 
-const fields = buildFormFields(Product)
-// [{ name: 'name', label: 'Product Name', required: true, phantom: false, ... }, ...]
+const fields = buildFieldList()
+// [{ name: 'name', label: 'Product Name', required: true, ... }, ...]
 ```
 
 For more advanced traversal patterns — recursive walking, flattening nested types, collecting metadata across the type tree — see [Type Traversal](/packages/typescript/type-definitions#type-traversal).

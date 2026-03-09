@@ -4,7 +4,7 @@ Annotations are metadata declarations that provide additional information about 
 
 Annotations serve multiple purposes:
 
-- **UI metadata** - Labels, placeholders, descriptions for form generation
+- **UI metadata** - Labels, placeholders, descriptions for schema-driven UI tools
 - **Validation constraints** - Min/max values, patterns, length restrictions
 - **Database metadata** - Collection names, indexes, field strategies
 - **Documentation** - Descriptions and multi-line documentation
@@ -131,7 +131,7 @@ Atscript provides common-purpose annotations:
 - `@ui.component 'name'` - UI component hint (e.g., `"select"`, `"datepicker"`)
 - `@ui.hidden` - Hide field from UI forms and tables
 - `@ui.group 'name'` - Group fields into form sections
-- `@ui.order 1` - Display order in auto-generated forms
+- `@ui.order 1` - Display order for form and table tools
 - `@ui.width 'half'` - Layout width hint (e.g., `"half"`, `"full"`, `"third"`)
 - `@ui.icon 'name'` - Icon hint for the field or entity
 - `@ui.hint 'text'` - Help text or tooltip

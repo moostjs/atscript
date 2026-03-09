@@ -324,15 +324,7 @@ export default defineConfig({
     siteTitle: 'Atscript',
 
     nav: [
-      {
-        text: 'TypeScript',
-        items: [
-          { text: 'Guide', link: '/packages/typescript/' },
-          // { text: 'MongoDB', link: '/packages/mongo/' },
-          // { text: 'Moost DB', link: '/packages/moost-db/' },
-          { text: 'Moost Validator', link: '/packages/moost-validator/' },
-        ],
-      },
+      { text: 'TypeScript', link: '/packages/typescript/' },
       {
         text: 'DB Integrations',
         items: [
@@ -342,7 +334,9 @@ export default defineConfig({
           { text: 'CRUD over HTTP', link: '/db-integrations/crud-http' },
         ],
       },
+      { text: 'Roadmap', link: '/roadmap' },
       { text: 'VSCode', link: '/packages/vscode/' },
+      { text: 'Moost Validator', link: '/packages/moost-validator/' },
       {
         text: 'Plugin Dev (Early)',
         items: [{ text: 'Creating a Plugin (Early)', link: '/plugin-development/' }],
@@ -352,35 +346,25 @@ export default defineConfig({
     sidebar: {
       '/packages/typescript/': [
         {
-          text: 'Introduction',
+          text: 'Get Started',
           items: [
             { text: 'Overview', link: '/packages/typescript/' },
             { text: 'Why Atscript?', link: '/packages/typescript/why-atscript' },
-            {
-              text: 'Atscript Validation vs Others',
-              link: '/packages/typescript/validation-comparison',
-            },
             { text: 'Quick Start', link: '/packages/typescript/quick-start' },
+            { text: 'Build Setup', link: '/packages/typescript/build-setup' },
           ],
         },
         {
-          text: 'Atscript Syntax',
+          text: 'Core Guides',
           items: [
             { text: 'Interfaces & Types', link: '/packages/typescript/interfaces-types' },
             { text: 'Imports & Exports', link: '/packages/typescript/imports-exports' },
             { text: 'Primitives', link: '/packages/typescript/primitives' },
-            { text: 'Annotations', link: '/packages/typescript/annotations' },
-            { text: 'Ad-hoc Annotations', link: '/packages/typescript/ad-hoc-annotations' },
-          ],
-        },
-        {
-          text: 'Runtime API',
-          items: [
+            { text: 'Annotations Guide', link: '/packages/typescript/annotations' },
+            { text: 'Validation Guide', link: '/packages/typescript/validation' },
             { text: 'Metadata', link: '/packages/typescript/metadata-export' },
-            { text: 'Validation', link: '/packages/typescript/validation' },
             { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
             { text: 'Serialization', link: '/packages/typescript/serialization' },
-            { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
           ],
         },
         {
@@ -389,12 +373,19 @@ export default defineConfig({
             { text: 'Installation', link: '/packages/typescript/installation' },
             { text: 'Configuration', link: '/packages/typescript/configuration' },
             { text: 'CLI', link: '/packages/typescript/cli' },
-            { text: 'Build Setup', link: '/packages/typescript/build-setup' },
           ],
         },
         {
-          text: 'Advanced',
+          text: 'Reference & Advanced',
           items: [
+            {
+              text: 'Atscript Validation vs Others',
+              link: '/packages/typescript/validation-comparison',
+            },
+            { text: 'Ad-hoc Annotations', link: '/packages/typescript/ad-hoc-annotations' },
+            { text: 'Annotations Reference', link: '/packages/typescript/annotations-reference' },
+            { text: 'Validation Reference', link: '/packages/typescript/validation-reference' },
+            { text: 'Type Definitions', link: '/packages/typescript/type-definitions' },
             { text: 'Code Generation', link: '/packages/typescript/code-generation' },
             { text: 'Custom Primitives', link: '/packages/typescript/custom-primitives' },
             { text: 'Custom Annotations', link: '/packages/typescript/custom-annotations' },
@@ -482,11 +473,11 @@ export default defineConfig({
 
       '/packages/moost-validator/': [
         {
-          text: '@atscript/moost-validator',
+          text: 'Start Here',
           items: [
             { text: 'Overview', link: '/packages/moost-validator/' },
             {
-              text: 'Atscript vs Others',
+              text: 'Why Atscript In Moost?',
               link: '/packages/moost-validator/why-atscript-validation',
             },
             { text: 'Validation Pipe', link: '/packages/moost-validator/validation-pipe' },
@@ -509,42 +500,32 @@ export default defineConfig({
 
       '/plugin-development/': [
         {
-          text: 'Getting Started',
+          text: 'Start Here',
           items: [
             { text: 'Overview', link: '/plugin-development/' },
-            { text: 'Plugin Architecture', link: '/plugin-development/architecture' },
-          ],
-        },
-        {
-          text: 'Extending the Language',
-          items: [
-            { text: 'Custom Primitives', link: '/plugin-development/primitives-type-tags' },
             { text: 'Custom Annotations', link: '/plugin-development/annotation-system' },
+            { text: 'Custom Primitives', link: '/plugin-development/primitives-type-tags' },
           ],
         },
         {
-          text: 'Code Generation',
+          text: 'Build Plugins',
           items: [
             { text: 'Building a Code Generator', link: '/plugin-development/code-generation' },
-            { text: 'Plugin Hooks Reference', link: '/plugin-development/plugin-hooks' },
-          ],
-        },
-        {
-          text: 'Runtime Behavior',
-          items: [
-            {
-              text: 'Validation Specification',
-              link: '/plugin-development/validation-spec',
-            },
-          ],
-        },
-        {
-          text: 'Testing & Tooling',
-          items: [
             { text: 'Testing Plugins', link: '/plugin-development/testing-plugins' },
             {
               text: 'VSCode & Build Integration',
               link: '/plugin-development/tooling-integration',
+            },
+          ],
+        },
+        {
+          text: 'Reference & Internals',
+          items: [
+            { text: 'Plugin Architecture', link: '/plugin-development/architecture' },
+            { text: 'Plugin Hooks Reference', link: '/plugin-development/plugin-hooks' },
+            {
+              text: 'Validation Specification',
+              link: '/plugin-development/validation-spec',
             },
           ],
         },

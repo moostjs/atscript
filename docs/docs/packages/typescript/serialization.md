@@ -3,12 +3,16 @@
 The serialization API converts runtime annotated types to and from a plain JSON format. This enables transferring type definitions between backend and frontend, storing them in databases, or caching compiled types.
 
 ```typescript
-import { serializeAnnotatedType, deserializeAnnotatedType } from '@atscript/typescript/utils'
+import {
+  serializeAnnotatedType,
+  deserializeAnnotatedType,
+  buildJsonSchema,
+} from '@atscript/typescript/utils'
 ```
 
 ## Purpose
 
-Serialize type definitions on the server and send them to the client. The client deserializes them and uses them for validation, form generation, or schema-driven UI — without bundling the original `.as` files.
+Serialize type definitions on the server and send them to the client. The client deserializes them and uses them for validation, live form tools, or schema-driven UI helpers without bundling the original `.as` files.
 
 ## Basic Usage
 
@@ -81,9 +85,9 @@ The `processAnnotation` callback receives:
 - `path` — property path as a `string[]` array (e.g. `['address', 'city']`)
 - `kind` — type kind at this node (`''`, `'object'`, `'array'`, etc.)
 
-## Example: Server-Driven Form Rendering
+## Example: Server-Driven Field Tools
 
-A practical use case — the server serializes a type definition and the client uses it to render a form with labels and validation.
+A practical use case: the server serializes a type definition and the client uses it to build a field list with labels and placeholders.
 
 **Server** (Express endpoint):
 
@@ -113,8 +117,8 @@ onMounted(async () => {
   const res = await fetch('/api/form/user')
   const type = deserializeAnnotatedType(await res.json())
 
-  // Build form fields from type metadata
-  for (const [name, prop] of type.props) {
+  // Build UI field data from type metadata
+  for (const [name, prop] of type.type.props.entries()) {
     fields.value.push({
       name,
       label: prop.metadata.get('meta.label') || name,
@@ -135,7 +139,7 @@ onMounted(async () => {
 </template>
 ```
 
-The form fields, labels, and placeholders are all driven by annotations defined in the `.as` file — no duplication between server and client.
+The field list, labels, and placeholders are all driven by annotations defined in the `.as` file, so the client does not need to duplicate that configuration.
 
 ## Next Steps
 

@@ -1,14 +1,14 @@
-Primitives are the basic types that map to fundamental types in virtually any programming language. While different languages may map some primitives to the same base type, each language plugin is responsible for determining how to map the set of primitives provided by Atscript core.
+Primitives are the building blocks of every `.as` model. In day-to-day app code, the main thing to learn is that Atscript lets you refine primitives with semantic extensions like `string.email` and `number.int`.
 
 ## Basic Primitive Types
 
 Atscript supports the following primitive types:
 
 - **`string`** - Text values
-- **`number`** - Numeric values (integers and floats)
+- **`number`** - Numeric values
 - **`boolean`** - True/false values
 - **`null`** - Null value
-- **`undefined`** - Undefined value (maps to void)
+- **`undefined`** - Undefined value
 - **`void`** - No value
 
 ```atscript
@@ -21,189 +21,110 @@ export interface BasicTypes {
 }
 ```
 
-## Semantic Types (Primitive Extensions)
+## Semantic Types
 
-Primitives can be extended using dot notation to create semantic types. These extensions serve two purposes:
-
-1. **Type refinement** - Extensions help map to the most appropriate type in target languages. For example, `number.double` maps to `number` in TypeScript, but in languages with distinct int, single, and double types, it maps to the appropriate double-precision type.
-
-2. **Implicit validation** - Extensions may automatically add annotations like `@expect.*` for validation constraints.
-
-### String Extensions
-
-String types can be extended to represent specific formats:
+Primitives can be extended with dot notation:
 
 ```atscript
 export interface User {
-    id: string.uuid           // UUID format
-    email: string.email        // Email address
-    phone: string.phone        // Phone number
-    name: string.required        // Non-empty, non-blank
-    birthDate: string.date     // Date string
-    createdAt: string.isoDate  // ISO 8601 date
+    email: string.email
+    name: string.required
+    age: number.int.positive
 }
 ```
 
-#### Available String Extensions
+These semantic types do two useful things:
 
-**`string.email`**
+1. they make the model easier to read
+2. they attach validation behavior automatically
 
-- Validates email format
-- Pattern: `^[^\s@]+@[^\s@]+\.[^\s@]+$`
-- Example: `user@example.com`
+### String Extensions
 
-**`string.phone`**
+The most common string extensions are:
 
-- Validates phone number format
-- Pattern: `^\+?[0-9\s-]{10,15}$`
-- Example: `+1 555-123-4567`
+```atscript
+export interface User {
+    id: string.uuid
+    email: string.email
+    phone: string.phone
+    name: string.required
+    birthDate: string.date
+    createdAt: string.isoDate
+}
+```
 
-**`string.date`**
-
-- Validates common date formats
-- Supports: `YYYY-MM-DD`, `MM/DD/YYYY`, `DD-MM-YYYY`, `D Month YYYY`
-- Examples: `2024-01-15`, `01/15/2024`, `15-01-2024`, `15 January 2024`
-
-**`string.isoDate`**
-
-- Validates ISO 8601 date format with time
-- Supports UTC and timezone offsets
-- Examples: `2024-01-15T10:30:00Z`, `2024-01-15T10:30:00+05:00`
-
-**`string.uuid`**
-
-- Validates UUID format
-- Pattern: `^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`
-- Example: `123e4567-e89b-12d3-a456-426614174000`
-
-**`string.required`**
-
-- Must contain at least one non-whitespace character
-- Implicitly adds `@meta.required`
-- Useful for form fields where an empty or whitespace-only value should not pass validation
+Use them when the field has a real meaning that is stronger than plain `string`.
 
 ### Number Extensions
 
-Number types can be extended to represent specific numeric constraints:
+The most common number extensions are:
 
 ```atscript
 export interface Product {
-    quantity: number.int          // Integer only
-    price: number.positive        // >= 0
-    discount: number.negative     // <= 0
-    weight: number.double         // Double precision
-    createdAt: number.timestamp   // Unix timestamp
+    quantity: number.int
+    price: number.positive
+    discount: number.negative
+    weight: number.double
 }
 ```
 
-#### Available Number Extensions
+Useful built-ins:
 
-**`number.int`**
-
-- Must be an integer (no decimals)
-- Implicitly adds `@expect.int`
-- Can be combined: `number.int.positive`, `number.int.negative`
-
-**`number.positive`**
-
-- Must be greater than or equal to 0
-- Implicitly adds `@expect.min 0`
-- Can be combined: `number.positive.int`, `number.positive.double`
-
-**`number.negative`**
-
-- Must be less than or equal to 0
-- Implicitly adds `@expect.max 0`
-- Can be combined: `number.negative.int`, `number.negative.single`
-
-**`number.single`**
-
-- Single-precision floating-point
-
-**`number.double`**
-
-- Double-precision floating-point
-
-**`number.timestamp`**
-
-- Unix timestamp (integer)
-- Typically seconds since epoch
-
-**`number.timestamp.created`**
-
-- Auto-set on creation
-- Implicitly adds `@db.default.fn "now"` and a `created` tag
-- DB adapters use this to automatically set the timestamp when a record is inserted
-
-**`number.timestamp.updated`**
-
-- Auto-updated on every write
-- Adds an `updated` tag that DB adapters recognize for automatic update behavior
+- `number.int` — integer only
+- `number.positive` — minimum `0`
+- `number.negative` — maximum `0`
+- `number.single` / `number.double` — numeric intent tags
 
 ### Boolean Extensions
 
-Boolean types can be extended for specific use cases:
+Boolean extensions are mostly useful for required checkboxes and flags:
 
 ```atscript
 export interface Settings {
-    agreed: boolean.required     // Must be true (e.g., accept terms)
-    alwaysOn: boolean.true       // Must be true
-    disabled: boolean.false      // Must be false
-    toggle: boolean              // Can be true or false
+    agreed: boolean.required
+    alwaysOn: boolean.true
+    disabled: boolean.false
 }
 ```
 
-**`boolean.required`**
+`boolean.required` is the one most application code needs. It means the value must be `true`.
 
-- Must be `true`
-- Implicitly adds `@meta.required`
-- Useful for checkboxes like "accept terms" where the value must be checked
+## Combining Extensions
 
-## Phantom Type
-
-The `phantom` primitive is a special type for non-data elements that should be discoverable via runtime type traversal but should not affect the actual data type, validation, or schema.
-
-This is useful when designing forms or UI components from `.as` interfaces — you may want to place paragraphs of text, alternative action buttons (like "reset password" or "resend OTP"), or other UI elements between the fields. `phantom` props carry their annotations (like `@label`, `@component`) but are invisible to TypeScript types, validators, and JSON schema.
+You can combine extensions when the field needs more than one rule:
 
 ```atscript
-export interface LoginForm {
-    @label "Email"
-    email: string.email
-
-    @label "Password"
-    password: string
-
-    @label "Forgot password?"
-    @component "link"
-    @href "/reset-password"
-    forgotPassword: phantom
-
-    @label "Don't have an account? Sign up"
-    @component "link"
-    @href "/signup"
-    signUp: phantom
+export interface Metrics {
+    retries: number.int.positive
+    loss: number.double.negative
 }
 ```
 
-**Behavior:**
+Prefer semantic types over separate `@expect.*` annotations when a built-in semantic type already says what you mean.
 
-- **TypeScript type** — phantom props are emitted as comments (`// forgotPassword: phantom`) and do not appear in the generated class
-- **Runtime** — phantom props are present in `type.props` Map with `designType: 'phantom'`, so form renderers can discover them and read their annotations
-- **Validation** — phantom props are skipped; data with a phantom prop name is treated as an unexpected property
-- **JSON Schema / Serialization** — phantom props are excluded
-- **MongoDB** — phantom props are ignored during index and schema traversal
+## Advanced Primitives
+
+### Timestamp Variants
+
+If you work with DB integrations later, Atscript also provides timestamp-oriented numeric tags like `number.timestamp`, `number.timestamp.created`, and `number.timestamp.updated`.
+
+These are advanced because they matter more for integrations than for basic TypeScript usage.
+
+### `phantom`
+
+`phantom` is a special non-data type for runtime-discoverable elements that should not appear in TypeScript data, validation, or JSON Schema.
+
+It is useful for advanced UI tooling and type traversal, but most application code can ignore it until needed.
 
 ## Best Practices
 
-1. **Use semantic types** instead of plain primitives when the data has a specific format
-2. **Let semantic types handle validation** — don't duplicate with `@expect` annotations
-3. **Choose the right extension** — `string.date` vs `string.isoDate` based on your needs
-4. **Combine extensions when needed** — `number.int.positive` for counting values, `number.double.negative` for losses
+1. Use semantic types when the field has real meaning beyond a plain primitive.
+2. Let built-in semantic types carry validation instead of duplicating the same rule by hand.
+3. Reach for `string.required`, `string.email`, and `number.int` early — they cover many common cases.
+4. Save advanced primitives like `phantom` and timestamp variants for pages or features that really need them.
 
 ::: tip Combining Extensions
-Some extensions can be combined to create more specific types. For example:
-
-- `number.int.positive` — Positive integers only
-- `number.double.negative` — Negative double-precision numbers
-- `number.single.positive` — Positive single-precision numbers
-  :::
+- `number.int.positive` — positive integers only
+- `number.double.negative` — negative double-precision numbers
+- `number.single.positive` — positive single-precision numbers
+:::

@@ -1,27 +1,34 @@
 # Quick Start
 
-A minimal working TypeScript example — from defining one `.as` model to validating data from it.
+A practical first run for app developers evaluating Atscript.
 
 ::: tip What You Will Build
-In this guide, you will define one `User` model, generate the TypeScript/runtime artifacts Atscript needs, and validate invalid input against that model.
+In this guide, you will:
+
+1. define one `.as` model
+2. generate the TypeScript and runtime files Atscript needs
+3. validate invalid input against that model
+4. wire Atscript into a real build once the basics make sense
 :::
 
 ::: info Current Scope
 Atscript is language-agnostic by design, but TypeScript is the first supported target today. If you are evaluating Atscript right now, this is the best place to start.
 :::
 
-## 1. Install
+## Phase 1: Prove The Workflow
+
+### 1. Install Packages
 
 ```bash
 npm install @atscript/typescript
-npm install -D @atscript/core unplugin-atscript
+npm install -D @atscript/core
 ```
 
-`@atscript/typescript` is a regular dependency — it ships runtime utilities (validation, metadata access) that your code needs at runtime. `@atscript/core` and `unplugin-atscript` are dev-only (build tooling).
+`@atscript/typescript` ships the runtime utilities you will use from application code. `@atscript/core` provides the compiler and plugin foundation at build time.
 
-## 2. Create a `.as` File
+### 2. Create A `.as` File
 
-Create `src/user.as` — this is your single source of truth for the data model, metadata, and validation constraints:
+Create `src/user.as`:
 
 ```atscript
 export interface User {
@@ -33,13 +40,17 @@ export interface User {
     email: string.email
 
     @expect.min 0
-    age: number
+    age: number.int
 }
 ```
 
-Here we define an interface with [annotations](/packages/typescript/annotations) like `@meta.label` and `@expect.minLength`, and a [semantic type](/packages/typescript/primitives) `string.email` that carries built-in validation. See [Interfaces & Types](/packages/typescript/interfaces-types) for the full syntax.
+This file already contains:
 
-## 3. Configure Atscript
+- the data shape
+- validation rules
+- metadata that runtime tools can read later
+
+### 3. Add A Minimal Config
 
 Create `atscript.config.js` in your project root:
 
@@ -53,46 +64,22 @@ export default defineConfig({
 })
 ```
 
-See [Configuration](/packages/typescript/configuration) for all available options and plugin settings.
+For this quick start, the default TypeScript plugin is enough.
 
-## 4. Set Up Automatic Compilation
+### 4. Generate The Files Atscript Uses
 
-Install `unplugin-atscript` and configure your bundler when you want `.as` files compiled automatically in your app build. Here's a Vite example for a Node.js library:
-
-```javascript
-// vite.config.js
-import { defineConfig } from 'vite'
-import atscript from 'unplugin-atscript/vite'
-
-export default defineConfig({
-  plugins: [atscript()],
-  build: {
-    lib: {
-      entry: 'src/index.ts',
-      formats: ['es'],
-    },
-    rollupOptions: {
-      external: [/node_modules/],
-    },
-  },
-})
-```
-
-The plugin compiles `.as` files automatically during the build. See [Build Setup](/packages/typescript/build-setup) for Rollup, esbuild, and other bundlers.
-
-## 5. Generate Type Definitions
-
-Install the [Atscript VSCode extension](https://marketplace.visualstudio.com/items?itemName=moost.atscript-as) — it automatically generates `.as.d.ts` files on save, giving you IntelliSense and type checking. See the [VSCode](/packages/vscode/) section for details.
-
-Alternatively, use the CLI:
+Run:
 
 ```bash
 npx asc -f dts
+npx asc -f js
 ```
 
-This generates `.as.d.ts` files for each `.as` file and an `atscript.d.ts` file with annotation type definitions. Run this at least once so TypeScript knows about your annotation types. See [CLI](/packages/typescript/cli) for all options.
+This gives you:
 
-If you are just evaluating the core TypeScript flow, this CLI step plus the runtime example below are enough to understand the model.
+- `src/user.as.d.ts` for TypeScript and editor support
+- `src/user.as.js` for runtime use
+- `atscript.d.ts` for typed annotation keys in your project
 
 Add `atscript.d.ts` to your `tsconfig.json`:
 
@@ -102,68 +89,108 @@ Add `atscript.d.ts` to your `tsconfig.json`:
 }
 ```
 
-## 6. Use in TypeScript
+### 5. Try The Runtime In One Small Script
 
-Import your `.as` types — the imported `User` is a fully typed class whose data shape matches the interface you defined:
+Create `src/demo.mjs`:
 
-```typescript
-// The generated type is equivalent to:
-declare class User {
-  name: string
-  email: string
-  age: number
-}
-```
+```javascript
+import { User } from './user.as.js'
 
-Beyond the data shape, it also carries static members that give you runtime access to everything declared in the `.as` file:
-
-- **`User.type`** — the [annotated type definition](/packages/typescript/type-definitions); traverse properties, access per-property metadata and tags
-- **`User.metadata`** — top-level [metadata](/packages/typescript/metadata-export) map for the interface itself
-- **`User.validator()`** — creates a [Validator](/packages/typescript/validation) that enforces `@expect.*` annotations and semantic type rules
-- **`User.toJsonSchema()`** — generates a [JSON Schema](/packages/typescript/json-schema) from the type and its annotations
-
-Here's a quick example:
-
-```typescript
-// src/index.ts
-import { User } from './user.as'
-
-// Access metadata
-const emailProp = User.type.props.get('email')
-console.log(emailProp?.metadata.get('meta.label'))
-// → 'Email Address'
-
-// Validate data
 const validator = User.validator()
 
-const data: any = {
+const input = {
   name: 'A',
   email: 'not-an-email',
   age: -5,
 }
 
-if (validator.validate(data, true)) {
-  console.log('Valid user:', data.name)
+if (validator.validate(input, true)) {
+  console.log('Valid user:', input)
 } else {
   console.log('Validation errors:')
   for (const err of validator.errors) {
-    console.log(`  ${err.path}: ${err.message}`)
+    console.log(`- ${err.path}: ${err.message}`)
   }
 }
 ```
 
+Run it:
+
+```bash
+node src/demo.mjs
+```
+
 Expected output:
 
-```
+```text
 Validation errors:
-  name: Expected minimum length 2
-  email: Expected valid email
-  age: Expected minimum value 0
+- name: Expected minimum length 2
+- email: Expected valid email
+- age: Expected minimum value 0
 ```
+
+At this point you have already proven the core Atscript workflow:
+
+- define the model once
+- generate runtime and type files
+- validate data from that model
+
+### 6. Use The Model In TypeScript
+
+Once `src/user.as.d.ts` exists, your TypeScript code can import from `./user.as`:
+
+```typescript
+import { User } from './user.as'
+
+const user: User = {
+  name: 'Ada',
+  email: 'ada@example.com',
+  age: 28,
+}
+
+const validator = User.validator()
+const emailProp = User.type.props.get('email')
+
+console.log(emailProp?.metadata.get('meta.label'))
+validator.validate(user)
+```
+
+Use `./user.as.js` when you want to run the generated JavaScript directly without a bundler. Use `./user.as` in TypeScript source once the declaration file exists and your app build knows how to compile the `.as` runtime file.
+
+## Phase 2: Integrate Atscript Into Your Build
+
+Once the CLI flow makes sense, add Atscript to your normal app build so you do not need to run `asc -f js` by hand.
+
+Install the bundler plugin:
+
+```bash
+npm install -D unplugin-atscript
+```
+
+Vite example:
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite'
+import atscript from 'unplugin-atscript/vite'
+
+export default defineConfig({
+  plugins: [atscript()],
+})
+```
+
+Now your app code can import `.as` files directly and let the build handle compilation.
+
+See [Build Setup](/packages/typescript/build-setup) for Rollup, esbuild, Webpack, Rspack, and more.
+
+## Optional But Helpful
+
+- Install the [Atscript VSCode extension](https://marketplace.visualstudio.com/items?itemName=moost.atscript-as) for syntax highlighting, diagnostics, and automatic `.as.d.ts` generation on save
+- Read [Imports & Exports](/packages/typescript/imports-exports) if you want a clearer picture of how `.as`, `.as.d.ts`, and `.as.js` fit together
 
 ## Next Steps
 
-- [DB Quick Start](/db-integrations/quick-start) — use the same model to drive your database workflow
-- [Interfaces & Types](/packages/typescript/interfaces-types) — how interfaces and type aliases work in `.as` files
-- [Annotations](/packages/typescript/annotations) — built-in annotations (`@meta.*`, `@expect.*`) and how to define custom ones
-- [Primitives](/packages/typescript/primitives) — semantic type extensions like `string.email`, `number.positive`
+- [Build Setup](/packages/typescript/build-setup) — integrate Atscript into your real app build
+- [Validation Guide](/packages/typescript/validation) — common validation tasks in application code
+- [Interfaces & Types](/packages/typescript/interfaces-types) — the core `.as` syntax
+- [Annotations Guide](/packages/typescript/annotations) — practical metadata and validation annotations

@@ -2,6 +2,12 @@
 
 Primitives are the fundamental scalar types in Atscript — `string`, `number`, `boolean`, and their semantic extensions like `string.email` or `number.int`. Plugins can add new primitive types and extensions that work identically to built-in ones: they appear in IntelliSense, carry validation constraints, and generate appropriate type tags at runtime.
 
+For a first plugin, keep the scope small:
+
+- start with one scalar extension like `geo.latitude`
+- add validation through `expect`
+- only reach for object, tuple, or phantom primitives when your plugin really needs them
+
 ## What Primitives Are
 
 A primitive in Atscript has:
@@ -97,13 +103,13 @@ Now `.as` files can use these types:
 
 ```atscript
 export interface Location {
-    @label "Latitude"
+    @meta.label "Latitude"
     lat: geo.latitude
 
-    @label "Longitude"
+    @meta.label "Longitude"
     lng: geo.longitude
 
-    @label "ZIP Code"
+    @meta.label "ZIP Code"
     zip: geo.postalCode
 }
 ```
@@ -462,14 +468,14 @@ primitives: {
 
 ```atscript
 export interface RegistrationForm {
-    @label "Full Name"
+    @meta.label "Full Name"
     name: string.required
 
-    @label "By signing up you agree to our terms."
+    @meta.label "By signing up you agree to our terms."
     terms: ui.paragraph
 
-    @label "Submit"
-    @component "primary-button"
+    @meta.label "Submit"
+    @ui.component "primary-button"
     submit: ui.action
 }
 ```

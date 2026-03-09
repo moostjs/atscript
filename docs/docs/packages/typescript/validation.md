@@ -1,6 +1,13 @@
-# Validation
+# Validation Guide
 
-Every generated Atscript type has a `.validator()` method that creates a `Validator` instance for runtime data validation. The validator enforces type structure and annotation-driven constraints (`@expect.*`), and acts as a TypeScript type guard.
+Every generated Atscript type has a `.validator()` method for runtime validation.
+
+In normal application code, you usually use it for:
+
+- validating request or form input
+- narrowing `unknown` data to a real TypeScript type
+- stripping or rejecting unexpected properties
+- handling partial updates safely
 
 ```typescript
 import { Product } from './product.as'
@@ -8,250 +15,152 @@ import { Product } from './product.as'
 const validator = Product.validator()
 ```
 
-## Basic Usage
+## 1. Validate One Value
 
-**Throwing mode** — throws `ValidatorError` on failure:
+### Safe Mode
 
-```typescript
-try {
-  validator.validate(data)
-  // data passed validation
-} catch (error) {
-  console.error(error.message) // first error message
-  console.error(error.errors) // all errors: { path, message }[]
-}
-```
-
-**Safe mode** — returns `false` on failure and acts as a type guard:
+Safe mode returns `false` on failure and acts as a type guard:
 
 ```typescript
 if (validator.validate(data, true)) {
-  // TypeScript narrows data to Product
+  // TypeScript now knows data is Product
   console.log(data.name, data.price)
 } else {
   console.log(validator.errors)
 }
 ```
 
-## Type Guard
+This is the most practical mode for request handlers and form submissions.
 
-The `validate()` method signature is:
+### Throwing Mode
+
+Throwing mode raises `ValidatorError` on failure:
 
 ```typescript
-validate<TT = DataType>(value: any, safe?: boolean, context?: unknown): value is TT
+try {
+  validator.validate(data)
+  // data passed validation
+} catch (error) {
+  console.error(error.message)
+  console.error(error.errors)
+}
 ```
 
-`DataType` is automatically inferred from the type definition's phantom generic — no manual type parameters needed. This works for generated interfaces, types, and even [deserialized](/packages/typescript/serialization) types:
+## 2. Narrow `unknown` Data
+
+The validator doubles as a type guard, so it works well at the edge of your app:
 
 ```typescript
 import { Product } from './product.as'
 
 function handleRequest(body: unknown) {
   if (Product.validator().validate(body, true)) {
-    // body is Product — fully typed
+    // body is Product here
     saveProduct(body)
   }
 }
 ```
 
-## Options
+No manual generic parameters are needed. Atscript already knows the data shape from the model.
 
-Pass options to `.validator()` or `new Validator(type, opts)`:
+## 3. Control Unexpected Properties
+
+Use `unknownProps` when inputs may contain extra fields:
 
 ```typescript
 const validator = Product.validator({
-  partial: true,
   unknownProps: 'strip',
-  errorLimit: 5,
 })
 ```
 
-### `partial`
+Options:
 
-Controls whether missing required properties are errors:
+- `'error'` — fail validation if an extra field is present
+- `'ignore'` — leave extra fields alone
+- `'strip'` — remove extra fields from the value
 
-- `false` (default) — all required properties must be present
-- `true` — missing properties are allowed at the top level only
-- `'deep'` — missing properties allowed at all levels (useful for patch operations)
-- `(type, path) => boolean` — custom function for fine-grained control
+`'strip'` is often useful for request payloads.
 
-### `unknownProps`
+## 4. Validate Partial Updates
 
-How to handle properties not defined in the type:
-
-- `'error'` (default) — report as validation error
-- `'ignore'` — silently skip
-- `'strip'` — delete the property from the value
-
-### `errorLimit`
-
-Maximum number of errors to collect before stopping (default: `10`).
-
-### `skipList`
-
-A `Set<string>` of property paths to skip during validation:
+Use `partial` when validating patch-like payloads:
 
 ```typescript
-Product.validator({ skipList: new Set(['internalId', 'audit.createdBy']) })
-```
-
-### `replace`
-
-A function to replace type definitions during validation. Useful for dynamic type overrides:
-
-```typescript
-Product.validator({
-  replace: (type, path) => (path === 'status' ? customStatusType : type),
+const patchValidator = Product.validator({
+  partial: true,
 })
 ```
 
-## Annotation-Driven Rules
+Options:
 
-Annotations from `.as` files are enforced automatically during validation. See the [Annotations](/packages/typescript/annotations) page for the full list.
+- `false` — all required properties must be present
+- `true` — allow missing properties at the top level
+- `'deep'` — allow missing properties at every level
 
-| Annotation          | Applies to      | Validates                                                              |
-| ------------------- | --------------- | ---------------------------------------------------------------------- |
-| `@meta.required`    | string, boolean | String: at least one non-whitespace character. Boolean: must be `true` |
-| `@expect.minLength` | string, array   | Minimum length                                                         |
-| `@expect.maxLength` | string, array   | Maximum length                                                         |
-| `@expect.min`       | number          | Minimum value                                                          |
-| `@expect.max`       | number          | Maximum value                                                          |
-| `@expect.int`       | number          | Must be integer (accepts optional custom error message)                |
-| `@expect.pattern`   | string          | Regex match (multiple patterns supported)                              |
-| `@expect.array.uniqueItems` | array  | No duplicate items (by key fields if defined, otherwise deep equality) |
-| `@expect.array.key` | property in array element | Marks a key field for lookups and patch operations (does not enforce uniqueness alone) |
+`'deep'` is useful for nested patch payloads.
 
-All validation annotations accept an optional custom error message as the last argument (except `@expect.array.key`):
+## 5. Put Rules On The Model
+
+Validation rules come from your `.as` file:
 
 ```atscript
-interface User {
-  @meta.required "Name is required"
-  @expect.minLength 3, "Username must be at least 3 characters"
-  @expect.maxLength 20, "Username cannot exceed 20 characters"
+export interface User {
+  @expect.minLength 3
   username: string
 
-  @expect.min 18, "You must be at least 18 years old"
-  @expect.max 120, "Age cannot exceed 120"
-  age: number
+  email: string.email
 
-  @expect.pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", "u", "Invalid email format"
-  email: string
+  @expect.min 18
+  age: number.int
 }
 ```
 
-When validation fails, the custom message (if provided) is used instead of the default error message.
+That means one model definition can give you:
 
-### Array Uniqueness
+- static typing
+- runtime validation
+- metadata for other tools
 
-`@expect.array.uniqueItems` and `@expect.array.key` work together to enforce unique elements in arrays:
+## 6. Write Better Error Messages
+
+Most validation annotations accept a custom message as the last argument:
 
 ```atscript
-interface Order {
-    @meta.id
-    id: number
-
-    @expect.array.uniqueItems "Duplicate line items"
-    items: OrderItem[]
-}
-
-interface OrderItem {
-    @expect.array.key           // identity field — must be string or number, non-optional
-    productId: number
-
-    quantity: number
-    price: number
+export interface SignupForm {
+  @meta.required "Please enter your name"
+  @expect.minLength 3, "Username must be at least 3 characters"
+  username: string
 }
 ```
 
-- `@expect.array.key` **identifies** which fields form an element's identity — it's used by `@expect.array.uniqueItems` and [patch operations](/db-adapters/patch-operations), but does **not** enforce uniqueness by itself.
-- `@expect.array.uniqueItems` **enforces** no duplicate items during validation. For object arrays, it checks by key fields if defined; for primitive arrays (e.g., `string[]`), it checks by deep equality.
-- Multiple `@expect.array.key` fields on the same element type form a **composite key**.
+When validation fails, the custom message is used instead of the default one.
 
-Semantic types like `string.email`, `string.required`, and `number.positive` automatically add validation rules through their annotation definitions. The `string.required` primitive implicitly adds `@meta.required`.
+## 7. Know The Common Built-Ins
 
-[Phantom](/packages/typescript/primitives#phantom-type) props are automatically skipped during validation — they are non-data elements and any data with a phantom-named key is treated as an unexpected property.
+The most common validation rules come from:
 
-## Error Handling
+- semantic types like `string.email`, `string.required`, `number.int.positive`
+- `@expect.minLength`
+- `@expect.maxLength`
+- `@expect.min`
+- `@expect.max`
+- `@expect.pattern`
 
-`ValidatorError` extends `Error` and includes structured details:
+For array uniqueness and other less common rules, see the [Validation Reference](/packages/typescript/validation-reference).
 
-```typescript
-import { ValidatorError } from '@atscript/typescript/utils'
+## When To Read The Reference
 
-try {
-  validator.validate(data)
-} catch (e) {
-  if (e instanceof ValidatorError) {
-    for (const err of e.errors) {
-      console.log(err.path) // e.g. "address.city"
-      console.log(err.message) // e.g. "Expected string, got number"
-      console.log(err.details) // nested errors for unions
-    }
-  }
-}
-```
+Use the reference page when you need:
 
-After safe validation, errors are available on the validator instance:
-
-```typescript
-if (!validator.validate(data, true)) {
-  validator.errors // same { path, message, details? }[] structure
-}
-```
-
-## Plugins
-
-Plugins intercept validation to add custom logic. A plugin is a function that returns `true` (accept), `false` (reject), or `undefined` (fall through to default validation):
-
-```typescript
-import type { TValidatorPlugin } from '@atscript/typescript/utils'
-
-const skipSensitive: TValidatorPlugin = (ctx, def, value) => {
-  // Accept any value for fields marked as sensitive
-  if (def.metadata.get('meta.sensitive')) {
-    return true // accept — skip default validation
-  }
-  return undefined // fall through to default validation
-}
-
-const validator = Product.validator({ plugins: [skipSensitive] })
-```
-
-### External Context
-
-Plugins can receive external context passed as the third argument to `validate()`. This is useful when validation rules depend on runtime state (e.g., user roles, request metadata, feature flags):
-
-```typescript
-const roleAware: TValidatorPlugin = (ctx, def, value) => {
-  const { context } = ctx
-  if (context && (context as { role: string }).role === 'admin') {
-    return true // admins bypass validation
-  }
-  return undefined // fall through to default
-}
-
-const validator = Product.validator({ plugins: [roleAware] })
-validator.validate(data, true, { role: 'admin' })
-```
-
-The context type is `unknown` — plugin developers are responsible for validating and casting it internally, since multiple plugins may expect different context formats.
-
-The plugin context (`TValidatorPluginContext`) exposes `opts`, `validateAnnotatedType`, `error`, `path`, and `context`.
-
-## Creating Validators Manually
-
-When working with types that aren't generated (e.g., deserialized or programmatically built), create a `Validator` directly:
-
-```typescript
-import { Validator, deserializeAnnotatedType } from '@atscript/typescript/utils'
-
-const type = deserializeAnnotatedType(jsonData)
-const validator = new Validator(type)
-validator.validate(someValue)
-```
+- every validator option in one place
+- the exact `validate()` signature
+- `ValidatorError`
+- array uniqueness rules
+- plugin hooks and external context
+- manual `Validator` construction from runtime types
 
 ## Next Steps
 
-- [Type Definitions](/packages/typescript/type-definitions) — understand the annotated type system
-- [JSON Schema](/packages/typescript/json-schema) — generate JSON Schema from types
-- [Serialization](/packages/typescript/serialization) — serialize types for transport
+- [Validation Reference](/packages/typescript/validation-reference) — options, plugins, and lower-level API details
+- [Annotations Guide](/packages/typescript/annotations) — keep validation rules on the model
+- [Type Definitions](/packages/typescript/type-definitions) — understand the runtime type system behind the validator

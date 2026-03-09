@@ -18,7 +18,9 @@ All hooks can be synchronous or async (return `Promise`). All are optional — i
 ## config()
 
 ```typescript
-config?(config: TAtscriptConfig): TAtscriptConfig | undefined
+config?(
+  config: TAtscriptConfig
+): Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
 ```
 
 Called once during `PluginManager` initialization, before any documents are opened. This is where you register primitives, annotations, and config options.
@@ -63,7 +65,7 @@ config() {
 ## resolve()
 
 ```typescript
-resolve?(id: string): string | undefined
+resolve?(id: string): Promise<string | undefined> | string | undefined
 ```
 
 Called when the repo opens a document or resolves an import. Allows you to remap module IDs — useful for virtual modules, path aliases, or rewriting import paths.
@@ -93,7 +95,7 @@ resolve(id) {
 ## load()
 
 ```typescript
-load?(id: string): string | undefined
+load?(id: string): Promise<string | undefined> | string | undefined
 ```
 
 Called to get the source content for a document. Allows plugins to provide virtual file content without a real file on disk.
@@ -127,7 +129,7 @@ load(id) {
 ## onDocument()
 
 ```typescript
-onDocument?(doc: AtscriptDoc): void
+onDocument?(doc: AtscriptDoc): Promise<void> | void
 ```
 
 Called after a document is parsed and its AST is fully built. All plugins receive the call in sequence — there is no early exit.
@@ -156,7 +158,10 @@ onDocument(doc) {
 ## render()
 
 ```typescript
-render?(doc: AtscriptDoc, format: string): TPluginOutput[]
+render?(
+  doc: AtscriptDoc,
+  format: TAtscriptRenderFormat
+): Promise<TPluginOutput[]> | TPluginOutput[]
 ```
 
 Called once per document per format during the build phase. This is the primary code generation hook.
@@ -204,7 +209,11 @@ render(doc, format) {
 ## buildEnd()
 
 ```typescript
-buildEnd?(output: TOutput[], format: string, repo: AtscriptRepo): void
+buildEnd?(
+  output: TOutput[],
+  format: TAtscriptRenderFormat,
+  repo: AtscriptRepo
+): Promise<void> | void
 ```
 
 Called once after all documents have been rendered for a given format. Use this for cross-document aggregation.

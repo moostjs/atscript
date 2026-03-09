@@ -44,10 +44,10 @@ const tabs = [
         status: 'Planned',
         tone: 'planned',
         title: 'Future UI automation',
-        desc: 'The model is being shaped so UI forms and table views can grow from the same metadata later.',
+        desc: 'The model is being shaped so UI tools can build forms and tables from the same live metadata later.',
         points: [
             'Labels, field hints, validation rules, and structure already live on the model.',
-            'That gives Atscript a clean path toward generated forms and data-table experiences.',
+            'That gives Atscript a clean path toward UI tools that respond directly to the live model.',
         ],
     },
 ]

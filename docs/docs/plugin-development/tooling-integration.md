@@ -9,7 +9,7 @@ Code generation flows through the same `build()` → `generate()` → `write()` 
 | Entry Point                | Trigger                      | Formats                                                 |
 | -------------------------- | ---------------------------- | ------------------------------------------------------- |
 | **CLI** (`asc`)            | Manual invocation            | `DEFAULT_FORMAT` when no `-f` flag; any format via `-f` |
-| **Build tools** (unplugin) | File change during build/dev | `'js'` (configured in unplugin)                         |
+| **Build tools** (unplugin) | File change during build/dev | `'js'` for the imported module                          |
 | **VSCode extension**       | File save                    | `DEFAULT_FORMAT`                                        |
 
 All three discover your plugin through `atscript.config.ts` and call `render(doc, format)` on every registered plugin.
@@ -117,9 +117,15 @@ export default defineConfig({
 1. When your bundler encounters an `import { User } from './user.as'`, the unplugin intercepts it
 2. It loads the Atscript config (including your plugin) and parses the `.as` file
 3. It calls `render(doc, 'js')` to generate JavaScript output
-4. The generated JS is passed to the bundler as the module content
+4. The first generated JS module is passed to the bundler as the imported module content
 
-Your plugin participates automatically — if it produces output for `format === 'js'`, that output is included in the bundle. If your plugin only handles custom formats (not `'js'`), it still runs `config()` to contribute primitives and annotations, but `render()` won't produce output during the build.
+Your plugin still participates automatically:
+
+- if it contributes primitives or annotations in `config()`, those affect parsing and generation during the build
+- if it transforms the document in `onDocument()`, those changes affect later rendering
+- if it produces the primary `js` module output, that output can be used by the bundler
+
+Build-tool integration is not the right place for arbitrary extra files. If your plugin needs sidecar artifacts, generate them through the CLI or another explicit format instead of relying on the bundler import path.
 
 ### Supported Bundlers
 
@@ -146,7 +152,7 @@ When you save a `.as` file in VSCode:
 3. It creates a `BuildRepo` for just the saved file
 4. It calls `bld.write({ format: DEFAULT_FORMAT })` — triggering all plugins' primary output
 
-This means your plugin's `render()` hook fires on every save, as long as it handles `DEFAULT_FORMAT`. The TypeScript plugin generates `.d.ts` files, a hypothetical Python plugin could generate `.pyi` stubs, and your custom plugin generates whatever it needs — all from the same save event.
+This means your plugin's `render()` hook fires on every save, as long as it handles `DEFAULT_FORMAT`. The TypeScript plugin generates `.d.ts` files, and a custom plugin can generate other primary development-time artifacts the same way.
 
 ### What Not to Generate On-Save
 

@@ -1,6 +1,14 @@
 # Custom Annotations
 
-Annotations are the metadata layer in Atscript — `@label "Name"`, `@expect.minLength 3`, `@db.table "users"`. Plugins can define custom annotations with typed arguments, validation logic, and even AST modification. Custom annotations get full IntelliSense, type checking, and flow into runtime metadata.
+Annotations are the metadata layer in Atscript. They can carry labels, validation rules, API hints, UI hints, or any other model-level information your plugin needs.
+
+For a first plugin, you usually only need:
+
+- a name
+- a `nodeType`
+- zero or more typed arguments
+
+Start there. Validation callbacks, merge strategies, and AST mutation are useful later, but they are not required for a useful first annotation.
 
 ## The AnnotationSpec Class
 
@@ -109,7 +117,7 @@ new AnnotationSpec({
 })
 ```
 
-Usage: `@deprecated` (no arguments)
+Usage: `@api.deprecated` (no arguments)
 
 ### Single Argument
 
@@ -122,7 +130,7 @@ new AnnotationSpec({
 })
 ```
 
-Usage: `@label "Full Name"`
+Usage: `@meta.label "Full Name"`
 
 ### Multiple Arguments
 
@@ -179,12 +187,12 @@ new AnnotationSpec({
 
 ```atscript
 interface Base {
-    @label "Base Name"
+    @meta.label "Base Name"
     name: string
 }
 
 annotate Base as Extended {
-    @label "Extended Name"    // overwrites "Base Name"
+    @meta.label "Extended Name"    // overwrites "Base Name"
     name
 }
 ```
@@ -274,7 +282,7 @@ new AnnotationSpec({
     const definition = _id.getDefinition()
     if (isRef(definition)) {
       const resolved = doc.unwindType(definition.id!, definition.chain)?.def
-      if (isPrimitive(resolved) && !['string', 'number'].includes(resolved.config.type)) {
+      if (isPrimitive(resolved) && !['string', 'number'].includes(resolved.type)) {
         errors.push({
           severity: 1,
           message: '_id must be of type string, number, or mongo.objectId',
@@ -486,15 +494,15 @@ Usage in `.as` files:
 @openapi.schema "CreateUserRequest"
 @openapi.tag "users"
 export interface CreateUser {
-    @label "Email Address"
+    @meta.label "Email Address"
     @openapi.example "user@example.com"
     email: string.email
 
-    @label "Full Name"
+    @meta.label "Full Name"
     @openapi.example "Jane Doe"
     name: string.required
 
-    @label "Date of Birth"
+    @meta.label "Date of Birth"
     @openapi.example "1990-01-15"
     birthday?: openapi.date
 }

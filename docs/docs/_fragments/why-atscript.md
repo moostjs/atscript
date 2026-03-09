@@ -63,8 +63,8 @@ From this single definition, Atscript can already drive several parts of your st
 
 Atscript is growing toward a wider model-driven workflow where the same `.as` definition can shape:
 
-- UI forms
-- Table and list views
+- UI form tools
+- Table and list tools
 - API contracts and integrations
 - TypeScript code
 - Database schema and operations

@@ -1,6 +1,6 @@
-## Interfaces
+## Start With Interfaces
 
-Basic object structure definition:
+Most `.as` files are just interfaces with a few annotations and semantic types:
 
 ```atscript
 export interface User {
@@ -11,16 +11,18 @@ export interface User {
 }
 ```
 
-### Nested & Annotations
+Use an interface when you want a named object shape that can later be imported, validated, and inspected at runtime.
+
+## Nest Objects Naturally
+
+Inline nested objects work well when the nested shape is local to one model:
 
 ```atscript
-@db.table 'users'
-@db.mongo.collection
 export interface User {
     id: string
     profile: {
         name: string
-        avatar?: string  // Optional
+        avatar?: string
     }
     settings: {
         theme: 'light' | 'dark'
@@ -28,9 +30,11 @@ export interface User {
 }
 ```
 
-## Type Aliases
+If you want to reuse a nested shape across files, give it its own interface or type alias and import it.
 
-Type aliases carry metadata and work as runtime objects:
+## Use Type Aliases For Reusable Values
+
+Type aliases are useful for named primitives, unions, and reusable constraints:
 
 ```atscript
 @expect.minLength 3
@@ -41,79 +45,85 @@ export type Status = 'pending' | 'success' | 'error'
 export type ID = string | number
 ```
 
-## Properties
+Like interfaces, exported type aliases also exist at runtime and can be validated.
 
-### Optional & Dynamic
+## Common Property Patterns
+
+### Optional Properties
 
 ```atscript
 export interface Config {
     name: string
-    bio?: string                    // Optional
-    [*]: string                     // Wildcard - any string props
-    [/^x-.*/]: string              // Pattern - props starting with x-
+    bio?: string
 }
 ```
 
-Common patterns:
+### Arrays, Tuples, And Literals
 
-- `[/^REACT_APP_.*/]` - Environment variables
-- `[/.*_URL$/]` - URL configs
-- `[/^social_.*/]` - Social links
+```atscript
+export interface Data {
+    tags: string[]
+    coords: [number, number]
+    status: 'pending' | 'done'
+}
+```
 
-## Type References
+### Dynamic Keys
+
+If a model needs open-ended keys, use wildcard or pattern properties:
+
+```atscript
+export interface EnvConfig {
+    NODE_ENV: 'development' | 'production'
+    [/^PUBLIC_.*/]: string
+}
+```
+
+That is useful for configuration objects, custom metadata maps, or other flexible records.
+
+## Reuse Types By Reference
 
 ```atscript
 import { Address } from './address'
 
 export interface User {
     address: Address
-    friends: User[]          // Self-reference
-    manager?: User          // Optional reference
+    friends: User[]
+    manager?: User
 }
 ```
 
-## Arrays & Complex Types
+You can reference other types, self-reference, and use arrays of references naturally.
+
+## Advanced Composition
+
+### Interface Extends
 
 ```atscript
-export interface Data {
-    tags: string[]                      // Array
-    matrix: number[][]                  // 2D array
-    tuple: [string, number]             // Tuple
-    coords: [number, number, number]    // 3-tuple
-}
-```
-
-## Interface Extends
-
-Interfaces can extend one or more parent interfaces, inheriting all their properties and annotations:
-
-```atscript
-interface Base {
-    @meta.label 'ID'
+interface BaseEntity {
     id: string
-    createdAt: string
+    createdAt: string.isoDate
 }
 
 interface Timestamped {
     updatedAt: string
 }
 
-export interface Post extends Base, Timestamped {
+export interface Post extends BaseEntity, Timestamped {
     title: string
     body: string
 }
-// Post has: id, createdAt, updatedAt, title, body
-// id inherits @meta.label 'ID' from Base
 ```
 
 Rules:
+
 - Own properties are added to the inherited ones
 - Prop-level annotations are inherited from parents
-- Interface-level annotations are **not** inherited
-- Overriding a parent property in a child is **not** allowed (produces a diagnostic error)
+- Interface-level annotations are not inherited
+- Overriding a parent property in a child is not allowed
 - Self-extends and circular extends are detected as errors
 
-## Intersection Types
+### Intersection Types
 
 ```atscript
 interface Timestamped {
@@ -122,40 +132,29 @@ interface Timestamped {
 
 interface Post {
     title: string
-} & Timestamped  // Has both title and createdAt
+} & Timestamped
 ```
 
-## Comments
+Intersections are useful when you want to combine types inline instead of declaring a new parent interface.
 
-```atscript
-// Single-line comment
-/* Multi-line
-   comment */
-```
-
-## Complete Example
+## Practical Example
 
 ```atscript
 import { Address } from './address'
 
-@db.table 'users'
-@db.mongo.collection
 export interface User {
-    @meta.id                     // multiple @meta.id fields form a composite PK
-    _id: mongo.objectId
-
-    username: string
+    id: string.uuid
+    username: string.required
     email: string.email
 
     profile: {
+        displayName: string
         bio?: string
-        [/^social_.*/]: string  // social_twitter, social_github, etc.
+        [/^social_.*/]: string
     }
 
     addresses: Address[]
-    status: 'active' | 'inactive'
+    status: 'active' | 'inactive' | 'pending'
     createdAt: string.isoDate
 }
-
-export type UserStatus = User['status']  // Derived type
 ```

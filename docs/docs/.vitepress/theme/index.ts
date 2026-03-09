@@ -2,6 +2,7 @@ import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import { nextTick } from 'vue'
 import HomeLayout from './HomeLayout.vue'
+import RoadmapVisual from './RoadmapVisual.vue'
 
 import './style.css'
 
@@ -23,6 +24,7 @@ export default {
   extends: DefaultTheme,
   Layout: HomeLayout,
   enhanceApp({ app }) {
+    app.component('RoadmapVisual', RoadmapVisual)
     app.mixin({
       mounted() {
         nextTick(colorizeAtscriptAnnotations)

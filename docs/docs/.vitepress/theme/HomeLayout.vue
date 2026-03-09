@@ -153,6 +153,10 @@ watch(() => route.path, setupScrollAnimations)
                                 <li>Generate runtime metadata and JSON Schema from the same definition.</li>
                                 <li>TypeScript is the first supported plugin and the best place to start today.</li>
                             </ul>
+                            <div class="aspect-links">
+                                <a href="/packages/typescript/quick-start" class="aspect-link">Learn more about TypeScript support</a>
+                                <a href="/packages/typescript/validation" class="aspect-link">See validation details</a>
+                            </div>
                         </div>
                         <div class="aspect-visual animate-in">
                             <ValidationAnimation />
@@ -182,6 +186,10 @@ watch(() => route.path, setupScrollAnimations)
                                 <li>Keep data-layer behavior aligned with the same types and validation rules.</li>
                                 <li>Use supported SQLite, MongoDB, and Moost-based integrations from one source of truth.</li>
                             </ul>
+                            <div class="aspect-links">
+                                <a href="/db-integrations/quick-start" class="aspect-link">Explore DB integrations</a>
+                                <a href="/db-integrations/crud-http" class="aspect-link">See REST/CRUD docs</a>
+                            </div>
                         </div>
                         <div class="aspect-visual aspect-visual-plain animate-in">
                             <DbRelationsAnimation />
@@ -211,6 +219,9 @@ watch(() => route.path, setupScrollAnimations)
                                 <li>Keep forms and tables aligned with the model as the schema evolves.</li>
                                 <li>Build toward a model-driven data flow from UI to API to TypeScript to DB.</li>
                             </ul>
+                            <div class="aspect-links">
+                                <a href="/roadmap" class="aspect-link">See roadmap</a>
+                            </div>
                         </div>
                         <div class="aspect-visual animate-in">
                             <PlannedUiPreview />
@@ -403,6 +414,28 @@ watch(() => route.path, setupScrollAnimations)
 }
 .aspect-list li::marker {
     color: var(--vp-c-brand-1);
+}
+.aspect-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 18px;
+}
+.aspect-link {
+    display: inline-flex;
+    align-items: center;
+    color: var(--vp-c-brand-1);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.aspect-link::after {
+    content: '->';
+    margin-left: 8px;
+    font-size: 12px;
+}
+.aspect-link:hover {
+    text-decoration: underline;
 }
 .aspect-visual {
     min-width: 0;

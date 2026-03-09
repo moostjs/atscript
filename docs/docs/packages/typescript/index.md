@@ -1,9 +1,14 @@
 # Atscript for TypeScript
 
-The TypeScript guide is the main place to evaluate Atscript today. TypeScript is the first supported target, and this section covers the most complete workflow for defining `.as` files, generating TypeScript code, and using runtime utilities like validation, JSON Schema, and serialization.
+The TypeScript guide is the main place to evaluate Atscript today. TypeScript is the first supported target, and this section is organized as a practical learning path first, with lower-level reference material separated out for later.
 
-::: tip Start Here
-If you are new to Atscript, start with the [Quick Start](/packages/typescript/quick-start). Atscript is language-agnostic by design, but the TypeScript plugin is the first production implementation today.
+::: tip Best Path For New Users
+If you are evaluating Atscript for the first time, read these in order:
+
+1. [Why Atscript?](/packages/typescript/why-atscript)
+2. [Quick Start](/packages/typescript/quick-start)
+3. [Build Setup](/packages/typescript/build-setup)
+4. [Validation Guide](/packages/typescript/validation)
 :::
 
 ## What You Can Do Today
@@ -14,37 +19,41 @@ If you are new to Atscript, start with the [Quick Start](/packages/typescript/qu
 - Export JSON Schema
 - Feed the same model into DB integrations
 
-## What's in This Guide
+## Recommended Learning Path
 
-**Introduction:**
+### 1. Get A First Success
 
-- [Why Atscript?](/packages/typescript/why-atscript) — the problem Atscript solves
-- [Atscript Validation vs Others](/packages/typescript/validation-comparison) — side-by-side comparison with Zod and class-validator
-- [Quick Start](/packages/typescript/quick-start) — create your first `.as` file
+- [Why Atscript?](/packages/typescript/why-atscript) — the problem Atscript solves for TypeScript applications
+- [Quick Start](/packages/typescript/quick-start) — define one model, generate files, and validate data
+- [Build Setup](/packages/typescript/build-setup) — wire Atscript into Vite, Rollup, esbuild, or another bundler
 
-**Atscript Syntax:**
+### 2. Learn The Core Language
 
-- [Interfaces & Types](/packages/typescript/interfaces-types) — define data structures
-- [Imports & Exports](/packages/typescript/imports-exports) — module system
-- [Primitives](/packages/typescript/primitives) — built-in types and semantic extensions
-- [Annotations](/packages/typescript/annotations) — syntax, inheritance, built-in annotations
-- [Ad-hoc Annotations](/packages/typescript/ad-hoc-annotations) — annotate existing types without modification
+- [Interfaces & Types](/packages/typescript/interfaces-types) — the `.as` syntax you will use most
+- [Imports & Exports](/packages/typescript/imports-exports) — how `.as`, `.as.d.ts`, and `.as.js` fit together
+- [Primitives](/packages/typescript/primitives) — semantic types like `string.email` and `number.int`
+- [Annotations Guide](/packages/typescript/annotations) — practical metadata and validation annotations
 
-**Runtime API:**
+### 3. Use The Runtime Tools
 
-- [Metadata](/packages/typescript/metadata-export) — access annotations at runtime
-- [Validation](/packages/typescript/validation) — validate data with type guard support
+- [Validation Guide](/packages/typescript/validation) — validate unknown input with type narrowing
+- [Metadata](/packages/typescript/metadata-export) — read labels, placeholders, and other annotations at runtime
 - [JSON Schema](/packages/typescript/json-schema) — generate JSON Schema from types
 - [Serialization](/packages/typescript/serialization) — serialize types for backend-to-frontend transfer
-- [Type Definitions](/packages/typescript/type-definitions) — the annotated type system and type traversal
 
-**Setup & Tooling:**
+### 4. Configure And Automate
 
-- [Configuration](/packages/typescript/configuration) — config file and plugin options
-- [CLI](/packages/typescript/cli) — build `.as` files from the command line
-- [Build Setup](/packages/typescript/build-setup) — bundler integration (Vite, Rollup, esbuild)
+- [Installation](/packages/typescript/installation) — packages, prerequisites, and optional tooling
+- [Configuration](/packages/typescript/configuration) — plugin options and config file settings
+- [CLI](/packages/typescript/cli) — generate files from the command line
 
-**Advanced:**
+### 5. Go Deeper When You Need To
 
+- [Atscript Validation vs Others](/packages/typescript/validation-comparison) — side-by-side comparison with Zod and class-validator
+- [Ad-hoc Annotations](/packages/typescript/ad-hoc-annotations) — annotate existing types without editing their source
+- [Annotations Reference](/packages/typescript/annotations-reference) — inheritance, merge rules, and the full annotation catalog
+- [Validation Reference](/packages/typescript/validation-reference) — validator options, plugin hooks, and lower-level API details
+- [Type Definitions](/packages/typescript/type-definitions) — the annotated runtime type system and traversal
+- [Code Generation](/packages/typescript/code-generation) — what Atscript emits and how imports work
 - [Custom Primitives](/packages/typescript/custom-primitives) — define your own primitive extensions
 - [Custom Annotations](/packages/typescript/custom-annotations) — define your own annotation types

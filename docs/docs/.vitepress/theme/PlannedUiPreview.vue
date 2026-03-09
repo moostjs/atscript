@@ -2,8 +2,8 @@
 import Carousel from './Carousel.vue'
 
 const slides = [
-    { label: 'Form', title: 'Generated form', chip: 'Planned form UI' },
-    { label: 'Table', title: 'Generated table', chip: 'Planned table UI' },
+    { label: 'Form', title: 'Live form tool', chip: 'Planned form tool' },
+    { label: 'Table', title: 'Live table tool', chip: 'Planned table tool' },
 ]
 </script>
 

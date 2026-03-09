@@ -2,7 +2,13 @@
 
 Code generation is the most powerful feature of the Atscript plugin system. A code generator reads parsed `.as` documents and produces output files — type declarations, runtime modules, data classes, JSON schemas, or any format you need.
 
-This page focuses on **what data is available** from the Atscript AST and **how to discover and traverse it** to produce your output.
+For a first generator, do not start by learning every node class. Start by answering three practical questions:
+
+1. which declarations in `doc.nodes` do you care about?
+2. how do you turn each declaration into one target-language construct?
+3. what metadata or annotations do you need to read along the way?
+
+This page focuses on the smallest useful `render()` flow first, then goes deeper into the document model.
 
 ## The render() Hook
 
@@ -22,6 +28,36 @@ render(doc: AtscriptDoc, format: string): TPluginOutput[] | undefined {
 `TPluginOutput` is simply `{ fileName: string, content: string }`. The `fileName` is relative — the build system resolves it to an absolute path based on `outDir` config.
 
 The `format` string is a plain string with no registry. Your plugin checks it with `if` statements and returns nothing for formats it doesn't handle. Multiple plugins can produce output for the same format — their outputs are concatenated.
+
+## A First Useful Generator
+
+Start with the smallest possible generator: one that turns interfaces into a flat text file.
+
+```typescript
+import { createAtscriptPlugin, isInterface } from '@atscript/core'
+
+export const namesPlugin = () =>
+  createAtscriptPlugin({
+    name: 'names',
+
+    render(doc, format) {
+      if (format !== 'names') return []
+
+      const lines = doc.nodes
+        .filter(isInterface)
+        .map(node => `interface ${node.id}`)
+
+      return [
+        {
+          fileName: `${doc.name}.names.txt`,
+          content: lines.join('\n'),
+        },
+      ]
+    },
+  })
+```
+
+Once that works, add property handling, type resolution, and annotation reads one step at a time.
 
 ## Iterating a Document
 
@@ -74,7 +110,7 @@ Every node with a type body has `getDefinition()`. The returned `SemanticNode` v
 When a definition is a `ref`, it points to another named type. You need to resolve it to understand the actual type:
 
 ```typescript
-import { isRef, isPrimitive } from '@atscript/core/nodes'
+import { isRef, isPrimitive } from '@atscript/core'
 
 const def = prop.getDefinition()
 
@@ -108,7 +144,7 @@ import {
   isArray,
   isConst,
   isInterface,
-} from '@atscript/core/nodes'
+} from '@atscript/core'
 
 function resolveType(def: SemanticNode | undefined, doc: AtscriptDoc): string {
   if (!def) return 'unknown'
@@ -192,7 +228,7 @@ Annotations carry metadata that code generators can use to produce richer output
 
 ```typescript
 for (const ann of prop.annotations) {
-  ann.name // 'label', 'expect.minLength', 'db.index.unique', etc.
+  ann.name // 'meta.label', 'expect.minLength', 'db.index.unique', etc.
   ann.args // array of Token objects
   ann.args[0]?.text // first argument's value as string
 }
@@ -329,6 +365,8 @@ render(doc, format) {
 ```
 
 `DEFAULT_FORMAT` is a well-known constant triggered by the VSCode extension on save and by the CLI when no `-f` flag is given. Handle it for your plugin's primary output — typically type declarations. See [VSCode & Build Integration](/plugin-development/tooling-integration#the-default-format-constant) for the full details.
+
+If your plugin needs extra sidecar files, prefer generating them through the CLI or explicit formats. Bundlers only need the JavaScript module they import, not arbitrary extra artifacts.
 
 Users trigger specific formats via the CLI:
 

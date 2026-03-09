@@ -1,6 +1,12 @@
 # Testing Plugins
 
-Testing is essential for Atscript plugins — you need to verify that primitives register correctly, annotations validate as expected, and code generation produces the right output. This page covers the standard testing patterns using Vitest.
+Testing is where plugin docs become practical. Start with one end-to-end test that:
+
+1. builds a small fixture
+2. runs your plugin
+3. asserts on generated output or diagnostics
+
+Once that works, add snapshots and narrower tests for edge cases. This page covers the standard patterns using Vitest.
 
 ## Test Setup
 
@@ -242,11 +248,11 @@ export interface Settings {
 ```atscript
 // test/fixtures/with-annotations.as
 export interface Product {
-    @label "Product Name"
+    @meta.label "Product Name"
     @expect.minLength 1
     name: string.required
 
-    @label "Price"
+    @meta.label "Price"
     @expect.min 0
     price: number
 }

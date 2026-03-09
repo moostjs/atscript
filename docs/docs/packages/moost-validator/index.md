@@ -1,8 +1,26 @@
-# Moost Validator
+# @atscript/moost-validator
 
-`@atscript/moost-validator` integrates Atscript's runtime validation into the [Moost framework](https://moost.org). It provides a validation pipe and an error interceptor that let you validate handler parameters automatically — no manual `validate()` calls needed.
+Use Atscript models as runtime validation contracts in Moost handlers.
 
-When a handler parameter is typed with an Atscript-generated type (e.g., `@Body() dto: CreateUserDto`), the pipe calls the type's built-in `.validator().validate(value)` method before your handler runs. If validation fails, the interceptor converts the error into a structured `400 Bad Request` response.
+`@atscript/moost-validator` gives you two small integration points:
+
+- `validatorPipe()` validates handler arguments whose runtime type comes from an `.as` model
+- `validationErrorTransform()` turns `ValidatorError` into `HttpError(400)` for HTTP apps
+
+::: tip Best Path For New Users
+If you are evaluating this package for the first time, read these in order:
+
+1. [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation)
+2. [Validation Pipe](/packages/moost-validator/validation-pipe)
+3. [Error Handling](/packages/moost-validator/error-handling)
+:::
+
+## What This Package Gives You
+
+- one `.as` model for TypeScript types and runtime validation
+- automatic validation in Moost handlers
+- the same Atscript validator options you already use elsewhere
+- optional HTTP-friendly error conversion when you use `@moostjs/event-http`
 
 ## Installation
 
@@ -20,39 +38,31 @@ npm install @atscript/moost-validator
 
 ### Peer Dependencies
 
-This package requires the following peer dependencies:
+You also need:
 
-| Package                | Purpose                                                    |
-| ---------------------- | ---------------------------------------------------------- |
-| `@atscript/core`       | Core parser and AST                                        |
-| `@atscript/typescript` | Provides `Validator`, `ValidatorError`, and type utilities |
-| `moost`                | Framework runtime (pipes, interceptors, DI)                |
-| `@moostjs/event-http`  | HTTP adapter (for `HttpError` in error transform)          |
+- `@atscript/core`
+- `@atscript/typescript`
+- `moost`
+- `@moostjs/event-http` if you want the built-in HTTP error transform
 
 ## Quick Start
 
-### 1. Define a DTO in Atscript
+### 1. Define A DTO In Atscript
 
 ```atscript
-// create-user.dto.as
-@label "Create User"
 export interface CreateUserDto {
-  @label "Display name"
-  @expect.minLength 2
-  @expect.maxLength 50
-  name: string
+    @meta.label 'Display Name'
+    @expect.minLength 2, 'Name must be at least 2 characters'
+    name: string
 
-  @expect.pattern "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", "u", "Invalid email"
-  email: string
+    email: string.email
 
-  @expect.minLength 8
-  password: string
-
-  roles?: string[]
+    @expect.minLength 8, 'Password must be at least 8 characters'
+    password: string
 }
 ```
 
-### 2. Register the pipe and interceptor
+### 2. Register The Pipe And HTTP Error Transform
 
 ```typescript
 import { Moost } from 'moost'
@@ -63,61 +73,41 @@ import { UsersController } from './users.controller'
 const app = new Moost()
 app.adapter(new MoostHttp())
 
-// Enable validation for all handlers
 app.applyGlobalPipes(validatorPipe())
-
-// Convert validation errors to 400 responses
 app.applyGlobalInterceptors(validationErrorTransform())
 
 app.registerControllers(UsersController)
 await app.init()
 ```
 
-### 3. Use the DTO in a controller
+### 3. Use The DTO In A Controller
 
 ```typescript
 import { Controller } from 'moost'
-import { Post, Body } from '@moostjs/event-http'
+import { Body, Post } from '@moostjs/event-http'
 import { CreateUserDto } from './create-user.dto.as'
 
 @Controller('users')
 export class UsersController {
   @Post()
   async create(@Body() dto: CreateUserDto) {
-    // dto is guaranteed valid — validation ran before this code
+    // dto has already been validated
     return { id: '123', ...dto }
   }
 }
 ```
 
-If the request body fails validation, the client receives:
+Without the pipe, the TypeScript annotation alone does not validate request data. With the pipe in place, your handler runs only after Atscript validation succeeds.
 
-```json
-{
-  "statusCode": 400,
-  "message": "email: Invalid email",
-  "errors": [
-    { "path": "email", "message": "Invalid email" },
-    { "path": "password", "message": "Length must be >= 8" }
-  ]
-}
-```
+## HTTP And Non-HTTP Usage
 
-## How It Works
+- `validatorPipe()` is the core integration and works anywhere Moost resolves handler arguments
+- `validationErrorTransform()` is HTTP-specific because it converts `ValidatorError` into `HttpError`
 
-1. **Compile** — Atscript compiles `.as` files into JavaScript classes that carry type metadata and a `.validator()` factory method.
-2. **Resolve** — Moost's resolve pipe extracts handler arguments (`@Body()`, `@Param()`, `@Query()`, etc.).
-3. **Validate** — The validation pipe checks if the parameter type is an Atscript annotated type (via `isAnnotatedType()`). If so, it instantiates a `Validator` and calls `.validate(value)`.
-4. **Catch** — If validation fails, `ValidatorError` is thrown. The error interceptor catches it and converts it to an `HttpError(400)` with structured error details.
-5. **Execute** — If validation passes, the handler runs with guaranteed-valid data.
+If you are not building an HTTP app, keep `validatorPipe()` and use your own error interceptor for your adapter or event format.
 
-## API at a Glance
+## Next Steps
 
-| Export                          | Type                | Description                                             |
-| ------------------------------- | ------------------- | ------------------------------------------------------- |
-| `validatorPipe(opts?)`          | Pipe factory        | Validates parameters against their Atscript type        |
-| `UseValidatorPipe(opts?)`       | Decorator           | Applies `validatorPipe` to a class or method            |
-| `validationErrorTransform()`    | Interceptor factory | Converts `ValidatorError` into `HttpError(400)`         |
-| `UseValidationErrorTransform()` | Decorator           | Applies `validationErrorTransform` to a class or method |
-
-See [Validation Pipe](./validation-pipe) and [Error Handling](./error-handling) for detailed usage.
+- [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation) — what this package removes from your handlers
+- [Validation Pipe](/packages/moost-validator/validation-pipe) — global setup, PATCH payloads, unknown props, and common options
+- [Error Handling](/packages/moost-validator/error-handling) — how the built-in HTTP error transform works
