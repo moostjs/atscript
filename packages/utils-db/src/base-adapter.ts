@@ -12,7 +12,6 @@ import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, T
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './db-readable'
-import type { AtscriptDbTable } from './db-table'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 
@@ -238,16 +237,6 @@ export abstract class BaseDbAdapter {
   async nativePatch(filter: FilterExpr, patch: unknown): Promise<TDbUpdateResult> {
     throw new Error('Native patch not supported by this adapter')
   }
-
-  /**
-   * Builds a custom patch validator for this adapter.
-   * When defined, {@link AtscriptDbTable} uses this instead of the default
-   * partial validator for the `'patch'` purpose.
-   *
-   * Example: MongoDB wraps top-level array fields with `$replace`/`$insert`/…
-   * patch operators that the default validator doesn't understand.
-   */
-  buildPatchValidator?(table: AtscriptDbTable): any
 
   // ── Adapter-specific annotation processing (overridable) ──────────────────
 

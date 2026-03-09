@@ -1350,7 +1350,7 @@ describe('AtscriptDbTable — Relations', () => {
       ).rejects.toThrow("Cannot patch relation 'author' — foreign key 'authorId' is null")
     })
 
-    it('should error on FROM relation in patch mode', async () => {
+    it('should reject FROM relation in patch mode with plain array', async () => {
       seedAll()
       const authorTable = db.getTable(Author)
       await expect(
@@ -1358,7 +1358,72 @@ describe('AtscriptDbTable — Relations', () => {
           id: 1,
           posts: [{ id: 1, title: 'Nope' }],
         } as any)
-      ).rejects.toThrow("Cannot patch relation 'posts' — patching 1:N relations not supported. Use replaceOne.")
+      ).rejects.toThrow('Cannot patch 1:N relation')
+    })
+
+    it('should accept FROM relation with $insert operator', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.updateOne({
+        id: 1,
+        posts: { $insert: [{ title: 'New Post' }] },
+      } as any)
+      expect(result.matchedCount).toBe(1)
+
+      // The new post should exist with FK wired to author 1
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: { authorId: 1 }, controls: {} }) as any[]
+      expect(posts.length).toBe(3) // 2 seeded + 1 inserted
+      expect(posts.some((p: any) => p.title === 'New Post')).toBe(true)
+    })
+
+    it('should accept FROM relation with $remove operator', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.updateOne({
+        id: 1,
+        posts: { $remove: [{ id: 2 }] },
+      } as any)
+      expect(result.matchedCount).toBe(1)
+
+      // Post 2 should be deleted
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: { authorId: 1 }, controls: {} }) as any[]
+      expect(posts.length).toBe(1)
+      expect(posts[0].id).toBe(1)
+    })
+
+    it('should accept FROM relation with $replace operator', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.updateOne({
+        id: 1,
+        posts: { $replace: [{ id: 1, title: 'Replaced Post' }] },
+      } as any)
+      expect(result.matchedCount).toBe(1)
+
+      // Only post 1 should remain (post 2 orphaned and deleted)
+      const postTable = db.getTable(Post)
+      const posts = await postTable.findMany({ filter: { authorId: 1 }, controls: {} }) as any[]
+      expect(posts.length).toBe(1)
+      expect(posts[0].title).toBe('Replaced Post')
+    })
+
+    it('should accept FROM relation with $update operator', async () => {
+      seedAll()
+      const authorTable = db.getTable(Author)
+      const result = await authorTable.updateOne({
+        id: 1,
+        posts: { $update: [{ id: 1, title: 'Updated Title' }] },
+      } as any)
+      expect(result.matchedCount).toBe(1)
+
+      // Post 1 should be updated, post 2 untouched
+      const postTable = db.getTable(Post)
+      const post1 = await postTable.findOne({ filter: { id: 1 }, controls: {} }) as any
+      expect(post1.title).toBe('Updated Title')
+      const post2 = await postTable.findOne({ filter: { id: 2 }, controls: {} }) as any
+      expect(post2.title).toBe('Second Post')
     })
 
     it('should error on null nav prop in patch mode', async () => {
@@ -1558,6 +1623,86 @@ describe('AtscriptDbTable — Relations', () => {
 
       const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
       expect(junctions).toHaveLength(0)
+    })
+
+    // ── VIA patch operators (bulkUpdate) ──────────────────────────────────
+
+    it('should reject VIA relation in patch mode with plain array', async () => {
+      const { taskAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+
+      await expect(
+        taskTable.updateOne({
+          id: 1,
+          tags: [{ name: 'nope' }],
+        } as any)
+      ).rejects.toThrow('Cannot patch M:N relation')
+    })
+
+    it('should accept VIA $insert: new tags + junction rows', async () => {
+      const { tagAdapter, taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+
+      await taskTable.updateOne({
+        id: 1,
+        tags: { $insert: [{ name: 'new-tag' }] },
+      } as any)
+
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      expect(tags).toHaveLength(1)
+      expect(tags[0]).toMatchObject({ name: 'new-tag' })
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(1)
+      expect(junctions[0]).toMatchObject({ taskId: 1, tagId: tags[0].id })
+    })
+
+    it('should accept VIA $remove: deletes junction rows', async () => {
+      const { tagAdapter, taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+      tagAdapter.seed([{ id: 10, name: 'tag-a' }, { id: 20, name: 'tag-b' }])
+      junctionAdapter.seed([
+        { id: 100, taskId: 1, tagId: 10 },
+        { id: 101, taskId: 1, tagId: 20 },
+      ])
+
+      await taskTable.updateOne({
+        id: 1,
+        tags: { $remove: [{ id: 10 }] },
+      } as any)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(1)
+      expect(junctions[0]).toMatchObject({ taskId: 1, tagId: 20 })
+    })
+
+    it('should accept VIA $replace: clear + rebuild junctions', async () => {
+      const { tagAdapter, taskAdapter, junctionAdapter } = createViaDb()
+      const taskTable = db.getTable(ViaTask)
+
+      taskAdapter.seed([{ id: 1, title: 'Task 1' }])
+      tagAdapter.seed([{ id: 10, name: 'old-tag' }])
+      junctionAdapter.seed([{ id: 100, taskId: 1, tagId: 10 }])
+
+      await taskTable.updateOne({
+        id: 1,
+        tags: { $replace: [{ name: 'replaced-tag' }] },
+      } as any)
+
+      const junctions = await junctionAdapter.findMany({ filter: {}, controls: {} })
+      expect(junctions).toHaveLength(1)
+      expect(junctions[0].taskId).toBe(1)
+
+      // New tag should exist
+      const tags = await tagAdapter.findMany({ filter: {}, controls: {} })
+      const replacedTag = tags.find((t: any) => t.name === 'replaced-tag')
+      expect(replacedTag).toBeDefined()
+      expect(junctions[0].tagId).toBe(replacedTag!.id)
     })
   })
 })

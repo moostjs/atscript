@@ -60,8 +60,8 @@ function prepareReplace(mongo: DbSpace, type: any, payload: any) {
 function prepareUpdate(mongo: DbSpace, type: any, payload: any) {
   const table = mongo.getTable(type)
   const adapter = mongo.getAdapter(type)
-  const v = table.getValidator('patch')!
-  if (v.validate(payload)) {
+  const v = table.getValidator('bulkUpdate')!
+  if (v.validate(payload, false, { mode: 'patch', flatMap: table.flatMap })) {
     return new CollectionPatcher(adapter.getPatcherContext(), payload).preparePatch()
   }
   throw new Error('Invalid payload')
@@ -185,11 +185,12 @@ describe('[mongo] AsCollection with structures', () => {
         name: 'John Doe',
       })
     ).toThrowError()
+    // Without _id: validation passes (partial mode); PK enforcement is at the db-table level
     expect(() =>
       prepareUpdate(mongo, MinimalCollection, {
         name: 'John Doe',
       })
-    ).toThrowError()
+    ).not.toThrowError()
   })
   it('[MERGE] checks _id as string', async () => {
     const { MinimalCollectionString } = await import('./fixtures/simple-collection.as.js')
@@ -205,11 +206,12 @@ describe('[mongo] AsCollection with structures', () => {
         name: 'John Doe',
       })
     ).not.toThrowError()
+    // Without _id: validation passes (partial mode); PK enforcement is at the db-table level
     expect(() =>
       prepareUpdate(mongo, MinimalCollectionString, {
         name: 'John Doe',
       })
-    ).toThrowError()
+    ).not.toThrowError()
   })
 
   it('prepares simple patch query', async () => {

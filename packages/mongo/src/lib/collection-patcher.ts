@@ -6,11 +6,8 @@ import type {
   TValidatorOptions,
   Validator,
 } from '@atscript/typescript/utils'
-import { isAnnotatedTypeOfPrimitive, defineAnnotatedType as $ } from '@atscript/typescript/utils'
 import { getKeyProps } from '@atscript/utils-db'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
-
-import { validateMongoIdPlugin } from './validate-plugins'
 
 /**
  * Context interface for CollectionPatcher.
@@ -50,103 +47,6 @@ export class CollectionPatcher {
   ) {}
 
   static getKeyProps = getKeyProps
-
-  /**
-   * Build a runtime *Validator* that understands the extended patch payload.
-   *
-   *  * Adds per‑array *patch* wrappers (the `$replace`, `$insert`, … fields).
-   *  * Honors `db.patch.strategy === "merge"` metadata.
-   *
-   * @param collection Target collection wrapper
-   * @returns Atscript Validator
-   */
-  static prepareValidator(context: TCollectionPatcherContext) {
-    return context.createValidator({
-      plugins: [validateMongoIdPlugin],
-      replace: (def, path) => {
-        if (path === '' && def.type.kind === 'object') {
-          const obj = $('object').copyMetadata(def.metadata)
-          for (const [prop, type] of def.type.props.entries()) {
-            obj.prop(
-              prop,
-              $()
-                .refTo(type)
-                .copyMetadata(type.metadata)
-                .optional(prop !== '_id').$type
-            )
-          }
-          return obj.$type
-        }
-        if (
-          def.type.kind === 'array' &&
-          context.flatMap.get(path)?.metadata.get('db.mongo.__topLevelArray') && // only patching top level arrays
-          !def.metadata.has('db.mongo.__patchArrayValue')
-        ) {
-          const defArray = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
-          const mergeStrategy = defArray.metadata.get('db.patch.strategy') === 'merge'
-          function getPatchType() {
-            const isPrimitive = isAnnotatedTypeOfPrimitive(defArray.type.of)
-            if (isPrimitive) {
-              return (
-                $()
-                  .refTo(def)
-                  .copyMetadata(def.metadata)
-                  // @ts-expect-error
-                  .annotate('db.mongo.__patchArrayValue')
-                  .optional().$type
-              )
-            }
-            if (defArray.type.of.type.kind === 'object') {
-              const objType = defArray.type.of.type
-              const t = $('object').copyMetadata(defArray.type.of.metadata)
-              const keyProps = CollectionPatcher.getKeyProps(defArray)
-              for (const [key, val] of objType.props.entries()) {
-                if (keyProps.size > 0) {
-                  if (keyProps.has(key)) {
-                    t.prop(key, $().refTo(val).copyMetadata(def.metadata).$type)
-                  } else {
-                    t.prop(key, $().refTo(val).copyMetadata(def.metadata).optional().$type)
-                  }
-                } else {
-                  t.prop(
-                    key,
-                    $().refTo(val).copyMetadata(def.metadata).optional(!!val.optional).$type
-                  )
-                }
-              }
-              return (
-                $('array')
-                  .of(t.$type)
-                  .copyMetadata(def.metadata)
-                  // @ts-expect-error
-                  .annotate('db.mongo.__patchArrayValue')
-                  .optional().$type
-              )
-            }
-            return undefined
-          }
-          const fullType = $()
-            .refTo(def)
-            .copyMetadata(def.metadata)
-            // @ts-expect-error
-            .annotate('db.mongo.__patchArrayValue')
-            .optional().$type
-          const patchType = getPatchType()
-          return patchType
-            ? $('object')
-                .prop('$replace', fullType)
-                .prop('$insert', fullType)
-                .prop('$upsert', fullType)
-                .prop('$update', mergeStrategy ? patchType : fullType)
-                .prop('$remove', patchType)
-                .optional().$type
-            : $('object').prop('$replace', fullType).prop('$insert', fullType).optional().$type
-        }
-        return def
-      },
-      partial: (def, path) => path !== '' && def.metadata.get('db.patch.strategy') === 'merge',
-    })
-  }
 
   /**
    * Internal accumulator: filter passed to `updateOne()`.
@@ -221,8 +121,8 @@ export class CollectionPatcher {
     for (const [_key, value] of Object.entries(payload)) {
       const key = evalKey(_key)
       const flatType = this.collection.flatMap.get(key)
-      const topLevelArray = flatType?.metadata?.get('db.mongo.__topLevelArray') as boolean | undefined
-      if (typeof value === 'object' && topLevelArray) {
+      const topLevelArray = flatType?.metadata?.get('db.__topLevelArray') as boolean | undefined
+      if (typeof value === 'object' && !Array.isArray(value) && topLevelArray && !flatType?.metadata?.has('db.json')) {
         this.parseArrayPatch(key, value, flatType!)
       } else if (
         typeof value === 'object' &&
@@ -327,20 +227,36 @@ export class CollectionPatcher {
    * - keyed  → remove existing matching by key(s) then append candidate
    * - unique → $setUnion (deep equality)
    */
-  private _upsert(key: string, input: any[] | undefined, keys: string[], _flatType: TAtscriptAnnotatedType) {
+  private _upsert(key: string, input: any[] | undefined, keys: string[], flatType: TAtscriptAnnotatedType) {
     if (!input?.length) {
       return
     }
 
     // ── keyed upsert ──────────────────────────────────────────────────────────
     if (keys.length > 0) {
+      const mergeStrategy = flatType.metadata?.get('db.patch.strategy') === 'merge'
+
+      const vars: Record<string, any> = { acc: '$$value', cand: '$$this' }
+      let appendExpr: any = '$$cand'
+
+      if (mergeStrategy) {
+        // Find the existing element to merge with
+        vars.existing = {
+          $arrayElemAt: [
+            { $filter: { input: '$$value', as: 'el', cond: this._keysEqual(keys, '$$el', '$$this') } },
+            0,
+          ],
+        }
+        appendExpr = { $cond: [{ $ifNull: ['$$existing', false] }, { $mergeObjects: ['$$existing', '$$cand'] }, '$$cand'] }
+      }
+
       this._set(key, {
         $reduce: {
           input, // literal payload
           initialValue: { $ifNull: [`$${key}`, []] },
           in: {
             $let: {
-              vars: { acc: '$$value', cand: '$$this' },
+              vars,
               in: {
                 $concatArrays: [
                   {
@@ -350,7 +266,7 @@ export class CollectionPatcher {
                       cond: { $not: this._keysEqual(keys, '$$el', '$$cand') },
                     },
                   },
-                  ['$$cand'],
+                  [appendExpr],
                 ],
               },
             },

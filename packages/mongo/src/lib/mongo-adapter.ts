@@ -10,7 +10,6 @@ import {
   BaseDbAdapter,
   DbError,
   AtscriptDbView,
-  type AtscriptDbTable,
   type DbQuery,
   type FilterExpr,
   type TDbInsertResult,
@@ -226,9 +225,7 @@ export class MongoAdapter extends BaseDbAdapter {
     return [validateMongoIdPlugin]
   }
 
-  override getTopLevelArrayTag(): string {
-    return 'db.mongo.__topLevelArray'
-  }
+  // Uses default 'db.__topLevelArray' tag from base adapter
 
   override getAdapterTableName(type: TAtscriptAnnotatedType): string | undefined {
     // @db.mongo.collection may inject _id but doesn't provide a name;
@@ -627,12 +624,6 @@ export class MongoAdapter extends BaseDbAdapter {
   private _resolveRelTargetTableName(relation: TDbRelation): string {
     const targetType = relation.targetType()
     return (targetType?.metadata?.get('db.table') as string) || targetType?.id || ''
-  }
-
-  // ── Patch validator ──────────────────────────────────────────────────────
-
-  override buildPatchValidator(table: AtscriptDbTable): any {
-    return CollectionPatcher.prepareValidator(this.getPatcherContext())
   }
 
   /** Returns the context object used by CollectionPatcher. */

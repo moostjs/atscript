@@ -49,8 +49,8 @@ function flattenPatchPayload(
     const flatType = table.flatMap.get(key)
     const isTopLevelArray = flatType?.metadata?.get(topLevelArrayTag) as boolean | undefined
 
-    if (typeof value === 'object' && value !== null && isTopLevelArray) {
-      // Top-level array with patch operators
+    if (typeof value === 'object' && value !== null && !Array.isArray(value) && isTopLevelArray && !flatType?.metadata?.has('db.json')) {
+      // Top-level array with patch operators (@db.json fields are excluded; plain arrays fall through as $replace)
       decomposeArrayPatch(key, value as Record<string, unknown>, flatType!, update, table)
     } else if (
       typeof value === 'object' &&
