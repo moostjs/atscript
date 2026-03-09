@@ -43,7 +43,7 @@ export class AsDbController<
    * Intercepts write operations. Return `undefined` to abort.
    */
   protected onWrite(
-    action: 'insert' | 'insertMany' | 'replace' | 'update',
+    action: 'insert' | 'insertMany' | 'replace' | 'replaceMany' | 'update' | 'updateMany',
     data: unknown
   ): unknown | Promise<unknown | undefined> {
     return data
@@ -75,20 +75,32 @@ export class AsDbController<
   }
 
   /**
-   * **PUT /** — fully replaces a record matched by primary key.
+   * **PUT /** — fully replaces one or many records matched by primary key.
    */
   @Put('')
   async replace(@Body() payload: unknown): Promise<HttpError | unknown> {
+    if (Array.isArray(payload)) {
+      const data = await this.onWrite('replaceMany', payload)
+      if (data === undefined) { return new HttpError(500, 'Not saved') }
+      return await this.table.bulkReplace(data as any)
+    }
+
     const data = await this.onWrite('replace', payload)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
     return await this.table.replaceOne(data as any)
   }
 
   /**
-   * **PATCH /** — partially updates a record matched by primary key.
+   * **PATCH /** — partially updates one or many records matched by primary key.
    */
   @Patch('')
   async update(@Body() payload: unknown): Promise<HttpError | unknown> {
+    if (Array.isArray(payload)) {
+      const data = await this.onWrite('updateMany', payload)
+      if (data === undefined) { return new HttpError(500, 'Not saved') }
+      return await this.table.bulkUpdate(data as any)
+    }
+
     const data = await this.onWrite('update', payload)
     if (data === undefined) { return new HttpError(500, 'Not saved') }
     return await this.table.updateOne(data as any)

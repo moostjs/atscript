@@ -42,6 +42,8 @@ function createMockTable(overrides: Record<string, any> = {}) {
     insertMany: vi.fn().mockResolvedValue({ insertedCount: 2, insertedIds: ['1', '2'] }),
     replaceOne: vi.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
     updateOne: vi.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
+    bulkReplace: vi.fn().mockResolvedValue({ matchedCount: 2, modifiedCount: 2 }),
+    bulkUpdate: vi.fn().mockResolvedValue({ matchedCount: 2, modifiedCount: 2 }),
     deleteOne: vi.fn().mockResolvedValue({ deletedCount: 1 }),
     ...overrides,
   } as any
@@ -366,6 +368,34 @@ describe('AsDbController', () => {
     })
   })
 
+  // ── PUT / (batch) ────────────────────────────────────────────────
+
+  describe('replace (batch)', () => {
+    it('should call table.bulkReplace for array payload', async () => {
+      const payload = [{ id: '1', name: 'A' }, { id: '2', name: 'B' }]
+      const result = await controller.replace(payload)
+      expect(table.bulkReplace).toHaveBeenCalledWith(payload)
+      expect(table.replaceOne).not.toHaveBeenCalled()
+      expect(result).toEqual({ matchedCount: 2, modifiedCount: 2 })
+    })
+
+    it('should call onWrite with replaceMany action for array', async () => {
+      const ctx = createController()
+      const spy = vi.spyOn(ctx.controller as any, 'onWrite')
+      const payload = [{ id: '1', name: 'A' }]
+      await ctx.controller.replace(payload)
+      expect(spy).toHaveBeenCalledWith('replaceMany', payload)
+    })
+
+    it('should return 500 when onWrite returns undefined for array', async () => {
+      const ctx = createController()
+      vi.spyOn(ctx.controller as any, 'onWrite').mockReturnValue(undefined)
+      const result = await ctx.controller.replace([{ id: '1', name: 'A' }])
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(500)
+    })
+  })
+
   // ── PATCH / ───────────────────────────────────────────────────────
 
   describe('update', () => {
@@ -373,6 +403,34 @@ describe('AsDbController', () => {
       const result = await controller.update({ id: '1', name: 'Patched' })
       expect(table.updateOne).toHaveBeenCalledWith({ id: '1', name: 'Patched' })
       expect(result).toEqual({ matchedCount: 1, modifiedCount: 1 })
+    })
+  })
+
+  // ── PATCH / (batch) ────────────────────────────────────────────────
+
+  describe('update (batch)', () => {
+    it('should call table.bulkUpdate for array payload', async () => {
+      const payload = [{ id: '1', name: 'X' }, { id: '2', name: 'Y' }]
+      const result = await controller.update(payload)
+      expect(table.bulkUpdate).toHaveBeenCalledWith(payload)
+      expect(table.updateOne).not.toHaveBeenCalled()
+      expect(result).toEqual({ matchedCount: 2, modifiedCount: 2 })
+    })
+
+    it('should call onWrite with updateMany action for array', async () => {
+      const ctx = createController()
+      const spy = vi.spyOn(ctx.controller as any, 'onWrite')
+      const payload = [{ id: '1', name: 'X' }]
+      await ctx.controller.update(payload)
+      expect(spy).toHaveBeenCalledWith('updateMany', payload)
+    })
+
+    it('should return 500 when onWrite returns undefined for array', async () => {
+      const ctx = createController()
+      vi.spyOn(ctx.controller as any, 'onWrite').mockReturnValue(undefined)
+      const result = await ctx.controller.update([{ id: '1', name: 'X' }])
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(500)
     })
   })
 
