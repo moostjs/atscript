@@ -240,16 +240,6 @@ export abstract class BaseDbAdapter {
   }
 
   /**
-   * Builds a custom insert validator for this adapter.
-   * When defined, {@link AtscriptDbTable} uses this instead of the default
-   * insert validator (which makes all primary keys optional).
-   *
-   * Example: MongoDB only makes ObjectId primary keys optional (auto-generated),
-   * but string/number IDs remain required.
-   */
-  buildInsertValidator?(table: AtscriptDbTable): any
-
-  /**
    * Builds a custom patch validator for this adapter.
    * When defined, {@link AtscriptDbTable} uses this instead of the default
    * partial validator for the `'patch'` purpose.

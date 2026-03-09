@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 
+import { DbError } from '../db-error'
 import { DbSpace } from '../db-space'
 import { prepareFixtures, MockAdapter } from './test-utils'
 
@@ -213,5 +214,29 @@ describe('FK Validation', () => {
         comments: [{ body: 'Bad comment', authorId: 999 }],
       })
     ).rejects.toThrow('FK constraint violation')
+  })
+
+  it('should prefix error paths with nav field name for nested FROM FK violations', async () => {
+    const space = createSpace()
+    space.getTable(AuthorType)
+    const posts = space.getTable(PostType)
+
+    seedData()
+
+    try {
+      await posts.insertOne({
+        title: 'Post with bad comment',
+        authorId: 1,
+        comments: [{ body: 'Bad comment', authorId: 999 }],
+      })
+      expect.unreachable('Should have thrown')
+    } catch (e) {
+      expect(e).toBeInstanceOf(DbError)
+      const err = e as DbError
+      expect(err.code).toBe('FK_VIOLATION')
+      // Error paths must include the nav field prefix
+      const paths = err.errors.map(e => e.path)
+      expect(paths).toContain('comments.authorId')
+    }
   })
 })

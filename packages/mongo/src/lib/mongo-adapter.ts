@@ -629,25 +629,6 @@ export class MongoAdapter extends BaseDbAdapter {
     return (targetType?.metadata?.get('db.table') as string) || targetType?.id || ''
   }
 
-  // ── Insert validator ─────────────────────────────────────────────────────
-
-  override buildInsertValidator(table: AtscriptDbTable): any {
-    return table.createValidator({
-      plugins: this.getValidatorPlugins(),
-      replace: (type, path) => {
-        // Make ObjectId primary keys optional (auto-generated)
-        if (path === '_id' && (type.type.tags as Set<string>)?.has('objectId')) {
-          return { ...type, optional: true }
-        }
-        // Make fields with defaults optional (applied before write)
-        if (table.defaults.has(path)) {
-          return { ...type, optional: true }
-        }
-        return type
-      },
-    })
-  }
-
   // ── Patch validator ──────────────────────────────────────────────────────
 
   override buildPatchValidator(table: AtscriptDbTable): any {

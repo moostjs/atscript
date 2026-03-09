@@ -60,18 +60,22 @@ Your code interacts with the Table API. The adapter handles the database-specifi
 | `@atscript/mongo` | MongoDB adapter with Atlas Search support |
 | `@atscript/moost-db` | REST API controller for Moost framework |
 
-## Compared to ORMs
+## Model-First, Not ORM-First
 
-Atscript's DB layer is **not an ORM**. Here's how it differs:
+Atscript's DB layer grows out of the same `.as` model that already drives your TypeScript types, validation rules, and runtime metadata. The database layer is one consumer of that model, not the center of the system.
 
-| | Traditional ORM | Atscript DB |
+That is why Atscript is better described as a **model-first data layer with database integrations** than as a traditional ORM.
+
+| | Traditional ORM | Atscript DB layer |
 |---|---|---|
-| **Schema definition** | Language-specific decorators or config | Language-agnostic `.as` files |
-| **Type safety** | Generated or manually synced | Derived from the same source |
-| **Validation** | Separate library | Built into the schema |
-| **Migrations** | Separate migration files | Automatic schema sync |
-| **Relations** | Object graph with lazy loading | Explicit `$with` loading |
-| **Query builder** | Method chaining | Filter expressions |
+| **Primary source of truth** | Entity classes, decorators, or ORM config | Shared `.as` model |
+| **What it optimizes for** | Object mapping and database access | Reusing one model across TS, validation, DB, and API tooling |
+| **Validation** | Usually a separate library or DTO layer | Built into the same model |
+| **Schema evolution** | Migrations or ORM-specific schema files | Schema sync from `@db.*` annotations |
+| **Relations** | Object graph patterns, often with lazy loading | Explicit relation loading with `$with` |
+| **Runtime metadata reuse** | Mostly DB-focused | The same model can also power validators, JSON Schema, and app-facing metadata |
+
+If you are coming from an ORM, think of Atscript as a shared model layer with table APIs and adapters, not as an entity manager centered on database objects.
 
 ## Next Steps
 

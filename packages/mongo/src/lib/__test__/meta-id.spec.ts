@@ -1,3 +1,4 @@
+import type { DbValidationContext } from '@atscript/utils-db'
 import { ObjectId } from 'mongodb'
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 
@@ -62,12 +63,14 @@ describe('[mongo] @meta.id, auto-increment, and _id as PK', () => {
 
     it('should make id optional in insert validator (has default fn)', () => {
       const v = table.getValidator('insert')!
-      expect(v.validate({ title: 'test' })).toBe(true)
+      const ctx: DbValidationContext = { mode: 'insert' }
+      expect(v.validate({ title: 'test' }, false, ctx)).toBe(true)
     })
 
     it('should accept explicit id in insert validator', () => {
       const v = table.getValidator('insert')!
-      expect(v.validate({ id: 5, title: 'test' })).toBe(true)
+      const ctx: DbValidationContext = { mode: 'insert' }
+      expect(v.validate({ id: 5, title: 'test' }, false, ctx)).toBe(true)
     })
 
     it('prepareId should convert string to ObjectId for _id', () => {

@@ -1,4 +1,4 @@
-import { DbSpace } from '@atscript/utils-db'
+import { type DbValidationContext, DbSpace } from '@atscript/utils-db'
 import { ObjectId } from 'mongodb'
 // oxlint-disable max-lines
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -15,10 +15,11 @@ function prepareInsert(mongo: DbSpace, type: any, payload: any) {
   const table = mongo.getTable(type)
   const adapter = mongo.getAdapter(type)
   const v = table.getValidator('insert')!
+  const ctx: DbValidationContext = { mode: 'insert' }
   const arr = Array.isArray(payload) ? payload : [payload]
   const prepared = [] as any[]
   for (const item of arr) {
-    if (v.validate(item)) {
+    if (v.validate(item, false, ctx)) {
       const data = { ...(item as Record<string, unknown>) }
       if (data._id) {
         data._id = adapter.prepareIdFromIdType(data._id as string)

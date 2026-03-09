@@ -919,7 +919,9 @@ export class AtscriptDbTable<
 
       // Validate types + FKs to third tables, excluding the FK back to this
       // (parent) table since the parent record doesn't exist yet
-      await targetTable.preValidateItems(allChildren, { excludeFkTargetTable: this.tableName })
+      await this._wrapNestedError(navField, () =>
+        targetTable.preValidateItems(allChildren, { excludeFkTargetTable: this.tableName })
+      )
     }
   }
 
@@ -1417,9 +1419,6 @@ export class AtscriptDbTable<
 
     switch (purpose) {
       case 'insert': {
-        if (this.adapter.buildInsertValidator) {
-          return this.adapter.buildInsertValidator(this as AtscriptDbTable) as Validator<T, DataType>
-        }
         return this.createValidator({
           plugins,
           replace: insertReplace,
