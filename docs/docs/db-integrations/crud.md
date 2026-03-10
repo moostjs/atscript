@@ -4,6 +4,8 @@ outline: deep
 
 # CRUD Operations
 
+<!--@include: ./_experimental-warning.md-->
+
 Atscript's DB layer provides a type-safe API for creating, reading, updating, and deleting records. All operations go through `AtscriptDbTable`, which handles validation, default values, nested object flattening, and adapter translation automatically.
 
 ## Setting Up
@@ -202,20 +204,20 @@ Cascade and set-null behaviors on delete are configured via `@db.rel.onDelete` i
 
 ## Validation
 
-Tables automatically validate data on every write operation using the constraints from your `.as` definitions (`@expect.*` annotations). If validation fails, a `DbError` is thrown with code `'CONFLICT'` and detailed error information.
+Tables automatically validate data on every write operation using the constraints from your `.as` definitions (`@expect.*` annotations). If validation fails, a `ValidatorError` is thrown with detailed error information.
 
 You can also access validators directly for manual checks:
 
 ```typescript
 const validator = users.getValidator('insert')
-const result = validator.validate(data)
-if (!result.valid) {
-  console.log(result.errors)
+if (!validator.validate(data, true)) {
+  // safe = true → returns false instead of throwing
+  console.log(validator.errors)
   // [{ path: 'email', message: 'Required field' }, ...]
 }
 ```
 
-Available validator purposes: `'insert'`, `'update'`, `'patch'`, `'bulkReplace'`, `'bulkUpdate'`.
+When called without `safe = true`, `validate()` throws a `ValidatorError` on failure. Available validator purposes: `'insert'`, `'update'`, `'patch'`, `'bulkReplace'`, `'bulkUpdate'`.
 
 ## Error Handling
 
@@ -223,7 +225,7 @@ Database operations throw `DbError` with a `code` property indicating the error 
 
 | Code | Meaning |
 |------|---------|
-| `CONFLICT` | Unique constraint violation or validation error |
+| `CONFLICT` | Unique constraint violation |
 | `FK_VIOLATION` | Foreign key constraint violated |
 | `NOT_FOUND` | Record not found |
 

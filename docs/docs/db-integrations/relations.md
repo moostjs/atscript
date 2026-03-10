@@ -4,6 +4,8 @@ outline: deep
 
 # Foreign Keys & Navigation
 
+<!--@include: ./_experimental-warning.md-->
+
 Relational data rarely lives in a single table. Atscript lets you define foreign keys and navigation properties directly in your `.as` schema so that relationships between tables are explicit, type-safe, and portable across database adapters.
 
 This page covers how to connect tables with foreign keys and how to navigate between related records at query time.

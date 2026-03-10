@@ -4,6 +4,8 @@ outline: deep
 
 # Database Views
 
+<!--@include: ./_experimental-warning.md-->
+
 Views let you define read-only projections across multiple tables — joins, filters, and computed columns declared in your `.as` schema. Like tables, views are defined in `.as` files using the `@db.view` annotation, but they produce read-only query interfaces instead of full CRUD tables.
 
 ## View Types
@@ -60,7 +62,7 @@ Use `@db.view.joins` to bring in columns from related tables. Each join takes a 
 @db.view.joins Project, `Project.id = Task.projectId`
 ```
 
-The annotation is repeatable — add as many joins as you need. Each generates a `LEFT JOIN` in the resulting SQL. Fields from joined tables can be marked optional (`?`) since the join may not match every row:
+The annotation is repeatable — add as many joins as you need. Each generates a `JOIN` in the resulting SQL (MongoDB uses `$lookup` with left-join semantics). Fields from joined tables can be marked optional (`?`) since the join may not match every row:
 
 ```atscript
 assigneeName?: User.name   // optional — task may have no assignee
@@ -143,12 +145,8 @@ export interface TaskStats {
 }
 ```
 
-::: info Database Support
-Materialized view support varies by database:
-- **PostgreSQL** — native `CREATE MATERIALIZED VIEW`
-- **Oracle** — native materialized view support
-- **MongoDB** — on-demand materialized views via `$merge`/`$out` aggregation stages
-- **SQLite** — not supported
+::: warning Adapter Support
+The `@db.view.materialized` annotation is recognized by schema sync, but actual materialized view support depends on the adapter. Currently, SQLite emits a standard `CREATE VIEW` (no materialized support), and MongoDB creates a standard view via `viewOn`. Future adapters (e.g. PostgreSQL) may support native `CREATE MATERIALIZED VIEW`.
 :::
 
 ## External Views

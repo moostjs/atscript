@@ -4,6 +4,8 @@ outline: deep
 
 # Defaults & Indexes
 
+<!--@include: ./_experimental-warning.md-->
+
 Atscript lets you set default values and create database indexes directly in your `.as` schema. Defaults ensure fields are populated automatically on insert, while indexes speed up queries and enforce constraints.
 
 ## Static Defaults

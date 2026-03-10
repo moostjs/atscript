@@ -4,6 +4,8 @@ outline: deep
 
 # Creating Custom Adapters
 
+<!--@include: ./_experimental-warning.md-->
+
 You can create adapters for any database by extending `BaseDbAdapter` from `@atscript/utils-db`. This guide covers the full interface — every abstract method you must implement, every optional hook you can override, and how your adapter plugs into the rest of the system.
 
 ## Architecture

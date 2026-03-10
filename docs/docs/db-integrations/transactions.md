@@ -4,6 +4,8 @@ outline: deep
 
 # Transactions
 
+<!--@include: ./_experimental-warning.md-->
+
 Transactions ensure that multiple database operations either all succeed or all roll back together. If any operation within a transaction fails, every change made during that transaction is reverted, leaving your database in a consistent state.
 
 ## Basic Usage
@@ -23,7 +25,7 @@ If any operation throws, the entire transaction rolls back. Neither the user nor
 
 ## Cross-Table Transactions
 
-When using `DbSpace`, all tables share the same adapter factory. Get any adapter to start a transaction — it applies to all operations in the same async context:
+Each table in a `DbSpace` has its own adapter instance, but transactions are shared across all adapters in the same async context via `AsyncLocalStorage`. Start a transaction on any table or adapter — all operations in the callback automatically participate:
 
 ```typescript
 const db = new DbSpace(adapterFactory)
@@ -31,9 +33,7 @@ const users = db.getTable(User)
 const projects = db.getTable(Project)
 const tasks = db.getTable(Task)
 
-const adapter = db.getAdapter(User)
-
-await adapter.withTransaction(async () => {
+await users.withTransaction(async () => {
   // Operations on different tables within the same transaction
   const result = await users.insertOne({ name: 'Alice', email: 'alice@example.com' })
   await projects.insertOne({ title: 'New Project', ownerId: result.insertedId })
@@ -44,7 +44,7 @@ await adapter.withTransaction(async () => {
 })
 ```
 
-Because all tables originate from the same `DbSpace`, they share the underlying adapter and participate in the same transaction.
+Even though `users`, `projects`, and `tasks` have separate adapter instances, the `AsyncLocalStorage` context ensures they all use the same underlying transaction.
 
 ## Automatic Nesting
 

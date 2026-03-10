@@ -4,34 +4,163 @@ outline: deep
 
 # Patch Operations
 
-When updating records, arrays and navigation properties support declarative patch operators for fine-grained control. Instead of replacing an entire field, you can insert, update, or remove individual items — whether the field is a simple string array, a keyed object array, or a 1:N / M:N navigation property.
+<!--@include: ./_experimental-warning.md-->
 
-## Array Patch Operators
+Patch operators give you fine-grained control over array fields and navigation properties during `updateOne` and `bulkUpdate` calls. Instead of replacing an entire collection of items, you can insert, update, or remove individual elements.
 
-Five operators are available for array fields during `updateOne` and `bulkUpdate`:
+## Where Patch Operators Apply
+
+Patch operators work on **arrays only** — not on scalar fields or non-array nested objects. There are two distinct contexts:
+
+| Context | Adapter support | How it works |
+|---------|----------------|--------------|
+| **Navigation properties** (`@db.rel.from`, `@db.rel.via`) | All adapters (SQLite, MongoDB, etc.) | Operators translate to real INSERT / UPDATE / DELETE on related tables and junction rows |
+| **Embedded arrays** (e.g. `tags: string[]`, `variants: {...}[]`) | Document DBs (MongoDB) | MongoDB uses native pipeline expressions for atomic in-place array manipulation |
+
+In **relational databases** (SQLite, Postgres, etc.), arrays are stored as JSON columns — and `@db.json` fields reject patch operators entirely. The natural pattern for collections that need partial updates is to model them as separate tables with FROM or VIA relations. Patch operators on navigation properties translate to real SQL INSERT / UPDATE / DELETE statements.
+
+In **document databases** (MongoDB), embedded arrays are first-class data types. Patch operators work natively via aggregation pipeline expressions — no read-modify-write needed. Both embedded arrays and navigation properties are natural patterns depending on your data model.
+
+## Operators
+
+Five operators are available:
 
 | Operator | Effect |
 |----------|--------|
-| `$replace` | Replace the entire array |
-| `$insert` | Append new items |
+| `$replace` | Replace the entire array / set of related records |
+| `$insert` | Append new items / create new related records |
 | `$upsert` | Insert or update items by key |
 | `$update` | Update existing items by key |
 | `$remove` | Remove items by key or value |
 
-A simple example with a string array:
+When multiple operators appear on the same field, they are applied in order: **remove → update → upsert → insert**.
+
+## FROM Navigation Properties {#from}
+
+Patch operators on 1:N relations (`@db.rel.from`) translate to real database operations on the child table. The foreign key is automatically wired to the parent. Elements are identified by their **primary key** (`@meta.id`) — not by `@expect.array.key`, which only applies to embedded arrays.
+
+```atscript
+import { Comment } from './comment.as'
+
+@db.table 'tasks'
+export interface Task {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    title: string
+
+    @db.rel.from
+    comments: Comment[]
+}
+```
 
 ```typescript
-await table.updateOne({
+await tasks.updateOne({
   id: 1,
-  tags: { $insert: ['backend', 'api'] },
+  comments: {
+    $insert: [{ body: 'Looks good!', authorId: 3 }],  // INSERT into comments, FK auto-set
+    $remove: [{ id: 5 }],                              // DELETE FROM comments WHERE id = 5
+    $update: [{ id: 7, body: 'Edited comment' }],      // UPDATE comments SET body = ... WHERE id = 7
+  },
+})
+
+// Upsert — update if PK is present, insert otherwise
+await tasks.updateOne({
+  id: 1,
+  comments: {
+    $upsert: [
+      { id: 7, body: 'Updated' },         // Has PK → update
+      { body: 'Brand new', authorId: 2 },  // No PK → insert with FK wired
+    ],
+  },
+})
+
+// Replace — delete all existing children, insert new ones
+await tasks.updateOne({
+  id: 1,
+  comments: { $replace: [{ body: 'Only comment', authorId: 1 }] },
 })
 ```
 
-When multiple operators appear on the same field, they are applied in order: remove, update, upsert, insert.
+Passing a plain array (without operators) is equivalent to `$replace`.
 
-## Key Fields
+## VIA Navigation Properties {#via}
 
-`@expect.array.key` marks which properties identify an element inside an object array. Keys are required for `$update`, `$upsert`, and `$remove` on object arrays.
+Patch operators on M:N relations (`@db.rel.via`) manage both the target records and the junction table entries. As with FROM, elements are identified by their **primary key** (`@meta.id`):
+
+```atscript
+import { Tag } from './tag.as'
+import { TaskTag } from './task-tag.as'
+
+@db.table 'tasks'
+export interface Task {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    title: string
+
+    @db.rel.via TaskTag
+    tags: Tag[]
+}
+```
+
+```typescript
+// Create new target record + junction entry
+await tasks.updateOne({ id: 1, tags: { $insert: [{ name: 'new-tag' }] } })
+
+// Reference existing target — creates junction row only
+await tasks.updateOne({ id: 1, tags: { $insert: [{ id: 5 }] } })
+
+// Remove junction entry (target record is preserved)
+await tasks.updateOne({ id: 1, tags: { $remove: [{ id: 5 }] } })
+
+// Update the target record (junction is untouched)
+await tasks.updateOne({ id: 1, tags: { $update: [{ id: 5, name: 'renamed' }] } })
+
+// Replace — clear all junction rows, create new ones
+await tasks.updateOne({ id: 1, tags: { $replace: [{ name: 'only-tag' }] } })
+```
+
+As with FROM relations, passing a plain array is equivalent to `$replace`.
+
+## Embedded Array Patches {#embedded-arrays}
+
+Patch operators work on embedded arrays — fields like `tags: string[]` or `variants: {...}[]` that are stored directly on the record. This is a **MongoDB feature**: document databases store arrays as native data types and patch operators translate to atomic aggregation pipeline expressions.
+
+::: warning Relational databases
+In SQL adapters, arrays are stored as JSON columns. Fields marked with `@db.json` reject patch operators entirely. For collections that need partial updates in a relational database, model them as separate tables with [FROM](./relations#from) or [VIA](./relations#via) relations — patch operators on navigation properties translate to real SQL statements.
+:::
+
+### Primitive Arrays
+
+For simple value arrays like `tags: string[]`, all operators work by **value equality** — no key fields are needed:
+
+```typescript
+await table.updateOne({ id: 1, tags: { $insert: ['urgent', 'reviewed'] } })
+await table.updateOne({ id: 1, tags: { $remove: ['draft'] } })
+await table.updateOne({ id: 1, tags: { $replace: ['final', 'approved'] } })
+```
+
+### Unique Primitive Arrays
+
+When `@expect.array.uniqueItems` is set, `$insert` automatically skips duplicates:
+
+```atscript
+@expect.array.uniqueItems
+tags: string[]
+```
+
+```typescript
+// Current tags: ['api', 'backend']
+await table.updateOne({ id: 1, tags: { $insert: ['api', 'frontend'] } })
+// Result: ['api', 'backend', 'frontend'] — 'api' was silently skipped
+```
+
+### Key Fields
+
+`@expect.array.key` marks which properties identify an element inside an embedded object array. Keys are required for `$update`, `$upsert`, and `$remove` on embedded object arrays.
 
 ```atscript
 variants: {
@@ -44,7 +173,11 @@ variants: {
 
 Multiple fields can be marked as keys to form a composite key — an element matches only when all key fields match.
 
-## Patch Strategies
+::: info Navigation properties don't need key fields
+FROM and VIA relations use `@meta.id` (primary keys) to identify elements — `@expect.array.key` is not needed and has no effect on navigation properties.
+:::
+
+### Patch Strategies
 
 `@db.patch.strategy` controls how matched objects are updated during `$update` and `$upsert`:
 
@@ -70,43 +203,9 @@ attributes: {
 }[]
 ```
 
-## Primitive Arrays
-
-For simple value arrays like `tags: string[]`, operators work by value equality:
-
-```typescript
-await table.updateOne({ id: 1, tags: { $insert: ['urgent', 'reviewed'] } })
-await table.updateOne({ id: 1, tags: { $remove: ['draft'] } })
-await table.updateOne({ id: 1, tags: { $replace: ['final', 'approved'] } })
-```
-
-## Unique Primitive Arrays
-
-When `@expect.array.uniqueItems` is set, `$insert` automatically skips duplicates:
-
-```atscript
-@expect.array.uniqueItems
-tags: string[]
-```
-
-```typescript
-// Current tags: ['api', 'backend']
-await table.updateOne({ id: 1, tags: { $insert: ['api', 'frontend'] } })
-// Result: ['api', 'backend', 'frontend'] — 'api' was silently skipped
-```
-
-## Keyed Object Arrays — Replace Strategy
+### Keyed Object Arrays — Replace Strategy
 
 With `@expect.array.key` and the default replace strategy, operators match elements by key:
-
-```atscript
-variants: {
-    @expect.array.key
-    sku: string
-    color: string
-    stock: number
-}[]
-```
 
 ```typescript
 // Insert a new variant
@@ -136,19 +235,9 @@ await table.updateOne({
 
 Under replace strategy, `$update` and `$upsert` replace the entire matched object — every required field must be present.
 
-## Keyed Object Arrays — Merge Strategy
+### Keyed Object Arrays — Merge Strategy
 
 With `@db.patch.strategy 'merge'`, updates merge into the existing object, preserving fields not explicitly provided:
-
-```atscript
-@db.patch.strategy 'merge'
-attributes: {
-    @expect.array.key
-    name: string
-    value: string
-    visible: boolean
-}[]
-```
 
 ```typescript
 // Current: [{ name: 'size', value: 'M', visible: true }]
@@ -159,9 +248,9 @@ await table.updateOne({
 // Result: [{ name: 'size', value: 'XL', visible: true }] — 'visible' preserved
 ```
 
-## Keyless Object Arrays
+### Keyless Object Arrays
 
-Arrays without `@expect.array.key` support only `$insert`, `$remove`, and `$replace`. Since there is no key to identify elements, `$update` and `$upsert` are not available:
+For object arrays without `@expect.array.key`, matching falls back to **full deep value equality** — every field in the provided item must match. This means `$remove` and `$upsert` work, but `$update` is a no-op (there are no key fields to locate the target element for a partial update):
 
 ```typescript
 await table.updateOne({ id: 1, logs: { $insert: [{ message: 'Deployed', ts: Date.now() }] } })
@@ -169,9 +258,9 @@ await table.updateOne({ id: 1, logs: { $remove: [{ message: 'Deployed', ts: 1710
 await table.updateOne({ id: 1, logs: { $replace: [] } })
 ```
 
-`$remove` matches items by full deep value equality — every field must match.
+For anything beyond simple append/remove, add `@expect.array.key` to enable key-based matching.
 
-## JSON Fields
+### JSON Fields
 
 Fields annotated with `@db.json` reject all patch operators. The field is stored as a single opaque JSON column, so only plain replacement is allowed:
 
@@ -193,101 +282,31 @@ await table.updateOne({ id: 1, settings: { $replace: { theme: 'dark' } } }) // E
 
 The same applies to `@db.json` arrays — use a plain array value instead of patch operators.
 
-## FROM Navigation Properties
+## Combining Operators
 
-When patching 1:N relations (defined via `@db.rel.from`), patch operators create, update, or delete child records. The foreign key is automatically wired.
-
-```atscript
-type Task {
-    @meta.id
-    id: number
-    title: string
-    @db.rel.from 'Comment' 'taskId'
-    comments: Comment[]
-}
-
-type Comment {
-    @meta.id
-    id: number
-    body: string
-    authorId: number
-    @db.rel.to 'Task'
-    taskId: number
-}
-```
+Multiple operators can be used on the same field, and multiple fields can be patched in one request:
 
 ```typescript
-await table.updateOne({
+await tasks.updateOne({
   id: 1,
   comments: {
-    $insert: [{ body: 'Looks good!', authorId: 3 }],  // FK auto-set to 1
-    $remove: [{ id: 5 }],                              // Delete child by PK
-    $update: [{ id: 7, body: 'Edited comment' }],      // Partial update by PK
+    $remove: [{ id: 3 }],
+    $update: [{ id: 7, body: 'Revised' }],
+    $insert: [{ body: 'New comment', authorId: 1 }],
   },
-})
-
-// Upsert — update if PK present, insert otherwise
-await table.updateOne({
-  id: 1,
-  comments: {
-    $upsert: [
-      { id: 7, body: 'Updated' },         // Has PK → update
-      { body: 'Brand new', authorId: 2 },  // No PK → insert
-    ],
-  },
-})
-
-// Replace — delete all old children, insert new ones
-await table.updateOne({
-  id: 1,
-  comments: { $replace: [{ body: 'Only comment', authorId: 1 }] },
+  tags: { $insert: [{ name: 'reviewed' }] },
+  title: 'Updated title',
 })
 ```
 
-Passing a plain array (without operators) is equivalent to `$replace`.
+Operators are always applied in order: **remove → update → upsert → insert** — regardless of the order they appear in the object.
 
-## VIA Navigation Properties
+## Nested Object Update Strategies {#nested-objects}
 
-When patching M:N relations (defined via `@db.rel.via`), operators manage both the target records and the junction table entries:
+Non-array nested objects do **not** support patch operators. Instead, they use a strategy-based approach controlled by `@db.patch.strategy`:
 
-```atscript
-type Task {
-    @meta.id
-    id: number
-    title: string
-    @db.rel.via 'TaskTag' 'Tag'
-    tags: Tag[]
-}
-
-type Tag {
-    @meta.id
-    id: number
-    name: string
-}
-```
-
-```typescript
-// Create new target + junction entry
-await table.updateOne({ id: 1, tags: { $insert: [{ name: 'new-tag' }] } })
-
-// Reference existing target — creates junction only
-await table.updateOne({ id: 1, tags: { $insert: [{ id: 5 }] } })
-
-// Remove junction entry (target record preserved)
-await table.updateOne({ id: 1, tags: { $remove: [{ id: 5 }] } })
-
-// Update target record (junction untouched)
-await table.updateOne({ id: 1, tags: { $update: [{ id: 5, name: 'renamed' }] } })
-
-// Replace — clear all junctions, create new ones
-await table.updateOne({ id: 1, tags: { $replace: [{ name: 'only-tag' }] } })
-```
-
-As with FROM relations, passing a plain array is equivalent to `$replace`.
-
-## Nested Object Patches
-
-Non-array nested objects follow the same strategy system. With the default **replace** strategy, the entire nested object is replaced — omitted fields are lost. With **merge**, only provided fields are updated:
+- **`"replace"`** (default) — the entire nested object is overwritten. Omitted fields are lost.
+- **`"merge"`** — only provided fields are updated. Existing fields are preserved.
 
 ```atscript
 @db.patch.strategy 'merge'
@@ -299,38 +318,16 @@ address: {
 ```
 
 ```typescript
-// Replace (default): address.line2 would be lost
-await table.updateOne({ id: 1, address: { line1: '123 New St', city: 'Portland' } })
-
-// Merge: only city changes, line1 and line2 preserved
+// With merge strategy: only city changes, line1 and line2 are preserved
 await table.updateOne({ id: 1, address: { city: 'Seattle' } })
+
+// With replace strategy (default): the whole address is overwritten —
+// line2 would be lost if not provided
+await table.updateOne({ id: 1, address: { line1: '123 New St', city: 'Portland' } })
 ```
-
-## Combining Operators
-
-Multiple operators can be used on the same field, and multiple fields can be patched in one request:
-
-```typescript
-await table.updateOne({
-  id: 1,
-  variants: {
-    $remove: [{ sku: 'OLD' }],
-    $update: [{ sku: 'A1', stock: 0 }],
-    $insert: [{ sku: 'NEW', color: 'red', stock: 50 }],
-  },
-  tags: { $insert: ['reviewed'] },
-  title: 'Updated title',
-})
-```
-
-Operators are always applied in order: remove, update, upsert, insert — regardless of the order they appear in the object.
-
-## Adapter Differences
-
-SQLite uses a generic read-modify-write approach: it fetches the current array value, applies patch operations in memory, and stores the resolved array back. MongoDB uses native aggregation pipeline expressions (`$map`, `$filter`, `$reduce`, `$concatArrays`) for in-place array manipulation, avoiding the extra read. Both adapters produce identical results from the caller's perspective.
 
 ## Next Steps
 
 - [Deep Operations](./deep-operations) — nested creation and replacement across relations
-- [Relations](./tables#relations) — defining TO, FROM, and VIA relations
+- [Relations](./relations) — defining TO, FROM, and VIA relations
 - [Views](./views) — read-only projections and materialized views

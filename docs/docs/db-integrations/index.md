@@ -4,6 +4,8 @@ outline: deep
 
 # Database Integrations
 
+<!--@include: ./_experimental-warning.md-->
+
 Atscript's DB layer extends the `.as` model with database annotations — define tables, relations, views, and constraints in the same files that drive your TypeScript types. One model powers your types, validation, schema, and runtime queries.
 
 ::: info New to Atscript?
@@ -55,7 +57,7 @@ Your application code talks to the Table API. The adapter handles SQL generation
 
 | Package | Purpose |
 |---------|---------|
-| `@atscript/core` | Ships all `@db.*` annotations — no extra install needed |
+| `@atscript/core` | Ships all generic `@db.*` annotations — no extra install needed |
 | `@atscript/utils-db` | Table API, views, relations, query translation, schema sync engine |
 | `@atscript/db-sqlite` | SQLite adapter (better-sqlite3 or node:sqlite) |
 | `@atscript/mongo` | MongoDB adapter with Atlas Search and vector search support |

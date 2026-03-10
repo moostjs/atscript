@@ -4,6 +4,8 @@ outline: deep
 
 # SQLite
 
+<!--@include: ./_experimental-warning.md-->
+
 The SQLite adapter (`@atscript/db-sqlite`) connects your `.as` models to SQLite databases via `better-sqlite3` or any compatible driver. Define your schema once in Atscript, and the adapter handles table creation, queries, type mapping, and embedded object flattening automatically.
 
 ## Features

@@ -856,7 +856,7 @@ export class MongoAdapter extends BaseDbAdapter {
    * Builds a MongoDB `$search` pipeline stage.
    * Override `buildVectorSearchStage` in subclasses to provide embeddings.
    */
-  protected buildSearchStage(text: string, indexName?: string): Document | undefined {
+  protected async buildSearchStage(text: string, indexName?: string): Promise<Document | undefined> {
     const index = this.getMongoSearchIndex(indexName)
     if (!index) { return undefined }
     if (index.type === 'vector') {
@@ -871,7 +871,7 @@ export class MongoAdapter extends BaseDbAdapter {
    * Builds a vector search stage. Override in subclasses to generate embeddings.
    * Returns `undefined` by default (vector search requires custom implementation).
    */
-  protected buildVectorSearchStage(text: string, index: TMongoIndex): Document | undefined {
+  protected async buildVectorSearchStage(text: string, index: TMongoIndex): Promise<Document | undefined> {
     return undefined
   }
 
@@ -880,7 +880,7 @@ export class MongoAdapter extends BaseDbAdapter {
     query: DbQuery,
     indexName?: string
   ): Promise<Array<Record<string, unknown>>> {
-    const searchStage = this.buildSearchStage(text, indexName)
+    const searchStage = await this.buildSearchStage(text, indexName)
     if (!searchStage) {
       throw new Error(indexName ? `Search index "${indexName}" not found` : 'No search index available')
     }
@@ -903,7 +903,7 @@ export class MongoAdapter extends BaseDbAdapter {
     query: DbQuery,
     indexName?: string
   ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
-    const searchStage = this.buildSearchStage(text, indexName)
+    const searchStage = await this.buildSearchStage(text, indexName)
     if (!searchStage) {
       throw new Error(indexName ? `Search index "${indexName}" not found` : 'No search index available')
     }

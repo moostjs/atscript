@@ -4,6 +4,8 @@ outline: deep
 
 # MongoDB Search & Vectors
 
+<!--@include: ./_experimental-warning.md-->
+
 MongoDB supports three search approaches — text indexes, Atlas Search, and vector search — all configurable from your `.as` schema. Start with basic text indexes on any deployment, then upgrade to Atlas Search or vector search when you need more power.
 
 ## Text Indexes
@@ -166,14 +168,14 @@ const results = await table.search('query', {}, 'product_search')
 
 ## Vector Search at Runtime
 
-Vector search requires you to **generate embeddings yourself** — the adapter does not call any external API by default. Override `buildVectorSearchStage()` in a `MongoAdapter` subclass to wire in your embedding provider:
+Vector search requires you to **generate embeddings yourself** — the adapter does not call any external API by default. Override `buildVectorSearchStage()` in a `MongoAdapter` subclass to wire in your embedding provider. The method is async, so you can call external embedding APIs directly:
 
 ```typescript
 import { MongoAdapter } from '@atscript/mongo'
 
 class MyMongoAdapter extends MongoAdapter {
-  protected override buildVectorSearchStage(text: string, index: TMongoIndex) {
-    const embedding = await getEmbedding(text) // Your embedding API call
+  protected override async buildVectorSearchStage(text: string, index: TMongoIndex): Promise<Document | undefined> {
+    const embedding = await getEmbedding(text) // Your async embedding API call
 
     return {
       $vectorSearch: {

@@ -4,6 +4,8 @@ outline: deep
 
 # Deep Operations
 
+<!--@include: ./_experimental-warning.md-->
+
 When inserting, replacing, or updating records, you can include related data inline — the DB layer handles the multi-phase orchestration automatically. Instead of manually creating parent records, wiring up foreign keys, and inserting children one by one, you pass a single nested payload and Atscript takes care of the rest.
 
 ## How Deep Operations Work

@@ -4,6 +4,8 @@ outline: deep
 
 # URL Query Syntax
 
+<!--@include: ./_experimental-warning.md-->
+
 The HTTP controllers (`AsDbController` and `AsDbReadableController`) accept a rich URL query syntax for filtering, sorting, pagination, and relation loading — powered by [`@uniqu/url`](https://github.com/moostjs/uniqu). Filters and controls are encoded directly into the query string using a compact, expressive format that all database adapters understand.
 
 ## Basic Filtering
@@ -180,7 +182,7 @@ Perform full-text search:
 ?$index=product_search             # named search index
 ```
 
-Full-text search support and behavior depends on the adapter. MongoDB supports Atlas Search with named indexes; SQLite uses FTS5 when available.
+Full-text search support depends on the adapter. MongoDB supports Atlas Search with named indexes. SQLite does not provide built-in fulltext search.
 
 ## Relation Loading (`$with`) {#with-relation-loading}
 

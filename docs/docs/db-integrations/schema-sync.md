@@ -4,6 +4,8 @@ outline: deep
 
 # Schema Sync & Migrations
 
+<!--@include: ./_experimental-warning.md-->
+
 Schema sync compares your `.as` definitions against the live database and applies changes automatically. There are no manual migration files to write, review, or track -- your `.as` files _are_ the schema, and `asc db sync` brings the database in line with them.
 
 ## Quick Start

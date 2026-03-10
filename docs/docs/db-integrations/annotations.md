@@ -4,6 +4,8 @@ outline: deep
 
 # Annotations Reference
 
+<!--@include: ./_experimental-warning.md-->
+
 Complete reference for all database annotations available in `.as` files. The `@db.*` annotations are shipped with `@atscript/core` — no extra packages needed. MongoDB-specific annotations require the `@atscript/mongo` plugin.
 
 ## Tables & Columns

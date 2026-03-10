@@ -4,6 +4,8 @@ outline: deep
 
 # MongoDB
 
+<!--@include: ./_experimental-warning.md-->
+
 The MongoDB adapter connects your `.as` models to MongoDB with native support for nested objects, aggregation pipelines, Atlas Search, and vector search. It translates annotation-driven CRUD operations into native MongoDB queries while preserving the same `AtscriptDbTable` API used by all adapters.
 
 ## Features
@@ -263,14 +265,19 @@ Capped collections do not support document deletion or updates that increase doc
 
 MongoDB transactions require a replica set or mongos topology. The adapter detects the topology at runtime and gracefully disables transactions on standalone instances.
 
-When available, transactions use the same `withTransaction()` API as other adapters:
+When available, transactions use the same `withTransaction()` API as other adapters. Call it on any table or adapter — not on `DbSpace` itself:
 
 ```typescript
-await db.withTransaction(async () => {
+const orders = db.getTable(Order)
+const inventory = db.getTable(Inventory)
+
+await orders.withTransaction(async () => {
   await orders.insertOne({ userId: 1, total: 99.99 })
   await inventory.updateOne({ productId: 42, stock: stock - 1 })
 })
 ```
+
+All tables in the same async context share the transaction via `AsyncLocalStorage`, even though each table has its own adapter instance.
 
 The second constructor argument (`client`) enables transaction support. If you do not need transactions, `new MongoAdapter(db)` without the client is sufficient.
 

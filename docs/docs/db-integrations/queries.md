@@ -4,6 +4,8 @@ outline: deep
 
 # Queries & Filters
 
+<!--@include: ./_experimental-warning.md-->
+
 Every query in Atscript's DB layer follows the same shape: a **filter** that selects which records to return, and a **controls** object that determines how they come back (sorting, pagination, projection, relations). This syntax is consistent across all adapters — SQLite, MongoDB, and any future adapter.
 
 ```typescript
@@ -272,7 +274,7 @@ Reference fields using `TableName.fieldName`:
 
 ```atscript
 @db.view.filter `Task.priority = 'high'`
-@db.view.joins `Project.id = Task.projectId`
+@db.view.joins Project, `Project.id = Task.projectId`
 ```
 
 ### Operators
@@ -321,7 +323,7 @@ Example in context of a view definition:
 ```atscript
 @db.view
 @db.view.for Task
-@db.view.joins `Project.id = Task.projectId`
+@db.view.joins Project, `Project.id = Task.projectId`
 @db.view.filter `Task.status != 'done' && Task.priority >= 3`
 type ActiveHighPriorityTasks {
   taskId: Task.id

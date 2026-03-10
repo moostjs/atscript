@@ -4,6 +4,8 @@ outline: deep
 
 # Customization & Hooks
 
+<!--@include: ./_experimental-warning.md-->
+
 `AsDbController` and `AsDbReadableController` expose a set of protected hooks that let you extend the default controller behavior without reimplementing endpoints. Override the hooks you need to add access control, data transformation, and business logic.
 
 ## Available Hooks

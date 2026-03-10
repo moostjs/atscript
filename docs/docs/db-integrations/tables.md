@@ -4,6 +4,8 @@ outline: deep
 
 # Tables & Fields
 
+<!--@include: ./_experimental-warning.md-->
+
 Atscript lets you define database tables directly in `.as` files. Each table is an interface annotated with `@db.table` — the fields become columns, and annotations control how they map to the underlying database.
 
 ## Declaring a Table

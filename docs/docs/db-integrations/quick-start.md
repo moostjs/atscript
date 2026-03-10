@@ -4,6 +4,8 @@ outline: deep
 
 # Quick Start
 
+<!--@include: ./_experimental-warning.md-->
+
 This guide builds on the [TypeScript Quick Start](/packages/typescript/quick-start) — you will use the same `.as` model-driven workflow to create a SQLite-backed application with typed CRUD operations.
 
 ::: tip What You Will Build

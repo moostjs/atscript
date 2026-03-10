@@ -4,6 +4,8 @@ outline: deep
 
 # HTTP Controllers
 
+<!--@include: ./_experimental-warning.md-->
+
 `@atscript/moost-db` provides zero-boilerplate REST controllers that expose your tables and views as HTTP endpoints via the [Moost](https://moost.org) framework. Define your schema once in a `.as` file, wire up a table, and get a full CRUD API with no endpoint code to write.
 
 ## Installation
