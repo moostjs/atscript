@@ -4,199 +4,114 @@ outline: deep
 
 # MongoDB
 
-`@atscript/mongo` provides a MongoDB adapter for the Atscript DB abstraction layer. It translates annotation-driven CRUD operations into native MongoDB queries, with support for auto-increment fields, ObjectId handling, nested document storage, Atlas Search indexes, and raw aggregation pipelines.
+The MongoDB adapter connects your `.as` models to MongoDB with native support for nested objects, aggregation pipelines, Atlas Search, and vector search. It translates annotation-driven CRUD operations into native MongoDB queries while preserving the same `AtscriptDbTable` API used by all adapters.
+
+## Features
+
+- Full CRUD operations (insert, find, update, delete) with the unified table API
+- Native nested object storage (no flattening)
+- Aggregation pipeline patches for array operations (`$insert`, `$remove`, `$update`, `$upsert`, `$replace`)
+- `$lookup`-based relation loading (TO, FROM, VIA)
+- Atlas Search indexes (dynamic and static mappings)
+- Vector search with pre-filtering
+- Capped collections for fixed-size FIFO storage
+- Transaction support (replica set or mongos topology)
+- Schema sync with drift detection and index management
 
 ## Installation
 
-::: code-group
-```bash [pnpm]
-pnpm add @atscript/mongo @atscript/utils-db @atscript/typescript mongodb
+```bash
+pnpm add @atscript/mongo mongodb
 ```
-```bash [npm]
-npm install @atscript/mongo @atscript/utils-db @atscript/typescript mongodb
-```
-```bash [yarn]
-yarn add @atscript/mongo @atscript/utils-db @atscript/typescript mongodb
-```
-:::
 
-`mongodb` is a peer dependency (`^6.17.0`).
-
-## Plugin Configuration
-
-Register the `MongoPlugin` in your `atscript.config.mts` to enable MongoDB-specific annotations and primitives (`mongo.objectId`, `mongo.vector`):
+Register the MongoDB plugin in your `atscript.config.mts` to enable `@db.mongo.*` annotations and `mongo.*` primitives:
 
 ```typescript
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
-import { MongoPlugin } from '@atscript/mongo/plugin'
+import mongo from '@atscript/mongo/plugin'
 
 export default defineConfig({
-  rootDir: 'src',
-  plugins: [ts(), MongoPlugin()],
+  plugins: [ts(), mongo()],
 })
 ```
 
-This adds the `@db.mongo.*` annotation namespace and the `mongo.objectId` / `mongo.vector` primitive types.
+## Quick Start
 
-## Define Your Schema
+Create a `DbSpace` with a `MongoAdapter` factory:
 
-Create a `.as` file with `@db.table` and `@db.mongo.collection` annotations:
+```typescript
+import { DbSpace } from '@atscript/utils-db'
+import { MongoAdapter } from '@atscript/mongo'
+import { MongoClient } from 'mongodb'
 
-```atscript
-// todo.as
-@db.table 'todos'
-@db.mongo.collection
-export interface Todo {
-    @meta.id
-    @db.default.fn 'increment'
-    id: number
-
-    title: string
-
-    description?: string
-
-    @db.default 'false'
-    completed: boolean
-
-    createdAt?: number.timestamp.created
-}
+const client = new MongoClient('mongodb://localhost:27017')
+const mongoDb = client.db('myapp')
+const db = new DbSpace(() => new MongoAdapter(mongoDb, client))
 ```
 
-The `@db.mongo.collection` annotation automatically injects a non-optional `_id: mongo.objectId` field if one is not explicitly defined. This means every document gets a MongoDB `_id` even when your logical primary key is a different field (like `id` above).
+Or use the convenience helper:
 
-::: tip
-If you want to control the `_id` type, declare it explicitly. It must be `string`, `number`, or `mongo.objectId`:
+```typescript
+import { createAdapter } from '@atscript/mongo'
+
+const db = createAdapter('mongodb://localhost:27017/myapp')
+```
+
+`createAdapter` connects the client, extracts the database from the connection string, and returns a ready-to-use `DbSpace`.
+
+Once you have a `DbSpace`, get a table handle for any `.as` type:
+
+```typescript
+import { User } from './schema/user.as'
+
+const users = db.getTable(User)
+
+// Now use the standard table API
+const user = await users.findById(1)
+```
+
+Run `npx asc db sync` to create or update collections and indexes. See [Schema Sync](./schema-sync) for details.
+
+## Schema Definition
+
+Use `@db.mongo.collection` alongside `@db.table` to mark an interface as a MongoDB collection:
 
 ```atscript
 @db.table 'users'
 @db.mongo.collection
 export interface User {
+    @meta.id
     _id: mongo.objectId
+
+    name: string
     email: string.email
 }
 ```
+
+`@db.mongo.collection` auto-injects a non-optional `_id: mongo.objectId` field if you do not declare one explicitly. This means every document gets a MongoDB `_id` even when your logical primary key is a different field.
+
+::: tip
+If you want to control the `_id` type, declare it explicitly. It must be `string`, `number`, or `mongo.objectId`.
 :::
 
-## Connect and Create Tables
-
-Create a `DbSpace` with a `MongoAdapter` factory to access tables:
-
-```typescript
-import { MongoAdapter } from '@atscript/mongo'
-import { DbSpace } from '@atscript/utils-db'
-import { MongoClient } from 'mongodb'
-import { Todo } from './schema/todo.as'
-
-const client = new MongoClient('mongodb://localhost:27017/myapp')
-const db = new DbSpace(() => new MongoAdapter(client.db(), client))
-const todos = db.getTable(Todo)
-
-// Run `npx asc db sync` to create/update collections and indexes
-```
-
-Use `npx asc db sync` to propagate your schema to the database. See [Schema Sync](./schema-sync) for details.
-
-The second argument (`client`) is optional -- it enables transaction support. If you don't need transactions, `new MongoAdapter(client.db())` is sufficient.
-
-You can also access the underlying `MongoAdapter` directly:
-
-```typescript
-const adapter = db.getAdapter(Todo)
-```
-
-## CRUD Operations
-
-The table API follows the same patterns as the generic DB abstraction layer. All examples below assume the `todos` table from the setup above.
-
-### Insert
-
-```typescript
-// Single insert
-const result = await todos.insertOne({
-  title: 'Write documentation',
-  completed: false,
-})
-// -> { insertedId: ObjectId('...') }
-// id auto-incremented, createdAt defaults to Date.now()
-// _id auto-generated as ObjectId
-
-// Bulk insert
-const bulk = await todos.insertMany([
-  { title: 'First task' },
-  { title: 'Second task' },
-])
-// -> { insertedCount: 2, insertedIds: [ObjectId('...'), ObjectId('...')] }
-// id values auto-incremented in order (1, 2, ...)
-```
-
-Fields with `@db.default` or `@db.default.fn` are automatically applied before insertion. Fields marked `@db.ignore` are stripped. ObjectId `_id` fields are optional on insert (auto-generated by MongoDB).
-
-### Find
-
-```typescript
-// Find one
-const todo = await todos.findOne({
-  filter: { completed: false },
-  controls: {},
-})
-
-// Find many with sorting and pagination
-const page = await todos.findMany({
-  filter: { completed: false },
-  controls: { $sort: { createdAt: -1 }, $limit: 10, $skip: 0 },
-})
-
-// Find by ID (tries _id first, then falls back to @meta.id fields)
-const byId = await todos.findById(1)
-
-// Count
-const total = await todos.count({
-  filter: { completed: true },
-  controls: {},
-})
-```
-
-See [Queries & Filters](./queries) for the full filter syntax.
-
-### Update
-
-```typescript
-// Partial update by primary key
-await todos.updateOne({ _id: someObjectId, completed: true })
-
-// Update many by filter
-await todos.updateMany(
-  { completed: false },
-  { completed: true },
-)
-```
-
-### Delete
-
-```typescript
-// Delete by primary key
-await todos.deleteOne({ _id: someObjectId })
-
-// Delete many by filter
-await todos.deleteMany({ completed: true })
-```
-
-## `_id` and Primary Keys
+## Primary Keys & _id
 
 MongoDB always uses `_id` as the document primary key. The adapter enforces this regardless of your schema:
 
-- **`@db.mongo.collection`** auto-injects `_id: mongo.objectId` if you don't declare one. The `_id` field is always non-optional.
-- **`@meta.id` on a non-`_id` field** does not make that field a MongoDB primary key. Instead, the adapter creates a unique index on it and registers it as a "unique property" for fallback lookups.
-- **`findById`** first tries `_id`, then falls back to fields marked with `@meta.id`. This means `findById(1)` works even when `1` is the auto-incremented `id` field rather than an ObjectId.
-- **`prepareId()`** automatically converts string IDs to `ObjectId` instances (for `mongo.objectId` fields) or to numbers (for numeric `_id` fields), so you can pass string values from URL parameters directly.
+- **Auto-injection** -- `@db.mongo.collection` adds `_id: mongo.objectId` if not declared. The `_id` field is always non-optional.
+- **Custom `@meta.id` fields** -- Marking a non-`_id` field with `@meta.id` does not make it a MongoDB primary key. Instead, the adapter creates a unique index on it and registers it for fallback lookups.
+- **`findById` resolution** -- First tries `_id`, then falls back to fields marked with `@meta.id`. So `findById(42)` works when `42` is an auto-incremented `id` field rather than an ObjectId.
+- **`prepareId()` conversion** -- Automatically converts string IDs to `ObjectId` instances (for `mongo.objectId` fields) or to numbers (for numeric `_id` fields), so you can pass string values from URL parameters directly.
 
 ```typescript
 // All of these work:
-await todos.findById(new ObjectId('507f1f77bcf86cd799439011'))  // by _id
-await todos.findById('507f1f77bcf86cd799439011')                // string -> ObjectId
-await todos.findById(42)                                         // by @meta.id field
+await users.findById(new ObjectId('507f1f77bcf86cd799439011'))  // by _id
+await users.findById('507f1f77bcf86cd799439011')                // string -> ObjectId
+await users.findById(42)                                         // by @meta.id field
 ```
+
+**ID types**: ObjectId (default), string, or number.
 
 ## Auto-Increment
 
@@ -208,15 +123,14 @@ The `@db.default.fn 'increment'` annotation enables auto-increment behavior for 
 id: number
 ```
 
-How it works:
+The adapter uses an `__atscript_counters` collection for atomic sequence allocation via `findOneAndUpdate` with `$inc`. Each counter is keyed by `{collection}.{field}`.
 
-1. On `insertOne`, the adapter reads the current maximum value for the field via a `$group` aggregation (`{ $max: "$id" }`).
-2. It assigns `max + 1` to the field.
-3. On `insertMany`, values are batch-assigned in order -- the first item gets `max + 1`, the second gets `max + 2`, and so on.
-4. If a document already has an explicit value for the field, that value is kept and the running maximum is updated accordingly.
+- On `insertOne`, the adapter atomically increments the counter by 1 and assigns the value.
+- On `insertMany`, the counter is incremented by the batch size to pre-allocate a range. Values are assigned in order -- first item gets `seq - count + 1`, second gets `seq - count + 2`, and so on.
+- If a document already has an explicit value for the field, that value is kept and the counter is adjusted to stay ahead.
 
 ::: warning
-Auto-increment uses no transactions or retries. It is simple and predictable for typical workloads, but concurrent inserts could produce duplicate values under high contention. For guaranteed uniqueness, combine `@db.default.fn 'increment'` with `@db.index.unique`.
+Concurrent inserts under high contention could produce duplicate values in rare cases. For guaranteed uniqueness, combine `@db.default.fn 'increment'` with `@db.index.unique`.
 :::
 
 ## Nested Objects
@@ -245,15 +159,9 @@ export interface User {
 }
 ```
 
-```typescript
-// Insert with nested objects -- stored natively in MongoDB
-await users.insertOne({
-  name: 'Alice',
-  contact: { email: 'alice@example.com', phone: '555-0100' },
-  preferences: { theme: 'dark', lang: 'en' },
-})
+Dot-notation queries work directly:
 
-// Query by nested path -- dot-notation works directly
+```typescript
 const result = await users.findMany({
   filter: { 'contact.email': 'alice@example.com' },
   controls: { $sort: { 'preferences.theme': 1 } },
@@ -261,39 +169,177 @@ const result = await users.findMany({
 ```
 
 ::: tip
-Since MongoDB handles nested objects natively, the `@db.json` annotation has no effect -- there is no flattening to override. You can still use it for documentation purposes, but it does not change storage behavior.
+The `@db.json` annotation has no effect on MongoDB -- there is no flattening to override. You can still use it for documentation purposes, but it does not change storage behavior.
 :::
+
+## Native Patch Pipelines
+
+MongoDB uses aggregation pipelines for array patch operations instead of the read-modify-write cycle used by relational adapters. All five patch operators are supported:
+
+- **`$insert`** -- Append items to an array
+- **`$remove`** -- Remove items matching a condition
+- **`$update`** -- Update matching items in place
+- **`$upsert`** -- Update if exists, insert if not
+- **`$replace`** -- Replace the entire array
+
+This is transparent to your code -- the same patch API works across all adapters, but MongoDB executes updates atomically on the server using `$concatArrays`, `$filter`, `$map`, and other aggregation operators.
+
+See [Patch Operations](./patch-operations) for the full patch API.
+
+## Native Relation Loading
+
+The adapter uses MongoDB `$lookup` aggregation stages for TO, FROM, and VIA relations instead of issuing separate queries. This means relation loading happens in a single round-trip to the database.
+
+- **TO relations** -- `$lookup` with `localField` / `foreignField`
+- **FROM relations** -- Reverse `$lookup` from the related collection
+- **VIA relations** -- Two-stage `$lookup` through the junction collection
+
+Relation controls (`$sort`, `$limit`, `$filter`) are applied as pipeline stages within the `$lookup`. Nested lookups (relations of relations) are supported.
+
+## MongoDB-Specific Annotations
+
+These annotations are available when the `MongoPlugin` is registered. They extend the generic `@db.*` namespace with MongoDB-specific behavior.
+
+| Annotation | Level | Purpose |
+|------------|-------|---------|
+| `@db.mongo.collection` | Interface | Mark as MongoDB collection, auto-inject `_id` |
+| `@db.mongo.capped size, max?` | Interface | Capped collection with size limit |
+| `@db.mongo.search.dynamic analyzer?, fuzzy?` | Interface | Dynamic Atlas Search index |
+| `@db.mongo.search.static analyzer?, fuzzy?, indexName` | Interface | Named static Atlas Search index |
+| `@db.mongo.search.text analyzer?, indexName` | Field | Include field in search index |
+| `@db.mongo.search.vector dims, similarity?, indexName?` | Field | Vector search field |
+| `@db.mongo.search.filter indexName` | Field | Pre-filter field for vector search |
+
+All generic `@db.*` annotations (`@db.table`, `@db.index.*`, `@db.default.*`, `@db.rel.*`, `@db.json`, etc.) work with MongoDB as well. See [Core Annotations](./annotations) for the full list.
+
+## Primitives
+
+### `mongo.objectId`
+
+A string type constrained to 24-character hex strings matching the MongoDB ObjectId format. Used for `_id` fields. At runtime, the adapter converts these strings to native `ObjectId` instances automatically.
+
+```atscript
+@db.table 'users'
+@db.mongo.collection
+export interface User {
+    // _id: mongo.objectId is auto-injected by @db.mongo.collection
+    name: string
+}
+```
+
+### `mongo.vector`
+
+An alias for `number[]`, used as a semantic marker for embedding fields. Paired with `@db.mongo.search.vector` to declare vector search indexes.
+
+```atscript
+@db.mongo.search.vector 1536 'dotProduct' 'embeddings_idx'
+embedding: mongo.vector
+```
+
+## Capped Collections
+
+Capped collections have a fixed maximum size and maintain insertion order (FIFO). They are ideal for logs, event streams, and cache-like data. Once the collection reaches its size limit, the oldest documents are automatically removed to make room for new ones.
+
+```atscript
+@db.table 'logs'
+@db.mongo.collection
+@db.mongo.capped 10485760, 10000
+@db.sync.method 'drop'
+export interface LogEntry {
+    message: string
+    level: string
+    @db.default.fn 'now'
+    timestamp: number.timestamp.created
+}
+```
+
+The first argument is the maximum size in bytes (10 MB above), and the optional second argument is the maximum number of documents (10,000 above). Changing cap size requires dropping and recreating the collection, so always pair `@db.mongo.capped` with `@db.sync.method 'drop'` to allow schema sync to handle this.
+
+::: warning
+Capped collections do not support document deletion or updates that increase document size. They are append-only by design.
+:::
+
+## Transactions
+
+MongoDB transactions require a replica set or mongos topology. The adapter detects the topology at runtime and gracefully disables transactions on standalone instances.
+
+When available, transactions use the same `withTransaction()` API as other adapters:
+
+```typescript
+await db.withTransaction(async () => {
+  await orders.insertOne({ userId: 1, total: 99.99 })
+  await inventory.updateOne({ productId: 42, stock: stock - 1 })
+})
+```
+
+The second constructor argument (`client`) enables transaction support. If you do not need transactions, `new MongoAdapter(db)` without the client is sufficient.
 
 ## Accessing the Adapter
 
-For operations beyond the standard CRUD interface, use `table.getAdapter()` to access the `MongoAdapter` directly. This gives you the raw MongoDB `Collection` and all driver methods:
+For operations beyond the standard CRUD interface, access the underlying `MongoAdapter` to use native MongoDB driver methods. This is useful for aggregation pipelines, bulk writes, or any MongoDB-specific functionality not covered by the generic table API.
 
 ```typescript
-const adapter = todos.getAdapter()
+const adapter = db.getAdapter(User) as MongoAdapter
 
 // Run an aggregation pipeline
 const cursor = adapter.collection.aggregate([
-  { $match: { completed: true } },
-  { $group: { _id: null, count: { $sum: 1 } } },
+  { $match: { status: 'active' } },
+  { $group: { _id: '$department', count: { $sum: 1 } } },
 ])
 const results = await cursor.toArray()
 
 // Use any MongoDB driver method
-await adapter.collection.bulkWrite([...])
 await adapter.collection.distinct('status')
+await adapter.collection.bulkWrite([...])
 ```
 
-You can also get the adapter via `DbSpace`:
+You can also access the adapter through a table handle:
 
 ```typescript
-const adapter = db.getAdapter(Todo)
-const collection = adapter.collection
+const users = db.getTable(User)
+const adapter = users.getAdapter()
+const collection = adapter.collection  // native MongoDB Collection
 ```
 
-## See Also
+## Complete Example
 
-- [Core Annotations](./annotations) -- `@db.table`, `@db.index.*`, `@db.default.*`, `@db.json`
-- [MongoDB Patch Operations](./mongodb-patches) -- Array patch pipelines, merge/replace strategies
-- [MongoDB Annotations](./mongodb-annotations) -- `@db.mongo.collection`, `@db.mongo.search.*`
-- [Search & Vectors](./mongodb-search) -- Atlas Search and vector search indexes
-- [CRUD Operations](./crud) -- `AtscriptDbTable` API reference
+Putting it all together -- a product collection with auto-increment IDs, compound indexes, vector search, and pre-filter fields:
+
+```atscript
+@db.table 'products'
+@db.mongo.collection
+@db.mongo.search.dynamic 'lucene.standard' 1
+export interface Product {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    @db.index.unique
+    sku: string
+
+    @db.index.plain 'category_status'
+    category: string
+
+    @db.index.plain 'category_status'
+    status: string
+
+    name: string
+    description?: string
+    price: number
+
+    @db.mongo.search.vector 768 'cosine' 'product_vectors'
+    embedding?: mongo.vector
+
+    @db.mongo.search.filter 'product_vectors'
+    inStock: boolean
+
+    @db.default.fn 'now'
+    createdAt?: number.timestamp.created
+}
+```
+
+## Next Steps
+
+- [MongoDB Search & Vectors](./mongodb-search) -- Atlas Search and vector search indexes
+- [CRUD Operations](./crud) -- Full `AtscriptDbTable` API reference
+- [Patch Operations](./patch-operations) -- Array patch operations and merge strategies

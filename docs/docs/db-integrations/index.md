@@ -4,15 +4,15 @@ outline: deep
 
 # Database Integrations
 
-Atscript's database layer is the next step after the TypeScript model workflow. Define tables, relations, views, and constraints directly in `.as` files, then use the same model at runtime with supported database integrations.
+Atscript's DB layer extends the `.as` model with database annotations — define tables, relations, views, and constraints in the same files that drive your TypeScript types. One model powers your types, validation, schema, and runtime queries.
 
-::: info Start with the Model
-If you are new to Atscript, read the [TypeScript Quick Start](/packages/typescript/quick-start) first. The DB layer builds on the same `.as` model rather than introducing a separate schema system.
+::: info New to Atscript?
+Start with the [TypeScript Quick Start](/packages/typescript/quick-start) to learn `.as` syntax and project setup. The DB layer builds on the same model.
 :::
 
 ## How It Works
 
-Your `.as` files are the single source of truth. You define your schema once, and the DB layer handles the rest:
+Add `@db.*` annotations to your `.as` definitions and the DB layer takes it from there:
 
 ```atscript
 @db.table 'users'
@@ -26,60 +26,66 @@ export interface User {
 
     name: string
 
-    createdAt?: number.timestamp.created
+    @db.default.fn 'now'
+    createdAt?: number.timestamp
 }
 ```
 
-From this single definition, you get:
+From this single definition you get:
 
-- **TypeScript types** — fully typed interfaces for your application code
-- **Database schema** — tables, columns, indexes, constraints
-- **Validation** — automatic data validation based on annotations
-- **CRUD operations** — type-safe insert, find, update, delete
-- **Schema sync** — automatic migrations via CLI
+- **TypeScript types** — fully typed interfaces and runtime metadata
+- **Database schema** — tables, columns, indexes, and constraints
+- **Validation** — automatic data validation from the same annotations
+- **CRUD operations** — type-safe insert, find, update, and delete
+- **Schema sync** — drift detection and automatic migrations via CLI
 
 ## Architecture
 
-The DB layer has three tiers:
+The DB layer is organized in three tiers:
 
-| Layer | What it does |
-|-------|-------------|
-| **Annotations** (`@db.*`) | Define schema, indexes, relations, and views in `.as` files |
-| **Table API** (`AtscriptDbTable`) | Type-safe CRUD, relation loading, query translation |
-| **Adapters** (`BaseDbAdapter`) | Database-specific drivers (SQLite, MongoDB, etc.) |
+| Layer | Role | Example |
+|-------|------|---------|
+| **Annotations** (`@db.*`) | Declare schema, indexes, relations, and views inside `.as` files | `@db.table`, `@db.rel.to`, `@db.view` |
+| **Table API** (`AtscriptDbTable`) | Type-safe CRUD, relation loading, query translation, schema sync | `table.find()`, `table.insert()` |
+| **Adapters** (`BaseDbAdapter`) | Database-specific drivers that implement the adapter interface | `SqliteAdapter`, `MongoAdapter` |
 
-Your code interacts with the Table API. The adapter handles the database-specific details behind the scenes.
+Your application code talks to the Table API. The adapter handles SQL generation, document mapping, or whatever your database needs — you never write driver-level code directly.
 
 ## What's Included
 
 | Package | Purpose |
 |---------|---------|
-| `@atscript/core` | Ships all `@db.*` annotations |
-| `@atscript/utils-db` | Table API, views, relations, schema sync engine |
+| `@atscript/core` | Ships all `@db.*` annotations — no extra install needed |
+| `@atscript/utils-db` | Table API, views, relations, query translation, schema sync engine |
 | `@atscript/db-sqlite` | SQLite adapter (better-sqlite3 or node:sqlite) |
-| `@atscript/mongo` | MongoDB adapter with Atlas Search support |
-| `@atscript/moost-db` | REST API controller for Moost framework |
+| `@atscript/mongo` | MongoDB adapter with Atlas Search and vector search support |
+| `@atscript/moost-db` | REST API controller for the Moost framework |
+
+## Feature Highlights
+
+- **Relations** — TO (foreign key), FROM (reverse 1:N), and VIA (M:N junction table) with explicit `$with` loading
+- **Views** — managed, materialized, and external views defined with `@db.view` annotations
+- **Array patch operators** — `$insert`, `$remove`, `$update`, `$upsert`, and `$replace` work across all adapters
+- **Schema sync** — CLI-driven migrations with FNV-1a drift detection, column renames, and distributed locking
+- **Transactions** — adapter-agnostic transaction support via `AsyncLocalStorage`
+- **Adapter-agnostic design** — swap SQLite for MongoDB (or a future adapter) without changing application code
 
 ## Model-First, Not ORM-First
 
-Atscript's DB layer grows out of the same `.as` model that already drives your TypeScript types, validation rules, and runtime metadata. The database layer is one consumer of that model, not the center of the system.
+Atscript is a **model-first data layer**, not a traditional ORM. The `.as` model is the center of the system — the database is one consumer of that model, alongside TypeScript types, validators, and API metadata.
 
-That is why Atscript is better described as a **model-first data layer with database integrations** than as a traditional ORM.
-
-| | Traditional ORM | Atscript DB layer |
+| | Traditional ORM | Atscript DB Layer |
 |---|---|---|
-| **Primary source of truth** | Entity classes, decorators, or ORM config | Shared `.as` model |
-| **What it optimizes for** | Object mapping and database access | Reusing one model across TS, validation, DB, and API tooling |
-| **Validation** | Usually a separate library or DTO layer | Built into the same model |
-| **Schema evolution** | Migrations or ORM-specific schema files | Schema sync from `@db.*` annotations |
-| **Relations** | Object graph patterns, often with lazy loading | Explicit relation loading with `$with` |
-| **Runtime metadata reuse** | Mostly DB-focused | The same model can also power validators, JSON Schema, and app-facing metadata |
-
-If you are coming from an ORM, think of Atscript as a shared model layer with table APIs and adapters, not as an entity manager centered on database objects.
+| **Source of truth** | Entity classes or ORM config | Shared `.as` model |
+| **Optimized for** | Object mapping and DB access | Reusing one model across types, validation, DB, and APIs |
+| **Validation** | Separate library or DTO layer | Built into the same model |
+| **Schema evolution** | ORM-specific migrations | Schema sync from `@db.*` annotations |
+| **Relations** | Object graph with lazy loading | Explicit relation loading via `$with` |
+| **Metadata reuse** | Mostly DB-focused | Same model powers validators, JSON Schema, and UI metadata |
 
 ## Next Steps
 
-- [Quick Start](./quick-start) — Build your first table in 5 minutes
-- [Tables & Fields](./tables) — Learn how to define your schema
-- [Relations](./foreign-keys) — Connect tables with foreign keys
-- [Views](./views) — Create database views
+- [Quick Start](./quick-start) — build your first table in five minutes
+- [Tables & Fields](./tables) — define columns, indexes, and defaults
+- [Relations](./relations) — connect tables with TO, FROM, and VIA relations
+- [CRUD Operations](./crud) — insert, query, update, and delete data

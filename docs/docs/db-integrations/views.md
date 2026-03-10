@@ -2,13 +2,23 @@
 outline: deep
 ---
 
-# Views
+# Database Views
 
-Database views provide read-only access to joined and filtered data. In Atscript, you define views in `.as` files just like tables — but use `@db.view` instead of `@db.table`.
+Views let you define read-only projections across multiple tables — joins, filters, and computed columns declared in your `.as` schema. Like tables, views are defined in `.as` files using the `@db.view` annotation, but they produce read-only query interfaces instead of full CRUD tables.
 
-## Managed Views
+## View Types
 
-A managed view has an entry table and optional joins/filters. Atscript creates and manages it in your database automatically.
+Atscript supports three kinds of database views:
+
+| Type | Created by sync? | Stored? | Use case |
+|------|-----------------|---------|----------|
+| **Managed** (virtual) | Yes | No — query-based | Joins, filters, projections you define in `.as` |
+| **Materialized** | Yes | Yes — precomputed | Performance-critical aggregations and summaries |
+| **External** | No | Already exists | Pre-existing views not managed by Atscript |
+
+## Declaring a Managed View
+
+A managed view combines `@db.view`, `@db.view.for`, and field chain references to define a projection over one or more tables:
 
 ```atscript
 import { Task } from './task'
@@ -24,62 +34,58 @@ export interface ActiveTask {
     id: Task.id
     title: Task.title
     status: Task.status
-    priority: Task.priority
-    createdAt: Task.createdAt
-    assigneeName?: User.name
+    assigneeName: User.name
     projectTitle: Project.title
 }
 ```
 
-Let's break this down:
+Each field maps to a column on one of the joined tables via chain references (`Task.id`, `User.name`, etc.). Schema sync translates this into a `CREATE VIEW` statement with the appropriate `SELECT`, `JOIN`, and `WHERE` clauses.
 
-| Annotation | Purpose |
-|-----------|---------|
-| `@db.view 'active_tasks'` | Names the view in the database |
-| `@db.view.for Task` | The entry (primary) table |
-| `@db.view.joins User, \`...\`` | Joins the `User` table with a condition |
-| `@db.view.joins Project, \`...\`` | Joins the `Project` table with a condition |
-| `@db.view.filter \`...\`` | WHERE clause — only non-done tasks |
+## Entry Table
 
-### View Fields
-
-Each field in a view maps to a field on one of the joined tables using chain references:
+The `@db.view.for` annotation specifies the primary (entry) table for the view. This is the table that drives the query — all joins are relative to it.
 
 ```atscript
-id: Task.id              // Task table → id column
-assigneeName?: User.name // User table → name column
-projectTitle: Project.title  // Project table → title column
+@db.view.for Task
 ```
 
-Fields from joined tables can be optional (`?`) since the join may not match every row.
+Every managed view requires `@db.view.for`. Without it, the view is treated as [external](#external-views).
 
-### Join Conditions
+## Joins
 
-Join conditions use [query expressions](./query-expressions) — a SQL-like syntax in backticks:
+Use `@db.view.joins` to bring in columns from related tables. Each join takes a target type and a condition written as a [query expression](./queries):
 
 ```atscript
 @db.view.joins User, `User.id = Task.assigneeId`
+@db.view.joins Project, `Project.id = Task.projectId`
 ```
 
-This generates a `JOIN users ON users.id = tasks.assignee_id` in the database.
+The annotation is repeatable — add as many joins as you need. Each generates a `LEFT JOIN` in the resulting SQL. Fields from joined tables can be marked optional (`?`) since the join may not match every row:
 
-### Filter Conditions
+```atscript
+assigneeName?: User.name   // optional — task may have no assignee
+projectTitle: Project.title // required — every task has a project
+```
 
-The `@db.view.filter` annotation adds a WHERE clause:
+## View Filters
+
+The `@db.view.filter` annotation adds a `WHERE` clause using backtick query expression syntax:
 
 ```atscript
 @db.view.filter `Task.status != 'done'`
 ```
 
-You can reference any table in the view — the entry table and all joined tables:
+You can reference any table in the view — both the entry table and all joined tables:
 
 ```atscript
-@db.view.filter `Task.status != 'done' and Project.status = 'active'`
+@db.view.filter `Task.status != 'done' && Task.priority = 'high'`
 ```
+
+For the full query expression syntax, see [Queries & Filters](./queries).
 
 ### Simple Views (No Joins)
 
-A view can be a simple filter over a single table:
+A view can filter a single table without any joins:
 
 ```atscript
 @db.view 'active_users'
@@ -92,72 +98,84 @@ export interface ActiveUser {
 }
 ```
 
-## External Views
-
-Reference a pre-existing database view (one you created manually or from another tool):
-
-```atscript
-@db.view 'legacy_report'
-export interface LegacyReport {
-    id: number
-    total: number
-}
-```
-
-External views:
-- Have `@db.view` but **no** `@db.view.for`
-- Are not created or dropped by [schema sync](./schema-sync)
-- Schema sync validates they exist in the database
-
-## Materialized Views
-
-Mark a view as materialized for pre-computed data:
-
-```atscript
-@db.view 'monthly_stats'
-@db.view.for Task
-@db.view.materialized
-@db.view.filter `Task.status = 'done'`
-export interface MonthlyStats {
-    id: Task.id
-    title: Task.title
-    createdAt: Task.createdAt
-}
-```
-
-::: info
-Materialized view support depends on your database:
-- **PostgreSQL** — Native `CREATE MATERIALIZED VIEW` support
-- **MongoDB** — On-demand materialized views via `$merge`/`$out` aggregation stages
-- **SQLite** — Not supported
-:::
-
 ## Querying Views
 
-Views are read-only. Use the same query API as tables, but through `DbSpace`:
+Use `db.getView()` to get a read-only `AtscriptDbView` instance. All read operations are available — `findOne`, `findMany`, `findById`, `count`, `findManyWithCount` — but no write operations:
 
 ```typescript
 import { DbSpace } from '@atscript/utils-db'
 import { ActiveTask } from './schema/active-task.as'
 
 const db = new DbSpace(adapterFactory)
-const activeTasks = db.getView(ActiveTask)
+const view = db.getView(ActiveTask)
 
-// Query the view
-const tasks = await activeTasks.findMany({
-  filter: { priority: 'high' },
-  controls: { $sort: { createdAt: -1 }, $limit: 10 },
+// Query with filter and sort
+const tasks = await view.findMany({
+  filter: { projectTitle: 'Website' },
+  controls: { $sort: { title: 1 }, $limit: 20 },
 })
 
-// Count
-const count = await activeTasks.count({
-  filter: { priority: 'high' },
+// Count matching records
+const count = await view.count({
+  filter: { status: 'in_progress' },
+})
+
+// Find a single record
+const task = await view.findOne({
+  filter: { assigneeName: 'Alice' },
 })
 ```
 
-## Renaming Views
+## Materialized Views
 
-Track view renames for schema sync:
+Add `@db.view.materialized` to store the view's results in the database. Materialized views are precomputed and can be faster to query than virtual views, especially for aggregations:
+
+```atscript
+@db.view 'task_stats'
+@db.view.for Task
+@db.view.materialized
+@db.view.filter `Task.status = 'done'`
+export interface TaskStats {
+    id: Task.id
+    title: Task.title
+    status: Task.status
+    createdAt: Task.createdAt
+}
+```
+
+::: info Database Support
+Materialized view support varies by database:
+- **PostgreSQL** — native `CREATE MATERIALIZED VIEW`
+- **Oracle** — native materialized view support
+- **MongoDB** — on-demand materialized views via `$merge`/`$out` aggregation stages
+- **SQLite** — not supported
+:::
+
+## External Views
+
+When you have a pre-existing view in your database that Atscript should not manage, declare it with `@db.view` alone — without `@db.view.for`:
+
+```atscript
+@db.view 'legacy_report'
+export interface LegacyReport {
+    @meta.id reportId: number
+    title: string
+    total: number
+}
+```
+
+External views:
+- Are **not** created, modified, or dropped by [schema sync](./schema-sync)
+- Can be queried with the same `getView()` API as managed views
+- Need field types declared directly (no chain references to source tables)
+
+## Schema Sync Behavior
+
+Schema sync manages the lifecycle of managed and materialized views:
+
+- **Creation**: Managed views are created as `CREATE VIEW` statements during sync
+- **Updates**: Views are dropped and recreated when their definition changes (there is no `ALTER VIEW`)
+- **Renames**: Track view renames with `@db.view.renamed` so sync can rename rather than drop and recreate:
 
 ```atscript
 @db.view 'premium_users'
@@ -170,8 +188,57 @@ export interface PremiumUsers {
 }
 ```
 
+External views are ignored by sync entirely.
+
+## Complete Example
+
+Here is a full view definition with an entry table, two joins, a filter, and its TypeScript usage:
+
+```atscript
+import { Task } from './task'
+import { User } from './user'
+import { Project } from './project'
+
+@db.view 'high_priority_tasks'
+@db.view.for Task
+@db.view.joins User, `User.id = Task.assigneeId`
+@db.view.joins Project, `Project.id = Task.projectId`
+@db.view.filter `Task.priority = 'high' && Task.status != 'done'`
+export interface HighPriorityTask {
+    id: Task.id
+    title: Task.title
+    status: Task.status
+    priority: Task.priority
+    createdAt: Task.createdAt
+    assigneeName?: User.name
+    projectTitle: Project.title
+}
+```
+
+```typescript
+import { DbSpace } from '@atscript/utils-db'
+import { HighPriorityTask } from './schema/high-priority-task.as'
+
+const db = new DbSpace(adapterFactory)
+const view = db.getView(HighPriorityTask)
+
+// Fetch high-priority tasks for a specific project, sorted by creation date
+const urgent = await view.findMany({
+  filter: { projectTitle: 'Website Redesign' },
+  controls: {
+    $sort: { createdAt: -1 },
+    $limit: 50,
+  },
+})
+
+// Count unassigned high-priority tasks
+const unassigned = await view.count({
+  filter: { assigneeName: undefined },
+})
+```
+
 ## Next Steps
 
-- [Query Expressions](./query-expressions) — Full syntax for conditions used in joins and filters
-- [CRUD Operations](./crud) — Working with data at runtime
-- [Schema Sync](./schema-sync) — Automatic view creation and management
+- [Schema Sync](./schema-sync) — how views are created and updated automatically
+- [Queries & Filters](./queries) — full syntax for query expressions used in joins and filters
+- [Relations](./relations) — defining relationships between tables

@@ -402,19 +402,30 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Schema Definition',
+          text: 'Defining Your Schema',
           items: [
             { text: 'Tables & Fields', link: '/db-integrations/tables' },
             { text: 'Defaults & Indexes', link: '/db-integrations/defaults-indexes' },
-            { text: 'Annotations Reference', link: '/db-integrations/annotations' },
+          ],
+        },
+        {
+          text: 'Working with Data',
+          items: [
+            { text: 'CRUD Operations', link: '/db-integrations/crud' },
+            { text: 'Queries & Filters', link: '/db-integrations/queries' },
           ],
         },
         {
           text: 'Relations',
           items: [
-            { text: 'Foreign Keys', link: '/db-integrations/foreign-keys' },
-            { text: 'Navigation Properties', link: '/db-integrations/navigation' },
+            { text: 'Foreign Keys & Navigation', link: '/db-integrations/relations' },
             { text: 'Deep Operations', link: '/db-integrations/deep-operations' },
+          ],
+        },
+        {
+          text: 'Array & Patch Operations',
+          items: [
+            { text: 'Patch Operations', link: '/db-integrations/patch-operations' },
           ],
         },
         {
@@ -424,49 +435,38 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Working with Data',
-          items: [
-            { text: 'CRUD Operations', link: '/db-integrations/crud' },
-            { text: 'Queries & Filters', link: '/db-integrations/queries' },
-            { text: 'Query Expressions', link: '/db-integrations/query-expressions' },
-            { text: 'Patch Operations', link: '/db-integrations/patch-operations' },
-            { text: 'Transactions', link: '/db-integrations/transactions' },
-          ],
-        },
-        {
           text: 'Schema Sync',
           items: [
             { text: 'Schema Sync & Migrations', link: '/db-integrations/schema-sync' },
           ],
         },
         {
-          text: 'SQLite',
+          text: 'Transactions',
           items: [
-            { text: 'Guide', link: '/db-integrations/sqlite' },
-            { text: 'API Reference', link: '/db-integrations/sqlite-api' },
+            { text: 'Transactions', link: '/db-integrations/transactions' },
           ],
         },
         {
-          text: 'MongoDB',
+          text: 'Adapters',
           items: [
-            { text: 'Guide', link: '/db-integrations/mongodb' },
-            { text: 'Patch Pipelines', link: '/db-integrations/mongodb-patches' },
-            { text: 'Annotations', link: '/db-integrations/mongodb-annotations' },
-            { text: 'Search & Vectors', link: '/db-integrations/mongodb-search' },
+            { text: 'SQLite', link: '/db-integrations/sqlite' },
+            { text: 'MongoDB', link: '/db-integrations/mongodb' },
+            { text: 'MongoDB Search & Vectors', link: '/db-integrations/mongodb-search' },
+            { text: 'Creating Custom Adapters', link: '/db-integrations/creating-adapters' },
           ],
         },
         {
-          text: 'CRUD over HTTP',
+          text: 'REST API (Moost)',
           items: [
-            { text: 'Guide', link: '/db-integrations/crud-http' },
+            { text: 'HTTP Controllers', link: '/db-integrations/crud-http' },
             { text: 'URL Query Syntax', link: '/db-integrations/crud-http-query-syntax' },
-            { text: 'Customization', link: '/db-integrations/crud-http-customization' },
+            { text: 'Customization & Hooks', link: '/db-integrations/crud-http-customization' },
           ],
         },
         {
-          text: 'Advanced',
+          text: 'Reference',
           items: [
-            { text: 'Creating Adapters', link: '/db-integrations/creating-adapters' },
+            { text: 'Annotations Reference', link: '/db-integrations/annotations' },
           ],
         },
       ],

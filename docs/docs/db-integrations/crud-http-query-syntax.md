@@ -4,283 +4,264 @@ outline: deep
 
 # URL Query Syntax
 
-## Overview
+The HTTP controllers (`AsDbController` and `AsDbReadableController`) accept a rich URL query syntax for filtering, sorting, pagination, and relation loading — powered by [`@uniqu/url`](https://github.com/moostjs/uniqu). Filters and controls are encoded directly into the query string using a compact, expressive format that all database adapters understand.
 
-The CRUD endpoints parse URL query strings using [`@uniqu/url`](https://github.com/moostjs/uniqu) into the Uniquery canonical format. This page documents the full syntax for filtering, sorting, pagination, and projection via URLs.
+## Basic Filtering
+
+Filter records by matching field values. Multiple conditions are combined with `&` (AND):
+
+```
+GET /query?status=active
+GET /query?status=active&priority=high
+```
 
 ## Comparison Operators
 
-| URL Syntax | Operator | Example | Result |
-|------------|----------|---------|--------|
-| `=` | `$eq` | `status=active` | `{ status: 'active' }` |
-| `!=` | `$ne` | `status!=deleted` | `{ status: { $ne: 'deleted' } }` |
-| `>` | `$gt` | `age>25` | `{ age: { $gt: 25 } }` |
-| `>=` | `$gte` | `age>=18` | `{ age: { $gte: 18 } }` |
-| `<` | `$lt` | `price<100` | `{ price: { $lt: 100 } }` |
-| `<=` | `$lte` | `price<=99` | `{ price: { $lte: 99 } }` |
-| `~=` | `$regex` | `name~=/^Jo/i` | `{ name: { $regex: '/^Jo/i' } }` |
+Compare fields against values using inline operators:
+
+```
+?status!=done          # not equal
+?priority>3            # greater than
+?priority>=3           # greater than or equal
+?priority<5            # less than
+?priority<=5           # less than or equal
+```
+
+These work with numeric fields, dates, and any comparable type supported by the adapter.
 
 ## Set Operators
 
-### IN
+Match against a set of values using curly braces:
 
 ```
-role{Admin,Editor}
+?role{Admin,Editor}     # IN (role is Admin or Editor)
+?status!{Draft,Deleted} # NOT IN
 ```
 
-Result: `{ role: { $in: ['Admin', 'Editor'] } }`
+The IN operator matches records where the field equals any value in the comma-separated list. NOT IN excludes records matching any value in the set.
 
-### NOT IN
+## Range (Between)
 
-```
-status!{Draft,Deleted}
-```
-
-Result: `{ status: { $nin: ['Draft', 'Deleted'] } }`
-
-## Between
+Filter a field within a numeric or date range:
 
 ```
-25<age<35
+?25<age<35             # exclusive range
+?25<=age<=35           # inclusive range
 ```
 
-Result: `{ age: { $gt: 25, $lt: 35 } }`
+The value is placed between two bounds. Mix `<` and `<=` as needed (e.g., `25<=age<35`).
+
+## Pattern Matching
+
+Match a field against a regular expression:
 
 ```
-25<=age<=35
+?name~=/^Al/i          # regex match
 ```
 
-Result: `{ age: { $gte: 25, $lte: 35 } }`
+The pattern follows `/pattern/flags` format. Common flags include `i` (case-insensitive). Regex support depends on the database adapter — MongoDB supports full PCRE, while SQLite uses `LIKE`-based approximation for simple patterns.
 
-## Exists
+## Existence
 
-```
-$exists=phone,email
-```
-
-Result: `{ phone: { $exists: true }, email: { $exists: true } }`
+Check whether fields are present (non-null) or absent (null):
 
 ```
-$!exists=deletedAt
+?$exists=email,phone   # fields must exist (not null)
+?$!exists=deletedAt    # field must not exist (is null)
 ```
 
-Result: `{ deletedAt: { $exists: false } }`
+Multiple fields can be comma-separated. A field "exists" when its value is not null.
+
+## Null Values
+
+Explicitly match null values:
+
+```
+?assigneeId=null       # field is null
+```
+
+The literal `null` is parsed as a null value, not the string `"null"`.
 
 ## Logical Operators
 
-### AND (`&`)
+Combine conditions with AND, OR, NOT, and grouping:
 
 ```
-age>=18&status=active
+?status=todo&priority=high               # AND (tighter binding)
+?status=done^priority=low                # OR (looser binding)
+?(status=todo^status=in_progress)        # grouped OR
+?!(status=done)                          # NOT
 ```
 
-Result: `{ age: { $gte: 18 }, status: 'active' }`
-
-### OR (`^`)
+**Operator precedence:** `&` (AND) binds tighter than `^` (OR). This means:
 
 ```
-role=admin^role=moderator
+?status=done^priority=high&role=admin
 ```
 
-Result: `{ $or: [{ role: 'admin' }, { role: 'moderator' }] }`
-
-### Precedence
-
-`&` binds tighter than `^`:
+is interpreted as:
 
 ```
-age>25^score>550&status=VIP
+status=done  OR  (priority=high AND role=admin)
 ```
 
-Result: `{ $or: [{ age: { $gt: 25 } }, { score: { $gt: 550 }, status: 'VIP' }] }`
-
-### Parentheses
-
-Override precedence with `()`:
+Use parentheses to override default precedence:
 
 ```
-(age>25^score>550)&status=VIP
+?(status=todo^status=in_progress)&priority=high
 ```
 
-Result: `{ $and: [{ $or: [{ age: { $gt: 25 } }, { score: { $gt: 550 } }] }, { status: 'VIP' }] }`
+This matches records where status is `todo` or `in_progress`, **and** priority is `high`.
 
-### NOT (`!()`)
+## Control Keywords {#control-keywords}
+
+Special `$`-prefixed parameters configure query behavior rather than filtering data.
+
+### Projection (`$select`)
+
+Control which fields are returned:
 
 ```
-!(status=deleted)
+?$select=id,title,status           # include only these fields
+?$select=-password,-secret         # exclude these fields
 ```
 
-Result: `{ $not: { status: 'deleted' } }`
-
-## Control Keywords
-
-Control keywords start with `$` and configure query behavior:
-
-| Keyword | Aliases | Example | Description |
-|---------|---------|---------|-------------|
-| `$select` | -- | `$select=name,email` | Include only listed fields |
-| `$select` | -- | `$select=-password` | Exclude listed fields |
-| `$order` | `$sort` | `$order=-createdAt,name` | Sort (prefix `-` for descending) |
-| `$limit` | `$top` | `$limit=20` | Max results |
-| `$skip` | -- | `$skip=40` | Skip N results |
-| `$count` | -- | `$count` | Return count instead of data |
-| `$search` | -- | `$search=hello world` | Full-text search term |
-| `$index` | -- | `$index=my_search_idx` | Named search index |
-| `$page` | -- | `$page=3` | Page number (for `/pages` endpoint) |
-| `$size` | -- | `$size=25` | Items per page (for `/pages` endpoint) |
-| `$with` | -- | `$with=author,comments` | Load relations ([details](#with-relation-loading)) |
-
-### `$select` Modes
-
-- **Include-only**: `$select=name,email` produces `['name', 'email']` (array form)
-- **Exclude-only**: `$select=-password,-secret` produces `{ password: 0, secret: 0 }` (object form)
+**Include mode** returns only the listed fields. **Exclude mode** (prefix with `-`) returns all fields except the listed ones.
 
 ::: warning Avoid mixed mode
-Mixing includes and excludes (e.g. `$select=name,-password`) produces an object map like `{ name: 1, password: 0 }`. The interpretation of mixed projection depends on the database adapter and may lead to unexpected results. Stick to **either** include-only or exclude-only in a single query.
+Mixing includes and excludes (e.g., `$select=name,-password`) produces unpredictable results depending on the adapter. Use either include-only or exclude-only.
 :::
 
-### `$order` / `$sort`
+### Sorting (`$sort`)
 
-Prefix a field name with `-` for descending order:
-
-```
-$order=-createdAt,name
-```
-
-Result: `{ $sort: { createdAt: -1, name: 1 } }`
-
-## Literal Types
-
-| Syntax | Parsed Type | Examples |
-|--------|-------------|---------|
-| Bare number | `number` | `42`, `-3.14` |
-| Leading zero | `string` | `007`, `00` |
-| `true` / `false` | `boolean` | `flag=true` |
-| `null` | `null` | `deleted=null` |
-| `'quoted'` | `string` | `name='John Doe'` |
-| Bare word | `string` | `status=active` |
-
-## `$with` — Relation Loading {#with-relation-loading}
-
-Load navigational properties declared with [`@db.rel.to` / `@db.rel.from`](./navigation). Comma-separated names load multiple relations. Parentheses scope filters and controls to a specific relation.
-
-### Basic
+Order results by one or more fields:
 
 ```
-$with=author
+?$sort=name                        # ascending
+?$sort=-createdAt                  # descending (prefix -)
+?$sort=status,-priority            # multi-field sort
 ```
 
-Load the `author` relation for each result.
+Fields are comma-separated. Prefix a field with `-` for descending order.
 
-### Multiple Relations
+### Pagination — Offset-Based (for `/query`)
 
-```
-$with=author,comments
-```
-
-Load both `author` and `comments`.
-
-### Nested Relations
+Use `$limit` and `$skip` for offset-based pagination:
 
 ```
-$with=posts($with=comments)
+?$limit=20                         # max records
+?$skip=40                          # offset
 ```
 
-Load posts, and for each post load its comments.
+### Pagination — Page-Based (for `/pages`)
 
-### With Filter
-
-```
-$with=posts(status=published)
-```
-
-Only load posts where `status` is `published`.
-
-### With Controls
+Use `$page` and `$size` for page-based pagination:
 
 ```
-$with=posts($sort=-createdAt&$limit=5)
+?$page=2&$size=10                  # page number + page size
 ```
 
-Load the 5 most recent posts, sorted by creation date.
+Pages are 1-based. The `/pages` endpoint returns paginated results with metadata (total count, page info).
 
-### Combined (Multi-Level)
+### Count (`$count`)
 
-```
-$with=posts(status=published&$sort=-createdAt&$with=comments(body~=Great))
-```
-
-Load published posts (newest first), and for each post load comments whose body matches "Great".
-
-### With Projection
+Return only the count of matching records, without data:
 
 ```
-$with=posts($select=title,createdAt&$with=comments($select=body))
+?$count                            # return count instead of data
 ```
 
-Load posts with only `title` and `createdAt`, and their comments with only `body`. FK fields needed for joining are included automatically.
+### Search (`$search`)
 
-## Complete Examples
-
-### Simple filter with sorting
+Perform full-text search:
 
 ```
-GET /todos/query?completed=false&$sort=-createdAt&$limit=10
+?$search=mongodb tutorial          # fulltext search
+?$index=product_search             # named search index
 ```
 
-Find incomplete todos, newest first, max 10.
+Full-text search support and behavior depends on the adapter. MongoDB supports Atlas Search with named indexes; SQLite uses FTS5 when available.
 
-### Paginated search
+## Relation Loading (`$with`) {#with-relation-loading}
 
-```
-GET /todos/pages?$search=important&$page=2&$size=20&$sort=-priority
-```
+Load related data inline by specifying navigational relations declared with `@db.rel.to`, `@db.rel.from`, or `@db.rel.via` in your schema.
 
-Search for "important", page 2, 20 per page, sorted by priority.
-
-### Complex filter
+**Single relation:**
 
 ```
-GET /users/query?age>=18&age<=30&role{Admin,Editor}&$select=id,name,email&$order=name
+?$with=author                              # single relation
 ```
 
-Users aged 18--30 who are Admin or Editor, include only id/name/email, sorted by name.
-
-### Count query
+**Multiple relations:**
 
 ```
-GET /todos/query?completed=true&$count
+?$with=author,comments                     # multiple relations
 ```
 
-Returns the count of completed todos (number, not array).
-
-### Excluding fields
+**With controls** — apply sorting, limits, or other controls to a specific relation using parentheses:
 
 ```
-GET /users/query?$select=-password,-secret
+?$with=posts($limit=5&$sort=-createdAt)    # with controls
 ```
 
-All users, excluding password and secret fields.
-
-### Loading relations
+**Nested relations** — load relations of relations:
 
 ```
-GET /posts/query?$with=author,comments&$sort=-createdAt&$limit=10
+?$with=posts($with=comments)               # nested relations
 ```
 
-Latest 10 posts with author and comments loaded.
-
-### Filtered nested relations
+**Filtered with nested** — combine filters, controls, and nesting inside parentheses:
 
 ```
-GET /users/query?$with=posts(status=published&$sort=-createdAt&$limit=5&$with=comments($limit=3))
+?$with=posts(status=published&$with=comments($limit=3))  # filtered + nested
 ```
 
-All users with their 5 most recent published posts, each with up to 3 comments.
+Parentheses contain a sub-query for the relation. All filter and control syntax described on this page works inside relation sub-queries.
 
-## See Also
+::: tip FK fields auto-included
+When using `$select` alongside `$with`, foreign key fields needed for joining are automatically included — even if not explicitly listed or explicitly excluded. This ensures relations resolve correctly.
+:::
 
-- [CRUD over HTTP](./crud-http) -- REST endpoint reference
-- [Queries & Filters](./queries) -- Programmatic filter syntax
-- [Relations & Navigation](./navigation) -- Declaring relations in your schema
-- [Customization](./crud-http-customization) -- Hooks and overrides
+## Comprehensive Examples
+
+**Simple list** — active items, sorted by recency, limited to 10:
+
+```
+GET /query?status=active&$sort=-createdAt&$limit=10
+```
+
+**Paginated with search** — full-text search with page-based pagination:
+
+```
+GET /pages?$search=typescript&$page=1&$size=20&$sort=-relevance
+```
+
+**Complex filtered with relations** — high-priority incomplete tasks with projection and relations:
+
+```
+GET /query?status!=done&priority>=3&$select=id,title,status&$with=assignee,tags&$sort=-priority,title&$limit=50
+```
+
+**Nested relation loading** — projects and comments with their own projections and controls:
+
+```
+GET /query?$with=project($select=id,title),comments($sort=-createdAt&$limit=5&$with=author($select=name))
+```
+
+**Count with filter** — count completed tasks without returning data:
+
+```
+GET /query?completed=true&$count
+```
+
+**Excluding sensitive fields:**
+
+```
+GET /query?$select=-password,-secret,-internalNotes
+```
+
+## Next Steps
+
+- [Customization & Hooks](./crud-http-customization) — Interceptors and overrides
+- [HTTP Controllers](./crud-http) — REST endpoint reference and setup
+- [Queries & Filters](./queries) — Programmatic query API (non-HTTP)

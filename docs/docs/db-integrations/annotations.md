@@ -4,93 +4,239 @@ outline: deep
 
 # Annotations Reference
 
-Complete reference for all `@db.*` annotations. These annotations are shipped with `@atscript/core` — no extra packages needed.
+Complete reference for all database annotations available in `.as` files. The `@db.*` annotations are shipped with `@atscript/core` — no extra packages needed. MongoDB-specific annotations require the `@atscript/mongo` plugin.
 
-## Table & Schema
+## Tables & Columns
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.table` / `@db.table 'name'` | interface | Map interface to a database table (name optional — defaults to interface name) |
-| `@db.table.renamed 'oldName'` | interface | Track table rename for [schema sync](./schema-sync) |
-| `@db.schema 'name'` | interface | Assign table to a database schema/namespace |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.table` | Interface | `name?` (string) | Mark as database table (defaults to interface name) |
+| `@db.table.renamed` | Interface | `oldName` (string) | Previous table name for [schema sync](./schema-sync) migration |
+| `@db.schema` | Interface | `name` (string) | Assign to a database schema/namespace |
+| `@db.column` | Field | `name` (string) | Override the physical column name |
+| `@db.column.renamed` | Field | `oldName` (string) | Previous column name for [schema sync](./schema-sync) migration |
+| `@db.json` | Field | — | Store as a single JSON column instead of flattening |
+| `@db.ignore` | Field | — | Exclude field from the database schema entirely |
 
-## Column Configuration
+```atscript
+@db.table 'users'
+@db.schema 'auth'
+interface User {
+  @db.column 'full_name'
+  name: string
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.column 'name'` | field | Override the physical column name |
-| `@db.column.renamed 'oldName'` | field | Track column rename for [schema sync](./schema-sync) |
-| `@db.json` | field | Store as a single JSON column instead of flattening |
-| `@db.ignore` | field | Exclude field from database schema |
+  @db.json
+  preferences: Preferences
+
+  @db.ignore
+  computedField: string
+}
+```
 
 ## Defaults
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.default 'value'` | field | Static default value |
-| `@db.default.fn 'name'` | field | Generated default: `'increment'`, `'uuid'`, or `'now'` |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.default` | Field | `value` (string) | Static default value |
+| `@db.default.fn` | Field | `fn` (string) | Generated default: `'increment'`, `'uuid'`, or `'now'` |
+
+**Default function values:**
+
+| Function | Requires | Description |
+|----------|----------|-------------|
+| `'increment'` | number type | Auto-incrementing integer |
+| `'uuid'` | string type | Random UUID string |
+| `'now'` | number or string type | Current timestamp |
+
+```atscript
+@db.table
+interface Product {
+  @meta.id
+  @db.default.fn 'uuid'
+  id: string
+
+  @db.default 'untitled'
+  name: string
+
+  @db.default.fn 'now'
+  createdAt: number
+}
+```
 
 ## Indexes
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.index.plain` | field | Non-unique index (auto-named) |
-| `@db.index.plain 'name'` | field | Non-unique index with explicit name |
-| `@db.index.plain 'name', 'desc'` | field | Non-unique index with sort direction |
-| `@db.index.unique` | field | Unique index (auto-named) |
-| `@db.index.unique 'name'` | field | Unique index with explicit name |
-| `@db.index.fulltext` | field | Full-text search index (auto-named) |
-| `@db.index.fulltext 'name'` | field | Full-text search index with explicit name |
-| `@db.index.fulltext 'name', 5` | field | Full-text search index with weight |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.index.plain` | Field | `name?` (string), `sort?` (string) | Standard index, optional name and sort direction (`'asc'`/`'desc'`) |
+| `@db.index.unique` | Field | `name?` (string) | Unique constraint index |
+| `@db.index.fulltext` | Field | `name?` (string), `weight?` (number) | Full-text search index with optional weight |
 
-Add the same index name to multiple fields for composite indexes.
+Use the same index name on multiple fields to create a composite index.
+
+```atscript
+@db.table
+interface Article {
+  @db.index.unique
+  slug: string
+
+  @db.index.plain 'date_idx', 'desc'
+  publishedAt: number
+
+  // Composite index across two fields
+  @db.index.plain 'author_cat'
+  authorId: string
+
+  @db.index.plain 'author_cat'
+  category: string
+
+  @db.index.fulltext 'search', 3
+  title: string
+
+  @db.index.fulltext 'search', 1
+  body: string
+}
+```
 
 ## Relations
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.rel.FK` | field | Declare a [foreign key](./foreign-keys) |
-| `@db.rel.FK 'alias'` | field | Foreign key with alias (for multiple FKs to the same table) |
-| `@db.rel.onDelete 'action'` | field | Referential action on delete |
-| `@db.rel.onUpdate 'action'` | field | Referential action on update |
-| `@db.rel.to` | field | Forward [navigation](./navigation) (FK on this table) |
-| `@db.rel.to 'alias'` | field | Forward navigation with alias |
-| `@db.rel.from` | field | Reverse [navigation](./navigation) (FK on other table) |
-| `@db.rel.from 'alias'` | field | Reverse navigation with alias |
-| `@db.rel.via JunctionType` | field | Many-to-many [navigation](./navigation) through a junction table |
-| `` @db.rel.filter `condition` `` | field | Filter condition for navigation property |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.rel.FK` | Field | `alias?` (string) | [Foreign key](./relations) (field must use chain ref) |
+| `@db.rel.to` | Field | `alias?` (string) | Forward [navigation](./relations) (N:1, FK on this table) |
+| `@db.rel.from` | Field | `alias?` (string) | Reverse [navigation](./relations) (1:N, FK on other table) |
+| `@db.rel.via` | Field | `junction` (ref) | Many-to-many [navigation](./relations) through a junction table |
+| `@db.rel.onDelete` | Field | `action` (string) | Referential action on parent delete |
+| `@db.rel.onUpdate` | Field | `action` (string) | Referential action on parent update |
+| `` @db.rel.filter `` | Field | `condition` (expr) | Static filter condition on navigation property |
 
-**Referential actions** for `@db.rel.onDelete` / `@db.rel.onUpdate`:
+```atscript
+@db.table
+interface Task {
+  @db.rel.FK
+  @db.rel.onDelete 'cascade'
+  projectId: Project.id
+
+  @db.rel.to
+  project: Project
+
+  @db.rel.from
+  comments: Comment[]
+
+  @db.rel.via TaskTag
+  tags: Tag[]
+
+  @db.rel.from
+  @db.rel.filter `status = 'open'`
+  openSubtasks: Task[]
+}
+```
+
+### Referential Action Values
+
+For `@db.rel.onDelete` and `@db.rel.onUpdate`:
 
 | Action | Description |
 |--------|-------------|
-| `'cascade'` | Delete/update related rows automatically |
-| `'restrict'` | Prevent if related rows exist |
-| `'noAction'` | No action (database default) |
+| `'cascade'` | Propagate delete/update to related rows |
+| `'restrict'` | Prevent operation if related rows exist |
+| `'noAction'` | Database default behavior (no action) |
 | `'setNull'` | Set FK to null (field must be optional) |
-| `'setDefault'` | Set FK to default value |
+| `'setDefault'` | Set FK to default value (needs `@db.default`) |
 
 ## Views
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.view` / `@db.view 'name'` | interface | Declare a database [view](./views) (name optional — defaults to interface name) |
-| `@db.view.for Type` | interface | Entry table for a managed view |
-| `` @db.view.joins Type, `condition` `` | interface | Join another table with a [query condition](./query-expressions) |
-| `` @db.view.filter `condition` `` | interface | WHERE clause for the view |
-| `@db.view.materialized` | interface | Mark view as materialized |
-| `@db.view.renamed 'oldName'` | interface | Track view rename for [schema sync](./schema-sync) |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.view` | Interface | `name?` (string) | Mark as database [view](./views) (defaults to interface name) |
+| `@db.view.for` | Interface | `entry` (ref) | Entry/primary table for a managed view |
+| `` @db.view.joins `` | Interface | `target` (ref), `condition` (expr) | Explicit join clause (repeatable) |
+| `` @db.view.filter `` | Interface | `condition` (expr) | View WHERE clause |
+| `@db.view.materialized` | Interface | — | Mark the view as materialized |
+| `@db.view.renamed` | Interface | `oldName` (string) | Previous view name for [schema sync](./schema-sync) migration |
 
-## Patch Behavior
-
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.patch.strategy 'replace'` | field | Replace entire nested object on update (default) |
-| `@db.patch.strategy 'merge'` | field | Deep-merge nested object on update |
+```atscript
+@db.view
+@db.view.for Task
+@db.view.joins Project, `Project.id = Task.projectId`
+@db.view.filter `Task.status = 'active'`
+interface ActiveTaskView {
+  taskName: Task.name
+  projectName: Project.name
+  dueDate: Task.dueDate
+}
+```
 
 ## Schema Sync
 
-| Annotation | Target | Description |
-|-----------|--------|-------------|
-| `@db.sync.method 'drop'` | interface | Drop and recreate table on structural changes (lossy) |
-| `@db.sync.method 'recreate'` | interface | Recreate with data preservation on structural changes |
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.sync.method` | Interface | `method` (string) | Sync strategy: `'drop'` or `'recreate'` |
+
+- **`'drop'`** — Drop and recreate the table on structural changes (lossy, data is deleted).
+- **`'recreate'`** — Recreate with data preservation on structural changes.
+
+## Patch Behavior
+
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.patch.strategy` | Field | `strategy` (string) | `'replace'` (default) or `'merge'` |
+
+Controls how nested objects are handled during PATCH/update operations. With `'replace'`, the entire nested object is overwritten. With `'merge'`, individual sub-fields are deep-merged.
+
+## MongoDB-Specific {#mongodb}
+
+These annotations require the `@atscript/mongo` plugin.
+
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@db.mongo.collection` | Interface | — | Mark as MongoDB collection (auto-injects `_id`) |
+| `@db.mongo.capped` | Interface | `size` (number), `max?` (number) | Capped collection with max byte size and optional doc limit |
+| `@db.mongo.search.dynamic` | Interface | `analyzer` (string), `fuzzy` (boolean) | Dynamic Atlas Search index |
+| `@db.mongo.search.static` | Interface | `analyzer` (string), `fuzzy` (boolean), `indexName` (string) | Named static Atlas Search index |
+| `@db.mongo.search.text` | Field | `analyzer` (string), `indexName` (string) | Include field in a search index |
+| `@db.mongo.search.vector` | Field | `dims` (number), `similarity` (string), `indexName` (string) | Vector search field |
+| `@db.mongo.search.filter` | Field | `indexName` (string) | Pre-filter field for vector search |
+
+```atscript
+use '@atscript/mongo'
+
+@db.mongo.collection
+@db.mongo.search.static 'standard', true, 'main_search'
+interface Product {
+  @meta.id
+  _id: ObjectId
+
+  @db.mongo.search.text 'standard', 'main_search'
+  name: string
+
+  @db.mongo.search.vector 1536, 'cosine', 'vec_idx'
+  embedding: number[]
+
+  @db.mongo.search.filter 'vec_idx'
+  category: string
+}
+```
+
+## Related Annotations {#related}
+
+These are not `@db.*` annotations but are commonly used alongside the database layer.
+
+| Annotation | Applies To | Arguments | Description |
+|------------|------------|-----------|-------------|
+| `@meta.id` | Field | — | Mark as primary key field (multiple fields form a composite key) |
+| `@expect.array.key` | Field | — | Array element key field for patch matching |
+| `@expect.array.uniqueItems` | Field | — | Enforce unique items in an array |
+
+```atscript
+@db.table
+interface OrderLine {
+  // Composite primary key
+  @meta.id
+  orderId: Order.id
+
+  @meta.id
+  productId: Product.id
+
+  quantity: number
+}
+```

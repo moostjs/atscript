@@ -4,14 +4,14 @@ outline: deep
 
 # Quick Start
 
-This guide shows the next step after the TypeScript quick start: using the same `.as` model to drive a simple SQLite-backed application.
+This guide builds on the [TypeScript Quick Start](/packages/typescript/quick-start) — you will use the same `.as` model-driven workflow to create a SQLite-backed application with typed CRUD operations.
 
 ::: tip What You Will Build
-In this guide, you will define one `Todo` model, generate its runtime artifacts, sync the schema into SQLite, and run typed CRUD operations from that same model.
+A **Todo app** backed by a single SQLite table. At the end, a brief two-table example shows how relations work.
 :::
 
-::: info Recommended Order
-If you are evaluating Atscript for the first time, start with the [TypeScript Quick Start](/packages/typescript/quick-start). This guide builds on that same model-driven workflow for the database layer.
+::: info Recommended Reading
+If you are new to Atscript, start with the [TypeScript Quick Start](/packages/typescript/quick-start) first. This guide assumes you are familiar with `.as` syntax and the compilation workflow.
 :::
 
 ## 1. Install Dependencies
@@ -22,7 +22,7 @@ pnpm add @atscript/core @atscript/typescript @atscript/utils-db @atscript/db-sql
 
 ## 2. Configure Atscript
 
-Create `atscript.config.mts`:
+Create `atscript.config.mts` in your project root:
 
 ```typescript
 import { defineConfig } from '@atscript/core'
@@ -38,6 +38,8 @@ export default defineConfig({
   },
 })
 ```
+
+The `db` section tells the CLI which adapter to use for schema sync and where to find your database file.
 
 ## 3. Define Your Schema
 
@@ -57,15 +59,12 @@ export interface Todo {
     @db.default 'false'
     completed: boolean
 
-    createdAt?: number.timestamp.created
+    @db.default.fn 'now'
+    createdAt?: number.timestamp
 }
 ```
 
-This defines a `todos` table with:
-- An auto-incrementing `id` primary key
-- Required `title` and optional `description`
-- A `completed` flag defaulting to `false`
-- A `createdAt` timestamp set automatically on insert
+This defines a `todos` table with an auto-incrementing primary key, a required `title`, an optional `description`, a `completed` flag that defaults to `false`, and a `createdAt` timestamp set automatically on insert.
 
 ## 4. Compile
 
@@ -77,13 +76,11 @@ This generates TypeScript types (`.as.d.ts`) and runtime metadata (`.as.js`) fro
 
 ## 5. Sync Your Schema
 
-Propagate your `.as` definitions to the database:
-
 ```bash
 npx asc db sync
 ```
 
-This inspects your schema, compares it against the database, and applies any changes — creating tables, adding columns, and syncing indexes as needed. See [Schema Sync](./schema-sync) for the full guide.
+Schema sync inspects your `@db.*` annotations, compares them against the live database, and applies any changes — creating tables, adding columns, and syncing indexes. See [Schema Sync](./schema-sync) for details.
 
 ## 6. Use in Your Application
 
@@ -92,37 +89,88 @@ import { DbSpace } from '@atscript/utils-db'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import { Todo } from './schema/todo.as'
 
-// Create a database space with SQLite adapter
+// Create a database space with a SQLite adapter
 const driver = new BetterSqlite3Driver('./myapp.db')
 const db = new DbSpace(() => new SqliteAdapter(driver))
 
-// Get a typed table instance
+// Get a typed table
 const todos = db.getTable(Todo)
 
-// Insert a record
-await todos.insertOne({
-  title: 'Learn Atscript',
-})
+// Insert
+await todos.insertOne({ title: 'Learn Atscript' })
 
-// Query records
-const all = await todos.findMany({
+// Query with filter and sort
+const pending = await todos.findMany({
   filter: { completed: false },
   controls: { $sort: { createdAt: -1 } },
 })
 
-// Update a record
-await todos.updateOne({
-  id: 1,
-  completed: true,
-})
+// Update
+await todos.updateOne({ id: 1, completed: true })
 
-// Delete a record
+// Delete
 await todos.deleteOne(1)
 ```
+
+Every operation is fully typed — `insertOne` requires `title` (the only non-optional, non-defaulted field), and `findMany` returns `Todo[]` with the correct shape.
+
+## 7. Bonus: Adding Relations
+
+Suppose each todo belongs to a category. Add a second `.as` file:
+
+```atscript
+@db.table 'categories'
+export interface Category {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    name: string
+}
+```
+
+Then update `todo.as` to reference it:
+
+```atscript
+import { Category } from './category.as'
+
+@db.table 'todos'
+export interface Todo {
+    @meta.id
+    @db.default.fn 'increment'
+    id: number
+
+    title: string
+    description?: string
+
+    @db.default 'false'
+    completed: boolean
+
+    @db.default.fn 'now'
+    createdAt?: number.timestamp
+
+    @db.rel.FK
+    categoryId?: Category.id
+
+    @db.rel.to
+    category?: Category
+}
+```
+
+Now you can load todos with their category in a single query:
+
+```typescript
+const todosWithCategory = await todos.findMany({
+  controls: { $with: [{ name: 'category' }] },
+})
+// todosWithCategory[0].category?.name → 'Work'
+```
+
+See [Relations](./relations) for the full guide on TO, FROM, and VIA relation types.
 
 ## Next Steps
 
 - [Tables & Fields](./tables) — Field types, nested objects, column mappings
 - [Defaults & Indexes](./defaults-indexes) — Auto-generated values and indexes
-- [Relations](./foreign-keys) — Connect tables with foreign keys
+- [Relations](./relations) — Foreign keys, reverse relations, and many-to-many
 - [Queries & Filters](./queries) — Advanced filtering, sorting, and pagination

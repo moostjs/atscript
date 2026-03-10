@@ -2,237 +2,181 @@
 outline: deep
 ---
 
-# SQLite Adapter
+# SQLite
 
-`@atscript/db-sqlite` provides a SQLite adapter for the Atscript DB abstraction layer. It translates annotation-driven CRUD operations and MongoDB-style filters into SQL queries, with support for swappable SQLite driver implementations.
+The SQLite adapter (`@atscript/db-sqlite`) connects your `.as` models to SQLite databases via `better-sqlite3` or any compatible driver. Define your schema once in Atscript, and the adapter handles table creation, queries, type mapping, and embedded object flattening automatically.
 
 ## Features
 
 - Full CRUD operations (insert, find, update, replace, delete)
-- Automatic table creation from Atscript field descriptors
-- **Embedded object support** — nested objects flattened to `__`-separated columns, `@db.json` for JSON storage
-- Index management (plain and unique indexes)
-- MongoDB-style filter-to-SQL translation with parameterized queries
-- Column mapping, defaults, and field ignoring via `@db.*` annotations
-- Transaction support for bulk operations
-- Swappable driver interface — use `better-sqlite3`, `node:sqlite`, or your own
+- Automatic schema sync — create and migrate tables from `.as` definitions
+- Foreign key enforcement via `PRAGMA foreign_keys = ON`
+- Index management (plain and unique)
+- Transaction support for bulk and nested operations
+- In-memory databases for testing and prototyping
+- Custom drivers — swap `better-sqlite3` for `node:sqlite` or any other binding
 
 ## Installation
 
-::: code-group
-```bash [pnpm]
-pnpm add @atscript/db-sqlite @atscript/utils-db better-sqlite3
+```bash
+pnpm add @atscript/db-sqlite better-sqlite3
 ```
-```bash [npm]
-npm install @atscript/db-sqlite @atscript/utils-db better-sqlite3
-```
-```bash [yarn]
-yarn add @atscript/db-sqlite @atscript/utils-db better-sqlite3
-```
-:::
 
 `better-sqlite3` is an optional peer dependency. You can use any SQLite driver that implements the `TSqliteDriver` interface.
 
 ## Quick Start
 
-### 1. Define Your Schema
-
-Create a `.as` file with `@db.*` annotations:
-
-```atscript
-// user.as
-@db.table 'users'
-export interface User {
-    @meta.id
-    id: number
-
-    @db.index.unique 'email_idx'
-    @db.column 'email_address'
-    email: string
-
-    @db.index.plain 'name_idx'
-    name: string
-
-    @db.default 'active'
-    status: string
-
-    @db.default.fn 'now'
-    createdAt: number
-
-    @db.ignore
-    displayName?: string
-}
-```
-
-### 2. Create the Adapter and Table
+Three steps to get a typed table backed by SQLite:
 
 ```typescript
-import { AtscriptDbTable } from '@atscript/utils-db'
+import { DbSpace } from '@atscript/utils-db'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
-import UserMeta from './user.as.js'
+import { User } from './user.as.js'
 
-// Open a database file (or use ':memory:' for in-memory)
-const driver = new BetterSqlite3Driver('myapp.db')
-const adapter = new SqliteAdapter(driver)
+// 1. Create driver
+const driver = new BetterSqlite3Driver('./myapp.db')
 
-// Create the table instance
-const users = new AtscriptDbTable<typeof UserMeta>(UserMeta, adapter)
+// 2. Create DbSpace with adapter factory
+const db = new DbSpace(() => new SqliteAdapter(driver))
 
-// Run `npx asc db sync` to create/update tables and indexes
+// 3. Get typed tables
+const users = db.getTable(User)
 ```
 
-### 3. Perform CRUD Operations
-
-#### Insert
+Or use the convenience function that wraps all three steps:
 
 ```typescript
-await users.insertOne({
-  id: 1,
-  email: 'alice@example.com',
-  name: 'Alice',
-})
-// status defaults to 'active'
-// createdAt defaults to Date.now()
-// displayName is stripped (@db.ignore)
-// email is stored in 'email_address' column (@db.column)
+import { createAdapter } from '@atscript/db-sqlite'
+import { User } from './user.as.js'
+
+const db = createAdapter('./myapp.db')
+const users = db.getTable(User)
 ```
 
-#### Query
+Once you have a table, run `npx asc db sync` to create or update the database schema, then use `users.insertOne(...)`, `users.findMany(...)`, etc. See [CRUD Operations](./crud) for the full API.
 
-Read operations use the `Uniquery` format — `{ filter, controls }`:
+## Type Mapping
 
-```typescript
-// Find by filter
-const user = await users.findOne({
-  filter: { email: 'alice@example.com' },
-  controls: {},
-})
+Atscript types map to SQLite column types as follows:
 
-// Find with sorting and pagination
-const page = await users.findMany({
-  filter: { status: 'active' },
-  controls: { $sort: { name: 1 }, $limit: 10, $skip: 0 },
-})
-
-// Count
-const total = await users.count({
-  filter: { status: 'active' },
-  controls: {},
-})
-```
-
-#### Update
-
-```typescript
-// Partial update by primary key
-await users.updateOne({ id: 1, status: 'inactive' })
-
-// Update many by filter
-await users.updateMany(
-  { status: 'pending' },
-  { status: 'active' }
-)
-```
-
-#### Delete
-
-```typescript
-await users.deleteOne({ id: 1 })
-await users.deleteMany({ status: 'deleted' })
-```
-
-## Advanced Filters
-
-The SQLite adapter supports MongoDB-style filters translated to SQL:
-
-```typescript
-// Comparison
-await users.findMany({ filter: { createdAt: { $gt: 1700000000 } }, controls: {} })
-
-// Set membership
-await users.findMany({ filter: { status: { $in: ['active', 'pending'] } }, controls: {} })
-
-// Pattern matching (regex → LIKE)
-await users.findMany({ filter: { name: { $regex: '^Ali' } }, controls: {} }) // LIKE 'Ali%'
-
-// Logical operators
-await users.findMany({
-  filter: {
-    $or: [
-      { status: 'admin' },
-      { createdAt: { $gt: 1700000000 } },
-    ]
-  },
-  controls: {},
-})
-```
+| Atscript Type | SQLite Type | Notes |
+|---------------|-------------|-------|
+| `string` | `TEXT` | |
+| `number` | `REAL` | `INTEGER` for primary keys (aliases `rowid`) |
+| `boolean` | `INTEGER` | Stored as `0` / `1` |
+| arrays | `TEXT` | JSON-serialized |
+| nested objects | flattened columns | `parent__child` naming convention |
+| `@db.json` fields | `TEXT` | JSON-serialized |
 
 ## Nested Objects
 
-Nested object fields are automatically flattened into `__`-separated columns. Use `@db.json` to store as a single JSON column instead:
+Nested object fields are automatically flattened into `__`-separated columns. You query with dot-notation and the adapter translates:
 
 ```atscript
-// product.as
-@db.table 'products'
-export interface Product {
+@db.table 'contacts'
+export interface Contact {
     @meta.id
     id: number
+
     name: string
 
-    // Flattened → columns: dimensions__width, dimensions__height
-    dimensions: {
-        width: number
-        height: number
+    // Becomes columns: address__city, address__zip
+    address: {
+        city: string
+        zip: string
     }
-
-    // Single JSON column
-    @db.json
-    metadata: {
-        color: string
-        material?: string
-    }
-
-    // Arrays are always JSON
-    tags: string[]
 }
 ```
 
 ```typescript
-// Insert with nested objects
-await products.insertOne({
+// Insert — pass the nested structure naturally
+await contacts.insertOne({
   id: 1,
-  name: 'Widget',
-  dimensions: { width: 10, height: 5 },
-  metadata: { color: 'red', material: 'plastic' },
-  tags: ['sale', 'new'],
+  name: 'Alice',
+  address: { city: 'Portland', zip: '97201' },
 })
 
-// Query by nested path (dot-notation → __-separated column)
-const results = await products.findMany({
-  filter: { 'dimensions.width': { $gt: 5 } },
-  controls: { $sort: { 'dimensions.height': 1 } },
+// Query — use dot-notation for nested fields
+const results = await contacts.findMany({
+  filter: { 'address.city': 'Portland' },
+  controls: { $sort: { 'address.zip': 1 } },
 })
 
-// Read back — nested objects reconstructed automatically
-// results[0].dimensions → { width: 10, height: 5 }
-// results[0].metadata → { color: 'red', material: 'plastic' }
+// Read — nested objects are reconstructed automatically
+// results[0].address → { city: 'Portland', zip: '97201' }
 ```
 
-See [Embedded Objects](./tables#embedded-objects) for the full flattening strategy.
+To store an entire nested object as a single JSON column instead of flattening, annotate it with `@db.json`. Arrays are always stored as JSON.
 
-## Using a Custom Driver
+## Foreign Keys
 
-The `SqliteAdapter` accepts any object implementing `TSqliteDriver`. This makes it easy to swap drivers or wrap existing ones:
+SQLite foreign keys are enforced natively. The adapter enables `PRAGMA foreign_keys = ON` at connection time, so referential integrity is always active.
+
+When a foreign key constraint is violated (e.g., inserting a row that references a non-existent parent, or deleting a parent with dependent children), the adapter raises a `DbError` with the `FK_VIOLATION` code:
+
+```typescript
+try {
+  await tasks.insertOne({ id: 1, assigneeId: 999 }) // no user with id 999
+} catch (err) {
+  // err.code === 'FK_VIOLATION'
+}
+```
+
+Cascade and set-null behaviors are controlled via `@db.rel.onDelete` and `@db.rel.onUpdate` annotations in your `.as` schema.
+
+## Filters
+
+All standard filter operators are supported (`$eq`, `$ne`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$nin`, `$and`, `$or`, `$not`). Regex patterns are converted to SQL `LIKE` expressions:
+
+| Regex Pattern | SQL LIKE | Matches |
+|---------------|----------|---------|
+| `^abc` | `abc%` | Starts with "abc" |
+| `end$` | `%end` | Ends with "end" |
+| `^exact$` | `exact` | Exact match |
+| `mid` | `%mid%` | Contains "mid" |
+
+```typescript
+// Pattern matching
+await users.findMany({
+  filter: { name: { $regex: '^Ali' } },
+  controls: {},
+})
+// → WHERE name LIKE 'Ali%'
+```
+
+## In-Memory Databases
+
+Pass `':memory:'` as the path to create an in-memory database — useful for tests and ephemeral data:
+
+```typescript
+const driver = new BetterSqlite3Driver(':memory:')
+const db = new DbSpace(() => new SqliteAdapter(driver))
+```
+
+In-memory databases are lost when the process exits or the driver is closed.
+
+## Custom Drivers
+
+The `SqliteAdapter` accepts any object implementing `TSqliteDriver`. This lets you use `node:sqlite`, `sql.js`, or any other SQLite binding:
+
+```typescript
+interface TSqliteDriver {
+  run(sql: string, params?: unknown[]): { changes: number; lastInsertRowid: number | bigint }
+  all<T>(sql: string, params?: unknown[]): T[]
+  get<T>(sql: string, params?: unknown[]): T | null
+  exec(sql: string): void
+  close(): void
+}
+```
+
+Example using Node.js built-in `node:sqlite`:
 
 ```typescript
 import { SqliteAdapter } from '@atscript/db-sqlite'
-import type { TSqliteDriver } from '@atscript/db-sqlite'
-
-// Use Node.js built-in sqlite (node:sqlite)
 import { DatabaseSync } from 'node:sqlite'
 
 const nodeDb = new DatabaseSync(':memory:')
-const driver: TSqliteDriver = {
+const driver = {
   run(sql, params) {
     const stmt = nodeDb.prepare(sql)
     return stmt.run(...(params ?? []))
@@ -252,28 +196,48 @@ const driver: TSqliteDriver = {
 const adapter = new SqliteAdapter(driver)
 ```
 
-## In-Memory Database
+## BetterSqlite3Driver
 
-For testing or transient data, use an in-memory database:
+The built-in `BetterSqlite3Driver` accepts either a file path (string) or a pre-created `better-sqlite3` `Database` instance:
 
 ```typescript
-const driver = new BetterSqlite3Driver(':memory:')
-const adapter = new SqliteAdapter(driver)
+// From file path
+const driver = new BetterSqlite3Driver('./data.db')
+
+// From existing instance
+import Database from 'better-sqlite3'
+const instance = new Database('./data.db', { verbose: console.log })
+const driver = new BetterSqlite3Driver(instance)
 ```
+
+The driver uses dynamic `import()` internally, so `better-sqlite3` remains an optional dependency — it is only loaded when `BetterSqlite3Driver` is instantiated.
 
 ## Limitations
 
-- **Fulltext indexes** are skipped (not supported in basic SQLite)
-- **Schema names** (`@db.schema`) are ignored (SQLite doesn't have schemas)
-- **Nested objects** are flattened into `__`-separated columns by default; `@db.json` and arrays are stored as JSON TEXT
-- **Booleans** are stored as INTEGER (1/0)
-- **Native array patches** are not supported — patches are decomposed into flat updates
+- **No native fulltext search** — FTS5 indexes require manual setup outside Atscript
+- **No database schemas** — the `@db.schema` annotation is ignored (SQLite has no schema namespaces)
+- **Booleans stored as integers** — `true`/`false` map to `1`/`0`
+- **No native array/JSON operations** — array patch operators use generic read-modify-write
+- **Synchronous driver** — both `better-sqlite3` and `node:sqlite` are synchronous; the adapter wraps calls in promises for the async `BaseDbAdapter` contract
 
-## When to Use
+## Utilities
 
-The SQLite adapter is a good choice for:
+The package exports `buildWhere` for constructing SQL WHERE clauses from filter objects — useful when writing custom queries outside the standard CRUD flow:
 
-- **Local-first applications** — Embedded database with zero configuration
-- **Development and testing** — Fast setup with in-memory or file-based databases
-- **CLI tools** — Ship a single binary with embedded storage
-- **Prototyping** — Quickly test your Atscript data models before choosing a production database
+```typescript
+import { buildWhere } from '@atscript/db-sqlite'
+
+const { sql, params } = buildWhere(
+  { status: 'active', age: { $gte: 18 } },
+  flatMap,
+  columnMap,
+)
+// sql → 'WHERE "status" = ? AND "age" >= ?'
+// params → ['active', 18]
+```
+
+## Next Steps
+
+- [MongoDB](./mongodb) — MongoDB adapter with Atlas Search and aggregation support
+- [CRUD Operations](./crud) — Full CRUD API reference for all adapters
+- [Schema Sync](./schema-sync) — Automatic schema migration from `.as` definitions

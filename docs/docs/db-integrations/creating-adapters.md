@@ -2,425 +2,360 @@
 outline: deep
 ---
 
-# Creating Adapters
+# Creating Custom Adapters
 
-Database adapters implement the bridge between `AtscriptDbTable` and a specific database engine. The `BaseDbAdapter` abstract class from `@atscript/utils-db` defines the contract that every adapter must fulfill.
+You can create adapters for any database by extending `BaseDbAdapter` from `@atscript/utils-db`. This guide covers the full interface — every abstract method you must implement, every optional hook you can override, and how your adapter plugs into the rest of the system.
 
 ## Architecture
 
+Your adapter sits between the table API and the database:
+
 ```
-AtscriptDbTable ──delegates CRUD──▶ BaseDbAdapter (abstract)
-               ◀──reads metadata──  (via this._table)
+AtscriptDbTable → BaseDbAdapter (your adapter) → Database
 ```
 
-When you create an `AtscriptDbTable`, it registers itself with the adapter via `registerTable()`. The adapter can then access all table metadata (field descriptors, indexes, column mappings, etc.) through `this._table`.
+The table handles query translation, field flattening, relation orchestration, validation, and default values. Your adapter handles raw CRUD operations and DDL — it receives pre-processed data and query objects, and returns results in a standard format.
 
-## Implementing an Adapter
+When an `AtscriptDbTable` is created with your adapter, it registers itself via `registerReadable()`. From that point, you can access all computed table metadata through `this._table`.
 
-To create a new database adapter, extend `BaseDbAdapter` and implement the abstract methods:
+## Getting Started
+
+Extend `BaseDbAdapter` and implement the abstract methods:
 
 ```typescript
 import { BaseDbAdapter } from '@atscript/utils-db'
-import type {
-  TDbInsertResult,
-  TDbInsertManyResult,
-  TDbUpdateResult,
-  TDbDeleteResult,
-} from '@atscript/utils-db'
-import type { FilterExpr, Uniquery } from '@uniqu/core'
 
-class MyAdapter extends BaseDbAdapter {
-  // --- Insert ---
-  async insertOne(data: Record<string, unknown>): Promise<TDbInsertResult> {
-    // data is already validated, defaults applied, columns mapped
-    // Implement database-specific insert logic
+export class PostgresAdapter extends BaseDbAdapter {
+  constructor(private pool: Pool) {
+    super()
   }
 
-  async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
-    // Bulk insert
-  }
-
-  // --- Read ---
-  async findOne(query: Uniquery): Promise<Record<string, unknown> | null> {
-    // Use query.filter for WHERE, query.controls for ORDER/LIMIT/SELECT
-  }
-
-  async findMany(query: Uniquery): Promise<Array<Record<string, unknown>>> {
-    // Use query.filter for WHERE, query.controls for ORDER/LIMIT/SELECT
-  }
-
-  async count(query: Uniquery): Promise<number> {
-    // Use query.filter for WHERE
-  }
-
-  // --- Update ---
-  async updateOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    // Update one matching row
-  }
-
-  async updateMany(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    // Update all matching rows
-  }
-
-  async replaceOne(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    // Full replacement of one matching row
-  }
-
-  async replaceMany(filter: FilterExpr, data: Record<string, unknown>): Promise<TDbUpdateResult> {
-    // Full replacement of all matching rows
-  }
-
-  // --- Delete ---
-  async deleteOne(filter: FilterExpr): Promise<TDbDeleteResult> {
-    // Delete one matching row
-  }
-
-  async deleteMany(filter: FilterExpr): Promise<TDbDeleteResult> {
-    // Delete all matching rows
-  }
-
-  // --- Schema ---
-  async syncIndexes(): Promise<void> {
-    // Create/drop indexes to match annotations
-  }
-
-  async ensureTable(): Promise<void> {
-    // Create table if not exists
-  }
+  // implement abstract methods (see below)
 }
 ```
 
-### Method Purpose Reference
+## Required Methods
 
-| Method | When Called | What to Do |
-|--------|-----------|------------|
-| `insertOne` | After validation, defaults, column mapping | Execute INSERT |
-| `insertMany` | After per-item validation + defaults | Execute batch INSERT |
-| `findOne` | Query with filter + controls | Execute SELECT ... LIMIT 1 |
-| `findMany` | Query with filter + controls | Execute SELECT with sort/limit/skip/select |
-| `count` | Count query | Execute COUNT with filter |
-| `updateOne` | After validation, with filter for PK | Execute UPDATE ... LIMIT 1 |
-| `updateMany` | Bulk update by filter | Execute UPDATE matching filter |
-| `replaceOne` | Full replacement by PK filter | Execute REPLACE or DELETE+INSERT |
-| `replaceMany` | Bulk replace by filter | Execute bulk REPLACE |
-| `deleteOne` | Delete by PK filter | Execute DELETE ... LIMIT 1 |
-| `deleteMany` | Bulk delete by filter | Execute DELETE matching filter |
-| `ensureTable` | Explicit call by user | Create table/collection DDL |
-| `syncIndexes` | Explicit call by user | Diff + create/drop indexes |
+These are abstract — every adapter must implement all of them.
+
+### Insert
+
+- **`insertOne(data)`** — Insert a single record. Returns `TDbInsertResult` with `{ insertedId }`.
+- **`insertMany(data)`** — Insert multiple records. Returns `TDbInsertManyResult` with `{ insertedCount, insertedIds }`.
+
+Data is already validated, defaults applied, and columns mapped by the table layer.
+
+### Read
+
+- **`findOne(query)`** — Find a single record matching the query. Returns the record or `null`. The `query` object contains `filter` (WHERE conditions) and `controls` (sort, limit, skip, select).
+- **`findMany(query)`** — Find all records matching the query. Returns an array of records.
+- **`count(query)`** — Count records matching the query filter. Returns a number.
+
+### Update
+
+- **`updateOne(filter, data)`** — Update a single record matching the filter. Returns `TDbUpdateResult` with `{ matchedCount, modifiedCount }`.
+- **`updateMany(filter, data)`** — Update all records matching the filter.
+- **`replaceOne(filter, data)`** — Full replacement of a single record (all columns overwritten).
+- **`replaceMany(filter, data)`** — Full replacement of all matching records.
+
+### Delete
+
+- **`deleteOne(filter)`** — Delete a single record matching the filter. Returns `TDbDeleteResult` with `{ deletedCount }`.
+- **`deleteMany(filter)`** — Delete all records matching the filter.
+
+### Schema
+
+- **`ensureTable()`** — Create the table/collection if it does not exist. Use `this._table.tableName`, `this._table.fieldDescriptors`, and `this._table.foreignKeys` to build the DDL.
+- **`syncIndexes()`** — Synchronize indexes between Atscript definitions and the database. Use `this._table.indexes` for the desired index state.
 
 ::: tip
-Data passed to insert/update methods is **already processed** by `AtscriptDbTable` — defaults applied, `@db.ignore` fields stripped, columns mapped. The adapter only needs to translate to its database's query language.
+Data passed to insert/update/replace methods is **already processed** by the table layer — defaults applied, `@db.ignore` fields stripped, column names mapped. Your adapter only needs to translate to the database's native query language.
 :::
+
+## Capability Flags
+
+Override these methods to declare what your database supports. All return `false` by default.
+
+### `supportsNativePatch()`
+
+Return `true` if your database handles array patch operators natively (e.g., MongoDB's `$push`, `$pull`). When `false`, the table layer decomposes patch operations into standard update calls.
+
+### `supportsNestedObjects()`
+
+Return `true` if your database stores nested objects natively (e.g., MongoDB embedded documents). When `true`, the table layer skips flattening and passes nested objects as-is. When `false`, nested objects are flattened to `__`-separated column names (e.g., `address__city`).
+
+### `supportsNativeForeignKeys()`
+
+Return `true` if your database enforces FK constraints at the engine level (e.g., SQLite with `PRAGMA foreign_keys = ON`). When `true`, the table layer skips application-level cascade/setNull logic on delete. When `false`, the table layer handles cascade by finding and deleting/nullifying child records before the parent.
+
+### `supportsNativeRelations()`
+
+Return `true` to handle `$with` relation loading natively via database features like SQL JOINs or MongoDB `$lookup`. When `false`, the table layer uses application-level batch loading — issuing separate queries per relation and stitching results together.
+
+## Transaction Support
+
+Override three protected methods to enable transactions:
+
+```typescript
+protected async _beginTransaction(): Promise<unknown> {
+  // Start a transaction, return opaque state (e.g., a session object)
+  await this.pool.query('BEGIN')
+  return { /* your transaction state */ }
+}
+
+protected async _commitTransaction(state: unknown): Promise<void> {
+  await this.pool.query('COMMIT')
+}
+
+protected async _rollbackTransaction(state: unknown): Promise<void> {
+  await this.pool.query('ROLLBACK')
+}
+```
+
+The `state` value you return from `_beginTransaction` is passed to commit and rollback. Use it to carry database-specific context (e.g., a MongoDB `ClientSession`).
+
+Transaction context is tracked via `AsyncLocalStorage` — nested `withTransaction()` calls within the same async chain automatically reuse the existing transaction. Inside any method, call `this._getTransactionState()` to retrieve the current transaction state.
 
 ## Adapter Hooks
 
-Adapters can optionally implement hooks that are called during metadata scanning:
+These optional methods are called during table initialization when the table scans its type metadata.
+
+### `onBeforeFlatten(type)`
+
+Called before field scanning begins. Use this to extract table-level adapter-specific annotations.
 
 ```typescript
-class MyAdapter extends BaseDbAdapter {
-  // Called before the table starts scanning fields
-  onBeforeFlatten(type: TAtscriptAnnotatedType): void {
-    // Pre-process the root type (e.g., inject synthetic fields)
-  }
-
-  // Called for each field during scanning
-  onFieldScanned(field: string, type: TAtscriptAnnotatedType, metadata: TMetadataMap): void {
-    // Process adapter-specific annotations on each field
-  }
-
-  // Called after all fields are scanned
-  onAfterFlatten(): void {
-    // Post-process metadata (e.g., set adapter-specific primary keys)
-  }
-
-  // Override the table name derived from @db.table
-  getAdapterTableName(type: TAtscriptAnnotatedType): string | undefined {
-    // Return a custom table name or undefined to use the default
-  }
+onBeforeFlatten(type: TAtscriptAnnotatedType): void {
+  // Example: read a table-level annotation
+  const dynamic = type.metadata?.get('db.mongo.search.dynamic')
+  if (dynamic) this.searchConfig.dynamic = true
 }
 ```
 
-### Hook Use Cases
+### `onFieldScanned(field, type, metadata)`
 
-| Hook | Purpose | Example |
-|------|---------|---------|
-| `onBeforeFlatten` | Pre-process the type before scanning | MongoDB: read `@db.mongo.search.dynamic` from type metadata |
-| `onFieldScanned` | Process adapter-specific annotations per field | MongoDB: detect `@db.default.fn 'increment'`, register search fields |
-| `onAfterFlatten` | Post-process after all fields are known | MongoDB: hardcode `_id` as primary key, associate vector filters |
-| `getAdapterTableName` | Override table name resolution | Return `undefined` to use the generic `@db.table` name |
+Called for each field during the scanning process. Use this to extract per-field adapter-specific annotations.
+
+```typescript
+onFieldScanned(
+  field: string,
+  type: TAtscriptAnnotatedType,
+  metadata: TMetadataMap
+): void {
+  // Example: register vector search fields
+  const vector = metadata.get('db.mongo.search.vector')
+  if (vector) this.vectorFields.set(field, vector)
+}
+```
+
+### `onAfterFlatten()`
+
+Called after all fields are scanned. Finalize any computed state here. You can access the fully populated `this._table` at this point.
+
+```typescript
+onAfterFlatten(): void {
+  // Example: hardcode a primary key that the adapter always uses
+  this._table.primaryKeys.add('_id')
+}
+```
+
+### `getAdapterTableName(type)`
+
+Return an adapter-specific table name, or `undefined` to fall back to `@db.table` or the interface name.
+
+```typescript
+getAdapterTableName(type: TAtscriptAnnotatedType): string | undefined {
+  // Example: read from a custom annotation
+  return type.metadata?.get('db.postgres.table') as string | undefined
+}
+```
 
 ## ID Preparation
 
-Adapters can transform primary key values before they're used in queries:
+Override `prepareId(id, fieldType)` to transform primary key values before they are used in queries. This is called when building filters for `findById`, relation loading, and other ID-based lookups.
 
 ```typescript
-class MongoAdapter extends BaseDbAdapter {
-  prepareId(id: unknown, fieldType: TAtscriptAnnotatedType): unknown {
-    // Convert string IDs to ObjectId, parse UUIDs, etc.
-    return new ObjectId(id as string)
-  }
+prepareId(id: unknown, fieldType: TAtscriptAnnotatedType): unknown {
+  // Example: convert string IDs to MongoDB ObjectId
+  return new ObjectId(id as string)
 }
 ```
 
-This is called by `findById()` when converting user-provided ID strings into the database's native format.
+The default implementation returns `id` unchanged.
 
 ## Native Patch Support
 
-If your database supports native array patch operations (like MongoDB's `$push`, `$pull`), implement these methods:
+If `supportsNativePatch()` returns `true`, implement the `nativePatch` method:
 
 ```typescript
-class MongoAdapter extends BaseDbAdapter {
-  supportsNativePatch(): boolean {
-    return true
-  }
-
-  async nativePatch(filter: FilterExpr, patch: unknown): Promise<TDbUpdateResult> {
-    // Convert patch operators to database-native operations
+async nativePatch(
+  filter: FilterExpr,
+  patch: unknown
+): Promise<TDbUpdateResult> {
+  // Convert patch operators to database-native operations
+  // e.g., { $push: { tags: 'new' } } → MongoDB updateOne
+  const result = await this.collection.updateOne(
+    this.buildFilter(filter),
+    patch as UpdateFilter<Document>
+  )
+  return {
+    matchedCount: result.matchedCount,
+    modifiedCount: result.modifiedCount,
   }
 }
 ```
 
-When `supportsNativePatch()` returns `false` (the default), `AtscriptDbTable` uses `decomposePatch()` to flatten patch operations into standard update calls.
+When `supportsNativePatch()` returns `false` (the default), the table layer decomposes patch operations into read-modify-write cycles using standard `updateOne`.
 
-## Nested Object Support
+## Native Relation Loading
 
-If your database handles nested objects natively (like MongoDB with embedded documents), override `supportsNestedObjects()`:
+If `supportsNativeRelations()` returns `true`, implement `loadRelations`:
 
 ```typescript
-class MongoAdapter extends BaseDbAdapter {
-  supportsNestedObjects(): boolean {
-    return true
-  }
+async loadRelations(
+  rows: Array<Record<string, unknown>>,
+  withRelations: WithRelation[],
+  relations: ReadonlyMap<string, TDbRelation>,
+  foreignKeys: ReadonlyMap<string, TDbForeignKey>,
+  tableResolver?: TTableResolver
+): Promise<void> {
+  // Enrich rows in place with related data
+  // e.g., use $lookup aggregation stages for MongoDB
+  // or JOIN queries for SQL databases
 }
 ```
 
-When `supportsNestedObjects()` returns `true`:
-- Nested objects are passed through as-is (no flattening into `__`-separated columns)
-- `@db.json` is ignored (the adapter handles all storage decisions)
-- Read results are returned as-is (no reconstruction)
-- Index field names use dot-notation paths directly
-
-When it returns `false` (the default), the generic `AtscriptDbTable` layer handles all flattening, reconstruction, and query translation. Adapters receive pre-flattened data with physical column names — they never need to know about logical dot-notation paths.
+When `supportsNativeRelations()` returns `false` (the default), the table layer handles relation loading by issuing separate queries per relation and stitching results together in JavaScript.
 
 ## Schema Sync Methods
 
-Adapters can implement schema synchronization methods to support automatic table migration when `.as` definitions change. These methods are used by the schema sync system to introspect, diff, and apply changes to the underlying database.
+These optional methods enable the schema sync system (`asc db sync`) to introspect, diff, and apply changes to your database. Implement them if you want automatic schema migration support.
 
-### `getExistingColumns()`
+### Introspection
 
-Introspects the database table and returns information about its current columns. This is the foundation for schema diffing — the sync system compares existing columns against the current Atscript field descriptors to determine what has changed.
+- **`getExistingColumns()`** — Return the current table structure as an array of `TExistingColumn` (name, type, nullability, default, PK status). The sync system diffs these against the current Atscript field descriptors.
+- **`getExistingColumnsForTable(tableName)`** — Same as above but for an arbitrary table name. Used to inspect a table under its old name before a rename.
+- **`tableExists()`** — Return whether the table/collection exists. Used by schema-less adapters (e.g., MongoDB) that skip column introspection.
+- **`detectTableOptionDrift()`** — Return `true` if table-level options have changed and the table needs drop+recreate (e.g., MongoDB capped collection size).
 
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  async getExistingColumns(): Promise<TColumnInfo[]> {
-    // Query the database's information schema or equivalent
-    // Return column names, types, nullability, defaults, etc.
-  }
-}
-```
+### Applying Changes
 
-### `syncColumns(diff)`
+- **`syncColumns(diff)`** — Apply column-level changes from a computed diff. The diff contains `added`, `renamed`, and `typeChanged` arrays. Execute `ALTER TABLE` statements or equivalent.
+- **`recreateTable()`** — Full table recreation with data migration. Used when structural changes cannot be handled by `ALTER TABLE` (e.g., column drops in SQLite). Typical pattern: create temp table, copy data, drop old, rename.
+- **`renameTable(oldName)`** — Rename the table from `oldName` to the adapter's current table name.
 
-Applies column-level changes to the table based on a computed diff. This handles adding new columns, changing column types, and updating defaults via `ALTER TABLE` statements (or equivalent).
+### Destructive Operations
 
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  async syncColumns(diff: TColumnDiff): Promise<void> {
-    // Apply ALTER TABLE ADD COLUMN for new fields
-    // Apply ALTER TABLE ALTER COLUMN for type changes
-  }
-}
-```
+- **`dropTable()`** — Drop the adapter's own table.
+- **`dropTableByName(name)`** — Drop a table by name (for removing tables no longer in the schema).
+- **`dropColumns(columns)`** — Drop specific columns from the table.
 
-### `recreateTable()`
+### Views
 
-Performs a lossless table recreation when `ALTER TABLE` is insufficient (e.g., SQLite does not support dropping columns via ALTER). This typically involves creating a new table, copying data, dropping the old table, and renaming.
+- **`ensureView(view)`** — Create or update a database view. Called when the adapter's readable is an `AtscriptDbView`.
+- **`dropViewByName(name)`** — Drop a view by name (for removing views no longer in the schema).
 
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  async recreateTable(): Promise<void> {
-    // 1. CREATE TABLE _new with updated schema
-    // 2. INSERT INTO _new SELECT ... FROM old
-    // 3. DROP TABLE old
-    // 4. ALTER TABLE _new RENAME TO old
-  }
-}
-```
+### Type Mapping
 
-### `dropTable()` / `dropColumns()`
+- **`typeMapper(field)`** — Map a field's metadata to the adapter's native column type string. Receives the full field descriptor (design type, annotations, PK status) for context-aware type decisions (e.g., `VARCHAR(255)` from maxLength, `INTEGER` for numeric PKs in SQLite).
 
-Destructive operations for removing tables or columns. These are separated from `syncColumns()` because they require explicit opt-in due to data loss.
+## Validation Plugins
+
+Override `getValidatorPlugins()` to return adapter-specific validation rules that are merged with the built-in Atscript validators:
 
 ```typescript
-class MyAdapter extends BaseDbAdapter {
-  async dropTable(): Promise<void> {
-    // DROP TABLE
-  }
-
-  async dropColumns(columns: string[]): Promise<void> {
-    // ALTER TABLE DROP COLUMN (if supported)
-    // or recreateTable() without the dropped columns
-  }
-}
-```
-
-### `renameTable(oldName)`
-
-Renames a table when the `@db.table` annotation value changes. The sync system detects the rename by comparing the previous table name with the current one.
-
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  async renameTable(oldName: string): Promise<void> {
-    // ALTER TABLE oldName RENAME TO newName
-  }
-}
-```
-
-### `syncForeignKeys()`
-
-Optional method for adapters that support foreign key constraints. Synchronizes FK definitions with the database, adding new constraints and dropping stale ones.
-
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  async syncForeignKeys(): Promise<void> {
-    // Diff declared @db.rel.* annotations against existing FK constraints
-    // Add missing FKs, drop stale ones
-  }
-}
-```
-
-Not all databases support foreign keys (e.g., MongoDB does not). Adapters that do not support FKs can omit this method.
-
-## Native Relations Support
-
-Adapters can declare whether they support native relation loading (e.g., SQL JOINs) by implementing `supportsNativeRelations()`:
-
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  supportsNativeRelations(): boolean {
-    return true
-  }
-}
-```
-
-When `supportsNativeRelations()` returns `true`, the adapter should also implement `loadRelations()` to perform native JOINs or equivalent operations:
-
-```typescript
-class MyAdapter extends BaseDbAdapter {
-  supportsNativeRelations(): boolean {
-    return true
-  }
-
-  async loadRelations(
-    data: Record<string, unknown>[],
-    relations: TRelationRequest[]
-  ): Promise<void> {
-    // Use JOINs or subqueries to load related data
-    // Attach results to each record in the data array
-  }
-}
-```
-
-When `supportsNativeRelations()` returns `false` (the default), `AtscriptDbTable` handles relation loading by issuing separate queries for each relation and stitching results together in JavaScript. This works with any adapter but may be less efficient for databases that support JOINs natively.
-
-## Validator Plugins
-
-Adapters can inject custom validation plugins:
-
-```typescript
-class MongoAdapter extends BaseDbAdapter {
-  override getValidatorPlugins(): TValidatorPlugin[] {
-    return [validateMongoIdPlugin]
-  }
-
-  override buildInsertValidator(table: AtscriptDbTable): Validator {
-    // Custom insert validator — e.g., make ObjectId PKs optional
-    return table.createValidator({
-      plugins: this.getValidatorPlugins(),
-      replace: (type, path) => {
-        if (path === '_id') return { ...type, optional: true }
-        return type
+getValidatorPlugins(): TValidatorPlugin[] {
+  return [
+    {
+      // Example: auto-generate ObjectId for _id fields on insert
+      name: 'mongo-objectid',
+      validate(value, type, path) {
+        if (path === '_id' && !value) {
+          return { value: new ObjectId(), valid: true }
+        }
+        return { valid: true }
       },
-    })
-  }
+    },
+  ]
 }
 ```
 
 ## Index Sync Helper
 
-`BaseDbAdapter` provides a `syncIndexesWithDiff()` helper for implementing `syncIndexes()`:
+`BaseDbAdapter` provides `syncIndexesWithDiff()` — a template method that handles the diff algorithm for index synchronization. You provide the three database-specific primitives:
 
 ```typescript
-class MyAdapter extends BaseDbAdapter {
-  async syncIndexes(): Promise<void> {
-    await this.syncIndexesWithDiff({
-      async listExisting() {
-        // Return existing indexes from the database
-        return [{ name: 'atscript__plain__email' }]
-      },
-      async createIndex(index) {
-        // Create a single index in the database
-      },
-      async dropIndex(name) {
-        // Drop a single index from the database
-      },
-      prefix: 'atscript__',  // Only manage indexes with this prefix
-      shouldSkipType(type) {
-        // Skip unsupported index types (e.g., fulltext for SQLite)
-        return type === 'fulltext'
-      },
-    })
-  }
+async syncIndexes(): Promise<void> {
+  await this.syncIndexesWithDiff({
+    listExisting: async () => {
+      // Return existing indexes as [{ name: string }]
+      return this.pool.query('SELECT indexname AS name FROM pg_indexes WHERE ...')
+    },
+    createIndex: async (index) => {
+      // Create a single index — index has key, fields, type ('plain'|'unique')
+      const cols = index.fields.map(f => `"${f.name}" ${f.sort}`).join(', ')
+      await this.pool.query(`CREATE INDEX "${index.key}" ON ... (${cols})`)
+    },
+    dropIndex: async (name) => {
+      await this.pool.query(`DROP INDEX "${name}"`)
+    },
+    // Optional: skip index types your DB doesn't support
+    shouldSkipType: (type) => type === 'fulltext',
+  })
 }
 ```
 
-This helper computes the diff between declared indexes and existing indexes, then creates missing ones and drops stale ones.
+The helper lists existing indexes, filters to managed ones (those with the `atscript__` prefix), creates missing indexes, and drops stale ones.
 
 ## Accessing Table Metadata
 
-Inside your adapter, `this._table` gives access to all metadata:
+Inside your adapter, `this._table` provides access to all computed metadata:
+
+| Property | Description |
+|----------|-------------|
+| `this._table.tableName` | Resolved table/collection name |
+| `this._table.schema` | Database schema (if applicable) |
+| `this._table.flatMap` | All fields after flattening (dot-notation paths) |
+| `this._table.primaryKeys` | Set of primary key field names |
+| `this._table.columnMap` | Logical field name to physical column name mappings |
+| `this._table.indexes` | Computed index definitions from `@db.index` annotations |
+| `this._table.foreignKeys` | FK definitions from `@db.rel.FK` annotations |
+| `this._table.defaults` | Default value configurations from `@db.default` |
+| `this._table.fieldDescriptors` | Full field metadata (type, nullability, PK, storage) |
+| `this._table.ignoredFields` | Fields excluded from the database via `@db.ignore` |
+| `this._table.uniqueProps` | Single-field unique index properties |
+| `this._table.isView` | Whether this readable is a view (vs a table) |
+
+The `resolveTableName()` method on the adapter itself returns the full table name, optionally including the schema prefix. Override it for databases that don't support schemas:
 
 ```typescript
-class MyAdapter extends BaseDbAdapter {
-  async ensureTable(): Promise<void> {
-    const tableName = this._table.tableName
-    const schema = this._table.schema
-    const fields = this._table.fieldDescriptors
-    const primaryKeys = this._table.primaryKeys
-
-    // Build CREATE TABLE from field descriptors
-    for (const field of fields) {
-      // field.path, field.physicalName, field.designType,
-      // field.optional, field.isPrimaryKey, field.ignored,
-      // field.defaultValue, field.storage, field.flattenedFrom
-    }
-  }
+override resolveTableName(): string {
+  return super.resolveTableName(false) // exclude schema prefix
 }
 ```
 
-## Accessing the Adapter
+## Registration
 
-Use `table.getAdapter()` to access the underlying adapter for database-specific operations that go beyond the generic CRUD interface:
+Use your adapter with `DbSpace` to create tables:
 
 ```typescript
-const adapter = table.getAdapter() as MongoAdapter
+import { DbSpace } from '@atscript/utils-db'
 
-// Access the raw MongoDB collection
-const collection = adapter.collection
-await collection.bulkWrite([...])
+const db = new DbSpace(() => new PostgresAdapter(pool))
 
-// Run an aggregation pipeline
-const cursor = adapter.collection.aggregate([
-  { $match: { completed: true } },
-  { $group: { _id: null, count: { $sum: 1 } } },
-])
+// Create typed tables
+const users = db.table(UsersType)
+const posts = db.table(PostsType)
+
+// Tables share the adapter factory — each gets its own instance
+await users.ensureTable()
+await posts.ensureTable()
 ```
 
-This is the recommended way to perform native operations — the adapter exposes all database-specific methods and properties directly.
+`DbSpace` calls your factory function for each table, so every table gets its own adapter instance. This keeps adapter state (table metadata, cached queries) isolated per table.
 
-## Available Adapters
+## Next Steps
 
-| Adapter | Package | Database |
-|---------|---------|----------|
-| `SqliteAdapter` | `@atscript/db-sqlite` | SQLite (via better-sqlite3 or node:sqlite) |
-| `MongoAdapter` | `@atscript/mongo` | MongoDB |
+- [SQLite Adapter](./sqlite) — reference implementation for a relational adapter
+- [MongoDB Adapter](./mongodb) — advanced implementation with native nested objects, patch operators, and search
+- [Schema Sync](./schema-sync) — how the sync system uses adapter methods to manage migrations

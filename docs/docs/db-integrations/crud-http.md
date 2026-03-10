@@ -2,49 +2,23 @@
 outline: deep
 ---
 
-# CRUD over HTTP
+# HTTP Controllers
 
-## Overview
-
-`@atscript/moost-db` provides a generic REST controller that works with any `AtscriptDbTable` + `BaseDbAdapter`. Define your schema in `.as`, wire up a table, and get a full CRUD API with zero endpoint code.
-
-The same controller class works identically whether the underlying adapter is MongoDB, SQLite, or any custom adapter you build. You write the schema once, pick an adapter, and the controller handles all HTTP routing, query parsing, validation, and error handling.
-
-::: tip What is Moost?
-[Moost](https://moost.org) is a metadata-driven TypeScript framework for building server applications. It uses decorators for routing, dependency injection, and event handling. `@atscript/moost-db` integrates Atscript's DB layer with Moost's HTTP adapter to generate REST endpoints automatically.
-:::
+`@atscript/moost-db` provides zero-boilerplate REST controllers that expose your tables and views as HTTP endpoints via the [Moost](https://moost.org) framework. Define your schema once in a `.as` file, wire up a table, and get a full CRUD API with no endpoint code to write.
 
 ## Installation
 
-::: code-group
-
-```bash [pnpm]
-pnpm add @atscript/moost-db moost @moostjs/event-http
+```bash
+pnpm add @atscript/moost-db @moostjs/event-http moost
 ```
 
-```bash [npm]
-npm install @atscript/moost-db moost @moostjs/event-http
+You also need a database adapter:
+
+```bash
+# Pick one (or both)
+pnpm add @atscript/db-sqlite better-sqlite3   # SQLite
+pnpm add @atscript/mongo mongodb              # MongoDB
 ```
-
-```bash [yarn]
-yarn add @atscript/moost-db moost @moostjs/event-http
-```
-
-:::
-
-You also need a database adapter. Pick one (or both):
-
-::: code-group
-
-```bash [MongoDB]
-pnpm add @atscript/mongo mongodb
-```
-
-```bash [SQLite]
-pnpm add @atscript/db-sqlite better-sqlite3
-```
-
-:::
 
 ## Quick Start
 
@@ -74,47 +48,25 @@ export interface Todo {
 }
 ```
 
-### 2. Initialize the Table
+### 2. Create DbSpace and Table
 
-Connect to your database and create the table instance:
-
-::: code-group
-
-```typescript [SQLite]
+```typescript
 import { AtscriptDbTable } from '@atscript/utils-db'
 import { BetterSqlite3Driver, SqliteAdapter } from '@atscript/db-sqlite'
 import { Todo } from './schema/todo.as'
 
 const driver = new BetterSqlite3Driver('./todos.db')
 export const todosTable = new AtscriptDbTable(Todo, new SqliteAdapter(driver))
-
-// Run `npx asc db sync` to create/update tables
 ```
-
-```typescript [MongoDB]
-import { MongoAdapter } from '@atscript/mongo'
-import { DbSpace } from '@atscript/utils-db'
-import { MongoClient } from 'mongodb'
-import { Todo } from './schema/todo.as'
-
-const client = new MongoClient('mongodb://localhost:27017/myapp')
-const db = new DbSpace(() => new MongoAdapter(client.db(), client))
-export const todosTable = db.getTable(Todo)
-
-// Run `npx asc db sync` to create/update tables
-```
-
-:::
 
 ### 3. Create the Controller
 
 Extend `AsDbController` and apply the `@TableController` decorator:
 
 ```typescript
-// controllers/todo.controller.ts
 import { AsDbController, TableController } from '@atscript/moost-db'
-import { Todo } from '../schema/todo.as'
-import { todosTable } from '../init-tables'
+import { Todo } from './schema/todo.as'
+import { todosTable } from './db'
 
 @TableController(todosTable)
 export class TodoController extends AsDbController<typeof Todo> {}
@@ -122,12 +74,9 @@ export class TodoController extends AsDbController<typeof Todo> {}
 
 That single line gives you a complete CRUD API -- no endpoint methods to write.
 
-### 4. Wire Up the App
-
-Register the controller with Moost and start listening:
+### 4. Register in Moost App
 
 ```typescript
-// main.ts
 import { Moost } from 'moost'
 import { MoostHttp } from '@moostjs/event-http'
 import { TodoController } from './controllers/todo.controller'
@@ -140,31 +89,38 @@ app.registerControllers(
 await app.init()
 ```
 
-The first argument to `registerControllers` is the route prefix. All endpoints below are relative to `/todos/`.
+All endpoints below are relative to the controller prefix (`/todos/`).
 
-## REST Endpoints
+## Generated Endpoints
 
-The `AsDbController` exposes the following endpoints. All paths are relative to the controller prefix (e.g., `/todos/`).
+`AsDbController` exposes the following endpoints, all relative to the controller prefix:
 
-### `GET /query` -- List Records
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/query` | List records with filtering, sorting, pagination |
+| `GET` | `/pages` | Paginated results with metadata |
+| `GET` | `/one/:id` | Single record by primary key |
+| `POST` | `/` | Insert one or many records |
+| `PUT` | `/` | Replace one or many records |
+| `PATCH` | `/` | Update one or many records |
+| `DELETE` | `/:id` | Delete by primary key |
+| `GET` | `/meta` | Table metadata for UI tooling |
 
-Query string is parsed via [`@uniqu/url`](https://github.com/moostjs/uniqu) for filtering, sorting, pagination, and projection.
+## GET /query
+
+Returns an array of records. Supports filtering, sorting, pagination, projection, relation loading, and fulltext search.
 
 ```
-GET /todos/query?status=active&$sort=-createdAt&$limit=10&$select=id,title
+GET /todos/query?completed=false&$sort=-createdAt&$limit=10&$select=id,title
 ```
-
-Returns `DataType[]` by default. If `$count` is set, returns a `number` instead.
-
-When `$search` is provided and the table has fulltext/search indexes, the controller falls back to text search automatically.
 
 **Query parameters:**
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `$skip` | `number` | Number of records to skip |
-| `$limit` | `number` | Maximum records to return (default: 1000) |
 | `$sort` | `string` | Sort expression (e.g., `-createdAt` for descending) |
+| `$limit` | `number` | Maximum records to return (default: 1000) |
+| `$skip` | `number` | Number of records to skip |
 | `$select` | `string` | Comma-separated field names for projection |
 | `$count` | `boolean` | Return count instead of records |
 | `$search` | `string` | Fulltext search term |
@@ -172,27 +128,41 @@ When `$search` is provided and the table has fulltext/search indexes, the contro
 | `$with` | `string` | Load relations (e.g., `$with=author,comments`) |
 | *(other)* | *any* | Filter fields (e.g., `status=active`, `priority=high`) |
 
+When `$count` is set, the endpoint returns a `number` instead of an array. When `$search` is provided and the table has fulltext/search indexes, the controller uses text search automatically.
+
 **Relation loading:**
 
 ```
-GET /posts/query?$with=author,comments
-GET /posts/query?$with=author,comments($limit=5&$sort=-createdAt)
-GET /users/query?$with=posts(status=published&$with=comments(body~=Great))
+GET /todos/query?$with=author,comments
+GET /todos/query?$with=author,comments($limit=5&$sort=-createdAt)
 ```
 
-See [URL Query Syntax — `$with`](./crud-http-query-syntax#with-relation-loading) for the full syntax and [Navigation & Relations](./navigation) for schema setup.
+See [URL Query Syntax](./crud-http-query-syntax) for the full filter and `$with` syntax.
 
-### `GET /pages` -- Paginated Results
+## GET /pages
+
+Returns paginated results with metadata.
 
 ```
-GET /todos/pages?$page=2&$size=10&$sort=-createdAt
+GET /todos/pages?$page=2&$size=10&status=active
 ```
 
-Returns a paginated response object:
+**Additional parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `$page` | `number` | `1` | Page number (1-based) |
+| `$size` | `number` | `10` | Items per page |
+
+All other query parameters from `GET /query` (filters, `$sort`, `$select`, `$search`, `$with`) are also supported.
+
+**Response:**
 
 ```json
 {
-  "data": [...],
+  "data": [
+    { "id": 11, "title": "Task 11", "status": "active" }
+  ],
   "page": 2,
   "itemsPerPage": 10,
   "pages": 5,
@@ -200,53 +170,89 @@ Returns a paginated response object:
 }
 ```
 
-**Query parameters:**
+## GET /one/:id
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `$page` | `number` | `1` | Page number (1-based) |
-| `$size` | `number` | `10` | Items per page |
-| `$sort` | `string` | — | Sort expression |
-| `$select` | `string` | — | Field projection |
-| `$search` | `string` | — | Fulltext search term |
-| `$index` | `string` | — | Search index name |
-| `$with` | `string` | — | Load relations |
-| *(other)* | *any* | — | Filter fields |
-
-### `GET /one/:id` -- Single Record
+Retrieves a single record by primary key. Returns `404` if not found.
 
 ```
 GET /todos/one/42
-GET /todos/one/69a8c048...
 ```
 
-Looks up the record by primary key. Returns `404` if not found. Supports `$select` for field projection and `$with` for relation loading in the query string.
+Supports `$select` and `$with` in the query string. Filter parameters are not allowed on this endpoint and return a `400` error.
 
-Filtering is not allowed on this endpoint -- any filter parameters will return a `400` error.
+**Composite keys** -- use query parameters instead of a path parameter:
 
-### `POST /` -- Insert
+```
+GET /task-tags/one?taskId=1&tagId=2
+```
+
+The controller matches query parameters against composite primary keys first, then compound unique indexes.
+
+## POST /
+
+Insert one or many records.
+
+**Single insert:**
 
 ```
 POST /todos/
 Content-Type: application/json
 
-{"title": "Buy milk"}
+{"title": "Buy milk", "priority": "high"}
 ```
 
-Accepts a single object or an array. A single object calls `insertOne`; an array calls `insertMany`. Default values from `@db.default` and `@db.default.fn` are applied automatically.
+Response:
 
-### `PUT /` -- Replace
+```json
+{ "insertedId": 1 }
+```
+
+**Batch insert:**
+
+```
+POST /todos/
+Content-Type: application/json
+
+[
+  {"title": "Buy milk"},
+  {"title": "Write docs"}
+]
+```
+
+Response:
+
+```json
+{ "insertedCount": 2, "insertedIds": [1, 2] }
+```
+
+Default values from `@db.default` and `@db.default.fn` are applied automatically. Supports nested relation data for deep insert operations.
+
+## PUT /
+
+Replace records. The body must include all required fields and the primary key field(s).
+
+**Single replace:**
 
 ```
 PUT /todos/
 Content-Type: application/json
 
-{"id": 1, "title": "Buy milk", "completed": true, "priority": "high"}
+{"id": 1, "title": "Buy oat milk", "completed": true, "priority": "high"}
 ```
 
-Full replacement by primary key. The body must include the primary key field(s) and all required fields.
+Response:
 
-### `PATCH /` -- Update
+```json
+{ "matchedCount": 1, "modifiedCount": 1 }
+```
+
+**Bulk replace** -- send an array of objects. Each object is replaced independently.
+
+## PATCH /
+
+Partial update by primary key. Only the provided fields are changed.
+
+**Single update:**
 
 ```
 PATCH /todos/
@@ -255,25 +261,49 @@ Content-Type: application/json
 {"id": 1, "completed": true}
 ```
 
-Partial update by primary key. Only the provided fields are changed. Supports [array patch operators](./patch-operations) for fine-grained array manipulation.
+Response:
 
-### `DELETE /:id` -- Delete
+```json
+{ "matchedCount": 1, "modifiedCount": 1 }
+```
+
+**Bulk update** -- send an array of objects. Supports [array patch operators](./patch-operations) for fine-grained array manipulation within update payloads.
+
+## DELETE /:id
+
+Removes a single record by primary key. Returns `404` if the record is not found.
 
 ```
 DELETE /todos/42
 ```
 
-Removes the record by primary key. Returns `404` if the record is not found.
+Response:
 
-### `GET /meta` -- Table Metadata
+```json
+{ "deletedCount": 1 }
+```
 
-Returns metadata about the table for use by UI tooling or client libraries:
+**Composite keys** -- use query parameters:
+
+```
+DELETE /task-tags/?taskId=1&tagId=2
+```
+
+Response:
+
+```json
+{ "deletedCount": 1 }
+```
+
+## GET /meta
+
+Returns table metadata for use by UI tooling or client libraries:
 
 ```json
 {
   "searchable": true,
   "searchIndexes": [
-    {"name": "DEFAULT", "description": "dynamic_text index"}
+    { "name": "DEFAULT", "description": "dynamic_text index" }
   ],
   "type": { ... }
 }
@@ -283,89 +313,45 @@ The `type` field contains the full serialized Atscript type definition, includin
 
 ## Read-Only Controllers
 
-For cases where you need a read-only view of the data — such as dashboards, reports, or filtered views — use `AsDbReadableController` with `@ReadableController` (or `@ViewController`). This creates only GET endpoints with no write operations.
+For views or restricted access, use `AsDbReadableController` with `@ReadableController`. This creates only GET endpoints -- no write operations.
 
 ```typescript
-import { ReadableController, AsDbReadableController } from '@atscript/moost-db'
+import { AsDbReadableController, ReadableController } from '@atscript/moost-db'
+import { ActiveTask } from './schema/active-tasks.as'
+import { activeTasksView } from './db'
 
 @ReadableController(activeTasksView)
 export class ActiveTasksController extends AsDbReadableController<typeof ActiveTask> {}
 ```
 
-This creates only the following endpoints:
+Available endpoints:
 
-- `GET /query` — List records with filtering, sorting, and pagination
-- `GET /pages` — Paginated results
-- `GET /one/:id` — Single record by ID
-- `GET /meta` — Table metadata
+- `GET /query` -- List records with filtering, sorting, and pagination
+- `GET /pages` -- Paginated results
+- `GET /one/:id` -- Single record by ID
+- `GET /meta` -- Table metadata
 
-No `POST`, `PUT`, `PATCH`, or `DELETE` endpoints are created. This is useful for:
+`POST`, `PUT`, `PATCH`, and `DELETE` return 404.
 
-- **Filtered views** — Expose a pre-filtered subset of data (e.g., only active tasks)
-- **Dashboards** — Read-only data for reporting UIs
-- **Public APIs** — Expose data without allowing modifications
-- **Aggregated views** — Present computed or joined data that shouldn't be directly edited
+## View Controllers
 
-The `@ViewController` decorator is an alias for `@ReadableController` — they are interchangeable:
+`@ViewController` is an alias for `@ReadableController` -- they are interchangeable:
 
 ```typescript
-import { ViewController, AsDbReadableController } from '@atscript/moost-db'
+import { AsDbReadableController, ViewController } from '@atscript/moost-db'
+import { TaskStats } from './schema/task-stats.as'
+import { taskStatsView } from './db'
 
-@ViewController(activeTasksView)
-export class ActiveTasksController extends AsDbReadableController<typeof ActiveTask> {}
+@ViewController(taskStatsView)
+export class TaskStatsController extends AsDbReadableController<typeof TaskStats> {}
 ```
 
-`AsDbReadableController` supports the same hooks as `AsDbController` for read operations — `transformFilter()`, `transformProjection()`, and `validateInsights()` — but does not include `onWrite()` or `onRemove()`.
+## Custom Route Prefix
 
-## Works with Any Adapter
-
-The same controller class works with any database adapter. Only the table initialization changes:
-
-::: code-group
-
-```typescript [SQLite]
-import { AtscriptDbTable } from '@atscript/utils-db'
-import { BetterSqlite3Driver, SqliteAdapter } from '@atscript/db-sqlite'
-import { Todo } from './schema/todo.as'
-
-const driver = new BetterSqlite3Driver('./todos.db')
-export const todosTable = new AtscriptDbTable(Todo, new SqliteAdapter(driver))
-
-// Run `npx asc db sync` to create/update tables
-```
-
-```typescript [MongoDB]
-import { MongoAdapter } from '@atscript/mongo'
-import { DbSpace } from '@atscript/utils-db'
-import { MongoClient } from 'mongodb'
-import { Todo } from './schema/todo.as'
-
-const client = new MongoClient('mongodb://localhost:27017/myapp')
-const db = new DbSpace(() => new MongoAdapter(client.db(), client))
-export const todosTable = db.getTable(Todo)
-
-// Run `npx asc db sync` to create/update tables
-```
-
-:::
-
-The controller stays identical regardless of the adapter:
+By default, `@TableController` uses the `@db.table` name as the route prefix. Override it with a second argument:
 
 ```typescript
-import { AsDbController, TableController } from '@atscript/moost-db'
-import { Todo } from './schema/todo.as'
-import { todosTable } from './init-tables'
-
-@TableController(todosTable)
-export class TodoController extends AsDbController<typeof Todo> {}
-```
-
-## Customizing the Route Prefix
-
-By default, `@TableController` uses the `@db.table` name as the route prefix. You can override it by passing a second argument:
-
-```typescript
-@TableController(todosTable, 'api/v2/todos')
+@TableController(todosTable, 'api/v1/todos')
 export class TodoController extends AsDbController<typeof Todo> {}
 ```
 
@@ -377,52 +363,44 @@ app.registerControllers(
 )
 ```
 
-## Overriding Hooks
+Both `@ReadableController` and `@ViewController` accept the same optional prefix argument.
 
-`AsDbController` provides hooks you can override in subclasses for access control, data transformation, or tenant filtering:
+## Adapter Agnostic
+
+The same controller code works identically regardless of which database adapter backs the table. Swap the adapter in your table setup and the HTTP API stays unchanged.
 
 ```typescript
-@TableController(todosTable)
-export class TodoController extends AsDbController<typeof Todo> {
-  // Add tenant filtering to all queries
-  protected transformFilter(filter: FilterExpr): FilterExpr {
-    return { ...filter, tenantId: this.getCurrentTenantId() }
-  }
+// Switch from SQLite to MongoDB — no controller changes needed
+import { MongoAdapter } from '@atscript/mongo'
 
-  // Intercept writes for validation or enrichment
-  protected onWrite(
-    action: 'insert' | 'insertMany' | 'replace' | 'update',
-    data: unknown
-  ) {
-    // Return undefined to abort the operation
-    // Return modified data to proceed
-    return data
-  }
+const todosTable = new AtscriptDbTable(Todo, new MongoAdapter(db, client))
+```
 
-  // Intercept deletes
-  protected onRemove(id: unknown) {
-    // Return undefined to abort
-    return id
-  }
+## Error Handling
+
+The controller automatically transforms errors into appropriate HTTP responses:
+
+| Error | HTTP Status | Response |
+|-------|-------------|----------|
+| `ValidatorError` | 400 | `{ message, statusCode, errors: [{ path, message }] }` |
+| `DbError` (CONFLICT) | 409 | `{ message, statusCode, errors }` |
+| `DbError` (other) | 400 | `{ message, statusCode, errors }` |
+| Not found | 404 | Standard 404 |
+
+Validation errors include detailed field-level information:
+
+```json
+{
+  "message": "Validation failed",
+  "statusCode": 400,
+  "errors": [
+    { "path": "title", "message": "Required field" }
+  ]
 }
 ```
 
-Available hooks:
+## Next Steps
 
-| Hook | Purpose |
-|------|---------|
-| `transformFilter(filter)` | Modify the filter before every query |
-| `transformProjection(projection)` | Modify field projection before queries |
-| `onWrite(action, data)` | Intercept insert/replace/update. Return `undefined` to abort |
-| `onRemove(id)` | Intercept delete. Return `undefined` to abort |
-| `init()` | One-time initialization hook (called in constructor) |
-
-## See Also
-
-- [Annotation Reference](./annotations) -- `@db.*` annotation reference
-- [Navigation & Relations](./navigation) -- `@db.rel.*` and `$with` loading
-- [CRUD Operations](./crud) -- `AtscriptDbTable` reference
-- [Queries & Filters](./queries) -- Filter expression syntax
-- [URL Query Syntax](./crud-http-query-syntax) -- Full URL filter and `$with` syntax
-- [Customization](./crud-http-customization) -- Hooks and overrides in detail
-- [Patch Operations](./patch-operations) -- Array-level patch operators
+- [URL Query Syntax](./crud-http-query-syntax) -- Full filter, sort, and `$with` syntax for query strings
+- [Customization & Hooks](./crud-http-customization) -- Override hooks for access control, tenant filtering, and data transformation
+- [CRUD Operations](./crud) -- `AtscriptDbTable` API reference for programmatic usage

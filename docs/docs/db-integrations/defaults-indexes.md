@@ -4,108 +4,101 @@ outline: deep
 
 # Defaults & Indexes
 
-## Default Values
+Atscript lets you set default values and create database indexes directly in your `.as` schema. Defaults ensure fields are populated automatically on insert, while indexes speed up queries and enforce constraints.
 
-### Static Defaults
+## Static Defaults
 
-Set a fixed default value with `@db.default`:
+Use `@db.default` to assign a fixed value when a field is not provided at insert time. The argument is always a string — non-string values are parsed as JSON:
 
 ```atscript
-@db.default 'active'
+// String default — used as-is
+@db.default 'pending'
 status: string
 
+// Boolean default — parsed from JSON
 @db.default 'false'
-completed: boolean
+isArchived: boolean
 
-@db.default 'medium'
-priority: string
+// Number default — parsed from JSON
+@db.default '0'
+retryCount: number
 ```
 
-Static defaults are applied at insert time when the field is not provided.
+## Generated Defaults
 
-### Generated Defaults
+Some defaults need to be computed at insert time. Use `@db.default.fn` with one of three portable generator functions:
 
-Use `@db.default.fn` for values generated automatically:
+### `'increment'` — Auto-Incrementing Integer
+
+Generates sequential integers (1, 2, 3, ...). The field must be a number type:
 
 ```atscript
 @db.default.fn 'increment'
 id: number
-// Auto-incrementing integer (1, 2, 3, ...)
-
-@db.default.fn 'uuid'
-id: string
-// Random UUID (e.g., "550e8400-e29b-41d4-a716-446655440000")
-
-@db.default.fn 'now'
-createdAt?: number
-// Current timestamp at insert time
 ```
 
-| Function | Type | Description |
-|----------|------|-------------|
-| `increment` | `number` | Auto-incrementing integer |
-| `uuid` | `string` | Random UUID v4 |
-| `now` | `number` | Current timestamp (milliseconds) |
+### `'uuid'` — Random UUID
 
-::: tip Semantic Primitives Include Defaults
-Semantic types like `number.timestamp.created` already include `@db.default.fn 'now'` — you don't need to add it yourself. Using semantic types keeps your schema concise:
+Generates a random UUID v4 string. The field must be a string type:
+
+```atscript
+@db.default.fn 'uuid'
+id: string
+```
+
+### `'now'` — Current Timestamp
+
+Captures the current time at insert. Works with number (Unix milliseconds) and string (ISO format) types:
+
+```atscript
+@db.default.fn 'now'
+createdAt?: number
+```
+
+::: tip Semantic Types Include Defaults
+Semantic types like `number.timestamp.created` already include `@db.default.fn 'now'` — you don't need to add it manually:
 
 ```atscript
 // Concise — semantic type handles the default
 createdAt?: number.timestamp.created
 
-// Verbose — only needed for plain number types
+// Equivalent verbose form
 @db.default.fn 'now'
 createdAt?: number
 ```
 
-Fields with `@db.default.fn` are typically marked optional (`?`) since they don't need to be provided on insert.
 :::
 
 ## Indexes
 
+Indexes improve query performance and can enforce constraints. Atscript supports three index types through the `@db.index.*` annotations.
+
 ### Plain Index
 
-Create a non-unique index for faster lookups:
+Create a standard index for faster lookups with `@db.index.plain`. The first argument is the index name, and an optional second argument sets the sort direction (`'asc'` or `'desc'`):
 
 ```atscript
 @db.index.plain 'name_idx'
 name: string
+
+@db.index.plain 'created_idx', 'desc'
+createdAt: number
 ```
 
 ### Unique Index
 
-Enforce uniqueness with a unique index:
+Enforce that no two records share the same value with `@db.index.unique`:
 
 ```atscript
 @db.index.unique 'email_idx'
 email: string
 ```
 
-### Composite Indexes
-
-Add the same index name to multiple fields to create a composite index:
-
-```atscript
-@db.index.plain 'name_created_idx'
-name: string
-
-@db.index.plain 'name_created_idx', 'desc'
-createdAt: number
-```
-
-The optional second argument sets the sort direction (`'asc'` or `'desc'`).
+Any attempt to insert a duplicate value will result in a constraint violation error.
 
 ### Full-Text Search Index
 
-Mark fields for full-text search:
-
-```atscript
-@db.index.fulltext 'search_idx'
-bio?: string
-```
-
-You can optionally assign a **weight** to a field — higher weight means more relevant in search results:
+Mark fields for full-text search with `@db.index.fulltext`. An optional second argument sets the field's **weight** — higher weight means greater relevance in search results:
 
 ```atscript
 @db.index.fulltext 'search_idx', 10
@@ -115,55 +108,77 @@ title: string
 body?: string
 ```
 
-The weight parameter defaults to `1`. It's supported by databases with weighted full-text search (e.g., MongoDB, PostgreSQL).
+The weight defaults to `1` when omitted. Weighted full-text search is supported by databases like MongoDB and PostgreSQL. SQLite requires the FTS5 extension and does not auto-manage full-text indexes.
 
-Full-text indexes are handled differently by each adapter:
-- **SQLite** — Requires FTS5 extension (not auto-managed)
-- **MongoDB** — Creates a text index; also supports Atlas Search via `@db.mongo.search.*`
+## Composite Indexes
 
-### Multiple Indexes on One Field
-
-A field can participate in multiple indexes:
+When multiple fields share the same index name, they form a **composite index**. This is useful for queries that filter or sort on multiple columns together:
 
 ```atscript
-@db.index.plain 'name_idx'
-@db.index.plain 'name_created_idx'
+@db.index.plain 'name_email_idx'
 name: string
+
+@db.index.plain 'name_email_idx'
+email: string
 ```
+
+This creates a single index spanning both `name` and `email`, which speeds up queries that filter on both fields simultaneously.
+
+## Multiple Indexes Per Field
+
+A single field can participate in more than one index. Simply stack multiple `@db.index.*` annotations:
+
+```atscript
+@db.index.unique 'email_idx'
+@db.index.plain 'name_email_idx'
+email: string
+```
+
+Here `email` has its own unique index and also participates in a composite index with another field.
 
 ## Complete Example
 
+Putting it all together — a `User` table with defaults, generated values, and several index types:
+
 ```atscript
 @db.table 'users'
-@db.schema 'auth'
 export interface User {
+    // Primary key with auto-increment
     @meta.id
+    @db.default.fn 'increment'
     id: number
 
+    // Unique index ensures no duplicate emails
     @db.index.unique 'email_idx'
-    @db.column 'email_address'
     email: string
 
+    // Plain index for fast name lookups, also part of a composite index
     @db.index.plain 'name_idx'
+    @db.index.plain 'name_status_idx'
     name: string
 
-    @db.index.plain 'name_idx'
-    @db.index.plain 'created_idx', 'desc'
-    @db.default.fn 'now'
-    createdAt: number
-
-    @db.ignore
-    displayName?: string
-
+    // Static default — new users start as 'active'
     @db.default 'active'
+    @db.index.plain 'name_status_idx'
     status: string
 
+    // Full-text search on bio
     @db.index.fulltext 'search_idx'
     bio?: string
+
+    // Auto-generated timestamps
+    @db.default.fn 'now'
+    createdAt?: number
+
+    @db.default.fn 'now'
+    updatedAt?: number
 }
 ```
 
+This gives you auto-incrementing IDs, a unique email constraint, composite and full-text indexes, a static default for `status`, and auto-generated timestamps -- all declared in one place.
+
 ## Next Steps
 
-- [Annotations Reference](./annotations) — Complete `@db.*` annotation list
-- [Relations](./foreign-keys) — Connect tables with foreign keys
+- [CRUD Operations](./crud) — Insert, read, update, and delete records
+- [Queries & Filters](./queries) — Filter, sort, and paginate results
+- [Relations](./relations) — Connect tables with foreign keys and joins
