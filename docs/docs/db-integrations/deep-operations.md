@@ -40,12 +40,16 @@ You never need to manually set `projectId` on the task or `taskId` on the commen
 
 ## Nested Replaces (PUT)
 
-A deep replace performs a full record swap including all relations. This is a 4-phase process similar to inserts, but with cleanup of old related data:
+A deep replace performs a full record swap including all relations. This is a 4-phase process similar to inserts, but with intelligent cleanup of old related data:
 
 1. **TO relations**: Parent records are fully replaced
 2. **Main record**: The record itself is replaced
-3. **FROM relations**: Old child records are removed (orphan cleanup), then new children are inserted
+3. **FROM relations**: Existing children are **diff-synced** — children whose primary key appears in the new payload are kept and updated in place, while orphaned children (present in the DB but absent from the payload) are deleted. New children (no PK or unrecognized PK) are inserted. This preserves the identity and downstream relations of kept children.
 4. **VIA relations**: Old junction entries are deleted, then new target records and junction entries are created
+
+::: tip Identity-preserving diff
+FROM replace does **not** delete all children and re-insert them. It compares by primary key (`@meta.id`) to detect which children are kept, which are new, and which are orphaned. Kept children retain their original PK and any downstream relations (e.g., a kept comment's replies survive the replace). Orphaned children are cascade-deleted according to their referential action rules.
+:::
 
 ```typescript
 await taskTable.replaceOne({
@@ -78,12 +82,13 @@ await taskTable.replaceOne({
 
 ## Nested Updates (PATCH)
 
-Partial updates support relations, but with an important distinction between TO and collection relations:
+Partial updates support relations, but with important constraints:
 
 - **TO relations**: Send changed fields plus the PK — the parent record is partially updated
-- **FROM and VIA relations**: You **must** use patch operators (`$insert`, `$remove`, `$update`, `$upsert`, `$replace`) — plain arrays are not accepted
+- **FROM and VIA relations**: You **must** use patch operators (`$insert`, `$remove`, `$update`, `$upsert`, `$replace`) — plain arrays are rejected with a `400` error
+- **Nested FROM inside TO**: Not supported — you cannot patch a TO parent's FROM children in a single call. This returns a `400` error.
 
-The reason is straightforward: a partial update cannot infer intent from a plain array. Should `comments: [{ body: 'Hi' }]` add a comment, replace all comments, or something else? Patch operators make your intent explicit.
+The reason for requiring operators is straightforward: a partial update cannot infer intent from a plain array. Should `comments: [{ body: 'Hi' }]` add a comment, replace all comments, or something else? Patch operators make your intent explicit.
 
 ```typescript
 await taskTable.updateOne({

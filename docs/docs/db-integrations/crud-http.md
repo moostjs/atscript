@@ -180,7 +180,7 @@ Retrieves a single record by primary key. Returns `404` if not found.
 GET /todos/one/42
 ```
 
-Supports `$select` and `$with` in the query string. Filter parameters are not allowed on this endpoint and return a `400` error.
+Supports `$select` and `$with` in the query string. Filter parameters (like `status=todo`) are not allowed on this endpoint and return a `400` error.
 
 **Composite keys** -- use query parameters instead of a path parameter:
 
@@ -229,6 +229,13 @@ Response:
 
 Default values from `@db.default` and `@db.default.fn` are applied automatically. Supports nested relation data for deep insert operations.
 
+::: details Batch edge cases
+- **Empty array** `[]` — behavior is adapter-dependent (may return 200, 201, 400, or 500)
+- **Single-item array** `[{...}]` — treated as a batch insert, returns `insertedCount` / `insertedIds`
+- **Large batches** (100+ items) — supported; the entire batch runs in a single transaction
+- **Partial failure** — if any item fails validation or violates a constraint, the entire batch is rolled back
+:::
+
 ## PUT /
 
 Replace records. The body must include all required fields and the primary key field(s).
@@ -248,7 +255,25 @@ Response:
 { "matchedCount": 1, "modifiedCount": 1 }
 ```
 
-**Bulk replace** -- send an array of objects. Each object is replaced independently.
+**Bulk replace** -- send an array of objects. Each object is replaced independently:
+
+```
+PUT /todos/
+Content-Type: application/json
+
+[
+  {"id": 1, "title": "Buy oat milk", "completed": true, "priority": "high"},
+  {"id": 2, "title": "Write tests", "completed": false, "priority": "medium"}
+]
+```
+
+Response:
+
+```json
+{ "matchedCount": 2, "modifiedCount": 2 }
+```
+
+Nested relation data is supported per item — each record goes through the [deep replace](./deep-operations) process.
 
 ## PATCH /
 
@@ -269,7 +294,25 @@ Response:
 { "matchedCount": 1, "modifiedCount": 1 }
 ```
 
-**Bulk update** -- send an array of objects. Supports [array patch operators](./patch-operations) for fine-grained array manipulation within update payloads.
+**Bulk update** -- send an array of objects:
+
+```
+PATCH /todos/
+Content-Type: application/json
+
+[
+  {"id": 1, "completed": true},
+  {"id": 2, "priority": "high"}
+]
+```
+
+Response:
+
+```json
+{ "matchedCount": 2, "modifiedCount": 2 }
+```
+
+Supports [array patch operators](./patch-operations) for fine-grained array manipulation within update payloads.
 
 ## DELETE /:id
 
@@ -389,17 +432,34 @@ The controller automatically transforms errors into appropriate HTTP responses:
 | `DbError` (other) | 400 | `{ message, statusCode, errors }` |
 | Not found | 404 | Standard 404 |
 
-Validation errors include detailed field-level information:
+Validation errors include detailed field-level information with dot-notation paths for nested data:
 
 ```json
 {
   "message": "Validation failed",
   "statusCode": 400,
   "errors": [
-    { "path": "title", "message": "Required field" }
+    { "path": "title", "message": "Required field" },
+    { "path": "project.title", "message": "Expected string, got number" },
+    { "path": "tasks.0.status", "message": "Required field" }
   ]
 }
 ```
+
+## Query Validation
+
+Invalid query parameters return `400` errors with descriptive messages:
+
+| Invalid query | Error reason |
+|--------------|--------------|
+| `$with=nonexistent` | Navigation property does not exist |
+| `$with=projectId` | FK field, not a navigation property |
+| `$with=tasks($with=nonexistent)` | Nested relation does not exist |
+| `$select=fakefield` | Field does not exist on the type |
+| `$sort=nonexistent` | Cannot sort by unknown field |
+| `GET /one/1?status=todo` | Filters not allowed on getOne endpoint |
+
+These validations apply to all endpoints that accept query controls — `/query`, `/pages`, and `/one/:id`.
 
 ## Next Steps
 

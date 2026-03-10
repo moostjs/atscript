@@ -72,6 +72,37 @@ export interface TaskTag {
 
 Here, the combination of `taskId` and `tagId` uniquely identifies each row. Neither field alone is unique — only the pair together serves as the key.
 
+### Composite Key Operations
+
+All CRUD operations work with composite keys. For programmatic usage, pass an object with all key fields:
+
+```typescript
+// Find by composite key
+const entry = await taskTags.findById({ taskId: 1, tagId: 2 })
+
+// Delete by composite key
+await taskTags.deleteOne({ taskId: 1, tagId: 2 })
+
+// Replace by composite key (all fields required)
+await taskTags.replaceOne({ taskId: 1, tagId: 2, assignedAt: Date.now() })
+
+// Update by composite key (partial)
+await taskTags.updateOne({ taskId: 1, tagId: 2, assignedAt: Date.now() })
+```
+
+Via HTTP, composite key fields are passed as query parameters:
+
+```
+GET    /task-tags/one?taskId=1&tagId=2
+DELETE /task-tags/?taskId=1&tagId=2
+```
+
+Providing only some key fields results in a `400` error for operations that require the full key (getOne, delete, replace, update). For `findMany`, partial key fields act as regular filters:
+
+```
+GET /task-tags/query?taskId=1    # returns all tags for task 1
+```
+
 ## Field Types
 
 Atscript types map to database column types automatically:

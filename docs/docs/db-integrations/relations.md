@@ -96,6 +96,44 @@ export interface Comment {
 
 When using `'setNull'`, the FK field must be optional (`?`) — otherwise there is no valid null state to fall back to.
 
+### Restrict
+
+Use `'restrict'` when child records should prevent parent deletion. This is useful for protecting important data from accidental cascading deletes:
+
+```atscript
+@db.table 'departments'
+export interface Department {
+    @meta.id
+    id: number
+
+    name: string
+
+    @db.rel.from
+    employees: Employee[]
+}
+
+@db.table 'employees'
+export interface Employee {
+    @meta.id
+    id: number
+
+    name: string
+
+    // Cannot delete department while employees exist
+    @db.rel.FK
+    @db.rel.onDelete 'restrict'
+    departmentId: Department.id
+}
+```
+
+Attempting to delete a department that still has employees returns a `CONFLICT` error (HTTP 409 via the controller). You must delete or reassign all employees first:
+
+```typescript
+await departments.deleteOne(1)
+// Throws DbError { code: 'CONFLICT', errors: [...] }
+// because employees with departmentId=1 still exist
+```
+
 ## Composite Foreign Keys
 
 When a target table has a composite primary key (multiple `@meta.id` fields), declare one FK per key field. They automatically combine into a single composite foreign key:
@@ -386,6 +424,65 @@ const projects = await projectTable.findMany({
 - **Null FK** — When a nullable FK is `null`, the corresponding `@db.rel.to` navigation property returns `null` (it is not omitted from the result).
 - **Empty collections** — When a `@db.rel.from` or `@db.rel.via` navigation has no matching records, it returns an empty array `[]`, not `null`.
 - **Explicit loading only** — Navigation properties are only populated when loaded via `$with`. Without it, they are `undefined` on the returned objects.
+
+## Nullable FK Lifecycle
+
+Optional foreign keys (`?`) support a full lifecycle of null ↔ value transitions:
+
+```typescript
+// Insert with null FK
+await tasks.insertOne({ title: 'Unassigned task', assigneeId: null })
+
+// Query for null FKs
+const unassigned = await tasks.findMany({ filter: { assigneeId: null } })
+
+// Load relation on null FK — returns null, not an error
+const task = await tasks.findOne({
+  filter: { assigneeId: null },
+  controls: { $with: [{ name: 'assignee' }] },
+})
+// task.assignee === null
+
+// Patch: assign a user
+await tasks.updateOne({ id: task.id, assigneeId: 5 })
+
+// Patch: unassign (set back to null)
+await tasks.updateOne({ id: task.id, assigneeId: null })
+```
+
+Setting an FK to a non-existent ID returns a `400` error (FK violation). Setting it to `null` always succeeds as long as the field is optional.
+
+## Nullable FK Lifecycle
+
+Optional foreign keys support a full lifecycle of null → value → null transitions:
+
+```typescript
+// Insert with null FK
+await tasks.insertOne({ title: 'Unassigned task', assigneeId: null })
+
+// Query for null FKs
+const unassigned = await tasks.findMany({ filter: { assigneeId: null } })
+
+// Load relation on null FK — returns null (not omitted)
+const task = await tasks.findOne({
+  filter: { assigneeId: null },
+  controls: { $with: [{ name: 'assignee' }] },
+})
+// task.assignee === null
+
+// Patch null → valid value
+await tasks.updateOne({ id: task.id, assigneeId: 1 })
+
+// Patch valid → null
+await tasks.updateOne({ id: task.id, assigneeId: null })
+```
+
+Setting an FK to a non-existent ID throws a `FK_VIOLATION` error (HTTP 400 via the controller):
+
+```typescript
+await tasks.updateOne({ id: 1, assigneeId: 99999 })
+// Throws DbError { code: 'FK_VIOLATION' }
+```
 
 ## Next Steps
 

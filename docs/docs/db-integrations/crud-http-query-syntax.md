@@ -182,7 +182,7 @@ Perform full-text search:
 ?$index=product_search             # named search index
 ```
 
-Full-text search support depends on the adapter. MongoDB supports Atlas Search with named indexes. SQLite does not provide built-in fulltext search.
+Full-text search support depends on the adapter. MongoDB supports Atlas Search with named indexes. SQLite does not provide built-in fulltext search. When search is not supported by the adapter, the endpoint returns a `400` or `501` error.
 
 ## Relation Loading (`$with`) {#with-relation-loading}
 

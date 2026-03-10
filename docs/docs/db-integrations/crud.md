@@ -252,6 +252,19 @@ try {
 
 Each error includes an `errors` array with `{ path, message }` entries for detailed diagnostics.
 
+### Error Paths in Nested Data
+
+When validation fails inside nested or array payloads, error paths use dot notation to pinpoint the exact location:
+
+| Context | Example path | Meaning |
+|---------|-------------|---------|
+| Top-level field | `"title"` | The `title` field failed validation |
+| TO navigation | `"project.title"` | The `title` field inside inline `project` data |
+| FROM array element | `"comments.0.body"` | The `body` field of the first comment in the array |
+| Deep nesting | `"tasks.2.project.title"` | The `title` of the project in the third task |
+
+This makes it straightforward to map errors back to specific fields in complex nested payloads — useful for building form validation UIs.
+
 ## Next Steps
 
 - [Queries & Filters](./queries) --- Advanced filtering, sorting, and projection

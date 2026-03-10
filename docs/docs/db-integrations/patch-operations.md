@@ -83,7 +83,9 @@ await tasks.updateOne({
 })
 ```
 
-Passing a plain array (without operators) is equivalent to `$replace`.
+::: warning Plain arrays rejected on PATCH
+When using `updateOne` / `bulkUpdate` (PATCH), passing a plain array instead of patch operators on a FROM navigation property returns a `400` error. Plain arrays are only accepted on `replaceOne` (PUT), where they trigger the diff-based sync described in [Deep Operations](./deep-operations). For partial updates, always use explicit operators.
+:::
 
 ## VIA Navigation Properties {#via}
 
@@ -123,7 +125,9 @@ await tasks.updateOne({ id: 1, tags: { $update: [{ id: 5, name: 'renamed' }] } }
 await tasks.updateOne({ id: 1, tags: { $replace: [{ name: 'only-tag' }] } })
 ```
 
-As with FROM relations, passing a plain array is equivalent to `$replace`.
+::: warning Plain arrays rejected on PATCH
+As with FROM relations, passing a plain array on a VIA navigation property during a PATCH operation returns a `400` error. Use `$replace` explicitly if you want to replace all entries.
+:::
 
 ## Embedded Array Patches {#embedded-arrays}
 

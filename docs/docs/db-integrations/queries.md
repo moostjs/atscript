@@ -254,6 +254,24 @@ controls: {
 }
 ```
 
+### Combining `$select` with `$with`
+
+Field projection and relation loading work together — selected fields apply to the main record, while relations are loaded in full (or with their own `$select`):
+
+```typescript
+const tasks = await taskTable.findMany({
+  controls: {
+    $select: ['id', 'title'],
+    $with: [{ name: 'assignee' }],
+  },
+})
+// Each task has only id + title, but the full assignee object is populated
+```
+
+::: tip FK fields auto-included
+When using `$select` with `$with`, foreign key fields needed for relation resolution (e.g., `assigneeId` for `assignee`) are automatically included even if not listed in `$select`. This ensures relations resolve correctly.
+:::
+
 For full details on relation types (TO, FROM, VIA), cascading, and deep loading, see the [Relations](./relations) page.
 
 ## Query Expressions
