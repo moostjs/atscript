@@ -1,3 +1,28 @@
+## [0.1.36](https://github.com/moostjs/atscript/compare/v0.1.35...v0.1.36) (2026-03-10)
+
+
+### Bug Fixes
+
+* bug fixes ([acaaa3e](https://github.com/moostjs/atscript/commit/acaaa3e56fe1b4dfc9b6312238d51a6ac1f46cfa))
+* bug fixes ([3af64f2](https://github.com/moostjs/atscript/commit/3af64f25c606e58dbc57a1b196c9fa8f4cf448dd))
+* bug fixing ([e8c3e20](https://github.com/moostjs/atscript/commit/e8c3e2044e937a87ebc0ec8687ed8af0f3aaa83e))
+* bug fixing ([adc36de](https://github.com/moostjs/atscript/commit/adc36de6e85b1d7400fbaa189b015018e61f9a7e))
+* bugs fixed ([fab9b5c](https://github.com/moostjs/atscript/commit/fab9b5cddcb1c1b07189383e23c9c290004ecba6))
+* db bugs fixing ([13c8c53](https://github.com/moostjs/atscript/commit/13c8c53286e1c2532cf4ff1d368e60783b0a3c2b))
+* fix bugs ([c6c125a](https://github.com/moostjs/atscript/commit/c6c125a5cf91915815899b22a84dc93d1e4b65c2))
+* fix bugs ([e818cd6](https://github.com/moostjs/atscript/commit/e818cd6826329fdf1ef8efea486c862051472d91))
+* fix bugs ([2c0c0c0](https://github.com/moostjs/atscript/commit/2c0c0c0fe7729cc134dabb07528a1f350f9c8fe5))
+* fix validations to be on top level ([01319d6](https://github.com/moostjs/atscript/commit/01319d64e38584237445bc656e00c4b04ebe937b))
+* more bugs fixed ([f8e3d6b](https://github.com/moostjs/atscript/commit/f8e3d6b5697141f89b6f67e85fbbe37ade81c2b9))
+* snapshot-based schema sync with type/nullable/default change detection and external view validation ([c66c9ed](https://github.com/moostjs/atscript/commit/c66c9edd2a57a6ec39e5e134cbb22d51c1e7de4c))
+
+
+### Features
+
+* move array patch operators to generic db layer with FROM/VIA operator support ([0020303](https://github.com/moostjs/atscript/commit/0020303fbe1fcb95140263cd9e5247ff4a99ee88))
+
+
+
 ## [0.1.35](https://github.com/moostjs/atscript/compare/v0.1.34...v0.1.35) (2026-03-07)
 
 
