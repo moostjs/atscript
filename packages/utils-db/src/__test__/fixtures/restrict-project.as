@@ -3,7 +3,7 @@ import { User } from './restrict-user'
 @db.table 'projects'
 export interface Project {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string

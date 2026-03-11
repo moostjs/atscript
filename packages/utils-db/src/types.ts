@@ -87,7 +87,7 @@ export type TDbDefaultFn = 'increment' | 'uuid' | 'now'
 
 export type TDbDefaultValue =
   | { kind: 'value'; value: string }
-  | { kind: 'fn'; fn: TDbDefaultFn }
+  | { kind: 'fn'; fn: TDbDefaultFn; start?: number }
 
 // ── ID Descriptor ───────────────────────────────────────────────────────────
 

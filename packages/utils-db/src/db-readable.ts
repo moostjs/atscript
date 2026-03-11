@@ -844,16 +844,21 @@ export class AtscriptDbReadable<
       this._columnFromMap.set(fieldName, columnFrom)
     }
 
-    // @db.default or @db.default.fn
+    // @db.default or @db.default.increment/uuid/now
     const defaultValue = metadata.get('db.default') as string | undefined
-    const defaultFn = metadata.get('db.default.fn') as string | undefined
     if (defaultValue !== undefined) {
       this._defaults.set(fieldName, { kind: 'value', value: defaultValue })
-    } else if (defaultFn !== undefined) {
+    } else if (metadata.has('db.default.increment')) {
+      const startValue = metadata.get('db.default.increment')
       this._defaults.set(fieldName, {
         kind: 'fn',
-        fn: defaultFn as TDbDefaultFn,
+        fn: 'increment',
+        start: typeof startValue === 'number' ? startValue : undefined,
       })
+    } else if (metadata.has('db.default.uuid')) {
+      this._defaults.set(fieldName, { kind: 'fn', fn: 'uuid' })
+    } else if (metadata.has('db.default.now')) {
+      this._defaults.set(fieldName, { kind: 'fn', fn: 'now' })
     }
 
     // @db.ignore

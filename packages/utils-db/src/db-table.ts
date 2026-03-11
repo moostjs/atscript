@@ -1836,7 +1836,7 @@ export class AtscriptDbTable<
 
     /** Makes PK, defaulted, and FK fields optional; forces nav fields non-optional. */
     const insertReplace = (type: TAtscriptAnnotatedType) => {
-      if (type.metadata?.has('meta.id') || type.metadata?.has('db.default') || type.metadata?.has('db.default.fn') || type.metadata?.has('db.rel.FK')) {
+      if (type.metadata?.has('meta.id') || type.metadata?.has('db.default') || type.metadata?.has('db.default.increment') || type.metadata?.has('db.default.uuid') || type.metadata?.has('db.default.now') || type.metadata?.has('db.rel.FK')) {
         return { ...type, optional: true }
       }
       return forceNavNonOptional(type)

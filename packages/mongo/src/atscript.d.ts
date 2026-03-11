@@ -39,7 +39,11 @@ declare global {
     "db.column.name": string
     "db.column.from": string
     "db.default.value": string
-    "db.default.fn": string
+    "db.default.increment": number | true
+    "db.default.uuid": true
+    "db.default.now": true
+    "db.column.collate": string
+    "db.column.precision": { precision: number; scale: number }
     "db.json": boolean
     "db.ignore": boolean
     "db.sync.method": string

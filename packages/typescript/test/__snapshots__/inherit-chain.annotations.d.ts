@@ -39,8 +39,12 @@ declare global {
     "db.index.fulltext": ({ name?: string, weight?: number })[]
     "db.column": string
     "db.column.renamed": string
+    "db.column.collate": string
+    "db.column.precision": { precision: number, scale: number }
     "db.default": string
-    "db.default.fn": string
+    "db.default.increment": number | true
+    "db.default.uuid": boolean
+    "db.default.now": boolean
     "db.json": boolean
     "db.ignore": boolean
     "db.sync.method": string
@@ -84,6 +88,6 @@ declare global {
     fromI1: boolean
     fromI2: boolean
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "url" | "ipv4" | "ipv6" | "ip" | "char" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "int8" | "int16" | "int32" | "int64" | "uint8" | "byte" | "uint16" | "port" | "uint32" | "uint64" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
 }
 // prettier-ignore-end

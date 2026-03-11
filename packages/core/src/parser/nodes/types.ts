@@ -36,7 +36,7 @@ export type TPrimitiveAnnotationArg = string | number | boolean
 export type TPrimitiveAnnotationArgs = Record<string, TPrimitiveAnnotationArg>
 export type TPrimitiveAnnotationValue =
   | boolean // no-arg annotation (e.g., 'expect.int': true)
-  | string // single string arg (e.g., 'db.default.fn': 'now')
+  | string // single string arg (e.g., 'db.column.collate': 'nocase')
   | number // single number arg (e.g., 'expect.min': 0)
   | TPrimitiveAnnotationArgs // multi named args (e.g., { pattern: '...', flags: 'i', message: '...' })
   | (TPrimitiveAnnotationArg | TPrimitiveAnnotationArgs)[] // multiple instances

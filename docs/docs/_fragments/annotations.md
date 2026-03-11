@@ -201,7 +201,8 @@ Atscript ships a comprehensive set of database annotations for defining tables, 
 
 - `@db.table`, `@db.schema` — Table definitions
 - `@db.column`, `@db.json`, `@db.ignore` — Column configuration
-- `@db.default`, `@db.default.fn` — Default values
+- `@db.default`, `@db.default.increment`, `@db.default.uuid`, `@db.default.now` — Default values
+- `@db.column.collate`, `@db.column.precision` — Column storage hints
 - `@db.index.plain`, `@db.index.unique`, `@db.index.fulltext` — Indexes
 - `@db.rel.FK`, `@db.rel.to`, `@db.rel.from`, `@db.rel.via`, `@db.rel.onDelete`, `@db.rel.onUpdate`, `@db.rel.filter` — Relations
 - `@db.view`, `@db.view.for`, `@db.view.joins`, `@db.view.filter`, `@db.view.materialized`, `@db.view.renamed` — Views

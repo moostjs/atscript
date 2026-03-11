@@ -21,7 +21,7 @@ $("object", Comment)
     $().designType("number")
       .tags("number")
       .annotate("meta.id", true)
-      .annotate("db.default.fn", "increment")
+      .annotate("db.default.increment", true)
       .$type
   ).prop(
     "body",
@@ -32,7 +32,7 @@ $("object", Comment)
     "createdAt",
     $().designType("number")
       .tags("created", "timestamp", "number")
-      .annotate("db.default.fn", "now")
+      .annotate("db.default.now", true)
       .annotate("expect.int", true)
       .optional()
       .$type

@@ -17,6 +17,8 @@ Complete reference for all database annotations available in `.as` files. The `@
 | `@db.schema` | Interface | `name` (string) | Assign to a database schema/namespace |
 | `@db.column` | Field | `name` (string) | Override the physical column name |
 | `@db.column.renamed` | Field | `oldName` (string) | Previous column name for [schema sync](./schema-sync) migration |
+| `@db.column.collate` | Field | `collation` (string) | Portable collation: `'binary'`, `'nocase'`, or `'unicode'` |
+| `@db.column.precision` | Field | `precision` (number), `scale` (number) | Decimal precision/scale for DB storage (e.g., `DECIMAL(10,2)`) |
 | `@db.json` | Field | — | Store as a single JSON column instead of flattening |
 | `@db.ignore` | Field | — | Exclude field from the database schema entirely |
 
@@ -32,6 +34,12 @@ interface User {
 
   @db.ignore
   computedField: string
+
+  @db.column.collate 'nocase'
+  username: string
+
+  @db.column.precision 10, 2
+  price: number
 }
 ```
 
@@ -40,27 +48,21 @@ interface User {
 | Annotation | Applies To | Arguments | Description |
 |------------|------------|-----------|-------------|
 | `@db.default` | Field | `value` (string) | Static default value |
-| `@db.default.fn` | Field | `fn` (string) | Generated default: `'increment'`, `'uuid'`, or `'now'` |
-
-**Default function values:**
-
-| Function | Requires | Description |
-|----------|----------|-------------|
-| `'increment'` | number type | Auto-incrementing integer |
-| `'uuid'` | string type | Random UUID string |
-| `'now'` | number or string type | Current timestamp |
+| `@db.default.increment` | Field | `start?` (number) | Auto-incrementing integer (requires number type) |
+| `@db.default.uuid` | Field | — | Random UUID string (requires string type) |
+| `@db.default.now` | Field | — | Current timestamp (requires number or string type) |
 
 ```atscript
 @db.table
 interface Product {
   @meta.id
-  @db.default.fn 'uuid'
+  @db.default.uuid
   id: string
 
   @db.default 'untitled'
   name: string
 
-  @db.default.fn 'now'
+  @db.default.now
   createdAt: number
 }
 ```

@@ -61,7 +61,7 @@ $("object", UsersTable)
       .tags("number")
       .annotate("db.index.plain", { name: "name_idx",  }, true)
       .annotate("db.index.plain", { name: "created_idx",  sort: "desc" }, true)
-      .annotate("db.default.fn", "now")
+      .annotate("db.default.now", true)
       .$type
   ).prop(
     "displayName",
@@ -93,7 +93,7 @@ $("object", ProfileTable)
     $().designType("number")
       .tags("number")
       .annotate("meta.id", true)
-      .annotate("db.default.fn", "increment")
+      .annotate("db.default.increment", true)
       .$type
   ).prop(
     "name",

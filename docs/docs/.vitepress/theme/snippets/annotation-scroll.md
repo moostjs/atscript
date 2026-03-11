@@ -4,7 +4,7 @@
 @db.table 'tasks'
 export interface Task {
   @meta.id
-  @db.default.fn 'increment'
+  @db.default.increment
   id: number
 
   @meta.label 'Title'
@@ -51,7 +51,7 @@ export interface Task {
   internalNotes?: string
 
   @meta.readonly
-  @db.default.fn 'now'
+  @db.default.now
   createdAt?: number.timestamp.created
 
   @db.rel.FK

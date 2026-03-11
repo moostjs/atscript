@@ -318,7 +318,7 @@ Here is a four-table schema that uses all the relation types together:
 @db.table 'users'
 export interface User {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string
@@ -331,7 +331,7 @@ export interface User {
 @db.table 'projects'
 export interface Project {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string
@@ -349,7 +349,7 @@ export interface Project {
 @db.table 'tasks'
 export interface Task {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -376,7 +376,7 @@ export interface Task {
 @db.table 'tags'
 export interface Tag {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     label: string
@@ -388,7 +388,7 @@ export interface Tag {
 @db.table 'task_tags'
 export interface TaskTag {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     @db.rel.FK

@@ -240,7 +240,9 @@ These `@db.*` annotations are defined in `@atscript/core` and processed by `Atsc
 | `@meta.id` | Field | Marks primary key (no args; multiple = composite key) |
 | `@db.column "name"` | Field | Physical column name override |
 | `@db.default "val"` | Field | Default value on insert |
-| `@db.default.fn "now"` | Field | Default function (`now`, `uuid`, `increment`) |
+| `@db.default.increment` | Field | Auto-incrementing integer default |
+| `@db.default.uuid` | Field | UUID generation default |
+| `@db.default.now` | Field | Current timestamp default |
 | `@db.ignore` | Field | Exclude from database operations |
 | `@db.index.plain "name"` | Field | B-tree index (optional sort: `"name", "desc"`) |
 | `@db.index.unique "name"` | Field | Unique index |

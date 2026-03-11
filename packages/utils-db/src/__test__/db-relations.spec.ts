@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import type { FilterExpr } from '@uniqu/core'
-import { defineAnnotatedType as $ } from '@atscript/typescript/utils'
 
 import { AtscriptDbTable } from '../db-table'
 import { DbSpace } from '../db-space'
@@ -14,66 +13,9 @@ import type {
   TDbDeleteResult,
 } from '../types'
 
-// ── Build types programmatically ─────────────────────────────────────────
-
 let Author: any
 let Post: any
 let Comment: any
-
-function buildTypes() {
-  // Forward-declare classes so refTo can use them
-  class AuthorClass {
-    static __is_atscript_annotated_type = true
-    static type = {}
-    static metadata = new Map()
-    static id = 'Author'
-    static validator = () => ({ validate: () => true })
-  }
-  class PostClass {
-    static __is_atscript_annotated_type = true
-    static type = {}
-    static metadata = new Map()
-    static id = 'Post'
-    static validator = () => ({ validate: () => true })
-  }
-  class CommentClass {
-    static __is_atscript_annotated_type = true
-    static type = {}
-    static metadata = new Map()
-    static id = 'Comment'
-    static validator = () => ({ validate: () => true })
-  }
-
-  // Author: id, name, createdAt, posts (rel.from)
-  $('object', AuthorClass)
-    .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
-    .prop('name', $().designType('string').tags('string').$type)
-    .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('posts', $('array').of($().refTo(() => PostClass as any).$type).annotate('db.rel.from', true).optional().$type)
-    .annotate('db.table', 'authors')
-
-  // Post: id, title, status, createdAt, authorId (FK), author (rel.to), comments (rel.from)
-  $('object', PostClass)
-    .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
-    .prop('title', $().designType('string').tags('string').$type)
-    .prop('status', $().designType('string').tags('string').annotate('db.default', 'draft').$type)
-    .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('authorId', $().refTo(() => AuthorClass as any, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
-    .prop('author', $().refTo(() => AuthorClass as any).annotate('db.rel.to', true).optional().$type)
-    .prop('comments', $('array').of($().refTo(() => CommentClass as any).$type).annotate('db.rel.from', true).optional().$type)
-    .annotate('db.table', 'posts')
-
-  // Comment: id, body, createdAt, postId (FK), post (rel.to)
-  $('object', CommentClass)
-    .prop('id', $().designType('number').tags('number').annotate('meta.id', true).annotate('db.default.fn', 'increment').$type)
-    .prop('body', $().designType('string').tags('string').$type)
-    .prop('createdAt', $().designType('number').tags('created', 'timestamp', 'number').annotate('db.default.fn', 'now').optional().$type)
-    .prop('postId', $().refTo(() => PostClass as any, ['id']).annotate('db.rel.FK', true).annotate('db.rel.onDelete', 'cascade').$type)
-    .prop('post', $().refTo(() => PostClass as any).annotate('db.rel.to', true).optional().$type)
-    .annotate('db.table', 'comments')
-
-  return { Author: AuthorClass, Post: PostClass, Comment: CommentClass }
-}
 
 // ── Mock adapter that stores data in memory ──────────────────────────────
 
@@ -190,11 +132,14 @@ function withRel(name: string, opts?: { filter?: any; controls?: any }): any {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('AtscriptDbTable — Relations', () => {
-  beforeAll(() => {
-    const types = buildTypes()
-    Author = types.Author
-    Post = types.Post
-    Comment = types.Comment
+  beforeAll(async () => {
+    await prepareFixtures()
+    const author = await import('./fixtures/rel-author.as.js')
+    const post = await import('./fixtures/test-relations.as.js')
+    const comment = await import('./fixtures/rel-comment.as.js')
+    Author = author.Author
+    Post = post.Post
+    Comment = comment.Comment
   })
 
   // ── Nav field purging ─────────────────────────────────────────────────
@@ -1474,7 +1419,6 @@ describe('AtscriptDbTable — Relations', () => {
     let db: DbSpace
 
     beforeAll(async () => {
-      await prepareFixtures()
       const task = await import('./fixtures/rel-task.as.js')
       const tag = await import('./fixtures/rel-tag.as.js')
       const taskTag = await import('./fixtures/rel-task-tag.as.js')

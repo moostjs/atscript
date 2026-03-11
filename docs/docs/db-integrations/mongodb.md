@@ -117,11 +117,11 @@ await users.findById(42)                                         // by @meta.id 
 
 ## Auto-Increment
 
-The `@db.default.fn 'increment'` annotation enables auto-increment behavior for numeric fields:
+The `@db.default.increment` annotation enables auto-increment behavior for numeric fields:
 
 ```atscript
 @meta.id
-@db.default.fn 'increment'
+@db.default.increment
 id: number
 ```
 
@@ -132,7 +132,7 @@ The adapter uses an `__atscript_counters` collection for atomic sequence allocat
 - If a document already has an explicit value for the field, that value is kept and the counter is adjusted to stay ahead.
 
 ::: warning
-Concurrent inserts under high contention could produce duplicate values in rare cases. For guaranteed uniqueness, combine `@db.default.fn 'increment'` with `@db.index.unique`.
+Concurrent inserts under high contention could produce duplicate values in rare cases. For guaranteed uniqueness, combine `@db.default.increment` with `@db.index.unique`.
 :::
 
 ## Nested Objects
@@ -144,7 +144,7 @@ Unlike relational databases where nested objects are flattened into `__`-separat
 @db.mongo.collection
 export interface User {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string
@@ -250,7 +250,7 @@ Capped collections have a fixed maximum size and maintain insertion order (FIFO)
 export interface LogEntry {
     message: string
     level: string
-    @db.default.fn 'now'
+    @db.default.now
     timestamp: number.timestamp.created
 }
 ```
@@ -318,7 +318,7 @@ Putting it all together -- a product collection with auto-increment IDs, compoun
 @db.mongo.search.dynamic 'lucene.standard' 1
 export interface Product {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     @db.index.unique
@@ -340,7 +340,7 @@ export interface Product {
     @db.mongo.search.filter 'product_vectors'
     inStock: boolean
 
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number.timestamp.created
 }
 ```

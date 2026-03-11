@@ -3,7 +3,7 @@ import { User } from './restrict-user'
 @db.table 'categories'
 export interface Category {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     label: string

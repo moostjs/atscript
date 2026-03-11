@@ -1,5 +1,6 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
+import type { AtscriptDoc } from '../document'
 import {
   isArray,
   isInterface,
@@ -43,6 +44,37 @@ function getParentTypeName(token: Token): string | undefined {
   if (!struct) { return undefined }
   const iface = struct.ownerNode
   return (iface && isInterface(iface)) ? iface.id! : struct.id
+}
+
+/**
+ * Validate that an annotation is on a field with the expected base type.
+ */
+function validateFieldBaseType(
+  token: Token,
+  doc: AtscriptDoc,
+  annotationName: string,
+  expectedType: string | string[],
+): TMessages {
+  const errors = [] as TMessages
+  const field = token.parentNode!
+  const definition = field.getDefinition()
+  if (!definition || !isRef(definition)) {
+    return errors
+  }
+  const unwound = doc.unwindType(definition.id!, definition.chain)
+  if (!unwound || !isPrimitive(unwound.def)) {
+    return errors
+  }
+  const baseType = unwound.def.config.type as string
+  const allowed = Array.isArray(expectedType) ? expectedType : [expectedType]
+  if (!allowed.includes(baseType)) {
+    errors.push({
+      message: `${annotationName} is not compatible with type "${baseType}" — requires ${allowed.join(' or ')}`,
+      severity: 1,
+      range: token.range,
+    })
+  }
+  return errors
 }
 
 /**
@@ -111,7 +143,9 @@ function refActionAnnotation(name: 'onDelete' | 'onUpdate'): AnnotationSpec {
 
         if (action === 'setDefault' &&
           field.countAnnotations('db.default') === 0 &&
-          field.countAnnotations('db.default.fn') === 0
+          field.countAnnotations('db.default.increment') === 0 &&
+          field.countAnnotations('db.default.uuid') === 0 &&
+          field.countAnnotations('db.default.now') === 0
         ) {
           errors.push({
             message: `@db.rel.${name} "setDefault" but no @db.default.* annotation — field will have no fallback value`,
@@ -409,6 +443,61 @@ export const dbAnnotations: TAnnotationsTree = {
         description: 'The old local field name (parent prefix is reconstructed automatically).',
       },
     }),
+
+    collate: new AnnotationSpec({
+      description:
+        'Portable collation for string comparison and sorting. ' +
+        'Adapters map the generic value to their native collation.' +
+        '\n\n' +
+        '- **"binary"** — exact byte comparison (case-sensitive)\n' +
+        '- **"nocase"** — case-insensitive comparison\n' +
+        '- **"unicode"** — full Unicode-aware sorting\n\n' +
+        'For adapter-specific collations, use `@db.<engine>.collate` instead.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.column.collate "nocase"\n' +
+        'username: string\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: {
+        name: 'collation',
+        type: 'string',
+        values: ['binary', 'nocase', 'unicode'],
+        description: 'Portable collation mode: "binary", "nocase", or "unicode".',
+      },
+      validate(token, args, doc) {
+        return validateFieldBaseType(token, doc, '@db.column.collate', 'string')
+      },
+    }),
+
+    precision: new AnnotationSpec({
+      description:
+        'Sets decimal precision and scale for database storage. ' +
+        'Adapters map this to their native decimal type (e.g., `DECIMAL(10,2)` in SQL, ignored in MongoDB).' +
+        '\n\n' +
+        'This is purely a DB storage hint — it does not affect runtime JavaScript number behavior.' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.column.precision 10, 2\n' +
+        'price: number\n' +
+        '```\n',
+      nodeType: ['prop'],
+      argument: [
+        {
+          name: 'precision',
+          type: 'number',
+          description: 'Total number of significant digits.',
+        },
+        {
+          name: 'scale',
+          type: 'number',
+          description: 'Number of digits after the decimal point.',
+        },
+      ],
+      validate(token, args, doc) {
+        return validateFieldBaseType(token, doc, '@db.column.precision', 'number')
+      },
+    }),
   },
 
   default: {
@@ -430,71 +519,58 @@ export const dbAnnotations: TAnnotationsTree = {
       },
     }),
 
-    fn: new AnnotationSpec({
+    increment: new AnnotationSpec({
       description:
-        'Sets a DB-level generated default. The function name is portable — ' +
-        'each adapter maps it to the appropriate DB mechanism.' +
+        'Auto-incrementing integer default. Each adapter maps this to its native mechanism ' +
+        '(e.g., `AUTO_INCREMENT` in MySQL, `INTEGER PRIMARY KEY` in SQLite, counter collection in MongoDB).' +
         '\n\n**Example:**\n' +
         '```atscript\n' +
-        '@db.default.fn "increment"\n' +
-        'id: number\n' +
+        '@db.default.increment\n' +
+        'id: number.int\n' +
+        '\n' +
+        '// With optional start value:\n' +
+        '@db.default.increment 1000\n' +
+        'id: number.int\n' +
         '```\n',
       nodeType: ['prop'],
       argument: {
-        name: 'fn',
-        type: 'string',
-        values: ['increment', 'uuid', 'now'],
-        description: 'Generation function name: "increment", "uuid", or "now".',
+        optional: true,
+        name: 'start',
+        type: 'number',
+        description: 'Starting value for the auto-increment sequence. Adapter-specific behavior; some adapters may ignore this.',
       },
       validate(token, args, doc) {
-        const errors = [] as TMessages
-        if (!args[0]) {
-          return errors
-        }
-        const fnName = args[0].text
-        const validFns = ['increment', 'uuid', 'now']
-        if (!validFns.includes(fnName)) {
-          errors.push({
-            message: `Unknown @db.default.fn "${fnName}" — expected "increment", "uuid", or "now"`,
-            severity: 1,
-            range: args[0].range,
-          })
-          return errors
-        }
+        return validateFieldBaseType(token, doc, 'db.default.increment', 'number')
+      },
+    }),
 
-        // Validate type compatibility
-        const field = token.parentNode!
-        const definition = field.getDefinition()
-        if (!definition || !isRef(definition)) {
-          return errors
-        }
-        const unwound = doc.unwindType(definition.id!, definition.chain)
-        if (!unwound || !isPrimitive(unwound.def)) {
-          return errors
-        }
-        const baseType = unwound.def.config.type as string
+    uuid: new AnnotationSpec({
+      description:
+        'UUID generation default. Each adapter maps this to its native mechanism ' +
+        '(e.g., `DEFAULT (UUID())` in MySQL, `gen_random_uuid()` in PostgreSQL, app-level in SQLite).' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.default.uuid\n' +
+        'id: string.uuid\n' +
+        '```\n',
+      nodeType: ['prop'],
+      validate(token, args, doc) {
+        return validateFieldBaseType(token, doc, 'db.default.uuid', 'string')
+      },
+    }),
 
-        if (fnName === 'increment' && baseType !== 'number') {
-          errors.push({
-            message: `@db.default.fn "increment" is not compatible with type "${baseType}" — requires number`,
-            severity: 1,
-            range: token.range,
-          })
-        } else if (fnName === 'uuid' && baseType !== 'string') {
-          errors.push({
-            message: `@db.default.fn "uuid" is not compatible with type "${baseType}" — requires string`,
-            severity: 1,
-            range: token.range,
-          })
-        } else if (fnName === 'now' && !['number', 'string'].includes(baseType)) {
-          errors.push({
-            message: `@db.default.fn "now" is not compatible with type "${baseType}" — requires number or string`,
-            severity: 1,
-            range: token.range,
-          })
-        }
-
-        return errors
+    now: new AnnotationSpec({
+      description:
+        'Current timestamp default. Each adapter maps this to its native mechanism ' +
+        '(e.g., `DEFAULT CURRENT_TIMESTAMP` in MySQL, `DEFAULT now()` in PostgreSQL).' +
+        '\n\n**Example:**\n' +
+        '```atscript\n' +
+        '@db.default.now\n' +
+        'createdAt: number.timestamp\n' +
+        '```\n',
+      nodeType: ['prop'],
+      validate(token, args, doc) {
+        return validateFieldBaseType(token, doc, 'db.default.now', ['number', 'string'])
       },
     }),
   },

@@ -33,7 +33,7 @@ Create a `.as` file with `@db.*` annotations:
 @db.table 'todos'
 export interface Todo {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -227,7 +227,7 @@ Response:
 { "insertedCount": 2, "insertedIds": [1, 2] }
 ```
 
-Default values from `@db.default` and `@db.default.fn` are applied automatically. Supports nested relation data for deep insert operations.
+Default values from `@db.default` and generated defaults (`@db.default.increment`, `@db.default.uuid`, `@db.default.now`) are applied automatically. Supports nested relation data for deep insert operations.
 
 ::: details Batch edge cases
 - **Empty array** `[]` — behavior is adapter-dependent (may return 200, 201, 400, or 500)

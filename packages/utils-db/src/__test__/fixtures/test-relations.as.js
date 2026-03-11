@@ -21,7 +21,7 @@ $("object", Post)
     $().designType("number")
       .tags("number")
       .annotate("meta.id", true)
-      .annotate("db.default.fn", "increment")
+      .annotate("db.default.increment", true)
       .$type
   ).prop(
     "title",
@@ -38,7 +38,7 @@ $("object", Post)
     "createdAt",
     $().designType("number")
       .tags("created", "timestamp", "number")
-      .annotate("db.default.fn", "now")
+      .annotate("db.default.now", true)
       .annotate("expect.int", true)
       .optional()
       .$type

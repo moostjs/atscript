@@ -16,6 +16,11 @@ Base type for textual data. Extensions accessed via dot notation in `.as` files.
 | `string.date`      | Date string (multiple formats)                | YYYY-MM-DD, MM/DD/YYYY, etc.       |
 | `string.isoDate`   | ISO 8601 date                                 | UTC and timezone variants           |
 | `string.uuid`      | UUID                                          | Standard UUID format (case-insensitive) |
+| `string.url`       | URL                                           | Pattern: `^https?://[^\s]+$`        |
+| `string.ipv4`      | IPv4 address                                  | Pattern: standard IPv4 validation   |
+| `string.ipv6`      | IPv6 address                                  | Pattern: standard IPv6 validation (case-insensitive) |
+| `string.ip`        | IP address (IPv4 or IPv6)                     | Accepts either IPv4 or IPv6 format  |
+| `string.char`      | Single character                              | `@expect.minLength 1`, `@expect.maxLength 1` |
 | `string.required`  | Non-empty string                              | `@meta.required` applied            |
 
 ### `number`
@@ -30,10 +35,20 @@ Base type for numeric data.
 | `number.int`               | Integer                       | `@expect.int`             |
 | `number.int.positive`      | Positive integer              | `@expect.int` + `@expect.min 0` |
 | `number.int.negative`      | Negative integer              | `@expect.int` + `@expect.max 0` |
+| `number.int.int8`          | Signed 8-bit (-128 to 127)   | `@expect.min -128`, `@expect.max 127`, tag: `int8` |
+| `number.int.int16`         | Signed 16-bit (-32768 to 32767) | `@expect.min -32768`, `@expect.max 32767`, tag: `int16` |
+| `number.int.int32`         | Signed 32-bit integer         | `@expect.min -2147483648`, `@expect.max 2147483647`, tag: `int32` |
+| `number.int.int64`         | Signed 64-bit (JS safe range) | `@expect.min MIN_SAFE_INTEGER`, `@expect.max MAX_SAFE_INTEGER`, tag: `int64` |
+| `number.int.uint8`         | Unsigned 8-bit (0 to 255)    | `@expect.min 0`, `@expect.max 255`, tag: `uint8` |
+| `number.int.uint8.byte`    | Byte value (alias for uint8) | tag: `byte`               |
+| `number.int.uint16`        | Unsigned 16-bit (0 to 65535) | `@expect.min 0`, `@expect.max 65535`, tag: `uint16` |
+| `number.int.uint16.port`   | Network port (0 to 65535)    | tag: `port`               |
+| `number.int.uint32`        | Unsigned 32-bit (0 to 4294967295) | `@expect.min 0`, `@expect.max 4294967295`, tag: `uint32` |
+| `number.int.uint64`        | Unsigned 64-bit (JS safe range) | `@expect.min 0`, `@expect.max MAX_SAFE_INTEGER`, tag: `uint64` |
 | `number.single`            | Single-precision float        | —                         |
 | `number.double`            | Double-precision float        | —                         |
 | `number.timestamp`         | Timestamp (integer)           | `@expect.int`             |
-| `number.timestamp.created` | Auto-set on creation          | `@db.default.fn "now"`, tag: `created` |
+| `number.timestamp.created` | Auto-set on creation          | `@db.default.now`, tag: `created` |
 | `number.timestamp.updated` | Auto-updated on write         | tag: `updated`            |
 
 ### `boolean`

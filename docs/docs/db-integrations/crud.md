@@ -56,7 +56,7 @@ const result = await users.insertOne({
 // result: { insertedId: 1 }
 ```
 
-Fields with `@db.default` or `@db.default.fn` are applied automatically --- you can omit them from the input.
+Fields with `@db.default` or generated defaults (`@db.default.increment`, `@db.default.uuid`, `@db.default.now`) are applied automatically --- you can omit them from the input.
 
 ### Insert Many
 

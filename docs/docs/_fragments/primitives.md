@@ -50,10 +50,15 @@ export interface User {
     name: string.required
     birthDate: string.date
     createdAt: string.isoDate
+    website: string.url
+    serverIp: string.ip
+    initial: string.char
 }
 ```
 
 Use them when the field has a real meaning that is stronger than plain `string`.
+
+Other string extensions include `string.ipv4` and `string.ipv6` for protocol-specific IP address validation.
 
 ### Number Extensions
 
@@ -74,6 +79,21 @@ Useful built-ins:
 - `number.positive` — minimum `0`
 - `number.negative` — maximum `0`
 - `number.single` / `number.double` — numeric intent tags
+
+#### Sized Integer Types
+
+For fields that need a specific bit width, `number.int` provides sized extensions:
+
+```atscript
+export interface SensorData {
+    reading: number.int.int16
+    flags: number.int.uint8
+    port: number.int.uint16.port
+    offset: number.int.int32
+}
+```
+
+Signed: `int8`, `int16`, `int32`, `int64`. Unsigned: `uint8`, `uint16`, `uint32`, `uint64`. Aliases: `uint8.byte` (byte value), `uint16.port` (network port).
 
 ### Boolean Extensions
 
@@ -127,4 +147,5 @@ It is useful for advanced UI tooling and type traversal, but most application co
 - `number.int.positive` — positive integers only
 - `number.double.negative` — negative double-precision numbers
 - `number.single.positive` — positive single-precision numbers
+- `number.int.uint16.port` — network port number
 :::

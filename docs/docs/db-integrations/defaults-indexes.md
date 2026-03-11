@@ -28,48 +28,80 @@ retryCount: number
 
 ## Generated Defaults
 
-Some defaults need to be computed at insert time. Use `@db.default.fn` with one of three portable generator functions:
+Some defaults need to be computed at insert time. Atscript provides three portable generated-default annotations:
 
-### `'increment'` — Auto-Incrementing Integer
+### `@db.default.increment` — Auto-Incrementing Integer
 
-Generates sequential integers (1, 2, 3, ...). The field must be a number type:
+Generates sequential integers (1, 2, 3, ...). The field must be a number type. An optional argument sets the starting value:
 
 ```atscript
-@db.default.fn 'increment'
+@db.default.increment
+id: number
+
+// With optional start value:
+@db.default.increment 1000
 id: number
 ```
 
-### `'uuid'` — Random UUID
+### `@db.default.uuid` — Random UUID
 
 Generates a random UUID v4 string. The field must be a string type:
 
 ```atscript
-@db.default.fn 'uuid'
+@db.default.uuid
 id: string
 ```
 
-### `'now'` — Current Timestamp
+### `@db.default.now` — Current Timestamp
 
 Captures the current time at insert. Works with number (Unix milliseconds) and string (ISO format) types:
 
 ```atscript
-@db.default.fn 'now'
+@db.default.now
 createdAt?: number
 ```
 
 ::: tip Semantic Types Include Defaults
-Semantic types like `number.timestamp.created` already include `@db.default.fn 'now'` — you don't need to add it manually:
+Semantic types like `number.timestamp.created` already include `@db.default.now` — you don't need to add it manually:
 
 ```atscript
 // Concise — semantic type handles the default
 createdAt?: number.timestamp.created
 
 // Equivalent verbose form
-@db.default.fn 'now'
+@db.default.now
 createdAt?: number
 ```
 
 :::
+
+## Column Storage Hints
+
+### Collation
+
+Use `@db.column.collate` to control how string comparison and sorting work. The value is portable — each adapter maps it to its native collation:
+
+```atscript
+@db.column.collate 'nocase'
+username: string
+```
+
+| Value | Behavior |
+|-------|----------|
+| `'binary'` | Exact byte comparison (case-sensitive) |
+| `'nocase'` | Case-insensitive comparison |
+| `'unicode'` | Full Unicode-aware sorting |
+
+For adapter-specific collations, use `@db.<engine>.collate` instead.
+
+### Decimal Precision
+
+Use `@db.column.precision` to set decimal precision and scale for database storage. Adapters map this to their native decimal type (e.g., `DECIMAL(10,2)` in SQL). This is purely a DB storage hint — it does not affect runtime JavaScript number behavior:
+
+```atscript
+@db.column.precision 10, 2
+price: number
+```
 
 ## Indexes
 
@@ -147,7 +179,7 @@ Putting it all together — a `User` table with defaults, generated values, and 
 export interface User {
     // Primary key with auto-increment
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     // Unique index ensures no duplicate emails
@@ -169,10 +201,10 @@ export interface User {
     bio?: string
 
     // Auto-generated timestamps
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number
 
-    @db.default.fn 'now'
+    @db.default.now
     updatedAt?: number
 }
 ```

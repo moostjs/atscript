@@ -60,7 +60,11 @@
 | `@db.index.fulltext`| `name?: string`              | **yes** (append) | prop      | Fulltext search index                    |
 | `@db.column`        | `name: string`               | no              | prop      | Override database column name            |
 | `@db.default`       | `value: string`              | no              | prop      | Static default value                     |
-| `@db.default.fn`    | `fn: string`                 | no              | prop      | Database function for default            |
+| `@db.default.increment` | `start?: number`         | no              | prop      | Auto-incrementing integer default        |
+| `@db.default.uuid`  | _(none)_                     | no              | prop      | UUID generation default                  |
+| `@db.default.now`   | _(none)_                     | no              | prop      | Current timestamp default                |
+| `@db.column.collate`| `collation: string`          | no              | prop      | Portable collation (binary/nocase/unicode)|
+| `@db.column.precision`| `precision: number`, `scale: number` | no     | prop      | Decimal precision/scale for DB storage   |
 | `@db.ignore`        | _(none)_                     | no              | prop      | Exclude field from database              |
 
 ### `@emit.*` — Build-time Directives

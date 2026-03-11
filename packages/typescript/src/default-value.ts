@@ -15,7 +15,7 @@ export interface TCreateDataOptions {
    * - `'empty'` — structural defaults only (`''`, `0`, `false`, `[]`, `{}`); optional props skipped
    * - `'default'` — use `@meta.default` annotations; optional props skipped unless annotated
    * - `'example'` — use `@meta.example` annotations; optional props always included; arrays get one sample item
-   * - `'db'` — use `@db.default` (parsed) or `@db.default.fn` (returns fn name string); optional props skipped unless annotated
+   * - `'db'` — use `@db.default` (parsed) or `@db.default.increment/uuid/now` (returns fn name string); optional props skipped unless annotated
    * - `function` — custom resolver per field; optional props skipped unless resolver returns a value
    *
    * @default 'empty'
@@ -61,12 +61,15 @@ function resolveValue(
       }
       return undefined
     }
-    // Fall back to @db.default.fn (return function name as-is)
-    const dbFn = prop.metadata.get('db.default.fn') as
-      | string
-      | undefined
-    if (dbFn !== undefined) {
-      return { value: dbFn }
+    // Fall back to @db.default.increment/uuid/now (return function name as-is)
+    if (prop.metadata.has('db.default.increment')) {
+      return { value: 'increment' }
+    }
+    if (prop.metadata.has('db.default.uuid')) {
+      return { value: 'uuid' }
+    }
+    if (prop.metadata.has('db.default.now')) {
+      return { value: 'now' }
     }
     return undefined
   }
@@ -138,7 +141,7 @@ function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown 
  * - `'empty'` — structural defaults only; optional props omitted
  * - `'default'` — uses `@meta.default` annotations; optional props omitted unless annotated
  * - `'example'` — uses `@meta.example` annotations; optional props always included; arrays get one sample item
- * - `'db'` — uses `@db.default` (parsed) or `@db.default.fn` (fn name string); optional props omitted unless annotated
+ * - `'db'` — uses `@db.default` (parsed) or `@db.default.increment/uuid/now` (fn name string); optional props omitted unless annotated
  * - `function` — custom resolver; optional props omitted unless resolver returns a value
  *
  * When a `@meta.default` / `@meta.example` value is set on a complex type (object, array)

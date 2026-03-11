@@ -51,7 +51,7 @@ Create `src/schema/todo.as`:
 @db.table 'todos'
 export interface Todo {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -61,7 +61,7 @@ export interface Todo {
     @db.default 'false'
     completed: boolean
 
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number.timestamp
 }
 ```
@@ -124,7 +124,7 @@ Suppose each todo belongs to a category. Add a second `.as` file:
 @db.table 'categories'
 export interface Category {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string
@@ -139,7 +139,7 @@ import { Category } from './category.as'
 @db.table 'todos'
 export interface Todo {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -148,7 +148,7 @@ export interface Todo {
     @db.default 'false'
     completed: boolean
 
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number.timestamp
 
     @db.rel.FK

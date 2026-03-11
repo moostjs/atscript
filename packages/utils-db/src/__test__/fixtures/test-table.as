@@ -13,7 +13,7 @@ export interface UsersTable {
 
     @db.index.plain 'name_idx'
     @db.index.plain 'created_idx', 'desc'
-    @db.default.fn 'now'
+    @db.default.now
     createdAt: number
 
     @db.ignore
@@ -29,7 +29,7 @@ export interface UsersTable {
 @db.table 'profiles'
 export interface ProfileTable {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string

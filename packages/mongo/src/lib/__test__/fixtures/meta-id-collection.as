@@ -2,7 +2,7 @@
 @db.mongo.collection
 export interface TodoCollection {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string

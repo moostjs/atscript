@@ -19,7 +19,7 @@ $("object", UserNoMongo)
     $().designType("number")
       .tags("number")
       .annotate("meta.id", true)
-      .annotate("db.default.fn", "increment")
+      .annotate("db.default.increment", true)
       .$type
   ).prop(
     "email",

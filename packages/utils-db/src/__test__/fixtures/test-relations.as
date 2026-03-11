@@ -4,7 +4,7 @@ import { Comment } from './rel-comment'
 @db.table 'posts'
 export interface Post {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -12,7 +12,7 @@ export interface Post {
     @db.default 'draft'
     status: string
 
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number.timestamp.created
 
     // ── Foreign Key ──────────────────────────────────────────────

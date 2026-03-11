@@ -4,7 +4,7 @@
 @db.table 'tasks'
 export interface Task {
   @meta.id
-  @db.default.fn 'increment'
+  @db.default.increment
   id: number
 
   @expect.maxLength 200

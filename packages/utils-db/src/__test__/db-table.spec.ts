@@ -187,7 +187,7 @@ describe('AtscriptDbTable', () => {
       expect(statusDefault).toEqual({ kind: 'value', value: 'active' })
     })
 
-    it('should extract defaults from @db.default.fn', () => {
+    it('should extract defaults from @db.default.now', () => {
       const createdAtDefault = table.defaults.get('createdAt')
       expect(createdAtDefault).toEqual({ kind: 'fn', fn: 'now' })
     })

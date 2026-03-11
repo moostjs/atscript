@@ -20,7 +20,7 @@ Add `@db.*` annotations to your `.as` definitions and the DB layer takes it from
 @db.table 'users'
 export interface User {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     @db.index.unique 'email_idx'
@@ -28,7 +28,7 @@ export interface User {
 
     name: string
 
-    @db.default.fn 'now'
+    @db.default.now
     createdAt?: number.timestamp
 }
 ```

@@ -85,7 +85,7 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Cached search index lookup. */
   protected _searchIndexesMap?: Map<string, TMongoIndex>
 
-  /** Physical field names with @db.default.fn "increment". */
+  /** Physical field names with @db.default.increment. */
   protected _incrementFields = new Set<string>()
 
   /** Capped collection options from @db.mongo.capped. */
@@ -694,9 +694,8 @@ export class MongoAdapter extends BaseDbAdapter {
       this._addMongoIndexField('unique', '__pk', field)
       this._table.addUniqueField(field)
     }
-    // @db.default.fn "increment" → track for auto-increment on insert
-    const defaultFn = metadata.get('db.default.fn') as string | undefined
-    if (defaultFn === 'increment') {
+    // @db.default.increment → track for auto-increment on insert
+    if (metadata.has('db.default.increment')) {
       const physicalName = (metadata.get('db.column') as string | undefined) ?? field
       this._incrementFields.add(physicalName)
     }

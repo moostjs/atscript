@@ -4,7 +4,7 @@ import { Category } from './restrict-category'
 @db.table 'users'
 export interface User {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     name: string

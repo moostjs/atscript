@@ -4,7 +4,7 @@ import { Tag } from './rel-tag'
 @db.table 'task_tags'
 export interface TaskTag {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     @db.rel.FK

@@ -45,7 +45,7 @@ import { Comment } from './comment.as'
 @db.table 'tasks'
 export interface Task {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
@@ -98,7 +98,7 @@ import { TaskTag } from './task-tag.as'
 @db.table 'tasks'
 export interface Task {
     @meta.id
-    @db.default.fn 'increment'
+    @db.default.increment
     id: number
 
     title: string
