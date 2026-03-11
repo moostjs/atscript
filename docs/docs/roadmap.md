@@ -1,18 +1,16 @@
 # Roadmap
 
-This page sets expectations for what Atscript supports today, what is planned next, and how the project is designed to grow over time.
+What Atscript supports today, what is coming next, and how it all connects.
 
 <RoadmapVisual />
 
-## How to Read Claims in the Docs
+## Status labels in the docs
 
-To keep the docs precise:
+- **Available today** — documented and part of the current workflow.
+- **Planned** — directionally important, but not yet shipped.
+- **Early** — available to explore, but docs or workflow may be incomplete.
 
-- **Available today** means documented and part of the current workflow.
-- **Planned** means directionally important, but not yet a finished product surface.
-- **Early** means available to explore, but the documentation or workflow is still incomplete.
-
-## Suggested Starting Points
+## Get started
 
 - [TypeScript Quick Start](/packages/typescript/quick-start)
 - [DB Quick Start](/db-integrations/quick-start)

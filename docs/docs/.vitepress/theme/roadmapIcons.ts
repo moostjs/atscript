@@ -41,6 +41,11 @@ export const roadmapIcons = {
         color: '#007ACC',
         background: 'rgba(0, 122, 204, 0.1)',
     },
+    ideTooling: {
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path fill="currentColor" d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16M64 152H48a8 8 0 0 1 0-16h16a8 8 0 0 1 0 16m0-32H48a8 8 0 0 1 0-16h16a8 8 0 0 1 0 16m0-32H48a8 8 0 0 1 0-16h16a8 8 0 0 1 0 16m152 112H88V56h128z"/></svg>',
+        color: '#007ACC',
+        background: 'rgba(0, 122, 204, 0.1)',
+    },
     uiForm: {
         svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="3" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75" d="M7.5 8h9m-9 4h4.2m-4.2 4h9"/><circle cx="15.7" cy="12" r="1.4" fill="currentColor"/></svg>',
         color: '#D97706',
@@ -65,5 +70,10 @@ export const roadmapIcons = {
         svg: code,
         color: '#7C3AED',
         background: 'rgba(124, 58, 237, 0.11)',
+    },
+    database: {
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path fill="currentColor" d="M4 5c0-1.007.875-1.755 1.9-2.223A10.2 10.2 0 0 1 10 2a10.2 10.2 0 0 1 4.1.777C15.125 3.245 16 3.993 16 5v4.207a5.5 5.5 0 0 0-1-.185V6.7q-.421.31-.9.525A10.2 10.2 0 0 1 10 8a10.2 10.2 0 0 1-4.1-.777A5 5 0 0 1 5 6.7V15c0 .374.356.875 1.318 1.313a9.2 9.2 0 0 0 3.281.686q.277.54.66 1.003q-.13 0-.259-.002a10.2 10.2 0 0 1-4.1-.777C4.875 16.755 4 16.007 4 15zm1 0c0 .374.356.875 1.318 1.313A9.2 9.2 0 0 0 10 7a9.2 9.2 0 0 0 3.682-.687C14.644 5.875 15 5.373 15 5c0-.374-.356-.875-1.318-1.313A9.2 9.2 0 0 0 10 3a9.2 9.2 0 0 0-3.682.687C5.356 4.125 5 4.626 5 5m14 9.5a4.5 4.5 0 1 1-9 0a4.5 4.5 0 0 1 9 0m-4.854 2.353l.003.003a.5.5 0 0 0 .348.144h.006a.5.5 0 0 0 .35-.146l2-2a.5.5 0 0 0-.707-.708L15 15.293V12.5a.5.5 0 0 0-1 0v2.793l-1.146-1.147a.5.5 0 0 0-.708.708z"/></svg>',
+        color: '#0F80CC',
+        background: 'rgba(15, 128, 204, 0.1)',
     },
 }

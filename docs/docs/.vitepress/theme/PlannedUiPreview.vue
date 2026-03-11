@@ -106,7 +106,7 @@ const slides = [
     border: 1px solid rgba(71, 26, 236, 0.16);
     background: var(--vp-c-bg);
     box-shadow: 0 10px 24px rgba(71, 26, 236, 0.08);
-    min-height: 290px;
+    height: 402px;
 }
 
 :global(.dark) .planned-card {
