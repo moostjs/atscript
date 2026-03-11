@@ -29,6 +29,7 @@ function createMockTable(overrides: Record<string, any> = {}) {
     uniqueProps: new Set<string>(),
     indexes: new Map(),
     isSearchable: vi.fn().mockReturnValue(false),
+    isVectorSearchable: vi.fn().mockReturnValue(false),
     getSearchIndexes: vi.fn().mockReturnValue([]),
     getValidator: vi.fn().mockReturnValue(mockValidator),
     findMany: vi.fn().mockResolvedValue([{ id: '1', name: 'Alice' }]),
@@ -517,6 +518,7 @@ describe('AsDbController', () => {
     it('should return table metadata', () => {
       const result = controller.meta()
       expect(result.searchable).toBe(false)
+      expect(result.vectorSearchable).toBe(false)
       expect(result.searchIndexes).toEqual([])
       expect(result.type).toBeDefined()
       expect(result.type.$v).toBe(1)

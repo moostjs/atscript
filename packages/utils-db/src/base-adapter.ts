@@ -369,6 +369,14 @@ export abstract class BaseDbAdapter {
     return this.getSearchIndexes().length > 0
   }
 
+  /**
+   * Whether this adapter supports vector similarity search.
+   * Override in adapters that support vector search.
+   */
+  isVectorSearchable(): boolean {
+    return false
+  }
+
   // ── Search ──────────────────────────────────────────────────────────────
 
   /**
@@ -399,6 +407,38 @@ export abstract class BaseDbAdapter {
     indexName?: string
   ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
     throw new Error('Search not supported by this adapter')
+  }
+
+  // ── Vector Search ─────────────────────────────────────────────────────
+
+  /**
+   * Vector similarity search. Override in adapters that support vector search.
+   *
+   * @param vector - Pre-computed embedding vector.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional vector index to target (for multi-vector documents).
+   */
+  async vectorSearch(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    throw new Error('Vector search not supported by this adapter')
+  }
+
+  /**
+   * Vector similarity search with count (for paginated results).
+   *
+   * @param vector - Pre-computed embedding vector.
+   * @param query - Filter, sort, limit, etc.
+   * @param indexName - Optional vector index to target (for multi-vector documents).
+   */
+  async vectorSearchWithCount(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    throw new Error('Vector search not supported by this adapter')
   }
 
   // ── Optimized pagination ──────────────────────────────────────────────

@@ -168,29 +168,33 @@ const results = await table.search('query', {}, 'product_search')
 
 ## Vector Search at Runtime
 
-Vector search requires you to **generate embeddings yourself** — the adapter does not call any external API by default. Override `buildVectorSearchStage()` in a `MongoAdapter` subclass to wire in your embedding provider. The method is async, so you can call external embedding APIs directly:
+Vector search accepts **pre-computed embedding vectors** — you generate them externally using any embedding provider (OpenAI, Hugging Face, Cohere, etc.), then pass the resulting `number[]` directly:
 
 ```typescript
-import { MongoAdapter } from '@atscript/mongo'
+// 1. Generate embedding externally (your concern)
+const response = await openai.embeddings.create({
+  model: 'text-embedding-3-small',
+  input: 'search query',
+})
+const vector = response.data[0].embedding
 
-class MyMongoAdapter extends MongoAdapter {
-  protected override async buildVectorSearchStage(text: string, index: TMongoIndex): Promise<Document | undefined> {
-    const embedding = await getEmbedding(text) // Your async embedding API call
+// 2. Vector search — uses the default (first) vector index
+const results = await table.vectorSearch(vector)
 
-    return {
-      $vectorSearch: {
-        index: index.key,
-        path: index.definition.fields?.[0]?.path,
-        queryVector: embedding,
-        numCandidates: 100,
-        limit: 20,
-      },
-    }
-  }
-}
+// With filters and pagination
+const { data, count } = await table.vectorSearchWithCount(vector, {
+  filter: { category: 'tech' },
+  controls: { $limit: 20, $skip: 0 },
+})
+
+// Target a specific vector index (for documents with multiple vector fields)
+const results = await table.vectorSearch('contentEmbedding', vector)
+const results = await table.vectorSearch('imageEmbedding', imageVector, {
+  controls: { $limit: 10 },
+})
 ```
 
-Then use this custom adapter when creating your `DbSpace`.
+No subclassing or callbacks required — the adapter builds the `$vectorSearch` aggregation pipeline from the vector you provide and the index metadata from your `.as` schema.
 
 ## Checking Capabilities
 
@@ -198,8 +202,9 @@ You can inspect whether a table supports search and which indexes are configured
 
 ```typescript
 const adapter = db.getAdapter(Product)
-adapter.isSearchable()        // true if any search index exists
-adapter.getSearchIndexes()    // list of configured indexes
+adapter.isSearchable()           // true if any text search index exists
+adapter.isVectorSearchable()     // true if any vector search index exists
+adapter.getSearchIndexes()       // list of all configured indexes (with type)
 ```
 
 ## Index Priority
@@ -217,7 +222,7 @@ You can always bypass the priority by passing an explicit index name to `search(
 - **Atlas Search** requires MongoDB Atlas — it is not available on self-hosted MongoDB
 - **Vector search** requires Atlas M10+ tier or higher
 - **Text indexes** work on all MongoDB deployments including standalone and `mongodb-memory-server`
-- **Embeddings** must be generated externally — the adapter does not include an embedding provider
+- **Embeddings** are generated externally — pass pre-computed vectors to `vectorSearch()`
 - Atlas Search indexes are managed separately from standard MongoDB indexes and may take a few seconds to build
 
 ## Next Steps

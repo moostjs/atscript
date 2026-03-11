@@ -849,18 +849,25 @@ export class MongoAdapter extends BaseDbAdapter {
     return [...mongoIndexes.entries()].map(([name, index]) => ({
       name,
       description: `${index.type} index`,
+      type: index.type === 'vector' ? 'vector' as const : 'text' as const,
     }))
   }
 
+  override isVectorSearchable(): boolean {
+    for (const index of this.getMongoSearchIndexes().values()) {
+      if (index.type === 'vector') { return true }
+    }
+    return false
+  }
+
   /**
-   * Builds a MongoDB `$search` pipeline stage.
-   * Override `buildVectorSearchStage` in subclasses to provide embeddings.
+   * Builds a MongoDB `$search` pipeline stage for text search.
    */
   protected async buildSearchStage(text: string, indexName?: string): Promise<Document | undefined> {
     const index = this.getMongoSearchIndex(indexName)
     if (!index) { return undefined }
     if (index.type === 'vector') {
-      return this.buildVectorSearchStage(text, index)
+      throw new Error('Vector indexes cannot be used with text search. Use vectorSearch() instead.')
     }
     return {
       $search: { index: index.key, text: { query: text, path: { wildcard: '*' } } },
@@ -868,11 +875,43 @@ export class MongoAdapter extends BaseDbAdapter {
   }
 
   /**
-   * Builds a vector search stage. Override in subclasses to generate embeddings.
-   * Returns `undefined` by default (vector search requires custom implementation).
+   * Builds a `$vectorSearch` aggregation stage from a pre-computed vector.
    */
-  protected async buildVectorSearchStage(text: string, index: TMongoIndex): Promise<Document | undefined> {
-    return undefined
+  private _buildVectorSearchPipelineStage(
+    vector: number[],
+    indexName?: string,
+    limit?: number
+  ): Document {
+    let index: TSearchIndex | undefined
+    if (indexName) {
+      const found = this.getMongoSearchIndex(indexName)
+      if (!found || found.type !== 'vector') {
+        throw new Error(`Vector index "${indexName}" not found`)
+      }
+      index = found as TSearchIndex
+    } else {
+      for (const idx of this.getMongoSearchIndexes().values()) {
+        if (idx.type === 'vector') { index = idx as TSearchIndex; break }
+      }
+    }
+    if (!index) {
+      throw new Error('No vector index available')
+    }
+
+    const vectorField = index.definition.fields?.find(f => f.type === 'vector')
+    if (!vectorField) {
+      throw new Error(`Vector index "${index.name}" has no vector field`)
+    }
+
+    return {
+      $vectorSearch: {
+        index: index.key,
+        path: vectorField.path,
+        queryVector: vector,
+        numCandidates: Math.max((limit || 20) * 10, 100),
+        limit: limit || 20,
+      },
+    }
   }
 
   override async search(
@@ -927,6 +966,59 @@ export class MongoAdapter extends BaseDbAdapter {
     ]
 
     this._log('aggregate (searchWithCount)', pipeline)
+    const result = await this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
+    return {
+      data: result[0]?.data || [],
+      count: result[0]?.meta[0]?.count || 0,
+    }
+  }
+
+  // ── Vector Search ─────────────────────────────────────────────────────
+
+  override async vectorSearch(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    const controls = query.controls || {}
+    const stage = this._buildVectorSearchPipelineStage(vector, indexName, controls.$limit as number | undefined)
+    const filter = buildMongoFilter(query.filter)
+    const pipeline: Document[] = [stage, { $match: filter }]
+    if (controls.$sort) { pipeline.push({ $sort: controls.$sort }) }
+    if (controls.$skip) { pipeline.push({ $skip: controls.$skip }) }
+    if (controls.$limit) { pipeline.push({ $limit: controls.$limit }) }
+    else { pipeline.push({ $limit: 1000 }) }
+    if (controls.$select) { pipeline.push({ $project: controls.$select.asProjection }) }
+
+    this._log('aggregate (vectorSearch)', pipeline)
+    return this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
+  }
+
+  override async vectorSearchWithCount(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    const controls = query.controls || {}
+    const stage = this._buildVectorSearchPipelineStage(vector, indexName, controls.$limit as number | undefined)
+    const filter = buildMongoFilter(query.filter)
+    const pipeline: Document[] = [
+      stage,
+      { $match: filter },
+      {
+        $facet: {
+          data: [
+            controls.$sort ? { $sort: controls.$sort } : undefined,
+            controls.$skip ? { $skip: controls.$skip } : undefined,
+            controls.$limit ? { $limit: controls.$limit } : undefined,
+            controls.$select ? { $project: controls.$select.asProjection } : undefined,
+          ].filter(Boolean),
+          meta: [{ $count: 'count' }],
+        },
+      },
+    ]
+
+    this._log('aggregate (vectorSearchWithCount)', pipeline)
     const result = await this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
     return {
       data: result[0]?.data || [],

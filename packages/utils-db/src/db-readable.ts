@@ -671,6 +671,78 @@ export class AtscriptDbReadable<
     }
   }
 
+  // ── Vector Search ─────────────────────────────────────────────────────
+
+  /** Whether the underlying adapter supports vector similarity search. */
+  public isVectorSearchable(): boolean {
+    return this.adapter.isVectorSearchable()
+  }
+
+  /**
+   * Vector similarity search with query translation and result reconstruction.
+   *
+   * Overloads:
+   * - `vectorSearch(vector, query?)` — uses default vector index
+   * - `vectorSearch(indexName, vector, query?)` — targets a specific vector index
+   */
+  public async vectorSearch<Q extends Uniquery<OwnProps, NavType>>(
+    vectorOrIndex: number[] | string,
+    maybeVectorOrQuery?: number[] | Q,
+    maybeQuery?: Q
+  ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
+    const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
+    this._flatten()
+    const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
+    const translated = this._translateQuery((query || {}) as Uniquery)
+    const results = await this.adapter.vectorSearch(vector, translated, indexName)
+    const rows = results.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
+    return rows as Array<DbResponse<DataType, NavType, Q>>
+  }
+
+  /**
+   * Vector similarity search with count for paginated results.
+   *
+   * Overloads:
+   * - `vectorSearchWithCount(vector, query?)` — uses default vector index
+   * - `vectorSearchWithCount(indexName, vector, query?)` — targets a specific vector index
+   */
+  public async vectorSearchWithCount<Q extends Uniquery<OwnProps, NavType>>(
+    vectorOrIndex: number[] | string,
+    maybeVectorOrQuery?: number[] | Q,
+    maybeQuery?: Q
+  ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
+    const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
+    this._flatten()
+    const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
+    const translated = this._translateQuery((query || {}) as Uniquery)
+    const result = await this.adapter.vectorSearchWithCount(vector, translated, indexName)
+    const rows = result.data.map(row => this._reconstructFromRead(row))
+    if (withRelations?.length) {
+      await this._loadRelations(rows, withRelations)
+    }
+    return {
+      data: rows as Array<DbResponse<DataType, NavType, Q>>,
+      count: result.count,
+    }
+  }
+
+  /** Resolves overloaded vector search arguments into canonical form. */
+  private _resolveVectorSearchArgs<Q>(
+    vectorOrIndex: number[] | string,
+    maybeVectorOrQuery?: number[] | Q,
+    maybeQuery?: Q
+  ): { vector: number[]; query: Q | undefined; indexName: string | undefined } {
+    if (Array.isArray(vectorOrIndex)) {
+      // vectorSearch(vector, query?)
+      return { vector: vectorOrIndex, query: maybeVectorOrQuery as Q | undefined, indexName: undefined }
+    }
+    // vectorSearch(indexName, vector, query?)
+    return { vector: maybeVectorOrQuery as number[], query: maybeQuery, indexName: vectorOrIndex }
+  }
+
   // ── Find by ID ──────────────────────────────────────────────────────────
 
   /**

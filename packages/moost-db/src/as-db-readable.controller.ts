@@ -360,6 +360,7 @@ export class AsDbReadableController<
   meta() {
     return {
       searchable: this.readable.isSearchable(),
+      vectorSearchable: this.readable.isVectorSearchable(),
       searchIndexes: this._searchIndexes,
       type: this._serializedType,
     }

@@ -36,6 +36,8 @@ export interface TSearchIndexInfo {
   name: string
   /** Human-readable label for UI display. */
   description?: string
+  /** Index type: text search or vector similarity search. */
+  type?: 'text' | 'vector'
 }
 
 // ── CRUD Result Types ───────────────────────────────────────────────────────
