@@ -1,3 +1,12 @@
+## [0.1.37](https://github.com/moostjs/atscript/compare/v0.1.36...v0.1.37) (2026-03-11)
+
+
+### Features
+
+* change vector search api ([13966a6](https://github.com/moostjs/atscript/commit/13966a60ff661ad1d7fd0ef8f4d67ccb68dec9b6))
+
+
+
 ## [0.1.36](https://github.com/moostjs/atscript/compare/v0.1.35...v0.1.36) (2026-03-10)
 
 
