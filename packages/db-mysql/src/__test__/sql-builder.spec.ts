@@ -7,6 +7,7 @@ import {
   buildDelete,
   buildCreateTable,
   mysqlTypeFromField,
+  mysqlDialect,
   esc,
   qi,
   quoteTableName,
@@ -95,6 +96,23 @@ describe('toSqlValue', () => {
   it('should pass through strings and numbers', () => {
     expect(toSqlValue('hello')).toBe('hello')
     expect(toSqlValue(42)).toBe(42)
+  })
+})
+
+describe('mysqlDialect.toParam', () => {
+  it('should convert undefined to null', () => {
+    expect(mysqlDialect.toParam(undefined)).toBeNull()
+  })
+
+  it('should convert booleans to 0/1', () => {
+    expect(mysqlDialect.toParam(true)).toBe(1)
+    expect(mysqlDialect.toParam(false)).toBe(0)
+  })
+
+  it('should pass through strings, numbers, and null', () => {
+    expect(mysqlDialect.toParam('hello')).toBe('hello')
+    expect(mysqlDialect.toParam(42)).toBe(42)
+    expect(mysqlDialect.toParam(null)).toBeNull()
   })
 })
 
@@ -291,8 +309,8 @@ describe('mysqlTypeFromField', () => {
     expect(mysqlTypeFromField(field({ designType: 'boolean' }))).toBe('TINYINT(1)')
   })
 
-  it('should map string to VARCHAR(255)', () => {
-    expect(mysqlTypeFromField(field({ designType: 'string' }))).toBe('VARCHAR(255)')
+  it('should map string without maxLength to TEXT', () => {
+    expect(mysqlTypeFromField(field({ designType: 'string' }))).toBe('TEXT')
   })
 
   it('should map char tag to CHAR(1)', () => {
@@ -360,7 +378,7 @@ describe('buildCreateTable', () => {
     ])
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS `users`')
     expect(sql).toContain('`id` INT PRIMARY KEY')
-    expect(sql).toContain('`name` VARCHAR(255) NOT NULL')
+    expect(sql).toContain('`name` TEXT NOT NULL')
     expect(sql).toContain('ENGINE=InnoDB')
     expect(sql).toContain('DEFAULT CHARSET=utf8mb4')
     expect(sql).toContain('COLLATE=utf8mb4_unicode_ci')
@@ -503,8 +521,8 @@ describe('buildCreateTable', () => {
       field({ physicalName: 'id', designType: 'integer', isPrimaryKey: true }),
       field({ physicalName: 'bio', designType: 'string', optional: true }),
     ])
-    expect(sql).toContain('`bio` VARCHAR(255)')
-    expect(sql).not.toMatch(/`bio` VARCHAR\(255\) NOT NULL/)
+    expect(sql).toContain('`bio` TEXT')
+    expect(sql).not.toMatch(/`bio` TEXT NOT NULL/)
   })
 })
 

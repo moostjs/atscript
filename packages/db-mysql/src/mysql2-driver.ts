@@ -1,5 +1,11 @@
 import type { TMysqlConnection, TMysqlDriver, TMysqlRunResult } from './types'
 
+/** mysql2 rejects `undefined` in bind arrays — coerce to `null`. */
+function sanitizeParams(params?: unknown[]): unknown[] {
+  if (!params) { return [] }
+  return params.map(v => v === undefined ? null : v)
+}
+
 /**
  * {@link TMysqlDriver} implementation backed by `mysql2/promise`.
  *
@@ -54,7 +60,7 @@ export class Mysql2Driver implements TMysqlDriver {
   }
 
   async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
-    const [result] = await this.pool.query(sql, params as any ?? [])
+    const [result] = await this.pool.query(sql, sanitizeParams(params))
     const header = result as import('mysql2').ResultSetHeader
     return {
       affectedRows: header.affectedRows ?? 0,
@@ -64,12 +70,12 @@ export class Mysql2Driver implements TMysqlDriver {
   }
 
   async all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
-    const [rows] = await this.pool.query(sql, params as any ?? [])
+    const [rows] = await this.pool.query(sql, sanitizeParams(params))
     return rows as T[]
   }
 
   async get<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | null> {
-    const [rows] = await this.pool.query(sql, params as any ?? [])
+    const [rows] = await this.pool.query(sql, sanitizeParams(params))
     return (rows as T[])[0] ?? null
   }
 
@@ -81,7 +87,7 @@ export class Mysql2Driver implements TMysqlDriver {
     const conn = await this.pool.getConnection()
     return {
       async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
-        const [result] = await conn.query(sql, params as any ?? [])
+        const [result] = await conn.query(sql, sanitizeParams(params))
         const header = result as import('mysql2').ResultSetHeader
         return {
           affectedRows: header.affectedRows ?? 0,
@@ -90,11 +96,11 @@ export class Mysql2Driver implements TMysqlDriver {
         }
       },
       async all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
-        const [rows] = await conn.query(sql, params as any ?? [])
+        const [rows] = await conn.query(sql, sanitizeParams(params))
         return rows as T[]
       },
       async get<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | null> {
-        const [rows] = await conn.query(sql, params as any ?? [])
+        const [rows] = await conn.query(sql, sanitizeParams(params))
         return (rows as T[])[0] ?? null
       },
       async exec(sql: string): Promise<void> {

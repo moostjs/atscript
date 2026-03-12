@@ -57,7 +57,10 @@ export const sqliteDialect: SqlDialect = {
   quoteTable(name: string) { return `"${esc(name)}"` },
   unlimitedLimit: '-1',
   toValue: toSqlValue,
-  toParam(value: unknown) { return typeof value === 'boolean' ? (value ? 1 : 0) : value },
+  toParam(value: unknown) {
+    if (value === undefined) { return null }
+    return typeof value === 'boolean' ? (value ? 1 : 0) : value
+  },
   regex(quotedCol: string, value: unknown): TSqlFragment {
     const pattern = regexToLike(value instanceof RegExp ? value.source : String(value))
     return { sql: `${quotedCol} LIKE ?`, params: [pattern] }

@@ -86,7 +86,7 @@ describe('MysqlAdapter — schema sync', () => {
     it('should query INFORMATION_SCHEMA.COLUMNS', async () => {
       const cannedColumns = [
         { COLUMN_NAME: 'id', COLUMN_TYPE: 'int', IS_NULLABLE: 'NO', COLUMN_KEY: 'PRI', COLUMN_DEFAULT: null },
-        { COLUMN_NAME: 'name', COLUMN_TYPE: 'varchar(255)', IS_NULLABLE: 'NO', COLUMN_KEY: '', COLUMN_DEFAULT: null },
+        { COLUMN_NAME: 'name', COLUMN_TYPE: 'text', IS_NULLABLE: 'NO', COLUMN_KEY: '', COLUMN_DEFAULT: null },
       ]
       const driver = createSyncMockDriver({
         allResults: new Map([['INFORMATION_SCHEMA.COLUMNS', cannedColumns]]),
@@ -97,7 +97,7 @@ describe('MysqlAdapter — schema sync', () => {
       const cols = await adapter.getExistingColumns()
       expect(cols).toEqual([
         { name: 'id', type: 'INT', notnull: true, pk: true, dflt_value: undefined },
-        { name: 'name', type: 'VARCHAR(255)', notnull: true, pk: false, dflt_value: undefined },
+        { name: 'name', type: 'TEXT', notnull: true, pk: false, dflt_value: undefined },
       ])
 
       const allCall = driver.calls.find(c => c.sql.includes('INFORMATION_SCHEMA'))
@@ -247,7 +247,7 @@ describe('MysqlAdapter — schema sync', () => {
     it('should create temp table, copy data, drop old, rename', async () => {
       const cannedColumns = [
         { COLUMN_NAME: 'id', COLUMN_TYPE: 'int', IS_NULLABLE: 'NO', COLUMN_KEY: 'PRI', COLUMN_DEFAULT: null },
-        { COLUMN_NAME: 'name', COLUMN_TYPE: 'varchar(255)', IS_NULLABLE: 'NO', COLUMN_KEY: '', COLUMN_DEFAULT: null },
+        { COLUMN_NAME: 'name', COLUMN_TYPE: 'text', IS_NULLABLE: 'NO', COLUMN_KEY: '', COLUMN_DEFAULT: null },
       ]
       const driver = createSyncMockDriver({
         allResults: new Map([['INFORMATION_SCHEMA.COLUMNS', cannedColumns]]),

@@ -134,7 +134,7 @@ describe('MysqlAdapter + AtscriptDbTable', () => {
     it('should include NOT NULL for required columns', async () => {
       await table.ensureTable()
       const sql = driver.calls.find(c => c.sql.includes('CREATE TABLE'))!.sql
-      expect(sql).toContain('`name` VARCHAR(255) NOT NULL')
+      expect(sql).toContain('`name` TEXT NOT NULL')
     })
 
     it('should set DEFAULT for @db.default fields', async () => {

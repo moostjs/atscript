@@ -60,7 +60,10 @@ export const mysqlDialect: SqlDialect = {
   quoteTable(name: string) { return quoteTableName(name) },
   unlimitedLimit: '18446744073709551615',
   toValue: toSqlValue,
-  toParam(value: unknown) { return typeof value === 'boolean' ? (value ? 1 : 0) : value },
+  toParam(value: unknown) {
+    if (value === undefined) { return null }
+    return typeof value === 'boolean' ? (value ? 1 : 0) : value
+  },
   regex(quotedCol: string, value: unknown): TSqlFragment {
     // MySQL supports native REGEXP — no LIKE conversion needed
     const pattern = value instanceof RegExp ? value.source : String(value)
@@ -208,7 +211,7 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       const maxLen = metadata?.get('expect.maxLength') as number | undefined
       if (maxLen !== undefined && maxLen <= 65535) { return `VARCHAR(${maxLen})` }
       if (maxLen !== undefined && maxLen > 65535) { return 'LONGTEXT' }
-      return 'VARCHAR(255)'
+      return 'TEXT'
     }
     case 'json':
     case 'object':
