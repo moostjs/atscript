@@ -1,5 +1,5 @@
 import { ValidatorError } from '@atscript/typescript/utils'
-import { DbError } from '@atscript/utils-db'
+import { DbError } from '@atscript/db-utils'
 import { HttpError } from '@moostjs/event-http'
 import { defineInterceptor, Intercept, TInterceptorPriority } from 'moost'
 

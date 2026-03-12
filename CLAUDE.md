@@ -12,7 +12,7 @@ Full-stack developers face a recurring problem: data models, metadata (labels, t
 packages/
   core/           - Parser, AST, plugin system, diagnostics, dependency tracking
   typescript/     - TypeScript language extension (codegen + runtime utils + CLI)
-  utils-db/       - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
+  db-utils/       - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
   db-sqlite/      - SQLite adapter (better-sqlite3 / node:sqlite driver, filter-to-SQL translation)
   mongo/          - MongoDB metadata/primitives extension and MongoCollection classes
   moost-db/       - Generic Moost framework database controller (works with any adapter)
@@ -31,7 +31,7 @@ explorations/     - Sandbox/playground for testing features
   │    ├─ @atscript/mongo (metadata extension, + peer: mongodb)
   │    ├─ @atscript/moost-validator (+ peer: moost)
   │    └─ unplugin-atscript (build integration)
-  └─ @atscript/utils-db (generic DB abstraction)
+  └─ @atscript/db-utils (generic DB abstraction)
        ├─ @atscript/moost-db (generic Moost controller, + peer: moost)
        ├─ @atscript/db-sqlite (SQLite adapter, + peer: better-sqlite3)
        └─ @atscript/mongo (MongoAdapter)

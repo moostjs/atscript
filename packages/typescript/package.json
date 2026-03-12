@@ -70,10 +70,10 @@
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/utils-db": "workspace:^"
+    "@atscript/db-utils": "workspace:^"
   },
   "peerDependenciesMeta": {
-    "@atscript/utils-db": {
+    "@atscript/db-utils": {
       "optional": true
     }
   },

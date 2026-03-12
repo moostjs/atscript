@@ -26,7 +26,7 @@ import {
   type TColumnDiff,
   type TSyncColumnResult,
   type TDbFieldMeta,
-} from '@atscript/utils-db'
+} from '@atscript/db-utils'
 import type {
   AggregationCursor,
   ClientSession,

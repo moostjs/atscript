@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType, TMetadataMap } from '@atscript/typescript/utils'
-import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/utils-db'
+import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/db-utils'
 import type {
   TDbDeleteResult,
   TDbIndex,
@@ -10,8 +10,8 @@ import type {
   TColumnDiff,
   TSyncColumnResult,
   TDbFieldMeta,
-} from '@atscript/utils-db'
-import type { DbQuery, FilterExpr } from '@atscript/utils-db'
+} from '@atscript/db-utils'
+import type { DbQuery, FilterExpr } from '@atscript/db-utils'
 
 import { buildWhere } from './filter-builder'
 import {
@@ -40,7 +40,7 @@ import type { TMysqlConnection, TMysqlDriver, TMysqlRunResult } from './types'
  * Usage:
  * ```typescript
  * import { Mysql2Driver, MysqlAdapter } from '@atscript/db-mysql'
- * import { DbSpace } from '@atscript/utils-db'
+ * import { DbSpace } from '@atscript/db-utils'
  *
  * const driver = new Mysql2Driver('mysql://root@localhost:3306/mydb')
  * const space = new DbSpace(() => new MysqlAdapter(driver))

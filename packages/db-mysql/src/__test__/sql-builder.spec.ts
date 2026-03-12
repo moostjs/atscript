@@ -15,7 +15,7 @@ import {
   collationToMysql,
   defaultValueForType,
 } from '../sql-builder'
-import type { TDbFieldMeta } from '@atscript/utils-db'
+import type { TDbFieldMeta } from '@atscript/db-utils'
 
 // ── Helper to create minimal TDbFieldMeta ─────────────────────────────────
 

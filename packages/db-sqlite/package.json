@@ -1,7 +1,7 @@
 {
   "name": "@atscript/db-sqlite",
   "version": "0.1.37",
-  "description": "SQLite adapter for @atscript/utils-db with swappable driver support.",
+  "description": "SQLite adapter for @atscript/db-utils with swappable driver support.",
   "keywords": [
     "atscript",
     "database",
@@ -44,7 +44,7 @@
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
-    "@atscript/utils-db": "workspace:^",
+    "@atscript/db-utils": "workspace:^",
     "@uniqu/core": "^0.0.6",
     "better-sqlite3": ">=11.0.0"
   },

@@ -4,7 +4,7 @@ import {
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
 } from '@atscript/typescript/utils'
-import type { AtscriptDbReadable, FilterExpr, UniqueryControls, Uniquery } from '@atscript/utils-db'
+import type { AtscriptDbReadable, FilterExpr, UniqueryControls, Uniquery } from '@atscript/db-utils'
 import { Get, HttpError, Query, Url } from '@moostjs/event-http'
 import { Inject, Moost, Param, type TConsoleBase } from 'moost'
 import { parseUrl } from '@uniqu/url'

@@ -13,7 +13,7 @@ Atscript's DB layer provides a type-safe API for creating, reading, updating, an
 `DbSpace` is the entry point for all database operations. It manages adapter lifecycle, table instances, and cross-table discovery for relations.
 
 ```typescript
-import { DbSpace } from '@atscript/utils-db'
+import { DbSpace } from '@atscript/db-utils'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 
 const driver = new BetterSqlite3Driver('./myapp.db')
@@ -232,7 +232,7 @@ Database operations throw `DbError` with a `code` property indicating the error 
 Handle errors by checking the code:
 
 ```typescript
-import { DbError } from '@atscript/utils-db'
+import { DbError } from '@atscript/db-utils'
 
 try {
   await users.insertOne({ email: 'alice@example.com', name: 'Alice' })

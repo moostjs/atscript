@@ -93,6 +93,9 @@ importers:
       '@atscript/db-sqlite':
         specifier: workspace:^
         version: link:../../packages/db-sqlite
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../../packages/db-utils
       '@atscript/mongo':
         specifier: workspace:^
         version: link:../../packages/mongo
@@ -102,9 +105,6 @@ importers:
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../../packages/typescript
-      '@atscript/utils-db':
-        specifier: workspace:^
-        version: link:../../packages/utils-db
       '@moostjs/event-http':
         specifier: ^0.6.2
         version: 0.6.2(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
@@ -154,12 +154,12 @@ importers:
       '@atscript/db-sqlite':
         specifier: workspace:^
         version: link:../../packages/db-sqlite
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../../packages/db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../../packages/typescript
-      '@atscript/utils-db':
-        specifier: workspace:^
-        version: link:../../packages/utils-db
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -217,12 +217,12 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
-      '@atscript/utils-db':
-        specifier: workspace:^
-        version: link:../utils-db
       '@uniqu/core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -239,12 +239,12 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
-      '@atscript/utils-db':
-        specifier: workspace:^
-        version: link:../utils-db
       '@uniqu/core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -259,7 +259,7 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/mongo:
+  packages/db-utils:
     dependencies:
       '@atscript/core':
         specifier: workspace:^
@@ -267,9 +267,25 @@ importers:
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
-      '@atscript/utils-db':
+      '@uniqu/core':
+        specifier: ^0.0.6
+        version: 0.0.6
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  packages/mongo:
+    dependencies:
+      '@atscript/core':
         specifier: workspace:^
-        version: link:../utils-db
+        version: link:../core
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../db-utils
+      '@atscript/typescript':
+        specifier: workspace:^
+        version: link:../typescript
       mongodb:
         specifier: ^6.17.0
         version: 6.17.0
@@ -280,12 +296,12 @@ importers:
 
   packages/moost-db:
     dependencies:
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
-      '@atscript/utils-db':
-        specifier: workspace:^
-        version: link:../utils-db
       '@uniqu/core':
         specifier: ^0.0.6
         version: 0.0.6
@@ -330,9 +346,9 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
-      '@atscript/utils-db':
+      '@atscript/db-utils':
         specifier: workspace:^
-        version: link:../utils-db
+        version: link:../db-utils
       '@moostjs/event-cli':
         specifier: ^0.6.2
         version: 0.6.2(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
@@ -355,22 +371,6 @@ importers:
       unplugin:
         specifier: ^2.1.2
         version: 2.3.11
-    devDependencies:
-      vitest:
-        specifier: 3.2.4
-        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/utils-db:
-    dependencies:
-      '@atscript/core':
-        specifier: workspace:^
-        version: link:../core
-      '@atscript/typescript':
-        specifier: workspace:^
-        version: link:../typescript
-      '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
     devDependencies:
       vitest:
         specifier: 3.2.4

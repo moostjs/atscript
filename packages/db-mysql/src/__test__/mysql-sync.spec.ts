@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
-import { AtscriptDbTable } from '@atscript/utils-db'
-import type { TColumnDiff, TDbFieldMeta } from '@atscript/utils-db'
+import { AtscriptDbTable } from '@atscript/db-utils'
+import type { TColumnDiff, TDbFieldMeta } from '@atscript/db-utils'
 
 import { MysqlAdapter } from '../mysql-adapter'
 import type { TMysqlDriver, TMysqlConnection, TMysqlRunResult } from '../types'

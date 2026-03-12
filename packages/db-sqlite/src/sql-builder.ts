@@ -1,5 +1,5 @@
-import type { TDbFieldMeta, TDbForeignKey, TDbReferentialAction, DbControls, UniquSelect } from '@atscript/utils-db'
-import type { AtscriptQueryNode, AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/utils-db'
+import type { TDbFieldMeta, TDbForeignKey, TDbReferentialAction, DbControls, UniquSelect } from '@atscript/db-utils'
+import type { AtscriptQueryNode, AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db-utils'
 
 import type { TSqlFragment } from './filter-builder'
 

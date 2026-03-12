@@ -1,6 +1,6 @@
 # @atscript/db-sqlite
 
-SQLite adapter for `@atscript/utils-db` with a swappable driver architecture. Define your schema once in Atscript, then use it with any SQLite engine.
+SQLite adapter for `@atscript/db-utils` with a swappable driver architecture. Define your schema once in Atscript, then use it with any SQLite engine.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ pnpm add @atscript/db-sqlite better-sqlite3
 ## Quick Start
 
 ```typescript
-import { AtscriptDbTable } from '@atscript/utils-db'
+import { AtscriptDbTable } from '@atscript/db-utils'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import { User } from './user.as'
 

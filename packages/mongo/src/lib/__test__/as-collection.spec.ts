@@ -1,4 +1,4 @@
-import { type DbValidationContext, DbSpace } from '@atscript/utils-db'
+import { type DbValidationContext, DbSpace } from '@atscript/db-utils'
 import { ObjectId } from 'mongodb'
 // oxlint-disable max-lines
 import { describe, it, expect, beforeAll } from 'vitest'

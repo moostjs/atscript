@@ -1,7 +1,7 @@
 import type {
   TValidatorPlugin,
 } from '@atscript/typescript/utils'
-import type { DbValidationContext } from '@atscript/utils-db'
+import type { DbValidationContext } from '@atscript/db-utils'
 import { ObjectId } from 'mongodb'
 
 export const validateMongoIdPlugin: TValidatorPlugin = (ctx, def, value) => {

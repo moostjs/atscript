@@ -8,7 +8,7 @@ Atscript generates typed static properties on `@db.table` interfaces:
 - `__ownProps` — (NEW) flat paths for table-owned fields only (no nav props)
 - `__navProps` — (NEW) navigation property map: `{ author: Author, comments: Comment[] }`
 
-The consuming side (`@atscript/utils-db`) passes these as generics to Uniquery:
+The consuming side (`@atscript/db-utils`) passes these as generics to Uniquery:
 ```typescript
 table.findOne(query: Uniquery<OwnProps, NavProps>)
 ```

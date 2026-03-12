@@ -129,7 +129,7 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | `packages/core/src/`            | `docs/docs/plugin-development/`                |
 | `packages/core/src/defaults/db-annotations.ts` | `docs/docs/db-integrations/annotations.md` |
 | `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
-| `packages/utils-db/src/`        | `docs/docs/db-integrations/`                   |
+| `packages/db-utils/src/`        | `docs/docs/db-integrations/`                   |
 | `packages/db-sqlite/src/`       | `docs/docs/db-integrations/sqlite*.md`         |
 | `packages/mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
 | `packages/moost-db/src/`        | `docs/docs/db-integrations/crud-http*.md`      |
