@@ -313,6 +313,18 @@ describe('mysqlTypeFromField', () => {
     expect(mysqlTypeFromField(field({ designType: 'string' }))).toBe('TEXT')
   })
 
+  it('should map string PK to VARCHAR(255)', () => {
+    expect(mysqlTypeFromField(field({ designType: 'string', isPrimaryKey: true }))).toBe('VARCHAR(255)')
+  })
+
+  it('should map indexed string to TEXT (index uses key length prefix)', () => {
+    expect(mysqlTypeFromField(field({ designType: 'string', isIndexed: true }))).toBe('TEXT')
+  })
+
+  it('should map string with default value to VARCHAR(255)', () => {
+    expect(mysqlTypeFromField(field({ designType: 'string', defaultValue: { kind: 'value', value: 'active' } }))).toBe('VARCHAR(255)')
+  })
+
   it('should map char tag to CHAR(1)', () => {
     expect(mysqlTypeFromField(fieldWithTags('string', ['char']))).toBe('CHAR(1)')
   })
@@ -514,6 +526,15 @@ describe('buildCreateTable', () => {
       field({ physicalName: 'hidden', designType: 'string', ignored: true }),
     ])
     expect(sql).not.toContain('hidden')
+  })
+
+  it('should use VARCHAR(255) for string PK without maxLength', () => {
+    const sql = buildCreateTable('__atscript_control', [
+      field({ physicalName: '_id', designType: 'string', isPrimaryKey: true }),
+      field({ physicalName: 'value', designType: 'string', optional: true }),
+    ])
+    expect(sql).toContain('`_id` VARCHAR(255) PRIMARY KEY')
+    expect(sql).not.toContain('`_id` TEXT')
   })
 
   it('should allow optional fields (no NOT NULL)', () => {

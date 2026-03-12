@@ -211,6 +211,8 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       const maxLen = metadata?.get('expect.maxLength') as number | undefined
       if (maxLen !== undefined && maxLen <= 65535) { return `VARCHAR(${maxLen})` }
       if (maxLen !== undefined && maxLen > 65535) { return 'LONGTEXT' }
+      // MySQL requires VARCHAR for primary keys and columns with DEFAULT values
+      if (field.isPrimaryKey || field.defaultValue) { return 'VARCHAR(255)' }
       return 'TEXT'
     }
     case 'json':
@@ -219,6 +221,7 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       return 'JSON'
     }
     default: {
+      if (field.isPrimaryKey || field.defaultValue) { return 'VARCHAR(255)' }
       return 'TEXT'
     }
   }

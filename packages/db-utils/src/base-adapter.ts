@@ -566,6 +566,14 @@ export abstract class BaseDbAdapter {
   getExistingColumns?(): Promise<TExistingColumn[]>
 
   /**
+   * When true, the adapter can handle column type changes in-place
+   * (e.g. MySQL's ALTER TABLE MODIFY COLUMN) without requiring table recreation.
+   * The generic sync layer will delegate type changes to {@link syncColumns}
+   * instead of requiring `@db.sync.method "recreate"` or `"drop"`.
+   */
+  supportsColumnModify?: boolean
+
+  /**
    * Applies column diff (ALTER TABLE ADD COLUMN, etc.).
    * The generic layer computes the diff; adapters execute DB-specific DDL.
    * Optional — only relational adapters implement this.

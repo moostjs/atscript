@@ -264,6 +264,24 @@ class TypedMockAdapter extends MockAdapter {
   }
 }
 
+/** Mock adapter that supports in-place column modification (like MySQL). */
+class ModifyMockAdapter extends TypedMockAdapter {
+  override supportsColumnModify = true
+  typeModified: string[] = []
+
+  override async syncColumns(diff: TColumnDiff): Promise<TSyncColumnResult> {
+    // Track type changes that were applied in-place
+    for (const { field } of diff.typeChanged ?? []) {
+      this.typeModified.push(field.physicalName)
+    }
+    // Also handle nullable changes in-place
+    for (const { field } of diff.nullableChanged ?? []) {
+      this.typeModified.push(field.physicalName)
+    }
+    return super.syncColumns(diff)
+  }
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 let sharedTables: Map<string, Array<Record<string, unknown>>>
@@ -281,6 +299,15 @@ function createTypedSpace(): DbSpace {
   sharedTables = new Map()
   return new DbSpace(() => {
     const adapter = new TypedMockAdapter()
+    adapter.tables = sharedTables
+    return adapter
+  })
+}
+
+function createModifySpace(): DbSpace {
+  sharedTables = new Map()
+  return new DbSpace(() => {
+    const adapter = new ModifyMockAdapter()
     adapter.tables = sharedTables
     return adapter
   })
@@ -1231,6 +1258,56 @@ describe('SchemaSync — type change detection', () => {
     expect(entry!.status).toBe('error')
     expect(entry!.errors.length).toBeGreaterThan(0)
     expect(entry!.errors[0]).toContain('createdAt')
+  })
+
+  it('should NOT error on type changes when adapter has supportsColumnModify (plan)', async () => {
+    const space = createModifySpace()
+    const sync = new SchemaSync(space)
+
+    await sync.run([UsersTable], { force: true })
+
+    const adapter = space.get(UsersTable).dbAdapter as ModifyMockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'REAL', notnull: true, pk: true },
+      { name: 'email_address', type: 'TEXT', notnull: true, pk: false },
+      { name: 'name', type: 'TEXT', notnull: true, pk: false },
+      { name: 'createdAt', type: 'TEXT', notnull: true, pk: false },
+      { name: 'status', type: 'TEXT', notnull: true, pk: false },
+      { name: 'bio', type: 'TEXT', notnull: false, pk: false },
+    ])
+
+    const plan = await sync.plan([UsersTable], { force: true })
+    const entry = plan.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    // supportsColumnModify → no error, status is 'alter'
+    expect(entry!.status).toBe('alter')
+    expect(entry!.typeChanges.length).toBeGreaterThan(0)
+    expect(entry!.typeChanges.some(tc => tc.column === 'createdAt')).toBe(true)
+  })
+
+  it('should apply type changes via syncColumns when adapter has supportsColumnModify (run)', async () => {
+    const space = createModifySpace()
+    const sync = new SchemaSync(space)
+
+    await sync.run([UsersTable], { force: true })
+
+    const adapter = space.get(UsersTable).dbAdapter as ModifyMockAdapter
+    adapter.setExistingColumns([
+      { name: 'id', type: 'REAL', notnull: true, pk: true },
+      { name: 'email_address', type: 'TEXT', notnull: true, pk: false },
+      { name: 'name', type: 'TEXT', notnull: true, pk: false },
+      { name: 'createdAt', type: 'TEXT', notnull: true, pk: false },
+      { name: 'status', type: 'TEXT', notnull: true, pk: false },
+      { name: 'bio', type: 'TEXT', notnull: false, pk: false },
+    ])
+
+    const result = await sync.run([UsersTable], { force: true })
+    const entry = result.entries.find(e => e.name === 'users')
+    expect(entry).toBeDefined()
+    // Should succeed without error
+    expect(entry!.status).toBe('alter')
+    // syncColumns should have been called with the type change
+    expect(adapter.typeModified).toContain('createdAt')
   })
 })
 

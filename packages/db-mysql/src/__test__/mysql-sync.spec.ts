@@ -99,6 +99,48 @@ describe('MysqlAdapter — schema sync', () => {
         { name: 'id', type: 'INT', notnull: true, pk: true, dflt_value: undefined },
         { name: 'name', type: 'TEXT', notnull: true, pk: false, dflt_value: undefined },
       ])
+    })
+
+    it('should normalize CURRENT_TIMESTAMP to fn:now', async () => {
+      const cannedColumns = [
+        { COLUMN_NAME: 'created_at', COLUMN_TYPE: 'timestamp', IS_NULLABLE: 'YES', COLUMN_KEY: '', COLUMN_DEFAULT: 'CURRENT_TIMESTAMP' },
+      ]
+      const driver = createSyncMockDriver({
+        allResults: new Map([['INFORMATION_SCHEMA.COLUMNS', cannedColumns]]),
+      })
+      const adapter = new MysqlAdapter(driver)
+      const table = new AtscriptDbTable(UsersTable, adapter)
+
+      const cols = await adapter.getExistingColumns()
+      expect(cols[0].dflt_value).toBe('fn:now')
+    })
+
+    it('should normalize uuid() to fn:uuid', async () => {
+      const cannedColumns = [
+        { COLUMN_NAME: 'id', COLUMN_TYPE: 'varchar(255)', IS_NULLABLE: 'NO', COLUMN_KEY: 'PRI', COLUMN_DEFAULT: 'uuid()' },
+      ]
+      const driver = createSyncMockDriver({
+        allResults: new Map([['INFORMATION_SCHEMA.COLUMNS', cannedColumns]]),
+      })
+      const adapter = new MysqlAdapter(driver)
+      const table = new AtscriptDbTable(UsersTable, adapter)
+
+      const cols = await adapter.getExistingColumns()
+      expect(cols[0].dflt_value).toBe('fn:uuid')
+    })
+
+    it('should strip enclosing single quotes from string defaults', async () => {
+      const cannedColumns = [
+        { COLUMN_NAME: 'status', COLUMN_TYPE: 'varchar(255)', IS_NULLABLE: 'NO', COLUMN_KEY: '', COLUMN_DEFAULT: "'active'" },
+      ]
+      const driver = createSyncMockDriver({
+        allResults: new Map([['INFORMATION_SCHEMA.COLUMNS', cannedColumns]]),
+      })
+      const adapter = new MysqlAdapter(driver)
+      const table = new AtscriptDbTable(UsersTable, adapter)
+
+      const cols = await adapter.getExistingColumns()
+      expect(cols[0].dflt_value).toBe('active')
 
       const allCall = driver.calls.find(c => c.sql.includes('INFORMATION_SCHEMA'))
       expect(allCall).toBeDefined()
@@ -307,7 +349,23 @@ describe('MysqlAdapter — schema sync', () => {
       expect(uniqueCall!.sql).toContain('email_idx')
     })
 
-    it('should emit CREATE FULLTEXT INDEX for fulltext indexes', async () => {
+    it('should add key length prefix (255) for string columns in non-fulltext indexes', async () => {
+      const driver = createSyncMockDriver({
+        allResults: new Map([['INFORMATION_SCHEMA.STATISTICS', []]]),
+      })
+      const adapter = new MysqlAdapter(driver)
+      const table = new AtscriptDbTable(UsersTable, adapter)
+
+      await table.syncIndexes()
+      // email is string + unique index → should have (255) prefix
+      const uniqueCall = driver.calls.find(c => c.sql.includes('UNIQUE INDEX'))
+      expect(uniqueCall!.sql).toContain('`email_address`(255)')
+      // name is string + plain index → should have (255) prefix
+      const plainCall = driver.calls.find(c => c.sql.includes('CREATE INDEX') && c.sql.includes('name_idx'))
+      expect(plainCall!.sql).toContain('`name`(255)')
+    })
+
+    it('should NOT add key length prefix for fulltext indexes on string columns', async () => {
       const driver = createSyncMockDriver({
         allResults: new Map([['INFORMATION_SCHEMA.STATISTICS', []]]),
       })
@@ -318,6 +376,7 @@ describe('MysqlAdapter — schema sync', () => {
       const fulltextCall = driver.calls.find(c => c.sql.includes('FULLTEXT INDEX'))
       expect(fulltextCall).toBeDefined()
       expect(fulltextCall!.sql).toContain('search_idx')
+      expect(fulltextCall!.sql).not.toContain('(255)')
     })
 
     it('should skip existing indexes', async () => {

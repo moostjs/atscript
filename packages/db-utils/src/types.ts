@@ -140,6 +140,8 @@ export interface TDbFieldMeta {
   renamedFrom?: string
   /** Collation from @db.column.collate (e.g. 'nocase', 'binary', 'unicode'). */
   collate?: TDbCollation
+  /** Whether this field participates in any index (@db.index.plain, @db.index.unique, @db.index.fulltext). */
+  isIndexed?: boolean
   /**
    * For FK fields: the resolved field metadata of the referenced (target) PK column.
    * Adapters use this in `typeMapper` to produce matching DB types for FK columns

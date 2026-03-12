@@ -49,6 +49,8 @@ import type { TMysqlConnection, TMysqlDriver } from './types'
  * ```
  */
 export class MysqlAdapter extends BaseDbAdapter {
+  override supportsColumnModify = true
+
   // ── MySQL-specific state from annotations ────────────────────────────────
   private _engine = 'InnoDB'
   private _charset = 'utf8mb4'
@@ -56,6 +58,9 @@ export class MysqlAdapter extends BaseDbAdapter {
   private _autoIncrementStart?: number
   private _incrementFields = new Set<string>()
   private _onUpdateFields = new Map<string, string>()
+
+  /** Schema name for INFORMATION_SCHEMA queries (null falls through to DATABASE()). */
+  private get _schema(): string | null { return this._table.schema ?? null }
 
   constructor(protected readonly driver: TMysqlDriver) {
     super()
@@ -352,7 +357,7 @@ export class MysqlAdapter extends BaseDbAdapter {
   }
 
   async getExistingColumnsForTable(tableName: string): Promise<TExistingColumn[]> {
-    const schema = this._table.schema ?? null
+    const schema = this._schema
     const rows = await this._exec().all<{
       COLUMN_NAME: string
       COLUMN_TYPE: string
@@ -371,7 +376,7 @@ export class MysqlAdapter extends BaseDbAdapter {
       type: r.COLUMN_TYPE.toUpperCase(),
       notnull: r.IS_NULLABLE === 'NO',
       pk: r.COLUMN_KEY === 'PRI',
-      dflt_value: r.COLUMN_DEFAULT ?? undefined,
+      dflt_value: normalizeMysqlDefault(r.COLUMN_DEFAULT),
     }))
   }
 
@@ -423,6 +428,22 @@ export class MysqlAdapter extends BaseDbAdapter {
       const sqlType = this.typeMapper(field)
       const nullability = field.optional ? 'NULL' : 'NOT NULL'
       const ddl = `ALTER TABLE ${quoteTableName(tableName)} MODIFY COLUMN ${qi(field.physicalName)} ${sqlType} ${nullability}`
+      this._log(ddl)
+      await this._exec().exec(ddl)
+    }
+
+    // Default value changes
+    for (const { field } of diff.defaultChanged ?? []) {
+      const sqlType = this.typeMapper(field)
+      let ddl = `ALTER TABLE ${quoteTableName(tableName)} MODIFY COLUMN ${qi(field.physicalName)} ${sqlType}`
+      if (!field.optional && !field.isPrimaryKey) { ddl += ' NOT NULL' }
+      if (field.defaultValue?.kind === 'value') {
+        ddl += ` DEFAULT ${defaultValueToSqlLiteral(field.designType, field.defaultValue.value)}`
+      } else if (field.defaultValue?.kind === 'fn') {
+        ddl += ` DEFAULT ${field.defaultValue.fn === 'now' ? 'CURRENT_TIMESTAMP' : field.defaultValue.fn === 'uuid' ? '(UUID())' : `(${field.defaultValue.fn}())`}`
+      } else {
+        ddl += ' DEFAULT NULL'
+      }
       this._log(ddl)
       await this._exec().exec(ddl)
     }
@@ -539,7 +560,11 @@ export class MysqlAdapter extends BaseDbAdapter {
 
   async syncIndexes(): Promise<void> {
     const tableName = this._table.tableName
-    const schema = this._table.schema
+    const schema = this._schema
+    // Pre-build lookup for string fields (O(1) per index field instead of linear scan)
+    const stringFields = new Set(
+      this._table.fieldDescriptors.filter(f => f.designType === 'string').map(f => f.physicalName)
+    )
 
     await this.syncIndexesWithDiff({
       listExisting: async () =>
@@ -551,8 +576,15 @@ export class MysqlAdapter extends BaseDbAdapter {
       createIndex: async (index: TDbIndex) => {
         const unique = index.type === 'unique' ? 'UNIQUE ' : ''
         const fulltext = index.type === 'fulltext' ? 'FULLTEXT ' : ''
+        // FULLTEXT indexes accept TEXT columns; others need a key length prefix
+        // for string fields that may still be TEXT in pre-existing tables
+        const needsPrefix = index.type !== 'fulltext'
         const cols = index.fields
-          .map(f => `${qi(f.name)} ${f.sort === 'desc' ? 'DESC' : 'ASC'}`)
+          .map(f => {
+            const col = qi(f.name)
+            const prefix = needsPrefix && stringFields.has(f.name) ? '(255)' : ''
+            return `${col}${prefix} ${f.sort === 'desc' ? 'DESC' : 'ASC'}`
+          })
           .join(', ')
         const sql = `CREATE ${fulltext}${unique}INDEX ${qi(index.key)} ON ${quoteTableName(this.resolveTableName())} (${cols})`
         this._log(sql)
@@ -571,7 +603,7 @@ export class MysqlAdapter extends BaseDbAdapter {
 
   async syncForeignKeys(): Promise<void> {
     const tableName = this._table.tableName
-    const schema = this._table.schema
+    const schema = this._schema
 
     // Get existing FK constraints
     const existingFks = await this._exec().all<{
@@ -715,4 +747,28 @@ export class MysqlAdapter extends BaseDbAdapter {
     }
     return undefined
   }
+}
+
+/**
+ * Normalizes MySQL INFORMATION_SCHEMA.COLUMNS.COLUMN_DEFAULT values
+ * to match the format produced by `serializeDefaultValue()`.
+ *
+ * MySQL stores expression defaults as raw SQL (e.g., `CURRENT_TIMESTAMP`,
+ * `uuid()`), but the diff engine compares against serialized form (`fn:now`,
+ * `fn:uuid`). Without normalization, every table with function defaults
+ * produces phantom ALTER diffs on re-plan.
+ */
+function normalizeMysqlDefault(value: string | null): string | undefined {
+  if (value === null) { return undefined }
+  const lower = value.toLowerCase()
+  // DEFAULT CURRENT_TIMESTAMP / current_timestamp() → fn:now
+  if (lower === 'current_timestamp' || lower === 'current_timestamp()') { return 'fn:now' }
+  // DEFAULT uuid() — MySQL 8.0 stores as "uuid()"
+  if (lower === 'uuid()') { return 'fn:uuid' }
+  // Strip enclosing single quotes and un-double escaped quotes
+  // MySQL INFORMATION_SCHEMA returns 'it''s active' for DEFAULT 'it''s active'
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replace(/''/g, "'")
+  }
+  return value
 }

@@ -506,6 +506,14 @@ export class AtscriptDbReadable<
       this._fieldDescriptors = []
       const skipFlattening = this._nestedObjects
 
+      // Collect all field names that participate in any index
+      const indexedFields = new Set<string>()
+      for (const index of this._indexes.values()) {
+        for (const f of index.fields) {
+          indexedFields.add(f.name)
+        }
+      }
+
       for (const [path, type] of this._flatMap!.entries()) {
         if (!path) { continue }
 
@@ -556,6 +564,7 @@ export class AtscriptDbReadable<
           flattenedFrom: isFlattened ? path : undefined,
           renamedFrom,
           collate: this._collateMap.get(path),
+          isIndexed: indexedFields.has(path) || undefined,
         })
       }
 

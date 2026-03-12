@@ -596,7 +596,7 @@ export class SchemaSync {
       } else if (existing.length > 0) {
         const typeMapper = adapter.typeMapper?.bind(adapter)
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
-        this.populatePlanFromDiff(diff, init, name, readable.syncMethod)
+        this.populatePlanFromDiff(diff, init, name, readable.syncMethod, adapter.supportsColumnModify)
       }
     } else if (adapter.syncColumns) {
       // Path B: Snapshot-based diffing (MongoDB)
@@ -613,7 +613,7 @@ export class SchemaSync {
       } else {
         const existing = snapshotToExistingColumns(storedSnapshot)
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, this.resolveTypeMapper(adapter))
-        this.populatePlanFromDiff(diff, init, name, readable.syncMethod)
+        this.populatePlanFromDiff(diff, init, name, readable.syncMethod, adapter.supportsColumnModify)
       }
     } else if (adapter.tableExists) {
       // Path C: Schema-less, no syncColumns
@@ -642,7 +642,8 @@ export class SchemaSync {
     diff: TColumnDiff,
     init: TSyncEntryInit,
     name: string,
-    syncMethod?: 'drop' | 'recreate'
+    syncMethod?: 'drop' | 'recreate',
+    adapterSupportsModify?: boolean
   ): void {
     init.columnsToAdd = diff.added
     init.columnsToRename = diff.renamed.map(r => ({ from: r.oldName, to: r.field.physicalName }))
@@ -679,7 +680,8 @@ export class SchemaSync {
       ]
     }
     // Type changes without a sync method → error (sync will fail)
-    if (diff.typeChanged.length > 0 && !syncMethod) {
+    // Exception: adapters that support in-place column modification (e.g. MySQL MODIFY COLUMN)
+    if (diff.typeChanged.length > 0 && !syncMethod && !adapterSupportsModify) {
       init.status = 'error'
       init.errors = [
         ...(init.errors ?? []),
@@ -851,7 +853,10 @@ export class SchemaSync {
     }
 
     // Handle type changes
-    if (diff.typeChanged.length > 0) {
+    // Adapters with supportsColumnModify (e.g. MySQL) can ALTER in-place;
+    // others require @db.sync.method "recreate"/"drop" or error out.
+    let needsSyncColumns = false
+    if (diff.typeChanged.length > 0 && init.status !== 'error') {
       const syncMethod = readable.syncMethod
       if (syncMethod === 'drop' && adapter.dropTable) {
         await adapter.dropTable()
@@ -861,6 +866,11 @@ export class SchemaSync {
       } else if (syncMethod === 'recreate' && adapter.recreateTable) {
         await adapter.recreateTable()
         init.recreated = true
+        init.status = 'alter'
+      } else if (adapter.supportsColumnModify && adapter.syncColumns) {
+        // Adapter can handle type changes in-place (e.g. MySQL MODIFY COLUMN)
+        // Defer to the single syncColumns call below
+        needsSyncColumns = true
         init.status = 'alter'
       } else {
         const errors: string[] = []
@@ -881,10 +891,14 @@ export class SchemaSync {
     // Handle nullable/default changes via table recreation (skip if already recreated or errored)
     // These require recreating the table for adapters that enforce constraints (e.g., SQLite)
     // For schema-less adapters (MongoDB), no DB action is needed — snapshot update handles it
+    // Adapters with supportsColumnModify defer these to the single syncColumns call below
     // Skip in safe mode — recreation could drop columns that should be preserved
     if (!safe && !init.recreated && init.status !== 'error' &&
         (diff.nullableChanged.length > 0 || diff.defaultChanged.length > 0)) {
-      if (adapter.recreateTable) {
+      if (adapter.supportsColumnModify && adapter.syncColumns) {
+        needsSyncColumns = true
+        init.status = 'alter'
+      } else if (adapter.recreateTable) {
         await adapter.recreateTable()
         init.recreated = true
         init.status = 'alter'
@@ -896,12 +910,15 @@ export class SchemaSync {
       init.status = 'alter'
     }
 
-    // Handle renames and adds (skip if table was recreated or errored)
-    if (!init.recreated && init.status !== 'error' && (diff.added.length > 0 || diff.renamed.length > 0) && adapter.syncColumns) {
+    // Handle renames, adds, type changes, and nullable changes via syncColumns
+    // For supportsColumnModify adapters, this single call handles everything
+    if (!init.recreated && init.status !== 'error' &&
+        (diff.added.length > 0 || diff.renamed.length > 0 || needsSyncColumns) &&
+        adapter.syncColumns) {
       const syncResult = await adapter.syncColumns(diff)
       init.columnsAdded = syncResult.added
       init.columnsRenamed = syncResult.renamed
-      if (syncResult.added.length > 0 || (syncResult.renamed?.length ?? 0) > 0) {
+      if (syncResult.added.length > 0 || (syncResult.renamed?.length ?? 0) > 0 || needsSyncColumns) {
         init.status = 'alter'
       }
     }
