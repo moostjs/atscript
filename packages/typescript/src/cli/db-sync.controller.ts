@@ -11,8 +11,8 @@ import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
-import { isAnnotatedType } from '../annotated-type'
-import type { TAtscriptAnnotatedType } from '../annotated-type'
+import { isAnnotatedType } from '../runtime/annotated-type'
+import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { getConfig } from './config'
 import { DbSyncPrinter } from './db-sync-printer'
 

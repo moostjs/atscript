@@ -1,4 +1,4 @@
-import type { TDbFieldMeta, TExistingColumn, TColumnDiff } from './types'
+import type { TDbFieldMeta, TExistingColumn, TColumnDiff } from '../types'
 import { serializeDefaultValue } from './schema-hash'
 
 /**

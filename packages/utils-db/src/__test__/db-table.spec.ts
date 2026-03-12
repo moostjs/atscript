@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import type { FilterExpr } from '@uniqu/core'
 
-import { AtscriptDbTable } from '../db-table'
+import { AtscriptDbTable } from '../table/db-table'
 import { BaseDbAdapter } from '../base-adapter'
 import type {
   DbQuery,

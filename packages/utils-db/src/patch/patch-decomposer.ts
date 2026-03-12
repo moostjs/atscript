@@ -1,6 +1,6 @@
 import type { TAtscriptAnnotatedType, TAtscriptTypeArray } from '@atscript/typescript/utils'
 
-import type { AtscriptDbTable } from './db-table'
+import type { AtscriptDbTable } from '../table/db-table'
 import { getKeyProps } from './patch-types'
 
 /**

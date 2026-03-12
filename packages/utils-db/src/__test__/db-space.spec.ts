@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest'
 import type { FilterExpr } from '@uniqu/core'
 
-import { DbSpace } from '../db-space'
+import { DbSpace } from '../table/db-space'
 import { BaseDbAdapter } from '../base-adapter'
 import type {
   DbQuery,

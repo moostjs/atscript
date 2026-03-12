@@ -1,4 +1,4 @@
-import type { TAtscriptAnnotatedType, TAtscriptDataType } from './annotated-type'
+import type { TAtscriptAnnotatedType, TAtscriptDataType } from './runtime/annotated-type'
 
 export {
   annotate,
@@ -8,7 +8,7 @@ export {
   isAnnotatedType,
   isAnnotatedTypeOfPrimitive,
   isPhantomType,
-} from './annotated-type'
+} from './runtime/annotated-type'
 export type {
   TAnnotatedTypeHandle,
   TAtscriptAnnotatedType,
@@ -21,7 +21,7 @@ export type {
   TAtscriptTypeDef,
   InferDataType,
   TAtscriptDataType,
-} from './annotated-type'
+} from './runtime/annotated-type'
 
 /**
  * Extracts the flat dot-notation type map from an Atscript annotated type.
@@ -57,24 +57,24 @@ export type OwnPropsOf<T> = T extends { __ownProps: infer O } ? O : FlatOf<T>
  */
 export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<string, unknown> } ? N : Record<string, never>
 
-export * from './validator'
+export * from './runtime/validator'
 
-export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './json-schema'
-export type { TJsonSchema } from './json-schema'
+export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
+export type { TJsonSchema } from './runtime/json-schema'
 
-export { forAnnotatedType } from './traverse'
+export { forAnnotatedType } from './runtime/traverse'
 
-export { createDataFromAnnotatedType } from './default-value'
-export type { TCreateDataOptions, TValueResolver } from './default-value'
+export { createDataFromAnnotatedType } from './runtime/default-value'
+export type { TCreateDataOptions, TValueResolver } from './runtime/default-value'
 
-export { throwFeatureDisabled } from './throw-disabled'
+export { throwFeatureDisabled } from './runtime/throw-disabled'
 
-export { flattenAnnotatedType } from './flatten'
-export type { TFlattenOptions } from './flatten'
+export { flattenAnnotatedType } from './runtime/flatten'
+export type { TFlattenOptions } from './runtime/flatten'
 
-export type { AtscriptRef, AtscriptQueryNode, AtscriptQueryFieldRef, AtscriptQueryComparison } from './query-types'
+export type { AtscriptRef, AtscriptQueryNode, AtscriptQueryFieldRef, AtscriptQueryComparison } from './runtime/query-types'
 
-export { serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION } from './serialize'
+export { serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION } from './runtime/serialize'
 export type {
   TSerializedAnnotatedType,
   TSerializedAnnotatedTypeInner,
@@ -85,4 +85,4 @@ export type {
   TSerializedTypeComplex,
   TSerializeOptions,
   TProcessAnnotationContext,
-} from './serialize'
+} from './runtime/serialize'

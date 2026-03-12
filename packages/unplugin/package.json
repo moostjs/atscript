@@ -91,37 +91,37 @@
     {},
     {
       "entries": [
-        "src/vite.ts"
+        "src/adapters/vite.ts"
       ]
     },
     {
       "entries": [
-        "src/rollup.ts"
+        "src/adapters/rollup.ts"
       ]
     },
     {
       "entries": [
-        "src/rolldown.ts"
+        "src/adapters/rolldown.ts"
       ]
     },
     {
       "entries": [
-        "src/webpack.ts"
+        "src/adapters/webpack.ts"
       ]
     },
     {
       "entries": [
-        "src/esbuild.ts"
+        "src/adapters/esbuild.ts"
       ]
     },
     {
       "entries": [
-        "src/rspack.ts"
+        "src/adapters/rspack.ts"
       ]
     },
     {
       "entries": [
-        "src/farm.ts"
+        "src/adapters/farm.ts"
       ]
     }
   ]

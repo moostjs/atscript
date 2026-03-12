@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
-import { defineAnnotatedType } from './annotated-type'
-import { Validator, type TValidatorPlugin, type TValidatorPluginContext } from './validator'
+import { defineAnnotatedType } from './runtime/annotated-type'
+import { Validator, type TValidatorPlugin, type TValidatorPluginContext } from './runtime/validator'
 
 describe('Validator at primitives', () => {
   it('should validate primitive string', () => {

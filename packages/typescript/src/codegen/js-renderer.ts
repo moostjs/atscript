@@ -29,8 +29,8 @@ import {
   defineAnnotatedType,
   type TAtscriptAnnotatedType,
   type TAnnotatedTypeHandle,
-} from '../annotated-type'
-import { buildJsonSchema } from '../json-schema'
+} from '../runtime/annotated-type'
+import { buildJsonSchema } from '../runtime/json-schema'
 import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'

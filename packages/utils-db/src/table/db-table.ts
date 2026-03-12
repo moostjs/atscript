@@ -11,15 +11,15 @@ import {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { BaseDbAdapter } from './base-adapter'
-import type { AtscriptDbTableLike, AtscriptDbWritable } from './types'
-import { DbError } from './db-error'
-import type { TGenericLogger } from './logger'
-import { resolveArrayOps, getArrayOpsFields } from './array-ops-resolver'
-import { decomposePatch } from './patch-decomposer'
+import type { BaseDbAdapter } from '../base-adapter'
+import type { AtscriptDbTableLike, AtscriptDbWritable } from '../types'
+import { DbError } from '../db-error'
+import type { TGenericLogger } from '../logger'
+import { resolveArrayOps, getArrayOpsFields } from '../patch/array-ops-resolver'
+import { decomposePatch } from '../patch/patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
-import { UniquSelect } from './uniqu-select'
-import { createDbValidatorPlugin, type DbValidationContext } from './db-validator-plugin'
+import { UniquSelect } from '../query/uniqu-select'
+import { createDbValidatorPlugin, type DbValidationContext } from '../db-validator-plugin'
 import type {
   TCascadeResolver,
   TDbDeleteResult,
@@ -30,7 +30,7 @@ import type {
   TFkLookupTarget,
   TTableResolver,
   TWriteTableResolver,
-} from './types'
+} from '../types'
 
 export { resolveDesignType } from './db-readable'
 

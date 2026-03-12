@@ -5,8 +5,8 @@ import {
   type TAtscriptAnnotatedType,
   type TAtscriptTypeObject,
   type TAtscriptTypeArray,
-} from './annotated-type'
-import { flattenAnnotatedType } from './flatten'
+} from './runtime/annotated-type'
+import { flattenAnnotatedType } from './runtime/flatten'
 
 function buildObject() {
   // {

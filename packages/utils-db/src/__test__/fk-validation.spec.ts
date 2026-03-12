@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 
 import { DbError } from '../db-error'
-import { DbSpace } from '../db-space'
+import { DbSpace } from '../table/db-space'
 import { prepareFixtures, MockAdapter } from './test-utils'
 
 let AuthorType: any

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
-import { defineAnnotatedType } from './annotated-type'
-import { createDataFromAnnotatedType } from './default-value'
+import { defineAnnotatedType } from './runtime/annotated-type'
+import { createDataFromAnnotatedType } from './runtime/default-value'
 
 // ── Helpers ─────────────────────────────────────────────────
 

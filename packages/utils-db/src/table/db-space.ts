@@ -3,10 +3,10 @@ import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import { AtscriptDbTable } from './db-table'
 import { AtscriptDbView } from './db-view'
 import type { AtscriptDbReadable } from './db-readable'
-import type { BaseDbAdapter } from './base-adapter'
-import type { TGenericLogger } from './logger'
-import { NoopLogger } from './logger'
-import type { TCascadeTarget, TFkLookupTarget } from './types'
+import type { BaseDbAdapter } from '../base-adapter'
+import type { TGenericLogger } from '../logger'
+import { NoopLogger } from '../logger'
+import type { TCascadeTarget, TFkLookupTarget } from '../types'
 
 /**
  * Adapter factory function. Called once per table/view to create a fresh adapter instance.

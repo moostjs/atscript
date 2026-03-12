@@ -1,6 +1,6 @@
 import type { TAtscriptAnnotatedType, TAtscriptTypeArray, TValidatorPlugin, TValidatorPluginContext } from '@atscript/typescript/utils'
 
-import { getKeyProps } from './patch-types'
+import { getKeyProps } from './patch/patch-types'
 
 export interface DbValidationContext {
   mode: 'insert' | 'replace' | 'patch'

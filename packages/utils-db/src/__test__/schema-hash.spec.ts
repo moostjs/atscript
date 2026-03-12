@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeTableSnapshot, computeSchemaHash, type TTableSnapshot } from '../schema-hash'
+import { computeTableSnapshot, computeSchemaHash, type TTableSnapshot } from '../schema/schema-hash'
 
 // Minimal mock readable for testing
 function mockReadable(overrides: Partial<{

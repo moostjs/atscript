@@ -1,5 +1,5 @@
 import { createEsbuildPlugin } from 'unplugin'
 
-import { unpluginFactory } from '.'
+import { unpluginFactory } from '..'
 
 export default createEsbuildPlugin(unpluginFactory)

@@ -11,7 +11,7 @@ import type { FilterExpr } from '@uniqu/core'
 import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
-import type { AtscriptDbReadable } from './db-readable'
+import type { AtscriptDbReadable } from './table/db-readable'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 

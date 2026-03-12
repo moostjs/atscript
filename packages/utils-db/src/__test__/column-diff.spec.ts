@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeColumnDiff } from '../column-diff'
+import { computeColumnDiff } from '../schema/column-diff'
 import type { TDbFieldMeta, TExistingColumn } from '../types'
 
 function field(overrides: Partial<TDbFieldMeta> & { physicalName: string }): TDbFieldMeta {

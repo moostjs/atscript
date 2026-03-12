@@ -8,15 +8,15 @@ import {
   type TAtscriptTypeObject,
   type TAtscriptTypeArray,
   type TAtscriptTypeComplex,
-} from './annotated-type'
+} from './runtime/annotated-type'
 import {
   serializeAnnotatedType,
   deserializeAnnotatedType,
   SERIALIZE_VERSION,
   type TSerializedTypeObject,
   type TSerializedTypeFinal,
-} from './serialize'
-import { Validator } from './validator'
+} from './runtime/serialize'
+import { Validator } from './runtime/validator'
 
 // ---------------------------------------------------------------------------
 // Helpers

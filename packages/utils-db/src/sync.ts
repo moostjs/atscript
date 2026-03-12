@@ -1,8 +1,8 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 
-import type { DbSpace } from './db-space'
-import { SchemaSync } from './schema-sync'
-import type { TSyncOptions, TSyncResult } from './schema-sync'
+import type { DbSpace } from './table/db-space'
+import { SchemaSync } from './schema/schema-sync'
+import type { TSyncOptions, TSyncResult } from './schema/schema-sync'
 
 /**
  * Synchronizes database schema with distributed locking.
@@ -35,8 +35,8 @@ export async function syncSchema(
   return sync.run(types, opts)
 }
 
-export { SchemaSync, SyncEntry, readStoredSnapshot } from './schema-sync'
-export type { TSyncOptions, TSyncResult, TSyncPlan, TSyncColors, TSyncEntryStatus } from './schema-sync'
-export { computeColumnDiff } from './column-diff'
-export { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns } from './schema-hash'
-export type { TTableSnapshot, TViewSnapshot, TFieldSnapshot } from './schema-hash'
+export { SchemaSync, SyncEntry, readStoredSnapshot } from './schema/schema-sync'
+export type { TSyncOptions, TSyncResult, TSyncPlan, TSyncColors, TSyncEntryStatus } from './schema/schema-sync'
+export { computeColumnDiff } from './schema/column-diff'
+export { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns } from './schema/schema-hash'
+export type { TTableSnapshot, TViewSnapshot, TFieldSnapshot } from './schema/schema-hash'

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import type { FilterExpr } from '@uniqu/core'
 
-import { AtscriptDbTable } from '../db-table'
-import { DbSpace } from '../db-space'
+import { AtscriptDbTable } from '../table/db-table'
+import { DbSpace } from '../table/db-space'
 import { BaseDbAdapter } from '../base-adapter'
 import { prepareFixtures } from './test-utils'
 import type {

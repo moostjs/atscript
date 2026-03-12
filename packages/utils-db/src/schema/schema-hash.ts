@@ -1,6 +1,6 @@
-import type { AtscriptDbReadable } from './db-readable'
-import type { AtscriptDbView } from './db-view'
-import type { TDbDefaultValue, TDbFieldMeta, TDbStorageType, TExistingColumn } from './types'
+import type { AtscriptDbReadable } from '../table/db-readable'
+import type { AtscriptDbView } from '../table/db-view'
+import type { TDbDefaultValue, TDbFieldMeta, TDbStorageType, TExistingColumn } from '../types'
 
 // ── Snapshot types ────────────────────────────────────────────────────────
 

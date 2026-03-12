@@ -10,9 +10,9 @@ import type {
   AtscriptQueryFieldRef,
 } from '@atscript/typescript/utils'
 
-import type { BaseDbAdapter } from './base-adapter'
+import type { BaseDbAdapter } from '../base-adapter'
 import { AtscriptDbReadable } from './db-readable'
-import type { TViewPlan, TViewJoin } from './query-tree'
+import type { TViewPlan, TViewJoin } from '../query/query-tree'
 
 export interface TViewColumnMapping {
   viewColumn: string

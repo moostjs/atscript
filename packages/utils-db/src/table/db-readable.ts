@@ -15,10 +15,10 @@ import {
 
 import type { FilterExpr, UniqueryControls, Uniquery, WithRelation } from '@uniqu/core'
 
-import type { BaseDbAdapter } from './base-adapter'
-import type { TGenericLogger } from './logger'
-import { NoopLogger } from './logger'
-import { UniquSelect } from './uniqu-select'
+import type { BaseDbAdapter } from '../base-adapter'
+import type { TGenericLogger } from '../logger'
+import { NoopLogger } from '../logger'
+import { UniquSelect } from '../query/uniqu-select'
 import type {
   DbControls,
   DbQuery,
@@ -35,7 +35,7 @@ import type {
   TSearchIndexInfo,
   TTableResolver,
   TWriteTableResolver,
-} from './types'
+} from '../types'
 
 /**
  * Extracts nav prop names from a query's `$with` array.

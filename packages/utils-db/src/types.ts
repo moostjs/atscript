@@ -1,6 +1,6 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
 import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls, WithRelation } from '@uniqu/core'
-import type { UniquSelect } from './uniqu-select'
+import type { UniquSelect } from './query/uniqu-select'
 
 export type { FlatOf, PrimaryKeyOf, OwnPropsOf, NavPropsOf } from '@atscript/typescript/utils'
 

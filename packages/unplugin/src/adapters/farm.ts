@@ -1,5 +1,5 @@
 import { createFarmPlugin } from 'unplugin'
 
-import { unpluginFactory } from '.'
+import { unpluginFactory } from '..'
 
 export default createFarmPlugin(unpluginFactory)
