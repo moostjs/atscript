@@ -29,6 +29,8 @@
       "@atscript/typescript/*": ["packages/typescript/src/*"],
       "@atscript/db-utils": ["packages/db-utils/src/index.ts"],
       "@atscript/db-utils/*": ["packages/db-utils/src/*"],
+      "@atscript/db-sql-tools": ["packages/db-sql-tools/src/index.ts"],
+      "@atscript/db-sql-tools/*": ["packages/db-sql-tools/src/*"],
       "@atscript/db-sqlite": ["packages/db-sqlite/src/index.ts"],
       "@atscript/db-sqlite/*": ["packages/db-sqlite/src/*"],
       "@atscript/db-mysql": ["packages/db-mysql/src/index.ts"],

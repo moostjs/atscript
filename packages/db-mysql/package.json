@@ -59,6 +59,7 @@
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
     "@atscript/db-utils": "workspace:^",
+    "@atscript/db-sql-tools": "workspace:^",
     "@uniqu/core": "^0.0.6",
     "mysql2": ">=3.0.0"
   },

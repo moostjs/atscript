@@ -217,6 +217,9 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db-sql-tools':
+        specifier: workspace:^
+        version: link:../db-sql-tools
       '@atscript/db-utils':
         specifier: workspace:^
         version: link:../db-utils
@@ -234,11 +237,27 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/db-sql-tools:
+    dependencies:
+      '@atscript/db-utils':
+        specifier: workspace:^
+        version: link:../db-utils
+      '@uniqu/core':
+        specifier: ^0.0.6
+        version: 0.0.6
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/db-sqlite:
     dependencies:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db-sql-tools':
+        specifier: workspace:^
+        version: link:../db-sql-tools
       '@atscript/db-utils':
         specifier: workspace:^
         version: link:../db-utils

@@ -20,6 +20,7 @@ import {
   buildInsert,
   buildSelect,
   buildUpdate,
+  defaultValueForType,
   esc,
   sqlStringLiteral,
   toSqliteValue,
@@ -475,16 +476,6 @@ export class SqliteAdapter extends BaseDbAdapter {
       },
       shouldSkipType: (type) => type === 'fulltext',
     })
-  }
-}
-
-/** Returns a safe SQLite DEFAULT literal for a given design type. */
-function defaultValueForType(designType: string): string {
-  switch (designType) {
-    case 'number':
-    case 'integer': { return '0' }
-    case 'boolean': { return '0' }
-    default: { return "''" }
   }
 }
 

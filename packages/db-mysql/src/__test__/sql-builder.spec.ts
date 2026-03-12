@@ -10,11 +10,11 @@ import {
   esc,
   qi,
   quoteTableName,
-  toMysqlValue,
   sqlStringLiteral,
   collationToMysql,
   defaultValueForType,
 } from '../sql-builder'
+import { toSqlValue } from '@atscript/db-sql-tools'
 import type { TDbFieldMeta } from '@atscript/db-utils'
 
 // ── Helper to create minimal TDbFieldMeta ─────────────────────────────────
@@ -70,31 +70,31 @@ describe('esc / qi / quoteTableName', () => {
 
 // ── Value conversion ────────────────────────────────────────────────────
 
-describe('toMysqlValue', () => {
+describe('toSqlValue', () => {
   it('should convert undefined to null', () => {
-    expect(toMysqlValue(undefined)).toBeNull()
+    expect(toSqlValue(undefined)).toBeNull()
   })
 
   it('should pass through null', () => {
-    expect(toMysqlValue(null)).toBeNull()
+    expect(toSqlValue(null)).toBeNull()
   })
 
   it('should stringify objects', () => {
-    expect(toMysqlValue({ a: 1 })).toBe('{"a":1}')
+    expect(toSqlValue({ a: 1 })).toBe('{"a":1}')
   })
 
   it('should stringify arrays', () => {
-    expect(toMysqlValue([1, 2])).toBe('[1,2]')
+    expect(toSqlValue([1, 2])).toBe('[1,2]')
   })
 
   it('should convert booleans to 0/1', () => {
-    expect(toMysqlValue(true)).toBe(1)
-    expect(toMysqlValue(false)).toBe(0)
+    expect(toSqlValue(true)).toBe(1)
+    expect(toSqlValue(false)).toBe(0)
   })
 
   it('should pass through strings and numbers', () => {
-    expect(toMysqlValue('hello')).toBe('hello')
-    expect(toMysqlValue(42)).toBe(42)
+    expect(toSqlValue('hello')).toBe('hello')
+    expect(toSqlValue(42)).toBe(42)
   })
 })
 
