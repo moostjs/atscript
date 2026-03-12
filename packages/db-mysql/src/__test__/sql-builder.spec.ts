@@ -198,6 +198,39 @@ describe('mysqlTypeFromField', () => {
     expect(mysqlTypeFromField(field({ designType: 'number' }))).toBe('DOUBLE')
   })
 
+  it('should map number with @db.default.increment to BIGINT (not DOUBLE)', () => {
+    expect(mysqlTypeFromField(field({
+      designType: 'number',
+      defaultValue: { kind: 'fn', fn: 'increment' },
+    }))).toBe('BIGINT')
+  })
+
+  it('should map FK field to target PK type via fkTargetField', () => {
+    const targetPk = field({
+      designType: 'number',
+      defaultValue: { kind: 'fn', fn: 'increment' },
+    })
+    expect(mysqlTypeFromField(field({
+      designType: 'number',
+      fkTargetField: targetPk,
+    }))).toBe('BIGINT')
+  })
+
+  it('should map FK field to INT when target PK is integer', () => {
+    const targetPk = field({ designType: 'integer' })
+    expect(mysqlTypeFromField(field({
+      designType: 'number',
+      fkTargetField: targetPk,
+    }))).toBe('INT')
+  })
+
+  it('should map number with @db.default.now to TIMESTAMP (not DOUBLE)', () => {
+    expect(mysqlTypeFromField(field({
+      designType: 'number',
+      defaultValue: { kind: 'fn', fn: 'now' },
+    }))).toBe('TIMESTAMP')
+  })
+
   it('should map number with precision to DECIMAL', () => {
     expect(mysqlTypeFromField(fieldWithMetadata('number', {
       'db.column.precision': { precision: 10, scale: 2 },
@@ -388,6 +421,27 @@ describe('buildCreateTable', () => {
       field({ physicalName: 'userId', designType: 'integer' }),
     ], fks)
     expect(sql).toContain('FOREIGN KEY (`userId`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT')
+  })
+
+  it('should use target PK type for FK columns via fkTargetField', () => {
+    const targetPk = field({
+      designType: 'number',
+      defaultValue: { kind: 'fn', fn: 'increment' },
+      isPrimaryKey: true,
+    })
+    const fks = new Map([
+      ['ownerId', {
+        fields: ['ownerId'],
+        targetTable: 'users',
+        targetFields: ['id'],
+      }],
+    ])
+    const sql = buildCreateTable('projects', [
+      field({ physicalName: 'id', designType: 'integer', isPrimaryKey: true }),
+      field({ physicalName: 'ownerId', designType: 'number', fkTargetField: targetPk }),
+    ], fks)
+    expect(sql).toContain('`ownerId` BIGINT NOT NULL')
+    expect(sql).not.toContain('`ownerId` DOUBLE')
   })
 
   it('should add composite primary key', () => {

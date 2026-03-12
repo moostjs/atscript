@@ -145,8 +145,16 @@ export function collationToMysql(collation: TDbCollation): string {
  *
  * Reads `designType`, primitive tags (via `type.type.tags`), and annotations
  * from field metadata to produce the most specific MySQL type.
+ *
+ * For FK fields, delegates to the target PK's type via `field.fkTargetField`
+ * so the FK column type always matches the referenced column.
  */
 export function mysqlTypeFromField(field: TDbFieldMeta): string {
+  // FK fields inherit their DB type from the referenced target column
+  if (field.fkTargetField) {
+    return mysqlTypeFromField(field.fkTargetField)
+  }
+
   const tags = field.type?.type?.tags as Set<string> | undefined
   const metadata = field.type?.metadata
 
@@ -166,6 +174,14 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
     case 'number': {
       if (precision) {
         return `DECIMAL(${precision.precision},${precision.scale})`
+      }
+      // AUTO_INCREMENT requires an integer type — DOUBLE is invalid
+      if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'increment') {
+        return unsigned ? 'BIGINT UNSIGNED' : 'BIGINT'
+      }
+      // @db.default.now fields are timestamps, not floats
+      if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+        return 'TIMESTAMP'
       }
       return 'DOUBLE'
     }

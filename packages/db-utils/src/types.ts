@@ -140,6 +140,13 @@ export interface TDbFieldMeta {
   renamedFrom?: string
   /** Collation from @db.column.collate (e.g. 'nocase', 'binary', 'unicode'). */
   collate?: TDbCollation
+  /**
+   * For FK fields: the resolved field metadata of the referenced (target) PK column.
+   * Adapters use this in `typeMapper` to produce matching DB types for FK columns
+   * (e.g., `typeMapper(field.fkTargetField)` to inherit the target PK's DB type).
+   * Undefined for non-FK fields or when the target cannot be resolved.
+   */
+  fkTargetField?: TDbFieldMeta
 }
 
 // ── Foreign Key Types ────────────────────────────────────────────────────

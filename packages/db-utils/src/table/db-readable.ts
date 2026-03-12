@@ -89,6 +89,28 @@ export function resolveDesignType(fieldType: TAtscriptAnnotatedType): string {
 }
 
 /**
+ * Resolves `@db.default.*` annotations from a metadata map into a {@link TDbDefaultValue}.
+ * Used both during normal field descriptor construction and for FK target field resolution.
+ */
+export function resolveDefaultFromMetadata(metadata: TMetadataMap<any>): TDbDefaultValue | undefined {
+  const defaultValue = metadata.get('db.default') as string | undefined
+  if (defaultValue !== undefined) {
+    return { kind: 'value', value: defaultValue }
+  }
+  if (metadata.has('db.default.increment')) {
+    const startValue = metadata.get('db.default.increment')
+    return { kind: 'fn', fn: 'increment', start: typeof startValue === 'number' ? startValue : undefined }
+  }
+  if (metadata.has('db.default.uuid')) {
+    return { kind: 'fn', fn: 'uuid' }
+  }
+  if (metadata.has('db.default.now')) {
+    return { kind: 'fn', fn: 'now' }
+  }
+  return undefined
+}
+
+/**
  * Checks whether an id value is type-compatible with a field's design type.
  * Used by `findById` to skip primary-key lookup when the id clearly can't match,
  * falling through to unique-property search instead.
@@ -536,9 +558,76 @@ export class AtscriptDbReadable<
           collate: this._collateMap.get(path),
         })
       }
+
+      // Second pass: resolve fkTargetField for FK fields.
+      // For each FK, resolve the target PK's annotated type and build a TDbFieldMeta
+      // so adapters can produce matching DB types via typeMapper(field.fkTargetField).
+      this._resolveFkTargetFields()
+
       Object.freeze(this._fieldDescriptors)
     }
     return this._fieldDescriptors
+  }
+
+  /**
+   * Resolves `fkTargetField` for FK fields in `_fieldDescriptors`.
+   *
+   * For each FK, resolves the target table's annotated type via `targetTypeRef()`,
+   * flattens it, and looks up the target PK field. Builds a minimal `TDbFieldMeta`
+   * so adapters can call `typeMapper(field.fkTargetField)` to produce matching DB types.
+   *
+   * Safe to call: `targetTypeRef()` already resolved during `_flatten()` (in the
+   * `@db.rel.FK` handler), so it's guaranteed to work for all FKs in the map.
+   */
+  private _resolveFkTargetFields(): void {
+    if (this._foreignKeys.size === 0 || !this._fieldDescriptors) { return }
+
+    // Build mapping: local field path → { targetTypeRef, targetFieldName }
+    const fkFieldToTarget = new Map<string, { targetTypeRef: () => TAtscriptAnnotatedType; targetField: string }>()
+    for (const fk of this._foreignKeys.values()) {
+      if (!fk.targetTypeRef) { continue }
+      for (let i = 0; i < fk.fields.length; i++) {
+        fkFieldToTarget.set(fk.fields[i], {
+          targetTypeRef: fk.targetTypeRef,
+          targetField: fk.targetFields[i],
+        })
+      }
+    }
+
+    if (fkFieldToTarget.size === 0) { return }
+
+    // Cache flattened target types — multiple FKs may reference the same table
+    const flatCache = new Map<TAtscriptAnnotatedType, Map<string, TAtscriptAnnotatedType>>()
+
+    for (const descriptor of this._fieldDescriptors) {
+      const target = fkFieldToTarget.get(descriptor.path)
+      if (!target) { continue }
+
+      const targetType = target.targetTypeRef()
+      if (!targetType) { continue }
+
+      let targetFlatMap = flatCache.get(targetType)
+      if (!targetFlatMap) {
+        targetFlatMap = flattenAnnotatedType(targetType as TAtscriptAnnotatedType<TAtscriptTypeObject>)
+        flatCache.set(targetType, targetFlatMap)
+      }
+      const targetFieldType = targetFlatMap.get(target.targetField)
+      if (!targetFieldType) { continue }
+
+      const targetMetadata = targetFieldType.metadata
+      descriptor.fkTargetField = {
+        path: target.targetField,
+        type: targetFieldType,
+        physicalName: target.targetField,
+        designType: resolveDesignType(targetFieldType),
+        optional: false,
+        isPrimaryKey: targetMetadata?.has('meta.id') ?? false,
+        ignored: false,
+        storage: 'column',
+        defaultValue: targetMetadata ? resolveDefaultFromMetadata(targetMetadata) : undefined,
+        collate: targetMetadata?.get('db.column.collate') as TDbCollation | undefined,
+      }
+    }
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -847,20 +936,9 @@ export class AtscriptDbReadable<
     }
 
     // @db.default or @db.default.increment/uuid/now
-    const defaultValue = metadata.get('db.default') as string | undefined
-    if (defaultValue !== undefined) {
-      this._defaults.set(fieldName, { kind: 'value', value: defaultValue })
-    } else if (metadata.has('db.default.increment')) {
-      const startValue = metadata.get('db.default.increment')
-      this._defaults.set(fieldName, {
-        kind: 'fn',
-        fn: 'increment',
-        start: typeof startValue === 'number' ? startValue : undefined,
-      })
-    } else if (metadata.has('db.default.uuid')) {
-      this._defaults.set(fieldName, { kind: 'fn', fn: 'uuid' })
-    } else if (metadata.has('db.default.now')) {
-      this._defaults.set(fieldName, { kind: 'fn', fn: 'now' })
+    const resolvedDefault = resolveDefaultFromMetadata(metadata)
+    if (resolvedDefault) {
+      this._defaults.set(fieldName, resolvedDefault)
     }
 
     // @db.ignore
