@@ -31,6 +31,8 @@
       "@atscript/utils-db/*": ["packages/utils-db/src/*"],
       "@atscript/db-sqlite": ["packages/db-sqlite/src/index.ts"],
       "@atscript/db-sqlite/*": ["packages/db-sqlite/src/*"],
+      "@atscript/db-mysql": ["packages/db-mysql/src/index.ts"],
+      "@atscript/db-mysql/*": ["packages/db-mysql/src/*"],
       "@atscript/mongo": ["packages/mongo/src/index.ts"],
       "@atscript/mongo/*": ["packages/mongo/src/*"],
       "@atscript/moost-db": ["packages/moost-db/src/index.ts"],
