@@ -22,6 +22,7 @@ import { UniquSelect } from './uniqu-select'
 import type {
   DbControls,
   DbQuery,
+  TDbCollation,
   TDbDefaultFn,
   TDbDefaultValue,
   TDbFieldMeta,
@@ -253,6 +254,7 @@ export class AtscriptDbReadable<
   protected _columnMap = new Map<string, string>()
   protected _columnFromMap = new Map<string, string>()
   protected _defaults = new Map<string, TDbDefaultValue>()
+  protected _collateMap = new Map<string, TDbCollation>()
   protected _ignoredFields = new Set<string>()
   protected _navFields = new Set<string>()
   protected _uniqueProps = new Set<string>()
@@ -532,6 +534,7 @@ export class AtscriptDbReadable<
           storage,
           flattenedFrom: isFlattened ? path : undefined,
           renamedFrom,
+          collate: this._collateMap.get(path),
         })
       }
       Object.freeze(this._fieldDescriptors)
@@ -952,6 +955,12 @@ export class AtscriptDbReadable<
       this._addIndexField('fulltext', name, fieldName, { weight })
     }
 
+    // @db.column.collate → collation
+    const collate = metadata.get('db.column.collate') as TDbCollation | undefined
+    if (collate) {
+      this._collateMap.set(fieldName, collate)
+    }
+
     // @db.json → mark as JSON storage
     if (metadata.has('db.json')) {
       this._jsonFields.add(fieldName)
@@ -986,6 +995,9 @@ export class AtscriptDbReadable<
     }
     for (const key of this._jsonFields) {
       if (isUnderNav(key)) { this._jsonFields.delete(key) }
+    }
+    for (const key of this._collateMap.keys()) {
+      if (isUnderNav(key)) { this._collateMap.delete(key) }
     }
     this._primaryKeys = this._primaryKeys.filter(k => !isUnderNav(k))
     this._originalMetaIdFields = this._originalMetaIdFields.filter(k => !isUnderNav(k))

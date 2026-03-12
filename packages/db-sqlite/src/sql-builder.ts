@@ -132,6 +132,9 @@ export function buildCreateTable(
     if (field.defaultValue?.kind === 'value') {
       def += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
     }
+    if (field.collate) {
+      def += ` COLLATE ${field.collate.toUpperCase()}`
+    }
     colDefs.push(def)
   }
 

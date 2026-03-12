@@ -332,6 +332,9 @@ export class SqliteAdapter extends BaseDbAdapter {
       } else if (!field.optional && !field.isPrimaryKey) {
         ddl += ` DEFAULT ${defaultValueForType(field.designType)}`
       }
+      if (field.collate) {
+        ddl += ` COLLATE ${field.collate.toUpperCase()}`
+      }
       this._log(ddl)
       this.driver.exec(ddl)
       added.push(field.physicalName)

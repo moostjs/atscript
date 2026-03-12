@@ -85,6 +85,8 @@ export interface TDbIndex {
 
 export type TDbDefaultFn = 'increment' | 'uuid' | 'now'
 
+export type TDbCollation = 'binary' | 'nocase' | 'unicode'
+
 export type TDbDefaultValue =
   | { kind: 'value'; value: string }
   | { kind: 'fn'; fn: TDbDefaultFn; start?: number }
@@ -136,6 +138,8 @@ export interface TDbFieldMeta {
   flattenedFrom?: string
   /** Old physical column name from @db.column.renamed (for rename migration). */
   renamedFrom?: string
+  /** Collation from @db.column.collate (e.g. 'nocase', 'binary', 'unicode'). */
+  collate?: TDbCollation
 }
 
 // ── Foreign Key Types ────────────────────────────────────────────────────
