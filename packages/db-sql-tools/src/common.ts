@@ -35,6 +35,27 @@ export function defaultValueForType(designType: string): string {
   }
 }
 
+/**
+ * Converts a stored default value string to a SQL DEFAULT literal,
+ * respecting the field's designType. Booleans become 0/1, numbers stay unquoted,
+ * strings are single-quote-escaped.
+ */
+export function defaultValueToSqlLiteral(designType: string, value: string): string {
+  switch (designType) {
+    case 'boolean': {
+      return (value === 'true' || value === '1') ? '1' : '0'
+    }
+    case 'number':
+    case 'integer': {
+      const n = Number(value)
+      return Number.isFinite(n) ? String(n) : '0'
+    }
+    default: {
+      return sqlStringLiteral(value)
+    }
+  }
+}
+
 export const queryOpToSql: Record<string, string> = {
   $eq: '=', $ne: '!=', $gt: '>', $gte: '>=', $lt: '<', $lte: '<=',
 }

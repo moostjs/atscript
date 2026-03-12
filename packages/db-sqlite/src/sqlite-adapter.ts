@@ -21,8 +21,8 @@ import {
   buildSelect,
   buildUpdate,
   defaultValueForType,
+  defaultValueToSqlLiteral,
   esc,
-  sqlStringLiteral,
   toSqliteValue,
   sqliteTypeFromDesignType,
 } from './sql-builder'
@@ -329,7 +329,7 @@ export class SqliteAdapter extends BaseDbAdapter {
       }
       // SQLite ADD COLUMN with NOT NULL requires a DEFAULT; also emit explicit @db.default
       if (field.defaultValue?.kind === 'value') {
-        ddl += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
+        ddl += ` DEFAULT ${defaultValueToSqlLiteral(field.designType, field.defaultValue.value)}`
       } else if (!field.optional && !field.isPrimaryKey) {
         ddl += ` DEFAULT ${defaultValueForType(field.designType)}`
       }
@@ -371,7 +371,7 @@ export class SqliteAdapter extends BaseDbAdapter {
           const field = fieldsByName.get(c)
           if (field && !field.optional && !field.isPrimaryKey) {
             const fallback = field.defaultValue?.kind === 'value'
-              ? sqlStringLiteral(field.defaultValue.value)
+              ? defaultValueToSqlLiteral(field.designType, field.defaultValue.value)
               : defaultValueForType(field.designType)
             return `COALESCE("${esc(c)}", ${fallback}) AS "${esc(c)}"`
           }

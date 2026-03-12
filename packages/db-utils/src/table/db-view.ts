@@ -131,19 +131,22 @@ export class AtscriptDbView<
   }
 
   /**
-   * Resolves a query field ref `{ type?: () => T, field: string }` to `"table"."column"`.
-   * Used by adapters to render join conditions and filters.
+   * Resolves a query field ref to a quoted `table.column` SQL fragment.
+   *
+   * @param ref - The field reference from the query tree.
+   * @param qi - Identifier quoting function (e.g. backtick for MySQL, double-quote for SQLite).
+   *             Defaults to double-quote wrapping for backwards compatibility.
    */
-  resolveFieldRef(ref: AtscriptQueryFieldRef): string {
+  resolveFieldRef(ref: AtscriptQueryFieldRef, qi: (name: string) => string = (n => `"${n}"`)): string {
     if (!ref.type) {
       // Unqualified — resolve against entry table
       const plan = this.viewPlan
-      return `"${plan.entryTable}"."${ref.field}"`
+      return `${qi(plan.entryTable)}.${qi(ref.field)}`
     }
     const resolved = ref.type()
     const table = (resolved?.metadata?.get('db.table') as string)
       || resolved?.id || ''
-    return `"${table}"."${ref.field}"`
+    return `${qi(table)}.${qi(ref.field)}`
   }
 
   /**

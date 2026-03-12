@@ -392,6 +392,29 @@ describe('buildCreateTable', () => {
     expect(sql).toContain("DEFAULT 'active'")
   })
 
+  it('should add DEFAULT 0 for boolean false (not DEFAULT \'false\')', () => {
+    const sql = buildCreateTable('t', [
+      field({ physicalName: 'completed', designType: 'boolean', defaultValue: { kind: 'value', value: 'false' } }),
+    ])
+    expect(sql).toContain('DEFAULT 0')
+    expect(sql).not.toContain("DEFAULT 'false'")
+  })
+
+  it('should add DEFAULT 1 for boolean true', () => {
+    const sql = buildCreateTable('t', [
+      field({ physicalName: 'active', designType: 'boolean', defaultValue: { kind: 'value', value: 'true' } }),
+    ])
+    expect(sql).toContain('DEFAULT 1')
+  })
+
+  it('should add unquoted DEFAULT for number value', () => {
+    const sql = buildCreateTable('t', [
+      field({ physicalName: 'priority', designType: 'integer', defaultValue: { kind: 'value', value: '5' } }),
+    ])
+    expect(sql).toContain('DEFAULT 5')
+    expect(sql).not.toContain("DEFAULT '5'")
+  })
+
   it('should add DEFAULT (UUID()) for uuid default', () => {
     const sql = buildCreateTable('t', [
       field({ physicalName: 'uid', designType: 'string', defaultValue: { kind: 'fn', fn: 'uuid' } }),

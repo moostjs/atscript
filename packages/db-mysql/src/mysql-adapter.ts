@@ -22,6 +22,7 @@ import {
   buildSelect,
   buildUpdate,
   defaultValueForType,
+  defaultValueToSqlLiteral,
   mysqlTypeFromField,
   qi,
   quoteTableName,
@@ -340,7 +341,7 @@ export class MysqlAdapter extends BaseDbAdapter {
       this.resolveTableName(),
       view.viewPlan,
       view.getViewColumnMappings(),
-      ref => view.resolveFieldRef(ref),
+      ref => view.resolveFieldRef(ref, qi),
     )
     this._log(sql)
     await this._exec().exec(sql)
@@ -395,7 +396,7 @@ export class MysqlAdapter extends BaseDbAdapter {
         ddl += ' NOT NULL'
       }
       if (field.defaultValue?.kind === 'value') {
-        ddl += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
+        ddl += ` DEFAULT ${defaultValueToSqlLiteral(field.designType, field.defaultValue.value)}`
       } else if (!field.optional && !field.isPrimaryKey) {
         ddl += ` DEFAULT ${defaultValueForType(field.designType)}`
       }
@@ -467,7 +468,7 @@ export class MysqlAdapter extends BaseDbAdapter {
           const field = fieldsByName.get(c)
           if (field && !field.optional && !field.isPrimaryKey) {
             const fallback = field.defaultValue?.kind === 'value'
-              ? sqlStringLiteral(field.defaultValue.value)
+              ? defaultValueToSqlLiteral(field.designType, field.defaultValue.value)
               : defaultValueForType(field.designType)
             return `COALESCE(${qi(c)}, ${fallback}) AS ${qi(c)}`
           }
@@ -489,7 +490,12 @@ export class MysqlAdapter extends BaseDbAdapter {
   async dropTable(): Promise<void> {
     const ddl = `DROP TABLE IF EXISTS ${quoteTableName(this.resolveTableName())}`
     this._log(ddl)
-    await this._exec().exec(ddl)
+    const conn = await this.driver.getConnection()
+    await conn.exec('SET FOREIGN_KEY_CHECKS = 0')
+    try { await conn.exec(ddl) } finally {
+      await conn.exec('SET FOREIGN_KEY_CHECKS = 1')
+      conn.release()
+    }
   }
 
   async dropColumns(columns: string[]): Promise<void> {
@@ -504,7 +510,12 @@ export class MysqlAdapter extends BaseDbAdapter {
   async dropTableByName(tableName: string): Promise<void> {
     const ddl = `DROP TABLE IF EXISTS ${quoteTableName(tableName)}`
     this._log(ddl)
-    await this._exec().exec(ddl)
+    const conn = await this.driver.getConnection()
+    await conn.exec('SET FOREIGN_KEY_CHECKS = 0')
+    try { await conn.exec(ddl) } finally {
+      await conn.exec('SET FOREIGN_KEY_CHECKS = 1')
+      conn.release()
+    }
   }
 
   async dropViewByName(viewName: string): Promise<void> {

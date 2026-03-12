@@ -12,10 +12,11 @@ import {
   sqlStringLiteral,
   refActionToSql,
   defaultValueForType,
+  defaultValueToSqlLiteral,
 } from '@atscript/db-sql-tools'
 
 // Re-export shared utilities for consumers that import from this package
-export { sqlStringLiteral, defaultValueForType }
+export { sqlStringLiteral, defaultValueForType, defaultValueToSqlLiteral }
 export { toSqlValue as toSqliteValue }
 
 // ── SQLite identifier quoting ────────────────────────────────────────────────
@@ -187,7 +188,7 @@ export function buildCreateTable(
       def += ' NOT NULL'
     }
     if (field.defaultValue?.kind === 'value') {
-      def += ` DEFAULT ${sqlStringLiteral(field.defaultValue.value)}`
+      def += ` DEFAULT ${defaultValueToSqlLiteral(field.designType, field.defaultValue.value)}`
     }
     if (field.collate) {
       def += ` COLLATE ${field.collate.toUpperCase()}`
