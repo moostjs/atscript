@@ -85,8 +85,8 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Cached search index lookup. */
   protected _searchIndexesMap?: Map<string, TMongoIndex>
 
-  /** Physical field names with @db.default.increment. */
-  protected _incrementFields = new Set<string>()
+  /** Physical field names with @db.default.increment → optional start value. */
+  protected _incrementFields = new Map<string, number | undefined>()
 
   /** Capped collection options from @db.mongo.capped. */
   protected _cappedOptions?: { size: number; max?: number }
@@ -694,10 +694,11 @@ export class MongoAdapter extends BaseDbAdapter {
       this._addMongoIndexField('unique', '__pk', field)
       this._table.addUniqueField(field)
     }
-    // @db.default.increment → track for auto-increment on insert
+    // @db.default.increment → track for auto-increment on insert (with optional start value)
     if (metadata.has('db.default.increment')) {
       const physicalName = (metadata.get('db.column') as string | undefined) ?? field
-      this._incrementFields.add(physicalName)
+      const startValue = metadata.get('db.default.increment')
+      this._incrementFields.set(physicalName, typeof startValue === 'number' ? startValue : undefined)
     }
     // @db.index.fulltext → MongoDB text index (adapter-level, with weight)
     for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
@@ -760,7 +761,7 @@ export class MongoAdapter extends BaseDbAdapter {
         }
         return false
       }
-      for (const field of this._incrementFields) {
+      for (const field of this._incrementFields.keys()) {
         if (isUnderNav(field)) { this._incrementFields.delete(field) }
       }
     }
@@ -1108,8 +1109,7 @@ export class MongoAdapter extends BaseDbAdapter {
     }
     this._log('insertOne', data)
     const result = await this._wrapDuplicateKeyError(() => this.collection.insertOne(data, this._getSessionOpts()))
-    const metaIdPhysical = this._getMetaIdPhysical()
-    return { insertedId: metaIdPhysical ? (data[metaIdPhysical] ?? result.insertedId) : result.insertedId }
+    return { insertedId: this._resolveInsertedId(data, result.insertedId) }
   }
 
   async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
@@ -1129,12 +1129,9 @@ export class MongoAdapter extends BaseDbAdapter {
 
     this._log('insertMany', `${data.length} docs`)
     const result = await this._wrapDuplicateKeyError(() => this.collection.insertMany(data, this._getSessionOpts()))
-    const metaIdPhysical = this._getMetaIdPhysical()
     return {
       insertedCount: result.insertedCount,
-      insertedIds: metaIdPhysical
-        ? data.map((item, i) => item[metaIdPhysical] ?? result.insertedIds[i])
-        : Object.values(result.insertedIds),
+      insertedIds: data.map((item, i) => this._resolveInsertedId(item, result.insertedIds[i])),
     }
   }
 
@@ -1648,26 +1645,6 @@ export class MongoAdapter extends BaseDbAdapter {
 
   // ── Meta ID resolution ──────────────────────────────────────────────────
 
-  /** Cached physical name of the single @meta.id field, or null if none/composite. */
-  private _metaIdPhysical: string | null | undefined
-
-  /**
-   * Returns the physical column name of the single @meta.id field (if any).
-   * Used to return the user's logical ID instead of MongoDB's _id on insert.
-   */
-  private _getMetaIdPhysical(): string | null {
-    if (this._metaIdPhysical === undefined) {
-      const fields = this._table.originalMetaIdFields
-      if (fields.length === 1) {
-        const field = fields[0]
-        this._metaIdPhysical = this._table.columnMap.get(field) ?? field
-      } else {
-        this._metaIdPhysical = null
-      }
-    }
-    return this._metaIdPhysical
-  }
-
   // ── Auto-increment helpers ────────────────────────────────────────────────
 
   /** Returns the counters collection used for atomic auto-increment. */
@@ -1678,7 +1655,7 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Returns physical field names of increment fields that are undefined in the data. */
   private _fieldsNeedingIncrement(data: Record<string, unknown>): string[] {
     const result: string[] = []
-    for (const physical of this._incrementFields) {
+    for (const physical of this._incrementFields.keys()) {
       if (data[physical] === undefined || data[physical] === null) {
         result.push(physical)
       }
@@ -1700,6 +1677,7 @@ export class MongoAdapter extends BaseDbAdapter {
 
     for (const field of physicalFields) {
       const counterId = `${collectionName}.${field}`
+      const startValue = this._incrementFields.get(field)
       const doc = await counters.findOneAndUpdate(
         { _id: counterId },
         { $inc: { seq: count } },
@@ -1707,17 +1685,20 @@ export class MongoAdapter extends BaseDbAdapter {
       )
       const seq = doc?.seq ?? count
       // If this was a fresh counter (upserted), check if collection already has data
-      // with higher values and re-seed if needed
+      // with higher values and re-seed if needed, or apply the start value
       if (seq === count) {
         const currentMax = await this._getCurrentFieldMax(field)
-        if (currentMax >= seq) {
-          const adjusted = currentMax + count
+        // Determine the minimum starting point: use start value or existing max + 1
+        const minStart = typeof startValue === 'number' ? startValue : 1
+        const effectiveBase = Math.max(minStart, currentMax + 1)
+        if (effectiveBase > seq) {
+          const adjusted = effectiveBase + count - 1
           await counters.updateOne(
             { _id: counterId },
             { $max: { seq: adjusted } },
             this._getSessionOpts()
           )
-          result.set(field, currentMax + 1)
+          result.set(field, effectiveBase)
           continue
         }
       }

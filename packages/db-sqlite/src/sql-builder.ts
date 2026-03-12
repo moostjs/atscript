@@ -119,6 +119,12 @@ export function buildCreateTable(
     let def = `"${esc(field.physicalName)}" ${sqlType}`
     if (field.isPrimaryKey && primaryKeys.length === 1) {
       def += ' PRIMARY KEY'
+      // Add AUTOINCREMENT for integer PKs with @db.default.increment
+      // (enables sqlite_sequence seeding for start values)
+      if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'increment'
+        && (field.designType === 'number' || field.designType === 'integer')) {
+        def += ' AUTOINCREMENT'
+      }
     }
     if (!field.optional && !field.isPrimaryKey) {
       def += ' NOT NULL'

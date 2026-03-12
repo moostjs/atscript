@@ -113,7 +113,7 @@ export class SqliteAdapter extends BaseDbAdapter {
     const { sql, params } = buildInsert(this.resolveTableName(), data)
     this._log(sql, params)
     const result = this._wrapConstraintError(() => this.driver.run(sql, params))
-    return { insertedId: result.lastInsertRowid }
+    return { insertedId: this._resolveInsertedId(data, result.lastInsertRowid) }
   }
 
   async insertMany(
@@ -125,7 +125,7 @@ export class SqliteAdapter extends BaseDbAdapter {
         const { sql, params } = buildInsert(this.resolveTableName(), row)
         this._log(sql, params)
         const result = this._wrapConstraintError(() => this.driver.run(sql, params))
-        ids.push(result.lastInsertRowid)
+        ids.push(this._resolveInsertedId(row, result.lastInsertRowid))
       }
       return { insertedCount: ids.length, insertedIds: ids }
     })
@@ -264,6 +264,30 @@ export class SqliteAdapter extends BaseDbAdapter {
     )
     this._log(sql)
     this.driver.exec(sql)
+
+    // Seed sqlite_sequence for @db.default.increment with start value
+    this._seedIncrementStart()
+  }
+
+  private _incrementSeeded = false
+
+  /**
+   * Seeds the sqlite_sequence table for auto-increment fields that have a start value.
+   * Only applies once per adapter instance (idempotent via INSERT OR IGNORE + flag).
+   */
+  private _seedIncrementStart(): void {
+    if (this._incrementSeeded) { return }
+    this._incrementSeeded = true
+    const tableName = this.resolveTableName()
+    for (const def of this._table.defaults.values()) {
+      if (def.kind === 'fn' && def.fn === 'increment' && typeof def.start === 'number') {
+        const seedSql = `INSERT OR IGNORE INTO sqlite_sequence(name, seq) VALUES(?, ?)`
+        const params = [tableName, def.start - 1]
+        this._log(seedSql, params)
+        this.driver.run(seedSql, params)
+        break // Only one auto-increment PK per table
+      }
+    }
   }
 
   async ensureView(): Promise<void> {
