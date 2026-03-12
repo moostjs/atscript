@@ -35,6 +35,7 @@ export type {
   TDbFieldMeta,
   TDbStorageType,
   TDbIndexType,
+  TDbCollation,
   TDbDefaultFn,
   TDbForeignKey,
   TDbReferentialAction,

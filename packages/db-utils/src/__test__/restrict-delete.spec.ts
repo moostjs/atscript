@@ -59,7 +59,7 @@ describe('RESTRICT delete', () => {
     seedData()
 
     // User 2 has a category with RESTRICT — delete should be blocked
-    const err = await users.deleteOne(2).catch((e: unknown) => e)
+    const err = await users.deleteOne(2).catch((error: unknown) => error)
     expect(err).toBeInstanceOf(DbError)
     expect((err as DbError).code).toBe('CONFLICT')
   })
@@ -73,7 +73,7 @@ describe('RESTRICT delete', () => {
     space.getTable(CategoryType)
     seedData()
 
-    const err = await users.deleteOne(2).catch((e: unknown) => e) as DbError
+    const err = await users.deleteOne(2).catch((error: unknown) => error) as DbError
     expect(err.message).toMatch(/categories/)
     expect(err.message).toMatch(/ownerId/)
     expect(err.message).toMatch(/RESTRICT/i)
@@ -90,7 +90,7 @@ describe('RESTRICT delete', () => {
 
     // User 1 has projects (cascade) AND categories (restrict).
     // Delete should be blocked by RESTRICT before any cascade happens.
-    const err = await users.deleteOne(1).catch((e: unknown) => e)
+    const err = await users.deleteOne(1).catch((error: unknown) => error)
     expect(err).toBeInstanceOf(DbError)
     expect((err as DbError).code).toBe('CONFLICT')
 
@@ -142,7 +142,7 @@ describe('RESTRICT delete', () => {
 
     nativeStore.set('users', [{ id: 1, name: 'Alice' }])
 
-    const err = await users.deleteOne(1).catch((e: unknown) => e) as DbError
+    const err = await users.deleteOne(1).catch((error: unknown) => error) as DbError
     expect(err).toBeInstanceOf(DbError)
     expect(err.code).toBe('CONFLICT')
     expect(err.message).toMatch(/RESTRICT/)

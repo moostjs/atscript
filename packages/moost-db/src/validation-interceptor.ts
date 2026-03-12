@@ -19,9 +19,9 @@ function transformValidationError(error: unknown, reply: (response: unknown) => 
   } else if (error instanceof DbError) {
     const statusCode = dbErrorCodeToStatus[error.code] ?? 400
     reply(
-      new HttpError(statusCode, {
+      new HttpError(statusCode as ConstructorParameters<typeof HttpError>[0], {
         message: error.message,
-        statusCode,
+        statusCode: statusCode as number,
         errors: error.errors,
       })
     )

@@ -9,10 +9,10 @@ const mockDialect: SqlDialect = {
   quoteTable: (name) => `[${name}]`,
   unlimitedLimit: '-1',
   toValue: (v) => {
-    if (v === undefined) return null
-    if (v === null) return null
-    if (typeof v === 'object') return JSON.stringify(v)
-    if (typeof v === 'boolean') return v ? 1 : 0
+    if (v === undefined) { return null }
+    if (v === null) { return null }
+    if (typeof v === 'object') { return JSON.stringify(v) }
+    if (typeof v === 'boolean') { return v ? 1 : 0 }
     return v
   },
   toParam: (v) => typeof v === 'boolean' ? (v ? 1 : 0) : v,

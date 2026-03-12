@@ -91,20 +91,20 @@ export class SqliteAdapter extends BaseDbAdapter {
   private _wrapConstraintError<R>(fn: () => R): R {
     try {
       return fn()
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        if (e.message.includes('FOREIGN KEY constraint failed')) {
-          throw new DbError('FK_VIOLATION', [{ path: '', message: e.message }])
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        if (error.message.includes('FOREIGN KEY constraint failed')) {
+          throw new DbError('FK_VIOLATION', [{ path: '', message: error.message }])
         }
-        const uniqueMatch = e.message.match(/UNIQUE constraint failed:\s*\S+\.(\S+)/)
+        const uniqueMatch = error.message.match(/UNIQUE constraint failed:\s*\S+\.(\S+)/)
         if (uniqueMatch) {
-          throw new DbError('CONFLICT', [{ path: uniqueMatch[1], message: e.message }])
+          throw new DbError('CONFLICT', [{ path: uniqueMatch[1], message: error.message }])
         }
-        if (e.message.includes('UNIQUE constraint failed')) {
-          throw new DbError('CONFLICT', [{ path: '', message: e.message }])
+        if (error.message.includes('UNIQUE constraint failed')) {
+          throw new DbError('CONFLICT', [{ path: '', message: error.message }])
         }
       }
-      throw e
+      throw error
     }
   }
 
@@ -482,7 +482,7 @@ export class SqliteAdapter extends BaseDbAdapter {
 /** Normalizes SQLite PRAGMA dflt_value to match serialized format.
  *  PRAGMA returns `'active'` (SQL-quoted), we store `active` (raw). */
 function normalizeSqliteDefault(value: string | null): string | undefined {
-  if (value == null) { return undefined }
+  if (value === null) { return undefined }
   // Strip enclosing single quotes from string literals
   if (value.startsWith("'") && value.endsWith("'")) {
     return value.slice(1, -1)

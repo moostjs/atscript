@@ -29,7 +29,7 @@ import {
   collationToMysql,
   refActionToSql,
 } from './sql-builder'
-import type { TMysqlConnection, TMysqlDriver, TMysqlRunResult } from './types'
+import type { TMysqlConnection, TMysqlDriver } from './types'
 
 /**
  * MySQL adapter for {@link AtscriptDbTable}.
@@ -157,9 +157,9 @@ export class MysqlAdapter extends BaseDbAdapter {
   private async _wrapConstraintError<R>(fn: () => Promise<R>): Promise<R> {
     try {
       return await fn()
-    } catch (e: unknown) {
-      if (e && typeof e === 'object' && 'errno' in e) {
-        const err = e as { errno: number; message: string; sqlMessage?: string }
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'errno' in error) {
+        const err = error as { errno: number; message: string; sqlMessage?: string }
 
         // Duplicate key (unique constraint)
         if (err.errno === 1062) {
@@ -174,7 +174,7 @@ export class MysqlAdapter extends BaseDbAdapter {
           throw new DbError('FK_VIOLATION', errors)
         }
       }
-      throw e
+      throw error
     }
   }
 
@@ -531,13 +531,12 @@ export class MysqlAdapter extends BaseDbAdapter {
     const schema = this._table.schema
 
     await this.syncIndexesWithDiff({
-      listExisting: async () => {
-        return this._exec().all<{ name: string }>(
+      listExisting: async () =>
+        this._exec().all<{ name: string }>(
           `SELECT DISTINCT INDEX_NAME as name FROM INFORMATION_SCHEMA.STATISTICS
            WHERE TABLE_NAME = ? AND TABLE_SCHEMA = COALESCE(?, DATABASE())`,
           [tableName, schema]
-        )
-      },
+        ),
       createIndex: async (index: TDbIndex) => {
         const unique = index.type === 'unique' ? 'UNIQUE ' : ''
         const fulltext = index.type === 'fulltext' ? 'FULLTEXT ' : ''

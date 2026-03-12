@@ -50,7 +50,7 @@ export interface TViewSnapshot {
 
 /** Extracts sorted field snapshots from a readable's field descriptors. */
 function extractFieldSnapshots(
-  fields: TDbFieldMeta[],
+  fields: readonly TDbFieldMeta[],
   typeMapper?: (field: TDbFieldMeta) => string
 ): TFieldSnapshot[] {
   return fields

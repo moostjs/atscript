@@ -50,11 +50,11 @@ export function resolveArrayOps(
     }
 
     switch (op) {
-      case 'insert': fieldOps.insert = value as unknown[]; break
-      case 'remove': fieldOps.remove = value as unknown[]; break
-      case 'upsert': fieldOps.upsert = value as unknown[]; break
-      case 'update': fieldOps.update = value as unknown[]; break
-      case 'keys': fieldOps.keys = value as string[]; break
+      case 'insert': { fieldOps.insert = value as unknown[]; break }
+      case 'remove': { fieldOps.remove = value as unknown[]; break }
+      case 'upsert': { fieldOps.upsert = value as unknown[]; break }
+      case 'update': { fieldOps.update = value as unknown[]; break }
+      case 'keys': { fieldOps.keys = value as string[]; break }
     }
   }
 

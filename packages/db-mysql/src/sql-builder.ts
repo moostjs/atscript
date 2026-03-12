@@ -136,6 +136,7 @@ export function collationToMysql(collation: TDbCollation): string {
     case 'binary': { return 'utf8mb4_bin' }
     case 'nocase': { return 'utf8mb4_general_ci' }
     case 'unicode': { return 'utf8mb4_unicode_ci' }
+    default: { return 'utf8mb4_unicode_ci' }
   }
 }
 

@@ -354,9 +354,9 @@ describe('MysqlAdapter + AtscriptDbTable', () => {
       try {
         await t.insertOne({ id: 1, email: 'x', name: 'X', createdAt: 1, status: 'a' } as any)
         expect.unreachable('should have thrown')
-      } catch (e) {
-        expect(e).toBeInstanceOf(DbError)
-        expect((e as DbError).code).toBe('CONFLICT')
+      } catch (error) {
+        expect(error).toBeInstanceOf(DbError)
+        expect((error as DbError).code).toBe('CONFLICT')
       }
     })
 
@@ -381,9 +381,9 @@ describe('MysqlAdapter + AtscriptDbTable', () => {
       try {
         await t.insertOne({ id: 1, email: 'x', name: 'X', createdAt: 1, status: 'a' } as any)
         expect.unreachable('should have thrown')
-      } catch (e) {
-        expect(e).toBeInstanceOf(DbError)
-        expect((e as DbError).code).toBe('FK_VIOLATION')
+      } catch (error) {
+        expect(error).toBeInstanceOf(DbError)
+        expect((error as DbError).code).toBe('FK_VIOLATION')
       }
     })
 

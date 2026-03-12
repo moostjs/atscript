@@ -11,7 +11,7 @@ function resolvePrimitive(rootName: string, chain: string[]): SemanticPrimitiveN
   let node = getPrimitive(rootName)
   for (const segment of chain) {
     const child = node.props.get(segment)
-    if (!child) return undefined
+    if (!child) { return undefined }
     // Child props are SemanticPrimitiveNode instances
     node = child as unknown as SemanticPrimitiveNode
   }

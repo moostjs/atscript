@@ -230,9 +230,9 @@ describe('FK Validation', () => {
         comments: [{ body: 'Bad comment', authorId: 999 }],
       })
       expect.unreachable('Should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const err = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const err = error as DbError
       expect(err.code).toBe('FK_VIOLATION')
       // Error paths must include the nav field prefix
       const paths = err.errors.map(e => e.path)

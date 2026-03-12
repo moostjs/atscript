@@ -50,9 +50,9 @@ describe('MysqlAdapter — FK error mapping', () => {
     try {
       await table.insertOne({ id: 1, title: 'Test', projectId: 999 } as any)
       expect.unreachable('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const dbErr = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const dbErr = error as DbError
       expect(dbErr.code).toBe('FK_VIOLATION')
       // Should extract 'projectId' from the FOREIGN KEY (`projectId`) pattern
       expect(dbErr.errors[0].path).toBe('projectId')
@@ -75,9 +75,9 @@ describe('MysqlAdapter — FK error mapping', () => {
     try {
       await table.deleteOne(1)
       expect.unreachable('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const dbErr = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const dbErr = error as DbError
       // Table layer remaps FK_VIOLATION → CONFLICT on delete
       expect(dbErr.code).toBe('CONFLICT')
     }
@@ -97,9 +97,9 @@ describe('MysqlAdapter — FK error mapping', () => {
     try {
       await table.insertOne({ id: 1, title: 'Test', projectId: 1 } as any)
       expect.unreachable('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const dbErr = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const dbErr = error as DbError
       expect(dbErr.code).toBe('CONFLICT')
       expect(dbErr.errors[0].path).toBe('PRIMARY')
     }
@@ -119,9 +119,9 @@ describe('MysqlAdapter — FK error mapping', () => {
     try {
       await table.insertOne({ id: 1, title: 'Test', projectId: 1 } as any)
       expect.unreachable('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const dbErr = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const dbErr = error as DbError
       expect(dbErr.code).toBe('FK_VIOLATION')
       // Falls back to physical column name when no mapping found
       expect(dbErr.errors[0].path).toBe('unknown_col')
@@ -144,9 +144,9 @@ describe('MysqlAdapter — FK error mapping', () => {
     try {
       await table.insertOne({ id: 1, title: 'Test', projectId: 1 } as any)
       expect.unreachable('should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const dbErr = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const dbErr = error as DbError
       expect(dbErr.code).toBe('FK_VIOLATION')
       // Table layer enriches empty-path errors with all FK fields from metadata
       const paths = dbErr.errors.map(err => err.path)

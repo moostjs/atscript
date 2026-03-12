@@ -23,7 +23,6 @@ import type {
   DbControls,
   DbQuery,
   TDbCollation,
-  TDbDefaultFn,
   TDbDefaultValue,
   TDbFieldMeta,
   TDbForeignKey,

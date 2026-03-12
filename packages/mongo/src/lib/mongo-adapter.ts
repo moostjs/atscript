@@ -1086,12 +1086,12 @@ export class MongoAdapter extends BaseDbAdapter {
   private async _wrapDuplicateKeyError<R>(fn: () => Promise<R>): Promise<R> {
     try {
       return await fn()
-    } catch (e: unknown) {
-      if (e instanceof MongoServerError && e.code === 11000) {
-        const field = e.keyPattern ? Object.keys(e.keyPattern)[0] ?? '' : ''
-        throw new DbError('CONFLICT', [{ path: field, message: e.message }])
+    } catch (error: unknown) {
+      if (error instanceof MongoServerError && error.code === 11000) {
+        const field = error.keyPattern ? Object.keys(error.keyPattern)[0] ?? '' : ''
+        throw new DbError('CONFLICT', [{ path: field, message: error.message }])
       }
-      throw e
+      throw error
     }
   }
 

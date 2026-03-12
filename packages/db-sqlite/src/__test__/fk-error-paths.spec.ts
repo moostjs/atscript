@@ -46,9 +46,9 @@ describe('FK error paths use logical field names', () => {
     try {
       await taskTable.insertOne({ id: 1, title: 'test', projectId: 999 })
       expect.unreachable('Should have thrown')
-    } catch (e) {
-      expect(e).toBeInstanceOf(DbError)
-      const err = e as DbError
+    } catch (error) {
+      expect(error).toBeInstanceOf(DbError)
+      const err = error as DbError
       expect(err.code).toBe('FK_VIOLATION')
       // Error paths must use logical field names, not internal __auto_ map keys
       const paths = err.errors.map(e => e.path)
@@ -63,8 +63,8 @@ describe('FK error paths use logical field names', () => {
     try {
       await taskTable.insertOne({ id: 1, title: 'test', projectId: 999 })
       expect.unreachable('Should have thrown')
-    } catch (e) {
-      const err = e as DbError
+    } catch (error) {
+      const err = error as DbError
       const paths = err.errors.map(e => e.path)
       // Both FK fields should be reported (projectId and reviewerId)
       expect(paths).toContain('projectId')

@@ -1,8 +1,9 @@
 import type { FilterExpr } from '@uniqu/core'
 import { buildWhere as _buildWhere } from '@atscript/db-sql-tools'
-export type { TSqlFragment } from '@atscript/db-sql-tools'
-
+import type { TSqlFragment } from '@atscript/db-sql-tools'
 import { sqliteDialect } from './sql-builder'
+
+export type { TSqlFragment } from '@atscript/db-sql-tools'
 
 /**
  * Translates a uniqu filter expression into a parameterized SQL WHERE clause.

@@ -1096,14 +1096,14 @@ export class AtscriptDbTable<
     for (let i = 0; i < items.length; i++) {
       try {
         validator.validate(items[i] as DataType, false, ctx)
-      } catch (e) {
-        if (e instanceof ValidatorError && items.length > 1) {
-          throw new ValidatorError(e.errors.map(err => ({
+      } catch (error) {
+        if (error instanceof ValidatorError && items.length > 1) {
+          throw new ValidatorError(error.errors.map(err => ({
             ...err,
             path: `[${i}].${err.path}`,
           })))
         }
-        throw e
+        throw error
       }
     }
   }
@@ -1126,14 +1126,14 @@ export class AtscriptDbTable<
   private async _wrapNestedError<R>(navField: string, fn: () => Promise<R>): Promise<R> {
     try {
       return await fn()
-    } catch (e) {
-      if (e instanceof ValidatorError) {
-        throw new ValidatorError(AtscriptDbTable._prefixErrorPaths(e.errors, navField))
+    } catch (error) {
+      if (error instanceof ValidatorError) {
+        throw new ValidatorError(AtscriptDbTable._prefixErrorPaths(error.errors, navField))
       }
-      if (e instanceof DbError) {
-        throw new DbError(e.code, AtscriptDbTable._prefixErrorPaths(e.errors, navField))
+      if (error instanceof DbError) {
+        throw new DbError(error.code, AtscriptDbTable._prefixErrorPaths(error.errors, navField))
       }
-      throw e
+      throw error
     }
   }
 
@@ -1145,18 +1145,18 @@ export class AtscriptDbTable<
   private async _enrichFkViolation<R>(fn: () => Promise<R>): Promise<R> {
     try {
       return await fn()
-    } catch (e) {
-      if (e instanceof DbError && e.code === 'FK_VIOLATION' && e.errors.every(err => !err.path)) {
-        const msg = e.errors[0]?.message ?? e.message
+    } catch (error) {
+      if (error instanceof DbError && error.code === 'FK_VIOLATION' && error.errors.every(err => !err.path)) {
+        const msg = error.errors[0]?.message ?? error.message
         const errors: Array<{ path: string; message: string }> = []
         for (const [, fk] of this._foreignKeys) {
           for (const field of fk.fields) {
             errors.push({ path: field, message: msg })
           }
         }
-        throw new DbError('FK_VIOLATION', errors.length > 0 ? errors : e.errors)
+        throw new DbError('FK_VIOLATION', errors.length > 0 ? errors : error.errors)
       }
-      throw e
+      throw error
     }
   }
 
@@ -1169,14 +1169,14 @@ export class AtscriptDbTable<
   private async _remapDeleteFkViolation<R>(fn: () => Promise<R>): Promise<R> {
     try {
       return await fn()
-    } catch (e) {
-      if (e instanceof DbError && e.code === 'FK_VIOLATION') {
+    } catch (error) {
+      if (error instanceof DbError && error.code === 'FK_VIOLATION') {
         throw new DbError('CONFLICT', [{
           path: this.tableName,
           message: `Cannot delete from "${this.tableName}": referenced by child records (RESTRICT)`,
         }])
       }
-      throw e
+      throw error
     }
   }
 
