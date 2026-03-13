@@ -772,20 +772,6 @@ export class MongoAdapter extends BaseDbAdapter {
   }
 
   override onAfterFlatten(): void {
-    // Purge fields that are under navigation relation paths
-    // (e.g. 'projects.id' from @db.rel.from projects?: Project[])
-    if (this._table.navFields.size > 0) {
-      const isUnderNav = (path: string) => {
-        for (const nav of this._table.navFields) {
-          if (path.startsWith(`${nav}.`)) { return true }
-        }
-        return false
-      }
-      for (const field of this._incrementFields.keys()) {
-        if (isUnderNav(field)) { this._incrementFields.delete(field) }
-      }
-    }
-
     // Associate vector filter fields with their vector indexes
     for (const [key, value] of this._vectorFilters.entries()) {
       const index = this._mongoIndexes.get(key)

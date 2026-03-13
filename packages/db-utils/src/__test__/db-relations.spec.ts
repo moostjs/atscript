@@ -142,9 +142,9 @@ describe('AtscriptDbTable — Relations', () => {
     Comment = comment.Comment
   })
 
-  // ── Nav field purging ─────────────────────────────────────────────────
+  // ── Nav field filtering ────────────────────────────────────────────────
 
-  describe('nav field purging', () => {
+  describe('nav field filtering', () => {
     let table: AtscriptDbTable
 
     beforeEach(() => {
@@ -178,7 +178,7 @@ describe('AtscriptDbTable — Relations', () => {
       expect(defaultKeys).toHaveLength(2)
     })
 
-    it('should purge nav descendant defaults on Post table', () => {
+    it('should not include nav descendant defaults on Post table', () => {
       const postTable = new AtscriptDbTable(Post, new InMemoryAdapter())
       for (const key of postTable.defaults.keys()) {
         expect(key.startsWith('comments.')).toBe(false)

@@ -306,9 +306,11 @@ export abstract class BaseDbAdapter {
   onBeforeFlatten?(type: TAtscriptAnnotatedType): void
 
   /**
-   * Called for each field during flattening.
-   * Use to extract field-level adapter-specific annotations.
+   * Called for each non-nav-descendant field during the build pipeline.
+   * Fields nested under navigation relations (`@db.rel.to/from/via`) are
+   * never delivered to this callback — adapters do not need to filter them.
    *
+   * Use to extract field-level adapter-specific annotations.
    * Example: MongoDB adapter extracts `@db.mongo.search.vector`, `@db.mongo.search.text`.
    */
   onFieldScanned?(

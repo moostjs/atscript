@@ -46,6 +46,11 @@ export function findAncestorInSet(path: string, set: ReadonlySet<string>): strin
   return undefined
 }
 
+/** Returns true if `metadata` indicates a navigation relation field. */
+function isNavRelation(metadata: TMetadataMap<AtscriptMetadata>): boolean {
+  return metadata.has('db.rel.to') || metadata.has('db.rel.from') || metadata.has('db.rel.via')
+}
+
 /**
  * Computed metadata for a database table or view.
  *
@@ -121,8 +126,8 @@ export class TableMetadata {
    *
    * Pipeline steps:
    * 1. `adapter.onBeforeFlatten(type)` — adapter hook
-   * 2. `flattenAnnotatedType()` with per-field annotation scanning
-   * 3. Purge nav field descendants
+   * 2. `flattenAnnotatedType()` — collect field tuples, detect nav fields eagerly
+   * 3. Replay non-nav-descendant tuples through annotation scanning + adapter.onFieldScanned
    * 4. Classify fields and build path maps (skipped for nested-objects adapters)
    * 5. `adapter.getMetadataOverrides()` → `_applyOverrides()` (PK/unique/inject adjustments)
    * 6. Build field descriptors (TDbFieldMeta[])
@@ -140,18 +145,28 @@ export class TableMetadata {
 
     adapter.onBeforeFlatten?.(type)
 
+    // Phase 1: Collect field tuples. Detect nav fields eagerly so
+    // Phase 2 can skip their descendants (flattenAnnotatedType fires
+    // onField post-order — children before parent — so we can't filter
+    // during the callback itself).
+    const collected: Array<{ path: string; type: TAtscriptAnnotatedType; metadata: TMetadataMap<AtscriptMetadata> }> = []
+
     this.flatMap = flattenAnnotatedType(type, {
       topLevelArrayTag: adapter.getTopLevelArrayTag?.() ?? 'db.__topLevelArray',
       excludePhantomTypes: true,
       onField: (path, fieldType, metadata) => {
-        this._scanGenericAnnotations(path, fieldType, metadata, logger)
-        adapter.onFieldScanned?.(path, fieldType, metadata)
+        if (isNavRelation(metadata)) { this.navFields.add(path) }
+        collected.push({ path, type: fieldType, metadata })
       },
     })
 
-    // Strip entries nested under navigational relation fields
-    if (this.navFields.size > 0) {
-      this._purgeNavFieldDescendants()
+    // Phase 2: Scan only non-nav-descendant fields into metadata maps.
+    // Nav descendants remain in flatMap (validation needs them) but never
+    // pollute primaryKeys, defaults, indexes, foreignKeys, etc.
+    for (const entry of collected) {
+      if (findAncestorInSet(entry.path, this.navFields) !== undefined) { continue }
+      this._scanGenericAnnotations(entry.path, entry.type, entry.metadata, logger)
+      adapter.onFieldScanned?.(entry.path, entry.type, entry.metadata)
     }
 
     // Classify fields and build path maps (before finalizing indexes)
@@ -282,7 +297,7 @@ export class TableMetadata {
     }
 
     // @db.rel.to / @db.rel.from / @db.rel.via → navigational field, not a stored column
-    if (metadata.has('db.rel.to') || metadata.has('db.rel.from') || metadata.has('db.rel.via')) {
+    if (isNavRelation(metadata)) {
       this.navFields.add(fieldName)
       this.ignoredFields.add(fieldName)
 
@@ -384,49 +399,6 @@ export class TableMetadata {
         logger.warn(
           `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
         )
-      }
-    }
-  }
-
-  // ── Private: nav field purge ─────────────────────────────────────────────
-
-  /**
-   * Removes entries nested under nav field prefixes from all internal maps.
-   */
-  private _purgeNavFieldDescendants(): void {
-    const isUnderNav = (path: string) => {
-      for (const nav of this.navFields) {
-        if (path.startsWith(`${nav}.`)) { return true }
-      }
-      return false
-    }
-
-    for (const key of this.defaults.keys()) {
-      if (isUnderNav(key)) { this.defaults.delete(key) }
-    }
-    for (const key of this.columnMap.keys()) {
-      if (isUnderNav(key)) { this.columnMap.delete(key) }
-    }
-    for (const key of this.jsonFields) {
-      if (isUnderNav(key)) { this.jsonFields.delete(key) }
-    }
-    for (const key of this._collateMap.keys()) {
-      if (isUnderNav(key)) { this._collateMap.delete(key) }
-    }
-    this.primaryKeys = this.primaryKeys.filter(k => !isUnderNav(k))
-    this.originalMetaIdFields = this.originalMetaIdFields.filter(k => !isUnderNav(k))
-
-    for (const [, index] of this.indexes) {
-      index.fields = index.fields.filter(f => !isUnderNav(f.name))
-    }
-    for (const [name, index] of this.indexes) {
-      if (index.fields.length === 0) { this.indexes.delete(name) }
-    }
-
-    // Purge FK entries whose local fields are under nav prefixes
-    for (const [key, fk] of this.foreignKeys) {
-      if (fk.fields.some(f => isUnderNav(f))) {
-        this.foreignKeys.delete(key)
       }
     }
   }
