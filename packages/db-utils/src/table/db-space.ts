@@ -44,6 +44,9 @@ export class DbSpace {
   /** All tables created in this space — used for reverse FK lookup during cascade. */
   private _allTables = new Set<AtscriptDbTable>()
 
+  /** Lazily created adapter for administrative ops (drop table/view) that don't need a registered readable. */
+  private _adminAdapter?: BaseDbAdapter
+
   constructor(
     protected readonly adapterFactory: TAdapterFactory,
     protected readonly logger: TGenericLogger = NoopLogger
@@ -127,7 +130,7 @@ export class DbSpace {
    * Drops a table by name. Used by schema sync to remove tables no longer in the schema.
    */
   async dropTableByName(tableName: string): Promise<void> {
-    const adapter = this.adapterFactory()
+    const adapter = this._getAdminAdapter()
     if (adapter.dropTableByName) {
       await adapter.dropTableByName(tableName)
     }
@@ -137,10 +140,14 @@ export class DbSpace {
    * Drops a view by name. Used by schema sync to remove views no longer in the schema.
    */
   async dropViewByName(viewName: string): Promise<void> {
-    const adapter = this.adapterFactory()
+    const adapter = this._getAdminAdapter()
     if (adapter.dropViewByName) {
       await adapter.dropViewByName(viewName)
     }
+  }
+
+  private _getAdminAdapter(): BaseDbAdapter {
+    return (this._adminAdapter ??= this.adapterFactory())
   }
 
   /**
