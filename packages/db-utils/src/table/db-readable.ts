@@ -930,6 +930,11 @@ export class AtscriptDbReadable<
       this._classifyFields()
     }
 
+    // Build field descriptors unconditionally — schema sync needs them
+    // even for adapters that support nested objects (e.g. MongoDB).
+    // _buildFieldDescriptors() already handles skipFlattening internally.
+    this._buildFieldDescriptors()
+
     this._finalizeIndexes()
     this.adapter.onAfterFlatten?.()
 
@@ -1244,8 +1249,6 @@ export class AtscriptDbReadable<
     }
 
     this._requiresMappings = this._flattenedParents.size > 0 || this._jsonFields.size > 0
-
-    this._buildFieldDescriptors()
   }
 
   /**

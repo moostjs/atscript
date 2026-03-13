@@ -1062,4 +1062,22 @@ describe('AtscriptDbTable — embedded objects', () => {
       expect(result.author).toEqual({ id: 10, name: 'Author A' })
     })
   })
+
+  // ── Nested-objects adapter (bug #14) ────────────────────────────────────
+
+  describe('nested-objects adapter (bug #14)', () => {
+    it('should build fieldDescriptors when adapter supports nested objects', () => {
+      class NestedAdapter extends MockAdapter {
+        override supportsNestedObjects(): boolean {
+          return true
+        }
+      }
+      const nestedTable = new AtscriptDbTable(UsersTable, new NestedAdapter())
+      const descriptors = nestedTable.fieldDescriptors
+      expect(descriptors).toBeDefined()
+      expect(Array.isArray(descriptors)).toBe(true)
+      expect(descriptors.length).toBeGreaterThan(0)
+      expect(descriptors.some(d => d.path === 'id')).toBe(true)
+    })
+  })
 })
