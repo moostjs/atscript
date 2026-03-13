@@ -6,14 +6,16 @@ import type { TDbForeignKey, TDbRelation, TTableResolver } from '../types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-/** Context needed by the relation loader — provided by the readable. */
-export interface TRelationLoaderContext {
-  tableName: string
-  relations: ReadonlyMap<string, TDbRelation>
-  foreignKeys: ReadonlyMap<string, TDbForeignKey>
-  tableResolver: TTableResolver | undefined
-  adapter: BaseDbAdapter
-  logger: TGenericLogger
+/** Host interface for the relation loader — matches AtscriptDbReadable property names. */
+export interface TRelationLoaderHost {
+  readonly tableName: string
+  readonly _meta: {
+    readonly relations: ReadonlyMap<string, TDbRelation>
+    readonly foreignKeys: ReadonlyMap<string, TDbForeignKey>
+  }
+  readonly _tableResolver?: TTableResolver
+  readonly adapter: BaseDbAdapter
+  readonly logger: TGenericLogger
 }
 
 /** Minimal interface for a resolved related table. */
@@ -91,15 +93,15 @@ export function resolveRelationTargetTable(relation: TDbRelation): string {
 export async function loadRelationsImpl(
   rows: Array<Record<string, unknown>>,
   withRelations: WithRelation[],
-  ctx: TRelationLoaderContext
+  host: TRelationLoaderHost
 ): Promise<void> {
   if (rows.length === 0 || withRelations.length === 0) { return }
 
-  if (ctx.adapter.supportsNativeRelations()) {
-    return ctx.adapter.loadRelations(rows, withRelations, ctx.relations, ctx.foreignKeys, ctx.tableResolver)
+  if (host.adapter.supportsNativeRelations()) {
+    return host.adapter.loadRelations(rows, withRelations, host._meta.relations, host._meta.foreignKeys, host._tableResolver)
   }
 
-  if (!ctx.tableResolver) { return }
+  if (!host._tableResolver) { return }
 
   const tasks: Array<Promise<void>> = []
 
@@ -107,17 +109,17 @@ export async function loadRelationsImpl(
     const relName = withRel.name
     if (relName.includes('.')) { continue }
 
-    const relation = ctx.relations.get(relName)
+    const relation = host._meta.relations.get(relName)
     if (!relation) {
-      throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...ctx.relations.keys()].join(', ') || '(none)'}`)
+      throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...host._meta.relations.keys()].join(', ') || '(none)'}`)
     }
 
     const targetType = relation.targetType()
     if (!targetType) { continue }
 
-    const targetTable = ctx.tableResolver(targetType)
+    const targetTable = host._tableResolver(targetType)
     if (!targetTable) {
-      ctx.logger.warn(`Could not resolve table for relation "${relName}" — skipping`)
+      host.logger.warn(`Could not resolve table for relation "${relName}" — skipping`)
       continue
     }
 
@@ -138,11 +140,11 @@ export async function loadRelationsImpl(
     const relQuery: TRelationQuery = { filter, controls }
 
     if (relation.direction === 'to') {
-      tasks.push(loadToRelation(rows, { relName, relation, targetTable, relQuery }, ctx))
+      tasks.push(loadToRelation(rows, { relName, relation, targetTable, relQuery }, host))
     } else if (relation.direction === 'via') {
-      tasks.push(loadViaRelation(rows, { relName, relation, targetTable, relQuery }, ctx))
+      tasks.push(loadViaRelation(rows, { relName, relation, targetTable, relQuery }, host))
     } else {
-      tasks.push(loadFromRelation(rows, { relName, relation, targetTable, relQuery }, ctx))
+      tasks.push(loadFromRelation(rows, { relName, relation, targetTable, relQuery }, host))
     }
   }
 
@@ -157,10 +159,10 @@ export async function loadRelationsImpl(
 async function loadToRelation(
   rows: Array<Record<string, unknown>>,
   opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery },
-  ctx: TRelationLoaderContext
+  host: TRelationLoaderHost
 ): Promise<void> {
   const { relName, relation, targetTable, relQuery } = opts
-  const fkEntry = findFKForRelation(relation, ctx.foreignKeys)
+  const fkEntry = findFKForRelation(relation, host._meta.foreignKeys)
   if (!fkEntry) { return }
 
   const { localFields, targetFields } = fkEntry
@@ -204,12 +206,12 @@ async function loadToRelation(
 async function loadFromRelation(
   rows: Array<Record<string, unknown>>,
   opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery },
-  ctx: TRelationLoaderContext
+  host: TRelationLoaderHost
 ): Promise<void> {
   const { relName, relation, targetTable, relQuery } = opts
-  const remoteFK = findRemoteFK(targetTable, ctx.tableName, relation.alias)
+  const remoteFK = findRemoteFK(targetTable, host.tableName, relation.alias)
   if (!remoteFK) {
-    ctx.logger.warn(`Could not find FK on target table for relation "${relName}"`)
+    host.logger.warn(`Could not find FK on target table for relation "${relName}"`)
     return
   }
 
@@ -272,25 +274,25 @@ async function loadFromRelation(
 async function loadViaRelation(
   rows: Array<Record<string, unknown>>,
   opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery },
-  ctx: TRelationLoaderContext
+  host: TRelationLoaderHost
 ): Promise<void> {
   const { relName, relation, targetTable, relQuery } = opts
 
-  if (!relation.viaType || !ctx.tableResolver) { return }
+  if (!relation.viaType || !host._tableResolver) { return }
 
   const junctionType = relation.viaType()
   if (!junctionType) { return }
 
-  const junctionTable = ctx.tableResolver(junctionType)
+  const junctionTable = host._tableResolver(junctionType)
   if (!junctionTable) {
-    ctx.logger.warn(`Could not resolve junction table for via relation "${relName}"`)
+    host.logger.warn(`Could not resolve junction table for via relation "${relName}"`)
     return
   }
 
   // Find FK on junction that points to THIS table
-  const fkToThis = findRemoteFK(junctionTable, ctx.tableName)
+  const fkToThis = findRemoteFK(junctionTable, host.tableName)
   if (!fkToThis) {
-    ctx.logger.warn(`Could not find FK on junction table pointing to "${ctx.tableName}" for via relation "${relName}"`)
+    host.logger.warn(`Could not find FK on junction table pointing to "${host.tableName}" for via relation "${relName}"`)
     return
   }
 
@@ -298,7 +300,7 @@ async function loadViaRelation(
   const targetTableName = resolveRelationTargetTable(relation)
   const fkToTarget = findRemoteFK(junctionTable, targetTableName)
   if (!fkToTarget) {
-    ctx.logger.warn(`Could not find FK on junction table pointing to target "${targetTableName}" for via relation "${relName}"`)
+    host.logger.warn(`Could not find FK on junction table pointing to target "${targetTableName}" for via relation "${relName}"`)
     return
   }
 

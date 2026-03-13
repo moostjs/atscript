@@ -6,19 +6,24 @@ import {
   type TAtscriptAnnotatedType,
   type TAtscriptDataType,
   type Validator,
-  ValidatorError,
 } from '@atscript/typescript/utils'
 
 import type { FilterExpr } from '@uniqu/core'
 
 import type { BaseDbAdapter } from '../base-adapter'
-import type { AtscriptDbTableLike, AtscriptDbWritable } from '../types'
 import { DbError } from '../db-error'
 import type { TGenericLogger } from '../logger'
 import { resolveArrayOps, getArrayOpsFields } from '../patch/array-ops-resolver'
 import { decomposePatch } from '../patch/patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
-import { resolveRelationTargetTable } from './relation-loader'
+import { enrichFkViolation, remapDeleteFkViolation } from './error-utils'
+import {
+  type TNestedWriterHost,
+  checkDepthOverflow, validateBatch, preValidateNestedFrom,
+  batchInsertNestedTo, batchInsertNestedFrom, batchInsertNestedVia,
+  batchReplaceNestedTo, batchReplaceNestedFrom, batchReplaceNestedVia,
+  batchPatchNestedTo, batchPatchNestedFrom, batchPatchNestedVia,
+} from './nested-writer'
 import { createDbValidatorPlugin, type DbValidationContext } from '../db-validator-plugin'
 import type { IntegrityStrategy } from '../strategies/integrity'
 import { NativeIntegrity } from '../strategies/integrity'
@@ -157,20 +162,21 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
-    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    if (!canNest && this._meta.navFields.size > 0) { checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth, this._meta) }
 
-    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
+    return enrichFkViolation(this._meta, () => this.adapter.withTransaction(async () => {
       // Clone + apply defaults (keep originals for FROM phase)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
 
       // Validate full payload (including nav fields) before any writes
       const validator = this.getValidator('insert')
       const ctx: DbValidationContext = { mode: 'insert' }
-      this._validateBatch(validator, items, ctx)
+      validateBatch(validator, items, ctx)
 
       // Phase 1: Batch TO dependencies (they must exist before we can set our FKs)
+      const host = this as any as TNestedWriterHost
       if (canNest) {
-        await this._batchInsertNestedTo(items, maxDepth, depth)
+        await batchInsertNestedTo(host, items, maxDepth, depth)
       }
 
       // Strip nav fields, prepare for write
@@ -187,7 +193,7 @@ export class AtscriptDbTable<
       // Catches errors early (before the parent is committed), essential for
       // adapters without transaction support.
       if (canNest) {
-        await this._preValidateNestedFrom(payloads as Array<Record<string, unknown>>)
+        await preValidateNestedFrom(host, payloads as Array<Record<string, unknown>>)
       }
 
       // Phase 2: Batch main insert
@@ -195,12 +201,12 @@ export class AtscriptDbTable<
 
       // Phase 3: Batch FROM dependents (they need our PKs)
       if (canNest) {
-        await this._batchInsertNestedFrom(payloads, result.insertedIds, maxDepth, depth)
+        await batchInsertNestedFrom(host, payloads as Array<Record<string, unknown>>, result.insertedIds, maxDepth, depth)
       }
 
       // Phase 4: Batch VIA relations (insert targets + junction entries)
       if (canNest) {
-        await this._batchInsertNestedVia(payloads, result.insertedIds, maxDepth, depth)
+        await batchInsertNestedVia(host, payloads as Array<Record<string, unknown>>, result.insertedIds, maxDepth, depth)
       }
 
       return result
@@ -234,20 +240,22 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
-    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    if (!canNest && this._meta.navFields.size > 0) { checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth, this._meta) }
 
-    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
+    return enrichFkViolation(this._meta, () => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — clone + defaults, validate full payload (including nav fields)
       const items = payloads.map(p => this._applyDefaults({ ...p }))
       const originals = canNest ? payloads.map(p => ({ ...p })) : []
 
       const validator = this.getValidator('bulkReplace')
       const ctx: DbValidationContext = { mode: 'replace' }
-      this._validateBatch(validator, items, ctx)
+      validateBatch(validator, items, ctx)
+
+      const host = this as any as TNestedWriterHost
 
       // Phase 1: TO dependencies (replace parents)
       if (canNest) {
-        await this._batchReplaceNestedTo(items, maxDepth, depth)
+        await batchReplaceNestedTo(host, items, maxDepth, depth)
       }
 
       // Validate FK references (application-level, for adapters without native FK support)
@@ -255,7 +263,7 @@ export class AtscriptDbTable<
 
       // Pre-validate FROM children (types + FK constraints) before the main replace
       if (canNest) {
-        await this._preValidateNestedFrom(originals)
+        await preValidateNestedFrom(host, originals)
       }
 
       // Phase 2: Main replace — strip nav fields, prepare, replace each
@@ -275,12 +283,12 @@ export class AtscriptDbTable<
 
       // Phase 3: FROM dependencies (replace children)
       if (canNest) {
-        await this._batchReplaceNestedFrom(originals, maxDepth, depth)
+        await batchReplaceNestedFrom(host, originals, maxDepth, depth)
       }
 
       // Phase 4: VIA dependencies (replace junction records)
       if (canNest) {
-        await this._batchReplaceNestedVia(originals, maxDepth, depth)
+        await batchReplaceNestedVia(host, originals, maxDepth, depth)
       }
 
       return { matchedCount, modifiedCount }
@@ -313,20 +321,22 @@ export class AtscriptDbTable<
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
     const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
-    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    if (!canNest && this._meta.navFields.size > 0) { checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth, this._meta) }
 
-    return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
+    return enrichFkViolation(this._meta, () => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — validate full payload (plugin checks nav field constraints)
       const validator = this.getValidator('bulkUpdate')
       const ctx: DbValidationContext = { mode: 'patch', flatMap: this.flatMap }
-      this._validateBatch(validator, payloads as Array<Record<string, unknown>>, ctx)
+      validateBatch(validator, payloads as Array<Record<string, unknown>>, ctx)
 
       // Preserve originals for FROM/VIA phase (nav fields are stripped in Phase 2)
       const originals = canNest ? payloads.map(p => ({ ...p }) as Record<string, unknown>) : []
 
+      const host = this as any as TNestedWriterHost
+
       // Phase 1: TO relation patches
       if (canNest) {
-        await this._batchPatchNestedTo(payloads as Array<Record<string, unknown>>, maxDepth, depth)
+        await batchPatchNestedTo(host, payloads as Array<Record<string, unknown>>, maxDepth, depth)
       }
 
       // Validate FK references (application-level, for adapters without native FK support)
@@ -374,12 +384,12 @@ export class AtscriptDbTable<
 
       // Phase 3: FROM relation patches
       if (canNest) {
-        await this._batchPatchNestedFrom(originals, maxDepth, depth)
+        await batchPatchNestedFrom(host, originals, maxDepth, depth)
       }
 
       // Phase 4: VIA relation patches
       if (canNest) {
-        await this._batchPatchNestedVia(originals, maxDepth, depth)
+        await batchPatchNestedVia(host, originals, maxDepth, depth)
       }
 
       return { matchedCount, modifiedCount }
@@ -400,12 +410,12 @@ export class AtscriptDbTable<
       return { deletedCount: 0 }
     }
     if (this._integrity.needsCascade(this._cascadeResolver)) {
-      return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
+      return remapDeleteFkViolation(this.tableName, () => this.adapter.withTransaction(async () => {
         await this._integrity.cascadeBeforeDelete(filter, this.tableName, this._meta, this._cascadeResolver!, f => this._fieldMapper.translateFilter(f, this._meta), this.adapter)
         return this.adapter.deleteOne(this._fieldMapper.translateFilter(filter, this._meta))
       }))
     }
-    return this._remapDeleteFkViolation(() => this.adapter.deleteOne(this._fieldMapper.translateFilter(filter, this._meta)))
+    return remapDeleteFkViolation(this.tableName, () => this.adapter.deleteOne(this._fieldMapper.translateFilter(filter, this._meta)))
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -416,7 +426,7 @@ export class AtscriptDbTable<
   ): Promise<TDbUpdateResult> {
     this._ensureBuilt()
     await this._integrity.validateForeignKeys([data as Record<string, unknown>], this._meta, this._fkLookupResolver, this._writeTableResolver, true)
-    return this._enrichFkViolation(() => this.adapter.updateMany(
+    return enrichFkViolation(this._meta, () => this.adapter.updateMany(
       this._fieldMapper.translateFilter(filter as FilterExpr, this._meta),
       this._fieldMapper.prepareForWrite({ ...data }, this._meta, this.adapter)
     ))
@@ -428,7 +438,7 @@ export class AtscriptDbTable<
   ): Promise<TDbUpdateResult> {
     this._ensureBuilt()
     await this._integrity.validateForeignKeys([data], this._meta, this._fkLookupResolver, this._writeTableResolver)
-    return this._enrichFkViolation(() => this.adapter.replaceMany(
+    return enrichFkViolation(this._meta, () => this.adapter.replaceMany(
       this._fieldMapper.translateFilter(filter as FilterExpr, this._meta),
       this._fieldMapper.prepareForWrite({ ...data }, this._meta, this.adapter)
     ))
@@ -437,12 +447,12 @@ export class AtscriptDbTable<
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
     this._ensureBuilt()
     if (this._integrity.needsCascade(this._cascadeResolver)) {
-      return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
+      return remapDeleteFkViolation(this.tableName, () => this.adapter.withTransaction(async () => {
         await this._integrity.cascadeBeforeDelete(filter as FilterExpr, this.tableName, this._meta, this._cascadeResolver!, f => this._fieldMapper.translateFilter(f, this._meta), this.adapter)
         return this.adapter.deleteMany(this._fieldMapper.translateFilter(filter as FilterExpr, this._meta))
       }))
     }
-    return this._remapDeleteFkViolation(() => this.adapter.deleteMany(this._fieldMapper.translateFilter(filter as FilterExpr, this._meta)))
+    return remapDeleteFkViolation(this.tableName, () => this.adapter.deleteMany(this._fieldMapper.translateFilter(filter as FilterExpr, this._meta)))
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -530,953 +540,10 @@ export class AtscriptDbTable<
     const validator = this.getValidator('insert')
     const ctx: DbValidationContext = { mode: 'insert' }
     const prepared = items.map(raw => this._applyDefaults({ ...raw }))
-    this._validateBatch(validator, prepared, ctx)
+    validateBatch(validator, prepared, ctx)
 
     // FK validation
     await this._integrity.validateForeignKeys(items, this._meta, this._fkLookupResolver, this._writeTableResolver, false, opts?.excludeFkTargetTable)
-  }
-
-  // ── Internal: batch nested creation ──────────────────────────────────────
-
-  /**
-   * Batch-creates TO dependencies before the main insert.
-   * For each `@db.rel.to` relation, collects all inline parent objects
-   * across items, batch-inserts them on the target table (recursively),
-   * and wires the returned IDs back as FK values on the source items.
-   */
-  private async _batchInsertNestedTo(
-    items: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'to') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const fk = this._findFKForRelation(relation)
-      if (!fk) { continue }
-
-      const parents: Array<Record<string, unknown>> = []
-      const sourceIndices: number[] = []
-      for (let i = 0; i < items.length; i++) {
-        const nested = items[i][navField]
-        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-          parents.push(nested as Record<string, unknown>)
-          sourceIndices.push(i)
-        }
-      }
-      if (parents.length === 0) { continue }
-
-      const result = await targetTable.insertMany(parents, { maxDepth, _depth: depth + 1 })
-
-      for (let j = 0; j < sourceIndices.length; j++) {
-        if (fk.localFields.length === 1) {
-          items[sourceIndices[j]][fk.localFields[0]] = result.insertedIds[j]
-        }
-      }
-    }
-  }
-
-  /**
-   * Pre-validates FROM children (type + FK constraints) before the main insert.
-   * Catches errors early before the parent record is committed, essential for
-   * adapters without transaction support.
-   */
-  private async _preValidateNestedFrom(
-    originals: Array<Record<string, unknown>>
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'from') { continue }
-
-      if (!this._writeTableResolver) { continue }
-      const targetTable = this._writeTableResolver(relation.targetType())
-      if (!targetTable) { continue }
-
-      // Find the FK field(s) on the child that reference this parent table.
-      // These will be auto-filled during the actual insert, so we set placeholder
-      // values to satisfy required-field validation.
-      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-
-      const allChildren: Array<Record<string, unknown>> = []
-      for (const orig of originals) {
-        const children = orig[navField]
-        if (!Array.isArray(children)) { continue }
-        for (const child of children) {
-          const childData = { ...(child as Record<string, unknown>) }
-          // Set placeholder values for the FK-to-parent fields
-          if (remoteFK) {
-            for (const field of remoteFK.fields) {
-              if (!(field in childData)) { childData[field] = 0 }
-            }
-          }
-          allChildren.push(childData)
-        }
-      }
-      if (allChildren.length === 0) { continue }
-
-      // Validate types + FKs to third tables, excluding the FK back to this
-      // (parent) table since the parent record doesn't exist yet
-      await this._wrapNestedError(navField, () =>
-        targetTable.preValidateItems(allChildren, { excludeFkTargetTable: this.tableName })
-      )
-    }
-  }
-
-  /**
-   * Batch-creates FROM dependents after the main insert.
-   * For each `@db.rel.from` relation, collects all child objects across
-   * items (setting the FK to the corresponding parent's ID), and
-   * batch-inserts them on the target table (recursively).
-   */
-  private async _batchInsertNestedFrom(
-    originals: Array<Record<string, unknown>>,
-    parentIds: unknown[],
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'from') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-      if (!remoteFK) { continue }
-
-      const allChildren: Array<Record<string, unknown>> = []
-      for (let i = 0; i < originals.length; i++) {
-        const children = originals[i][navField]
-        if (!Array.isArray(children)) { continue }
-        for (const child of children) {
-          const childData = { ...(child as Record<string, unknown>) }
-          if (remoteFK.fields.length === 1) {
-            childData[remoteFK.fields[0]] = parentIds[i]
-          }
-          allChildren.push(childData)
-        }
-      }
-      if (allChildren.length === 0) { continue }
-
-      await this._wrapNestedError(navField, () =>
-        targetTable.insertMany(allChildren, { maxDepth, _depth: depth + 1 })
-      )
-    }
-  }
-
-  /**
-   * Batch-creates VIA (M:N) targets and junction entries after the main insert.
-   * For each `@db.rel.via` relation, collects inline target objects,
-   * batch-inserts them on the target table, then creates junction rows
-   * linking parent PKs to target PKs.
-   */
-  private async _batchInsertNestedVia(
-    originals: Array<Record<string, unknown>>,
-    parentIds: unknown[],
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'via' || !relation.viaType) { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const junctionTable = this._writeTableResolver!(relation.viaType())
-      if (!junctionTable) { continue }
-
-      const targetTableName = resolveRelationTargetTable(relation)
-
-      const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
-      if (!fkToThis) { continue }
-      const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
-      if (!fkToTarget) { continue }
-
-      const targetPKField = targetTable.primaryKeys[0]
-      if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
-
-      for (let i = 0; i < originals.length; i++) {
-        const targets = originals[i][navField]
-        if (!Array.isArray(targets) || targets.length === 0) { continue }
-
-        const parentPK = parentIds[i]
-        if (parentPK === undefined) { continue }
-
-        // Separate existing targets (have PK) from new targets (need insert)
-        const newTargets: Array<Record<string, unknown>> = []
-        const existingIds: unknown[] = []
-        for (const t of targets) {
-          const rec = t as Record<string, unknown>
-          const pk = rec[targetPKField]
-          if (pk !== undefined && pk !== null) {
-            existingIds.push(pk)
-          } else {
-            newTargets.push({ ...rec })
-          }
-        }
-
-        // a) Insert only new target records
-        const allTargetIds: unknown[] = [...existingIds]
-        if (newTargets.length > 0) {
-          const targetResult = await targetTable.insertMany(newTargets, { maxDepth, _depth: depth + 1 })
-          allTargetIds.push(...targetResult.insertedIds)
-        }
-
-        // b) Insert junction rows linking parent to all targets
-        if (allTargetIds.length > 0) {
-          const junctionRows = allTargetIds.map(targetId => ({
-            [fkToThis.fields[0]]: parentPK,
-            [fkToTarget.fields[0]]: targetId,
-          }))
-          await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
-        }
-      }
-    }
-  }
-
-  // ── Internal: nav prop checking ─────────────────────────────────────────
-
-  /**
-   * Checks if any payload contains navigational data that would be silently
-   * dropped because maxDepth is 0. Only called for top-level (user-facing)
-   * calls, not internal recursive ones.
-   */
-  private _checkDepthOverflow(
-    payloads: Array<Record<string, unknown>>,
-    maxDepth: number,
-  ): void {
-    if (this._meta.navFields.size === 0) { return }
-    for (const payload of payloads) {
-      for (const navField of this._meta.navFields) {
-        if (payload[navField] !== undefined) {
-          throw new Error(
-            `Nested data in '${navField}' exceeds maxDepth (${maxDepth}). ` +
-            `Increase maxDepth or strip nested data before writing.`
-          )
-        }
-      }
-    }
-  }
-
-  /**
-   * Validates a batch of items using the given validator and context.
-   * Wraps per-item validation errors with array index paths for batch operations.
-   */
-  private _validateBatch(
-    validator: Validator<T, DataType>,
-    items: Array<Record<string, unknown>>,
-    ctx: DbValidationContext
-  ): void {
-    for (let i = 0; i < items.length; i++) {
-      try {
-        validator.validate(items[i] as DataType, false, ctx)
-      } catch (error) {
-        if (error instanceof ValidatorError && items.length > 1) {
-          throw new ValidatorError(error.errors.map(err => ({
-            ...err,
-            path: `[${i}].${err.path}`,
-          })))
-        }
-        throw error
-      }
-    }
-  }
-
-  /**
-   * Wraps an async nested operation and prefixes error paths with the nav field context.
-   * This ensures errors from child table operations (e.g., FK violations on a comment)
-   * get paths like `comments[0].authorId` instead of just `authorId`.
-   */
-  private static _prefixErrorPaths(
-    errors: Array<{ path: string; message: string }>,
-    prefix: string
-  ): Array<{ path: string; message: string }> {
-    return errors.map(err => ({
-      ...err,
-      path: err.path ? `${prefix}.${err.path}` : prefix,
-    }))
-  }
-
-  private async _wrapNestedError<R>(navField: string, fn: () => Promise<R>): Promise<R> {
-    try {
-      return await fn()
-    } catch (error) {
-      if (error instanceof ValidatorError) {
-        throw new ValidatorError(AtscriptDbTable._prefixErrorPaths(error.errors, navField))
-      }
-      if (error instanceof DbError) {
-        throw new DbError(error.code, AtscriptDbTable._prefixErrorPaths(error.errors, navField))
-      }
-      throw error
-    }
-  }
-
-  /**
-   * Catches `DbError('FK_VIOLATION')` with empty paths (from adapters that
-   * enforce FKs natively but can't report which field failed) and enriches
-   * the error with all FK field names from table metadata.
-   */
-  private async _enrichFkViolation<R>(fn: () => Promise<R>): Promise<R> {
-    try {
-      return await fn()
-    } catch (error) {
-      if (error instanceof DbError && error.code === 'FK_VIOLATION' && error.errors.every(err => !err.path)) {
-        const msg = error.errors[0]?.message ?? error.message
-        const errors: Array<{ path: string; message: string }> = []
-        for (const [, fk] of this._meta.foreignKeys) {
-          for (const field of fk.fields) {
-            errors.push({ path: field, message: msg })
-          }
-        }
-        throw new DbError('FK_VIOLATION', errors.length > 0 ? errors : error.errors)
-      }
-      throw error
-    }
-  }
-
-  /**
-   * Wraps a delete operation: catches native `FK_VIOLATION` errors (e.g. SQLite
-   * RESTRICT) and re-throws as `CONFLICT` (409) with a descriptive message.
-   * During DELETE, an FK violation is always a RESTRICT constraint — cascade and
-   * setNull are handled at the app level or natively without errors.
-   */
-  private async _remapDeleteFkViolation<R>(fn: () => Promise<R>): Promise<R> {
-    try {
-      return await fn()
-    } catch (error) {
-      if (error instanceof DbError && error.code === 'FK_VIOLATION') {
-        throw new DbError('CONFLICT', [{
-          path: this.tableName,
-          message: `Cannot delete from "${this.tableName}": referenced by child records (RESTRICT)`,
-        }])
-      }
-      throw error
-    }
-  }
-
-  // ── Internal: batch nested replace ──────────────────────────────────────
-
-  /**
-   * Batch-replaces TO dependencies before the main replace.
-   * Mirrors {@link _batchInsertNestedTo} but calls bulkReplace.
-   */
-  private async _batchReplaceNestedTo(
-    items: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'to') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const fk = this._findFKForRelation(relation)
-      if (!fk) { continue }
-
-      const parents: Array<Record<string, unknown>> = []
-      const sourceIndices: number[] = []
-      for (let i = 0; i < items.length; i++) {
-        const nested = items[i][navField]
-        if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-          parents.push(nested as Record<string, unknown>)
-          sourceIndices.push(i)
-        }
-      }
-      if (parents.length === 0) { continue }
-
-      await targetTable.bulkReplace(parents, { maxDepth, _depth: depth + 1 })
-
-      // Wire FK values back from the nested objects' PKs
-      for (let j = 0; j < sourceIndices.length; j++) {
-        if (fk.localFields.length === 1 && fk.targetFields.length === 1) {
-          items[sourceIndices[j]][fk.localFields[0]] = parents[j][fk.targetFields[0]]
-        }
-      }
-    }
-  }
-
-  /**
-   * Batch-replaces FROM dependents after the main replace.
-   * Mirrors {@link _batchInsertNestedFrom} but calls bulkReplace.
-   */
-  private async _batchReplaceNestedFrom(
-    originals: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'from') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-      if (!remoteFK) { continue }
-
-      const childPKs = [...targetTable.primaryKeys]
-      for (const original of originals) {
-        const children = original[navField]
-        if (!Array.isArray(children)) { continue }
-        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
-        if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
-        const fkField = remoteFK.fields[0]
-
-        // Wire FK on each child and separate by PK presence
-        const toReplace: Array<Record<string, unknown>> = []
-        const toInsert: Array<Record<string, unknown>> = []
-        const newPKSet = new Set<string>()
-        for (const child of children) {
-          const childData = { ...(child as Record<string, unknown>) }
-          childData[fkField] = parentPK
-          const hasPK = childPKs.length > 0 && childPKs.every(pk => childData[pk] !== undefined)
-          if (hasPK) {
-            newPKSet.add(childPKs.map(pk => String(childData[pk])).join('\0'))
-            toReplace.push(childData)
-          } else {
-            toInsert.push(childData)
-          }
-        }
-
-        // Fetch existing children to find orphans
-        const existing = await targetTable.findMany({
-          filter: { [fkField]: parentPK },
-          controls: childPKs.length > 0 ? { $select: [...childPKs] } : {},
-        })
-
-        // Delete orphans (existing children not in the new set)
-        for (const row of existing) {
-          const pkKey = childPKs.map(pk => String(row[pk])).join('\0')
-          if (!newPKSet.has(pkKey)) {
-            const orphanFilter: Record<string, unknown> = {}
-            for (const pk of childPKs) { orphanFilter[pk] = row[pk] }
-            await targetTable.deleteMany(orphanFilter)
-          }
-        }
-
-        // Replace children with PKs (update in place, preserving identity)
-        if (toReplace.length > 0) {
-          await this._wrapNestedError(navField, () =>
-            targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
-          )
-        }
-        // Insert new children without PKs
-        if (toInsert.length > 0) {
-          await this._wrapNestedError(navField, () =>
-            targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-          )
-        }
-      }
-    }
-  }
-
-  /**
-   * Handles VIA (M:N) relations during replace.
-   * Deletes existing junction rows, replaces target records, inserts new junction rows.
-   */
-  private async _batchReplaceNestedVia(
-    originals: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'via' || !relation.viaType) { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const junctionTable = this._writeTableResolver!(relation.viaType())
-      if (!junctionTable) { continue }
-
-      const targetTableName = resolveRelationTargetTable(relation)
-
-      const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
-      if (!fkToThis) { continue }
-      const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
-      if (!fkToTarget) { continue }
-
-      const targetPKField = targetTable.primaryKeys[0]
-      if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
-
-      for (const original of originals) {
-        const targets = original[navField]
-        if (!Array.isArray(targets)) { continue }
-
-        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
-        if (parentPK === undefined) { continue }
-
-        // a) Delete existing junction rows
-        await junctionTable.deleteMany({ [fkToThis.fields[0]]: parentPK })
-
-        // Separate targets: existing (ID-only ref), replace (ID + data), new (no ID)
-        const toReplace: Array<Record<string, unknown>> = []
-        const toInsert: Array<Record<string, unknown>> = []
-        const existingIds: unknown[] = []
-        for (const t of targets) {
-          const rec = t as Record<string, unknown>
-          const pk = rec[targetPKField]
-          if (pk !== undefined && pk !== null) {
-            const keys = Object.keys(rec).filter(k => k !== targetPKField)
-            if (keys.length > 0) {
-              toReplace.push({ ...rec })
-            }
-            existingIds.push(pk)
-          } else {
-            toInsert.push({ ...rec })
-          }
-        }
-
-        // b) Replace target records that have PK + data
-        if (toReplace.length > 0) {
-          await targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
-        }
-
-        // c) Insert new target records and collect their IDs
-        const allTargetIds: unknown[] = [...existingIds]
-        if (toInsert.length > 0) {
-          const insertResult = await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-          allTargetIds.push(...insertResult.insertedIds)
-        }
-
-        // d) Insert new junction rows
-        if (allTargetIds.length > 0) {
-          const junctionRows = allTargetIds.map(targetId => ({
-            [fkToThis.fields[0]]: parentPK,
-            [fkToTarget.fields[0]]: targetId,
-          }))
-          await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
-        }
-      }
-    }
-  }
-
-  // ── Internal: batch nested patch ────────────────────────────────────────
-
-  /**
-   * Batch-patches TO dependencies before the main patch.
-   * Reads FK values from DB if not present in the payload.
-   */
-  private async _batchPatchNestedTo(
-    items: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'to') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const fk = this._findFKForRelation(relation)
-      if (!fk) { continue }
-
-      const patches: Array<Record<string, unknown>> = []
-      for (const item of items) {
-        const nested = item[navField]
-        if (!nested || typeof nested !== 'object' || Array.isArray(nested)) { continue }
-
-        const patch = { ...(nested as Record<string, unknown>) }
-
-        // Get FK value from payload, or read from DB
-        let fkValue = fk.localFields.length === 1 ? item[fk.localFields[0]] : undefined
-        if (fkValue === undefined) {
-          // Need to read current record to get FK
-          const pkFilter = this._extractPrimaryKeyFilter(item) as FilterExpr<OwnProps>
-          const current = await this.findOne({ filter: pkFilter, controls: {} })
-          if (!current) {
-            throw new DbError('NOT_FOUND', [{ path: navField, message: `Cannot patch relation '${navField}' — source record not found` }])
-          }
-          fkValue = fk.localFields.length === 1 ? (current as Record<string, unknown>)[fk.localFields[0]] : undefined
-        }
-
-        if (fkValue === null || fkValue === undefined) {
-          throw new DbError('FK_VIOLATION', [{ path: fk.localFields[0], message: `Cannot patch relation '${navField}' — foreign key '${fk.localFields[0]}' is null` }])
-        }
-
-        // Inject target PK into the nested patch
-        if (fk.targetFields.length === 1) {
-          patch[fk.targetFields[0]] = fkValue
-        }
-
-        patches.push(patch)
-      }
-      if (patches.length === 0) { continue }
-
-      await targetTable.bulkUpdate(patches, { maxDepth, _depth: depth + 1 })
-    }
-  }
-
-  /**
-   * Batch-patches FROM (1:N) dependencies after the main patch.
-   *
-   * Supports patch operators:
-   * - Plain array → $replace semantics (delete orphans + replace/insert)
-   * - `{ $replace }` → same as plain array
-   * - `{ $insert }` → insert new children with FK wired
-   * - `{ $remove }` → delete children by PK
-   * - `{ $update }` → patch children by PK
-   * - `{ $upsert }` → update if PK present, insert otherwise
-   */
-  private async _batchPatchNestedFrom(
-    originals: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'from') { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-      if (!remoteFK) { continue }
-
-      const childPKs = [...targetTable.primaryKeys]
-
-      for (const original of originals) {
-        const navValue = original[navField]
-        if (navValue === undefined || navValue === null) { continue }
-
-        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
-        if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
-        const fkField = remoteFK.fields[0]
-
-        // Determine operations
-        const ops = this._extractNavPatchOps(navValue)
-
-        // $replace — full replacement (delete orphans + replace/insert)
-        if (ops.replace) {
-          await this._fromReplace(targetTable, ops.replace, parentPK, fkField, childPKs, navField, maxDepth, depth)
-        }
-
-        // $remove — delete children by PK
-        if (ops.remove) {
-          for (const child of ops.remove) {
-            const rec = child as Record<string, unknown>
-            const pkFilter: Record<string, unknown> = {}
-            for (const pk of childPKs) { pkFilter[pk] = rec[pk] }
-            pkFilter[fkField] = parentPK // ensure scoped to this parent
-            await targetTable.deleteMany(pkFilter)
-          }
-        }
-
-        // $update — patch children by PK
-        if (ops.update && ops.update.length > 0) {
-          const items = ops.update.map(child => {
-            const rec = { ...(child as Record<string, unknown>) }
-            rec[fkField] = parentPK
-            return rec
-          })
-          await this._wrapNestedError(navField, () =>
-            targetTable.bulkUpdate(items, { maxDepth, _depth: depth + 1 })
-          )
-        }
-
-        // $upsert — update if has PK, insert otherwise
-        if (ops.upsert) {
-          const toUpdate: Array<Record<string, unknown>> = []
-          const toInsert: Array<Record<string, unknown>> = []
-          for (const child of ops.upsert) {
-            const rec = { ...(child as Record<string, unknown>) }
-            rec[fkField] = parentPK
-            const hasPK = childPKs.length > 0 && childPKs.every(pk => rec[pk] !== undefined)
-            if (hasPK) {
-              toUpdate.push(rec)
-            } else {
-              toInsert.push(rec)
-            }
-          }
-          if (toUpdate.length > 0) {
-            await this._wrapNestedError(navField, () =>
-              targetTable.bulkUpdate(toUpdate, { maxDepth, _depth: depth + 1 })
-            )
-          }
-          if (toInsert.length > 0) {
-            await this._wrapNestedError(navField, () =>
-              targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-            )
-          }
-        }
-
-        // $insert — insert new children with FK wired
-        if (ops.insert && ops.insert.length > 0) {
-          const items = ops.insert.map(child => {
-            const rec = { ...(child as Record<string, unknown>) }
-            rec[fkField] = parentPK
-            return rec
-          })
-          await this._wrapNestedError(navField, () =>
-            targetTable.insertMany(items, { maxDepth, _depth: depth + 1 })
-          )
-        }
-      }
-    }
-  }
-
-  /**
-   * FROM $replace helper: mirrors `_batchReplaceNestedFrom` logic for a single parent.
-   */
-  private async _fromReplace(
-    targetTable: AtscriptDbTableLike & AtscriptDbWritable,
-    children: unknown[],
-    parentPK: unknown,
-    fkField: string,
-    childPKs: string[],
-    navField: string,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    const toReplace: Array<Record<string, unknown>> = []
-    const toInsert: Array<Record<string, unknown>> = []
-    const newPKSet = new Set<string>()
-    for (const child of children) {
-      const childData = { ...(child as Record<string, unknown>) }
-      childData[fkField] = parentPK
-      const hasPK = childPKs.length > 0 && childPKs.every(pk => childData[pk] !== undefined)
-      if (hasPK) {
-        newPKSet.add(childPKs.map(pk => String(childData[pk])).join('\0'))
-        toReplace.push(childData)
-      } else {
-        toInsert.push(childData)
-      }
-    }
-
-    // Fetch existing children to find orphans
-    const existing = await targetTable.findMany({
-      filter: { [fkField]: parentPK },
-      controls: childPKs.length > 0 ? { $select: [...childPKs] } : {},
-    })
-
-    // Delete orphans
-    for (const row of existing) {
-      const pkKey = childPKs.map(pk => String(row[pk])).join('\0')
-      if (!newPKSet.has(pkKey)) {
-        const orphanFilter: Record<string, unknown> = {}
-        for (const pk of childPKs) { orphanFilter[pk] = row[pk] }
-        await targetTable.deleteMany(orphanFilter)
-      }
-    }
-
-    if (toReplace.length > 0) {
-      await this._wrapNestedError(navField, () =>
-        targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
-      )
-    }
-    if (toInsert.length > 0) {
-      await this._wrapNestedError(navField, () =>
-        targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-      )
-    }
-  }
-
-  /**
-   * Batch-patches VIA (M:N) dependencies after the main patch.
-   *
-   * Supports patch operators:
-   * - Plain array → $replace semantics (clear junctions + rebuild)
-   * - `{ $replace }` → same as plain array
-   * - `{ $insert }` → insert new targets + junction rows
-   * - `{ $remove }` → delete junction rows for target PKs
-   * - `{ $update }` → update target records by PK (junction untouched)
-   * - `{ $upsert }` → update target if PK present, insert otherwise; ensure junction
-   */
-  private async _batchPatchNestedVia(
-    originals: Array<Record<string, unknown>>,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    for (const [navField, relation] of this._meta.relations) {
-      if (relation.direction !== 'via' || !relation.viaType) { continue }
-
-      const targetTable = this._writeTableResolver!(relation.targetType())
-      if (!targetTable) { continue }
-      const junctionTable = this._writeTableResolver!(relation.viaType())
-      if (!junctionTable) { continue }
-
-      const targetTableName = resolveRelationTargetTable(relation)
-
-      const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
-      if (!fkToThis) { continue }
-      const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
-      if (!fkToTarget) { continue }
-
-      const targetPKField = targetTable.primaryKeys[0]
-      if (!targetPKField || fkToTarget.fields.length !== 1 || fkToThis.fields.length !== 1) { continue }
-
-      for (const original of originals) {
-        const navValue = original[navField]
-        if (navValue === undefined || navValue === null) { continue }
-
-        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
-        if (parentPK === undefined) { continue }
-
-        const ops = this._extractNavPatchOps(navValue)
-
-        // $replace — clear junctions + rebuild (same as existing replace logic)
-        if (ops.replace) {
-          await this._viaReplace(targetTable, junctionTable, ops.replace, parentPK, targetPKField, fkToThis.fields[0], fkToTarget.fields[0], maxDepth, depth)
-        }
-
-        // $remove — delete junction rows for target PKs
-        if (ops.remove) {
-          for (const target of ops.remove) {
-            const rec = target as Record<string, unknown>
-            const targetPK = rec[targetPKField]
-            if (targetPK !== undefined && targetPK !== null) {
-              await junctionTable.deleteMany({
-                [fkToThis.fields[0]]: parentPK,
-                [fkToTarget.fields[0]]: targetPK,
-              })
-            }
-          }
-        }
-
-        // $update — update target records by PK (junction untouched)
-        if (ops.update && ops.update.length > 0) {
-          await targetTable.bulkUpdate(
-            ops.update.map(t => ({ ...(t as Record<string, unknown>) })),
-            { maxDepth, _depth: depth + 1 }
-          )
-        }
-
-        // $upsert — update if PK, insert if not; ensure junction rows
-        if (ops.upsert) {
-          for (const target of ops.upsert) {
-            const rec = { ...(target as Record<string, unknown>) }
-            const pk = rec[targetPKField]
-            if (pk !== undefined && pk !== null) {
-              // Update existing target
-              await targetTable.bulkUpdate([rec], { maxDepth, _depth: depth + 1 })
-              // Ensure junction exists
-              const existingJunction = await junctionTable.findMany({
-                filter: { [fkToThis.fields[0]]: parentPK, [fkToTarget.fields[0]]: pk },
-                controls: {},
-              })
-              if (existingJunction.length === 0) {
-                await junctionTable.insertMany([{
-                  [fkToThis.fields[0]]: parentPK,
-                  [fkToTarget.fields[0]]: pk,
-                }], { maxDepth: 0 })
-              }
-            } else {
-              // Insert new target + junction
-              const insertResult = await targetTable.insertMany([rec], { maxDepth, _depth: depth + 1 })
-              const newId = insertResult.insertedIds[0]
-              await junctionTable.insertMany([{
-                [fkToThis.fields[0]]: parentPK,
-                [fkToTarget.fields[0]]: newId,
-              }], { maxDepth: 0 })
-            }
-          }
-        }
-
-        // $insert — insert new targets + junction rows
-        if (ops.insert && ops.insert.length > 0) {
-          const toInsert: Array<Record<string, unknown>> = []
-          const existingIds: unknown[] = []
-          for (const target of ops.insert) {
-            const rec = { ...(target as Record<string, unknown>) }
-            const pk = rec[targetPKField]
-            if (pk !== undefined && pk !== null) {
-              // ID-only reference — just link it
-              existingIds.push(pk)
-            } else {
-              toInsert.push(rec)
-            }
-          }
-          const allIds = [...existingIds]
-          if (toInsert.length > 0) {
-            const insertResult = await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-            allIds.push(...insertResult.insertedIds)
-          }
-          if (allIds.length > 0) {
-            const junctionRows = allIds.map(targetId => ({
-              [fkToThis.fields[0]]: parentPK,
-              [fkToTarget.fields[0]]: targetId,
-            }))
-            await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * VIA $replace helper: mirrors `_batchReplaceNestedVia` logic for a single parent.
-   */
-  private async _viaReplace(
-    targetTable: AtscriptDbTableLike & AtscriptDbWritable,
-    junctionTable: AtscriptDbTableLike & AtscriptDbWritable,
-    targets: unknown[],
-    parentPK: unknown,
-    targetPKField: string,
-    fkToThisField: string,
-    fkToTargetField: string,
-    maxDepth: number,
-    depth: number
-  ): Promise<void> {
-    // Delete existing junction rows
-    await junctionTable.deleteMany({ [fkToThisField]: parentPK })
-
-    const toReplace: Array<Record<string, unknown>> = []
-    const toInsert: Array<Record<string, unknown>> = []
-    const existingIds: unknown[] = []
-    for (const t of targets) {
-      const rec = t as Record<string, unknown>
-      const pk = rec[targetPKField]
-      if (pk !== undefined && pk !== null) {
-        const keys = Object.keys(rec).filter(k => k !== targetPKField)
-        if (keys.length > 0) {
-          toReplace.push({ ...rec })
-        }
-        existingIds.push(pk)
-      } else {
-        toInsert.push({ ...rec })
-      }
-    }
-
-    if (toReplace.length > 0) {
-      await targetTable.bulkReplace(toReplace, { maxDepth, _depth: depth + 1 })
-    }
-
-    const allTargetIds: unknown[] = [...existingIds]
-    if (toInsert.length > 0) {
-      const insertResult = await targetTable.insertMany(toInsert, { maxDepth, _depth: depth + 1 })
-      allTargetIds.push(...insertResult.insertedIds)
-    }
-
-    if (allTargetIds.length > 0) {
-      const junctionRows = allTargetIds.map(targetId => ({
-        [fkToThisField]: parentPK,
-        [fkToTargetField]: targetId,
-      }))
-      await junctionTable.insertMany(junctionRows, { maxDepth: 0 })
-    }
-  }
-
-  /**
-   * Extracts patch operations from a nav field value.
-   *
-   * - Plain array → treated as `$replace`
-   * - Object with `$insert`, `$remove`, etc. → individual ops
-   */
-  private _extractNavPatchOps(navValue: unknown): {
-    replace?: unknown[]
-    insert?: unknown[]
-    remove?: unknown[]
-    update?: unknown[]
-    upsert?: unknown[]
-  } {
-    // Plain array → $replace
-    if (Array.isArray(navValue)) {
-      return { replace: navValue }
-    }
-
-    if (typeof navValue !== 'object' || navValue === null) {
-      return {}
-    }
-
-    const obj = navValue as Record<string, unknown>
-    return {
-      replace: obj.$replace !== undefined ? obj.$replace as unknown[] : undefined,
-      insert: obj.$insert !== undefined ? obj.$insert as unknown[] : undefined,
-      remove: obj.$remove !== undefined ? obj.$remove as unknown[] : undefined,
-      update: obj.$update !== undefined ? obj.$update as unknown[] : undefined,
-      upsert: obj.$upsert !== undefined ? obj.$upsert as unknown[] : undefined,
-    }
   }
 
   // ── Internal: validator building ──────────────────────────────────────────
