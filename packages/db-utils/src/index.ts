@@ -1,4 +1,5 @@
 export { AtscriptDbReadable, resolveDesignType } from './table/db-readable'
+export { TableMetadata } from './table/table-metadata'
 export { DbError } from './db-error'
 export type { DbErrorCode } from './db-error'
 export { createDbValidatorPlugin } from './db-validator-plugin'

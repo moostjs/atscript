@@ -421,16 +421,16 @@ describe('AtscriptDbTable', () => {
       // Trigger fieldDescriptors computation (which builds _valueFormatters)
       t.fieldDescriptors
       // createdAt has @db.default.now on a number field — should have a formatter
-      expect((t as any)._valueFormatters).toBeDefined()
-      expect((t as any)._valueFormatters.size).toBe(1)
-      expect((t as any)._valueFormatters.has('createdAt')).toBe(true)
+      expect((t as any)._meta.valueFormatters).toBeDefined()
+      expect((t as any)._meta.valueFormatters.size).toBe(1)
+      expect((t as any)._meta.valueFormatters.has('createdAt')).toBe(true)
     })
 
     it('should not build value formatters when adapter has no formatValue', () => {
       const hookAdapter = new MockAdapter()
       const t = new AtscriptDbTable(UsersTable, hookAdapter)
       t.fieldDescriptors
-      expect((t as any)._valueFormatters).toBeUndefined()
+      expect((t as any)._meta.valueFormatters).toBeUndefined()
     })
 
     it('should apply value formatter during insertOne (write path)', async () => {
@@ -849,21 +849,21 @@ describe('AtscriptDbTable — embedded objects', () => {
 
       // Inject FK metadata: this table has a FK "authorId" → target "authors" table
       const tbl = mainTable as any
-      tbl._foreignKeys.set('__auto_authorId', {
+      tbl._meta.foreignKeys.set('__auto_authorId', {
         fields: ['authorId'],
         targetTable: 'authors',
         targetFields: ['id'],
       })
 
       // Inject relation metadata
-      tbl._relations.set('author', {
+      tbl._meta.relations.set('author', {
         direction: 'to',
         alias: undefined,
         targetType: () => ({ id: 'Author', metadata: new Map([['db.table', 'authors']]) }),
         isArray: false,
       })
 
-      tbl._relations.set('posts', {
+      tbl._meta.relations.set('posts', {
         direction: 'from',
         alias: undefined,
         targetType: () => ({ id: 'Post', metadata: new Map([['db.table', 'posts']]) }),
@@ -1009,7 +1009,7 @@ describe('AtscriptDbTable — embedded objects', () => {
     it('should not load relations when no table resolver is provided', async () => {
       const noResolverTable = new AtscriptDbTable(UsersTable, mainAdapter)
       const tbl = noResolverTable as any
-      tbl._relations.set('author', {
+      tbl._meta.relations.set('author', {
         direction: 'to',
         alias: undefined,
         targetType: () => ({ id: 'Author', metadata: new Map() }),

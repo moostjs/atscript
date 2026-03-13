@@ -1,5 +1,4 @@
 import {
-  flattenAnnotatedType,
   isAnnotatedType,
   type FlatOf,
   type PrimaryKeyOf,
@@ -22,19 +21,17 @@ import { UniquSelect } from '../query/uniqu-select'
 import type {
   DbControls,
   DbQuery,
-  TDbCollation,
   TDbDefaultValue,
   TDbFieldMeta,
   TDbForeignKey,
   TDbIndex,
-  TDbIndexField,
   TDbRelation,
-  TDbStorageType,
   TIdDescriptor,
   TSearchIndexInfo,
   TTableResolver,
   TWriteTableResolver,
 } from '../types'
+import { TableMetadata } from './table-metadata'
 
 /**
  * Extracts nav prop names from a query's `$with` array.
@@ -57,8 +54,6 @@ export type DbResponse<Data, Nav, Q> =
   [keyof Nav] extends [never]
     ? Data
     : Omit<Data, keyof Nav & string> & Pick<Data, ExtractWith<Q> & keyof Data & string>
-
-const INDEX_PREFIX = 'atscript__'
 
 /**
  * Resolves the design type from an annotated type.
@@ -234,14 +229,6 @@ function assignSingle(opts: TAssignOpts): void {
   }
 }
 
-function indexKey(type: string, name: string): string {
-  const cleanName = name
-    .replace(/[^a-z0-9_.-]/gi, '_')
-    .replace(/_+/g, '_')
-    .slice(0, 127 - INDEX_PREFIX.length - type.length - 2)
-  return `${INDEX_PREFIX}${type}__${cleanName}`
-}
-
 /**
  * Shared read-only database abstraction driven by Atscript annotations.
  *
@@ -271,52 +258,12 @@ export class AtscriptDbReadable<
   /** Previous table/view name from `@db.table.renamed` or `@db.view.renamed`. */
   public readonly renamedFrom: string | undefined
 
-  // ── Lazy-computed field analysis ──────────────────────────────────────────
+  // ── Metadata ─────────────────────────────────────────────────────────────
 
-  protected _flatMap?: Map<string, TAtscriptAnnotatedType>
-  protected _fieldDescriptors?: TDbFieldMeta[]
-  /** Pre-built value formatters keyed by physical column name (from adapter.formatValue). */
-  protected _valueFormatters?: Map<string, (value: unknown) => unknown>
-  protected _indexes = new Map<string, TDbIndex>()
-  protected _primaryKeys: string[] = []
-  /** Original @meta.id field names as declared by the user (before adapter manipulation). */
-  protected _originalMetaIdFields: string[] = []
-  protected _columnMap = new Map<string, string>()
-  protected _columnFromMap = new Map<string, string>()
-  protected _defaults = new Map<string, TDbDefaultValue>()
-  protected _collateMap = new Map<string, TDbCollation>()
-  protected _ignoredFields = new Set<string>()
-  protected _navFields = new Set<string>()
-  protected _uniqueProps = new Set<string>()
-  protected _foreignKeys = new Map<string, TDbForeignKey>()
-  protected _relations = new Map<string, TDbRelation>()
+  /** Computed metadata for this table/view. Built lazily on first access. */
+  protected readonly _meta: TableMetadata
+
   protected _writeTableResolver?: TWriteTableResolver
-
-  // ── Embedded object mapping ──────────────────────────────────────────────
-
-  /** Logical dot-path → physical column name. */
-  protected _pathToPhysical = new Map<string, string>()
-  /** Physical column name → logical dot-path (inverse). */
-  protected _physicalToPath = new Map<string, string>()
-  /** Object paths being flattened into __-separated columns (no column themselves). */
-  protected _flattenedParents = new Set<string>()
-  /** Fields stored as JSON (@db.json + array fields). */
-  protected _jsonFields = new Set<string>()
-  /** Intermediate paths → their leaf physical column names (for $select expansion in relational DBs). */
-  protected _selectExpansion = new Map<string, string[]>()
-  /** Physical column names of boolean fields (for storage coercion on read). */
-  protected _booleanFields = new Set<string>()
-  /** Physical column names of decimal fields (for read-side coercion to string). */
-  protected _decimalFields = new Set<string>()
-  /** Fast-path flag: skip all mapping when no nested/json fields exist. */
-  protected _requiresMappings = false
-  /** All non-ignored physical field names (for UniquSelect exclusion inversion). */
-  protected _allPhysicalFields: string[] = []
-
-  // ── Adapter capabilities (cached) ────────────────────────────────────────
-
-  /** Cached result of adapter.supportsNestedObjects(). */
-  protected readonly _nestedObjects: boolean
 
   constructor(
     protected readonly _type: T,
@@ -346,10 +293,17 @@ export class AtscriptDbReadable<
     this.renamedFrom = (_type.metadata.get('db.table.renamed') as string | undefined)
       ?? (_type.metadata.get('db.view.renamed') as string | undefined)
 
-    this._nestedObjects = adapter.supportsNestedObjects()
+    this._meta = new TableMetadata(adapter.supportsNestedObjects())
 
     // Establish bidirectional relationship
     adapter.registerReadable(this, logger)
+  }
+
+  /** Ensures metadata is built. Called before any metadata access. */
+  protected _ensureBuilt(): void {
+    if (!this._meta.isBuilt) {
+      this._meta.build(this.type, this.adapter, this.logger)
+    }
   }
 
   // ── Public getters ────────────────────────────────────────────────────────
@@ -371,26 +325,26 @@ export class AtscriptDbReadable<
 
   /** Lazily-built flat map of all fields (dot-notation paths → annotated types). */
   public get flatMap(): Map<string, TAtscriptAnnotatedType> {
-    this._flatten()
-    return this._flatMap!
+    this._ensureBuilt()
+    return this._meta.flatMap
   }
 
   /** All computed indexes from `@db.index.*` annotations. */
   public get indexes(): Map<string, TDbIndex> {
-    this._flatten()
-    return this._indexes
+    this._ensureBuilt()
+    return this._meta.indexes
   }
 
   /** Primary key field names from `@meta.id`. */
   public get primaryKeys(): readonly string[] {
-    this._flatten()
-    return this._primaryKeys
+    this._ensureBuilt()
+    return this._meta.primaryKeys
   }
 
   /** Original `@meta.id` field names as declared in the schema (before adapter manipulation). */
   public get originalMetaIdFields(): readonly string[] {
-    this._flatten()
-    return this._originalMetaIdFields
+    this._ensureBuilt()
+    return this._meta.originalMetaIdFields
   }
 
   /**
@@ -399,26 +353,21 @@ export class AtscriptDbReadable<
    * even without an explicit `@meta.id` annotation.
    */
   public addPrimaryKey(field: string): void {
-    if (!this._primaryKeys.includes(field)) {
-      this._primaryKeys.push(field)
-    }
+    this._meta.addPrimaryKey(field)
   }
 
   /**
    * Removes a field from the primary key list.
    */
   public removePrimaryKey(field: string): void {
-    const idx = this._primaryKeys.indexOf(field)
-    if (idx >= 0) {
-      this._primaryKeys.splice(idx, 1)
-    }
+    this._meta.removePrimaryKey(field)
   }
 
   /**
    * Registers a field as having a unique constraint.
    */
   public addUniqueField(field: string): void {
-    this._uniqueProps.add(field)
+    this._meta.addUniqueField(field)
   }
 
   /** Sync method for structural changes: 'drop' (lossy), 'recreate' (lossless), or undefined (manual). */
@@ -426,52 +375,46 @@ export class AtscriptDbReadable<
     return this._syncMethod
   }
 
-  /** Returns the `__`-separated parent prefix for a dot-separated path, or empty string for top-level paths. */
-  protected _flattenedPrefix(path: string): string {
-    const lastDot = path.lastIndexOf('.')
-    return lastDot >= 0 ? `${path.slice(0, lastDot).replace(/\./g, '__')}__` : ''
-  }
-
   /** Logical → physical column name mapping from `@db.column`. */
   public get columnMap(): ReadonlyMap<string, string> {
-    this._flatten()
-    return this._columnMap
+    this._ensureBuilt()
+    return this._meta.columnMap
   }
 
   /** Default values from `@db.default.*`. */
   public get defaults(): ReadonlyMap<string, TDbDefaultValue> {
-    this._flatten()
-    return this._defaults
+    this._ensureBuilt()
+    return this._meta.defaults
   }
 
   /** Fields excluded from DB via `@db.ignore`. */
   public get ignoredFields(): ReadonlySet<string> {
-    this._flatten()
-    return this._ignoredFields
+    this._ensureBuilt()
+    return this._meta.ignoredFields
   }
 
   /** Navigational fields (`@db.rel.to` / `@db.rel.from`) — not stored as columns. */
   public get navFields(): ReadonlySet<string> {
-    this._flatten()
-    return this._navFields
+    this._ensureBuilt()
+    return this._meta.navFields
   }
 
   /** Single-field unique index properties. */
   public get uniqueProps(): ReadonlySet<string> {
-    this._flatten()
-    return this._uniqueProps
+    this._ensureBuilt()
+    return this._meta.uniqueProps
   }
 
   /** Foreign key constraints from `@db.rel.FK` annotations. */
   public get foreignKeys(): ReadonlyMap<string, TDbForeignKey> {
-    this._flatten()
-    return this._foreignKeys
+    this._ensureBuilt()
+    return this._meta.foreignKeys
   }
 
   /** Navigational relation metadata from `@db.rel.to` / `@db.rel.from`. */
   public get relations(): ReadonlyMap<string, TDbRelation> {
-    this._flatten()
-    return this._relations
+    this._ensureBuilt()
+    return this._meta.relations
   }
 
   /** The underlying database adapter instance. */
@@ -489,22 +432,22 @@ export class AtscriptDbReadable<
 
   /** Precomputed logical dot-path → physical column name map. */
   public get pathToPhysical(): ReadonlyMap<string, string> {
-    this._flatten()
-    return this._pathToPhysical
+    this._ensureBuilt()
+    return this._meta.pathToPhysical
   }
 
   /** Precomputed physical column name → logical dot-path map (inverse). */
   public get physicalToPath(): ReadonlyMap<string, string> {
-    this._flatten()
-    return this._physicalToPath
+    this._ensureBuilt()
+    return this._meta.physicalToPath
   }
 
   /** Descriptor for the primary ID field(s). */
   public getIdDescriptor(): TIdDescriptor {
-    this._flatten()
+    this._ensureBuilt()
     return {
-      fields: [...this._primaryKeys],
-      isComposite: this._primaryKeys.length > 1,
+      fields: [...this._meta.primaryKeys],
+      isComposite: this._meta.primaryKeys.length > 1,
     }
   }
 
@@ -512,160 +455,8 @@ export class AtscriptDbReadable<
    * Pre-computed field metadata for adapter use.
    */
   public get fieldDescriptors(): readonly TDbFieldMeta[] {
-    this._flatten()
-    return this._fieldDescriptors!
-  }
-
-  /**
-   * Builds field descriptors, physical-name lookup, and value formatters.
-   * Called once at the end of `_flatten()` — everything it needs
-   * (_flatMap, _indexes, _columnMap, etc.) is already populated.
-   */
-  private _buildFieldDescriptors(): void {
-    this._fieldDescriptors = []
-    const skipFlattening = this._nestedObjects
-
-    // Collect all field names that participate in any index
-    const indexedFields = new Set<string>()
-    for (const index of this._indexes.values()) {
-      for (const f of index.fields) {
-        indexedFields.add(f.name)
-      }
-    }
-
-    for (const [path, type] of this._flatMap!.entries()) {
-      if (!path) { continue }
-
-      if (!skipFlattening && this._flattenedParents.has(path)) {
-        continue
-      }
-
-      if (!skipFlattening && this._findAncestorInSet(path, this._jsonFields) !== undefined) {
-        continue
-      }
-
-      const isJson = this._jsonFields.has(path)
-      const isFlattened = !skipFlattening && this._findAncestorInSet(path, this._flattenedParents) !== undefined
-      const designType = isJson ? 'json' : resolveDesignType(type)
-
-      let storage: TDbStorageType
-      if (skipFlattening) {
-        storage = 'column'
-      } else if (isJson) {
-        storage = 'json'
-      } else if (isFlattened) {
-        storage = 'flattened'
-      } else {
-        storage = 'column'
-      }
-
-      const physicalName = skipFlattening
-        ? (this._columnMap.get(path) ?? path)
-        : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
-
-      // Compute renamedFrom (old physical name from @db.column.renamed)
-      const fromLocal = this._columnFromMap.get(path)
-      let renamedFrom: string | undefined
-      if (fromLocal) {
-        renamedFrom = isFlattened ? this._flattenedPrefix(path) + fromLocal : fromLocal
-      }
-
-      this._fieldDescriptors.push({
-        path,
-        type,
-        physicalName,
-        designType,
-        optional: type.optional === true,
-        isPrimaryKey: this._primaryKeys.includes(path),
-        ignored: this._ignoredFields.has(path),
-        defaultValue: this._defaults.get(path),
-        storage,
-        flattenedFrom: isFlattened ? path : undefined,
-        renamedFrom,
-        collate: this._collateMap.get(path),
-        isIndexed: indexedFields.has(path) || undefined,
-      })
-    }
-
-    // Second pass: resolve fkTargetField for FK fields.
-    // For each FK, resolve the target PK's annotated type and build a TDbFieldMeta
-    // so adapters can produce matching DB types via typeMapper(field.fkTargetField).
-    this._resolveFkTargetFields()
-
-    // Build value formatters from adapter hook
-    const fmtHook = this.adapter.formatValue?.bind(this.adapter)
-    if (fmtHook) {
-      for (const fd of this._fieldDescriptors) {
-        const fmt = fmtHook(fd)
-        if (fmt) {
-          if (!this._valueFormatters) { this._valueFormatters = new Map() }
-          this._valueFormatters.set(fd.physicalName, fmt)
-        }
-      }
-    }
-
-    Object.freeze(this._fieldDescriptors)
-  }
-
-  /**
-   * Resolves `fkTargetField` for FK fields in `_fieldDescriptors`.
-   *
-   * For each FK, resolves the target table's annotated type via `targetTypeRef()`,
-   * flattens it, and looks up the target PK field. Builds a minimal `TDbFieldMeta`
-   * so adapters can call `typeMapper(field.fkTargetField)` to produce matching DB types.
-   *
-   * Safe to call: `targetTypeRef()` already resolved during `_flatten()` (in the
-   * `@db.rel.FK` handler), so it's guaranteed to work for all FKs in the map.
-   */
-  private _resolveFkTargetFields(): void {
-    if (this._foreignKeys.size === 0 || !this._fieldDescriptors) { return }
-
-    // Build mapping: local field path → { targetTypeRef, targetFieldName }
-    const fkFieldToTarget = new Map<string, { targetTypeRef: () => TAtscriptAnnotatedType; targetField: string }>()
-    for (const fk of this._foreignKeys.values()) {
-      if (!fk.targetTypeRef) { continue }
-      for (let i = 0; i < fk.fields.length; i++) {
-        fkFieldToTarget.set(fk.fields[i], {
-          targetTypeRef: fk.targetTypeRef,
-          targetField: fk.targetFields[i],
-        })
-      }
-    }
-
-    if (fkFieldToTarget.size === 0) { return }
-
-    // Cache flattened target types — multiple FKs may reference the same table
-    const flatCache = new Map<TAtscriptAnnotatedType, Map<string, TAtscriptAnnotatedType>>()
-
-    for (const descriptor of this._fieldDescriptors) {
-      const target = fkFieldToTarget.get(descriptor.path)
-      if (!target) { continue }
-
-      const targetType = target.targetTypeRef()
-      if (!targetType) { continue }
-
-      let targetFlatMap = flatCache.get(targetType)
-      if (!targetFlatMap) {
-        targetFlatMap = flattenAnnotatedType(targetType as TAtscriptAnnotatedType<TAtscriptTypeObject>)
-        flatCache.set(targetType, targetFlatMap)
-      }
-      const targetFieldType = targetFlatMap.get(target.targetField)
-      if (!targetFieldType) { continue }
-
-      const targetMetadata = targetFieldType.metadata
-      descriptor.fkTargetField = {
-        path: target.targetField,
-        type: targetFieldType,
-        physicalName: target.targetField,
-        designType: resolveDesignType(targetFieldType),
-        optional: false,
-        isPrimaryKey: targetMetadata?.has('meta.id') ?? false,
-        ignored: false,
-        storage: 'column',
-        defaultValue: targetMetadata ? resolveDefaultFromMetadata(targetMetadata) : undefined,
-        collate: targetMetadata?.get('db.column.collate') as TDbCollation | undefined,
-      }
-    }
+    this._ensureBuilt()
+    return this._meta.fieldDescriptors
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -687,7 +478,7 @@ export class AtscriptDbReadable<
   public async findOne<Q extends Uniquery<OwnProps, NavType>>(
     query: Q
   ): Promise<DbResponse<DataType, NavType, Q> | null> {
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
     const result = await this.adapter.findOne(translatedQuery)
@@ -707,7 +498,7 @@ export class AtscriptDbReadable<
   public async findMany<Q extends Uniquery<OwnProps, NavType>>(
     query: Q
   ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translatedQuery = this._translateQuery(query as Uniquery)
     const results = await this.adapter.findMany(translatedQuery)
@@ -722,7 +513,7 @@ export class AtscriptDbReadable<
    * Counts records matching the query.
    */
   public async count(query?: Uniquery<OwnProps, NavType>): Promise<number> {
-    this._flatten()
+    this._ensureBuilt()
     query ??= { filter: {}, controls: {} } as Uniquery<OwnProps, NavType>
     return this.adapter.count(this._translateQuery(query as Uniquery))
   }
@@ -733,7 +524,7 @@ export class AtscriptDbReadable<
   public async findManyWithCount<Q extends Uniquery<OwnProps, NavType>>(
     query: Q
   ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const result = await this.adapter.findManyWithCount(translated)
@@ -767,7 +558,7 @@ export class AtscriptDbReadable<
     query: Q,
     indexName?: string
   ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const results = await this.adapter.search(text, translated, indexName)
@@ -786,7 +577,7 @@ export class AtscriptDbReadable<
     query: Q,
     indexName?: string
   ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery(query as Uniquery)
     const result = await this.adapter.searchWithCount(text, translated, indexName)
@@ -820,7 +611,7 @@ export class AtscriptDbReadable<
     maybeQuery?: Q
   ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
     const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery((query || {}) as Uniquery)
     const results = await this.adapter.vectorSearch(vector, translated, indexName)
@@ -844,7 +635,7 @@ export class AtscriptDbReadable<
     maybeQuery?: Q
   ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
     const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
-    this._flatten()
+    this._ensureBuilt()
     const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
     const translated = this._translateQuery((query || {}) as Uniquery)
     const result = await this.adapter.vectorSearchWithCount(vector, translated, indexName)
@@ -891,7 +682,7 @@ export class AtscriptDbReadable<
     id: IdType,
     query?: Q
   ): Promise<DbResponse<DataType, NavType, Q> | null> {
-    this._flatten()
+    this._ensureBuilt()
     const filter = this._resolveIdFilter(id)
     if (!filter) {
       return null
@@ -902,392 +693,13 @@ export class AtscriptDbReadable<
     } as Uniquery<OwnProps, NavType>) as DbResponse<DataType, NavType, Q> | null
   }
 
-  // ── Internal: field flattening ────────────────────────────────────────────
-
-  protected _flatten(): void {
-    if (this._flatMap) {
-      return
-    }
-
-    this.adapter.onBeforeFlatten?.(this._type)
-
-    this._flatMap = flattenAnnotatedType(this.type, {
-      topLevelArrayTag: this.adapter.getTopLevelArrayTag?.() ?? 'db.__topLevelArray',
-      excludePhantomTypes: true,
-      onField: (path, type, metadata) => {
-        this._scanGenericAnnotations(path, type, metadata)
-        this.adapter.onFieldScanned?.(path, type, metadata)
-      },
-    })
-
-    // Strip entries nested under navigational relation fields
-    if (this._navFields.size > 0) {
-      this._purgeNavFieldDescendants()
-    }
-
-    // Classify fields and build path maps (before finalizing indexes)
-    if (!this._nestedObjects) {
-      this._classifyFields()
-    }
-
-    // Build field descriptors unconditionally — schema sync needs them
-    // even for adapters that support nested objects (e.g. MongoDB).
-    // _buildFieldDescriptors() already handles skipFlattening internally.
-    this._buildFieldDescriptors()
-
-    this._finalizeIndexes()
-    this.adapter.onAfterFlatten?.()
-
-    // Build physical field list for UniquSelect exclusion inversion
-    if (this._nestedObjects && this._flatMap) {
-      for (const path of this._flatMap.keys()) {
-        if (path && !this._ignoredFields.has(path)) {
-          this._allPhysicalFields.push(path)
-        }
-      }
-    } else {
-      for (const physical of this._pathToPhysical.values()) {
-        this._allPhysicalFields.push(physical)
-      }
-    }
-  }
-
-  /**
-   * Scans `@db.*` and `@meta.id` annotations on a field during flattening.
-   */
-  private _scanGenericAnnotations(
-    fieldName: string,
-    fieldType: TAtscriptAnnotatedType,
-    metadata: TMetadataMap<AtscriptMetadata>
-  ): void {
-    // @meta.id → primary key
-    if (metadata.has('meta.id')) {
-      this._primaryKeys.push(fieldName)
-      this._originalMetaIdFields.push(fieldName)
-    }
-
-    // @db.column → column mapping
-    const column = metadata.get('db.column') as string | undefined
-    if (column) {
-      this._columnMap.set(fieldName, column)
-    }
-
-    // @db.column.renamed → rename mapping
-    const columnFrom = metadata.get('db.column.renamed') as string | undefined
-    if (columnFrom) {
-      this._columnFromMap.set(fieldName, columnFrom)
-    }
-
-    // @db.default or @db.default.increment/uuid/now
-    const resolvedDefault = resolveDefaultFromMetadata(metadata)
-    if (resolvedDefault) {
-      this._defaults.set(fieldName, resolvedDefault)
-    }
-
-    // @db.ignore
-    if (metadata.has('db.ignore')) {
-      this._ignoredFields.add(fieldName)
-    }
-
-    // @db.rel.to / @db.rel.from / @db.rel.via → navigational field, not a stored column
-    if (metadata.has('db.rel.to') || metadata.has('db.rel.from') || metadata.has('db.rel.via')) {
-      this._navFields.add(fieldName)
-      this._ignoredFields.add(fieldName)
-
-      const direction = metadata.has('db.rel.to')
-        ? 'to' as const
-        : metadata.has('db.rel.from')
-          ? 'from' as const
-          : 'via' as const
-      const raw = direction === 'via'
-        ? metadata.get('db.rel.via')
-        : metadata.get(`db.rel.${direction}`)
-      const alias = (raw === true || typeof raw === 'function' ? undefined : raw) as string | undefined
-      const isArr = fieldType.type.kind === 'array'
-      const elementType = isArr
-        ? (fieldType.type as unknown as { of: TAtscriptAnnotatedType }).of
-        : fieldType
-      const resolveTarget = () => elementType?.ref?.type() ?? elementType
-      this._relations.set(fieldName, {
-        direction,
-        alias,
-        targetType: resolveTarget,
-        isArray: isArr,
-        ...(direction === 'via' ? { viaType: raw as (() => TAtscriptAnnotatedType) } : {}),
-      })
-    }
-
-    // @db.rel.FK → foreign key constraint metadata
-    if (metadata.has('db.rel.FK')) {
-      const raw = metadata.get('db.rel.FK')
-      const alias = (raw === true ? undefined : raw) as string | undefined
-      if (fieldType.ref) {
-        const refTarget = fieldType.ref.type()
-        const targetTable = (refTarget?.metadata?.get('db.table') as string) || refTarget?.id || ''
-        const targetField = fieldType.ref.field
-        const key = alias || `__auto_${fieldName}`
-        const existing = this._foreignKeys.get(key)
-        if (existing) {
-          existing.fields.push(fieldName)
-          existing.targetFields.push(targetField)
-        } else {
-          this._foreignKeys.set(key, {
-            fields: [fieldName],
-            targetTable,
-            targetFields: [targetField],
-            targetTypeRef: fieldType.ref.type,
-            alias,
-          })
-        }
-      }
-    }
-
-    // @db.rel.onDelete / @db.rel.onUpdate → referential actions on FK
-    const onDelete = metadata.get('db.rel.onDelete') as string | undefined
-    const onUpdate = metadata.get('db.rel.onUpdate') as string | undefined
-    if (onDelete || onUpdate) {
-      for (const fk of this._foreignKeys.values()) {
-        if (fk.fields.includes(fieldName)) {
-          if (onDelete) { fk.onDelete = onDelete as TDbForeignKey['onDelete'] }
-          if (onUpdate) { fk.onUpdate = onUpdate as TDbForeignKey['onUpdate'] }
-          break
-        }
-      }
-    }
-
-    // @db.index.plain
-    for (const index of (metadata.get('db.index.plain') as any[]) || []) {
-      const name = index === true ? fieldName : (index?.name || fieldName)
-      const sort = (index === true ? undefined : index?.sort) || 'asc'
-      this._addIndexField('plain', name, fieldName, { sort: sort as 'asc' | 'desc' })
-    }
-
-    // @db.index.unique (single arg → raw string or { name })
-    for (const index of (metadata.get('db.index.unique') as any[]) || []) {
-      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
-      this._addIndexField('unique', name, fieldName)
-    }
-
-    // @db.index.fulltext (args: name?, weight?)
-    for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
-      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
-      const weight = (index !== true && typeof index === 'object') ? index?.weight : undefined
-      this._addIndexField('fulltext', name, fieldName, { weight })
-    }
-
-    // @db.column.collate → collation
-    const collate = metadata.get('db.column.collate') as TDbCollation | undefined
-    if (collate) {
-      this._collateMap.set(fieldName, collate)
-    }
-
-    // @db.json → mark as JSON storage
-    if (metadata.has('db.json')) {
-      this._jsonFields.add(fieldName)
-
-      const hasIndex = metadata.has('db.index.plain')
-        || metadata.has('db.index.unique')
-        || metadata.has('db.index.fulltext')
-      if (hasIndex) {
-        this.logger.warn(
-          `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
-        )
-      }
-    }
-  }
-
-  /**
-   * Removes entries nested under nav field prefixes from all internal maps.
-   */
-  private _purgeNavFieldDescendants(): void {
-    const isUnderNav = (path: string) => {
-      for (const nav of this._navFields) {
-        if (path.startsWith(`${nav}.`)) { return true }
-      }
-      return false
-    }
-
-    for (const key of this._defaults.keys()) {
-      if (isUnderNav(key)) { this._defaults.delete(key) }
-    }
-    for (const key of this._columnMap.keys()) {
-      if (isUnderNav(key)) { this._columnMap.delete(key) }
-    }
-    for (const key of this._jsonFields) {
-      if (isUnderNav(key)) { this._jsonFields.delete(key) }
-    }
-    for (const key of this._collateMap.keys()) {
-      if (isUnderNav(key)) { this._collateMap.delete(key) }
-    }
-    this._primaryKeys = this._primaryKeys.filter(k => !isUnderNav(k))
-    this._originalMetaIdFields = this._originalMetaIdFields.filter(k => !isUnderNav(k))
-
-    for (const [, index] of this._indexes) {
-      index.fields = index.fields.filter(f => !isUnderNav(f.name))
-    }
-    for (const [name, index] of this._indexes) {
-      if (index.fields.length === 0) { this._indexes.delete(name) }
-    }
-
-    // Purge FK entries whose local fields are under nav prefixes
-    for (const [key, fk] of this._foreignKeys) {
-      if (fk.fields.some(f => isUnderNav(f))) {
-        this._foreignKeys.delete(key)
-      }
-    }
-  }
-
-  // ── Internal: index helpers ───────────────────────────────────────────────
-
-  protected _addIndexField(
-    type: TDbIndex['type'],
-    name: string,
-    field: string,
-    opts?: { sort?: 'asc' | 'desc'; weight?: number }
-  ): void {
-    const key = indexKey(type, name)
-    const index = this._indexes.get(key)
-    const indexField: TDbIndexField = { name: field, sort: opts?.sort ?? 'asc' }
-    if (opts?.weight !== undefined) {
-      indexField.weight = opts.weight
-    }
-    if (index) {
-      index.fields.push(indexField)
-    } else {
-      this._indexes.set(key, {
-        key,
-        name,
-        type,
-        fields: [indexField],
-      })
-    }
-  }
-
-  /**
-   * Classifies each field as column, flattened, json, or parent-object.
-   * Builds the bidirectional _pathToPhysical / _physicalToPath maps.
-   */
-  private _classifyFields(): void {
-    for (const [path, type] of this._flatMap!.entries()) {
-      if (!path) { continue }
-
-      const designType = resolveDesignType(type)
-      const isJson = this._jsonFields.has(path)
-      const isArray = designType === 'array'
-      const isObject = designType === 'object'
-
-      if (isArray) {
-        this._jsonFields.add(path)
-      } else if (isObject && isJson) {
-        // Already in _jsonFields from @db.json detection
-      } else if (isObject && !isJson) {
-        this._flattenedParents.add(path)
-      }
-    }
-
-    // Propagate @db.ignore from parent objects to their children
-    for (const ignoredField of this._ignoredFields) {
-      if (this._flattenedParents.has(ignoredField)) {
-        const prefix = `${ignoredField}.`
-        for (const path of this._flatMap!.keys()) {
-          if (path.startsWith(prefix)) {
-            this._ignoredFields.add(path)
-          }
-        }
-      }
-    }
-
-    // J4: @db.column on a flattened parent is invalid
-    for (const parentPath of this._flattenedParents) {
-      if (this._columnMap.has(parentPath)) {
-        throw new Error(
-          `@db.column cannot rename a flattened object field "${parentPath}" — ` +
-          `apply @db.column to individual nested fields, or use @db.json to store as a single column`
-        )
-      }
-    }
-
-    // Build physical name maps for all non-parent fields
-    for (const [path] of this._flatMap!.entries()) {
-      if (!path) { continue }
-      if (this._flattenedParents.has(path)) { continue }
-      if (this._findAncestorInSet(path, this._jsonFields) !== undefined) { continue }
-
-      const isFlattened = this._findAncestorInSet(path, this._flattenedParents) !== undefined
-      const columnOverride = this._columnMap.get(path)
-      let physicalName: string
-      if (columnOverride) {
-        // For flattened fields, prepend parent prefix: 'address.zip' with override 'zip_code' → 'address__zip_code'
-        physicalName = isFlattened ? this._flattenedPrefix(path) + columnOverride : columnOverride
-      } else {
-        physicalName = isFlattened ? path.replace(/\./g, '__') : path
-      }
-
-      this._pathToPhysical.set(path, physicalName)
-      this._physicalToPath.set(physicalName, path)
-
-      const fieldType = this._flatMap?.get(path)
-      if (fieldType) {
-        const dt = resolveDesignType(fieldType)
-        if (dt === 'boolean') { this._booleanFields.add(physicalName) }
-        else if (dt === 'decimal') { this._decimalFields.add(physicalName) }
-      }
-    }
-
-    // Build select expansion map
-    for (const parentPath of this._flattenedParents) {
-      const prefix = `${parentPath}.`
-      const leaves: string[] = []
-      for (const [path, physical] of this._pathToPhysical) {
-        if (path.startsWith(prefix)) {
-          leaves.push(physical)
-        }
-      }
-      if (leaves.length > 0) {
-        this._selectExpansion.set(parentPath, leaves)
-      }
-    }
-
-    this._requiresMappings = this._flattenedParents.size > 0 || this._jsonFields.size > 0
-  }
-
-  /**
-   * Finds the nearest ancestor of `path` that belongs to `set`.
-   */
-  protected _findAncestorInSet(path: string, set: ReadonlySet<string>): string | undefined {
-    let pos = path.length
-    while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
-      const ancestor = path.slice(0, pos)
-      if (set.has(ancestor)) {
-        return ancestor
-      }
-    }
-    return undefined
-  }
-
-  private _finalizeIndexes(): void {
-    for (const index of this._indexes.values()) {
-      if (index.type === 'unique' && index.fields.length === 1) {
-        this._uniqueProps.add(index.fields[0].name)
-      }
-    }
-
-    for (const index of this._indexes.values()) {
-      for (const field of index.fields) {
-        field.name = this._pathToPhysical.get(field.name)
-          ?? this._columnMap.get(field.name)
-          ?? field.name
-      }
-    }
-  }
-
   // ── Internal: read reconstruction ────────────────────────────────────────
 
   /**
    * Reconstructs nested objects from flat __-separated column values.
    */
   protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
-    if (!this._requiresMappings || this._nestedObjects) {
+    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
       return this._coerceFieldValues(row)
     }
 
@@ -1295,17 +707,17 @@ export class AtscriptDbReadable<
 
     const rowKeys = Object.keys(row)
     for (const physical of rowKeys) {
-      const value = this._booleanFields.has(physical) ? toBool(row[physical])
-        : this._decimalFields.has(physical) ? toDecimalString(row[physical])
+      const value = this._meta.booleanFields.has(physical) ? toBool(row[physical])
+        : this._meta.decimalFields.has(physical) ? toDecimalString(row[physical])
         : row[physical]
-      const logicalPath = this._physicalToPath.get(physical)
+      const logicalPath = this._meta.physicalToPath.get(physical)
 
       if (!logicalPath) {
         result[physical] = value
         continue
       }
 
-      if (this._jsonFields.has(logicalPath)) {
+      if (this._meta.jsonFields.has(logicalPath)) {
         const parsed = typeof value === 'string' ? JSON.parse(value) : value
         this._setNestedValue(result, logicalPath, parsed)
       } else if (logicalPath.includes('.')) {
@@ -1316,7 +728,7 @@ export class AtscriptDbReadable<
     }
 
     // Collapse null parent objects
-    for (const parentPath of this._flattenedParents) {
+    for (const parentPath of this._meta.flattenedParents) {
       this._reconstructNullParent(result, parentPath)
     }
 
@@ -1328,13 +740,13 @@ export class AtscriptDbReadable<
    * (booleans from 0/1, decimals from number to string).
    */
   private _coerceFieldValues(row: Record<string, unknown>): Record<string, unknown> {
-    if (this._booleanFields.size === 0 && this._decimalFields.size === 0) { return row }
-    for (const field of this._booleanFields) {
+    if (this._meta.booleanFields.size === 0 && this._meta.decimalFields.size === 0) { return row }
+    for (const field of this._meta.booleanFields) {
       if (field in row) {
         row[field] = toBool(row[field])
       }
     }
-    for (const field of this._decimalFields) {
+    for (const field of this._meta.decimalFields) {
       if (field in row) {
         row[field] = toDecimalString(row[field])
       }
@@ -1393,7 +805,7 @@ export class AtscriptDbReadable<
     }
 
     if (allNull) {
-      const parentType = this._flatMap?.get(parentPath)
+      const parentType = this._meta.flatMap?.get(parentPath)
       current[lastPart] = parentType?.optional ? null : {}
     }
   }
@@ -1405,15 +817,15 @@ export class AtscriptDbReadable<
    * dot-notation paths to physical column names.
    */
   protected _translateQuery(query: Uniquery): DbQuery {
-    if (!this._requiresMappings || this._nestedObjects) {
+    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
       const controls = query.controls
       return {
-        filter: this._valueFormatters ? this._translateFilter(query.filter as FilterExpr) : query.filter as FilterExpr,
+        filter: this._meta.valueFormatters ? this._translateFilter(query.filter as FilterExpr) : query.filter as FilterExpr,
         controls: {
           ...controls,
           $with: undefined, // $with is handled by the table layer, not passed to adapters
           $select: controls?.$select
-            ? new UniquSelect(controls.$select, this._allPhysicalFields)
+            ? new UniquSelect(controls.$select, this._meta.allPhysicalFields)
             : undefined,
         },
         insights: query.insights,
@@ -1436,7 +848,7 @@ export class AtscriptDbReadable<
    */
   protected _translateFilter(filter: FilterExpr, renameKeys = false): FilterExpr {
     if (!filter || typeof filter !== 'object') { return filter }
-    if (!renameKeys && !this._valueFormatters) { return filter }
+    if (!renameKeys && !this._meta.valueFormatters) { return filter }
 
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(filter as Record<string, unknown>)) {
@@ -1447,7 +859,7 @@ export class AtscriptDbReadable<
       } else if (key.startsWith('$')) {
         result[key] = value
       } else {
-        const physical = renameKeys ? (this._pathToPhysical.get(key) ?? key) : key
+        const physical = renameKeys ? (this._meta.pathToPhysical.get(key) ?? key) : key
         result[physical] = this._formatFilterValue(physical, value)
       }
     }
@@ -1460,7 +872,7 @@ export class AtscriptDbReadable<
    * Uses pre-built formatter map — skips columns without a registered formatter.
    */
   protected _formatFilterValue(physicalName: string, value: unknown): unknown {
-    const fmt = this._valueFormatters?.get(physicalName)
+    const fmt = this._meta.valueFormatters?.get(physicalName)
     if (!fmt) { return value }
 
     if (value === null || value === undefined) { return value }
@@ -1498,8 +910,8 @@ export class AtscriptDbReadable<
       const sortObj = controls.$sort as Record<string, unknown>
       const sortKeys = Object.keys(sortObj)
       for (const key of sortKeys) {
-        if (this._flattenedParents.has(key)) { continue }
-        const physical = this._pathToPhysical.get(key) ?? key
+        if (this._meta.flattenedParents.has(key)) { continue }
+        const physical = this._meta.pathToPhysical.get(key) ?? key
         translated[physical] = sortObj[key]
       }
       result.$sort = translated as UniqueryControls['$sort']
@@ -1510,11 +922,11 @@ export class AtscriptDbReadable<
       if (Array.isArray(controls.$select)) {
         const expanded: string[] = []
         for (const key of controls.$select) {
-          const expansion = this._selectExpansion.get(key as string)
+          const expansion = this._meta.selectExpansion.get(key as string)
           if (expansion) {
             expanded.push(...expansion)
           } else {
-            expanded.push((this._pathToPhysical.get(key as string) ?? key) as string)
+            expanded.push((this._meta.pathToPhysical.get(key as string) ?? key) as string)
           }
         }
         translatedRaw = expanded
@@ -1524,19 +936,19 @@ export class AtscriptDbReadable<
         const selectKeys = Object.keys(selectObj)
         for (const key of selectKeys) {
           const val = selectObj[key]
-          const expansion = this._selectExpansion.get(key)
+          const expansion = this._meta.selectExpansion.get(key)
           if (expansion) {
             for (const leaf of expansion) {
               translated[leaf] = val
             }
           } else {
-            const physical = this._pathToPhysical.get(key) ?? key
+            const physical = this._meta.pathToPhysical.get(key) ?? key
             translated[physical] = val
           }
         }
         translatedRaw = translated as UniqueryControls['$select']
       }
-      result.$select = new UniquSelect(translatedRaw, this._allPhysicalFields)
+      result.$select = new UniquSelect(translatedRaw, this._meta.allPhysicalFields)
     }
 
     return result
@@ -1585,7 +997,7 @@ export class AtscriptDbReadable<
     // Try compound unique indexes when id is an object
     if (typeof id === 'object' && id !== null && orFilters.length === 0) {
       const idObj = id as Record<string, unknown>
-      for (const index of this._indexes.values()) {
+      for (const index of this._meta.indexes.values()) {
         if (index.type !== 'unique' || index.fields.length < 2) { continue }
         const compoundFilter: FilterExpr = {}
         let valid = true
@@ -1654,7 +1066,7 @@ export class AtscriptDbReadable<
     if (rows.length === 0 || withRelations.length === 0) { return }
 
     if (this.adapter.supportsNativeRelations()) {
-      return this.adapter.loadRelations(rows, withRelations, this._relations, this._foreignKeys, this._tableResolver)
+      return this.adapter.loadRelations(rows, withRelations, this._meta.relations, this._meta.foreignKeys, this._tableResolver)
     }
 
     if (!this._tableResolver) { return }
@@ -1665,9 +1077,9 @@ export class AtscriptDbReadable<
       const relName = withRel.name
       if (relName.includes('.')) { continue }
 
-      const relation = this._relations.get(relName)
+      const relation = this._meta.relations.get(relName)
       if (!relation) {
-        throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...this._relations.keys()].join(', ') || '(none)'}`)
+        throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...this._meta.relations.keys()].join(', ') || '(none)'}`)
       }
 
       const targetType = relation.targetType()
@@ -2021,7 +1433,7 @@ export class AtscriptDbReadable<
    * Finds the FK entry that connects a `@db.rel.to` relation to its target.
    */
   protected _findFKForRelation(relation: TDbRelation): { localFields: string[]; targetFields: string[] } | undefined {
-    for (const fk of this._foreignKeys.values()) {
+    for (const fk of this._meta.foreignKeys.values()) {
       if (relation.alias) {
         if (fk.alias === relation.alias) {
           return { localFields: fk.fields, targetFields: fk.targetFields }

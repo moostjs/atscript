@@ -1,0 +1,688 @@
+import {
+  flattenAnnotatedType,
+  type TAtscriptAnnotatedType,
+  type TAtscriptTypeObject,
+  type TMetadataMap,
+} from '@atscript/typescript/utils'
+
+import type { BaseDbAdapter } from '../base-adapter'
+import type { TGenericLogger } from '../logger'
+import { resolveDesignType, resolveDefaultFromMetadata } from './db-readable'
+import type {
+  TDbCollation,
+  TDbDefaultValue,
+  TDbFieldMeta,
+  TDbForeignKey,
+  TDbIndex,
+  TDbIndexField,
+  TDbRelation,
+  TDbStorageType,
+} from '../types'
+
+const INDEX_PREFIX = 'atscript__'
+
+function indexKey(type: string, name: string): string {
+  const cleanName = name
+    .replace(/[^a-z0-9_.-]/gi, '_')
+    .replace(/_+/g, '_')
+    .slice(0, 127 - INDEX_PREFIX.length - type.length - 2)
+  return `${INDEX_PREFIX}${type}__${cleanName}`
+}
+
+/**
+ * Finds the nearest ancestor of `path` that belongs to `set`.
+ * Used by both the build pipeline (in `_classifyFields`) and
+ * runtime reconstruction on the Readable.
+ */
+export function findAncestorInSet(path: string, set: ReadonlySet<string>): string | undefined {
+  let pos = path.length
+  while ((pos = path.lastIndexOf('.', pos - 1)) !== -1) {
+    const ancestor = path.slice(0, pos)
+    if (set.has(ancestor)) {
+      return ancestor
+    }
+  }
+  return undefined
+}
+
+/**
+ * Computed metadata for a database table or view.
+ *
+ * Contains all field metadata, physical mapping indexes, relation definitions,
+ * and constraint information derived from Atscript annotations. Built lazily
+ * on first access via {@link build}, then immutable.
+ *
+ * This class owns the build pipeline that was previously part of
+ * `AtscriptDbReadable._flatten()`. The Readable delegates all metadata
+ * access to this class.
+ */
+export class TableMetadata {
+  // ── Adapter capability (set in constructor) ──────────────────────────────
+
+  readonly nestedObjects: boolean
+
+  // ── Canonical data — populated during build() ────────────────────────────
+
+  flatMap!: Map<string, TAtscriptAnnotatedType>
+  fieldDescriptors!: readonly TDbFieldMeta[]
+  primaryKeys: string[] = []
+  originalMetaIdFields: string[] = []
+  indexes = new Map<string, TDbIndex>()
+  foreignKeys = new Map<string, TDbForeignKey>()
+  relations = new Map<string, TDbRelation>()
+  navFields = new Set<string>()
+  ignoredFields = new Set<string>()
+  uniqueProps = new Set<string>()
+  defaults = new Map<string, TDbDefaultValue>()
+  columnMap = new Map<string, string>()
+
+  // ── Hot-path lookup indexes — derived during build() ─────────────────────
+
+  pathToPhysical = new Map<string, string>()
+  physicalToPath = new Map<string, string>()
+  flattenedParents = new Set<string>()
+  jsonFields = new Set<string>()
+  selectExpansion = new Map<string, string[]>()
+  booleanFields = new Set<string>()
+  decimalFields = new Set<string>()
+  allPhysicalFields: string[] = []
+  requiresMappings = false
+  valueFormatters?: Map<string, (value: unknown) => unknown>
+
+  // ── Build state ──────────────────────────────────────────────────────────
+
+  private _built = false
+
+  // Intermediate build-time maps (not exposed after build)
+  private _collateMap = new Map<string, TDbCollation>()
+  private _columnFromMap = new Map<string, string>()
+
+  constructor(nestedObjects: boolean) {
+    this.nestedObjects = nestedObjects
+  }
+
+  get isBuilt(): boolean {
+    return this._built
+  }
+
+  // ── Build pipeline ───────────────────────────────────────────────────────
+
+  /**
+   * Runs the full metadata compilation pipeline. Called once by
+   * `AtscriptDbReadable._ensureBuilt()` on first metadata access.
+   *
+   * Pipeline steps:
+   * 1. `adapter.onBeforeFlatten(type)` — adapter hook
+   * 2. `flattenAnnotatedType()` with per-field annotation scanning
+   * 3. Purge nav field descendants
+   * 4. Classify fields and build path maps (skipped for nested-objects adapters)
+   * 5. Build field descriptors (TDbFieldMeta[])
+   * 6. Finalize indexes (resolve field names to physical)
+   * 7. `adapter.onAfterFlatten()` — adapter hook (may mutate primaryKeys, etc.)
+   * 8. Build allPhysicalFields list
+   */
+  build(
+    type: TAtscriptAnnotatedType<TAtscriptTypeObject>,
+    adapter: BaseDbAdapter,
+    logger: TGenericLogger
+  ): void {
+    if (this._built) { return }
+
+    adapter.onBeforeFlatten?.(type)
+
+    this.flatMap = flattenAnnotatedType(type, {
+      topLevelArrayTag: adapter.getTopLevelArrayTag?.() ?? 'db.__topLevelArray',
+      excludePhantomTypes: true,
+      onField: (path, fieldType, metadata) => {
+        this._scanGenericAnnotations(path, fieldType, metadata, logger)
+        adapter.onFieldScanned?.(path, fieldType, metadata)
+      },
+    })
+
+    // Strip entries nested under navigational relation fields
+    if (this.navFields.size > 0) {
+      this._purgeNavFieldDescendants()
+    }
+
+    // Classify fields and build path maps (before finalizing indexes)
+    if (!this.nestedObjects) {
+      this._classifyFields()
+    }
+
+    // Build field descriptors unconditionally — schema sync needs them
+    // even for adapters that support nested objects (e.g. MongoDB).
+    // _buildFieldDescriptors() already handles skipFlattening internally.
+    this._buildFieldDescriptors(adapter)
+
+    this._finalizeIndexes()
+
+    // Release intermediate build-time maps
+    this._collateMap.clear()
+    this._columnFromMap.clear()
+
+    // Mark built BEFORE adapter.onAfterFlatten() — the adapter hook may access
+    // metadata via public getters (e.g. MongoAdapter reads this._table.flatMap),
+    // which call _ensureBuilt(). Without this flag, that triggers infinite recursion.
+    this._built = true
+
+    adapter.onAfterFlatten?.()
+
+    // Build physical field list for UniquSelect exclusion inversion
+    if (this.nestedObjects && this.flatMap) {
+      for (const path of this.flatMap.keys()) {
+        if (path && !this.ignoredFields.has(path)) {
+          this.allPhysicalFields.push(path)
+        }
+      }
+    } else {
+      for (const physical of this.pathToPhysical.values()) {
+        this.allPhysicalFields.push(physical)
+      }
+    }
+  }
+
+  // ── Build-time mutation API (for adapter.onAfterFlatten) ─────────────────
+
+  /**
+   * Registers an additional primary key field.
+   * Used by adapters (e.g., MongoDB) where `_id` is always the primary key.
+   */
+  addPrimaryKey(field: string): void {
+    if (!this.primaryKeys.includes(field)) {
+      this.primaryKeys.push(field)
+    }
+  }
+
+  /**
+   * Removes a field from the primary key list.
+   */
+  removePrimaryKey(field: string): void {
+    const idx = this.primaryKeys.indexOf(field)
+    if (idx >= 0) {
+      this.primaryKeys.splice(idx, 1)
+    }
+  }
+
+  /**
+   * Registers a field as having a unique constraint.
+   */
+  addUniqueField(field: string): void {
+    this.uniqueProps.add(field)
+  }
+
+  // ── Private: annotation scanning ─────────────────────────────────────────
+
+  /**
+   * Scans `@db.*` and `@meta.id` annotations on a field during flattening.
+   */
+  private _scanGenericAnnotations(
+    fieldName: string,
+    fieldType: TAtscriptAnnotatedType,
+    metadata: TMetadataMap<AtscriptMetadata>,
+    logger: TGenericLogger
+  ): void {
+    // @meta.id → primary key
+    if (metadata.has('meta.id')) {
+      this.primaryKeys.push(fieldName)
+      this.originalMetaIdFields.push(fieldName)
+    }
+
+    // @db.column → column mapping
+    const column = metadata.get('db.column') as string | undefined
+    if (column) {
+      this.columnMap.set(fieldName, column)
+    }
+
+    // @db.column.renamed → rename mapping (intermediate, consumed by _buildFieldDescriptors)
+    const columnFrom = metadata.get('db.column.renamed') as string | undefined
+    if (columnFrom) {
+      this._columnFromMap.set(fieldName, columnFrom)
+    }
+
+    // @db.default or @db.default.increment/uuid/now
+    const resolvedDefault = resolveDefaultFromMetadata(metadata)
+    if (resolvedDefault) {
+      this.defaults.set(fieldName, resolvedDefault)
+    }
+
+    // @db.ignore
+    if (metadata.has('db.ignore')) {
+      this.ignoredFields.add(fieldName)
+    }
+
+    // @db.rel.to / @db.rel.from / @db.rel.via → navigational field, not a stored column
+    if (metadata.has('db.rel.to') || metadata.has('db.rel.from') || metadata.has('db.rel.via')) {
+      this.navFields.add(fieldName)
+      this.ignoredFields.add(fieldName)
+
+      const direction = metadata.has('db.rel.to')
+        ? 'to' as const
+        : metadata.has('db.rel.from')
+          ? 'from' as const
+          : 'via' as const
+      const raw = direction === 'via'
+        ? metadata.get('db.rel.via')
+        : metadata.get(`db.rel.${direction}`)
+      const alias = (raw === true || typeof raw === 'function' ? undefined : raw) as string | undefined
+      const isArr = fieldType.type.kind === 'array'
+      const elementType = isArr
+        ? (fieldType.type as unknown as { of: TAtscriptAnnotatedType }).of
+        : fieldType
+      const resolveTarget = () => elementType?.ref?.type() ?? elementType
+      this.relations.set(fieldName, {
+        direction,
+        alias,
+        targetType: resolveTarget,
+        isArray: isArr,
+        ...(direction === 'via' ? { viaType: raw as (() => TAtscriptAnnotatedType) } : {}),
+      })
+    }
+
+    // @db.rel.FK → foreign key constraint metadata
+    if (metadata.has('db.rel.FK')) {
+      const raw = metadata.get('db.rel.FK')
+      const alias = (raw === true ? undefined : raw) as string | undefined
+      if (fieldType.ref) {
+        const refTarget = fieldType.ref.type()
+        const targetTable = (refTarget?.metadata?.get('db.table') as string) || refTarget?.id || ''
+        const targetField = fieldType.ref.field
+        const key = alias || `__auto_${fieldName}`
+        const existing = this.foreignKeys.get(key)
+        if (existing) {
+          existing.fields.push(fieldName)
+          existing.targetFields.push(targetField)
+        } else {
+          this.foreignKeys.set(key, {
+            fields: [fieldName],
+            targetTable,
+            targetFields: [targetField],
+            targetTypeRef: fieldType.ref.type,
+            alias,
+          })
+        }
+      }
+    }
+
+    // @db.rel.onDelete / @db.rel.onUpdate → referential actions on FK
+    const onDelete = metadata.get('db.rel.onDelete') as string | undefined
+    const onUpdate = metadata.get('db.rel.onUpdate') as string | undefined
+    if (onDelete || onUpdate) {
+      for (const fk of this.foreignKeys.values()) {
+        if (fk.fields.includes(fieldName)) {
+          if (onDelete) { fk.onDelete = onDelete as TDbForeignKey['onDelete'] }
+          if (onUpdate) { fk.onUpdate = onUpdate as TDbForeignKey['onUpdate'] }
+          break
+        }
+      }
+    }
+
+    // @db.index.plain
+    for (const index of (metadata.get('db.index.plain') as any[]) || []) {
+      const name = index === true ? fieldName : (index?.name || fieldName)
+      const sort = (index === true ? undefined : index?.sort) || 'asc'
+      this._addIndexField('plain', name, fieldName, { sort: sort as 'asc' | 'desc' })
+    }
+
+    // @db.index.unique (single arg → raw string or { name })
+    for (const index of (metadata.get('db.index.unique') as any[]) || []) {
+      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
+      this._addIndexField('unique', name, fieldName)
+    }
+
+    // @db.index.fulltext (args: name?, weight?)
+    for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
+      const name = index === true ? fieldName : (typeof index === 'string' ? index : (index?.name || fieldName))
+      const weight = (index !== true && typeof index === 'object') ? index?.weight : undefined
+      this._addIndexField('fulltext', name, fieldName, { weight })
+    }
+
+    // @db.column.collate → collation (intermediate, consumed by _buildFieldDescriptors)
+    const collate = metadata.get('db.column.collate') as TDbCollation | undefined
+    if (collate) {
+      this._collateMap.set(fieldName, collate)
+    }
+
+    // @db.json → mark as JSON storage
+    if (metadata.has('db.json')) {
+      this.jsonFields.add(fieldName)
+
+      const hasIndex = metadata.has('db.index.plain')
+        || metadata.has('db.index.unique')
+        || metadata.has('db.index.fulltext')
+      if (hasIndex) {
+        logger.warn(
+          `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
+        )
+      }
+    }
+  }
+
+  // ── Private: nav field purge ─────────────────────────────────────────────
+
+  /**
+   * Removes entries nested under nav field prefixes from all internal maps.
+   */
+  private _purgeNavFieldDescendants(): void {
+    const isUnderNav = (path: string) => {
+      for (const nav of this.navFields) {
+        if (path.startsWith(`${nav}.`)) { return true }
+      }
+      return false
+    }
+
+    for (const key of this.defaults.keys()) {
+      if (isUnderNav(key)) { this.defaults.delete(key) }
+    }
+    for (const key of this.columnMap.keys()) {
+      if (isUnderNav(key)) { this.columnMap.delete(key) }
+    }
+    for (const key of this.jsonFields) {
+      if (isUnderNav(key)) { this.jsonFields.delete(key) }
+    }
+    for (const key of this._collateMap.keys()) {
+      if (isUnderNav(key)) { this._collateMap.delete(key) }
+    }
+    this.primaryKeys = this.primaryKeys.filter(k => !isUnderNav(k))
+    this.originalMetaIdFields = this.originalMetaIdFields.filter(k => !isUnderNav(k))
+
+    for (const [, index] of this.indexes) {
+      index.fields = index.fields.filter(f => !isUnderNav(f.name))
+    }
+    for (const [name, index] of this.indexes) {
+      if (index.fields.length === 0) { this.indexes.delete(name) }
+    }
+
+    // Purge FK entries whose local fields are under nav prefixes
+    for (const [key, fk] of this.foreignKeys) {
+      if (fk.fields.some(f => isUnderNav(f))) {
+        this.foreignKeys.delete(key)
+      }
+    }
+  }
+
+  // ── Private: index helpers ───────────────────────────────────────────────
+
+  private _addIndexField(
+    type: TDbIndex['type'],
+    name: string,
+    field: string,
+    opts?: { sort?: 'asc' | 'desc'; weight?: number }
+  ): void {
+    const key = indexKey(type, name)
+    const index = this.indexes.get(key)
+    const indexField: TDbIndexField = { name: field, sort: opts?.sort ?? 'asc' }
+    if (opts?.weight !== undefined) {
+      indexField.weight = opts.weight
+    }
+    if (index) {
+      index.fields.push(indexField)
+    } else {
+      this.indexes.set(key, {
+        key,
+        name,
+        type,
+        fields: [indexField],
+      })
+    }
+  }
+
+  // ── Private: field classification ────────────────────────────────────────
+
+  /**
+   * Classifies each field as column, flattened, json, or parent-object.
+   * Builds the bidirectional pathToPhysical / physicalToPath maps.
+   */
+  private _classifyFields(): void {
+    for (const [path, type] of this.flatMap.entries()) {
+      if (!path) { continue }
+
+      const designType = resolveDesignType(type)
+      const isJson = this.jsonFields.has(path)
+      const isArray = designType === 'array'
+      const isObject = designType === 'object'
+
+      if (isArray) {
+        this.jsonFields.add(path)
+      } else if (isObject && isJson) {
+        // Already in jsonFields from @db.json detection
+      } else if (isObject && !isJson) {
+        this.flattenedParents.add(path)
+      }
+    }
+
+    // Propagate @db.ignore from parent objects to their children
+    for (const ignoredField of this.ignoredFields) {
+      if (this.flattenedParents.has(ignoredField)) {
+        const prefix = `${ignoredField}.`
+        for (const path of this.flatMap.keys()) {
+          if (path.startsWith(prefix)) {
+            this.ignoredFields.add(path)
+          }
+        }
+      }
+    }
+
+    // J4: @db.column on a flattened parent is invalid
+    for (const parentPath of this.flattenedParents) {
+      if (this.columnMap.has(parentPath)) {
+        throw new Error(
+          `@db.column cannot rename a flattened object field "${parentPath}" — ` +
+          `apply @db.column to individual nested fields, or use @db.json to store as a single column`
+        )
+      }
+    }
+
+    // Build physical name maps for all non-parent fields
+    for (const [path] of this.flatMap.entries()) {
+      if (!path) { continue }
+      if (this.flattenedParents.has(path)) { continue }
+      if (findAncestorInSet(path, this.jsonFields) !== undefined) { continue }
+
+      const isFlattened = findAncestorInSet(path, this.flattenedParents) !== undefined
+      const columnOverride = this.columnMap.get(path)
+      let physicalName: string
+      if (columnOverride) {
+        // For flattened fields, prepend parent prefix: 'address.zip' with override 'zip_code' → 'address__zip_code'
+        physicalName = isFlattened ? this._flattenedPrefix(path) + columnOverride : columnOverride
+      } else {
+        physicalName = isFlattened ? path.replace(/\./g, '__') : path
+      }
+
+      this.pathToPhysical.set(path, physicalName)
+      this.physicalToPath.set(physicalName, path)
+
+      const fieldType = this.flatMap.get(path)
+      if (fieldType) {
+        const dt = resolveDesignType(fieldType)
+        if (dt === 'boolean') { this.booleanFields.add(physicalName) }
+        else if (dt === 'decimal') { this.decimalFields.add(physicalName) }
+      }
+    }
+
+    // Build select expansion map
+    for (const parentPath of this.flattenedParents) {
+      const prefix = `${parentPath}.`
+      const leaves: string[] = []
+      for (const [path, physical] of this.pathToPhysical) {
+        if (path.startsWith(prefix)) {
+          leaves.push(physical)
+        }
+      }
+      if (leaves.length > 0) {
+        this.selectExpansion.set(parentPath, leaves)
+      }
+    }
+
+    this.requiresMappings = this.flattenedParents.size > 0 || this.jsonFields.size > 0
+  }
+
+  /** Returns the `__`-separated parent prefix for a dot-separated path, or empty string for top-level paths. */
+  private _flattenedPrefix(path: string): string {
+    const lastDot = path.lastIndexOf('.')
+    return lastDot >= 0 ? `${path.slice(0, lastDot).replace(/\./g, '__')}__` : ''
+  }
+
+  // ── Private: field descriptor building ───────────────────────────────────
+
+  /**
+   * Builds field descriptors, physical-name lookup, and value formatters.
+   * Called once during build() — everything it needs
+   * (flatMap, indexes, columnMap, etc.) is already populated.
+   */
+  private _buildFieldDescriptors(adapter: BaseDbAdapter): void {
+    const descriptors: TDbFieldMeta[] = []
+    const skipFlattening = this.nestedObjects
+
+    // Collect all field names that participate in any index
+    const indexedFields = new Set<string>()
+    for (const index of this.indexes.values()) {
+      for (const f of index.fields) {
+        indexedFields.add(f.name)
+      }
+    }
+
+    for (const [path, type] of this.flatMap.entries()) {
+      if (!path) { continue }
+
+      if (!skipFlattening && this.flattenedParents.has(path)) {
+        continue
+      }
+
+      if (!skipFlattening && findAncestorInSet(path, this.jsonFields) !== undefined) {
+        continue
+      }
+
+      const isJson = this.jsonFields.has(path)
+      const isFlattened = !skipFlattening && findAncestorInSet(path, this.flattenedParents) !== undefined
+      const designType = isJson ? 'json' : resolveDesignType(type)
+
+      let storage: TDbStorageType
+      if (skipFlattening) {
+        storage = 'column'
+      } else if (isJson) {
+        storage = 'json'
+      } else if (isFlattened) {
+        storage = 'flattened'
+      } else {
+        storage = 'column'
+      }
+
+      const physicalName = skipFlattening
+        ? (this.columnMap.get(path) ?? path)
+        : (this.pathToPhysical.get(path) ?? this.columnMap.get(path) ?? path)
+
+      // Compute renamedFrom (old physical name from @db.column.renamed)
+      const fromLocal = this._columnFromMap.get(path)
+      let renamedFrom: string | undefined
+      if (fromLocal) {
+        renamedFrom = isFlattened ? this._flattenedPrefix(path) + fromLocal : fromLocal
+      }
+
+      descriptors.push({
+        path,
+        type,
+        physicalName,
+        designType,
+        optional: type.optional === true,
+        isPrimaryKey: this.primaryKeys.includes(path),
+        ignored: this.ignoredFields.has(path),
+        defaultValue: this.defaults.get(path),
+        storage,
+        flattenedFrom: isFlattened ? path : undefined,
+        renamedFrom,
+        collate: this._collateMap.get(path),
+        isIndexed: indexedFields.has(path) || undefined,
+      })
+    }
+
+    // Second pass: resolve fkTargetField for FK fields.
+    this._resolveFkTargetFields(descriptors)
+
+    // Build value formatters from adapter hook
+    const fmtHook = adapter.formatValue?.bind(adapter)
+    if (fmtHook) {
+      for (const fd of descriptors) {
+        const fmt = fmtHook(fd)
+        if (fmt) {
+          if (!this.valueFormatters) { this.valueFormatters = new Map() }
+          this.valueFormatters.set(fd.physicalName, fmt)
+        }
+      }
+    }
+
+    Object.freeze(descriptors)
+    this.fieldDescriptors = descriptors
+  }
+
+  /**
+   * Resolves `fkTargetField` for FK fields in field descriptors.
+   */
+  private _resolveFkTargetFields(descriptors: TDbFieldMeta[]): void {
+    if (this.foreignKeys.size === 0) { return }
+
+    // Build mapping: local field path → { targetTypeRef, targetFieldName }
+    const fkFieldToTarget = new Map<string, { targetTypeRef: () => TAtscriptAnnotatedType; targetField: string }>()
+    for (const fk of this.foreignKeys.values()) {
+      if (!fk.targetTypeRef) { continue }
+      for (let i = 0; i < fk.fields.length; i++) {
+        fkFieldToTarget.set(fk.fields[i], {
+          targetTypeRef: fk.targetTypeRef,
+          targetField: fk.targetFields[i],
+        })
+      }
+    }
+
+    if (fkFieldToTarget.size === 0) { return }
+
+    // Cache flattened target types — multiple FKs may reference the same table
+    const flatCache = new Map<TAtscriptAnnotatedType, Map<string, TAtscriptAnnotatedType>>()
+
+    for (const descriptor of descriptors) {
+      const target = fkFieldToTarget.get(descriptor.path)
+      if (!target) { continue }
+
+      const targetType = target.targetTypeRef()
+      if (!targetType) { continue }
+
+      let targetFlatMap = flatCache.get(targetType)
+      if (!targetFlatMap) {
+        targetFlatMap = flattenAnnotatedType(targetType as TAtscriptAnnotatedType<TAtscriptTypeObject>)
+        flatCache.set(targetType, targetFlatMap)
+      }
+      const targetFieldType = targetFlatMap.get(target.targetField)
+      if (!targetFieldType) { continue }
+
+      const targetMetadata = targetFieldType.metadata
+      descriptor.fkTargetField = {
+        path: target.targetField,
+        type: targetFieldType,
+        physicalName: target.targetField,
+        designType: resolveDesignType(targetFieldType),
+        optional: false,
+        isPrimaryKey: targetMetadata?.has('meta.id') ?? false,
+        ignored: false,
+        storage: 'column',
+        defaultValue: targetMetadata ? resolveDefaultFromMetadata(targetMetadata) : undefined,
+        collate: targetMetadata?.get('db.column.collate') as TDbCollation | undefined,
+      }
+    }
+  }
+
+  // ── Private: index finalization ──────────────────────────────────────────
+
+  private _finalizeIndexes(): void {
+    for (const index of this.indexes.values()) {
+      if (index.type === 'unique' && index.fields.length === 1) {
+        this.uniqueProps.add(index.fields[0].name)
+      }
+    }
+
+    for (const index of this.indexes.values()) {
+      for (const field of index.fields) {
+        field.name = this.pathToPhysical.get(field.name)
+          ?? this.columnMap.get(field.name)
+          ?? field.name
+      }
+    }
+  }
+}

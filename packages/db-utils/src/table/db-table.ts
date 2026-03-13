@@ -144,11 +144,11 @@ export class AtscriptDbTable<
     payloads: Array<Partial<DataType> & Record<string, unknown>>,
     opts?: { maxDepth?: number }
   ): Promise<TDbInsertManyResult> {
-    this._flatten()
+    this._ensureBuilt()
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
-    const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
-    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
+    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Clone + apply defaults (keep originals for FROM phase)
@@ -167,7 +167,7 @@ export class AtscriptDbTable<
       // Strip nav fields, prepare for write
       const prepared: Array<Record<string, unknown>> = []
       for (const data of items) {
-        for (const navField of this._navFields) { delete data[navField] }
+        for (const navField of this._meta.navFields) { delete data[navField] }
         prepared.push(this._prepareForWrite(data))
       }
 
@@ -221,11 +221,11 @@ export class AtscriptDbTable<
     payloads: Array<DataType & Record<string, unknown>>,
     opts?: { maxDepth?: number }
   ): Promise<TDbUpdateResult> {
-    this._flatten()
+    this._ensureBuilt()
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
-    const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
-    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
+    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — clone + defaults, validate full payload (including nav fields)
@@ -253,7 +253,7 @@ export class AtscriptDbTable<
       let matchedCount = 0
       let modifiedCount = 0
       for (const data of items) {
-        for (const navField of this._navFields) { delete data[navField] }
+        for (const navField of this._meta.navFields) { delete data[navField] }
         const filter = this._extractPrimaryKeyFilter(data)
         const prepared = this._prepareForWrite(data)
         const result = await this.adapter.replaceOne(
@@ -300,11 +300,11 @@ export class AtscriptDbTable<
     payloads: Array<Partial<DataType> & Record<string, unknown>>,
     opts?: { maxDepth?: number }
   ): Promise<TDbUpdateResult> {
-    this._flatten()
+    this._ensureBuilt()
     const maxDepth = opts?.maxDepth ?? 3
     const depth = (opts as { _depth?: number })?._depth ?? 0
-    const canNest = depth < maxDepth && this._writeTableResolver && this._navFields.size > 0
-    if (!canNest && this._navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
+    const canNest = depth < maxDepth && this._writeTableResolver && this._meta.navFields.size > 0
+    if (!canNest && this._meta.navFields.size > 0) { this._checkDepthOverflow(payloads as Array<Record<string, unknown>>, maxDepth) }
 
     return this._enrichFkViolation(() => this.adapter.withTransaction(async () => {
       // Phase 0: Setup — validate full payload (plugin checks nav field constraints)
@@ -328,11 +328,11 @@ export class AtscriptDbTable<
       let modifiedCount = 0
       for (const payload of payloads) {
         const data = { ...payload } as Record<string, unknown>
-        for (const navField of this._navFields) { delete data[navField] }
+        for (const navField of this._meta.navFields) { delete data[navField] }
         const filter = this._extractPrimaryKeyFilter(data)
 
         // Strip PK fields from data — they're in the filter, not in the SET clause
-        for (const pk of this._primaryKeys) { delete data[pk] }
+        for (const pk of this._meta.primaryKeys) { delete data[pk] }
 
         // Skip if nothing left to update (e.g. only nav props + PK in payload)
         if (Object.keys(data).length === 0) {
@@ -385,7 +385,7 @@ export class AtscriptDbTable<
    * cascade and setNull actions are applied before the delete.
    */
   public async deleteOne(id: IdType): Promise<TDbDeleteResult> {
-    this._flatten()
+    this._ensureBuilt()
     const filter = this._resolveIdFilter(id)
     if (!filter) {
       return { deletedCount: 0 }
@@ -405,7 +405,7 @@ export class AtscriptDbTable<
     filter: FilterExpr<FlatType>,
     data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    this._flatten()
+    this._ensureBuilt()
     await this._validateForeignKeys([data as Record<string, unknown>], true)
     return this._enrichFkViolation(() => this.adapter.updateMany(
       this._translateFilter(filter as FilterExpr),
@@ -417,7 +417,7 @@ export class AtscriptDbTable<
     filter: FilterExpr<FlatType>,
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
-    this._flatten()
+    this._ensureBuilt()
     await this._validateForeignKeys([data])
     return this._enrichFkViolation(() => this.adapter.replaceMany(
       this._translateFilter(filter as FilterExpr),
@@ -426,7 +426,7 @@ export class AtscriptDbTable<
   }
 
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
-    this._flatten()
+    this._ensureBuilt()
     if (this._needsCascade()) {
       return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
         await this._cascadeBeforeDelete(filter as FilterExpr)
@@ -442,7 +442,7 @@ export class AtscriptDbTable<
    * Synchronizes indexes between Atscript definitions and the database.
    */
   public async syncIndexes(): Promise<void> {
-    this._flatten()
+    this._ensureBuilt()
     return this.adapter.syncIndexes()
   }
 
@@ -450,7 +450,7 @@ export class AtscriptDbTable<
    * Ensures the table/collection exists in the database.
    */
   public async ensureTable(): Promise<void> {
-    this._flatten()
+    this._ensureBuilt()
     return this.adapter.ensureTable()
   }
 
@@ -464,10 +464,10 @@ export class AtscriptDbTable<
   protected _applyDefaults(data: Record<string, unknown>): Record<string, unknown> {
     const nativeValues = this.adapter.supportsNativeValueDefaults()
     const nativeFns = this.adapter.nativeDefaultFns()
-    for (const [field, def] of this._defaults.entries()) {
+    for (const [field, def] of this._meta.defaults.entries()) {
       if (data[field] === undefined) {
         if (def.kind === 'value' && !nativeValues) {
-          const fieldType = this._flatMap?.get(field)
+          const fieldType = this._meta.flatMap?.get(field)
           const designType = fieldType?.type.kind === '' && (fieldType.type as { designType: string }).designType
           data[field] = designType === 'string' ? def.value : JSON.parse(def.value)
         } else if (def.kind === 'fn' && !nativeFns.has(def.fn)) {
@@ -490,9 +490,9 @@ export class AtscriptDbTable<
     const data = { ...payload }
 
     // Prepare primary key values
-    for (const pk of this._primaryKeys) {
+    for (const pk of this._meta.primaryKeys) {
       if (data[pk] !== undefined) {
-        const fieldType = this._flatMap?.get(pk)
+        const fieldType = this._meta.flatMap?.get(pk)
         if (fieldType) {
           data[pk] = this.adapter.prepareId(data[pk], fieldType)
         }
@@ -500,15 +500,15 @@ export class AtscriptDbTable<
     }
 
     // Strip top-level ignored fields
-    for (const field of this._ignoredFields) {
+    for (const field of this._meta.ignoredFields) {
       if (!field.includes('.')) {
         delete data[field]
       }
     }
 
     // Fast path: no nested/json fields — just do column mapping
-    if (!this._requiresMappings || this._nestedObjects) {
-      for (const [logical, physical] of this._columnMap.entries()) {
+    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
+      for (const [logical, physical] of this._meta.columnMap.entries()) {
         if (logical in data) {
           data[physical] = data[logical]
           delete data[logical]
@@ -526,8 +526,8 @@ export class AtscriptDbTable<
    * Uses pre-built formatter map — only touches columns that have a registered formatter.
    */
   private _formatWriteValues(data: Record<string, unknown>): Record<string, unknown> {
-    if (!this._valueFormatters) { return data }
-    for (const [col, fmt] of this._valueFormatters) {
+    if (!this._meta.valueFormatters) { return data }
+    for (const [col, fmt] of this._meta.valueFormatters) {
       const val = data[col]
       if (val !== null && val !== undefined) {
         data[col] = fmt(val)
@@ -557,9 +557,9 @@ export class AtscriptDbTable<
     value: unknown,
     result: Record<string, unknown>
   ): void {
-    if (this._ignoredFields.has(path)) { return }
+    if (this._meta.ignoredFields.has(path)) { return }
 
-    if (this._flattenedParents.has(path)) {
+    if (this._meta.flattenedParents.has(path)) {
       if (value === null || value === undefined) {
         this._setFlattenedChildrenNull(path, result)
       } else if (typeof value === 'object' && !Array.isArray(value)) {
@@ -568,13 +568,13 @@ export class AtscriptDbTable<
           this._writeFlattenedField(`${path}.${key}`, obj[key], result)
         }
       }
-    } else if (this._jsonFields.has(path)) {
-      const physical = this._pathToPhysical.get(path) ?? path.replace(/\./g, '__')
+    } else if (this._meta.jsonFields.has(path)) {
+      const physical = this._meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
       result[physical] = (value !== undefined && value !== null)
         ? JSON.stringify(value)
         : value
     } else {
-      const physical = this._pathToPhysical.get(path) ?? path.replace(/\./g, '__')
+      const physical = this._meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
       result[physical] = value
     }
   }
@@ -587,7 +587,7 @@ export class AtscriptDbTable<
     result: Record<string, unknown>
   ): void {
     const prefix = `${parentPath}.`
-    for (const [path, physical] of this._pathToPhysical.entries()) {
+    for (const [path, physical] of this._meta.pathToPhysical.entries()) {
       if (path.startsWith(prefix)) {
         result[physical] = null
       }
@@ -619,7 +619,7 @@ export class AtscriptDbTable<
    * Translates dot-notation keys in a decomposed patch to physical column names.
    */
   protected _translatePatchKeys(update: Record<string, unknown>): Record<string, unknown> {
-    if (!this._requiresMappings || this._nestedObjects) {
+    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
       return update
     }
 
@@ -632,10 +632,10 @@ export class AtscriptDbTable<
       const basePath = operatorMatch ? operatorMatch[1] : key
       const suffix = operatorMatch ? operatorMatch[2] : ''
 
-      const physical = this._pathToPhysical.get(basePath) ?? basePath
+      const physical = this._meta.pathToPhysical.get(basePath) ?? basePath
       const finalKey = physical + suffix
 
-      if (this._jsonFields.has(basePath) && typeof value === 'object' && value !== null && !suffix) {
+      if (this._meta.jsonFields.has(basePath) && typeof value === 'object' && value !== null && !suffix) {
         result[finalKey] = JSON.stringify(value)
       } else {
         result[finalKey] = value
@@ -681,7 +681,7 @@ export class AtscriptDbTable<
     const physicalToLogical = new Map<string, string>()
     const physicalFields: string[] = []
     for (const logical of neededLogical) {
-      const physical = this._pathToPhysical.get(logical) ?? this._columnMap.get(logical) ?? logical
+      const physical = this._meta.pathToPhysical.get(logical) ?? this._meta.columnMap.get(logical) ?? logical
       physicalFields.push(physical)
       physicalToLogical.set(physical, logical)
     }
@@ -783,7 +783,7 @@ export class AtscriptDbTable<
     items: Array<Record<string, unknown>>,
     opts?: { excludeFkTargetTable?: string }
   ): Promise<void> {
-    this._flatten()
+    this._ensureBuilt()
 
     // Type validation: apply defaults, validate full payload
     const validator = this.getValidator('insert')
@@ -814,7 +814,7 @@ export class AtscriptDbTable<
     // Build all FK checks, then run in parallel
     const checks: Array<() => Promise<void>> = []
 
-    for (const [, fk] of this._foreignKeys) {
+    for (const [, fk] of this._meta.foreignKeys) {
       // Skip FKs that reference the excluded table (e.g. FROM child → parent during pre-validation)
       if (excludeTargetTable && fk.targetTable === excludeTargetTable) { continue }
 
@@ -896,7 +896,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'to') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -933,7 +933,7 @@ export class AtscriptDbTable<
   private async _preValidateNestedFrom(
     originals: Array<Record<string, unknown>>
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'from') { continue }
 
       if (!this._writeTableResolver) { continue }
@@ -982,7 +982,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'from') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1022,7 +1022,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'via' || !relation.viaType) { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1090,9 +1090,9 @@ export class AtscriptDbTable<
     payloads: Array<Record<string, unknown>>,
     maxDepth: number,
   ): void {
-    if (this._navFields.size === 0) { return }
+    if (this._meta.navFields.size === 0) { return }
     for (const payload of payloads) {
-      for (const navField of this._navFields) {
+      for (const navField of this._meta.navFields) {
         if (payload[navField] !== undefined) {
           throw new Error(
             `Nested data in '${navField}' exceeds maxDepth (${maxDepth}). ` +
@@ -1168,7 +1168,7 @@ export class AtscriptDbTable<
       if (error instanceof DbError && error.code === 'FK_VIOLATION' && error.errors.every(err => !err.path)) {
         const msg = error.errors[0]?.message ?? error.message
         const errors: Array<{ path: string; message: string }> = []
-        for (const [, fk] of this._foreignKeys) {
+        for (const [, fk] of this._meta.foreignKeys) {
           for (const field of fk.fields) {
             errors.push({ path: field, message: msg })
           }
@@ -1210,7 +1210,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'to') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1249,7 +1249,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'from') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1261,7 +1261,7 @@ export class AtscriptDbTable<
       for (const original of originals) {
         const children = original[navField]
         if (!Array.isArray(children)) { continue }
-        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
         if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
         const fkField = remoteFK.fields[0]
 
@@ -1322,7 +1322,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'via' || !relation.viaType) { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1344,7 +1344,7 @@ export class AtscriptDbTable<
         const targets = original[navField]
         if (!Array.isArray(targets)) { continue }
 
-        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
         if (parentPK === undefined) { continue }
 
         // a) Delete existing junction rows
@@ -1403,7 +1403,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'to') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1463,7 +1463,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'from') { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1477,7 +1477,7 @@ export class AtscriptDbTable<
         const navValue = original[navField]
         if (navValue === undefined || navValue === null) { continue }
 
-        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
         if (parentPK === undefined || remoteFK.fields.length !== 1) { continue }
         const fkField = remoteFK.fields[0]
 
@@ -1625,7 +1625,7 @@ export class AtscriptDbTable<
     maxDepth: number,
     depth: number
   ): Promise<void> {
-    for (const [navField, relation] of this._relations) {
+    for (const [navField, relation] of this._meta.relations) {
       if (relation.direction !== 'via' || !relation.viaType) { continue }
 
       const targetTable = this._writeTableResolver!(relation.targetType())
@@ -1647,7 +1647,7 @@ export class AtscriptDbTable<
         const navValue = original[navField]
         if (navValue === undefined || navValue === null) { continue }
 
-        const parentPK = this._primaryKeys.length === 1 ? original[this._primaryKeys[0]] : undefined
+        const parentPK = this._meta.primaryKeys.length === 1 ? original[this._meta.primaryKeys[0]] : undefined
         if (parentPK === undefined) { continue }
 
         const ops = this._extractNavPatchOps(navValue)
@@ -1882,7 +1882,7 @@ export class AtscriptDbTable<
         })
       }
       case 'bulkUpdate': {
-        const navFields = this._navFields
+        const navFields = this._meta.navFields
         return this.createValidator({
           plugins,
           // Top level: partial (all fields optional in a patch).
