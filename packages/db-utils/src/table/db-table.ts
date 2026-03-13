@@ -18,6 +18,7 @@ import type { TGenericLogger } from '../logger'
 import { resolveArrayOps, getArrayOpsFields } from '../patch/array-ops-resolver'
 import { decomposePatch } from '../patch/patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
+import { resolveRelationTargetTable } from './relation-loader'
 import { createDbValidatorPlugin, type DbValidationContext } from '../db-validator-plugin'
 import type { IntegrityStrategy } from '../strategies/integrity'
 import { NativeIntegrity } from '../strategies/integrity'
@@ -682,7 +683,7 @@ export class AtscriptDbTable<
       const junctionTable = this._writeTableResolver!(relation.viaType())
       if (!junctionTable) { continue }
 
-      const targetTableName = (relation.targetType()?.metadata?.get('db.table') as string) || relation.targetType()?.id || ''
+      const targetTableName = resolveRelationTargetTable(relation)
 
       const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
       if (!fkToThis) { continue }
@@ -982,7 +983,7 @@ export class AtscriptDbTable<
       const junctionTable = this._writeTableResolver!(relation.viaType())
       if (!junctionTable) { continue }
 
-      const targetTableName = (relation.targetType()?.metadata?.get('db.table') as string) || relation.targetType()?.id || ''
+      const targetTableName = resolveRelationTargetTable(relation)
 
       const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
       if (!fkToThis) { continue }
@@ -1285,7 +1286,7 @@ export class AtscriptDbTable<
       const junctionTable = this._writeTableResolver!(relation.viaType())
       if (!junctionTable) { continue }
 
-      const targetTableName = (relation.targetType()?.metadata?.get('db.table') as string) || relation.targetType()?.id || ''
+      const targetTableName = resolveRelationTargetTable(relation)
 
       const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
       if (!fkToThis) { continue }

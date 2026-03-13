@@ -252,7 +252,7 @@ export class ApplicationIntegrity extends IntegrityStrategy {
     let key = tableName
     for (const f of pkFields) {
       const v = record[f]
-      key += '\0' + (v == null ? '' : String(v))
+      key += `\0${v === null || v === undefined ? '' : String(v)}`
     }
     return key
   }

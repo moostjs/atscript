@@ -28,7 +28,6 @@ import {
   mysqlTypeFromField,
   qi,
   quoteTableName,
-  sqlStringLiteral,
   collationToMysql,
   refActionToSql,
 } from './sql-builder'

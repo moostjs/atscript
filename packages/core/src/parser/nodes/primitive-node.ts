@@ -73,6 +73,7 @@ export class SemanticPrimitiveNode extends SemanticNode {
     | 'void'
     | 'null'
     | 'phantom'
+    | 'decimal'
 
   get key() {
     return this.parentKey ? `${this.parentKey}.${this._id}` : this._id

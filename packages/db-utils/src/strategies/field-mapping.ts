@@ -1,4 +1,4 @@
-import type { FilterExpr, Uniquery, UniqueryControls } from '@uniqu/core'
+import type { FilterExpr, Uniquery } from '@uniqu/core'
 
 import type { BaseDbAdapter } from '../base-adapter'
 import { UniquSelect } from '../query/uniqu-select'

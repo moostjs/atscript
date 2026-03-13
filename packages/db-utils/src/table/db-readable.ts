@@ -31,6 +31,7 @@ import type {
 import { TableMetadata } from './table-metadata'
 import { type FieldMappingStrategy, DocumentFieldMapper } from '../strategies/field-mapping'
 import { RelationalFieldMapper } from '../strategies/relational-field-mapper'
+import { loadRelationsImpl, findFKForRelation, findRemoteFK } from './relation-loader'
 
 /**
  * Extracts nav prop names from a query's `$with` array.
@@ -127,97 +128,6 @@ function isIdCompatible(id: unknown, fieldType: TAtscriptAnnotatedType): boolean
     default: { // 'string' and unknown design types
       return typeof id === 'string'
     }
-  }
-}
-
-/** Minimal interface for a resolved related table. */
-interface TResolvedTable {
-  findMany(query: unknown): Promise<Array<Record<string, unknown>>>
-  primaryKeys: readonly string[]
-  relations: ReadonlyMap<string, TDbRelation>
-  foreignKeys: ReadonlyMap<string, TDbForeignKey>
-}
-
-/** Per-relation filter + controls bundle. */
-interface TRelationQuery {
-  filter: FilterExpr | undefined
-  controls: Record<string, unknown>
-}
-
-/**
- * If controls include an array-style $select, ensure the given join fields
- * are present so that FK matching works after the query returns.
- */
-function ensureSelectIncludesFields(
-  controls: Record<string, unknown> | undefined,
-  fields: string[]
-): Record<string, unknown> | undefined {
-  if (!controls) { return controls }
-  const sel = controls.$select
-  if (!Array.isArray(sel)) { return controls }
-  const augmented = [...sel]
-  for (const f of fields) {
-    if (!augmented.includes(f)) { augmented.push(f) }
-  }
-  return { ...controls, $select: augmented }
-}
-
-function compositeKey(fields: string[], obj: Record<string, unknown>): string {
-  let key = ''
-  for (let i = 0; i < fields.length; i++) {
-    if (i > 0) { key += '\0\0' }
-    const v = obj[fields[i]]
-    key += v == null ? '\0' : String(v)
-  }
-  return key
-}
-
-/** Collects unique non-null values for a field across rows. */
-function collectUniqueValues(rows: Array<Record<string, unknown>>, field: string): unknown[] {
-  const set = new Set<unknown>()
-  for (const row of rows) {
-    const v = row[field]
-    if (v !== null && v !== undefined) { set.add(v) }
-  }
-  return [...set]
-}
-
-interface TAssignOpts {
-  rows: Array<Record<string, unknown>>
-  related: Array<Record<string, unknown>>
-  localField: string
-  remoteField: string
-  relName: string
-}
-
-/** Assigns related items grouped by FK value (one-to-many). */
-function assignGrouped(opts: TAssignOpts): void {
-  const { rows, related, localField, remoteField, relName } = opts
-  const groups = new Map<unknown, Array<Record<string, unknown>>>()
-  for (const item of related) {
-    const key = item[remoteField]
-    let group = groups.get(key)
-    if (!group) {
-      group = []
-      groups.set(key, group)
-    }
-    group.push(item)
-  }
-  for (const row of rows) {
-    row[relName] = groups.get(row[localField]) ?? []
-  }
-}
-
-/** Assigns related items by FK value (many-to-one / one-to-one). */
-function assignSingle(opts: TAssignOpts): void {
-  const { rows, related, localField, remoteField, relName } = opts
-  const index = new Map<unknown, Record<string, unknown>>()
-  for (const item of related) {
-    const key = item[remoteField]
-    if (!index.has(key)) { index.set(key, item) }
-  }
-  for (const row of rows) {
-    row[relName] = index.get(row[localField]) ?? null
   }
 }
 
@@ -460,7 +370,7 @@ export class AtscriptDbReadable<
     if (!result) { return null }
     const row = this._fieldMapper.reconstructFromRead(result, this._meta)
     if (withRelations?.length) {
-      await this._loadRelations([row], withRelations)
+      await this.loadRelations([row], withRelations)
     }
     return row as DbResponse<DataType, NavType, Q>
   }
@@ -479,7 +389,7 @@ export class AtscriptDbReadable<
     const results = await this.adapter.findMany(translatedQuery)
     const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return rows as Array<DbResponse<DataType, NavType, Q>>
   }
@@ -505,7 +415,7 @@ export class AtscriptDbReadable<
     const result = await this.adapter.findManyWithCount(translated)
     const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return {
       data: rows as Array<DbResponse<DataType, NavType, Q>>,
@@ -539,7 +449,7 @@ export class AtscriptDbReadable<
     const results = await this.adapter.search(text, translated, indexName)
     const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return rows as Array<DbResponse<DataType, NavType, Q>>
   }
@@ -558,7 +468,7 @@ export class AtscriptDbReadable<
     const result = await this.adapter.searchWithCount(text, translated, indexName)
     const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return {
       data: rows as Array<DbResponse<DataType, NavType, Q>>,
@@ -592,7 +502,7 @@ export class AtscriptDbReadable<
     const results = await this.adapter.vectorSearch(vector, translated, indexName)
     const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return rows as Array<DbResponse<DataType, NavType, Q>>
   }
@@ -616,7 +526,7 @@ export class AtscriptDbReadable<
     const result = await this.adapter.vectorSearchWithCount(vector, translated, indexName)
     const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
-      await this._loadRelations(rows, withRelations)
+      await this.loadRelations(rows, withRelations)
     }
     return {
       data: rows as Array<DbResponse<DataType, NavType, Q>>,
@@ -762,7 +672,7 @@ export class AtscriptDbReadable<
     }
   }
 
-  // ── Internal: relation loading ($with) ────────────────────────────────────
+  // ── Relation loading ($with) ─────────────────────────────────────────────
 
   /**
    * Public entry point for relation loading. Used by adapters for nested $with delegation.
@@ -771,449 +681,33 @@ export class AtscriptDbReadable<
     rows: Array<Record<string, unknown>>,
     withRelations: WithRelation[]
   ): Promise<void> {
-    return this._loadRelations(rows, withRelations)
-  }
-
-  /**
-   * Loads related data for `$with` relations and attaches them to the result rows.
-   */
-  protected async _loadRelations(
-    rows: Array<Record<string, unknown>>,
-    withRelations: WithRelation[]
-  ): Promise<void> {
-    if (rows.length === 0 || withRelations.length === 0) { return }
-
-    if (this.adapter.supportsNativeRelations()) {
-      return this.adapter.loadRelations(rows, withRelations, this._meta.relations, this._meta.foreignKeys, this._tableResolver)
-    }
-
-    if (!this._tableResolver) { return }
-
-    const tasks: Array<Promise<void>> = []
-
-    for (const withRel of withRelations) {
-      const relName = withRel.name
-      if (relName.includes('.')) { continue }
-
-      const relation = this._meta.relations.get(relName)
-      if (!relation) {
-        throw new Error(`Unknown relation "${relName}" in $with. Available relations: ${[...this._meta.relations.keys()].join(', ') || '(none)'}`)
-      }
-
-      const targetType = relation.targetType()
-      if (!targetType) { continue }
-
-      const targetTable = this._tableResolver(targetType)
-      if (!targetTable) {
-        this.logger.warn(`Could not resolve table for relation "${relName}" — skipping`)
-        continue
-      }
-
-      const filter = withRel.filter && Object.keys(withRel.filter).length > 0
-        ? withRel.filter : undefined
-
-      // @uniqu/url parseWithSegment places $sort/$limit/$skip/$select as flat
-      // keys on the relation object rather than nesting under .controls.
-      // Merge both shapes so relation loading works either way.
-      const flatRel = withRel as Record<string, unknown>
-      const nested = (withRel.controls || {}) as Record<string, unknown>
-      const controls: Record<string, unknown> = { ...nested }
-      if (flatRel.$sort && !controls.$sort) { controls.$sort = flatRel.$sort }
-      if (flatRel.$limit !== null && flatRel.$limit !== undefined && (controls.$limit === null || controls.$limit === undefined)) { controls.$limit = flatRel.$limit }
-      if (flatRel.$skip !== null && flatRel.$skip !== undefined && (controls.$skip === null || controls.$skip === undefined)) { controls.$skip = flatRel.$skip }
-      if (flatRel.$select && !controls.$select) { controls.$select = flatRel.$select }
-      if (flatRel.$with && !controls.$with) { controls.$with = flatRel.$with }
-      const relQuery: TRelationQuery = { filter, controls }
-
-      if (relation.direction === 'to') {
-        tasks.push(this._loadToRelation(rows, { relName, relation, targetTable, relQuery }))
-      } else if (relation.direction === 'via') {
-        tasks.push(this._loadViaRelation(rows, { relName, relation, targetTable, relQuery }))
-      } else {
-        tasks.push(this._loadFromRelation(rows, { relName, relation, targetTable, relQuery }))
-      }
-    }
-
-    await Promise.all(tasks)
-  }
-
-  /**
-   * Loads a `@db.rel.to` relation (FK is on this table).
-   */
-  private async _loadToRelation(
-    rows: Array<Record<string, unknown>>,
-    opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery }
-  ): Promise<void> {
-    const { relName, relation, targetTable, relQuery } = opts
-    const fkEntry = this._findFKForRelation(relation)
-    if (!fkEntry) { return }
-
-    const { localFields, targetFields } = fkEntry
-
-    if (localFields.length === 1) {
-      const localField = localFields[0]
-      const targetField = targetFields[0]
-
-      const fkValues = collectUniqueValues(rows, localField)
-      if (fkValues.length === 0) {
-        for (const row of rows) { row[relName] = null }
-        return
-      }
-
-      const inFilter = { [targetField]: { $in: fkValues } }
-      const targetFilter = relQuery.filter
-        ? { $and: [inFilter, relQuery.filter] }
-        : inFilter
-
-      const controls = ensureSelectIncludesFields(relQuery.controls, targetFields)
-      const related = await targetTable.findMany({ filter: targetFilter, controls })
-
-      assignSingle({ rows, related, localField, remoteField: targetField, relName })
-    } else {
-      const related = await this._queryCompositeFK(rows, { localFields, targetFields, targetTable, relQuery })
-
-      const index = new Map<string, Record<string, unknown>>()
-      for (const item of related) {
-        index.set(compositeKey(targetFields, item), item)
-      }
-
-      for (const row of rows) {
-        row[relName] = index.get(compositeKey(localFields, row)) ?? null
-      }
-    }
-  }
-
-  /**
-   * Loads a `@db.rel.from` relation (FK is on the target table).
-   */
-  private async _loadFromRelation(
-    rows: Array<Record<string, unknown>>,
-    opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery }
-  ): Promise<void> {
-    const { relName, relation, targetTable, relQuery } = opts
-    const remoteFK = this._findRemoteFK(targetTable, this.tableName, relation.alias)
-    if (!remoteFK) {
-      this.logger.warn(`Could not find FK on target table for relation "${relName}"`)
-      return
-    }
-
-    const localFields = remoteFK.targetFields
-    const remoteFields = remoteFK.fields
-
-    if (localFields.length === 1) {
-      const localField = localFields[0]
-      const remoteField = remoteFields[0]
-
-      const pkValues = collectUniqueValues(rows, localField)
-      if (pkValues.length === 0) { return }
-
-      const inFilter = { [remoteField]: { $in: pkValues } }
-      const targetFilter = relQuery.filter
-        ? { $and: [inFilter, relQuery.filter] }
-        : inFilter
-
-      const controls = ensureSelectIncludesFields(relQuery.controls, remoteFields)
-      const related = await targetTable.findMany({ filter: targetFilter, controls })
-
-      if (relation.isArray) {
-        assignGrouped({ rows, related, localField, remoteField, relName })
-      } else {
-        assignSingle({ rows, related, localField, remoteField, relName })
-      }
-    } else {
-      const related = await this._queryCompositeFK(rows, { localFields, targetFields: remoteFields, targetTable, relQuery })
-
-      if (relation.isArray) {
-        const groups = new Map<string, Array<Record<string, unknown>>>()
-        for (const item of related) {
-          const key = compositeKey(remoteFields, item)
-          let group = groups.get(key)
-          if (!group) {
-            group = []
-            groups.set(key, group)
-          }
-          group.push(item)
-        }
-        for (const row of rows) {
-          row[relName] = groups.get(compositeKey(localFields, row)) ?? []
-        }
-      } else {
-        const index = new Map<string, Record<string, unknown>>()
-        for (const item of related) {
-          const key = compositeKey(remoteFields, item)
-          if (!index.has(key)) { index.set(key, item) }
-        }
-        for (const row of rows) {
-          row[relName] = index.get(compositeKey(localFields, row)) ?? null
-        }
-      }
-    }
-  }
-
-  /**
-   * Loads a `@db.rel.via` relation (M:N through a junction table).
-   *
-   * Steps:
-   * 1. Resolve junction table from `relation.viaType`
-   * 2. Find FK on junction → this table (gives local PK ↔ junction FK)
-   * 3. Find FK on junction → target table (gives junction FK ↔ target PK)
-   * 4. Query junction rows matching this table's PKs
-   * 5. Query target rows matching junction's target FKs
-   * 6. Group targets by source row
-   */
-  private async _loadViaRelation(
-    rows: Array<Record<string, unknown>>,
-    opts: { relName: string; relation: TDbRelation; targetTable: TResolvedTable; relQuery: TRelationQuery }
-  ): Promise<void> {
-    const { relName, relation, targetTable, relQuery } = opts
-
-    if (!relation.viaType || !this._tableResolver) { return }
-
-    const junctionType = relation.viaType()
-    if (!junctionType) { return }
-
-    const junctionTable = this._tableResolver(junctionType)
-    if (!junctionTable) {
-      this.logger.warn(`Could not resolve junction table for via relation "${relName}"`)
-      return
-    }
-
-    // Find FK on junction that points to THIS table
-    const fkToThis = this._findRemoteFK(junctionTable, this.tableName)
-    if (!fkToThis) {
-      this.logger.warn(`Could not find FK on junction table pointing to "${this.tableName}" for via relation "${relName}"`)
-      return
-    }
-
-    // Find FK on junction that points to TARGET table
-    const targetTableName = this._resolveRelationTargetTable(relation)
-    const fkToTarget = this._findRemoteFK(junctionTable, targetTableName)
-    if (!fkToTarget) {
-      this.logger.warn(`Could not find FK on junction table pointing to target "${targetTableName}" for via relation "${relName}"`)
-      return
-    }
-
-    // Local PK fields (on this table) and corresponding junction FK fields
-    const localPKFields = fkToThis.targetFields   // e.g. ['id'] on tasks
-    const junctionLocalFields = fkToThis.fields    // e.g. ['taskId'] on task_tags
-
-    // Target PK fields and corresponding junction FK fields
-    const targetPKFields = fkToTarget.targetFields // e.g. ['id'] on tags
-    const junctionTargetFields = fkToTarget.fields // e.g. ['tagId'] on task_tags
-
-    // Step 1: Collect unique local PK values from rows
-    if (localPKFields.length === 1) {
-      const localField = localPKFields[0]
-      const junctionLocalField = junctionLocalFields[0]
-      const junctionTargetField = junctionTargetFields[0]
-      const targetPKField = targetPKFields[0]
-
-      const pkValues = collectUniqueValues(rows, localField)
-      if (pkValues.length === 0) {
-        for (const row of rows) { row[relName] = [] }
-        return
-      }
-
-      // Step 2: Query junction table
-      const junctionFilter = { [junctionLocalField]: { $in: pkValues } }
-      const junctionRows = await junctionTable.findMany({
-        filter: junctionFilter,
-        controls: { $select: [junctionLocalField, junctionTargetField] },
-      })
-
-      if (junctionRows.length === 0) {
-        for (const row of rows) { row[relName] = relation.isArray ? [] : null }
-        return
-      }
-
-      // Step 3: Collect unique target FK values from junction
-      const targetFKValues = collectUniqueValues(junctionRows, junctionTargetField)
-
-      // Step 4: Query target table
-      const inFilter = { [targetPKField]: { $in: targetFKValues } }
-      const targetFilter = relQuery.filter
-        ? { $and: [inFilter, relQuery.filter] }
-        : inFilter
-      const controls = ensureSelectIncludesFields(relQuery.controls, targetPKFields)
-      const targetRows = await targetTable.findMany({ filter: targetFilter, controls })
-
-      // Step 5: Index target rows by PK
-      const targetIndex = new Map<string, Record<string, unknown>>()
-      for (const item of targetRows) {
-        targetIndex.set(String(item[targetPKField]), item)
-      }
-
-      // Step 6: Group junction rows by local FK, resolve to target records
-      const groups = new Map<string, Array<Record<string, unknown>>>()
-      for (const jRow of junctionRows) {
-        const localKey = String(jRow[junctionLocalField])
-        const targetKey = String(jRow[junctionTargetField])
-        const target = targetIndex.get(targetKey)
-        if (!target) { continue }
-
-        let group = groups.get(localKey)
-        if (!group) {
-          group = []
-          groups.set(localKey, group)
-        }
-        group.push(target)
-      }
-
-      // Step 7: Assign to rows
-      for (const row of rows) {
-        const key = String(row[localField])
-        row[relName] = relation.isArray ? (groups.get(key) ?? []) : (groups.get(key)?.[0] ?? null)
-      }
-    } else {
-      // Composite PK via relation — less common but handle gracefully
-      const pkValues = new Set<string>()
-      for (const row of rows) {
-        pkValues.add(compositeKey(localPKFields, row))
-      }
-
-      // Build OR filter for junction
-      const orFilters: Array<Record<string, unknown>> = []
-      for (const row of rows) {
-        const condition: Record<string, unknown> = {}
-        let valid = true
-        for (let i = 0; i < localPKFields.length; i++) {
-          const val = row[localPKFields[i]]
-          if (val === null || val === undefined) { valid = false; break }
-          condition[junctionLocalFields[i]] = val
-        }
-        if (valid) { orFilters.push(condition) }
-      }
-
-      if (orFilters.length === 0) {
-        for (const row of rows) { row[relName] = relation.isArray ? [] : null }
-        return
-      }
-
-      const junctionFilter = orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
-      const junctionRows = await junctionTable.findMany({
-        filter: junctionFilter,
-        controls: { $select: [...junctionLocalFields, ...junctionTargetFields] },
-      })
-
-      if (junctionRows.length === 0) {
-        for (const row of rows) { row[relName] = relation.isArray ? [] : null }
-        return
-      }
-
-      // Query targets
-      const targetOrFilters: Array<Record<string, unknown>> = []
-      const seenTargets = new Set<string>()
-      for (const jRow of junctionRows) {
-        const key = compositeKey(junctionTargetFields, jRow)
-        if (seenTargets.has(key)) { continue }
-        seenTargets.add(key)
-        const condition: Record<string, unknown> = {}
-        for (let i = 0; i < junctionTargetFields.length; i++) {
-          condition[targetPKFields[i]] = jRow[junctionTargetFields[i]]
-        }
-        targetOrFilters.push(condition)
-      }
-
-      const targetFilter = targetOrFilters.length === 1 ? targetOrFilters[0] : { $or: targetOrFilters }
-      const finalFilter = relQuery.filter ? { $and: [targetFilter, relQuery.filter] } : targetFilter
-      const targetRows = await targetTable.findMany({ filter: finalFilter, controls: relQuery.controls })
-
-      // Index targets
-      const targetIndex = new Map<string, Record<string, unknown>>()
-      for (const item of targetRows) {
-        targetIndex.set(compositeKey(targetPKFields, item), item)
-      }
-
-      // Group and assign
-      const groups = new Map<string, Array<Record<string, unknown>>>()
-      for (const jRow of junctionRows) {
-        const localKey = compositeKey(junctionLocalFields, jRow)
-        const targetKey = compositeKey(junctionTargetFields, jRow)
-        const target = targetIndex.get(targetKey)
-        if (!target) { continue }
-
-        let group = groups.get(localKey)
-        if (!group) {
-          group = []
-          groups.set(localKey, group)
-        }
-        group.push(target)
-      }
-
-      for (const row of rows) {
-        const key = compositeKey(localPKFields, row)
-        row[relName] = relation.isArray ? (groups.get(key) ?? []) : (groups.get(key)?.[0] ?? null)
-      }
-    }
+    return loadRelationsImpl(rows, withRelations, {
+      tableName: this.tableName,
+      relations: this._meta.relations,
+      foreignKeys: this._meta.foreignKeys,
+      tableResolver: this._tableResolver,
+      adapter: this.adapter,
+      logger: this.logger,
+    })
   }
 
   /**
    * Finds the FK entry that connects a `@db.rel.to` relation to its target.
+   * Thin wrapper — delegates to relation-loader for shared use with db-table.ts write path.
    */
   protected _findFKForRelation(relation: TDbRelation): { localFields: string[]; targetFields: string[] } | undefined {
-    for (const fk of this._meta.foreignKeys.values()) {
-      if (relation.alias) {
-        if (fk.alias === relation.alias) {
-          return { localFields: fk.fields, targetFields: fk.targetFields }
-        }
-      } else if (fk.targetTable === this._resolveRelationTargetTable(relation)) {
-        return { localFields: fk.fields, targetFields: fk.targetFields }
-      }
-    }
-    return undefined
-  }
-
-  private _resolveRelationTargetTable(relation: TDbRelation): string {
-    const targetType = relation.targetType()
-    return (targetType?.metadata?.get('db.table') as string) || targetType?.id || ''
+    return findFKForRelation(relation, this._meta.foreignKeys)
   }
 
   /**
    * Finds a FK on a remote table that points back to this table.
+   * Thin wrapper — delegates to relation-loader for shared use with db-table.ts write path.
    */
   protected _findRemoteFK(
     targetTable: { foreignKeys: ReadonlyMap<string, TDbForeignKey> },
     thisTableName: string,
     alias?: string
   ): TDbForeignKey | undefined {
-    for (const fk of targetTable.foreignKeys.values()) {
-      if (alias && fk.alias === alias && fk.targetTable === thisTableName) { return fk }
-      if (!alias && fk.targetTable === thisTableName) { return fk }
-    }
-    return undefined
-  }
-
-  /**
-   * Batch query for composite FK.
-   */
-  private _queryCompositeFK(
-    rows: Array<Record<string, unknown>>,
-    opts: { localFields: string[]; targetFields: string[]; targetTable: TResolvedTable; relQuery: TRelationQuery }
-  ): Promise<Array<Record<string, unknown>>> {
-    const { localFields, targetFields, targetTable, relQuery } = opts
-    const seen = new Set<string>()
-    const orFilters: Array<Record<string, unknown>> = []
-
-    for (const row of rows) {
-      const key = compositeKey(localFields, row)
-      if (seen.has(key)) { continue }
-      seen.add(key)
-
-      const condition: Record<string, unknown> = {}
-      let valid = true
-      for (let i = 0; i < localFields.length; i++) {
-        const val = row[localFields[i]]
-        if (val === null || val === undefined) { valid = false; break }
-        condition[targetFields[i]] = val
-      }
-      if (valid) { orFilters.push(condition) }
-    }
-
-    if (orFilters.length === 0) { return Promise.resolve([]) }
-
-    const baseFilter = orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
-    const targetFilter = relQuery.filter ? { $and: [baseFilter, relQuery.filter] } : baseFilter
-
-    return targetTable.findMany({ filter: targetFilter, controls: relQuery.controls })
+    return findRemoteFK(targetTable, thisTableName, alias)
   }
 }
