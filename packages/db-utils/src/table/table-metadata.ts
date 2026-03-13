@@ -89,6 +89,13 @@ export class TableMetadata {
   requiresMappings = false
   valueFormatters?: Map<string, (value: unknown) => unknown>
 
+  // ── Unified leaf field indexes — derived from fieldDescriptors ──────────
+
+  /** Leaf field descriptors indexed by physical column name (read path). */
+  leafByPhysical = new Map<string, TDbFieldMeta>()
+  /** Leaf field descriptors indexed by logical path (write/patch/filter paths). */
+  leafByLogical = new Map<string, TDbFieldMeta>()
+
   // ── Build state ──────────────────────────────────────────────────────────
 
   private _built = false
@@ -154,11 +161,17 @@ export class TableMetadata {
     // _buildFieldDescriptors() already handles skipFlattening internally.
     this._buildFieldDescriptors(adapter)
 
+    // Build leaf field indexes for unified read/write classification
+    if (!this.nestedObjects) {
+      this._buildLeafIndexes()
+    }
+
     this._finalizeIndexes()
 
     // Release intermediate build-time maps
     this._collateMap.clear()
     this._columnFromMap.clear()
+    this.jsonFields.clear()
 
     // Mark built BEFORE adapter.onAfterFlatten() — the adapter hook may access
     // metadata via public getters (e.g. MongoAdapter reads this._table.flatMap),
@@ -520,6 +533,20 @@ export class TableMetadata {
   private _flattenedPrefix(path: string): string {
     const lastDot = path.lastIndexOf('.')
     return lastDot >= 0 ? `${path.slice(0, lastDot).replace(/\./g, '__')}__` : ''
+  }
+
+  // ── Private: leaf field indexes ──────────────────────────────────────────
+
+  /**
+   * Indexes `fieldDescriptors` into two lookup maps for unified
+   * read/write field classification in the RelationalFieldMapper.
+   */
+  private _buildLeafIndexes(): void {
+    for (const fd of this.fieldDescriptors) {
+      if (fd.ignored) { continue }
+      this.leafByPhysical.set(fd.physicalName, fd)
+      this.leafByLogical.set(fd.path, fd)
+    }
   }
 
   // ── Private: field descriptor building ───────────────────────────────────

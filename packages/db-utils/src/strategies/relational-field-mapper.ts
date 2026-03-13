@@ -25,27 +25,24 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
 
     const result: Record<string, unknown> = {}
 
-    const rowKeys = Object.keys(row)
-    for (const physical of rowKeys) {
-      const value = meta.booleanFields.has(physical)
-        ? toBool(row[physical])
-        : meta.decimalFields.has(physical)
-          ? toDecimalString(row[physical])
-          : row[physical]
-      const logicalPath = meta.physicalToPath.get(physical)
-
-      if (!logicalPath) {
-        result[physical] = value
+    for (const physical of Object.keys(row)) {
+      const fd = meta.leafByPhysical.get(physical)
+      if (!fd) {
+        result[physical] = row[physical]
         continue
       }
 
-      if (meta.jsonFields.has(logicalPath)) {
-        const parsed = typeof value === 'string' ? JSON.parse(value) : value
-        this.setNestedValue(result, logicalPath, parsed)
-      } else if (logicalPath.includes('.')) {
-        this.setNestedValue(result, logicalPath, value)
+      const raw = row[physical]
+      const value = fd.designType === 'boolean' ? toBool(raw)
+        : fd.designType === 'decimal' ? toDecimalString(raw)
+        : raw
+
+      if (fd.storage === 'json') {
+        this.setNestedValue(result, fd.path, typeof value === 'string' ? JSON.parse(value) : value)
+      } else if (fd.storage === 'flattened') {
+        this.setNestedValue(result, fd.path, value)
       } else {
-        result[logicalPath] = value
+        result[fd.path] = value
       }
     }
 
@@ -98,7 +95,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
       } else if (key.startsWith('$')) {
         result[key] = value
       } else {
-        const physical = meta.pathToPhysical.get(key) ?? key
+        const physical = meta.leafByLogical.get(key)?.physicalName ?? key
         result[physical] = this.formatFilterValue(physical, value, meta)
       }
     }
@@ -147,10 +144,10 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
       const basePath = operatorMatch ? operatorMatch[1] : key
       const suffix = operatorMatch ? operatorMatch[2] : ''
 
-      const physical = meta.pathToPhysical.get(basePath) ?? basePath
-      const finalKey = physical + suffix
+      const fd = meta.leafByLogical.get(basePath)
+      const finalKey = (fd?.physicalName ?? basePath) + suffix
 
-      if (meta.jsonFields.has(basePath) && typeof value === 'object' && value !== null && !suffix) {
+      if (fd?.storage === 'json' && typeof value === 'object' && value !== null && !suffix) {
         result[finalKey] = JSON.stringify(value)
       } else {
         result[finalKey] = value
@@ -176,7 +173,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
       const sortKeys = Object.keys(sortObj)
       for (const key of sortKeys) {
         if (meta.flattenedParents.has(key)) { continue }
-        const physical = meta.pathToPhysical.get(key) ?? key
+        const physical = meta.leafByLogical.get(key)?.physicalName ?? key
         translated[physical] = sortObj[key]
       }
       result.$sort = translated as UniqueryControls['$sort']
@@ -191,7 +188,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
           if (expansion) {
             expanded.push(...expansion)
           } else {
-            expanded.push((meta.pathToPhysical.get(key as string) ?? key) as string)
+            expanded.push((meta.leafByLogical.get(key as string)?.physicalName ?? key) as string)
           }
         }
         translatedRaw = expanded
@@ -207,7 +204,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
               translated[leaf] = val
             }
           } else {
-            const physical = meta.pathToPhysical.get(key) ?? key
+            const physical = meta.leafByLogical.get(key)?.physicalName ?? key
             translated[physical] = val
           }
         }
@@ -255,14 +252,16 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
           this.writeFlattenedField(`${path}.${key}`, obj[key], result, meta)
         }
       }
-    } else if (meta.jsonFields.has(path)) {
-      const physical = meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
-      result[physical] = (value !== undefined && value !== null)
-        ? JSON.stringify(value)
-        : value
     } else {
-      const physical = meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
-      result[physical] = value
+      const fd = meta.leafByLogical.get(path)
+      const physical = fd?.physicalName ?? path.replace(/\./g, '__')
+      if (fd?.storage === 'json') {
+        result[physical] = (value !== undefined && value !== null)
+          ? JSON.stringify(value)
+          : value
+      } else {
+        result[physical] = value
+      }
     }
   }
 
@@ -275,9 +274,9 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
     meta: TableMetadata
   ): void {
     const prefix = `${parentPath}.`
-    for (const [path, physical] of meta.pathToPhysical.entries()) {
+    for (const [path, fd] of meta.leafByLogical.entries()) {
       if (path.startsWith(prefix)) {
-        result[physical] = null
+        result[fd.physicalName] = null
       }
     }
   }
