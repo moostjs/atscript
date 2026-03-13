@@ -196,7 +196,7 @@ export class ApplicationIntegrity extends IntegrityStrategy {
     if (records.length === 0) { return }
 
     try {
-    await cascadeStorage.run({ visited, depth }, async () => {
+      await cascadeStorage.run({ visited, depth }, async () => {
       // Pass 1: RESTRICT pre-check — block the delete before any side effects
       // All restrict checks are read-only counts, safe to run in parallel.
       const restrictChecks: Array<Promise<void>> = []
@@ -236,7 +236,7 @@ export class ApplicationIntegrity extends IntegrityStrategy {
           }
         }
       }
-    })
+      })
     } finally {
       for (const key of addedKeys) { visited.delete(key) }
     }
