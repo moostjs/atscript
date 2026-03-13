@@ -181,7 +181,8 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           schema.const = d.type.value
         }
         if (d.type.designType && d.type.designType !== 'any') {
-          schema.type = d.type.designType === 'undefined' ? 'null' : d.type.designType
+          const dt = d.type.designType
+          schema.type = dt === 'undefined' ? 'null' : dt === 'decimal' ? 'string' : dt
           if (schema.type === 'number' && meta.get('expect.int')) {
             schema.type = 'integer'
           }

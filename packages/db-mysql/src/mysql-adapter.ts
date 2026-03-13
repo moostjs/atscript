@@ -10,6 +10,7 @@ import type {
   TColumnDiff,
   TSyncColumnResult,
   TDbFieldMeta,
+  TDbDefaultFn,
 } from '@atscript/db-utils'
 import type { DbQuery, FilterExpr } from '@atscript/db-utils'
 
@@ -32,6 +33,12 @@ import {
 } from './sql-builder'
 import type { TMysqlConnection, TMysqlDriver } from './types'
 
+/** Formats epoch ms as 'YYYY-MM-DD HH:MM:SS' in UTC for MySQL TIMESTAMP columns. */
+function epochMsToUtcDatetime(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`
+}
+
 /**
  * MySQL adapter for {@link AtscriptDbTable}.
  *
@@ -50,6 +57,12 @@ import type { TMysqlConnection, TMysqlDriver } from './types'
  */
 export class MysqlAdapter extends BaseDbAdapter {
   override supportsColumnModify = true
+
+  // 'uuid' is intentionally excluded: MySQL's DEFAULT (UUID()) generates the value
+  // server-side, but the insertId in the result header is always 0 for non-AUTO_INCREMENT
+  // columns, making it impossible to retrieve the generated UUID without a separate SELECT.
+  // Client-side generation via crypto.randomUUID() avoids this round-trip.
+  private static readonly NATIVE_DEFAULT_FNS: ReadonlySet<TDbDefaultFn> = new Set(['now', 'increment'])
 
   // ── MySQL-specific state from annotations ────────────────────────────────
   private _engine = 'InnoDB'
@@ -117,6 +130,12 @@ export class MysqlAdapter extends BaseDbAdapter {
     return id
   }
 
+  override supportsNativeValueDefaults(): boolean { return true }
+
+  override nativeDefaultFns(): ReadonlySet<TDbDefaultFn> {
+    return MysqlAdapter.NATIVE_DEFAULT_FNS
+  }
+
   // ── Annotation hooks ──────────────────────────────────────────────────────
 
   override onBeforeFlatten(type: TAtscriptAnnotatedType): void {
@@ -147,6 +166,18 @@ export class MysqlAdapter extends BaseDbAdapter {
     if (onUpdate) {
       this._onUpdateFields.set(field, onUpdate)
     }
+  }
+
+  /**
+   * Returns a value formatter for TIMESTAMP-mapped fields.
+   * Number fields with @db.default.now map to MySQL TIMESTAMP — the formatter
+   * converts epoch ms to a UTC datetime string for the wire protocol.
+   */
+  override formatValue(field: TDbFieldMeta): ((value: unknown) => unknown) | undefined {
+    if (field.designType === 'number' && field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+      return (value: unknown) => typeof value === 'number' ? epochMsToUtcDatetime(value) : value
+    }
+    return undefined
   }
 
   // ── Error mapping ─────────────────────────────────────────────────────────

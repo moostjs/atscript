@@ -65,9 +65,10 @@ function validateFieldBaseType(
   if (!unwound || !isPrimitive(unwound.def)) {
     return errors
   }
-  const baseType = unwound.def.config.type as string
+  const ct = unwound.def.config.type
+  const baseType = typeof ct === 'object' ? (ct.kind === 'final' ? ct.value : ct.kind) : ct
   const allowed = Array.isArray(expectedType) ? expectedType : [expectedType]
-  if (!allowed.includes(baseType)) {
+  if (!allowed.includes(baseType as string)) {
     errors.push({
       message: `${annotationName} is not compatible with type "${baseType}" — requires ${allowed.join(' or ')}`,
       severity: 1,
@@ -475,11 +476,11 @@ export const dbAnnotations: TAnnotationsTree = {
         'Sets decimal precision and scale for database storage. ' +
         'Adapters map this to their native decimal type (e.g., `DECIMAL(10,2)` in SQL, ignored in MongoDB).' +
         '\n\n' +
-        'This is purely a DB storage hint — it does not affect runtime JavaScript number behavior.' +
+        'For `decimal` fields the runtime value is a string; for `number` fields this is a DB storage hint only.' +
         '\n\n**Example:**\n' +
         '```atscript\n' +
         '@db.column.precision 10, 2\n' +
-        'price: number\n' +
+        'price: decimal\n' +
         '```\n',
       nodeType: ['prop'],
       argument: [
@@ -495,7 +496,7 @@ export const dbAnnotations: TAnnotationsTree = {
         },
       ],
       validate(token, args, doc) {
-        return validateFieldBaseType(token, doc, '@db.column.precision', 'number')
+        return validateFieldBaseType(token, doc, '@db.column.precision', ['number', 'decimal'])
       },
     }),
   },

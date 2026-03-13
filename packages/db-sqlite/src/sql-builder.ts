@@ -141,7 +141,8 @@ export function buildCreateView(
 export function sqliteTypeFromDesignType(designType: string): string {
   switch (designType) {
     case 'number':
-    case 'integer': {
+    case 'integer':
+    case 'decimal': {
       return 'REAL'
     }
     case 'boolean': {

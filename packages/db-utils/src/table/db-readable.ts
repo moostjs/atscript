@@ -142,6 +142,13 @@ function toBool(value: unknown): unknown {
   return !!value
 }
 
+function toDecimalString(value: unknown): unknown {
+  if (value === null || value === undefined) { return value }
+  if (typeof value === 'string') { return value }
+  if (typeof value === 'number') { return String(value) }
+  return value
+}
+
 /** Minimal interface for a resolved related table. */
 interface TResolvedTable {
   findMany(query: unknown): Promise<Array<Record<string, unknown>>>
@@ -268,6 +275,8 @@ export class AtscriptDbReadable<
 
   protected _flatMap?: Map<string, TAtscriptAnnotatedType>
   protected _fieldDescriptors?: TDbFieldMeta[]
+  /** Pre-built value formatters keyed by physical column name (from adapter.formatValue). */
+  protected _valueFormatters?: Map<string, (value: unknown) => unknown>
   protected _indexes = new Map<string, TDbIndex>()
   protected _primaryKeys: string[] = []
   /** Original @meta.id field names as declared by the user (before adapter manipulation). */
@@ -297,6 +306,8 @@ export class AtscriptDbReadable<
   protected _selectExpansion = new Map<string, string[]>()
   /** Physical column names of boolean fields (for storage coercion on read). */
   protected _booleanFields = new Set<string>()
+  /** Physical column names of decimal fields (for read-side coercion to string). */
+  protected _decimalFields = new Set<string>()
   /** Fast-path flag: skip all mapping when no nested/json fields exist. */
   protected _requiresMappings = false
   /** All non-ignored physical field names (for UniquSelect exclusion inversion). */
@@ -502,80 +513,98 @@ export class AtscriptDbReadable<
    */
   public get fieldDescriptors(): readonly TDbFieldMeta[] {
     this._flatten()
-    if (!this._fieldDescriptors) {
-      this._fieldDescriptors = []
-      const skipFlattening = this._nestedObjects
+    return this._fieldDescriptors!
+  }
 
-      // Collect all field names that participate in any index
-      const indexedFields = new Set<string>()
-      for (const index of this._indexes.values()) {
-        for (const f of index.fields) {
-          indexedFields.add(f.name)
-        }
+  /**
+   * Builds field descriptors, physical-name lookup, and value formatters.
+   * Called once at the end of `_flatten()` — everything it needs
+   * (_flatMap, _indexes, _columnMap, etc.) is already populated.
+   */
+  private _buildFieldDescriptors(): void {
+    this._fieldDescriptors = []
+    const skipFlattening = this._nestedObjects
+
+    // Collect all field names that participate in any index
+    const indexedFields = new Set<string>()
+    for (const index of this._indexes.values()) {
+      for (const f of index.fields) {
+        indexedFields.add(f.name)
       }
-
-      for (const [path, type] of this._flatMap!.entries()) {
-        if (!path) { continue }
-
-        if (!skipFlattening && this._flattenedParents.has(path)) {
-          continue
-        }
-
-        if (!skipFlattening && this._findAncestorInSet(path, this._jsonFields) !== undefined) {
-          continue
-        }
-
-        const isJson = this._jsonFields.has(path)
-        const isFlattened = !skipFlattening && this._findAncestorInSet(path, this._flattenedParents) !== undefined
-        const designType = isJson ? 'json' : resolveDesignType(type)
-
-        let storage: TDbStorageType
-        if (skipFlattening) {
-          storage = 'column'
-        } else if (isJson) {
-          storage = 'json'
-        } else if (isFlattened) {
-          storage = 'flattened'
-        } else {
-          storage = 'column'
-        }
-
-        const physicalName = skipFlattening
-          ? (this._columnMap.get(path) ?? path)
-          : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
-
-        // Compute renamedFrom (old physical name from @db.column.renamed)
-        const fromLocal = this._columnFromMap.get(path)
-        let renamedFrom: string | undefined
-        if (fromLocal) {
-          renamedFrom = isFlattened ? this._flattenedPrefix(path) + fromLocal : fromLocal
-        }
-
-        this._fieldDescriptors.push({
-          path,
-          type,
-          physicalName,
-          designType,
-          optional: type.optional === true,
-          isPrimaryKey: this._primaryKeys.includes(path),
-          ignored: this._ignoredFields.has(path),
-          defaultValue: this._defaults.get(path),
-          storage,
-          flattenedFrom: isFlattened ? path : undefined,
-          renamedFrom,
-          collate: this._collateMap.get(path),
-          isIndexed: indexedFields.has(path) || undefined,
-        })
-      }
-
-      // Second pass: resolve fkTargetField for FK fields.
-      // For each FK, resolve the target PK's annotated type and build a TDbFieldMeta
-      // so adapters can produce matching DB types via typeMapper(field.fkTargetField).
-      this._resolveFkTargetFields()
-
-      Object.freeze(this._fieldDescriptors)
     }
-    return this._fieldDescriptors
+
+    for (const [path, type] of this._flatMap!.entries()) {
+      if (!path) { continue }
+
+      if (!skipFlattening && this._flattenedParents.has(path)) {
+        continue
+      }
+
+      if (!skipFlattening && this._findAncestorInSet(path, this._jsonFields) !== undefined) {
+        continue
+      }
+
+      const isJson = this._jsonFields.has(path)
+      const isFlattened = !skipFlattening && this._findAncestorInSet(path, this._flattenedParents) !== undefined
+      const designType = isJson ? 'json' : resolveDesignType(type)
+
+      let storage: TDbStorageType
+      if (skipFlattening) {
+        storage = 'column'
+      } else if (isJson) {
+        storage = 'json'
+      } else if (isFlattened) {
+        storage = 'flattened'
+      } else {
+        storage = 'column'
+      }
+
+      const physicalName = skipFlattening
+        ? (this._columnMap.get(path) ?? path)
+        : (this._pathToPhysical.get(path) ?? this._columnMap.get(path) ?? path)
+
+      // Compute renamedFrom (old physical name from @db.column.renamed)
+      const fromLocal = this._columnFromMap.get(path)
+      let renamedFrom: string | undefined
+      if (fromLocal) {
+        renamedFrom = isFlattened ? this._flattenedPrefix(path) + fromLocal : fromLocal
+      }
+
+      this._fieldDescriptors.push({
+        path,
+        type,
+        physicalName,
+        designType,
+        optional: type.optional === true,
+        isPrimaryKey: this._primaryKeys.includes(path),
+        ignored: this._ignoredFields.has(path),
+        defaultValue: this._defaults.get(path),
+        storage,
+        flattenedFrom: isFlattened ? path : undefined,
+        renamedFrom,
+        collate: this._collateMap.get(path),
+        isIndexed: indexedFields.has(path) || undefined,
+      })
+    }
+
+    // Second pass: resolve fkTargetField for FK fields.
+    // For each FK, resolve the target PK's annotated type and build a TDbFieldMeta
+    // so adapters can produce matching DB types via typeMapper(field.fkTargetField).
+    this._resolveFkTargetFields()
+
+    // Build value formatters from adapter hook
+    const fmtHook = this.adapter.formatValue?.bind(this.adapter)
+    if (fmtHook) {
+      for (const fd of this._fieldDescriptors) {
+        const fmt = fmtHook(fd)
+        if (fmt) {
+          if (!this._valueFormatters) { this._valueFormatters = new Map() }
+          this._valueFormatters.set(fd.physicalName, fmt)
+        }
+      }
+    }
+
+    Object.freeze(this._fieldDescriptors)
   }
 
   /**
@@ -1193,8 +1222,10 @@ export class AtscriptDbReadable<
       this._physicalToPath.set(physicalName, path)
 
       const fieldType = this._flatMap?.get(path)
-      if (fieldType && resolveDesignType(fieldType) === 'boolean') {
-        this._booleanFields.add(physicalName)
+      if (fieldType) {
+        const dt = resolveDesignType(fieldType)
+        if (dt === 'boolean') { this._booleanFields.add(physicalName) }
+        else if (dt === 'decimal') { this._decimalFields.add(physicalName) }
       }
     }
 
@@ -1213,6 +1244,8 @@ export class AtscriptDbReadable<
     }
 
     this._requiresMappings = this._flattenedParents.size > 0 || this._jsonFields.size > 0
+
+    this._buildFieldDescriptors()
   }
 
   /**
@@ -1252,14 +1285,16 @@ export class AtscriptDbReadable<
    */
   protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
     if (!this._requiresMappings || this._nestedObjects) {
-      return this._coerceBooleans(row)
+      return this._coerceFieldValues(row)
     }
 
     const result: Record<string, unknown> = {}
 
     const rowKeys = Object.keys(row)
     for (const physical of rowKeys) {
-      const value = this._booleanFields.has(physical) ? toBool(row[physical]) : row[physical]
+      const value = this._booleanFields.has(physical) ? toBool(row[physical])
+        : this._decimalFields.has(physical) ? toDecimalString(row[physical])
+        : row[physical]
       const logicalPath = this._physicalToPath.get(physical)
 
       if (!logicalPath) {
@@ -1286,13 +1321,19 @@ export class AtscriptDbReadable<
   }
 
   /**
-   * Coerces boolean fields from storage representation (0/1) to JS booleans.
+   * Coerces field values from storage representation to JS types
+   * (booleans from 0/1, decimals from number to string).
    */
-  private _coerceBooleans(row: Record<string, unknown>): Record<string, unknown> {
-    if (this._booleanFields.size === 0) { return row }
+  private _coerceFieldValues(row: Record<string, unknown>): Record<string, unknown> {
+    if (this._booleanFields.size === 0 && this._decimalFields.size === 0) { return row }
     for (const field of this._booleanFields) {
       if (field in row) {
         row[field] = toBool(row[field])
+      }
+    }
+    for (const field of this._decimalFields) {
+      if (field in row) {
+        row[field] = toDecimalString(row[field])
       }
     }
     return row
@@ -1364,7 +1405,7 @@ export class AtscriptDbReadable<
     if (!this._requiresMappings || this._nestedObjects) {
       const controls = query.controls
       return {
-        filter: query.filter as FilterExpr,
+        filter: this._valueFormatters ? this._translateFilter(query.filter as FilterExpr) : query.filter as FilterExpr,
         controls: {
           ...controls,
           $with: undefined, // $with is handled by the table layer, not passed to adapters
@@ -1375,36 +1416,68 @@ export class AtscriptDbReadable<
       }
     }
     return {
-      filter: this._translateFilter(query.filter as FilterExpr),
+      filter: this._translateFilter(query.filter as FilterExpr, true),
       controls: query.controls ? this._translateControls(query.controls) : {},
     }
   }
 
   /**
-   * Recursively translates field names in a filter expression.
+   * Recursively walks a filter expression, optionally renaming field keys
+   * and applying adapter-specific value formatting via `_formatFilterValue`.
+   *
+   * When `renameKeys` is true, logical dot-paths are mapped to physical
+   * column names via `_pathToPhysical`. Used by `_translateQuery` (mapping
+   * path) and all write-path operations.
    */
-  protected _translateFilter(filter: FilterExpr): FilterExpr {
+  protected _translateFilter(filter: FilterExpr, renameKeys = false): FilterExpr {
     if (!filter || typeof filter !== 'object') { return filter }
-    if (!this._requiresMappings) { return filter }
+    if (!renameKeys && !this._valueFormatters) { return filter }
 
     const result: Record<string, unknown> = {}
-
-    const filterKeys = Object.keys(filter)
-    for (const key of filterKeys) {
-      const value = (filter as Record<string, unknown>)[key]
+    for (const [key, value] of Object.entries(filter as Record<string, unknown>)) {
       if (key === '$and' || key === '$or') {
-        result[key] = (value as FilterExpr[]).map(f => this._translateFilter(f))
+        result[key] = (value as FilterExpr[]).map(f => this._translateFilter(f, renameKeys))
       } else if (key === '$not') {
-        result[key] = this._translateFilter(value as FilterExpr)
+        result[key] = this._translateFilter(value as FilterExpr, renameKeys)
       } else if (key.startsWith('$')) {
         result[key] = value
       } else {
-        const physical = this._pathToPhysical.get(key) ?? key
-        result[physical] = value
+        const physical = renameKeys ? (this._pathToPhysical.get(key) ?? key) : key
+        result[physical] = this._formatFilterValue(physical, value)
       }
     }
-
     return result as FilterExpr
+  }
+
+  /**
+   * Applies adapter-specific value formatting to a single filter value.
+   * Handles direct values, operator objects ({$gt: v}), and $in/$nin arrays.
+   * Uses pre-built formatter map — skips columns without a registered formatter.
+   */
+  protected _formatFilterValue(physicalName: string, value: unknown): unknown {
+    const fmt = this._valueFormatters?.get(physicalName)
+    if (!fmt) { return value }
+
+    if (value === null || value === undefined) { return value }
+
+    // Direct value: { field: 123 }
+    if (typeof value !== 'object') {
+      return fmt(value)
+    }
+
+    // Operator object: { $gt: 123, $lt: 456 }
+    const ops = value as Record<string, unknown>
+    const formatted: Record<string, unknown> = {}
+    for (const [op, opVal] of Object.entries(ops)) {
+      if ((op === '$in' || op === '$nin') && Array.isArray(opVal)) {
+        formatted[op] = opVal.map(v => v === null || v === undefined ? v : fmt(v))
+      } else if (op.startsWith('$') && opVal !== null && opVal !== undefined) {
+        formatted[op] = fmt(opVal)
+      } else {
+        formatted[op] = opVal
+      }
+    }
+    return formatted
   }
 
   /**

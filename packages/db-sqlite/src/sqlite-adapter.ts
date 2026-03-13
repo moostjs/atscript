@@ -44,6 +44,8 @@ import type { TSqliteDriver } from './types'
  * ```
  */
 export class SqliteAdapter extends BaseDbAdapter {
+  override supportsNativeValueDefaults(): boolean { return true }
+
   constructor(protected readonly driver: TSqliteDriver) {
     super()
     this.driver.exec('PRAGMA foreign_keys = ON')

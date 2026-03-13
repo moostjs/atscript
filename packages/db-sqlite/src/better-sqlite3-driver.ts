@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import type { TSqliteDriver, TSqliteRunResult } from './types'
 
 /**
@@ -31,9 +32,9 @@ export class BetterSqlite3Driver implements TSqliteDriver {
 
   constructor(pathOrDb: string | import('better-sqlite3').Database, options?: Record<string, unknown>) {
     if (typeof pathOrDb === 'string') {
-      // Dynamic import to keep better-sqlite3 optional at the package level
-      // oxlint-disable-next-line typescript-eslint/no-var-requires -- dynamic require for optional peer dep
-      const Database = require('better-sqlite3') as typeof import('better-sqlite3')
+      // Use createRequire to support both CJS and ESM environments
+      const req = createRequire(import.meta.url)
+      const Database = req('better-sqlite3') as typeof import('better-sqlite3')
       this.db = new (Database as any)(pathOrDb, options)
     } else {
       this.db = pathOrDb

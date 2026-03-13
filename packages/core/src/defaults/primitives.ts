@@ -223,6 +223,11 @@ export const primitives: Record<string, TPrimitiveConfig> = {
     },
   },
 
+  decimal: {
+    type: 'decimal',
+    documentation: 'Decimal number stored as string to preserve precision. Use with @db.column.precision.',
+  },
+
   boolean: {
     type: 'boolean',
     documentation: 'Represents true/false values.',

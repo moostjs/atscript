@@ -152,7 +152,7 @@ async function rolldownPackages(ws) {
     }
     const inputOptions = {
       input,
-      external: [...(external || externals.get(ws)), '@atscript/typescript/utils'],
+      external: [...(external || externals.get(ws))],
       define: {
         __VERSION__: JSON.stringify(pkg.version),
       },

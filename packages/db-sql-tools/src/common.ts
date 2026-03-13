@@ -31,6 +31,7 @@ export function defaultValueForType(designType: string): string {
     case 'number':
     case 'integer': { return '0' }
     case 'boolean': { return '0' }
+    case 'decimal': { return "'0'" }
     default: { return "''" }
   }
 }
@@ -46,7 +47,8 @@ export function defaultValueToSqlLiteral(designType: string, value: string): str
       return (value === 'true' || value === '1') ? '1' : '0'
     }
     case 'number':
-    case 'integer': {
+    case 'integer':
+    case 'decimal': {
       const n = Number(value)
       return Number.isFinite(n) ? String(n) : '0'
     }

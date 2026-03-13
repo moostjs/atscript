@@ -397,6 +397,95 @@ describe('AtscriptDbTable', () => {
       const t = new AtscriptDbTable(UsersTable, hookAdapter)
       expect(t.tableName).toBe('custom_users')
     })
+
+    /** Attaches a formatValue hook that tags `@db.default.now` fields with a prefix formatter. */
+    function withTimestampFormatter(adapter: MockAdapter, prefix = 'formatted'): MockAdapter {
+      adapter.formatValue = (field) => {
+        if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+          return (v: unknown) => typeof v === 'number' ? `${prefix}:${v}` : v
+        }
+        return undefined
+      }
+      return adapter
+    }
+
+    it('should build value formatters from adapter.formatValue', () => {
+      const hookAdapter = new MockAdapter()
+      hookAdapter.formatValue = (field) => {
+        if (field.designType === 'number' && field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+          return (v: unknown) => typeof v === 'number' ? `ts:${v}` : v
+        }
+        return undefined
+      }
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      // Trigger fieldDescriptors computation (which builds _valueFormatters)
+      t.fieldDescriptors
+      // createdAt has @db.default.now on a number field — should have a formatter
+      expect((t as any)._valueFormatters).toBeDefined()
+      expect((t as any)._valueFormatters.size).toBe(1)
+      expect((t as any)._valueFormatters.has('createdAt')).toBe(true)
+    })
+
+    it('should not build value formatters when adapter has no formatValue', () => {
+      const hookAdapter = new MockAdapter()
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      t.fieldDescriptors
+      expect((t as any)._valueFormatters).toBeUndefined()
+    })
+
+    it('should apply value formatter during insertOne (write path)', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.insertMany([{ id: 1, email: 'a@b.com', name: 'A', createdAt: 1000, status: 'ok' }])
+      const call = hookAdapter.calls.find(c => c.method === 'insertMany')!
+      // createdAt should be formatted; other fields untouched
+      expect(call.args[0][0].createdAt).toBe('formatted:1000')
+      expect(call.args[0][0].id).toBe(1)
+      expect(call.args[0][0].name).toBe('A')
+    })
+
+    it('should apply value formatter to direct filter values', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.findMany({ filter: { createdAt: 5000 } as any, controls: {} })
+      const call = hookAdapter.calls.find(c => c.method === 'findMany')!
+      expect(call.args[0].filter.createdAt).toBe('formatted:5000')
+    })
+
+    it('should apply value formatter to operator filter values ($gt, $lt)', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.findMany({ filter: { createdAt: { $gt: 1000, $lt: 2000 } } as any, controls: {} })
+      const call = hookAdapter.calls.find(c => c.method === 'findMany')!
+      expect(call.args[0].filter.createdAt).toEqual({ $gt: 'formatted:1000', $lt: 'formatted:2000' })
+    })
+
+    it('should apply value formatter to $in array values', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.findMany({ filter: { createdAt: { $in: [100, 200, 300] } } as any, controls: {} })
+      const call = hookAdapter.calls.find(c => c.method === 'findMany')!
+      expect(call.args[0].filter.createdAt).toEqual({ $in: ['formatted:100', 'formatted:200', 'formatted:300'] })
+    })
+
+    it('should not format null/undefined filter values', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.findMany({ filter: { createdAt: null } as any, controls: {} })
+      const call = hookAdapter.calls.find(c => c.method === 'findMany')!
+      expect(call.args[0].filter.createdAt).toBeNull()
+    })
+
+    it('should not format fields without a registered formatter', async () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      await t.insertMany([{ id: 42, email: 'x@y.com', name: 'X', createdAt: 999, status: 'ok' }])
+      const call = hookAdapter.calls.find(c => c.method === 'insertMany')!
+      // 'name' has no formatter — should pass through unchanged
+      expect(call.args[0][0].name).toBe('X')
+      // 'id' has no formatter
+      expect(call.args[0][0].id).toBe(42)
+    })
   })
 })
 

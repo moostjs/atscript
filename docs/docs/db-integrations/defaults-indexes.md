@@ -54,12 +54,14 @@ id: string
 
 ### `@db.default.now` — Current Timestamp
 
-Captures the current time at insert. Works with number (Unix milliseconds) and string (ISO format) types:
+Captures the current time at insert. Works with number (Unix epoch milliseconds) and string (ISO format) types:
 
 ```atscript
 @db.default.now
 createdAt?: number
 ```
+
+Timestamps use `number` (epoch milliseconds) rather than a `Date` type — this is deliberate. Numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. A `Date` type would require walking every response to convert strings back to `Date` instances on both sides.
 
 ::: tip Semantic Types Include Defaults
 Semantic types like `number.timestamp.created` already include `@db.default.now` — you don't need to add it manually:
@@ -96,12 +98,16 @@ For adapter-specific collations, use `@db.<engine>.collate` instead.
 
 ### Decimal Precision
 
-Use `@db.column.precision` to set decimal precision and scale for database storage. Adapters map this to their native decimal type (e.g., `DECIMAL(10,2)` in SQL). This is purely a DB storage hint — it does not affect runtime JavaScript number behavior:
+Use `@db.column.precision` to set decimal precision and scale for database storage. Adapters map this to their native decimal type (e.g., `DECIMAL(10,2)` in SQL):
 
 ```atscript
 @db.column.precision 10, 2
-price: number
+price: decimal
 ```
+
+The `decimal` type stores values as strings at runtime (e.g., `"19.99"`) to preserve exact precision. This also means decimal values pass through JSON transport (client ↔ server) without any loss — no serialization or hydration step is needed. Use `decimal` for prices, financial amounts, and any field where floating-point rounding is unacceptable.
+
+`@db.column.precision` also works on `number` fields for cases where you want a database-level decimal column but don't need string precision at runtime.
 
 ## Indexes
 

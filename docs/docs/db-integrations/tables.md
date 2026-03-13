@@ -107,15 +107,18 @@ GET /task-tags/query?taskId=1    # returns all tags for task 1
 
 Atscript types map to database column types automatically:
 
-| Atscript Type | SQLite | MongoDB |
-|---------------|--------|---------|
-| `string` | TEXT | string |
-| `number` | REAL (INTEGER for PK) | number |
-| `boolean` | INTEGER (0/1) | boolean |
-| Arrays | TEXT (JSON) | native array |
-| Nested objects | Flattened columns | native object (unless flattened) |
+| Atscript Type | SQLite | MySQL | MongoDB |
+|---------------|--------|-------|---------|
+| `string` | TEXT | VARCHAR / TEXT | string |
+| `number` | REAL (INTEGER for PK) | DOUBLE (INT for PK) | number |
+| `decimal` | REAL | DECIMAL(p,s) | string |
+| `boolean` | INTEGER (0/1) | TINYINT(1) | boolean |
+| Arrays | TEXT (JSON) | JSON | native array |
+| Nested objects | Flattened columns | Flattened columns | native object (unless flattened) |
 
 Semantic subtypes like `string.email`, `number.int`, and `number.timestamp` map to the same base column types. They carry meaning for validation and code generation, but the storage type follows the base type.
+
+The `decimal` type is stored as a string at runtime to preserve exact precision. This also means it passes through JSON transport without any loss. Use `@db.column.precision` to control the database column's precision and scale.
 
 ## Nested Objects
 

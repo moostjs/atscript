@@ -534,6 +534,13 @@ export class Validator<
         }
         return true
       }
+      case 'decimal': {
+        if (typeOfValue !== 'string') {
+          this.error(`Expected string (decimal), got ${typeOfValue}`)
+          return false
+        }
+        return true
+      }
       default: {
         throw new Error(`Unknown type "${def.type.designType}"`)
       }

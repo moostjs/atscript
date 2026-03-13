@@ -201,6 +201,12 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       if (tags?.has('uint64')) { return 'BIGINT UNSIGNED' }
       return unsigned ? 'INT UNSIGNED' : 'INT'
     }
+    case 'decimal': {
+      if (precision) {
+        return `DECIMAL(${precision.precision},${precision.scale})`
+      }
+      return 'DECIMAL(10,2)'
+    }
     case 'boolean': {
       return 'TINYINT(1)'
     }

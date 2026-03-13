@@ -65,6 +65,7 @@ Atscript types map to SQLite column types as follows:
 |---------------|-------------|-------|
 | `string` | `TEXT` | |
 | `number` | `REAL` | `INTEGER` for primary keys (aliases `rowid`) |
+| `decimal` | `REAL` | Runtime value is string; coerced on read |
 | `boolean` | `INTEGER` | Stored as `0` / `1` |
 | arrays | `TEXT` | JSON-serialized |
 | nested objects | flattened columns | `parent__child` naming convention |

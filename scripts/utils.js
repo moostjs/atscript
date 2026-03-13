@@ -12,14 +12,12 @@ export function getExternals(ws) {
   const devDeps = Object.keys(pkg.devDependencies ?? {})
   const peerDeps = Object.keys(pkg.peerDependencies ?? {})
 
-  // Combine dependencies and built-in Node.js modules
+  // Use regex patterns so subpath imports (e.g. "mysql2/promise") are also externalized
+  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const packages = [...deps, ...devDeps, ...peerDeps, 'vscode']
   return [
-    ...deps,
-    ...devDeps,
-    ...peerDeps,
-    ...builtinModules,
-    ...builtinModules.map(mod => `node:${mod}`),
-    'vscode',
+    ...packages.map(d => new RegExp(`^${escapeRe(d)}(/|$)`)),
+    ...builtinModules.map(m => new RegExp(`^(node:)?${escapeRe(m)}(/|$)`)),
   ]
 }
 

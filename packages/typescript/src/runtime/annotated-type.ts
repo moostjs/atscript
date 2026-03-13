@@ -82,6 +82,7 @@ export interface TAtscriptTypeFinal<DataType = unknown> {
     | 'any'
     | 'never'
     | 'phantom'
+    | 'decimal'
 
   /**
    * value for literals

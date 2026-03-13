@@ -7,6 +7,27 @@ function sanitizeParams(params?: unknown[]): unknown[] {
 }
 
 /**
+ * Custom type-casting for mysql2 result columns to maintain cross-adapter consistency.
+ *
+ * - TIMESTAMP/DATETIME → epoch milliseconds (number) instead of Date objects
+ * - DECIMAL/NEWDECIMAL → number instead of string
+ */
+function atscriptTypeCast(field: any, next: () => any): any {
+  if (field.type === 'TIMESTAMP' || field.type === 'DATETIME') {
+    const str = field.string()
+    if (str === null) { return null }
+    // Connection uses timezone: '+00:00', so the string is in UTC.
+    // Parse explicitly to avoid local-timezone misinterpretation.
+    return Date.parse(str.replace(' ', 'T') + 'Z')
+  }
+  if (field.type === 'NEWDECIMAL' || field.type === 'DECIMAL') {
+    const str = field.string()
+    return str === null ? null : Number(str)
+  }
+  return next()
+}
+
+/**
  * {@link TMysqlDriver} implementation backed by `mysql2/promise`.
  *
  * Accepts a connection URI string, a `PoolOptions` object, or a pre-created
@@ -39,7 +60,8 @@ function sanitizeParams(params?: unknown[]): unknown[] {
  * ```
  */
 export class Mysql2Driver implements TMysqlDriver {
-  private pool: import('mysql2/promise').Pool
+  private pool: import('mysql2/promise').Pool | undefined
+  private poolInit: Promise<import('mysql2/promise').Pool> | undefined
 
   constructor(
     poolOrConfig: string | import('mysql2/promise').Pool | import('mysql2/promise').PoolOptions
@@ -48,19 +70,25 @@ export class Mysql2Driver implements TMysqlDriver {
       // Pre-created pool instance
       this.pool = poolOrConfig as import('mysql2/promise').Pool
     } else {
-      // Dynamic require to keep mysql2 optional at the package level
-      // oxlint-disable-next-line typescript-eslint/no-var-requires -- dynamic require for optional peer dep
-      const mysql = require('mysql2/promise') as typeof import('mysql2/promise')
-      if (typeof poolOrConfig === 'string') {
-        this.pool = mysql.createPool({ uri: poolOrConfig, supportBigNumbers: true, bigNumberStrings: false })
-      } else {
-        this.pool = mysql.createPool({ supportBigNumbers: true, bigNumberStrings: false, ...poolOrConfig })
-      }
+      // Dynamic import to keep mysql2 optional and support both CJS and ESM
+      this.poolInit = import('mysql2/promise').then(mysql => {
+        if (typeof poolOrConfig === 'string') {
+          this.pool = mysql.createPool({ uri: poolOrConfig, timezone: '+00:00', supportBigNumbers: true, bigNumberStrings: false, typeCast: atscriptTypeCast })
+        } else {
+          this.pool = mysql.createPool({ ...poolOrConfig, timezone: '+00:00', supportBigNumbers: true, bigNumberStrings: false, typeCast: atscriptTypeCast })
+        }
+        return this.pool
+      })
     }
   }
 
+  private getPool(): import('mysql2/promise').Pool | Promise<import('mysql2/promise').Pool> {
+    return this.pool || this.poolInit!
+  }
+
   async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
-    const [result] = await this.pool.query(sql, sanitizeParams(params))
+    const pool = await this.getPool()
+    const [result] = await pool.query(sql, sanitizeParams(params))
     const header = result as import('mysql2').ResultSetHeader
     return {
       affectedRows: header.affectedRows ?? 0,
@@ -70,21 +98,25 @@ export class Mysql2Driver implements TMysqlDriver {
   }
 
   async all<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T[]> {
-    const [rows] = await this.pool.query(sql, sanitizeParams(params))
+    const pool = await this.getPool()
+    const [rows] = await pool.query(sql, sanitizeParams(params))
     return rows as T[]
   }
 
   async get<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | null> {
-    const [rows] = await this.pool.query(sql, sanitizeParams(params))
+    const pool = await this.getPool()
+    const [rows] = await pool.query(sql, sanitizeParams(params))
     return (rows as T[])[0] ?? null
   }
 
   async exec(sql: string): Promise<void> {
-    await this.pool.query(sql)
+    const pool = await this.getPool()
+    await pool.query(sql)
   }
 
   async getConnection(): Promise<TMysqlConnection> {
-    const conn = await this.pool.getConnection()
+    const pool = await this.getPool()
+    const conn = await pool.getConnection()
     return {
       async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
         const [result] = await conn.query(sql, sanitizeParams(params))
@@ -113,6 +145,7 @@ export class Mysql2Driver implements TMysqlDriver {
   }
 
   async close(): Promise<void> {
-    await this.pool.end()
+    const pool = await this.getPool()
+    await pool.end()
   }
 }

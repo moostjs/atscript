@@ -458,15 +458,19 @@ export class AtscriptDbTable<
 
   /**
    * Applies default values for fields that are missing from the payload.
+   * Defaults handled natively by the DB engine are skipped — the field stays
+   * absent so the DB's own DEFAULT clause applies.
    */
   protected _applyDefaults(data: Record<string, unknown>): Record<string, unknown> {
+    const nativeValues = this.adapter.supportsNativeValueDefaults()
+    const nativeFns = this.adapter.nativeDefaultFns()
     for (const [field, def] of this._defaults.entries()) {
       if (data[field] === undefined) {
-        if (def.kind === 'value') {
+        if (def.kind === 'value' && !nativeValues) {
           const fieldType = this._flatMap?.get(field)
           const designType = fieldType?.type.kind === '' && (fieldType.type as { designType: string }).designType
           data[field] = designType === 'string' ? def.value : JSON.parse(def.value)
-        } else if (def.kind === 'fn') {
+        } else if (def.kind === 'fn' && !nativeFns.has(def.fn)) {
           switch (def.fn) {
             case 'now': { data[field] = Date.now(); break }
             case 'uuid': { data[field] = crypto.randomUUID(); break }
@@ -510,11 +514,26 @@ export class AtscriptDbTable<
           delete data[logical]
         }
       }
-      return data
+      return this._formatWriteValues(data)
     }
 
     // Flatten nested objects and apply physical names
-    return this._flattenPayload(data)
+    return this._formatWriteValues(this._flattenPayload(data))
+  }
+
+  /**
+   * Applies adapter-specific value formatting to prepared (physical-named) data.
+   * Uses pre-built formatter map — only touches columns that have a registered formatter.
+   */
+  private _formatWriteValues(data: Record<string, unknown>): Record<string, unknown> {
+    if (!this._valueFormatters) { return data }
+    for (const [col, fmt] of this._valueFormatters) {
+      const val = data[col]
+      if (val !== null && val !== undefined) {
+        data[col] = fmt(val)
+      }
+    }
+    return data
   }
 
   /**

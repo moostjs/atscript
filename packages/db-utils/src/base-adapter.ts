@@ -8,12 +8,16 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './table/db-readable'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const EMPTY_DEFAULT_FNS: ReadonlySet<TDbDefaultFn> = new Set()
 
 // ── Transaction context ─────────────────────────────────────────────────────
 
@@ -201,6 +205,30 @@ export abstract class BaseDbAdapter {
    */
   supportsNestedObjects(): boolean {
     return false
+  }
+
+  /**
+   * Whether the DB engine handles static `@db.default "value"` natively
+   * via column-level DEFAULT clauses in CREATE TABLE.
+   * When `true`, `_applyDefaults()` skips client-side value defaults,
+   * letting the DB apply its own DEFAULT. SQL adapters return `true`;
+   * document stores (MongoDB) return `false` and apply defaults client-side.
+   */
+  supportsNativeValueDefaults(): boolean {
+    return false
+  }
+
+  /**
+   * Function default names handled natively by this adapter's DB engine.
+   * Fields with these defaults are omitted from INSERT when no value is provided,
+   * letting the DB apply its own DEFAULT expression (e.g. CURRENT_TIMESTAMP, UUID()).
+   *
+   * Override in adapters whose DB engine supports function defaults.
+   * The generic layer checks this in `_applyDefaults()` to decide whether
+   * to generate the value client-side or leave it for the DB.
+   */
+  nativeDefaultFns(): ReadonlySet<TDbDefaultFn> {
+    return EMPTY_DEFAULT_FNS
   }
 
   /**
@@ -637,4 +665,16 @@ export abstract class BaseDbAdapter {
    * Optional — adapters that don't implement this skip type change detection.
    */
   typeMapper?(field: TDbFieldMeta): string
+
+  /**
+   * Returns a value formatter for a field, or undefined if no formatting is needed.
+   * Called once per field during flattening. The returned function is cached and
+   * applied during write preparation and filter translation.
+   *
+   * This avoids per-value method dispatch — only fields that need formatting
+   * get a formatter function, and the generic layer skips fields without one.
+   *
+   * Example: MySQL returns `epochMsToUtcDatetime` for TIMESTAMP-mapped fields.
+   */
+  formatValue?(field: TDbFieldMeta): ((value: unknown) => unknown) | undefined
 }

@@ -18,6 +18,10 @@ primitives.set('number', new SemanticPrimitiveNode('number', {
     timestamp: { type: 'number' },
   },
 }))
+primitives.set('decimal', new SemanticPrimitiveNode('decimal', {
+  type: 'decimal',
+  documentation: 'Decimal number stored as string to preserve precision.',
+}))
 primitives.set('boolean', new SemanticPrimitiveNode('boolean', { type: 'boolean' }))
 
 function createDoc(source: string): AtscriptDoc {
@@ -103,7 +107,28 @@ interface Test {
     expect(getErrors(doc)).toHaveLength(0)
   })
 
-  it('should reject on non-number field', () => {
+  it('should accept on decimal field', () => {
+    const doc = createDoc(`
+@db.table "test"
+interface Test {
+  @db.column.precision 10, 2
+  price: decimal
+}`)
+    expect(getErrors(doc)).toHaveLength(0)
+  })
+
+  it('should reject on non-number/decimal field', () => {
+    const doc = createDoc(`
+@db.table "test"
+interface Test {
+  @db.column.precision 10, 2
+  active: boolean
+}`)
+    const errors = getErrors(doc)
+    expect(errors.some(e => e.message.includes('not compatible'))).toBe(true)
+  })
+
+  it('should reject on string field', () => {
     const doc = createDoc(`
 @db.table "test"
 interface Test {

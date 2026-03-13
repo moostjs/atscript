@@ -6,6 +6,7 @@ Atscript supports the following primitive types:
 
 - **`string`** - Text values
 - **`number`** - Numeric values
+- **`decimal`** - Decimal number stored as string to preserve precision
 - **`boolean`** - True/false values
 - **`null`** - Null value
 - **`undefined`** - Undefined value
@@ -15,6 +16,7 @@ Atscript supports the following primitive types:
 export interface BasicTypes {
     text: string
     count: number
+    price: decimal
     isEnabled: boolean
     empty: null
     nothing: void
@@ -122,13 +124,33 @@ export interface Metrics {
 
 Prefer semantic types over separate `@expect.*` annotations when a built-in semantic type already says what you mean.
 
+### Decimal Type
+
+Use `decimal` for fields that need exact decimal precision — prices, financial amounts, measurements:
+
+```atscript
+export interface Product {
+    @db.column.precision 10, 2
+    price: decimal
+
+    @db.column.precision 8, 4
+    exchangeRate: decimal
+}
+```
+
+At runtime, `decimal` values are strings (e.g., `"19.99"`). This preserves precision and survives JSON transport without any loss — unlike floating-point `number`, which can introduce rounding errors for decimal fractions.
+
+In SQL databases, `decimal` maps to the native `DECIMAL` type (with precision/scale from `@db.column.precision`). Use `number` for general-purpose numerics and `decimal` when exact decimal representation matters.
+
 ## Advanced Primitives
 
 ### Timestamp Variants
 
-If you work with DB integrations later, Atscript also provides timestamp-oriented numeric tags like `number.timestamp`, `number.timestamp.created`, and `number.timestamp.updated`.
+Atscript provides timestamp-oriented numeric tags: `number.timestamp`, `number.timestamp.created`, and `number.timestamp.updated`.
 
-These are advanced because they matter more for integrations than for basic TypeScript usage.
+Timestamps are stored as `number` (Unix epoch milliseconds). This is a deliberate choice — numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. Using `Date` objects would require walking every response to convert strings back to `Date` instances on both sides of the transport layer.
+
+These are advanced because they matter more for DB integrations than for basic TypeScript usage.
 
 ### `phantom`
 
@@ -141,7 +163,8 @@ It is useful for advanced UI tooling and type traversal, but most application co
 1. Use semantic types when the field has real meaning beyond a plain primitive.
 2. Let built-in semantic types carry validation instead of duplicating the same rule by hand.
 3. Reach for `string.required`, `string.email`, and `number.int` early — they cover many common cases.
-4. Save advanced primitives like `phantom` and timestamp variants for pages or features that really need them.
+4. Use `decimal` instead of `number` when exact decimal precision matters (prices, financial data).
+5. Save advanced primitives like `phantom` and timestamp variants for pages or features that really need them.
 
 ::: tip Combining Extensions
 - `number.int.positive` — positive integers only
