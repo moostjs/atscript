@@ -18,8 +18,10 @@ import type { TGenericLogger } from '../logger'
 import { resolveArrayOps, getArrayOpsFields } from '../patch/array-ops-resolver'
 import { decomposePatch } from '../patch/patch-decomposer'
 import { AtscriptDbReadable } from './db-readable'
-import { UniquSelect } from '../query/uniqu-select'
 import { createDbValidatorPlugin, type DbValidationContext } from '../db-validator-plugin'
+import type { IntegrityStrategy } from '../strategies/integrity'
+import { NativeIntegrity } from '../strategies/integrity'
+import { ApplicationIntegrity } from '../strategies/application-integrity'
 import type {
   TCascadeResolver,
   TDbDeleteResult,
@@ -27,7 +29,6 @@ import type {
   TDbInsertResult,
   TDbUpdateResult,
   TFkLookupResolver,
-  TFkLookupTarget,
   TTableResolver,
   TWriteTableResolver,
 } from '../types'
@@ -65,6 +66,10 @@ export class AtscriptDbTable<
   protected _cascadeResolver?: TCascadeResolver
   protected _fkLookupResolver?: TFkLookupResolver
 
+  // ── Integrity strategy ──────────────────────────────────────────────────
+
+  protected readonly _integrity: IntegrityStrategy
+
   // ── Validators ────────────────────────────────────────────────────────────
 
   protected readonly validators = new Map<string, Validator<T, DataType>>()
@@ -80,6 +85,9 @@ export class AtscriptDbTable<
     if (_writeTableResolver) {
       this._writeTableResolver = _writeTableResolver
     }
+    this._integrity = adapter.supportsNativeForeignKeys()
+      ? new NativeIntegrity()
+      : new ApplicationIntegrity()
   }
 
   /**
@@ -168,11 +176,11 @@ export class AtscriptDbTable<
       const prepared: Array<Record<string, unknown>> = []
       for (const data of items) {
         for (const navField of this._meta.navFields) { delete data[navField] }
-        prepared.push(this._prepareForWrite(data))
+        prepared.push(this._fieldMapper.prepareForWrite(data, this._meta, this.adapter))
       }
 
       // Validate FK references (application-level, for adapters without native FK support)
-      await this._validateForeignKeys(items)
+      await this._integrity.validateForeignKeys(items, this._meta, this._fkLookupResolver, this._writeTableResolver)
 
       // Pre-validate FROM children (types + FK constraints) before the main insert.
       // Catches errors early (before the parent is committed), essential for
@@ -242,7 +250,7 @@ export class AtscriptDbTable<
       }
 
       // Validate FK references (application-level, for adapters without native FK support)
-      await this._validateForeignKeys(items)
+      await this._integrity.validateForeignKeys(items, this._meta, this._fkLookupResolver, this._writeTableResolver)
 
       // Pre-validate FROM children (types + FK constraints) before the main replace
       if (canNest) {
@@ -255,9 +263,9 @@ export class AtscriptDbTable<
       for (const data of items) {
         for (const navField of this._meta.navFields) { delete data[navField] }
         const filter = this._extractPrimaryKeyFilter(data)
-        const prepared = this._prepareForWrite(data)
+        const prepared = this._fieldMapper.prepareForWrite(data, this._meta, this.adapter)
         const result = await this.adapter.replaceOne(
-          this._translateFilter(filter),
+          this._fieldMapper.translateFilter(filter, this._meta),
           prepared
         )
         matchedCount += result.matchedCount
@@ -321,7 +329,7 @@ export class AtscriptDbTable<
       }
 
       // Validate FK references (application-level, for adapters without native FK support)
-      await this._validateForeignKeys(payloads as Array<Record<string, unknown>>, true)
+      await this._integrity.validateForeignKeys(payloads as Array<Record<string, unknown>>, this._meta, this._fkLookupResolver, this._writeTableResolver, true)
 
       // Phase 2: Main patch — strip nav fields, decompose, update each
       let matchedCount = 0
@@ -342,12 +350,12 @@ export class AtscriptDbTable<
         }
 
         let result: TDbUpdateResult
-        const translatedFilter = this._translateFilter(filter)
+        const translatedFilter = this._fieldMapper.translateFilter(filter, this._meta)
         if (this.adapter.supportsNativePatch()) {
           result = await this.adapter.nativePatch(translatedFilter, data)
         } else {
           const update = decomposePatch(data, this as AtscriptDbTable)
-          const translatedUpdate = this._translatePatchKeys(update)
+          const translatedUpdate = this._fieldMapper.translatePatchKeys(update, this._meta)
 
           // Resolve array ops via read-modify-write if any __$ keys present
           const arrayOpsFields = getArrayOpsFields(translatedUpdate)
@@ -390,13 +398,13 @@ export class AtscriptDbTable<
     if (!filter) {
       return { deletedCount: 0 }
     }
-    if (this._needsCascade()) {
+    if (this._integrity.needsCascade(this._cascadeResolver)) {
       return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
-        await this._cascadeBeforeDelete(filter)
-        return this.adapter.deleteOne(this._translateFilter(filter))
+        await this._integrity.cascadeBeforeDelete(filter, this.tableName, this._meta, this._cascadeResolver!, f => this._fieldMapper.translateFilter(f, this._meta), this.adapter)
+        return this.adapter.deleteOne(this._fieldMapper.translateFilter(filter, this._meta))
       }))
     }
-    return this._remapDeleteFkViolation(() => this.adapter.deleteOne(this._translateFilter(filter)))
+    return this._remapDeleteFkViolation(() => this.adapter.deleteOne(this._fieldMapper.translateFilter(filter, this._meta)))
   }
 
   // ── Batch operations ──────────────────────────────────────────────────────
@@ -406,10 +414,10 @@ export class AtscriptDbTable<
     data: Partial<DataType> & Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this._ensureBuilt()
-    await this._validateForeignKeys([data as Record<string, unknown>], true)
+    await this._integrity.validateForeignKeys([data as Record<string, unknown>], this._meta, this._fkLookupResolver, this._writeTableResolver, true)
     return this._enrichFkViolation(() => this.adapter.updateMany(
-      this._translateFilter(filter as FilterExpr),
-      this._prepareForWrite({ ...data })
+      this._fieldMapper.translateFilter(filter as FilterExpr, this._meta),
+      this._fieldMapper.prepareForWrite({ ...data }, this._meta, this.adapter)
     ))
   }
 
@@ -418,22 +426,22 @@ export class AtscriptDbTable<
     data: Record<string, unknown>
   ): Promise<TDbUpdateResult> {
     this._ensureBuilt()
-    await this._validateForeignKeys([data])
+    await this._integrity.validateForeignKeys([data], this._meta, this._fkLookupResolver, this._writeTableResolver)
     return this._enrichFkViolation(() => this.adapter.replaceMany(
-      this._translateFilter(filter as FilterExpr),
-      this._prepareForWrite({ ...data })
+      this._fieldMapper.translateFilter(filter as FilterExpr, this._meta),
+      this._fieldMapper.prepareForWrite({ ...data }, this._meta, this.adapter)
     ))
   }
 
   public async deleteMany(filter: FilterExpr<FlatType>): Promise<TDbDeleteResult> {
     this._ensureBuilt()
-    if (this._needsCascade()) {
+    if (this._integrity.needsCascade(this._cascadeResolver)) {
       return this._remapDeleteFkViolation(() => this.adapter.withTransaction(async () => {
-        await this._cascadeBeforeDelete(filter as FilterExpr)
-        return this.adapter.deleteMany(this._translateFilter(filter as FilterExpr))
+        await this._integrity.cascadeBeforeDelete(filter as FilterExpr, this.tableName, this._meta, this._cascadeResolver!, f => this._fieldMapper.translateFilter(f, this._meta), this.adapter)
+        return this.adapter.deleteMany(this._fieldMapper.translateFilter(filter as FilterExpr, this._meta))
       }))
     }
-    return this._remapDeleteFkViolation(() => this.adapter.deleteMany(this._translateFilter(filter as FilterExpr)))
+    return this._remapDeleteFkViolation(() => this.adapter.deleteMany(this._fieldMapper.translateFilter(filter as FilterExpr, this._meta)))
   }
 
   // ── Schema operations ─────────────────────────────────────────────────────
@@ -482,117 +490,6 @@ export class AtscriptDbTable<
     return data
   }
 
-  /**
-   * Prepares a payload for writing to the database:
-   * prepares IDs, strips ignored fields, flattens nested objects, maps column names.
-   */
-  protected _prepareForWrite(payload: Record<string, unknown>): Record<string, unknown> {
-    const data = { ...payload }
-
-    // Prepare primary key values
-    for (const pk of this._meta.primaryKeys) {
-      if (data[pk] !== undefined) {
-        const fieldType = this._meta.flatMap?.get(pk)
-        if (fieldType) {
-          data[pk] = this.adapter.prepareId(data[pk], fieldType)
-        }
-      }
-    }
-
-    // Strip top-level ignored fields
-    for (const field of this._meta.ignoredFields) {
-      if (!field.includes('.')) {
-        delete data[field]
-      }
-    }
-
-    // Fast path: no nested/json fields — just do column mapping
-    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
-      for (const [logical, physical] of this._meta.columnMap.entries()) {
-        if (logical in data) {
-          data[physical] = data[logical]
-          delete data[logical]
-        }
-      }
-      return this._formatWriteValues(data)
-    }
-
-    // Flatten nested objects and apply physical names
-    return this._formatWriteValues(this._flattenPayload(data))
-  }
-
-  /**
-   * Applies adapter-specific value formatting to prepared (physical-named) data.
-   * Uses pre-built formatter map — only touches columns that have a registered formatter.
-   */
-  private _formatWriteValues(data: Record<string, unknown>): Record<string, unknown> {
-    if (!this._meta.valueFormatters) { return data }
-    for (const [col, fmt] of this._meta.valueFormatters) {
-      const val = data[col]
-      if (val !== null && val !== undefined) {
-        data[col] = fmt(val)
-      }
-    }
-    return data
-  }
-
-  /**
-   * Flattens nested object fields into __-separated keys and
-   * JSON-stringifies @db.json / array fields.
-   */
-  private _flattenPayload(data: Record<string, unknown>): Record<string, unknown> {
-    const result: Record<string, unknown> = {}
-    for (const key of Object.keys(data)) {
-      this._writeFlattenedField(key, data[key], result)
-    }
-    return result
-  }
-
-  /**
-   * Classifies and writes a single field to the result object.
-   * Recurses into nested objects that should be flattened.
-   */
-  private _writeFlattenedField(
-    path: string,
-    value: unknown,
-    result: Record<string, unknown>
-  ): void {
-    if (this._meta.ignoredFields.has(path)) { return }
-
-    if (this._meta.flattenedParents.has(path)) {
-      if (value === null || value === undefined) {
-        this._setFlattenedChildrenNull(path, result)
-      } else if (typeof value === 'object' && !Array.isArray(value)) {
-        const obj = value as Record<string, unknown>
-        for (const key of Object.keys(obj)) {
-          this._writeFlattenedField(`${path}.${key}`, obj[key], result)
-        }
-      }
-    } else if (this._meta.jsonFields.has(path)) {
-      const physical = this._meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
-      result[physical] = (value !== undefined && value !== null)
-        ? JSON.stringify(value)
-        : value
-    } else {
-      const physical = this._meta.pathToPhysical.get(path) ?? path.replace(/\./g, '__')
-      result[physical] = value
-    }
-  }
-
-  /**
-   * When a parent object is null/undefined, set all its flattened children to null.
-   */
-  private _setFlattenedChildrenNull(
-    parentPath: string,
-    result: Record<string, unknown>
-  ): void {
-    const prefix = `${parentPath}.`
-    for (const [path, physical] of this._meta.pathToPhysical.entries()) {
-      if (path.startsWith(prefix)) {
-        result[physical] = null
-      }
-    }
-  }
 
   /**
    * Extracts primary key field(s) from a payload to build a filter.
@@ -616,163 +513,6 @@ export class AtscriptDbTable<
   }
 
   /**
-   * Translates dot-notation keys in a decomposed patch to physical column names.
-   */
-  protected _translatePatchKeys(update: Record<string, unknown>): Record<string, unknown> {
-    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
-      return update
-    }
-
-    const result: Record<string, unknown> = {}
-    const updateKeys = Object.keys(update)
-    for (const key of updateKeys) {
-      const value = update[key]
-      // Handle array patch operator keys like "tags.__$insert"
-      const operatorMatch = key.match(/^(.+?)(\.__\$.+)$/)
-      const basePath = operatorMatch ? operatorMatch[1] : key
-      const suffix = operatorMatch ? operatorMatch[2] : ''
-
-      const physical = this._meta.pathToPhysical.get(basePath) ?? basePath
-      const finalKey = physical + suffix
-
-      if (this._meta.jsonFields.has(basePath) && typeof value === 'object' && value !== null && !suffix) {
-        result[finalKey] = JSON.stringify(value)
-      } else {
-        result[finalKey] = value
-      }
-    }
-    return result
-  }
-
-  // ── Internal: cascade delete ─────────────────────────────────────────────
-
-  /**
-   * Whether application-level cascade is needed for deletes.
-   * True when the adapter doesn't handle FK constraints natively
-   * and a cascade resolver is available.
-   */
-  private _needsCascade(): boolean {
-    return !this.adapter.supportsNativeForeignKeys() && !!this._cascadeResolver
-  }
-
-  /**
-   * Applies cascade/setNull actions on child tables before deleting parent records.
-   * Finds all records matching `filter`, extracts their PK values, then for each
-   * child table with a FK pointing to this table:
-   * - `cascade`: recursively deletes child records
-   * - `setNull`: sets FK fields to null
-   * - `restrict`: throws if any children exist
-   *
-   * @param filter - Filter identifying parent records to be deleted (logical field names).
-   */
-  private async _cascadeBeforeDelete(filter: FilterExpr): Promise<void> {
-    const targets = this._cascadeResolver!(this.tableName)
-    if (targets.length === 0) { return }
-
-    // Collect all fields referenced by FK targetFields across all cascade targets.
-    // These are the parent fields that child FKs point to (e.g. 'id' in projectId: Project.id).
-    // In MongoDB, this differs from _primaryKeys ('_id') — the FK references 'id', not '_id'.
-    const neededLogical = new Set<string>()
-    for (const t of targets) {
-      for (const tf of t.fk.targetFields) { neededLogical.add(tf) }
-    }
-
-    // Map logical → physical for the adapter query, then back for FK matching
-    const physicalToLogical = new Map<string, string>()
-    const physicalFields: string[] = []
-    for (const logical of neededLogical) {
-      const physical = this._meta.pathToPhysical.get(logical) ?? this._meta.columnMap.get(logical) ?? logical
-      physicalFields.push(physical)
-      physicalToLogical.set(physical, logical)
-    }
-    const rawRecords = await this.adapter.findMany({
-      filter: this._translateFilter(filter),
-      controls: { $select: new UniquSelect(physicalFields) },
-    })
-    if (rawRecords.length === 0) { return }
-
-    // Map physical column names back to logical for FK matching
-    const records = rawRecords.map(r => {
-      const mapped: Record<string, unknown> = {}
-      for (const [key, val] of Object.entries(r)) {
-        mapped[physicalToLogical.get(key) ?? key] = val
-      }
-      return mapped
-    })
-
-    // Pass 1: RESTRICT pre-check — block the delete before any side effects
-    for (const target of targets) {
-      if (target.fk.onDelete !== 'restrict') { continue }
-      const childFilter = this._buildCascadeChildFilter(records, target.fk)
-      if (!childFilter) { continue }
-      const count = await target.count(childFilter)
-      if (count > 0) {
-        throw new DbError('CONFLICT', [{
-          path: this.tableName,
-          message: `Cannot delete from "${this.tableName}": ${count} record(s) in "${target.childTable}" (${target.fk.fields.join(', ')}) reference it (RESTRICT)`,
-        }])
-      }
-    }
-
-    // Pass 2: CASCADE / SET NULL — safe to execute now that RESTRICT passed
-    for (const target of targets) {
-      const action = target.fk.onDelete
-      if (!action || action === 'noAction' || action === 'restrict') { continue }
-
-      const childFilter = this._buildCascadeChildFilter(records, target.fk)
-      if (!childFilter) { continue }
-
-      switch (action) {
-        case 'cascade': {
-          await target.deleteMany(childFilter)
-          break
-        }
-        case 'setNull': {
-          const nullData: Record<string, unknown> = {}
-          for (const f of target.fk.fields) { nullData[f] = null }
-          await target.updateMany(childFilter, nullData)
-          break
-        }
-      }
-    }
-  }
-
-  /**
-   * Builds a filter for child records whose FK matches the deleted parent's PK values.
-   */
-  private _buildCascadeChildFilter(
-    parentRecords: Array<Record<string, unknown>>,
-    fk: { fields: string[]; targetFields: string[] }
-  ): Record<string, unknown> | undefined {
-    if (fk.fields.length === 1 && fk.targetFields.length === 1) {
-      // Single-field FK: { fkField: { $in: [pk1, pk2, ...] } }
-      const pkField = fk.targetFields[0]
-      const values = parentRecords.map(r => r[pkField]).filter(v => v !== undefined && v !== null)
-      if (values.length === 0) { return undefined }
-      return values.length === 1
-        ? { [fk.fields[0]]: values[0] }
-        : { [fk.fields[0]]: { $in: values } }
-    }
-
-    // Composite FK: { $or: [{ fk1: pk1, fk2: pk2 }, ...] }
-    const orFilters: Array<Record<string, unknown>> = []
-    for (const record of parentRecords) {
-      const condition: Record<string, unknown> = {}
-      let valid = true
-      for (let i = 0; i < fk.fields.length; i++) {
-        const val = record[fk.targetFields[i]]
-        if (val === undefined || val === null) { valid = false; break }
-        condition[fk.fields[i]] = val
-      }
-      if (valid) { orFilters.push(condition) }
-    }
-    if (orFilters.length === 0) { return undefined }
-    return orFilters.length === 1 ? orFilters[0] : { $or: orFilters }
-  }
-
-  // ── Internal: FK validation ─────────────────────────────────────────────
-
-  /**
    * Pre-validate items (type validation + FK constraints) without inserting them.
    * Used by parent tables to validate FROM children before the main insert,
    * ensuring errors are caught before the parent is committed.
@@ -792,95 +532,7 @@ export class AtscriptDbTable<
     this._validateBatch(validator, prepared, ctx)
 
     // FK validation
-    await this._validateForeignKeys(items, false, opts?.excludeFkTargetTable)
-  }
-
-  /**
-   * Validates that all FK field values reference existing records in target tables.
-   * Only runs for adapters without native FK support (e.g. MongoDB).
-   * No-op if the adapter has native FK support or no resolver is set.
-   *
-   * @param items - Records to validate (pre-write, logical field names).
-   * @param partial - If true, only validate FK fields present in the data (for updates).
-   * @param excludeTargetTable - Skip FKs referencing this table (for pre-validation of children).
-   */
-  private async _validateForeignKeys(
-    items: Array<Record<string, unknown>>,
-    partial?: boolean,
-    excludeTargetTable?: string
-  ): Promise<void> {
-    if (this.adapter.supportsNativeForeignKeys() || !this._fkLookupResolver) { return }
-
-    // Build all FK checks, then run in parallel
-    const checks: Array<() => Promise<void>> = []
-
-    for (const [, fk] of this._meta.foreignKeys) {
-      // Skip FKs that reference the excluded table (e.g. FROM child → parent during pre-validation)
-      if (excludeTargetTable && fk.targetTable === excludeTargetTable) { continue }
-
-      // Collect unique FK values across all items using Sets for O(1) dedup
-      const valueSets: Array<Set<unknown>> = fk.fields.map(() => new Set<unknown>())
-
-      for (const item of items) {
-        // For partial updates, skip if none of the FK fields are in the payload
-        if (partial && !fk.fields.some(f => f in item)) { continue }
-
-        // Skip if any FK field is null/undefined (nullable FK — no constraint)
-        let allPresent = true
-        const vals: unknown[] = []
-        for (const field of fk.fields) {
-          const v = item[field]
-          if (v === null || v === undefined) { allPresent = false; break }
-          vals.push(v)
-        }
-        if (!allPresent) { continue }
-
-        for (let i = 0; i < vals.length; i++) {
-          valueSets[i].add(vals[i])
-        }
-      }
-
-      if (valueSets[0].size === 0) { continue }
-
-      // Resolve target table — try lookup resolver first, then write resolver as fallback
-      let target: TFkLookupTarget | undefined = this._fkLookupResolver(fk.targetTable)
-      if (!target && fk.targetTypeRef && this._writeTableResolver) {
-        const resolved = this._writeTableResolver(fk.targetTypeRef())
-        if (resolved) {
-          target = { count: (filter: Record<string, unknown>) => resolved.count({ filter }) }
-        }
-      }
-      if (!target) { continue }
-
-      // Build filter on target table's fields and count matching records
-      const filter: Record<string, unknown> = {}
-      const valueArrays = valueSets.map(s => [...s])
-      for (let i = 0; i < fk.targetFields.length; i++) {
-        filter[fk.targetFields[i]] = valueArrays[i].length === 1
-          ? valueArrays[i][0]
-          : { $in: valueArrays[i] }
-      }
-
-      // For single-field FK: expected = unique values count
-      // For composite FK: also use unique values per field (best we can do with flat filter)
-      const expectedCount = valueArrays[0].length
-
-      checks.push(async () => {
-        const count = await target.count(filter)
-        if (count < expectedCount) {
-          const sample = valueArrays[0].slice(0, 3).join(', ')
-          const suffix = valueArrays[0].length > 3 ? `, ... (${valueArrays[0].length} total)` : ''
-          throw new DbError('FK_VIOLATION', [{
-            path: fk.fields.join(', '),
-            message: `FK constraint violation: "${fk.fields.join(', ')}" references non-existent record in "${fk.targetTable}" (values: ${sample}${suffix})`,
-          }])
-        }
-      })
-    }
-
-    if (checks.length > 0) {
-      await Promise.all(checks.map(fn => fn()))
-    }
+    await this._integrity.validateForeignKeys(items, this._meta, this._fkLookupResolver, this._writeTableResolver, false, opts?.excludeFkTargetTable)
   }
 
   // ── Internal: batch nested creation ──────────────────────────────────────

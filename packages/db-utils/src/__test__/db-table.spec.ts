@@ -623,14 +623,14 @@ describe('AtscriptDbTable — embedded objects', () => {
     })
 
     it('should set all children to null when parent is null', async () => {
-      // Access the internal _prepareForWrite directly to avoid validation
+      // Access the internal _fieldMapper.prepareForWrite directly to avoid validation
       // (validation rejects null for a required object field)
       table.flatMap // trigger flatten
-      const prepared = (table as any)._prepareForWrite({
+      const prepared = (table as any)._fieldMapper.prepareForWrite({
         ...baseProfileInput,
         contact: null,
         tags: [],
-      })
+      }, (table as any)._meta, (table as any).adapter)
 
       expect(prepared.contact__email).toBeNull()
       expect(prepared.contact__phone).toBeNull()

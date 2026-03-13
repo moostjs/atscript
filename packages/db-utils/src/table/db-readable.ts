@@ -17,10 +17,7 @@ import type { FilterExpr, UniqueryControls, Uniquery, WithRelation } from '@uniq
 import type { BaseDbAdapter } from '../base-adapter'
 import type { TGenericLogger } from '../logger'
 import { NoopLogger } from '../logger'
-import { UniquSelect } from '../query/uniqu-select'
 import type {
-  DbControls,
-  DbQuery,
   TDbDefaultValue,
   TDbFieldMeta,
   TDbForeignKey,
@@ -32,6 +29,8 @@ import type {
   TWriteTableResolver,
 } from '../types'
 import { TableMetadata } from './table-metadata'
+import { type FieldMappingStrategy, DocumentFieldMapper } from '../strategies/field-mapping'
+import { RelationalFieldMapper } from '../strategies/relational-field-mapper'
 
 /**
  * Extracts nav prop names from a query's `$with` array.
@@ -129,19 +128,6 @@ function isIdCompatible(id: unknown, fieldType: TAtscriptAnnotatedType): boolean
       return typeof id === 'string'
     }
   }
-}
-
-/** Coerces a storage value (0/1/null) back to a JS boolean. */
-function toBool(value: unknown): unknown {
-  if (value === null || value === undefined) { return value }
-  return !!value
-}
-
-function toDecimalString(value: unknown): unknown {
-  if (value === null || value === undefined) { return value }
-  if (typeof value === 'string') { return value }
-  if (typeof value === 'number') { return String(value) }
-  return value
 }
 
 /** Minimal interface for a resolved related table. */
@@ -263,6 +249,9 @@ export class AtscriptDbReadable<
   /** Computed metadata for this table/view. Built lazily on first access. */
   protected readonly _meta: TableMetadata
 
+  /** Strategy for mapping between logical field shapes and physical storage. */
+  protected readonly _fieldMapper: FieldMappingStrategy
+
   protected _writeTableResolver?: TWriteTableResolver
 
   constructor(
@@ -294,6 +283,9 @@ export class AtscriptDbReadable<
       ?? (_type.metadata.get('db.view.renamed') as string | undefined)
 
     this._meta = new TableMetadata(adapter.supportsNestedObjects())
+    this._fieldMapper = adapter.supportsNestedObjects()
+      ? new DocumentFieldMapper()
+      : new RelationalFieldMapper()
 
     // Establish bidirectional relationship
     adapter.registerReadable(this, logger)
@@ -480,10 +472,10 @@ export class AtscriptDbReadable<
   ): Promise<DbResponse<DataType, NavType, Q> | null> {
     this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translatedQuery = this._translateQuery(query as Uniquery)
+    const translatedQuery = this._fieldMapper.translateQuery(query as Uniquery, this._meta)
     const result = await this.adapter.findOne(translatedQuery)
     if (!result) { return null }
-    const row = this._reconstructFromRead(result)
+    const row = this._fieldMapper.reconstructFromRead(result, this._meta)
     if (withRelations?.length) {
       await this._loadRelations([row], withRelations)
     }
@@ -500,9 +492,9 @@ export class AtscriptDbReadable<
   ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
     this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translatedQuery = this._translateQuery(query as Uniquery)
+    const translatedQuery = this._fieldMapper.translateQuery(query as Uniquery, this._meta)
     const results = await this.adapter.findMany(translatedQuery)
-    const rows = results.map(row => this._reconstructFromRead(row))
+    const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -515,7 +507,7 @@ export class AtscriptDbReadable<
   public async count(query?: Uniquery<OwnProps, NavType>): Promise<number> {
     this._ensureBuilt()
     query ??= { filter: {}, controls: {} } as Uniquery<OwnProps, NavType>
-    return this.adapter.count(this._translateQuery(query as Uniquery))
+    return this.adapter.count(this._fieldMapper.translateQuery(query as Uniquery, this._meta))
   }
 
   /**
@@ -526,9 +518,9 @@ export class AtscriptDbReadable<
   ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
     this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translated = this._translateQuery(query as Uniquery)
+    const translated = this._fieldMapper.translateQuery(query as Uniquery, this._meta)
     const result = await this.adapter.findManyWithCount(translated)
-    const rows = result.data.map(row => this._reconstructFromRead(row))
+    const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -560,9 +552,9 @@ export class AtscriptDbReadable<
   ): Promise<Array<DbResponse<DataType, NavType, Q>>> {
     this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translated = this._translateQuery(query as Uniquery)
+    const translated = this._fieldMapper.translateQuery(query as Uniquery, this._meta)
     const results = await this.adapter.search(text, translated, indexName)
-    const rows = results.map(row => this._reconstructFromRead(row))
+    const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -579,9 +571,9 @@ export class AtscriptDbReadable<
   ): Promise<{ data: Array<DbResponse<DataType, NavType, Q>>; count: number }> {
     this._ensureBuilt()
     const withRelations = (query.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translated = this._translateQuery(query as Uniquery)
+    const translated = this._fieldMapper.translateQuery(query as Uniquery, this._meta)
     const result = await this.adapter.searchWithCount(text, translated, indexName)
-    const rows = result.data.map(row => this._reconstructFromRead(row))
+    const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -613,9 +605,9 @@ export class AtscriptDbReadable<
     const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
     this._ensureBuilt()
     const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translated = this._translateQuery((query || {}) as Uniquery)
+    const translated = this._fieldMapper.translateQuery((query || {}) as Uniquery, this._meta)
     const results = await this.adapter.vectorSearch(vector, translated, indexName)
-    const rows = results.map(row => this._reconstructFromRead(row))
+    const rows = results.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -637,9 +629,9 @@ export class AtscriptDbReadable<
     const { vector, query, indexName } = this._resolveVectorSearchArgs<Q>(vectorOrIndex, maybeVectorOrQuery, maybeQuery)
     this._ensureBuilt()
     const withRelations = (query?.controls as UniqueryControls)?.$with as WithRelation[] | undefined
-    const translated = this._translateQuery((query || {}) as Uniquery)
+    const translated = this._fieldMapper.translateQuery((query || {}) as Uniquery, this._meta)
     const result = await this.adapter.vectorSearchWithCount(vector, translated, indexName)
-    const rows = result.data.map(row => this._reconstructFromRead(row))
+    const rows = result.data.map(row => this._fieldMapper.reconstructFromRead(row, this._meta))
     if (withRelations?.length) {
       await this._loadRelations(rows, withRelations)
     }
@@ -693,266 +685,9 @@ export class AtscriptDbReadable<
     } as Uniquery<OwnProps, NavType>) as DbResponse<DataType, NavType, Q> | null
   }
 
-  // ── Internal: read reconstruction ────────────────────────────────────────
 
-  /**
-   * Reconstructs nested objects from flat __-separated column values.
-   */
-  protected _reconstructFromRead(row: Record<string, unknown>): Record<string, unknown> {
-    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
-      return this._coerceFieldValues(row)
-    }
 
-    const result: Record<string, unknown> = {}
 
-    const rowKeys = Object.keys(row)
-    for (const physical of rowKeys) {
-      const value = this._meta.booleanFields.has(physical) ? toBool(row[physical])
-        : this._meta.decimalFields.has(physical) ? toDecimalString(row[physical])
-        : row[physical]
-      const logicalPath = this._meta.physicalToPath.get(physical)
-
-      if (!logicalPath) {
-        result[physical] = value
-        continue
-      }
-
-      if (this._meta.jsonFields.has(logicalPath)) {
-        const parsed = typeof value === 'string' ? JSON.parse(value) : value
-        this._setNestedValue(result, logicalPath, parsed)
-      } else if (logicalPath.includes('.')) {
-        this._setNestedValue(result, logicalPath, value)
-      } else {
-        result[logicalPath] = value
-      }
-    }
-
-    // Collapse null parent objects
-    for (const parentPath of this._meta.flattenedParents) {
-      this._reconstructNullParent(result, parentPath)
-    }
-
-    return result
-  }
-
-  /**
-   * Coerces field values from storage representation to JS types
-   * (booleans from 0/1, decimals from number to string).
-   */
-  private _coerceFieldValues(row: Record<string, unknown>): Record<string, unknown> {
-    if (this._meta.booleanFields.size === 0 && this._meta.decimalFields.size === 0) { return row }
-    for (const field of this._meta.booleanFields) {
-      if (field in row) {
-        row[field] = toBool(row[field])
-      }
-    }
-    for (const field of this._meta.decimalFields) {
-      if (field in row) {
-        row[field] = toDecimalString(row[field])
-      }
-    }
-    return row
-  }
-
-  /**
-   * Sets a value at a dot-notation path, creating intermediate objects as needed.
-   */
-  private _setNestedValue(
-    obj: Record<string, unknown>,
-    dotPath: string,
-    value: unknown
-  ): void {
-    const parts = dotPath.split('.')
-    let current: Record<string, unknown> = obj
-
-    for (let i = 0; i < parts.length - 1; i++) {
-      const part = parts[i]
-      if (current[part] === undefined || current[part] === null) {
-        current[part] = {}
-      }
-      current = current[part] as Record<string, unknown>
-    }
-
-    current[parts[parts.length - 1]] = value
-  }
-
-  /**
-   * If all children of a flattened parent are null, collapse the parent to null.
-   */
-  private _reconstructNullParent(
-    obj: Record<string, unknown>,
-    parentPath: string
-  ): void {
-    const parts = parentPath.split('.')
-    let current: Record<string, unknown> = obj
-    for (let i = 0; i < parts.length - 1; i++) {
-      if (current[parts[i]] === undefined) { return }
-      current = current[parts[i]] as Record<string, unknown>
-    }
-
-    const lastPart = parts[parts.length - 1]
-    const parentObj = current[lastPart]
-    if (typeof parentObj !== 'object' || parentObj === null) { return }
-
-    let allNull = true
-    const parentKeys = Object.keys(parentObj as Record<string, unknown>)
-    for (const k of parentKeys) {
-      const v = (parentObj as Record<string, unknown>)[k]
-      if (v !== null && v !== undefined) {
-        allNull = false
-        break
-      }
-    }
-
-    if (allNull) {
-      const parentType = this._meta.flatMap?.get(parentPath)
-      current[lastPart] = parentType?.optional ? null : {}
-    }
-  }
-
-  // ── Internal: query translation ──────────────────────────────────────────
-
-  /**
-   * Translates a Uniquery's filter, sort, and projection from logical
-   * dot-notation paths to physical column names.
-   */
-  protected _translateQuery(query: Uniquery): DbQuery {
-    if (!this._meta.requiresMappings || this._meta.nestedObjects) {
-      const controls = query.controls
-      return {
-        filter: this._meta.valueFormatters ? this._translateFilter(query.filter as FilterExpr) : query.filter as FilterExpr,
-        controls: {
-          ...controls,
-          $with: undefined, // $with is handled by the table layer, not passed to adapters
-          $select: controls?.$select
-            ? new UniquSelect(controls.$select, this._meta.allPhysicalFields)
-            : undefined,
-        },
-        insights: query.insights,
-      }
-    }
-    return {
-      filter: this._translateFilter(query.filter as FilterExpr, true),
-      controls: query.controls ? this._translateControls(query.controls) : {},
-      insights: query.insights,
-    }
-  }
-
-  /**
-   * Recursively walks a filter expression, optionally renaming field keys
-   * and applying adapter-specific value formatting via `_formatFilterValue`.
-   *
-   * When `renameKeys` is true, logical dot-paths are mapped to physical
-   * column names via `_pathToPhysical`. Used by `_translateQuery` (mapping
-   * path) and all write-path operations.
-   */
-  protected _translateFilter(filter: FilterExpr, renameKeys = false): FilterExpr {
-    if (!filter || typeof filter !== 'object') { return filter }
-    if (!renameKeys && !this._meta.valueFormatters) { return filter }
-
-    const result: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(filter as Record<string, unknown>)) {
-      if (key === '$and' || key === '$or') {
-        result[key] = (value as FilterExpr[]).map(f => this._translateFilter(f, renameKeys))
-      } else if (key === '$not') {
-        result[key] = this._translateFilter(value as FilterExpr, renameKeys)
-      } else if (key.startsWith('$')) {
-        result[key] = value
-      } else {
-        const physical = renameKeys ? (this._meta.pathToPhysical.get(key) ?? key) : key
-        result[physical] = this._formatFilterValue(physical, value)
-      }
-    }
-    return result as FilterExpr
-  }
-
-  /**
-   * Applies adapter-specific value formatting to a single filter value.
-   * Handles direct values, operator objects ({$gt: v}), and $in/$nin arrays.
-   * Uses pre-built formatter map — skips columns without a registered formatter.
-   */
-  protected _formatFilterValue(physicalName: string, value: unknown): unknown {
-    const fmt = this._meta.valueFormatters?.get(physicalName)
-    if (!fmt) { return value }
-
-    if (value === null || value === undefined) { return value }
-
-    // Direct value: { field: 123 }
-    if (typeof value !== 'object') {
-      return fmt(value)
-    }
-
-    // Operator object: { $gt: 123, $lt: 456 }
-    const ops = value as Record<string, unknown>
-    const formatted: Record<string, unknown> = {}
-    for (const [op, opVal] of Object.entries(ops)) {
-      if ((op === '$in' || op === '$nin') && Array.isArray(opVal)) {
-        formatted[op] = opVal.map(v => v === null || v === undefined ? v : fmt(v))
-      } else if (op.startsWith('$') && opVal !== null && opVal !== undefined) {
-        formatted[op] = fmt(opVal)
-      } else {
-        formatted[op] = opVal
-      }
-    }
-    return formatted
-  }
-
-  /**
-   * Translates field names in sort and projection controls.
-   */
-  private _translateControls(controls: UniqueryControls): DbControls {
-    if (!controls) { return {} }
-
-    const result: DbControls = { ...controls, $select: undefined, $with: undefined }
-
-    if (controls.$sort) {
-      const translated: Record<string, unknown> = {}
-      const sortObj = controls.$sort as Record<string, unknown>
-      const sortKeys = Object.keys(sortObj)
-      for (const key of sortKeys) {
-        if (this._meta.flattenedParents.has(key)) { continue }
-        const physical = this._meta.pathToPhysical.get(key) ?? key
-        translated[physical] = sortObj[key]
-      }
-      result.$sort = translated as UniqueryControls['$sort']
-    }
-
-    if (controls.$select) {
-      let translatedRaw: UniqueryControls['$select']
-      if (Array.isArray(controls.$select)) {
-        const expanded: string[] = []
-        for (const key of controls.$select) {
-          const expansion = this._meta.selectExpansion.get(key as string)
-          if (expansion) {
-            expanded.push(...expansion)
-          } else {
-            expanded.push((this._meta.pathToPhysical.get(key as string) ?? key) as string)
-          }
-        }
-        translatedRaw = expanded
-      } else {
-        const translated: Record<string, number> = {}
-        const selectObj = controls.$select as Record<string, number>
-        const selectKeys = Object.keys(selectObj)
-        for (const key of selectKeys) {
-          const val = selectObj[key]
-          const expansion = this._meta.selectExpansion.get(key)
-          if (expansion) {
-            for (const leaf of expansion) {
-              translated[leaf] = val
-            }
-          } else {
-            const physical = this._meta.pathToPhysical.get(key) ?? key
-            translated[physical] = val
-          }
-        }
-        translatedRaw = translated as UniqueryControls['$select']
-      }
-      result.$select = new UniquSelect(translatedRaw, this._meta.allPhysicalFields)
-    }
-
-    return result
-  }
 
   /**
    * Resolves an id value into a filter expression.
