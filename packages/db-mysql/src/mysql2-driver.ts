@@ -1,4 +1,5 @@
 import type { TMysqlConnection, TMysqlDriver, TMysqlRunResult } from './types'
+import { utcDatetimeToEpochMs } from './mysql-adapter'
 
 /** mysql2 rejects `undefined` in bind arrays — coerce to `null`. */
 function sanitizeParams(params?: unknown[]): unknown[] {
@@ -16,9 +17,7 @@ function atscriptTypeCast(field: any, next: () => any): any {
   if (field.type === 'TIMESTAMP' || field.type === 'DATETIME') {
     const str = field.string()
     if (str === null) { return null }
-    // Connection uses timezone: '+00:00', so the string is in UTC.
-    // Parse explicitly to avoid local-timezone misinterpretation.
-    return Date.parse(str.replace(' ', 'T') + 'Z')
+    return utcDatetimeToEpochMs(str)
   }
   if (field.type === 'NEWDECIMAL' || field.type === 'DECIMAL') {
     const str = field.string()

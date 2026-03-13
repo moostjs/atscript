@@ -38,6 +38,7 @@ export type {
   TDbDefaultValue,
   TIdDescriptor,
   TDbFieldMeta,
+  TValueFormatterPair,
   TDbStorageType,
   TDbIndexType,
   TDbCollation,

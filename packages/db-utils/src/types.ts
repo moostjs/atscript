@@ -153,6 +153,15 @@ export interface TDbFieldMeta {
   fkTargetField?: TDbFieldMeta
 }
 
+// ── Value Formatters ─────────────────────────────────────────────────────
+
+export interface TValueFormatterPair {
+  /** Converts a JS value to storage representation (write + filter paths). */
+  toStorage: (value: unknown) => unknown
+  /** Converts a storage value back to JS representation (read path). */
+  fromStorage: (value: unknown) => unknown
+}
+
 // ── Foreign Key Types ────────────────────────────────────────────────────
 
 export type TDbReferentialAction = 'cascade' | 'restrict' | 'noAction' | 'setNull' | 'setDefault'

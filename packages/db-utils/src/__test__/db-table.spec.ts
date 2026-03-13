@@ -418,19 +418,19 @@ describe('AtscriptDbTable', () => {
         return undefined
       }
       const t = new AtscriptDbTable(UsersTable, hookAdapter)
-      // Trigger fieldDescriptors computation (which builds _valueFormatters)
+      // Trigger fieldDescriptors computation (which builds toStorageFormatters)
       t.fieldDescriptors
       // createdAt has @db.default.now on a number field — should have a formatter
-      expect((t as any)._meta.valueFormatters).toBeDefined()
-      expect((t as any)._meta.valueFormatters.size).toBe(1)
-      expect((t as any)._meta.valueFormatters.has('createdAt')).toBe(true)
+      expect((t as any)._meta.toStorageFormatters).toBeDefined()
+      expect((t as any)._meta.toStorageFormatters.size).toBe(1)
+      expect((t as any)._meta.toStorageFormatters.has('createdAt')).toBe(true)
     })
 
     it('should not build value formatters when adapter has no formatValue', () => {
       const hookAdapter = new MockAdapter()
       const t = new AtscriptDbTable(UsersTable, hookAdapter)
       t.fieldDescriptors
-      expect((t as any)._meta.valueFormatters).toBeUndefined()
+      expect((t as any)._meta.toStorageFormatters).toBeUndefined()
     })
 
     it('should apply value formatter during insertOne (write path)', async () => {
@@ -485,6 +485,69 @@ describe('AtscriptDbTable', () => {
       expect(call.args[0][0].name).toBe('X')
       // 'id' has no formatter
       expect(call.args[0][0].id).toBe(42)
+    })
+
+    it('should build both toStorage and fromStorage from TValueFormatterPair', () => {
+      const hookAdapter = new MockAdapter()
+      hookAdapter.formatValue = (field) => {
+        if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+          return {
+            toStorage: (v: unknown) => `to:${v}`,
+            fromStorage: (v: unknown) => `from:${v}`,
+          }
+        }
+        return undefined
+      }
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      t.fieldDescriptors
+      expect((t as any)._meta.toStorageFormatters).toBeDefined()
+      expect((t as any)._meta.toStorageFormatters.has('createdAt')).toBe(true)
+      expect((t as any)._meta.fromStorageFormatters).toBeDefined()
+      expect((t as any)._meta.fromStorageFormatters.has('createdAt')).toBe(true)
+    })
+
+    it('should not build fromStorageFormatters for bare function return (backward compat)', () => {
+      const hookAdapter = withTimestampFormatter(new MockAdapter())
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      t.fieldDescriptors
+      expect((t as any)._meta.toStorageFormatters).toBeDefined()
+      expect((t as any)._meta.fromStorageFormatters).toBeUndefined()
+    })
+
+    it('should apply fromStorage formatter during findOne (read path)', async () => {
+      const hookAdapter = new MockAdapter()
+      hookAdapter.formatValue = (field) => {
+        if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+          return {
+            toStorage: (v: unknown) => v,
+            fromStorage: (v: unknown) => typeof v === 'string' ? Number(v) * 10 : v,
+          }
+        }
+        return undefined
+      }
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      // Seed mock data with string values (simulating raw DB)
+      hookAdapter.findOne = async () => ({ id: 1, email: 'a@b.com', name: 'A', createdAt: '100', status: 'ok' })
+      const result = await t.findOne(1)
+      // fromStorage should convert '100' → 1000
+      expect(result!.createdAt).toBe(1000)
+    })
+
+    it('should not apply fromStorage formatter to null values', async () => {
+      const hookAdapter = new MockAdapter()
+      hookAdapter.formatValue = (field) => {
+        if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
+          return {
+            toStorage: (v: unknown) => v,
+            fromStorage: () => { throw new Error('should not be called for null') },
+          }
+        }
+        return undefined
+      }
+      const t = new AtscriptDbTable(UsersTable, hookAdapter)
+      hookAdapter.findOne = async () => ({ id: 1, email: 'a@b.com', name: 'A', createdAt: null, status: 'ok' })
+      const result = await t.findOne(1)
+      expect(result!.createdAt).toBeNull()
     })
   })
 })

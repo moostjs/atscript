@@ -93,7 +93,8 @@ export class TableMetadata {
   decimalFields = new Set<string>()
   allPhysicalFields: string[] = []
   requiresMappings = false
-  valueFormatters?: Map<string, (value: unknown) => unknown>
+  toStorageFormatters?: Map<string, (value: unknown) => unknown>
+  fromStorageFormatters?: Map<string, (value: unknown) => unknown>
 
   // ── Unified leaf field indexes — derived from fieldDescriptors ──────────
 
@@ -621,8 +622,20 @@ export class TableMetadata {
       for (const fd of descriptors) {
         const fmt = fmtHook(fd)
         if (fmt) {
-          if (!this.valueFormatters) { this.valueFormatters = new Map() }
-          this.valueFormatters.set(fd.physicalName, fmt)
+          if (typeof fmt === 'function') {
+            // Bare function = toStorage only (backward compat)
+            if (!this.toStorageFormatters) { this.toStorageFormatters = new Map() }
+            this.toStorageFormatters.set(fd.physicalName, fmt)
+          } else {
+            if (fmt.toStorage) {
+              if (!this.toStorageFormatters) { this.toStorageFormatters = new Map() }
+              this.toStorageFormatters.set(fd.physicalName, fmt.toStorage)
+            }
+            if (fmt.fromStorage) {
+              if (!this.fromStorageFormatters) { this.fromStorageFormatters = new Map() }
+              this.fromStorageFormatters.set(fd.physicalName, fmt.fromStorage)
+            }
+          }
         }
       }
     }

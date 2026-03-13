@@ -8,7 +8,7 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn, TMetadataOverrides } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn, TMetadataOverrides, TValueFormatterPair } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './table/db-readable'
@@ -682,13 +682,18 @@ export abstract class BaseDbAdapter {
 
   /**
    * Returns a value formatter for a field, or undefined if no formatting is needed.
-   * Called once per field during flattening. The returned function is cached and
-   * applied during write preparation and filter translation.
+   * Called once per field during build. The returned formatter(s) are cached and
+   * applied during write preparation, filter translation, and read reconstruction.
+   *
+   * Can return:
+   * - A bare function: used as `toStorage` only (write + filter paths)
+   * - A `TValueFormatterPair`: `toStorage` for writes/filters, `fromStorage` for reads
+   * - `undefined`: no formatting needed
    *
    * This avoids per-value method dispatch — only fields that need formatting
    * get a formatter function, and the generic layer skips fields without one.
    *
-   * Example: MySQL returns `epochMsToUtcDatetime` for TIMESTAMP-mapped fields.
+   * Example: MySQL returns a pair for TIMESTAMP-mapped fields (epoch ms ↔ datetime string).
    */
-  formatValue?(field: TDbFieldMeta): ((value: unknown) => unknown) | undefined
+  formatValue?(field: TDbFieldMeta): TValueFormatterPair | ((value: unknown) => unknown) | undefined
 }

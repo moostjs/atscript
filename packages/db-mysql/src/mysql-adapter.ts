@@ -11,6 +11,7 @@ import type {
   TSyncColumnResult,
   TDbFieldMeta,
   TDbDefaultFn,
+  TValueFormatterPair,
 } from '@atscript/db-utils'
 import type { DbQuery, FilterExpr } from '@atscript/db-utils'
 
@@ -32,6 +33,24 @@ import {
   refActionToSql,
 } from './sql-builder'
 import type { TMysqlConnection, TMysqlDriver } from './types'
+
+/** Parses a MySQL UTC datetime string ('YYYY-MM-DD HH:MM:SS') to epoch ms. Returns the original value if parsing fails. */
+export function utcDatetimeToEpochMs(value: unknown): unknown {
+  if (typeof value === 'number') { return value }
+  if (value instanceof Date) { return value.getTime() }
+  if (typeof value === 'string') {
+    const ms = Date.UTC(
+      +value.slice(0, 4),
+      +value.slice(5, 7) - 1,
+      +value.slice(8, 10),
+      +value.slice(11, 13),
+      +value.slice(14, 16),
+      +value.slice(17, 19),
+    )
+    return Number.isNaN(ms) ? value : ms
+  }
+  return value
+}
 
 /** Formats epoch ms as 'YYYY-MM-DD HH:MM:SS' in UTC for MySQL TIMESTAMP columns. */
 function epochMsToUtcDatetime(ms: number): string {
@@ -173,9 +192,12 @@ export class MysqlAdapter extends BaseDbAdapter {
    * Number fields with @db.default.now map to MySQL TIMESTAMP — the formatter
    * converts epoch ms to a UTC datetime string for the wire protocol.
    */
-  override formatValue(field: TDbFieldMeta): ((value: unknown) => unknown) | undefined {
+  override formatValue(field: TDbFieldMeta): TValueFormatterPair | ((value: unknown) => unknown) | undefined {
     if (field.designType === 'number' && field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
-      return (value: unknown) => typeof value === 'number' ? epochMsToUtcDatetime(value) : value
+      return {
+        toStorage: (value: unknown) => typeof value === 'number' ? epochMsToUtcDatetime(value) : value,
+        fromStorage: utcDatetimeToEpochMs,
+      }
     }
     return undefined
   }

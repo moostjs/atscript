@@ -47,7 +47,7 @@ export abstract class FieldMappingStrategy {
    */
   translateFilter(filter: FilterExpr, meta: TableMetadata): FilterExpr {
     if (!filter || typeof filter !== 'object') { return filter }
-    if (!meta.valueFormatters) { return filter }
+    if (!meta.toStorageFormatters) { return filter }
 
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(filter as Record<string, unknown>)) {
@@ -96,6 +96,24 @@ export abstract class FieldMappingStrategy {
     for (const field of meta.decimalFields) {
       if (field in row) {
         row[field] = toDecimalString(row[field])
+      }
+    }
+    return row
+  }
+
+  /**
+   * Applies adapter-specific fromStorage formatting to a row read from the database.
+   * Converts storage representations back to JS values (e.g. Date → epoch ms).
+   */
+  protected applyFromStorageFormatters(
+    row: Record<string, unknown>,
+    meta: TableMetadata
+  ): Record<string, unknown> {
+    if (!meta.fromStorageFormatters) { return row }
+    for (const [col, fmt] of meta.fromStorageFormatters) {
+      const val = row[col]
+      if (val !== null && val !== undefined) {
+        row[col] = fmt(val)
       }
     }
     return row
@@ -163,7 +181,7 @@ export abstract class FieldMappingStrategy {
    * Handles direct values, operator objects ({$gt: v}), and $in/$nin arrays.
    */
   protected formatFilterValue(physicalName: string, value: unknown, meta: TableMetadata): unknown {
-    const fmt = meta.valueFormatters?.get(physicalName)
+    const fmt = meta.toStorageFormatters?.get(physicalName)
     if (!fmt) { return value }
 
     if (value === null || value === undefined) { return value }
@@ -192,8 +210,8 @@ export abstract class FieldMappingStrategy {
    * Applies adapter-specific value formatting to prepared (physical-named) data.
    */
   protected formatWriteValues(data: Record<string, unknown>, meta: TableMetadata): Record<string, unknown> {
-    if (!meta.valueFormatters) { return data }
-    for (const [col, fmt] of meta.valueFormatters) {
+    if (!meta.toStorageFormatters) { return data }
+    for (const [col, fmt] of meta.toStorageFormatters) {
       const val = data[col]
       if (val !== null && val !== undefined) {
         data[col] = fmt(val)
@@ -242,13 +260,13 @@ export class DocumentFieldMapper extends FieldMappingStrategy {
     row: Record<string, unknown>,
     meta: TableMetadata
   ): Record<string, unknown> {
-    return this.coerceFieldValues(row, meta)
+    return this.applyFromStorageFormatters(this.coerceFieldValues(row, meta), meta)
   }
 
   translateQuery(query: Uniquery, meta: TableMetadata): DbQuery {
     const controls = query.controls
     return {
-      filter: meta.valueFormatters
+      filter: meta.toStorageFormatters
         ? this.translateFilter(query.filter as FilterExpr, meta)
         : query.filter as FilterExpr,
       controls: {

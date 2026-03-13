@@ -20,10 +20,11 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
     meta: TableMetadata
   ): Record<string, unknown> {
     if (!meta.requiresMappings) {
-      return this.coerceFieldValues(row, meta)
+      return this.applyFromStorageFormatters(this.coerceFieldValues(row, meta), meta)
     }
 
     const result: Record<string, unknown> = {}
+    const fromFmts = meta.fromStorageFormatters
 
     for (const physical of Object.keys(row)) {
       const fd = meta.leafByPhysical.get(physical)
@@ -32,7 +33,9 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
         continue
       }
 
-      const raw = row[physical]
+      let raw = row[physical]
+      const fromFmt = fromFmts?.get(physical)
+      if (fromFmt && raw !== null && raw !== undefined) { raw = fromFmt(raw) }
       const value = fd.designType === 'boolean' ? toBool(raw)
         : fd.designType === 'decimal' ? toDecimalString(raw)
         : raw
@@ -58,7 +61,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
     if (!meta.requiresMappings) {
       const controls = query.controls
       return {
-        filter: meta.valueFormatters
+        filter: meta.toStorageFormatters
           ? this.translateFilter(query.filter as FilterExpr, meta)
           : query.filter as FilterExpr,
         controls: {
