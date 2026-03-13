@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import type { FilterExpr } from '@uniqu/core'
 
 import type { BaseDbAdapter } from '../base-adapter'
@@ -12,6 +14,17 @@ import type {
   TWriteTableResolver,
 } from '../types'
 import { IntegrityStrategy } from './integrity'
+
+// ── Cascade context ─────────────────────────────────────────────────────
+
+const MAX_CASCADE_DEPTH = 100
+
+interface CascadeContext {
+  visited: Set<string>
+  depth: number
+}
+
+const cascadeStorage = new AsyncLocalStorage<CascadeContext>()
 
 /**
  * Integrity strategy for adapters without native FK support (e.g. MongoDB).
@@ -122,14 +135,26 @@ export class ApplicationIntegrity extends IntegrityStrategy {
     translateFilter: (f: FilterExpr) => FilterExpr,
     adapter: BaseDbAdapter
   ): Promise<void> {
+    const parentCtx = cascadeStorage.getStore()
+    const visited = parentCtx?.visited ?? new Set<string>()
+    const depth = (parentCtx?.depth ?? 0) + 1
+
+    if (depth > MAX_CASCADE_DEPTH) {
+      throw new DbError('CASCADE_CYCLE', [{
+        path: tableName,
+        message: `Cascade delete aborted: chain exceeded ${MAX_CASCADE_DEPTH} levels, likely caused by a circular or deeply nested cascade relationship`,
+      }])
+    }
+
     const targets = cascadeResolver(tableName)
     if (targets.length === 0) { return }
 
-    // Collect all fields referenced by FK targetFields across all cascade targets.
+    // Ensure PK fields are fetched (needed for record-level cycle detection)
     const neededLogical = new Set<string>()
     for (const t of targets) {
       for (const tf of t.fk.targetFields) { neededLogical.add(tf) }
     }
+    for (const pk of meta.primaryKeys) { neededLogical.add(pk) }
 
     // Map logical → physical for the adapter query, then back for FK matching
     const physicalToLogical = new Map<string, string>()
@@ -146,7 +171,7 @@ export class ApplicationIntegrity extends IntegrityStrategy {
     if (rawRecords.length === 0) { return }
 
     // Map physical column names back to logical for FK matching
-    const records = rawRecords.map(r => {
+    const allRecords = rawRecords.map(r => {
       const mapped: Record<string, unknown> = {}
       for (const [key, val] of Object.entries(r)) {
         mapped[physicalToLogical.get(key) ?? key] = val
@@ -154,40 +179,66 @@ export class ApplicationIntegrity extends IntegrityStrategy {
       return mapped
     })
 
-    // Pass 1: RESTRICT pre-check — block the delete before any side effects
-    for (const target of targets) {
-      if (target.fk.onDelete !== 'restrict') { continue }
-      const childFilter = this.buildCascadeChildFilter(records, target.fk)
-      if (!childFilter) { continue }
-      const count = await target.count(childFilter)
-      if (count > 0) {
-        throw new DbError('CONFLICT', [{
-          path: tableName,
-          message: `Cannot delete from "${tableName}": ${count} record(s) in "${target.childTable}" (${target.fk.fields.join(', ')}) reference it (RESTRICT)`,
-        }])
-      }
+    // Record-level cycle detection: skip records already being deleted
+    // by an ancestor in the cascade chain (e.g. A1→B1→A1 skips A1).
+    // Records in the same table but with different keys proceed normally
+    // (e.g. A1→B1→C1→A2 processes A2).
+    const pkFields = meta.primaryKeys
+    const addedKeys: string[] = []
+    const records: Array<Record<string, unknown>> = []
+    for (const record of allRecords) {
+      const key = this.recordKey(tableName, pkFields, record)
+      if (visited.has(key)) { continue }
+      visited.add(key)
+      addedKeys.push(key)
+      records.push(record)
     }
+    if (records.length === 0) { return }
 
-    // Pass 2: CASCADE / SET NULL — safe to execute now that RESTRICT passed
-    for (const target of targets) {
-      const action = target.fk.onDelete
-      if (!action || action === 'noAction' || action === 'restrict') { continue }
+    try {
+    await cascadeStorage.run({ visited, depth }, async () => {
+      // Pass 1: RESTRICT pre-check — block the delete before any side effects
+      // All restrict checks are read-only counts, safe to run in parallel.
+      const restrictChecks: Array<Promise<void>> = []
+      for (const target of targets) {
+        if (target.fk.onDelete !== 'restrict') { continue }
+        const childFilter = this.buildCascadeChildFilter(records, target.fk)
+        if (!childFilter) { continue }
+        restrictChecks.push(target.count(childFilter).then(count => {
+          if (count > 0) {
+            throw new DbError('CONFLICT', [{
+              path: tableName,
+              message: `Cannot delete from "${tableName}": ${count} record(s) in "${target.childTable}" (${target.fk.fields.join(', ')}) reference it (RESTRICT)`,
+            }])
+          }
+        }))
+      }
+      if (restrictChecks.length > 0) { await Promise.all(restrictChecks) }
 
-      const childFilter = this.buildCascadeChildFilter(records, target.fk)
-      if (!childFilter) { continue }
+      // Pass 2: CASCADE / SET NULL — safe to execute now that RESTRICT passed
+      for (const target of targets) {
+        const action = target.fk.onDelete
+        if (!action || action === 'noAction' || action === 'restrict') { continue }
 
-      switch (action) {
-        case 'cascade': {
-          await target.deleteMany(childFilter)
-          break
-        }
-        case 'setNull': {
-          const nullData: Record<string, unknown> = {}
-          for (const f of target.fk.fields) { nullData[f] = null }
-          await target.updateMany(childFilter, nullData)
-          break
+        const childFilter = this.buildCascadeChildFilter(records, target.fk)
+        if (!childFilter) { continue }
+
+        switch (action) {
+          case 'cascade': {
+            await target.deleteMany(childFilter)
+            break
+          }
+          case 'setNull': {
+            const nullData: Record<string, unknown> = {}
+            for (const f of target.fk.fields) { nullData[f] = null }
+            await target.updateMany(childFilter, nullData)
+            break
+          }
         }
       }
+    })
+    } finally {
+      for (const key of addedKeys) { visited.delete(key) }
     }
   }
 
@@ -196,6 +247,15 @@ export class ApplicationIntegrity extends IntegrityStrategy {
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
+
+  private recordKey(tableName: string, pkFields: string[], record: Record<string, unknown>): string {
+    let key = tableName
+    for (const f of pkFields) {
+      const v = record[f]
+      key += '\0' + (v == null ? '' : String(v))
+    }
+    return key
+  }
 
   /**
    * Builds a filter for child records whose FK matches the deleted parent's PK values.

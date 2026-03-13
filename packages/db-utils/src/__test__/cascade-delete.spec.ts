@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 
+import { DbError } from '../db-error'
 import { DbSpace } from '../table/db-space'
 import { prepareFixtures, MockAdapter } from './test-utils'
 
 let AuthorType: any
 let PostType: any
 let CommentType: any
+let CycleAType: any
+let CycleBType: any
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -18,9 +21,13 @@ describe('Cascade Delete', () => {
     const author = await import('./fixtures/rel-author.as.js')
     const post = await import('./fixtures/test-relations.as.js')
     const comment = await import('./fixtures/rel-comment.as.js')
+    const cycleA = await import('./fixtures/cycle-a.as.js')
+    const cycleB = await import('./fixtures/cycle-b.as.js')
     AuthorType = author.Author
     PostType = post.Post
     CommentType = comment.Comment
+    CycleAType = cycleA.CycleA
+    CycleBType = cycleB.CycleB
   })
 
   beforeEach(() => {
@@ -162,5 +169,44 @@ describe('Cascade Delete', () => {
     // Everything untouched
     expect(sharedStore.get('posts')!).toHaveLength(3)
     expect(sharedStore.get('comments')!).toHaveLength(4)
+  })
+
+  it('should detect cascade cycles and stop instead of infinite recursion', async () => {
+    // CycleA.bId → CycleB (cascade), CycleB.aId → CycleA (cascade)
+    const space = createSpace()
+    const tableA = space.getTable(CycleAType)
+    const tableB = space.getTable(CycleBType)
+
+    sharedStore.set('cycle_a', [
+      { id: 1, name: 'A1', bId: 10 },
+    ])
+    sharedStore.set('cycle_b', [
+      { id: 10, name: 'B1', aId: 1 },
+    ])
+
+    // Delete A1 → cascades to B1 → would cascade back to A1, but cycle detection stops it
+    await tableA.deleteOne(1)
+
+    expect(sharedStore.get('cycle_a')!).toHaveLength(0)
+    expect(sharedStore.get('cycle_b')!).toHaveLength(0)
+  })
+
+  it('should not interfere between independent cascade chains', async () => {
+    // Two independent deletes should each get a fresh visited set
+    const space = createSpace()
+    const authors = space.getTable(AuthorType)
+    space.getTable(PostType)
+    space.getTable(CommentType)
+
+    seedData()
+
+    // First delete: author 1
+    await authors.deleteOne(1)
+    expect(sharedStore.get('authors')!.map(a => a.id)).toEqual([2])
+
+    // Second delete: author 2 — should work even though 'authors' was visited in the first chain
+    await authors.deleteOne(2)
+    expect(sharedStore.get('authors')!).toHaveLength(0)
+    expect(sharedStore.get('posts')!).toHaveLength(0)
   })
 })
