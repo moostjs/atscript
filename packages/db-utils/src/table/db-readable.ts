@@ -339,29 +339,6 @@ export class AtscriptDbReadable<
     return this._meta.originalMetaIdFields
   }
 
-  /**
-   * Registers an additional primary key field.
-   * Useful for adapters (e.g., MongoDB) where `_id` is always the primary key
-   * even without an explicit `@meta.id` annotation.
-   */
-  public addPrimaryKey(field: string): void {
-    this._meta.addPrimaryKey(field)
-  }
-
-  /**
-   * Removes a field from the primary key list.
-   */
-  public removePrimaryKey(field: string): void {
-    this._meta.removePrimaryKey(field)
-  }
-
-  /**
-   * Registers a field as having a unique constraint.
-   */
-  public addUniqueField(field: string): void {
-    this._meta.addUniqueField(field)
-  }
-
   /** Sync method for structural changes: 'drop' (lossy), 'recreate' (lossless), or undefined (manual). */
   public get syncMethod(): 'drop' | 'recreate' | undefined {
     return this._syncMethod

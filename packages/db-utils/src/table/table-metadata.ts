@@ -17,6 +17,7 @@ import type {
   TDbIndexField,
   TDbRelation,
   TDbStorageType,
+  TMetadataOverrides,
 } from '../types'
 
 const INDEX_PREFIX = 'atscript__'
@@ -123,10 +124,12 @@ export class TableMetadata {
    * 2. `flattenAnnotatedType()` with per-field annotation scanning
    * 3. Purge nav field descendants
    * 4. Classify fields and build path maps (skipped for nested-objects adapters)
-   * 5. Build field descriptors (TDbFieldMeta[])
-   * 6. Finalize indexes (resolve field names to physical)
-   * 7. `adapter.onAfterFlatten()` — adapter hook (may mutate primaryKeys, etc.)
-   * 8. Build allPhysicalFields list
+   * 5. `adapter.getMetadataOverrides()` → `_applyOverrides()` (PK/unique/inject adjustments)
+   * 6. Build field descriptors (TDbFieldMeta[])
+   * 7. Build leaf field indexes (skipped for nested-objects adapters)
+   * 8. Finalize indexes (resolve field names to physical)
+   * 9. `adapter.onAfterFlatten()` — adapter hook (read-only bookkeeping)
+   * 10. Build allPhysicalFields list
    */
   build(
     type: TAtscriptAnnotatedType<TAtscriptTypeObject>,
@@ -154,6 +157,13 @@ export class TableMetadata {
     // Classify fields and build path maps (before finalizing indexes)
     if (!this.nestedObjects) {
       this._classifyFields()
+    }
+
+    // Apply adapter-provided metadata overrides (PK adjustments, synthetic fields, etc.)
+    // before building field descriptors — so isPrimaryKey on descriptors is accurate.
+    const overrides = adapter.getMetadataOverrides?.(this)
+    if (overrides) {
+      this._applyOverrides(overrides)
     }
 
     // Build field descriptors unconditionally — schema sync needs them
@@ -194,33 +204,41 @@ export class TableMetadata {
     }
   }
 
-  // ── Build-time mutation API (for adapter.onAfterFlatten) ─────────────────
+  // ── Private: apply metadata overrides ───────────────────────────────────
 
   /**
-   * Registers an additional primary key field.
-   * Used by adapters (e.g., MongoDB) where `_id` is always the primary key.
+   * Applies adapter-provided metadata overrides atomically.
+   * Processing order: injectFields → removePrimaryKeys → addPrimaryKeys → addUniqueFields.
    */
-  addPrimaryKey(field: string): void {
-    if (!this.primaryKeys.includes(field)) {
-      this.primaryKeys.push(field)
+  private _applyOverrides(overrides: TMetadataOverrides): void {
+    if (overrides.injectFields) {
+      for (const { path, type } of overrides.injectFields) {
+        this.flatMap.set(path, type)
+      }
     }
-  }
 
-  /**
-   * Removes a field from the primary key list.
-   */
-  removePrimaryKey(field: string): void {
-    const idx = this.primaryKeys.indexOf(field)
-    if (idx >= 0) {
-      this.primaryKeys.splice(idx, 1)
+    if (overrides.removePrimaryKeys) {
+      for (const field of overrides.removePrimaryKeys) {
+        const idx = this.primaryKeys.indexOf(field)
+        if (idx >= 0) {
+          this.primaryKeys.splice(idx, 1)
+        }
+      }
     }
-  }
 
-  /**
-   * Registers a field as having a unique constraint.
-   */
-  addUniqueField(field: string): void {
-    this.uniqueProps.add(field)
+    if (overrides.addPrimaryKeys) {
+      for (const field of overrides.addPrimaryKeys) {
+        if (!this.primaryKeys.includes(field)) {
+          this.primaryKeys.push(field)
+        }
+      }
+    }
+
+    if (overrides.addUniqueFields) {
+      for (const field of overrides.addUniqueFields) {
+        this.uniqueProps.add(field)
+      }
+    }
   }
 
   // ── Private: annotation scanning ─────────────────────────────────────────

@@ -8,10 +8,11 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn, TMetadataOverrides } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './table/db-readable'
+import type { TableMetadata } from './table/table-metadata'
 import type { TGenericLogger } from './logger'
 import { NoopLogger } from './logger'
 
@@ -315,6 +316,17 @@ export abstract class BaseDbAdapter {
     type: TAtscriptAnnotatedType,
     metadata: TMetadataMap<AtscriptMetadata>
   ): void
+
+  /**
+   * Returns metadata overrides applied during the build pipeline.
+   * Called after field scanning/classification, before field descriptors are built.
+   *
+   * Use this to adjust primary keys, inject synthetic fields, or register
+   * unique constraints — instead of mutating metadata via back-references.
+   *
+   * @param meta - The table metadata (direct reference, not through readable getters).
+   */
+  getMetadataOverrides?(meta: TableMetadata): TMetadataOverrides | undefined
 
   /**
    * Called after all fields are scanned.

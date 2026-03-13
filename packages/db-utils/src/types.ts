@@ -203,6 +203,26 @@ export interface TSyncColumnResult {
   renamed: string[]
 }
 
+// ── Metadata Overrides ───────────────────────────────────────────────────
+
+/**
+ * Adapter-provided metadata adjustments applied atomically during the
+ * build pipeline, before field descriptors are built.
+ *
+ * Replaces the old pattern where adapters mutated metadata via
+ * back-references (`this._table.addPrimaryKey()`, etc.).
+ */
+export interface TMetadataOverrides {
+  /** Fields to add as primary keys. */
+  addPrimaryKeys?: string[]
+  /** Fields to remove from primary keys. */
+  removePrimaryKeys?: string[]
+  /** Fields to register as having a unique constraint. */
+  addUniqueFields?: string[]
+  /** Synthetic fields to inject into flatMap (e.g. MongoDB's `_id`). */
+  injectFields?: Array<{ path: string; type: TAtscriptAnnotatedType }>
+}
+
 // ── Table Resolver ───────────────────────────────────────────────────────
 
 /**

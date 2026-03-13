@@ -27,6 +27,8 @@ import {
   type TSyncColumnResult,
   type TDbFieldMeta,
   type TDbCollation,
+  type TMetadataOverrides,
+  type TableMetadata,
   computeInsights,
 } from '@atscript/db-utils'
 import type {
@@ -99,6 +101,9 @@ export class MongoAdapter extends BaseDbAdapter {
 
   /** Whether the schema explicitly defines _id (via @db.mongo.collection or manual _id field). */
   protected _hasExplicitId = false
+
+  /** Unique fields accumulated during onFieldScanned, returned via getMetadataOverrides. */
+  private _pendingUniqueFields: string[] = []
 
   constructor(
     protected readonly db: Db,
@@ -698,7 +703,7 @@ export class MongoAdapter extends BaseDbAdapter {
     //   (via @db.mongo.collection). Otherwise keep it as PK for replace/update.
     if (field !== '_id' && metadata.has('meta.id')) {
       this._addMongoIndexField('unique', '__pk', field)
-      this._table.addUniqueField(field)
+      this._pendingUniqueFields.push(field)
     }
     // @db.default.increment → track for auto-increment on insert (with optional start value)
     if (metadata.has('db.default.increment')) {
@@ -736,28 +741,37 @@ export class MongoAdapter extends BaseDbAdapter {
     }
   }
 
-  override onAfterFlatten(): void {
+  override getMetadataOverrides(meta: TableMetadata): TMetadataOverrides {
+    const uniqueFields = this._pendingUniqueFields
+
     if (this._hasExplicitId) {
       // Schema defines _id explicitly (via @db.mongo.collection or manual field).
       // _id is the primary key; remove non-_id @meta.id fields from PKs (they become unique indexes).
-      this._table.addPrimaryKey('_id')
-      for (const field of this._table.originalMetaIdFields) {
-        if (field !== '_id') {
-          this._table.removePrimaryKey(field)
-        }
+      return {
+        addPrimaryKeys: ['_id'],
+        removePrimaryKeys: meta.originalMetaIdFields.filter(f => f !== '_id'),
+        addUniqueFields: uniqueFields.length > 0 ? uniqueFields : undefined,
       }
-    } else {
-      // Schema does NOT define _id. The user's @meta.id field is the primary key
-      // for replace/update operations. Inject a synthetic _id as unique field so
-      // that findById can resolve ObjectId strings via _resolveIdFilter.
-      this._table.flatMap.set('_id', {
-        __is_atscript_annotated_type: true,
-        type: { kind: '', designType: 'string', tags: new Set(['objectId', 'mongo']) },
-        metadata: new Map(),
-      } as any)
-      this._table.addUniqueField('_id')
     }
 
+    // Schema does NOT define _id. The user's @meta.id field is the primary key
+    // for replace/update operations. Inject a synthetic _id as unique field so
+    // that findById can resolve ObjectId strings via _resolveIdFilter.
+    uniqueFields.push('_id')
+    return {
+      injectFields: [{
+        path: '_id',
+        type: {
+          __is_atscript_annotated_type: true,
+          type: { kind: '', designType: 'string', tags: new Set(['objectId', 'mongo']) },
+          metadata: new Map(),
+        } as any,
+      }],
+      addUniqueFields: uniqueFields,
+    }
+  }
+
+  override onAfterFlatten(): void {
     // Purge fields that are under navigation relation paths
     // (e.g. 'projects.id' from @db.rel.from projects?: Project[])
     if (this._table.navFields.size > 0) {

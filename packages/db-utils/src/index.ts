@@ -56,6 +56,7 @@ export type {
   TCascadeResolver,
   TFkLookupResolver,
   TFkLookupTarget,
+  TMetadataOverrides,
   WithRelation,
   TypedWithRelation,
   OwnPropsOf,
