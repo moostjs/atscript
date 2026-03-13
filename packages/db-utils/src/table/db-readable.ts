@@ -1416,11 +1416,13 @@ export class AtscriptDbReadable<
             ? new UniquSelect(controls.$select, this._allPhysicalFields)
             : undefined,
         },
+        insights: query.insights,
       }
     }
     return {
       filter: this._translateFilter(query.filter as FilterExpr, true),
       controls: query.controls ? this._translateControls(query.controls) : {},
+      insights: query.insights,
     }
   }
 

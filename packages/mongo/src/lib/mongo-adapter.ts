@@ -26,10 +26,13 @@ import {
   type TColumnDiff,
   type TSyncColumnResult,
   type TDbFieldMeta,
+  type TDbCollation,
+  computeInsights,
 } from '@atscript/db-utils'
 import type {
   AggregationCursor,
   ClientSession,
+  CollationOptions,
   Collection,
   Db,
   Document,
@@ -87,6 +90,9 @@ export class MongoAdapter extends BaseDbAdapter {
 
   /** Physical field names with @db.default.increment → optional start value. */
   protected _incrementFields = new Map<string, number | undefined>()
+
+  /** Physical field names that have a non-binary collation (nocase/unicode). */
+  private _collateFields?: Map<string, TDbCollation>
 
   /** Capped collection options from @db.mongo.capped. */
   protected _cappedOptions?: { size: number; max?: number }
@@ -776,6 +782,14 @@ export class MongoAdapter extends BaseDbAdapter {
         })
       }
     }
+
+    // Build map of fields with non-binary collation for query-time collation injection
+    for (const fd of this._table.fieldDescriptors) {
+      if (fd.collate && fd.collate !== 'binary') {
+        if (!this._collateFields) { this._collateFields = new Map() }
+        this._collateFields.set(fd.physicalName, fd.collate)
+      }
+    }
   }
 
   // ── Search index management ──────────────────────────────────────────────
@@ -1047,7 +1061,7 @@ export class MongoAdapter extends BaseDbAdapter {
     ]
 
     this._log('aggregate (findManyWithCount)', pipeline)
-    const result = await this.collection.aggregate(pipeline, this._getSessionOpts()).toArray()
+    const result = await this.collection.aggregate(pipeline, { ...this._getCollationOpts(query), ...this._getSessionOpts() }).toArray()
     return {
       data: result[0]?.data || [],
       count: result[0]?.meta[0]?.count || 0,
@@ -1139,7 +1153,7 @@ export class MongoAdapter extends BaseDbAdapter {
     const filter = buildMongoFilter(query.filter)
     const opts = this._buildFindOptions(query.controls)
     this._log('findOne', filter, opts)
-    return this.collection.findOne(filter, { ...opts, ...this._getSessionOpts() })
+    return this.collection.findOne(filter, { ...opts, ...this._getCollationOpts(query), ...this._getSessionOpts() })
   }
 
   async findMany(query: DbQuery): Promise<Array<Record<string, unknown>>> {
@@ -1147,13 +1161,13 @@ export class MongoAdapter extends BaseDbAdapter {
     const opts = this._buildFindOptions(query.controls)
     this._log('findMany', filter, opts)
     // eslint-disable-next-line unicorn/no-array-method-this-argument -- MongoDB Collection.find, not Array.find
-    return this.collection.find(filter, { ...opts, ...this._getSessionOpts() }).toArray()
+    return this.collection.find(filter, { ...opts, ...this._getCollationOpts(query), ...this._getSessionOpts() }).toArray()
   }
 
   async count(query: DbQuery): Promise<number> {
     const filter = buildMongoFilter(query.filter)
     this._log('countDocuments', filter)
-    return this.collection.countDocuments(filter, this._getSessionOpts())
+    return this.collection.countDocuments(filter, { ...this._getCollationOpts(query), ...this._getSessionOpts() })
   }
 
   async updateOne(
@@ -1766,6 +1780,23 @@ export class MongoAdapter extends BaseDbAdapter {
     if (controls.$skip) { opts.skip = controls.$skip }
     if (controls.$select) { opts.projection = controls.$select.asProjection }
     return opts
+  }
+
+  /**
+   * Returns MongoDB collation options if any filter field has a non-binary collation.
+   * Uses pre-computed insights when available, falls back to computing them on demand.
+   * Maps: nocase → strength 2 (case-insensitive), unicode → strength 1 (case+accent-insensitive).
+   */
+  private _getCollationOpts(query: DbQuery): { collation: CollationOptions } | undefined {
+    if (!this._collateFields) { return undefined }
+    const insights = query.insights ?? computeInsights(query.filter)
+    let strength: 1 | 2 | undefined
+    for (const field of insights.keys()) {
+      const collation = this._collateFields.get(field)
+      if (collation === 'unicode') { return { collation: { locale: 'en', strength: 1 } } }
+      if (collation === 'nocase') { strength = 2 }
+    }
+    return strength ? { collation: { locale: 'en', strength } } : undefined
   }
 
   protected _addMongoIndexField(

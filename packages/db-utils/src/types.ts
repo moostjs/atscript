@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls, WithRelation } from '@uniqu/core'
+import type { FilterExpr as _FilterExpr, UniqueryControls as _UniqueryControls, UniqueryInsights, WithRelation } from '@uniqu/core'
 import type { UniquSelect } from './query/uniqu-select'
 
 export type { FlatOf, PrimaryKeyOf, OwnPropsOf, NavPropsOf } from '@atscript/typescript/utils'
@@ -26,6 +26,8 @@ export interface DbControls extends Omit<_UniqueryControls, '$select'> {
 export interface DbQuery {
   filter: _FilterExpr
   controls: DbControls
+  /** Pre-computed query insights (field → operators). Adapters may use this to apply query-time behaviour (e.g. collation). */
+  insights?: UniqueryInsights
 }
 
 // ── Search Index Metadata ───────────────────────────────────────────────────
