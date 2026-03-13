@@ -163,7 +163,13 @@ function ensureSelectIncludesFields(
 }
 
 function compositeKey(fields: string[], obj: Record<string, unknown>): string {
-  return fields.map(f => String(obj[f] ?? '')).join('\0')
+  let key = ''
+  for (let i = 0; i < fields.length; i++) {
+    if (i > 0) { key += '\0\0' }
+    const v = obj[fields[i]]
+    key += v == null ? '\0' : String(v)
+  }
+  return key
 }
 
 /** Collects unique non-null values for a field across rows. */
