@@ -114,8 +114,8 @@ export class AsDbReadableController<
   protected validateInsights(
     insights: Map<string, unknown>
   ): string | undefined {
-    for (const [key, value] of insights) {
-      if (key === '*' && (value === 'count' || value === '$select')) { continue }
+    for (const [key] of insights) {
+      if (key === '*') { continue }
       if (!this.readable.flatMap.has(key)) {
         return `Unknown field "${key}"`
       }
