@@ -115,8 +115,7 @@ export class AsDbReadableController<
     insights: Map<string, unknown>
   ): string | undefined {
     for (const [key, value] of insights) {
-      // count(*) produces "*" as an insight key — not a real field, skip it
-      if (key === '*' && value === 'count') { continue }
+      if (key === '*' && (value === 'count' || value === '$select')) { continue }
       if (!this.readable.flatMap.has(key)) {
         return `Unknown field "${key}"`
       }
