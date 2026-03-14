@@ -14,6 +14,8 @@ import type { DbQuery, FilterExpr } from '@atscript/db'
 
 import { buildWhere } from './filter-builder'
 import {
+  buildAggregateCount,
+  buildAggregateSelect,
   buildCreateTable,
   buildCreateView,
   buildDelete,
@@ -166,6 +168,22 @@ export class SqliteAdapter extends BaseDbAdapter {
     this._log(sql, where.params)
     const row = this.driver.get<{ cnt: number }>(sql, where.params)
     return row?.cnt ?? 0
+  }
+
+  async aggregate(query: DbQuery): Promise<Array<Record<string, unknown>>> {
+    const where = buildWhere(query.filter)
+    const tableName = this.resolveTableName()
+
+    if (query.controls.$count) {
+      const { sql, params } = buildAggregateCount(tableName, where, query.controls)
+      this._log(sql, params)
+      const row = this.driver.get<{ count: number }>(sql, params)
+      return [{ count: row?.count ?? 0 }]
+    }
+
+    const { sql, params } = buildAggregateSelect(tableName, where, query.controls)
+    this._log(sql, params)
+    return this.driver.all(sql, params)
   }
 
   // ── CRUD: Update ───────────────────────────────────────────────────────────
