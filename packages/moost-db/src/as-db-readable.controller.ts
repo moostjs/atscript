@@ -272,10 +272,11 @@ export class AsDbReadableController<
     const searchTerm = controls.$search as string | undefined
     const indexName = controls.$index as string | undefined
     const vectorField = controls.$vector as string | undefined
+    const threshold = controls.$threshold ? Number(controls.$threshold) : undefined
 
     const queryObj = {
       filter,
-      controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
+      controls: { ...controls, $select: select, $limit: controls.$limit || 1000, $threshold: threshold },
     } as Uniquery<any, any>
 
     if (vectorField !== undefined && searchTerm) {
@@ -323,10 +324,11 @@ export class AsDbReadableController<
     const searchTerm = controls.$search as string | undefined
     const indexName = controls.$index as string | undefined
     const vectorField = controls.$vector as string | undefined
+    const threshold = controls.$threshold ? Number(controls.$threshold) : undefined
 
     const query = {
       filter,
-      controls: { ...controls, $select: select, $skip: skip, $limit: size },
+      controls: { ...controls, $select: select, $skip: skip, $limit: size, $threshold: threshold },
     }
 
     let result: { data: DataType[]; count: number }

@@ -151,6 +151,12 @@ $("object", QueryControlsDto)
       .optional()
       .$type
   ).prop(
+    "$threshold",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
     "$with",
     $("array")
       .of($()
@@ -208,6 +214,12 @@ $("object", PagesControlsDto)
       .$type
   ).prop(
     "$vector",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
+    "$threshold",
     $().designType("string")
       .tags("string")
       .optional()

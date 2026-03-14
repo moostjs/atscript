@@ -37,6 +37,8 @@ const analyzers = [
  * - `@db.mongo.patch.strategy` → use `@db.patch.strategy`
  * - `@db.mongo.array.uniqueItems` → use `@expect.array.uniqueItems`
  * - `@db.mongo.autoIndexes` → removed (use explicit syncIndexes() calls)
+ * - `@db.mongo.search.vector` → use `@db.search.vector` (generic, in @atscript/db/plugin)
+ * - `@db.mongo.search.filter` → use `@db.search.filter` (generic, in @atscript/db/plugin)
  */
 export const annotations: TAnnotationsTree = {
   collection: new AnnotationSpec({
@@ -249,73 +251,6 @@ export const annotations: TAnnotationsTree = {
           type: 'string',
           description:
             'The **name of the search index** defined in `@db.mongo.search.static`. This links the field to the correct index. If not set, defaults to `"DEFAULT"`.',
-        },
-      ],
-    }),
-
-    vector: new AnnotationSpec({
-      description:
-        'Creates a **MongoDB Vector Search Index** for **semantic search, embeddings, and AI-powered search**.\n\n' +
-        '- Each field that stores vector embeddings **must define its own vector index**.\n' +
-        '- Supports **cosine similarity, Euclidean distance, and dot product similarity**.\n' +
-        '- Vector fields must be an **array of numbers**.\n\n' +
-        '**Example:**\n' +
-        '```atscript\n' +
-        '@db.mongo.search.vector 512, "cosine"\n' +
-        'embedding: mongo.vector\n' +
-        '```\n',
-      nodeType: ['prop'],
-      multiple: false,
-      argument: [
-        {
-          optional: false,
-          name: 'dimensions',
-          type: 'number',
-          description:
-            'The **number of dimensions in the vector** (e.g., 512 for OpenAI embeddings).',
-          values: ['512', '768', '1024', '1536', '3072', '4096'],
-        },
-        {
-          optional: true,
-          name: 'similarity',
-          type: 'string',
-          description:
-            'The **similarity metric** used for vector search. Defaults to `"cosine"`.\n\n' +
-            '**Available options:** `"cosine"`, `"euclidean"`, `"dotProduct"`.',
-          values: ['cosine', 'euclidean', 'dotProduct'],
-        },
-        {
-          optional: true,
-          name: 'indexName',
-          type: 'string',
-          description:
-            'The **name of the vector search index** (optional, defaults to property name).',
-        },
-      ],
-    }),
-
-    filter: new AnnotationSpec({
-      description:
-        'Assigns a field as a **filter field** for a **MongoDB Vector Search Index**.\n\n' +
-        '- The assigned field **must be indexed** for efficient filtering.\n' +
-        '- Filters allow vector search queries to return results **only within a specific category, user group, or tag**.\n' +
-        '- The vector index must be defined using `@db.mongo.search.vector`.\n\n' +
-        '**Example:**\n' +
-        '```atscript\n' +
-        '@db.mongo.search.vector 512, "cosine"\n' +
-        'embedding: number[]\n\n' +
-        '@db.mongo.search.filter "embedding"\n' +
-        'category: string\n' +
-        '```\n',
-      nodeType: ['prop'],
-      multiple: true,
-      argument: [
-        {
-          optional: false,
-          name: 'indexName',
-          type: 'string',
-          description:
-            'The **name of the vector search index** this field should be used as a filter for.',
         },
       ],
     }),

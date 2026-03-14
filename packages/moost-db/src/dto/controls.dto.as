@@ -7,6 +7,7 @@ export interface QueryControlsDto {
     $search?: string
     $index?: string
     $vector?: string
+    $threshold?: string
     $with?: WithRelationDto[]
 }
 
@@ -20,6 +21,7 @@ export interface PagesControlsDto {
     $search?: string
     $index?: string
     $vector?: string
+    $threshold?: string
     $with?: WithRelationDto[]
 }
 

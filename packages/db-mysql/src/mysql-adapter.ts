@@ -15,7 +15,7 @@ import type {
   TDbDefaultFn,
   TValueFormatterPair,
 } from '@atscript/db'
-import type { DbQuery, FilterExpr } from '@atscript/db'
+import type { DbQuery, FilterExpr, TSearchIndexInfo } from '@atscript/db'
 
 import { buildWhere } from './filter-builder'
 import {
@@ -93,6 +93,14 @@ export class MysqlAdapter extends BaseDbAdapter {
   private _autoIncrementStart?: number
   private _incrementFields = new Set<string>()
   private _onUpdateFields = new Map<string, string>()
+
+  // ── Vector search state ─────────────────────────────────────────────────
+  /** Whether the connected MySQL instance supports native VECTOR type (MySQL 9.0+). */
+  private _supportsVector: boolean | undefined
+  /** Vector fields: physical field name → { dimensions, similarity, indexName }. */
+  private _vectorFields = new Map<string, { dimensions: number; similarity: string; indexName: string }>()
+  /** Default similarity thresholds per vector field (from @db.search.vector.threshold). */
+  private _vectorThresholds = new Map<string, number>()
 
   /** Schema name for INFORMATION_SCHEMA queries (null falls through to DATABASE()). */
   private get _schema(): string | null { return this._table.schema ?? null }
@@ -188,6 +196,24 @@ export class MysqlAdapter extends BaseDbAdapter {
     if (onUpdate) {
       this._onUpdateFields.set(field, onUpdate)
     }
+    // @db.search.vector — vector embedding field
+    const vectorMeta = metadata.get('db.search.vector') as { dimensions: number; similarity?: string; indexName?: string } | undefined
+    if (vectorMeta) {
+      const indexName = vectorMeta.indexName || field
+      this._vectorFields.set(field, {
+        dimensions: vectorMeta.dimensions,
+        similarity: vectorMeta.similarity || 'cosine',
+        indexName,
+      })
+      // @db.search.vector.threshold
+      const threshold = metadata.get('db.search.vector.threshold') as number | undefined
+      if (threshold !== undefined) {
+        this._vectorThresholds.set(indexName, threshold)
+      }
+    }
+    // @db.search.filter — pre-filter field for vector index
+    // Note: filter field metadata is stored but not yet used in SQL generation.
+    // Future: use to add indexed WHERE clauses to vector search queries.
   }
 
   // ── Table options ────────────────────────────────────────────────────────
@@ -452,6 +478,10 @@ export class MysqlAdapter extends BaseDbAdapter {
   // ── Schema ────────────────────────────────────────────────────────────────
 
   async ensureTable(): Promise<void> {
+    // Detect vector support lazily on first schema operation
+    if (this._supportsVector === undefined && this._vectorFields.size > 0) {
+      await this._detectVectorSupport()
+    }
     if (this._table instanceof AtscriptDbView) {
       return this._ensureView()
     }
@@ -685,6 +715,11 @@ export class MysqlAdapter extends BaseDbAdapter {
   }
 
   typeMapper(field: TDbFieldMeta): string {
+    // Vector fields → VECTOR(N) on MySQL 9+, JSON otherwise
+    if (this._vectorFields.has(field.path)) {
+      const vec = this._vectorFields.get(field.path)!
+      return this._supportsVector ? `VECTOR(${vec.dimensions})` : 'JSON'
+    }
     return mysqlTypeFromField(field)
   }
 
@@ -812,8 +847,8 @@ export class MysqlAdapter extends BaseDbAdapter {
 
   // ── Fulltext search ───────────────────────────────────────────────────────
 
-  override getSearchIndexes() {
-    const indexes: Array<{ name: string; description?: string; type?: 'text' | 'vector' }> = []
+  override getSearchIndexes(): TSearchIndexInfo[] {
+    const indexes: TSearchIndexInfo[] = []
     for (const index of this._table.indexes.values()) {
       if (index.type === 'fulltext') {
         indexes.push({
@@ -822,6 +857,14 @@ export class MysqlAdapter extends BaseDbAdapter {
           type: 'text',
         })
       }
+    }
+    // Add vector indexes
+    for (const [field, vec] of this._vectorFields) {
+      indexes.push({
+        name: vec.indexName,
+        description: `VECTOR(${vec.dimensions}) on ${field}, ${vec.similarity}`,
+        type: 'vector',
+      })
     }
     return indexes
   }
@@ -890,6 +933,142 @@ export class MysqlAdapter extends BaseDbAdapter {
     }
     return undefined
   }
+
+  // ── Vector search ──────────────────────────────────────────────────────
+
+  /**
+   * Detects native VECTOR type support by inspecting the server version.
+   * MySQL 9.0+ supports the VECTOR column type natively.
+   * Caches the result for the lifetime of this adapter instance.
+   */
+  private async _detectVectorSupport(): Promise<boolean> {
+    if (this._supportsVector !== undefined) { return this._supportsVector }
+    try {
+      const row = await this.driver.get<{ v: string }>('SELECT VERSION() as v', [])
+      if (row?.v) {
+        // VERSION() returns e.g. '9.0.1', '8.4.3', '8.0.mysql_aurora.3.07.1'
+        const major = Number.parseInt(row.v, 10)
+        this._supportsVector = !Number.isNaN(major) && major >= 9
+      } else {
+        this._supportsVector = false
+      }
+    } catch {
+      this._supportsVector = false
+    }
+    return this._supportsVector
+  }
+
+  override isVectorSearchable(): boolean {
+    return this._supportsVector === true && this._vectorFields.size > 0
+  }
+
+  override async vectorSearch(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    await this._detectVectorSupport()
+    if (!this._supportsVector) {
+      throw new Error('Vector search requires MySQL 9.0+')
+    }
+    const { sql, params } = this._buildVectorSearchQuery(vector, query, indexName)
+    this._log(sql, params)
+    return this._exec().all(sql, params)
+  }
+
+  override async vectorSearchWithCount(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    await this._detectVectorSupport()
+    if (!this._supportsVector) {
+      throw new Error('Vector search requires MySQL 9.0+')
+    }
+    const { sql, params } = this._buildVectorSearchQuery(vector, query, indexName)
+    const { sql: countSql, params: countParams } = this._buildVectorSearchCountQuery(vector, query, indexName)
+    this._log(sql, params)
+    this._log(countSql, countParams)
+    const [data, countRow] = await Promise.all([
+      this._exec().all(sql, params),
+      this._exec().get<{ cnt: number }>(countSql, countParams),
+    ])
+    return { data, count: countRow?.cnt ?? 0 }
+  }
+
+  /** Resolves vector field and computes shared context for vector search SQL builders. */
+  private _prepareVectorSearch(vector: number[], query: DbQuery, indexName?: string) {
+    // Resolve target vector field
+    let field: string
+    let vec: { dimensions: number; similarity: string; indexName: string }
+    if (indexName) {
+      let found = false
+      for (const [f, v] of this._vectorFields) {
+        if (v.indexName === indexName) { field = f; vec = v; found = true; break }
+      }
+      if (!found) { throw new Error(`Vector index "${indexName}" not found`) }
+    } else {
+      const first = this._vectorFields.entries().next()
+      if (first.done) { throw new Error('No vector fields defined') }
+      field = first.value[0]; vec = first.value[1]
+    }
+    const distanceFn = similarityToMysqlFn(vec!.similarity)
+    const where = buildWhere(query.filter)
+    const controls = query.controls || {}
+    const threshold = this._resolveVectorThreshold(controls, vec!.indexName)
+    return { field: field!, vec: vec!, distanceFn, where, controls, threshold, tableName: this.resolveTableName(), vectorStr: vectorToString(vector) }
+  }
+
+  private _buildVectorSearchQuery(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): { sql: string; params: unknown[] } {
+    const ctx = this._prepareVectorSearch(vector, query, indexName)
+
+    // Use subquery so distance is computed once per row, then filter/sort on the alias
+    let inner = `SELECT *, ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
+    const params: unknown[] = [ctx.vectorStr, ...ctx.where.params]
+
+    let sql = `SELECT * FROM (${inner}) _v`
+    if (ctx.threshold !== undefined) {
+      // Distance threshold: lower distance = higher similarity. Similarity threshold (0-1)
+      // maps to max distance = 1 - threshold for cosine.
+      sql += ` WHERE _distance <= ?`
+      params.push(1 - ctx.threshold)
+    }
+    sql += ` ORDER BY _distance ASC`
+    if (ctx.controls.$skip) { sql += ` LIMIT ${ctx.controls.$limit || 1000} OFFSET ${ctx.controls.$skip}` }
+    else { sql += ` LIMIT ${ctx.controls.$limit || 20}` }
+
+    return { sql, params }
+  }
+
+  private _buildVectorSearchCountQuery(
+    vector: number[],
+    query: DbQuery,
+    indexName?: string
+  ): { sql: string; params: unknown[] } {
+    const ctx = this._prepareVectorSearch(vector, query, indexName)
+
+    let inner = `SELECT ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
+    const params: unknown[] = [ctx.vectorStr, ...ctx.where.params]
+
+    let sql = `SELECT COUNT(*) AS cnt FROM (${inner}) _v`
+    if (ctx.threshold !== undefined) {
+      sql += ` WHERE _distance <= ?`
+      params.push(1 - ctx.threshold)
+    }
+
+    return { sql, params }
+  }
+
+  /** Resolves threshold: query-time $threshold > schema-level @db.search.vector.threshold. */
+  private _resolveVectorThreshold(controls: Record<string, unknown>, indexName: string): number | undefined {
+    const queryThreshold = controls.$threshold as number | undefined
+    if (queryThreshold !== undefined) { return queryThreshold }
+    return this._vectorThresholds.get(indexName)
+  }
 }
 
 /**
@@ -914,4 +1093,18 @@ function normalizeMysqlDefault(value: string | null): string | undefined {
     return value.slice(1, -1).replace(/''/g, "'")
   }
   return value
+}
+
+/** Maps generic similarity metric to MySQL 9+ distance function name. */
+function similarityToMysqlFn(similarity: string): string {
+  switch (similarity) {
+    case 'euclidean': return 'VEC_DISTANCE_EUCLIDEAN'
+    case 'dotProduct': return 'VEC_DISTANCE_DOT'
+    default: return 'VEC_DISTANCE_COSINE'
+  }
+}
+
+/** Formats a number[] vector as MySQL's STRING_TO_VECTOR input: '[1.0, 2.0, ...]'. */
+function vectorToString(vector: number[]): string {
+  return `[${vector.join(',')}]`
 }

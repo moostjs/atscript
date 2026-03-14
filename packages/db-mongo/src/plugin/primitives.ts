@@ -17,16 +17,6 @@ export const primitives: TAtscriptConfig['primitives'] = {
           'expect.pattern': { pattern: '^[a-fA-F0-9]{24}$' },
         },
       },
-      vector: {
-        type: { kind: 'array', of: 'number' },
-        documentation:
-          'Represents a **MongoDB Vector (Array of Numbers)** for **Vector Search**.\n\n' +
-          '- Equivalent to `number[]` but explicitly used for **vector embeddings**.\n\n' +
-          '**Example:**\n' +
-          '```atscript\n' +
-          'embedding: mongo.vector\n' +
-          '```\n',
-      },
     },
   },
 }

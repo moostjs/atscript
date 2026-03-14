@@ -9,6 +9,7 @@ export interface TMongoSearchHost {
   readonly collection: Collection<any>
   getMongoSearchIndex(name?: string): TMongoIndex | undefined
   getMongoSearchIndexes(): Map<string, TMongoIndex>
+  getVectorThreshold(indexKey?: string): number | undefined
   _getSessionOpts(): Record<string, unknown>
   _log(...args: unknown[]): void
 }
@@ -73,7 +74,8 @@ export async function vectorSearchImpl(
 ): Promise<Array<Record<string, unknown>>> {
   const controls = query.controls || {}
   const stage = buildVectorSearchStage(host, vector, indexName, controls.$limit as number | undefined)
-  return runSearchPipeline(host, stage, query, 'vectorSearch')
+  const threshold = resolveThreshold(host, controls, indexName)
+  return runSearchPipeline(host, stage, query, 'vectorSearch', threshold)
 }
 
 /** Vector search with faceted count. */
@@ -85,7 +87,19 @@ export async function vectorSearchWithCountImpl(
 ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
   const controls = query.controls || {}
   const stage = buildVectorSearchStage(host, vector, indexName, controls.$limit as number | undefined)
-  return runSearchWithCountPipeline(host, stage, query, 'vectorSearchWithCount')
+  const threshold = resolveThreshold(host, controls, indexName)
+  return runSearchWithCountPipeline(host, stage, query, 'vectorSearchWithCount', threshold)
+}
+
+/** Resolves the effective threshold: query-time $threshold > schema-level @db.search.vector.threshold. */
+function resolveThreshold(
+  host: TMongoSearchHost,
+  controls: Record<string, unknown>,
+  indexName?: string
+): number | undefined {
+  const queryThreshold = controls.$threshold as number | undefined
+  if (queryThreshold !== undefined) { return queryThreshold }
+  return host.getVectorThreshold(indexName)
 }
 
 // ── Stage builders ───────────────────────────────────────────────────────────
@@ -153,11 +167,17 @@ async function runSearchPipeline(
   host: TMongoSearchHost,
   stage: Document,
   query: DbQuery,
-  label: string
+  label: string,
+  threshold?: number
 ): Promise<Array<Record<string, unknown>>> {
   const filter = buildMongoFilter(query.filter)
   const controls = query.controls || {}
-  const pipeline: Document[] = [stage, { $match: filter }]
+  const pipeline: Document[] = [stage]
+  if (threshold !== undefined) {
+    pipeline.push({ $addFields: { _score: { $meta: 'vectorSearchScore' } } })
+    pipeline.push({ $match: { _score: { $gte: threshold } } })
+  }
+  pipeline.push({ $match: filter })
   if (controls.$sort) { pipeline.push({ $sort: controls.$sort }) }
   if (controls.$skip) { pipeline.push({ $skip: controls.$skip }) }
   if (controls.$limit) { pipeline.push({ $limit: controls.$limit }) }
@@ -173,10 +193,17 @@ async function runSearchWithCountPipeline(
   host: TMongoSearchHost,
   stage: Document,
   query: DbQuery,
-  label: string
+  label: string,
+  threshold?: number
 ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
   const filter = buildMongoFilter(query.filter)
   const controls = query.controls || {}
+
+  const preStages: Document[] = []
+  if (threshold !== undefined) {
+    preStages.push({ $addFields: { _score: { $meta: 'vectorSearchScore' } } })
+    preStages.push({ $match: { _score: { $gte: threshold } } })
+  }
 
   const dataStages: Document[] = []
   if (controls.$sort) { dataStages.push({ $sort: controls.$sort }) }
@@ -186,6 +213,7 @@ async function runSearchWithCountPipeline(
 
   const pipeline: Document[] = [
     stage,
+    ...preStages,
     { $match: filter },
     {
       $facet: {

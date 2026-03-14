@@ -68,6 +68,9 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Vector search filter associations built during flattening. */
   protected _vectorFilters = new Map<string, string>()
 
+  /** Default similarity thresholds per vector index (from @db.search.vector.threshold). */
+  protected _vectorThresholds = new Map<string, number>()
+
   /** Cached search index lookup. */
   protected _searchIndexesMap?: Map<string, TMongoIndex>
 
@@ -341,22 +344,28 @@ export class MongoAdapter extends BaseDbAdapter {
     for (const index of (metadata.get('db.mongo.search.text') as any[]) || []) {
       this._addFieldToSearchIndex('search_text', index.indexName, field, index.analyzer)
     }
-    // @db.mongo.search.vector
-    const vectorIndex = metadata.get('db.mongo.search.vector') as any
+    // @db.search.vector (generic)
+    const vectorIndex = metadata.get('db.search.vector') as any
     if (vectorIndex) {
-      this._setSearchIndex('vector', vectorIndex.indexName || field, {
+      const indexName = vectorIndex.indexName || field
+      this._setSearchIndex('vector', indexName, {
         fields: [
           {
             type: 'vector',
             path: field,
-            similarity: vectorIndex.similarity || 'dotProduct',
+            similarity: vectorIndex.similarity || 'cosine',
             numDimensions: vectorIndex.dimensions,
           },
         ],
       })
+      // @db.search.vector.threshold
+      const threshold = metadata.get('db.search.vector.threshold') as number | undefined
+      if (threshold !== undefined) {
+        this._vectorThresholds.set(mongoIndexKey('vector', indexName), threshold)
+      }
     }
-    // @db.mongo.search.filter
-    for (const index of (metadata.get('db.mongo.search.filter') as any[]) || []) {
+    // @db.search.filter (generic)
+    for (const index of (metadata.get('db.search.filter') as any[]) || []) {
       this._vectorFilters.set(mongoIndexKey('vector', index.indexName), field)
     }
   }
@@ -473,6 +482,12 @@ export class MongoAdapter extends BaseDbAdapter {
   /** Returns a specific MongoDB search index by name. */
   getMongoSearchIndex(name = DEFAULT_INDEX_NAME): TMongoIndex | undefined {
     return this.getMongoSearchIndexes().get(name)
+  }
+
+  /** Returns the default similarity threshold for a vector index (from @db.search.vector.threshold). */
+  getVectorThreshold(indexName?: string): number | undefined {
+    const key = mongoIndexKey('vector', indexName)
+    return this._vectorThresholds.get(key)
   }
 
   // ── Search overrides ────────────────────────────────────────────────────
