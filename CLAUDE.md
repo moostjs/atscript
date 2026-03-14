@@ -13,8 +13,7 @@ packages/
   core/           - Parser, AST, plugin system, diagnostics, dependency tracking
   typescript/     - TypeScript language extension (codegen + runtime utils + CLI)
   db/             - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
-                    Sub-entries: /plugin (annotations), /rel (relations), /agg (aggregation), /shared (helpers)
-  db-sync/        - Schema sync engine (dev-time tool: drift detection, migrations, CLI)
+                    Sub-entries: /plugin (annotations), /rel (relations), /agg (aggregation), /sync (schema sync), /shared (helpers)
   db-sqlite/      - SQLite adapter (better-sqlite3 / node:sqlite driver, filter-to-SQL translation)
   db-mongo/       - MongoDB adapter (MongoAdapter) and metadata/primitives extension
   db-mysql/       - MySQL adapter (WIP)
@@ -39,8 +38,8 @@ explorations/     - Sandbox/playground for testing features
        ├── /plugin — dbPlugin() registers all @db.* annotations
        ├── /rel — relation loading + nested writes (dynamic import)
        ├── /agg — aggregation validation (dynamic import)
+       ├── /sync — schema sync, dev-time only (dynamic import)
        ├── /shared — annotation helpers for adapter plugins
-       ├─ @atscript/db-sync (schema sync, dev-time tool)
        ├─ @atscript/moost-db (generic Moost controller, + peer: moost)
        ├─ @atscript/db-sqlite (SQLite adapter, + peer: better-sqlite3)
        ├─ @atscript/db-mysql (MySQL adapter, + peer: mysql2)
@@ -91,15 +90,15 @@ All packages under `packages/` follow a strict naming convention:
 
 | Category | Pattern | Examples |
 |----------|---------|----------|
-| **DB-related** | `db-*` | `db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools`, `db-sync` |
-| **DB sub-entries** | `db/<feature>` | `db/plugin`, `db/rel`, `db/agg`, `db/shared` |
+| **DB-related** | `db-*` | `db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools` |
+| **DB sub-entries** | `db/<feature>` | `db/plugin`, `db/rel`, `db/agg`, `db/sync`, `db/shared` |
 | **DB adapters** | `db-<engine>` | `db-sqlite`, `db-mongo`, `db-mysql` |
 | **Moost integrations** | `moost-*` | `moost-db`, `moost-validator` |
 | **Non-DB packages** | descriptive name | `core`, `typescript`, `unplugin`, `vscode` |
 
 Key rules:
 - Every DB-related package starts with `db-` (except `db` itself, the primary DB package)
-- `db` features are exposed as sub-entries (`/plugin`, `/rel`, `/agg`, `/shared`), not separate packages
+- `db` features are exposed as sub-entries (`/plugin`, `/rel`, `/agg`, `/sync`, `/shared`), not separate packages
 - Adapter packages use `db-<engine>` (e.g. `db-mongo`, not `mongo`)
 - Moost framework integrations use `moost-*` prefix
 
