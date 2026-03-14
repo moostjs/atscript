@@ -8,10 +8,11 @@ import type { BaseDbAdapter } from '../base-adapter'
 import type { DbSpace } from '../table/db-space'
 import type { TGenericLogger } from '../logger'
 import { NoopLogger } from '../logger'
-import type { TColumnDiff, TDbFieldMeta } from '../types'
-import { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns } from './schema-hash'
+import type { TColumnDiff, TDbFieldMeta, TExistingTableOption, TTableOptionDiff } from '../types'
+import { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns, snapshotToExistingTableOptions } from './schema-hash'
 import type { TTableSnapshot, TViewSnapshot } from './schema-hash'
 import { computeColumnDiff } from './column-diff'
+import { computeTableOptionDiff } from './table-option-diff'
 
 // ── Colors ───────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ export interface TSyncEntryInit {
   nullableChanges?: Array<{ column: string; toNullable: boolean }>
   defaultChanges?: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   columnsToDrop?: string[]
+  optionChanges?: TTableOptionDiff['changed']
   columnsAdded?: string[]
   columnsRenamed?: string[]
   columnsDropped?: string[]
@@ -68,6 +70,7 @@ export class SyncEntry {
   readonly nullableChanges: Array<{ column: string; toNullable: boolean }>
   readonly defaultChanges: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   readonly columnsToDrop: string[]
+  readonly optionChanges: TTableOptionDiff['changed']
 
   // Result fields
   readonly columnsAdded: string[]
@@ -88,6 +91,7 @@ export class SyncEntry {
     this.nullableChanges = init.nullableChanges ?? []
     this.defaultChanges = init.defaultChanges ?? []
     this.columnsToDrop = init.columnsToDrop ?? []
+    this.optionChanges = init.optionChanges ?? []
     this.columnsAdded = init.columnsAdded ?? []
     this.columnsRenamed = init.columnsRenamed ?? []
     this.columnsDropped = init.columnsDropped ?? []
@@ -102,7 +106,7 @@ export class SyncEntry {
       // Dropping virtual/external views is not destructive
       return this.viewType !== 'V' && this.viewType !== 'E'
     }
-    return this.columnsToDrop.length > 0 || this.typeChanges.length > 0 || this.recreated
+    return this.columnsToDrop.length > 0 || this.typeChanges.length > 0 || this.recreated || this.optionChanges.some(c => c.destructive)
   }
 
   /** Whether this entry represents any change (not in-sync) */
@@ -184,6 +188,11 @@ export class SyncEntry {
         ...this.columnsToDrop.map(col =>
           `      ${c.red(`- ${col} — drop`)}`
         ),
+        ...this.optionChanges.map(oc => {
+          const tag = oc.destructive ? c.red('!') : c.yellow('~')
+          const action = oc.destructive ? ' — requires recreation' : ''
+          return `      ${tag} ${c.cyan(`option ${oc.key}`)}: ${oc.oldValue} → ${oc.newValue}${action}`
+        }),
         '',
       ]
     }
@@ -213,10 +222,11 @@ export class SyncEntry {
       ]
     }
 
-    const hasColumnChanges = this.columnsAdded.length > 0 ||
-      this.columnsRenamed.length > 0 || this.columnsDropped.length > 0
+    const hasChanges = this.columnsAdded.length > 0 ||
+      this.columnsRenamed.length > 0 || this.columnsDropped.length > 0 ||
+      this.optionChanges.length > 0
 
-    if (hasColumnChanges || this.recreated || this.renamedFrom) {
+    if (hasChanges || this.recreated || this.renamedFrom) {
       const rlabel = this.recreated ? 'recreated' : 'altered'
       const renameInfo = this.renamedFrom ? ` ${c.yellow(`(renamed from ${this.renamedFrom})`)}` : ''
       const color = this.recreated ? c.yellow : c.cyan
@@ -225,6 +235,9 @@ export class SyncEntry {
         ...this.columnsAdded.map(col => `      ${c.green(`+ ${col} — added`)}`),
         ...this.columnsRenamed.map(col => `      ${c.yellow(`~ ${col} — renamed`)}`),
         ...this.columnsDropped.map(col => `      ${c.red(`- ${col} — dropped`)}`),
+        ...this.optionChanges.map(oc =>
+          `      ${c.cyan(`~ option ${oc.key}: ${oc.oldValue} → ${oc.newValue}`)}`
+        ),
         '',
       ]
     }
@@ -317,7 +330,8 @@ export class SchemaSync {
     const snapshots = allReadables.map(r => {
       if (r.isView) { return computeViewSnapshot(r as AtscriptDbView) }
       const tm = r.dbAdapter.typeMapper?.bind(r.dbAdapter)
-      return computeTableSnapshot(r, tm)
+      const opts = r.dbAdapter.getDesiredTableOptions?.()
+      return computeTableSnapshot(r, tm, opts)
     })
     const hash = computeSchemaHash(snapshots)
 
@@ -480,9 +494,10 @@ export class SchemaSync {
       for (const readable of allReadables) {
         const adapter = readable.dbAdapter
         const tm = adapter.typeMapper?.bind(adapter)
+        const opts = adapter.getDesiredTableOptions?.()
         const snapshot = readable.isView
           ? computeViewSnapshot(readable as AtscriptDbView)
-          : computeTableSnapshot(readable, tm)
+          : computeTableSnapshot(readable, tm, opts)
         await this.writeTableSnapshot(readable.tableName, snapshot)
       }
 
@@ -623,12 +638,15 @@ export class SchemaSync {
       init.status = 'create'
     }
 
-    // Detect collection-level option drift (e.g. MongoDB capped size/max)
-    if (init.status !== 'create' && adapter.detectTableOptionDrift && adapter.dropTable) {
-      const drifted = await adapter.detectTableOptionDrift()
-      if (drifted) {
+    // Detect table option drift (e.g. MySQL engine/charset, MongoDB capped)
+    if (init.status !== 'create') {
+      const optionDiff = await this.diffTableOptions(readable)
+      if (optionDiff && optionDiff.changed.length > 0) {
         init.status = 'alter'
-        init.recreated = true
+        init.optionChanges = optionDiff.changed
+        if (optionDiff.changed.some(c => c.destructive)) {
+          init.recreated = true
+        }
       }
     }
 
@@ -692,6 +710,32 @@ export class SchemaSync {
         ),
       ]
     }
+  }
+
+  /**
+   * Computes table option diff using DB-first introspection with snapshot fallback.
+   * Returns null if the adapter has no table options.
+   */
+  private async diffTableOptions(readable: AtscriptDbReadable): Promise<TTableOptionDiff | null> {
+    const adapter = readable.dbAdapter
+    const desired = adapter.getDesiredTableOptions?.()
+    if (!desired || desired.length === 0) { return null }
+
+    let existing: TExistingTableOption[]
+
+    if (adapter.getExistingTableOptions) {
+      // Primary: live introspection from DB
+      existing = await adapter.getExistingTableOptions()
+    } else {
+      // Fallback: stored snapshot
+      const snapshot = await this.readTableSnapshot(readable.tableName)
+      existing = snapshot ? snapshotToExistingTableOptions(snapshot) : []
+    }
+
+    if (existing.length === 0) { return null }
+
+    const destructiveKeys = adapter.destructiveOptionKeys?.()
+    return computeTableOptionDiff(desired, existing, destructiveKeys)
   }
 
   /** Checks if a tracked view's definition changed since the last stored snapshot. */
@@ -770,51 +814,46 @@ export class SchemaSync {
         const diff = computeColumnDiff(readable.fieldDescriptors, existing, this.resolveTypeMapper(adapter))
         await this.applyColumnDiff(adapter, readable, diff, init, safe)
       }
-
-      // Option drift detection (same logic as Path C)
-      if (init.status !== 'create' && !init.recreated && !safe && adapter.detectTableOptionDrift) {
-        const drifted = await adapter.detectTableOptionDrift()
-        if (drifted) {
-          const syncMethod = readable.syncMethod
-          if (syncMethod === 'recreate' && adapter.recreateTable) {
-            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — recreating with data preservation`)
-            await adapter.recreateTable()
-            init.status = 'alter'
-            init.recreated = true
-          } else if (adapter.dropTable) {
-            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
-            await adapter.dropTable()
-            await adapter.ensureTable()
-            init.status = 'alter'
-            init.recreated = true
-          }
-        }
-      }
     } else {
       // Path C: Truly schema-less, no syncColumns
       const existed = adapter.tableExists ? await adapter.tableExists() : true
-      // Detect collection-level option drift (e.g. MongoDB capped size/max)
-      if (existed && !safe && adapter.detectTableOptionDrift) {
-        const drifted = await adapter.detectTableOptionDrift()
-        if (drifted) {
+      if (!init.recreated) {
+        await adapter.ensureTable()
+        if (!existed) { init.status = 'create' }
+      }
+    }
+
+    // Detect and apply table option drift (unified across all paths)
+    if (init.status !== 'create' && !init.recreated && !safe) {
+      const optionDiff = await this.diffTableOptions(readable)
+      if (optionDiff && optionDiff.changed.length > 0) {
+        init.optionChanges = optionDiff.changed
+
+        const hasDestructive = optionDiff.changed.some(c => c.destructive)
+        const nonDestructive = optionDiff.changed.filter(c => !c.destructive)
+
+        // Apply non-destructive changes in-place (e.g., MySQL ALTER TABLE ENGINE=X)
+        if (nonDestructive.length > 0 && adapter.applyTableOptions) {
+          await adapter.applyTableOptions(nonDestructive)
+          init.status = 'alter'
+        }
+
+        // Destructive changes require recreation
+        if (hasDestructive) {
           const syncMethod = readable.syncMethod
           if (syncMethod === 'recreate' && adapter.recreateTable) {
-            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — recreating with data preservation`)
+            this.logger.warn?.(`[schema-sync] Destructive table option change on "${name}" — recreating with data preservation`)
             await adapter.recreateTable()
             init.status = 'alter'
             init.recreated = true
           } else if (adapter.dropTable) {
-            this.logger.warn?.(`[schema-sync] Table option drift on "${name}" — dropping and recreating (destructive)`)
+            this.logger.warn?.(`[schema-sync] Destructive table option change on "${name}" — dropping and recreating`)
             await adapter.dropTable()
             await adapter.ensureTable()
             init.status = 'alter'
             init.recreated = true
           }
         }
-      }
-      if (!init.recreated) {
-        await adapter.ensureTable()
-        if (!existed) { init.status = 'create' }
       }
     }
 

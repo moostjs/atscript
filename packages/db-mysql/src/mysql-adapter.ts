@@ -7,7 +7,9 @@ import type {
   TDbInsertResult,
   TDbUpdateResult,
   TExistingColumn,
+  TExistingTableOption,
   TColumnDiff,
+  TTableOptionDiff,
   TSyncColumnResult,
   TDbFieldMeta,
   TDbDefaultFn,
@@ -183,6 +185,63 @@ export class MysqlAdapter extends BaseDbAdapter {
     const onUpdate = metadata.get('db.mysql.onUpdate') as string | undefined
     if (onUpdate) {
       this._onUpdateFields.set(field, onUpdate)
+    }
+  }
+
+  // ── Table options ────────────────────────────────────────────────────────
+
+  override getDesiredTableOptions(): TExistingTableOption[] {
+    return [
+      { key: 'engine', value: this._engine },
+      { key: 'charset', value: this._charset },
+      { key: 'collation', value: this._collation },
+    ]
+  }
+
+  override async getExistingTableOptions(): Promise<TExistingTableOption[]> {
+    const row = await this._exec().get<{
+      ENGINE: string
+      TABLE_COLLATION: string
+    }>(
+      `SELECT ENGINE, TABLE_COLLATION
+       FROM INFORMATION_SCHEMA.TABLES
+       WHERE TABLE_NAME = ? AND TABLE_SCHEMA = COALESCE(?, DATABASE())`,
+      [this._table.tableName, this._schema]
+    )
+    if (!row) { return [] }
+
+    // Extract charset from collation (e.g., utf8mb4_unicode_ci → utf8mb4)
+    const charset = row.TABLE_COLLATION?.split('_')[0] ?? 'utf8mb4'
+
+    return [
+      { key: 'engine', value: row.ENGINE ?? 'InnoDB' },
+      { key: 'charset', value: charset },
+      { key: 'collation', value: row.TABLE_COLLATION ?? 'utf8mb4_unicode_ci' },
+    ]
+  }
+
+  override async applyTableOptions(changes: TTableOptionDiff['changed']): Promise<void> {
+    const tableName = this.resolveTableName()
+    const clauses: string[] = []
+
+    for (const change of changes) {
+      switch (change.key) {
+        case 'engine':
+          clauses.push(`ENGINE = ${change.newValue}`)
+          break
+        case 'charset':
+          clauses.push(`CHARACTER SET = ${change.newValue}`)
+          break
+        case 'collation':
+          clauses.push(`COLLATE = ${change.newValue}`)
+          break
+      }
+    }
+
+    if (clauses.length > 0) {
+      const ddl = `ALTER TABLE ${quoteTableName(tableName)} ${clauses.join(', ')}`
+      this._log(ddl)
+      await this._exec().exec(ddl)
     }
   }
 

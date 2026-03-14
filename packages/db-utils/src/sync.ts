@@ -38,5 +38,6 @@ export async function syncSchema(
 export { SchemaSync, SyncEntry, readStoredSnapshot } from './schema/schema-sync'
 export type { TSyncOptions, TSyncResult, TSyncPlan, TSyncColors, TSyncEntryStatus } from './schema/schema-sync'
 export { computeColumnDiff } from './schema/column-diff'
-export { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns } from './schema/schema-hash'
+export { computeTableOptionDiff } from './schema/table-option-diff'
+export { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns, snapshotToExistingTableOptions } from './schema/schema-hash'
 export type { TTableSnapshot, TViewSnapshot, TFieldSnapshot } from './schema/schema-hash'

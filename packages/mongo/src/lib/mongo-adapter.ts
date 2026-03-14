@@ -27,6 +27,7 @@ import {
   type TSyncColumnResult,
   type TDbFieldMeta,
   type TDbCollation,
+  type TExistingTableOption,
   type TMetadataOverrides,
   type TableMetadata,
   computeInsights,
@@ -1231,15 +1232,41 @@ export class MongoAdapter extends BaseDbAdapter {
     return this.collectionExists()
   }
 
-  async detectTableOptionDrift(): Promise<boolean> {
-    if (!this._cappedOptions) { return false }
+  private static readonly DESTRUCTIVE_OPTION_KEYS: ReadonlySet<string> = new Set([
+    'capped', 'capped.size', 'capped.max',
+  ])
+
+  override getDesiredTableOptions(): TExistingTableOption[] {
+    if (!this._cappedOptions) { return [] }
+    const opts: TExistingTableOption[] = [
+      { key: 'capped', value: 'true' },
+      { key: 'capped.size', value: String(this._cappedOptions.size) },
+    ]
+    if (this._cappedOptions.max !== undefined) {
+      opts.push({ key: 'capped.max', value: String(this._cappedOptions.max) })
+    }
+    return opts
+  }
+
+  override async getExistingTableOptions(): Promise<TExistingTableOption[]> {
     const cols = await this.db.listCollections({ name: this._table.tableName }, { nameOnly: false }).toArray()
-    if (cols.length === 0) { return false }
-    const opts = cols[0].options
-    if (!opts?.capped) { return true } // was not capped but should be
-    if (opts.size !== this._cappedOptions.size) { return true }
-    if ((opts.max ?? undefined) !== (this._cappedOptions.max ?? undefined)) { return true }
-    return false
+    if (cols.length === 0) { return [] }
+    const collOpts = cols[0].options
+    if (!collOpts?.capped) { return [] }
+    const opts: TExistingTableOption[] = [
+      { key: 'capped', value: 'true' },
+    ]
+    if (collOpts.size !== undefined) {
+      opts.push({ key: 'capped.size', value: String(collOpts.size) })
+    }
+    if (collOpts.max !== undefined) {
+      opts.push({ key: 'capped.max', value: String(collOpts.max) })
+    }
+    return opts
+  }
+
+  override destructiveOptionKeys(): ReadonlySet<string> {
+    return MongoAdapter.DESTRUCTIVE_OPTION_KEYS
   }
 
   async ensureTable(): Promise<void> {

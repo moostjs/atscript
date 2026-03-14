@@ -212,6 +212,23 @@ export interface TSyncColumnResult {
   renamed: string[]
 }
 
+/** A single table-level option in unified key-value format. */
+export interface TExistingTableOption {
+  key: string
+  value: string
+}
+
+/** Result of comparing desired table options against existing ones. */
+export interface TTableOptionDiff {
+  changed: Array<{
+    key: string
+    oldValue: string
+    newValue: string
+    /** Whether applying this change requires dropping and recreating the table. */
+    destructive: boolean
+  }>
+}
+
 // ── Metadata Overrides ───────────────────────────────────────────────────
 
 /**

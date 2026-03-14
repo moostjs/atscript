@@ -1,6 +1,6 @@
 import type { AtscriptDbReadable } from '../table/db-readable'
 import type { AtscriptDbView } from '../table/db-view'
-import type { TDbDefaultValue, TDbFieldMeta, TDbStorageType, TExistingColumn } from '../types'
+import type { TDbDefaultValue, TDbFieldMeta, TDbStorageType, TExistingColumn, TExistingTableOption } from '../types'
 
 // ── Snapshot types ────────────────────────────────────────────────────────
 
@@ -34,6 +34,8 @@ export interface TTableSnapshot {
   fields: TFieldSnapshot[]
   indexes: TIndexSnapshot[]
   foreignKeys: TForeignKeySnapshot[]
+  /** Adapter-specific table-level options (e.g., MySQL engine/charset, MongoDB capped). */
+  tableOptions?: TExistingTableOption[]
 }
 
 export interface TViewSnapshot {
@@ -83,7 +85,8 @@ function extractFieldSnapshots(
  */
 export function computeTableSnapshot(
   readable: AtscriptDbReadable,
-  typeMapper?: (field: TDbFieldMeta) => string
+  typeMapper?: (field: TDbFieldMeta) => string,
+  tableOptions?: TExistingTableOption[]
 ): TTableSnapshot {
   const fields = extractFieldSnapshots(readable.fieldDescriptors, typeMapper)
 
@@ -105,12 +108,18 @@ export function computeTableSnapshot(
     }))
     .sort((a, b) => a.fields.join(',').localeCompare(b.fields.join(',')))
 
-  return {
+  const snapshot: TTableSnapshot = {
     tableName: readable.tableName,
     fields,
     indexes,
     foreignKeys,
   }
+
+  if (tableOptions?.length) {
+    snapshot.tableOptions = [...tableOptions].sort((a, b) => a.key.localeCompare(b.key))
+  }
+
+  return snapshot
 }
 
 // ── View snapshot ─────────────────────────────────────────────────────────
@@ -189,6 +198,14 @@ export function snapshotToExistingColumns(snapshot: TTableSnapshot): TExistingCo
     pk: f.isPrimaryKey,
     dflt_value: serializeDefaultValue(f.defaultValue),
   }))
+}
+
+/**
+ * Extracts table options from a stored snapshot for diff comparison.
+ * Used as fallback when an adapter lacks native table option introspection.
+ */
+export function snapshotToExistingTableOptions(snapshot: TTableSnapshot): TExistingTableOption[] {
+  return snapshot.tableOptions ?? []
 }
 
 /** Serializes a TDbDefaultValue to a comparable string. */

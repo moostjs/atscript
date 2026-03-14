@@ -8,7 +8,7 @@ import type {
 
 import type { FilterExpr } from '@uniqu/core'
 
-import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TColumnDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn, TMetadataOverrides, TValueFormatterPair } from './types'
+import type { DbQuery, TDbIndex, TSearchIndexInfo, TDbRelation, TDbForeignKey, TExistingColumn, TExistingTableOption, TColumnDiff, TTableOptionDiff, TSyncColumnResult, TDbFieldMeta, TTableResolver, TDbDefaultFn, TMetadataOverrides, TValueFormatterPair } from './types'
 import type { TDbInsertResult, TDbInsertManyResult, TDbUpdateResult, TDbDeleteResult } from './types'
 import type { WithRelation } from '@uniqu/core'
 import type { AtscriptDbReadable } from './table/db-readable'
@@ -581,17 +581,36 @@ export abstract class BaseDbAdapter {
   async syncForeignKeys?(): Promise<void>
 
   /**
-   * Detects whether table/collection-level options have drifted from the schema.
-   * Used by schema sync for adapters where table-level options (e.g. MongoDB capped
-   * collection size/max) can change independently of columns.
+   * Returns the desired table options from Atscript annotations.
+   * Called after onBeforeFlatten/onAfterFlatten, so adapter-specific state
+   * (e.g., engine, charset, capped options) is populated.
    *
-   * Returns `true` if options have changed and the table needs drop+recreate.
-   * Returns `false` or `undefined` if options are in sync or not applicable.
-   *
-   * This operation is inherently destructive — recreation loses existing data.
-   * Schema sync skips it in safe mode.
+   * Values are stringified for consistent comparison.
+   * Returns undefined if the adapter has no table-level options.
    */
-  detectTableOptionDrift?(): Promise<boolean>
+  getDesiredTableOptions?(): TExistingTableOption[]
+
+  /**
+   * Returns the current table options from the live database.
+   * Primary source for option diffing (DB-first strategy).
+   *
+   * Returns undefined if the adapter cannot introspect table options.
+   * In that case, schema sync falls back to stored snapshot.
+   */
+  getExistingTableOptions?(): Promise<TExistingTableOption[]>
+
+  /**
+   * Applies non-destructive table option changes (e.g., MySQL ALTER TABLE ENGINE=X).
+   * Called for each non-destructive change in the diff.
+   * Destructive changes go through dropTable+ensureTable or recreateTable.
+   */
+  applyTableOptions?(changes: TTableOptionDiff['changed']): Promise<void>
+
+  /**
+   * Returns the set of option keys where a value change requires table recreation.
+   * Default: empty (all changes are non-destructive).
+   */
+  destructiveOptionKeys?(): ReadonlySet<string>
 
   /**
    * Checks whether the table/collection already exists in the database.

@@ -11,6 +11,8 @@ import type {
   TExistingColumn,
   TColumnDiff,
   TSyncColumnResult,
+  TExistingTableOption,
+  TTableOptionDiff,
 } from '../types'
 
 import { prepareFixtures } from './test-utils'
@@ -1386,10 +1388,20 @@ class DriftableSchemalessAdapter extends SchemalessAdapter {
   private _drifted = false
   dropped = false
 
+  private static readonly DESTRUCTIVE_KEYS = new Set(['capped'])
+
   setDrifted(drifted: boolean): void { this._drifted = drifted }
 
-  async detectTableOptionDrift(): Promise<boolean> {
-    return this._drifted
+  override getDesiredTableOptions(): TExistingTableOption[] {
+    return [{ key: 'capped', value: this._drifted ? '2000' : '1000' }]
+  }
+
+  override async getExistingTableOptions(): Promise<TExistingTableOption[]> {
+    return [{ key: 'capped', value: '1000' }]
+  }
+
+  override destructiveOptionKeys(): ReadonlySet<string> {
+    return DriftableSchemalessAdapter.DESTRUCTIVE_KEYS
   }
 
   async dropTable(): Promise<void> {
