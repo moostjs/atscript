@@ -8,6 +8,8 @@ import {
   buildUpdate as _buildUpdate,
   buildDelete as _buildDelete,
   buildCreateView as _buildCreateView,
+  buildAggregateSelect as _buildAggregateSelect,
+  buildAggregateCount as _buildAggregateCount,
   toSqlValue,
   sqlStringLiteral,
   refActionToSql,
@@ -128,6 +130,28 @@ export function buildCreateView(
   resolveFieldRef: (ref: AtscriptQueryFieldRef) => string,
 ): string {
   return _buildCreateView(mysqlDialect, viewName, plan, columns, resolveFieldRef)
+}
+
+/**
+ * Builds a SELECT ... GROUP BY statement with aggregate functions.
+ */
+export function buildAggregateSelect(
+  table: string,
+  where: TSqlFragment,
+  controls: DbControls
+): TSqlFragment {
+  return _buildAggregateSelect(mysqlDialect, table, where, controls)
+}
+
+/**
+ * Builds a COUNT query for the number of distinct groups.
+ */
+export function buildAggregateCount(
+  table: string,
+  where: TSqlFragment,
+  controls: DbControls
+): TSqlFragment {
+  return _buildAggregateCount(mysqlDialect, table, where, controls)
 }
 
 // ── MySQL-specific ──────────────────────────────────────────────────────────

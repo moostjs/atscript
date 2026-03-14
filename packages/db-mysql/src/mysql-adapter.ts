@@ -25,6 +25,8 @@ import {
   buildInsert,
   buildSelect,
   buildUpdate,
+  buildAggregateSelect,
+  buildAggregateCount,
   defaultValueForType,
   defaultValueToSqlLiteral,
   mysqlTypeFromField,
@@ -360,6 +362,22 @@ export class MysqlAdapter extends BaseDbAdapter {
     this._log(sql, where.params)
     const row = await this._exec().get<{ cnt: number }>(sql, where.params)
     return row?.cnt ?? 0
+  }
+
+  async aggregate(query: DbQuery): Promise<Array<Record<string, unknown>>> {
+    const where = buildWhere(query.filter)
+    const tableName = this.resolveTableName()
+
+    if (query.controls.$count) {
+      const { sql, params } = buildAggregateCount(tableName, where, query.controls)
+      this._log(sql, params)
+      const row = await this._exec().get<{ count: number }>(sql, params)
+      return [{ count: row?.count ?? 0 }]
+    }
+
+    const { sql, params } = buildAggregateSelect(tableName, where, query.controls)
+    this._log(sql, params)
+    return this._exec().all(sql, params)
   }
 
   // ── CRUD: Update ──────────────────────────────────────────────────────────

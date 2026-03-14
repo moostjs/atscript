@@ -1,77 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { AtscriptDbTable, DbError } from '@atscript/db'
 
 import { MysqlAdapter } from '../mysql-adapter'
-import type { TMysqlDriver, TMysqlConnection, TMysqlRunResult } from '../types'
+import type { TMysqlConnection } from '../types'
 
-import { prepareFixtures } from './test-utils'
-
-// ── Mock driver ──────────────────────────────────────────────────────────────
-
-interface CapturedCall {
-  method: 'run' | 'all' | 'get' | 'exec'
-  sql: string
-  params?: unknown[]
-}
-
-/**
- * Creates a mock MySQL driver that captures all SQL calls.
- * Both pool-level and connection-level calls are recorded in `calls`.
- */
-function createMockDriver(overrides?: {
-  runResult?: Partial<TMysqlRunResult>
-  allResult?: unknown[]
-  getResult?: unknown | null
-}): TMysqlDriver & { calls: CapturedCall[] } {
-  const calls: CapturedCall[] = []
-
-  const runResult: TMysqlRunResult = {
-    affectedRows: 1,
-    insertId: 1,
-    changedRows: 1,
-    ...overrides?.runResult,
-  }
-
-  return {
-    calls,
-    async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
-      calls.push({ method: 'run', sql, params })
-      return runResult
-    },
-    async all<T>(sql: string, params?: unknown[]): Promise<T[]> {
-      calls.push({ method: 'all', sql, params })
-      return (overrides?.allResult ?? []) as T[]
-    },
-    async get<T>(sql: string, params?: unknown[]): Promise<T | null> {
-      calls.push({ method: 'get', sql, params })
-      return (overrides?.getResult ?? null) as T | null
-    },
-    async exec(sql: string): Promise<void> {
-      calls.push({ method: 'exec', sql })
-    },
-    async getConnection(): Promise<TMysqlConnection> {
-      return {
-        async run(sql: string, params?: unknown[]): Promise<TMysqlRunResult> {
-          calls.push({ method: 'run', sql, params })
-          return runResult
-        },
-        async all<T>(sql: string, params?: unknown[]): Promise<T[]> {
-          calls.push({ method: 'all', sql, params })
-          return (overrides?.allResult ?? []) as T[]
-        },
-        async get<T>(sql: string, params?: unknown[]): Promise<T | null> {
-          calls.push({ method: 'get', sql, params })
-          return (overrides?.getResult ?? null) as T | null
-        },
-        async exec(sql: string): Promise<void> {
-          calls.push({ method: 'exec', sql })
-        },
-        release: vi.fn(),
-      }
-    },
-    async close(): Promise<void> {},
-  }
-}
+import { prepareFixtures, createMockDriver } from './test-utils'
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 

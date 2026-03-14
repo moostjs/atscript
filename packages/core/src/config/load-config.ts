@@ -118,7 +118,8 @@ export async function loadTsConfig(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(/* @vite-ignore */ pathToFileURL(file).href)).default
   } catch (error) {
-    console.error('Could not load config file', file, error)
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`Could not load config file ${configFile}: ${message}`)
     return {}
   } finally {
     fs.unlink(file, () => {})

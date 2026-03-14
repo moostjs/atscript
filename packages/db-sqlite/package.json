@@ -46,7 +46,7 @@
     "@atscript/typescript": "workspace:^",
     "@atscript/db": "workspace:^",
     "@atscript/db-sql-tools": "workspace:^",
-    "@uniqu/core": "^0.1.1",
+    "@uniqu/core": "^0.1.2",
     "better-sqlite3": ">=11.0.0"
   },
   "peerDependenciesMeta": {

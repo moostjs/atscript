@@ -90,15 +90,15 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@atscript/db':
+        specifier: workspace:^
+        version: link:../../packages/db
       '@atscript/db-mongo':
         specifier: workspace:^
         version: link:../../packages/db-mongo
       '@atscript/db-sqlite':
         specifier: workspace:^
         version: link:../../packages/db-sqlite
-      '@atscript/db-utils':
-        specifier: workspace:^
-        version: link:../../packages/db-utils
       '@atscript/moost-db':
         specifier: workspace:^
         version: link:../../packages/moost-db
@@ -151,12 +151,12 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../../packages/core
+      '@atscript/db':
+        specifier: workspace:^
+        version: link:../../packages/db
       '@atscript/db-sqlite':
         specifier: workspace:^
         version: link:../../packages/db-sqlite
-      '@atscript/db-utils':
-        specifier: workspace:^
-        version: link:../../packages/db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../../packages/typescript
@@ -212,14 +212,30 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/db:
+    dependencies:
+      '@atscript/core':
+        specifier: workspace:^
+        version: link:../core
+      '@atscript/typescript':
+        specifier: workspace:^
+        version: link:../typescript
+      '@uniqu/core':
+        specifier: ^0.1.2
+        version: 0.1.2
+    devDependencies:
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
+
   packages/db-mongo:
     dependencies:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
-      '@atscript/db-utils':
+      '@atscript/db':
         specifier: workspace:^
-        version: link:../db-utils
+        version: link:../db
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
@@ -236,18 +252,18 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db':
+        specifier: workspace:^
+        version: link:../db
       '@atscript/db-sql-tools':
         specifier: workspace:^
         version: link:../db-sql-tools
-      '@atscript/db-utils':
-        specifier: workspace:^
-        version: link:../db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       mysql2:
         specifier: ^3.11.0
@@ -258,12 +274,12 @@ importers:
 
   packages/db-sql-tools:
     dependencies:
-      '@atscript/db-utils':
+      '@atscript/db':
         specifier: workspace:^
-        version: link:../db-utils
+        version: link:../db
       '@uniqu/core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       vitest:
         specifier: 3.2.4
@@ -274,18 +290,18 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
+      '@atscript/db':
+        specifier: workspace:^
+        version: link:../db
       '@atscript/db-sql-tools':
         specifier: workspace:^
         version: link:../db-sql-tools
-      '@atscript/db-utils':
-        specifier: workspace:^
-        version: link:../db-utils
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -297,36 +313,20 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  packages/db-utils:
-    dependencies:
-      '@atscript/core':
-        specifier: workspace:^
-        version: link:../core
-      '@atscript/typescript':
-        specifier: workspace:^
-        version: link:../typescript
-      '@uniqu/core':
-        specifier: ^0.1.1
-        version: 0.1.1
-    devDependencies:
-      vitest:
-        specifier: 3.2.4
-        version: 3.2.4(@types/node@22.19.11)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
-
   packages/moost-db:
     dependencies:
-      '@atscript/db-utils':
+      '@atscript/db':
         specifier: workspace:^
-        version: link:../db-utils
+        version: link:../db
       '@atscript/typescript':
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
       '@uniqu/url':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.1.2
+        version: 0.1.2
     devDependencies:
       '@atscript/core':
         specifier: workspace:^
@@ -365,9 +365,9 @@ importers:
       '@atscript/core':
         specifier: workspace:^
         version: link:../core
-      '@atscript/db-utils':
+      '@atscript/db':
         specifier: workspace:^
-        version: link:../db-utils
+        version: link:../db
       '@moostjs/event-cli':
         specifier: ^0.6.2
         version: 0.6.2(@prostojs/logger@0.4.3)(@prostojs/router@0.3.3)(@wooksjs/event-core@0.7.4)(moost@0.6.2)(wooks@0.7.4)
@@ -2169,14 +2169,14 @@ packages:
   '@uniqu/core@0.0.3':
     resolution: {integrity: sha512-Dl/5sqTsP57WRNzEXBhUQ2fE5tnLn2g6MUSzJeZr1yDLbXVmESwnRhlJ7PMI8VkNDj7fN6DBVEkMQiMuQFp79g==}
 
-  '@uniqu/core@0.1.1':
-    resolution: {integrity: sha512-9CZjee25aWUb+nG2fOp9VaT5RFuAabAraCdfRtCMvB3cP5JpMC/sDPcPQN+SEgqRO9DYX570mEp4ZueNxwKfPw==}
+  '@uniqu/core@0.1.2':
+    resolution: {integrity: sha512-TTJdXBczPW0rLYH6jFYOv1ZxAREFaNV2BIN6hjMc4Fyaq3vJKieSyKoErfWqCtTiMnQeu1h/syjhDTs+lO2qKQ==}
 
   '@uniqu/url@0.0.3':
     resolution: {integrity: sha512-Y4Y+oNqqMRc6KMA/XglGCNmMUGC9u291gLSwKtyR1Jh2Soz2RMpqPVth3atlMcOultdkUqT0r4qRgJA1lqoYSw==}
 
-  '@uniqu/url@0.1.1':
-    resolution: {integrity: sha512-C+GIf7e49kv36rK2HNNwcnpTP3/hYm9WhAK+UjoZc2eGRmA2nxJbibZHhiyOTS9W+tdi/pamXjKUymI6gs1Ytg==}
+  '@uniqu/url@0.1.2':
+    resolution: {integrity: sha512-zyDsBrulqwc0kyNU4NBEz7FmORN160oOkLUrHt75vop6vxq0i22yMiXSJcDKqU1qu/XMZBGPALeioThawyh/Mw==}
 
   '@vitejs/plugin-vue@5.2.1':
     resolution: {integrity: sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ==}
@@ -5961,15 +5961,15 @@ snapshots:
 
   '@uniqu/core@0.0.3': {}
 
-  '@uniqu/core@0.1.1': {}
+  '@uniqu/core@0.1.2': {}
 
   '@uniqu/url@0.0.3':
     dependencies:
       '@uniqu/core': 0.0.3
 
-  '@uniqu/url@0.1.1':
+  '@uniqu/url@0.1.2':
     dependencies:
-      '@uniqu/core': 0.1.1
+      '@uniqu/core': 0.1.2
 
   '@vitejs/plugin-vue@5.2.1(vite@5.4.14(@types/node@22.19.11))(vue@3.5.21(typescript@5.9.3))':
     dependencies:
