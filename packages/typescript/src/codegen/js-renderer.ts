@@ -263,9 +263,9 @@ export class JsRenderer extends BaseRenderer {
   }
 
   private renderDimMeasure(node: SemanticNode) {
-    if (!isInterface(node)) return
+    if (!isInterface(node)) { return }
     const interfaceNode = node as SemanticInterfaceNode
-    if (!interfaceNode.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')) return
+    if (!interfaceNode.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')) { return }
 
     let struct: SemanticNode | undefined
     if (interfaceNode.hasExtends) {
@@ -274,16 +274,16 @@ export class JsRenderer extends BaseRenderer {
     if (!struct) {
       struct = interfaceNode.getDefinition()
     }
-    if (!struct || !isStructure(struct)) return
+    if (!struct || !isStructure(struct)) { return }
 
     const structNode = struct as SemanticStructureNode
     const dims: string[] = []
     const measures: string[] = []
 
     for (const [name, prop] of structNode.props) {
-      if (prop.token('identifier')?.pattern) continue
-      if (prop.countAnnotations('db.column.dimension') > 0) dims.push(name)
-      if (prop.countAnnotations('db.column.measure') > 0) measures.push(name)
+      if (prop.token('identifier')?.pattern) { continue }
+      if (prop.countAnnotations('db.column.dimension') > 0) { dims.push(name) }
+      if (prop.countAnnotations('db.column.measure') > 0) { measures.push(name) }
     }
 
     if (dims.length > 0) {

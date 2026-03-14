@@ -12,9 +12,10 @@ import {
   type TValidatorOptions,
 } from '@atscript/typescript/utils'
 
-import type { FilterExpr, UniqueryControls, Uniquery, WithRelation } from '@uniqu/core'
+import type { AggregateQuery, FilterExpr, UniqueryControls, Uniquery, WithRelation } from '@uniqu/core'
 
 import type { BaseDbAdapter } from '../base-adapter'
+import { DbError } from '../db-error'
 import type { TGenericLogger } from '../logger'
 import { NoopLogger } from '../logger'
 import type {
@@ -256,6 +257,18 @@ export class AtscriptDbReadable<
     return this._meta.originalMetaIdFields
   }
 
+  /** Dimension fields from `@db.column.dimension`. */
+  public get dimensions(): readonly string[] {
+    this._ensureBuilt()
+    return this._meta.dimensions
+  }
+
+  /** Measure fields from `@db.column.measure`. */
+  public get measures(): readonly string[] {
+    this._ensureBuilt()
+    return this._meta.measures
+  }
+
   /** Sync method for structural changes: 'drop' (lossy), 'recreate' (lossless), or undefined (manual). */
   public get syncMethod(): 'drop' | 'recreate' | undefined {
     return this._syncMethod
@@ -422,6 +435,78 @@ export class AtscriptDbReadable<
       data: rows as Array<DbResponse<DataType, NavType, Q>>,
       count: result.count,
     }
+  }
+
+  // ── Aggregation ─────────────────────────────────────────────────────────
+
+  /**
+   * Executes an aggregate query with GROUP BY and aggregate functions.
+   *
+   * Validates:
+   * - Plain fields in $select are a subset of $groupBy
+   * - When dimensions/measures are defined (strict mode): $groupBy fields
+   *   must be dimensions, aggregate $field values must be measures (or '*')
+   *
+   * Translates field names, delegates to adapter.aggregate(),
+   * then reverse-maps and applies fromStorage formatters on results.
+   */
+  public async aggregate(
+    query: AggregateQuery
+  ): Promise<Array<Record<string, unknown>>> {
+    this._ensureBuilt()
+    const { $groupBy, $select } = query.controls
+
+    // Validate: plain fields in $select must be in $groupBy
+    if ($select) {
+      const groupBySet = new Set($groupBy)
+      for (const item of $select) {
+        if (typeof item === 'string' && !groupBySet.has(item)) {
+          throw new DbError('INVALID_QUERY', [
+            { path: '$select', message: `Plain field "${item}" in $select must also appear in $groupBy` },
+          ])
+        }
+      }
+    }
+
+    // Strict mode: validate dimensions/measures if any are defined
+    const { dimensions, measures } = this._meta
+    if (dimensions.length > 0 || measures.length > 0) {
+      const dimSet = new Set(dimensions)
+      const measSet = new Set(measures)
+
+      for (const field of $groupBy) {
+        if (!dimSet.has(field)) {
+          throw new DbError('INVALID_QUERY', [
+            { path: '$groupBy', message: `Field "${field}" is not a dimension` },
+          ])
+        }
+      }
+
+      if ($select) {
+        for (const item of $select) {
+          if (typeof item !== 'string' && item.$field !== '*' && !measSet.has(item.$field)) {
+            throw new DbError('INVALID_QUERY', [
+              { path: '$select', message: `Aggregate field "${item.$field}" is not a measure` },
+            ])
+          }
+        }
+      }
+    }
+
+    // Translate and delegate
+    const dbQuery = this._fieldMapper.translateAggregateQuery(query, this._meta)
+    const results = await this.adapter.aggregate(dbQuery)
+
+    // Reverse-map physical → logical field names, apply fromStorage formatters
+    return results.map(row => {
+      const mapped: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(row)) {
+        const logical = this._meta.physicalToPath.get(key) ?? key
+        const fmt = this._meta.fromStorageFormatters?.get(key)
+        mapped[logical] = fmt && value !== null && value !== undefined ? fmt(value) : value
+      }
+      return mapped
+    })
   }
 
   // ── Search ──────────────────────────────────────────────────────────────

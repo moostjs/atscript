@@ -81,6 +81,8 @@ export class TableMetadata {
   uniqueProps = new Set<string>()
   defaults = new Map<string, TDbDefaultValue>()
   columnMap = new Map<string, string>()
+  dimensions: string[] = []
+  measures: string[] = []
 
   // ── Hot-path lookup indexes — derived during build() ─────────────────────
 
@@ -401,6 +403,16 @@ export class TableMetadata {
           `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
         )
       }
+    }
+
+    // @db.column.dimension → mark as dimension (groupable in aggregate queries)
+    if (metadata.has('db.column.dimension')) {
+      this.dimensions.push(fieldName)
+    }
+
+    // @db.column.measure → mark as measure (aggregatable in aggregate queries)
+    if (metadata.has('db.column.measure')) {
+      this.measures.push(fieldName)
     }
   }
 

@@ -1,4 +1,4 @@
-export type DbErrorCode = 'CONFLICT' | 'FK_VIOLATION' | 'NOT_FOUND' | 'CASCADE_CYCLE'
+export type DbErrorCode = 'CONFLICT' | 'FK_VIOLATION' | 'NOT_FOUND' | 'CASCADE_CYCLE' | 'INVALID_QUERY'
 
 export class DbError extends Error {
   name = 'DbError'

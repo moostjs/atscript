@@ -151,7 +151,7 @@ export class MongoAdapter extends BaseDbAdapter {
     return this._collection
   }
 
-  aggregate(pipeline: Document[]): AggregationCursor {
+  aggregatePipeline(pipeline: Document[]): AggregationCursor {
     return this.collection.aggregate(pipeline, this._getSessionOpts())
   }
 

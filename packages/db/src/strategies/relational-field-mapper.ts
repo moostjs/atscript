@@ -1,5 +1,6 @@
-import type { FilterExpr, Uniquery, UniqueryControls } from '@uniqu/core'
+import type { AggregateExpr, AggregateQuery, FilterExpr, Uniquery, UniqueryControls } from '@uniqu/core'
 
+import { resolveAlias } from '../agg'
 import type { BaseDbAdapter } from '../base-adapter'
 import { UniquSelect } from '../query/uniqu-select'
 import type { DbControls, DbQuery } from '../types'
@@ -77,6 +78,87 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
     return {
       filter: this.translateFilterWithRename(query.filter as FilterExpr, meta),
       controls: query.controls ? this.translateControls(query.controls, meta) : {},
+      insights: query.insights,
+    }
+  }
+
+  translateAggregateQuery(query: AggregateQuery, meta: TableMetadata): DbQuery {
+    const controls = query.controls
+
+    // Translate filter (pre-aggregation WHERE clause)
+    const filter = meta.requiresMappings
+      ? this.translateFilterWithRename((query.filter ?? {}) as FilterExpr, meta)
+      : meta.toStorageFormatters
+        ? this.translateFilter((query.filter ?? {}) as FilterExpr, meta)
+        : (query.filter ?? {}) as FilterExpr
+
+    // Translate $groupBy: logical → physical
+    const groupBy = controls.$groupBy.map(
+      field => meta.leafByLogical.get(field)?.physicalName ?? field
+    )
+
+    // Translate $select: strings → physical, AggregateExpr.$field → physical
+    let select: UniqueryControls['$select'] | undefined
+    if (controls.$select) {
+      select = controls.$select.map(item => {
+        if (typeof item === 'string') {
+          return meta.leafByLogical.get(item)?.physicalName ?? item
+        }
+        // AggregateExpr: translate $field (except '*'), keep $as
+        if (item.$field === '*') { return item }
+        return {
+          ...item,
+          $field: meta.leafByLogical.get(item.$field)?.physicalName ?? item.$field,
+        } as AggregateExpr
+      }) as UniqueryControls['$select']
+    }
+
+    // Build alias set from $select AggregateExpr entries for $sort pass-through
+    const aliases = new Set<string>()
+    if (controls.$select) {
+      for (const item of controls.$select) {
+        if (typeof item !== 'string') {
+          aliases.add(resolveAlias(item))
+        }
+      }
+    }
+
+    // Translate $sort: alias keys pass through, others → physical
+    let sort: DbControls['$sort']
+    if (controls.$sort) {
+      const translated: Record<string, unknown> = {}
+      for (const [key, dir] of Object.entries(controls.$sort)) {
+        if (aliases.has(key)) {
+          translated[key] = dir
+        } else {
+          const physical = meta.leafByLogical.get(key)?.physicalName ?? key
+          translated[physical] = dir
+        }
+      }
+      sort = translated as DbControls['$sort']
+    }
+
+    // Translate $having: same as filter translation (aliases pass through via ?? key fallback)
+    let having: FilterExpr | undefined
+    if (controls.$having) {
+      having = meta.requiresMappings
+        ? this.translateFilterWithRename(controls.$having, meta)
+        : meta.toStorageFormatters
+          ? this.translateFilter(controls.$having, meta)
+          : controls.$having
+    }
+
+    return {
+      filter,
+      controls: {
+        $groupBy: groupBy,
+        $select: select ? new UniquSelect(select, meta.allPhysicalFields) : undefined,
+        $sort: sort,
+        $having: having,
+        $skip: controls.$skip,
+        $limit: controls.$limit,
+        $count: controls.$count,
+      },
       insights: query.insights,
     }
   }

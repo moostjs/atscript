@@ -608,12 +608,12 @@ export class TypeRenderer extends BaseRenderer {
     const measures: string[] = []
 
     for (const [name, prop] of structNode.props) {
-      if (prop.token('identifier')?.pattern) continue
-      if (prop.countAnnotations('db.column.dimension') > 0) dims.push(name)
-      if (prop.countAnnotations('db.column.measure') > 0) measures.push(name)
+      if (prop.token('identifier')?.pattern) { continue }
+      if (prop.countAnnotations('db.column.dimension') > 0) { dims.push(name) }
+      if (prop.countAnnotations('db.column.measure') > 0) { measures.push(name) }
     }
 
-    if (dims.length === 0 && measures.length === 0) return
+    if (dims.length === 0 && measures.length === 0) { return }
 
     this.writeln()
     if (dims.length > 0) {

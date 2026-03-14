@@ -1,4 +1,4 @@
-import type { FilterExpr, Uniquery } from '@uniqu/core'
+import type { AggregateQuery, FilterExpr, Uniquery } from '@uniqu/core'
 
 import type { BaseDbAdapter } from '../base-adapter'
 import { UniquSelect } from '../query/uniqu-select'
@@ -37,6 +37,11 @@ export abstract class FieldMappingStrategy {
 
   abstract translateQuery(
     query: Uniquery,
+    meta: TableMetadata
+  ): DbQuery
+
+  abstract translateAggregateQuery(
+    query: AggregateQuery,
     meta: TableMetadata
   ): DbQuery
 
@@ -274,6 +279,23 @@ export class DocumentFieldMapper extends FieldMappingStrategy {
         $with: undefined,
         $select: controls?.$select
           ? new UniquSelect(controls.$select, meta.allPhysicalFields)
+          : undefined,
+      },
+      insights: query.insights,
+    }
+  }
+
+  translateAggregateQuery(query: AggregateQuery, meta: TableMetadata): DbQuery {
+    const controls = query.controls
+    return {
+      filter: meta.toStorageFormatters
+        ? this.translateFilter(query.filter as FilterExpr, meta)
+        : (query.filter ?? {}) as FilterExpr,
+      controls: {
+        ...controls,
+        $with: undefined,
+        $select: controls.$select
+          ? new UniquSelect(controls.$select as any, meta.allPhysicalFields)
           : undefined,
       },
       insights: query.insights,

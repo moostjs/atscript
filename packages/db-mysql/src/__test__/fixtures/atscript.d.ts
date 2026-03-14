@@ -54,6 +54,8 @@ declare global {
     "db.column.renamed": string
     "db.column.collate": string
     "db.column.precision": { precision: number, scale: number }
+    "db.column.dimension": boolean
+    "db.column.measure": boolean
     "db.default": string
     "db.default.increment": number | true
     "db.default.uuid": boolean
@@ -74,6 +76,12 @@ declare global {
     "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.materialized": boolean
     "db.view.renamed": string
+    "db.view.having": import("@atscript/typescript/utils").AtscriptQueryNode
+    "db.agg.sum": string
+    "db.agg.avg": string
+    "db.agg.count": string | true
+    "db.agg.min": string
+    "db.agg.max": string
     "db.mysql.engine": string
     "db.mysql.charset": string
     "db.mysql.collate": string

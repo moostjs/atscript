@@ -1,4 +1,4 @@
-import type { UniqueryControls } from '@uniqu/core'
+import type { AggregateExpr, UniqueryControls } from '@uniqu/core'
 
 /**
  * Wraps a raw `$select` value and provides lazy-cached conversions
@@ -16,14 +16,21 @@ export class UniquSelect {
   private _allFields?: string[]
   private _array: string[] | undefined | symbol = UniquSelect.UNRESOLVED
   private _projection: Record<string, 0 | 1> | undefined | symbol = UniquSelect.UNRESOLVED
+  private _aggregates: AggregateExpr[] | undefined | symbol = UniquSelect.UNRESOLVED
 
   constructor(raw: UniqueryControls['$select'], allFields?: string[]) {
     this._raw = raw
     this._allFields = allFields
   }
 
+  /** Type guard: checks if a value is an AggregateExpr ({$fn, $field}). */
+  private static _isAggregateExpr(v: unknown): v is AggregateExpr {
+    return typeof v === 'object' && v !== null && '$fn' in v && '$field' in v
+  }
+
   /**
-   * Resolved inclusion array of field names.
+   * Resolved inclusion array of plain field names (strings only).
+   * AggregateExpr objects are filtered out.
    * For exclusion form, inverts using `allFields` from constructor.
    */
   get asArray(): string[] | undefined {
@@ -32,7 +39,9 @@ export class UniquSelect {
     }
 
     if (Array.isArray(this._raw)) {
-      this._array = this._raw as string[]
+      this._array = (this._raw as unknown[]).filter(
+        (item): item is string => typeof item === 'string'
+      )
       return this._array
     }
 
@@ -61,6 +70,7 @@ export class UniquSelect {
    * Record projection preserving original semantics.
    * Returns original object as-is if raw was object.
    * Converts `string[]` to `{field: 1}` inclusion object.
+   * AggregateExpr objects in array form are ignored.
    */
   get asProjection(): Record<string, 0 | 1> | undefined {
     if (this._projection !== UniquSelect.UNRESOLVED) {
@@ -73,16 +83,38 @@ export class UniquSelect {
       return this._projection
     }
 
-    const arr = this._raw as string[]
-    if (arr.length === 0) {
+    const strings = this.asArray
+    if (!strings || strings.length === 0) {
       this._projection = undefined
       return undefined
     }
     const result: Record<string, 1> = {}
-    for (const item of arr) {
+    for (const item of strings) {
       result[item] = 1
     }
     this._projection = result
     return this._projection
+  }
+
+  /**
+   * Extracts AggregateExpr entries from array-form $select.
+   * Returns undefined if no aggregates present or if $select is object form.
+   */
+  get aggregates(): AggregateExpr[] | undefined {
+    if (this._aggregates !== UniquSelect.UNRESOLVED) {
+      return this._aggregates as AggregateExpr[] | undefined
+    }
+    if (!Array.isArray(this._raw)) {
+      this._aggregates = undefined
+      return undefined
+    }
+    const aggs = (this._raw as unknown[]).filter(UniquSelect._isAggregateExpr)
+    this._aggregates = aggs.length > 0 ? aggs : undefined
+    return this._aggregates
+  }
+
+  /** Whether the $select contains any AggregateExpr entries. */
+  get hasAggregates(): boolean {
+    return !!this.aggregates?.length
   }
 }

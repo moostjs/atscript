@@ -13,6 +13,11 @@ export type {
   Uniquery,
   WithRelation,
   TypedWithRelation,
+  AggregateExpr,
+  AggregateFn,
+  AggregateControls,
+  AggregateQuery,
+  AggregateResult,
 } from '@uniqu/core'
 
 // ── Resolved query types (adapter-facing) ──────────────────────────────────

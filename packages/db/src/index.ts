@@ -64,6 +64,11 @@ export type {
   TypedWithRelation,
   OwnPropsOf,
   NavPropsOf,
+  AggregateExpr,
+  AggregateFn,
+  AggregateControls,
+  AggregateQuery,
+  AggregateResult,
 } from './types'
 export type { TGenericLogger } from './logger'
 export { NoopLogger } from './logger'

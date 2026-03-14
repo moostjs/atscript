@@ -103,6 +103,13 @@ export class MockAdapter extends BaseDbAdapter {
     return { deletedCount: before - remaining.length }
   }
 
+  public aggregateResult: Array<Record<string, unknown>> = []
+
+  async aggregate(query: DbQuery): Promise<Array<Record<string, unknown>>> {
+    this.record('aggregate', query)
+    return this.aggregateResult
+  }
+
   async syncIndexes(): Promise<void> {}
   async ensureTable(): Promise<void> {}
 }

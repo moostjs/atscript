@@ -524,6 +524,16 @@ export abstract class BaseDbAdapter {
     return { data, count }
   }
 
+  /**
+   * Executes an aggregate query (GROUP BY + aggregate functions).
+   * Default throws — override in adapters that support aggregation.
+   */
+  async aggregate(
+    _query: DbQuery
+  ): Promise<Array<Record<string, unknown>>> {
+    throw new Error('Aggregation not supported by this adapter')
+  }
+
   // ── Abstract CRUD — adapters must implement ───────────────────────────────
   // The adapter reads this._table.tableName and any other metadata it needs
   // internally. No table name parameter needed.
