@@ -24,6 +24,10 @@ function createMockTable(overrides: Record<string, any> = {}) {
       ['id', {} as any],
       ['name', {} as any],
       ['email', {} as any],
+      ['status', {} as any],
+      ['amount', {} as any],
+      ['region', {} as any],
+      ['total', {} as any],
     ]),
     primaryKeys: ['id'],
     uniqueProps: new Set<string>(),
@@ -39,6 +43,7 @@ function createMockTable(overrides: Record<string, any> = {}) {
     search: vi.fn().mockResolvedValue([{ id: '1', name: 'Alice' }]),
     searchWithCount: vi.fn().mockResolvedValue({ data: [{ id: '1', name: 'Alice' }], count: 1 }),
     count: vi.fn().mockResolvedValue(42),
+    aggregate: vi.fn().mockResolvedValue([{ status: 'active', total: 100 }]),
     insertOne: vi.fn().mockResolvedValue({ insertedId: '1' }),
     insertMany: vi.fn().mockResolvedValue({ insertedCount: 2, insertedIds: ['1', '2'] }),
     replaceOne: vi.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 }),
@@ -168,6 +173,60 @@ describe('AsDbController', () => {
       expect(result).not.toBeInstanceOf(HttpError)
       const call = table.findMany.mock.calls[0][0]
       expect(call.filter).toEqual({ id: '69aca32e434504011457636c' })
+    })
+  })
+
+  // ── GET /query (aggregate) ──────────────────────────────────────────
+
+  describe('query (aggregate)', () => {
+    it('should call readable.aggregate when $groupBy is present', async () => {
+      const result = await controller.query('/query?$groupBy=status&$select=status,sum(amount):total')
+      expect(table.aggregate).toHaveBeenCalled()
+      expect(table.findMany).not.toHaveBeenCalled()
+      expect(result).toEqual([{ status: 'active', total: 100 }])
+    })
+
+    it('should return 400 when $groupBy and $with are combined', async () => {
+      const ctx = createController({ relations: new Map([['tags', {}]]) })
+      const result = await ctx.controller.query('/query?$groupBy=status&$with=tags')
+      expect(result).toBeInstanceOf(HttpError)
+      expect((result as HttpError).body.statusCode).toBe(400)
+      expect((result as HttpError).body.message).toContain('$with')
+      expect(ctx.table.aggregate).not.toHaveBeenCalled()
+    })
+
+    it('should pass $count through to aggregate', async () => {
+      await controller.query('/query?$groupBy=status&$count=true')
+      expect(table.aggregate).toHaveBeenCalled()
+      const call = table.aggregate.mock.calls[0][0]
+      expect(call.controls.$count).toBe(true)
+    })
+
+    it('should apply filter to aggregate query', async () => {
+      await controller.query('/query?status=active&$groupBy=region')
+      const call = table.aggregate.mock.calls[0][0]
+      expect(call.filter).toEqual({ status: 'active' })
+    })
+
+    it('should pass sort through to aggregate', async () => {
+      await controller.query('/query?$groupBy=status&$select=status,sum(amount):total&$sort=total')
+      const call = table.aggregate.mock.calls[0][0]
+      expect(call.controls.$sort).toEqual({ total: 1 })
+    })
+
+    it('should pass pagination controls through to aggregate', async () => {
+      await controller.query('/query?$groupBy=status&$skip=10&$limit=5')
+      const call = table.aggregate.mock.calls[0][0]
+      expect(call.controls.$skip).toBe(10)
+      expect(call.controls.$limit).toBe(5)
+    })
+
+    it('should apply transformFilter to aggregate query', async () => {
+      const ctx = createController()
+      vi.spyOn(ctx.controller as any, 'transformFilter').mockReturnValue({ tenant: 'abc' })
+      await ctx.controller.query('/query?$groupBy=status')
+      const call = ctx.table.aggregate.mock.calls[0][0]
+      expect(call.filter).toEqual({ tenant: 'abc' })
     })
   })
 

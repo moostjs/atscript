@@ -237,11 +237,30 @@ export class AsDbReadableController<
   @Get('query')
   async query(@Url() url: string): Promise<DataType[] | number | HttpError> {
     const parsed = this.parseQueryString(url)
+    const controls = parsed.controls
 
+    // ── Aggregate path (before DTO validation — $groupBy is not in QueryControlsDto) ──
+    const groupBy = controls.$groupBy as string[] | undefined
+    if (groupBy?.length) {
+      if ((controls.$with as unknown[])?.length) {
+        return new HttpError(400, 'Cannot combine $with and $groupBy in the same query')
+      }
+      if (parsed.insights) {
+        const insightsError = this.validateInsights(parsed.insights as Map<string, unknown>)
+        if (insightsError) { return new HttpError(400, insightsError) }
+      }
+      const filter = this.transformFilter(parsed.filter)
+      return this.readable.aggregate({
+        filter,
+        controls: controls as any,
+        insights: parsed.insights,
+      }) as Promise<any>
+    }
+
+    // ── Regular query path ──────────────────────────────────────────
     const error = this.validateParsed(parsed, 'query')
     if (error) { return error }
 
-    const controls = parsed.controls
     const filter = this.transformFilter(parsed.filter)
     const select = this.transformProjection(controls.$select)
 
