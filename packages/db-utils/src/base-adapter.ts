@@ -581,6 +581,15 @@ export abstract class BaseDbAdapter {
   async syncForeignKeys?(): Promise<void>
 
   /**
+   * Drops FK constraints identified by their canonical local column key.
+   * Called by the sync executor before column operations to remove stale FKs
+   * that would otherwise block ALTER COLUMN.
+   *
+   * @param fkFieldKeys - Canonical FK keys (sorted local field names, comma-joined).
+   */
+  dropForeignKeys?(fkFieldKeys: string[]): Promise<void>
+
+  /**
    * Returns the desired table options from Atscript annotations.
    * Called after onBeforeFlatten/onAfterFlatten, so adapter-specific state
    * (e.g., engine, charset, capped options) is populated.

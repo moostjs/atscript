@@ -21,7 +21,7 @@ interface TIndexSnapshot {
   fields: Array<{ name: string; sort: string }>
 }
 
-interface TForeignKeySnapshot {
+export interface TForeignKeySnapshot {
   fields: string[]
   targetTable: string
   targetFields: string[]

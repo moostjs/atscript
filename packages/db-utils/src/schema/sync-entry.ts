@@ -34,6 +34,9 @@ export interface TSyncEntryInit {
   defaultChanges?: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   columnsToDrop?: string[]
   optionChanges?: TTableOptionDiff['changed']
+  fkAdded?: Array<{ fields: string[]; targetTable: string }>
+  fkRemoved?: Array<{ fields: string[]; targetTable: string }>
+  fkChanged?: Array<{ fields: string[]; targetTable: string; details: string }>
   columnsAdded?: string[]
   columnsRenamed?: string[]
   columnsDropped?: string[]
@@ -57,6 +60,9 @@ export class SyncEntry {
   readonly defaultChanges: Array<{ column: string; oldDefault?: string; newDefault?: string }>
   readonly columnsToDrop: string[]
   readonly optionChanges: TTableOptionDiff['changed']
+  readonly fkAdded: Array<{ fields: string[]; targetTable: string }>
+  readonly fkRemoved: Array<{ fields: string[]; targetTable: string }>
+  readonly fkChanged: Array<{ fields: string[]; targetTable: string; details: string }>
 
   // Result fields
   readonly columnsAdded: string[]
@@ -78,6 +84,9 @@ export class SyncEntry {
     this.defaultChanges = init.defaultChanges ?? []
     this.columnsToDrop = init.columnsToDrop ?? []
     this.optionChanges = init.optionChanges ?? []
+    this.fkAdded = init.fkAdded ?? []
+    this.fkRemoved = init.fkRemoved ?? []
+    this.fkChanged = init.fkChanged ?? []
     this.columnsAdded = init.columnsAdded ?? []
     this.columnsRenamed = init.columnsRenamed ?? []
     this.columnsDropped = init.columnsDropped ?? []
@@ -179,6 +188,15 @@ export class SyncEntry {
           const action = oc.destructive ? ' — requires recreation' : ''
           return `      ${tag} ${c.cyan(`option ${oc.key}`)}: ${oc.oldValue} → ${oc.newValue}${action}`
         }),
+        ...this.fkAdded.map(fk =>
+          `      ${c.green(`+ FK(${fk.fields.join(',')}) → ${fk.targetTable} — add`)}`
+        ),
+        ...this.fkRemoved.map(fk =>
+          `      ${c.red(`- FK(${fk.fields.join(',')}) → ${fk.targetTable} — remove`)}`
+        ),
+        ...this.fkChanged.map(fk =>
+          `      ${c.yellow(`~ FK(${fk.fields.join(',')}) → ${fk.targetTable} — ${fk.details}`)}`
+        ),
         '',
       ]
     }

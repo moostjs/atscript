@@ -713,32 +713,7 @@ export class MysqlAdapter extends BaseDbAdapter {
   // ── FK sync ───────────────────────────────────────────────────────────────
 
   async syncForeignKeys(): Promise<void> {
-    const tableName = this._table.tableName
-    const schema = this._schema
-
-    // Get existing FK constraints
-    const existingFks = await this._exec().all<{
-      CONSTRAINT_NAME: string
-      COLUMN_NAME: string
-      REFERENCED_TABLE_NAME: string
-      REFERENCED_COLUMN_NAME: string
-    }>(
-      `SELECT kcu.CONSTRAINT_NAME, kcu.COLUMN_NAME,
-              kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME
-       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-       WHERE kcu.TABLE_NAME = ? AND kcu.TABLE_SCHEMA = COALESCE(?, DATABASE())
-         AND kcu.REFERENCED_TABLE_NAME IS NOT NULL`,
-      [tableName, schema]
-    )
-
-    // Group by constraint name
-    const existingByName = new Map<string, string[]>()
-    for (const row of existingFks) {
-      if (!existingByName.has(row.CONSTRAINT_NAME)) {
-        existingByName.set(row.CONSTRAINT_NAME, [])
-      }
-      existingByName.get(row.CONSTRAINT_NAME)!.push(row.COLUMN_NAME)
-    }
+    const existingByName = await this._getExistingFkConstraints()
 
     // Build desired FK set (keyed by sorted local column names)
     const desiredFkKeys = new Set<string>()
@@ -776,6 +751,42 @@ export class MysqlAdapter extends BaseDbAdapter {
         await this._exec().exec(ddl)
       }
     }
+  }
+
+  async dropForeignKeys(fkFieldKeys: string[]): Promise<void> {
+    if (fkFieldKeys.length === 0) { return }
+    const keySet = new Set(fkFieldKeys)
+    const existingByName = await this._getExistingFkConstraints()
+
+    for (const [constraintName, cols] of existingByName) {
+      const key = cols.sort().join(',')
+      if (keySet.has(key)) {
+        const ddl = `ALTER TABLE ${quoteTableName(this.resolveTableName())} DROP FOREIGN KEY ${qi(constraintName)}`
+        this._log(ddl)
+        await this._exec().exec(ddl)
+      }
+    }
+  }
+
+  /** Queries INFORMATION_SCHEMA for existing FK constraints, grouped by constraint name → column names. */
+  private async _getExistingFkConstraints(): Promise<Map<string, string[]>> {
+    const rows = await this._exec().all<{
+      CONSTRAINT_NAME: string
+      COLUMN_NAME: string
+    }>(
+      `SELECT kcu.CONSTRAINT_NAME, kcu.COLUMN_NAME
+       FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+       WHERE kcu.TABLE_NAME = ? AND kcu.TABLE_SCHEMA = COALESCE(?, DATABASE())
+         AND kcu.REFERENCED_TABLE_NAME IS NOT NULL`,
+      [this._table.tableName, this._schema]
+    )
+    const byName = new Map<string, string[]>()
+    for (const row of rows) {
+      let cols = byName.get(row.CONSTRAINT_NAME)
+      if (!cols) { cols = []; byName.set(row.CONSTRAINT_NAME, cols) }
+      cols.push(row.COLUMN_NAME)
+    }
+    return byName
   }
 
   // ── Fulltext search ───────────────────────────────────────────────────────

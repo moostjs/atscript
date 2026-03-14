@@ -10,6 +10,7 @@ import type { TColumnDiff, TDbFieldMeta, TExistingTableOption, TTableOptionDiff 
 import { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, snapshotToExistingColumns, snapshotToExistingTableOptions } from './schema-hash'
 import type { TTableSnapshot } from './schema-hash'
 import { computeColumnDiff } from './column-diff'
+import { computeForeignKeyDiff, hasForeignKeyChanges } from './fk-diff'
 import { computeTableOptionDiff } from './table-option-diff'
 import { SyncStore } from './sync-store'
 import { SyncEntry, type TSyncEntryInit, type TSyncEntryStatus } from './sync-entry'
@@ -45,6 +46,29 @@ export interface TSyncResult {
   status: 'up-to-date' | 'synced' | 'synced-by-peer'
   schemaHash: string
   entries: SyncEntry[]
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/** Builds a human-readable description of what changed in an FK constraint. */
+function buildFkChangeDetails(
+  desired: { targetTable: string; targetFields: string[]; onDelete?: string; onUpdate?: string },
+  existing: { targetTable: string; targetFields: string[]; onDelete?: string; onUpdate?: string },
+): string {
+  const parts: string[] = []
+  if (existing.targetTable !== desired.targetTable) {
+    parts.push(`retarget ${existing.targetTable} → ${desired.targetTable}`)
+  }
+  if ([...existing.targetFields].sort().join(',') !== [...desired.targetFields].sort().join(',')) {
+    parts.push(`fields ${existing.targetFields.join(',')} → ${desired.targetFields.join(',')}`)
+  }
+  if ((existing.onDelete ?? undefined) !== (desired.onDelete ?? undefined)) {
+    parts.push(`onDelete ${existing.onDelete ?? 'noAction'} → ${desired.onDelete ?? 'noAction'}`)
+  }
+  if ((existing.onUpdate ?? undefined) !== (desired.onUpdate ?? undefined)) {
+    parts.push(`onUpdate ${existing.onUpdate ?? 'noAction'} → ${desired.onUpdate ?? 'noAction'}`)
+  }
+  return parts.join(', ')
 }
 
 // ── SchemaSync ────────────────────────────────────────────────────────────
@@ -366,6 +390,10 @@ export class SchemaSync {
       init.status = 'alter'
     }
 
+    // Read stored snapshot once — used by Path B column diff and FK diff
+    const fkSnapshotName = pendingRename ? renamedFrom : name
+    const storedSnapshot = await this.store.readTableSnapshot(fkSnapshotName)
+
     if (adapter.getExistingColumns) {
       // Path A: Live introspection (SQLite)
       const existing = pendingRename && adapter.getExistingColumnsForTable
@@ -380,9 +408,7 @@ export class SchemaSync {
         this.populatePlanFromDiff(diff, init, name, readable.syncMethod, adapter.supportsColumnModify)
       }
     } else if (adapter.syncColumns) {
-      // Path B: Snapshot-based diffing (MongoDB)
-      const snapshotName = pendingRename ? renamedFrom : name
-      const storedSnapshot = await this.store.readTableSnapshot(snapshotName)
+      // Path B: Snapshot-based diffing (MongoDB) — reuses storedSnapshot from above
       if (!storedSnapshot) {
         if (!pendingRename) {
           const exists = adapter.tableExists ? await adapter.tableExists() : false
@@ -413,6 +439,21 @@ export class SchemaSync {
         if (optionDiff.changed.some(c => c.destructive)) {
           init.recreated = true
         }
+      }
+    }
+
+    // Detect FK changes (reuses storedSnapshot from above)
+    if (init.status !== 'create' && storedSnapshot) {
+      const fkDiff = computeForeignKeyDiff(readable.foreignKeys, storedSnapshot.foreignKeys)
+      if (hasForeignKeyChanges(fkDiff)) {
+        init.status = 'alter'
+        init.fkAdded = fkDiff.added.map(fk => ({ fields: fk.fields, targetTable: fk.targetTable }))
+        init.fkRemoved = fkDiff.removed.map(fk => ({ fields: fk.fields, targetTable: fk.targetTable }))
+        init.fkChanged = fkDiff.changed.map(fk => ({
+          fields: fk.desired.fields,
+          targetTable: fk.desired.targetTable,
+          details: buildFkChangeDetails(fk.desired, fk.existing),
+        }))
       }
     }
 

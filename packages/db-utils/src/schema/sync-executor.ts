@@ -7,6 +7,8 @@ import type { TColumnDiff, TDbFieldMeta, TTableOptionDiff } from '../types'
 import type { SyncStore } from './sync-store'
 import { SyncEntry, type TSyncEntryInit, type TSyncEntryStatus } from './sync-entry'
 import { computeColumnDiff } from './column-diff'
+import { computeForeignKeyDiff, hasForeignKeyChanges, fkKey } from './fk-diff'
+import type { TForeignKeyDiff } from './fk-diff'
 import { snapshotToExistingColumns, computeTableHash, computeViewSnapshot } from './schema-hash'
 
 // ── Deps ─────────────────────────────────────────────────────────────────
@@ -52,21 +54,48 @@ export async function executeSyncTable(
     init.status = 'alter'
   }
 
+  // Compute FK diff from stored snapshot (used by Path A to detect FK changes)
+  let fkDiff: TForeignKeyDiff | undefined
+  const fkSnapshotName = init.renamedFrom ?? name
+  const storedSnapshot = await deps.store.readTableSnapshot(fkSnapshotName)
+  if (storedSnapshot) {
+    fkDiff = computeForeignKeyDiff(readable.foreignKeys, storedSnapshot.foreignKeys)
+  }
+  const hasFkChanges = fkDiff ? hasForeignKeyChanges(fkDiff) : false
+
   if (adapter.getExistingColumns && adapter.syncColumns) {
-    // Path A: Live introspection (SQLite)
+    // Path A: Live introspection (SQLite, MySQL)
     const existing = await adapter.getExistingColumns()
     if (existing.length === 0 && !init.renamedFrom) {
       await adapter.ensureTable()
       init.status = 'create'
     } else if (existing.length > 0) {
-      const typeMapper = adapter.typeMapper?.bind(adapter)
-      const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
-      await applyColumnDiff(adapter, readable, diff, init, safe, deps.logger)
+      // FK changes on adapters without syncForeignKeys (SQLite) require table recreation
+      if (hasFkChanges && !init.recreated && !adapter.syncForeignKeys && adapter.recreateTable) {
+        await adapter.recreateTable()
+        init.recreated = true
+        init.status = 'alter'
+      } else {
+        // Drop stale/changed FKs before column ops (MySQL) to unblock ALTERs
+        if (hasFkChanges && fkDiff && adapter.dropForeignKeys) {
+          const keysToDrop = [
+            ...fkDiff.removed.map(fk => fkKey(fk.fields)),
+            ...fkDiff.changed.map(fk => fkKey(fk.desired.fields)),
+          ]
+          if (keysToDrop.length > 0) {
+            await adapter.dropForeignKeys(keysToDrop)
+            init.status = 'alter'
+          }
+        }
+
+        const typeMapper = adapter.typeMapper?.bind(adapter)
+        const diff = computeColumnDiff(readable.fieldDescriptors, existing, typeMapper)
+        await applyColumnDiff(adapter, readable, diff, init, safe, deps.logger)
+      }
     }
   } else if (adapter.syncColumns) {
     // Path B: Snapshot-based diffing (MongoDB)
-    const snapshotName = init.renamedFrom ?? name
-    const storedSnapshot = await deps.store.readTableSnapshot(snapshotName)
+    // Reuse the storedSnapshot already read above for FK diff (same key)
     if (!storedSnapshot) {
       // First sync or no prior snapshot — just ensure table exists
       const existed = adapter.tableExists ? await adapter.tableExists() : false

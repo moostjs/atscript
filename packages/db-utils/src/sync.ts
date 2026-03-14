@@ -40,4 +40,6 @@ export type { TSyncOptions, TSyncResult, TSyncPlan, TSyncColors, TSyncEntryStatu
 export { computeColumnDiff } from './schema/column-diff'
 export { computeTableOptionDiff } from './schema/table-option-diff'
 export { computeTableSnapshot, computeViewSnapshot, computeSchemaHash, computeTableHash, snapshotToExistingColumns, snapshotToExistingTableOptions } from './schema/schema-hash'
-export type { TTableSnapshot, TViewSnapshot, TFieldSnapshot } from './schema/schema-hash'
+export type { TTableSnapshot, TViewSnapshot, TFieldSnapshot, TForeignKeySnapshot } from './schema/schema-hash'
+export { computeForeignKeyDiff, hasForeignKeyChanges, fkKey } from './schema/fk-diff'
+export type { TForeignKeyDiff } from './schema/fk-diff'
