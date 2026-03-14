@@ -6,7 +6,7 @@ outline: deep
 
 <!--@include: ./_experimental-warning.md-->
 
-Complete reference for all database annotations available in `.as` files. The `@db.*` annotations are shipped with `@atscript/core` — no extra packages needed. MongoDB-specific annotations require the `@atscript/mongo` plugin.
+Complete reference for all database annotations available in `.as` files. The generic `@db.*` annotations are provided by `@atscript/db-utils/plugin` via `dbPlugin()`. MongoDB-specific annotations require the `@atscript/db-mongo` plugin.
 
 ## Tables & Columns
 
@@ -189,7 +189,7 @@ Controls how nested objects are handled during PATCH/update operations. With `'r
 
 ## MongoDB-Specific {#mongodb}
 
-These annotations require the `@atscript/mongo` plugin.
+These annotations require the `@atscript/db-mongo` plugin.
 
 | Annotation | Applies To | Arguments | Description |
 |------------|------------|-----------|-------------|
@@ -202,7 +202,7 @@ These annotations require the `@atscript/mongo` plugin.
 | `@db.mongo.search.filter` | Field | `indexName` (string) | Pre-filter field for vector search |
 
 ```atscript
-use '@atscript/mongo'
+use '@atscript/db-mongo'
 
 @db.mongo.collection
 @db.mongo.search.static 'standard', true, 'main_search'

@@ -15,3 +15,5 @@ export const MysqlPlugin: () => TAtscriptPlugin = () => ({
     }
   },
 })
+
+export { MysqlPlugin as default }

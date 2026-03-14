@@ -30,37 +30,6 @@ declare global {
     "expect.array.uniqueItems": { message?: string }
     "expect.array.key": { message?: string }
     "emit.jsonSchema": boolean
-    "db.patch.strategy": string
-    "db.table": string | true
-    "db.table.renamed": string
-    "db.schema": string
-    "db.index.plain": ({ name?: string, sort?: string })[]
-    "db.index.unique": (string | true)[]
-    "db.index.fulltext": ({ name?: string, weight?: number })[]
-    "db.column": string
-    "db.column.renamed": string
-    "db.column.collate": string
-    "db.column.precision": { precision: number, scale: number }
-    "db.default": string
-    "db.default.increment": number | true
-    "db.default.uuid": boolean
-    "db.default.now": boolean
-    "db.json": boolean
-    "db.ignore": boolean
-    "db.sync.method": string
-    "db.rel.FK": string | true
-    "db.rel.to": string | true
-    "db.rel.from": string | true
-    "db.rel.onDelete": string
-    "db.rel.onUpdate": string
-    "db.rel.via": import("@atscript/typescript/utils").AtscriptRef
-    "db.rel.filter": import("@atscript/typescript/utils").AtscriptQueryNode
-    "db.view": string | true
-    "db.view.for": import("@atscript/typescript/utils").AtscriptRef
-    "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
-    "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
-    "db.view.materialized": boolean
-    "db.view.renamed": string
     "ui.placeholder": string
     "ui.component": string
     "ui.hidden": boolean

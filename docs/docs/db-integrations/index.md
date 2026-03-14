@@ -57,10 +57,10 @@ Your application code talks to the Table API. The adapter handles SQL generation
 
 | Package | Purpose |
 |---------|---------|
-| `@atscript/core` | Ships all generic `@db.*` annotations — no extra install needed |
+| `@atscript/db-utils/plugin` | Provides all generic `@db.*` annotations via `dbPlugin()` |
 | `@atscript/db-utils` | Table API, views, relations, query translation, schema sync engine |
 | `@atscript/db-sqlite` | SQLite adapter (better-sqlite3 or node:sqlite) |
-| `@atscript/mongo` | MongoDB adapter with Atlas Search and vector search support |
+| `@atscript/db-mongo` | MongoDB adapter with Atlas Search and vector search support |
 | `@atscript/moost-db` | REST API controller for the Moost framework |
 
 ## Feature Highlights

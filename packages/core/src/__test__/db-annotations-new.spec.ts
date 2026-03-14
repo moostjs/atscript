@@ -1,34 +1,19 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
-import { dbAnnotations } from '../defaults/db-annotations'
+import dbPlugin from '../../../db-utils/src/plugin'
+import type { TAtscriptDocConfig } from '../document'
 import { AtscriptDoc } from '../document'
-import { SemanticPrimitiveNode } from '../parser/nodes/primitive-node'
+import { PluginManager } from '../plugin/plugin-manager'
 
-const primitives = new Map<string, SemanticPrimitiveNode>()
-primitives.set('string', new SemanticPrimitiveNode('string', {
-  type: 'string',
-  extensions: {
-    uuid: { type: 'string' },
-  },
-}))
-primitives.set('number', new SemanticPrimitiveNode('number', {
-  type: 'number',
-  extensions: {
-    int: { type: 'number' },
-    timestamp: { type: 'number' },
-  },
-}))
-primitives.set('decimal', new SemanticPrimitiveNode('decimal', {
-  type: 'decimal',
-  documentation: 'Decimal number stored as string to preserve precision.',
-}))
-primitives.set('boolean', new SemanticPrimitiveNode('boolean', { type: 'boolean' }))
+let docConfig: TAtscriptDocConfig
+
+beforeAll(async () => {
+  const pm = new PluginManager({ plugins: [dbPlugin()] })
+  docConfig = await pm.getDocConfig()
+})
 
 function createDoc(source: string): AtscriptDoc {
-  const doc = new AtscriptDoc('test.as', {
-    primitives,
-    annotations: { db: dbAnnotations },
-  })
+  const doc = new AtscriptDoc('test.as', docConfig)
   doc.update(source)
   return doc
 }

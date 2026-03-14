@@ -3,14 +3,15 @@ import path from 'path'
 
 import { build } from '@atscript/core'
 import { tsPlugin as ts } from '@atscript/typescript'
-import { MysqlPlugin } from '../plugin/index'
+import dbPlugin from '@atscript/db-utils/plugin'
+import MysqlPlugin from '../plugin/index'
 
 export async function prepareFixtures() {
   const wd = path.join(path.dirname(import.meta.url.slice(7)), 'fixtures')
   const repo = await build({
     rootDir: wd,
     include: ['**/*.as'],
-    plugins: [ts(), MysqlPlugin()],
+    plugins: [ts(), dbPlugin(), MysqlPlugin()],
   })
   const out = await repo.generate({
     outDir: '.',

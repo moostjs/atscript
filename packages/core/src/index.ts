@@ -9,7 +9,6 @@ export * from './repo'
 export * from './plugin'
 export * from './build'
 export * from './flatten'
-export { findFKFieldsPointingTo, validateRefArgument, type TFKFieldMatch } from './defaults/db-utils'
 export {
   getQueryScope,
   resolveQueryFieldRef,

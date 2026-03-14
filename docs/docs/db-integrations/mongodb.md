@@ -23,7 +23,7 @@ The MongoDB adapter connects your `.as` models to MongoDB with native support fo
 ## Installation
 
 ```bash
-pnpm add @atscript/mongo mongodb
+pnpm add @atscript/db-mongo mongodb
 ```
 
 Register the MongoDB plugin in your `atscript.config.mts` to enable `@db.mongo.*` annotations and `mongo.*` primitives:
@@ -31,7 +31,7 @@ Register the MongoDB plugin in your `atscript.config.mts` to enable `@db.mongo.*
 ```typescript
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
-import mongo from '@atscript/mongo/plugin'
+import mongo from '@atscript/db-mongo/plugin'
 
 export default defineConfig({
   plugins: [ts(), mongo()],
@@ -44,7 +44,7 @@ Create a `DbSpace` with a `MongoAdapter` factory:
 
 ```typescript
 import { DbSpace } from '@atscript/db-utils'
-import { MongoAdapter } from '@atscript/mongo'
+import { MongoAdapter } from '@atscript/db-mongo'
 import { MongoClient } from 'mongodb'
 
 const client = new MongoClient('mongodb://localhost:27017')
@@ -55,7 +55,7 @@ const db = new DbSpace(() => new MongoAdapter(mongoDb, client))
 Or use the convenience helper:
 
 ```typescript
-import { createAdapter } from '@atscript/mongo'
+import { createAdapter } from '@atscript/db-mongo'
 
 const db = createAdapter('mongodb://localhost:27017/myapp')
 ```
@@ -212,7 +212,7 @@ These annotations are available when the `MongoPlugin` is registered. They exten
 | `@db.mongo.search.vector dims, similarity?, indexName?` | Field | Vector search field |
 | `@db.mongo.search.filter indexName` | Field | Pre-filter field for vector search |
 
-All generic `@db.*` annotations (`@db.table`, `@db.index.*`, `@db.default.*`, `@db.rel.*`, `@db.json`, etc.) work with MongoDB as well. See [Core Annotations](./annotations) for the full list.
+All generic `@db.*` annotations (`@db.table`, `@db.index.*`, `@db.default.*`, `@db.rel.*`, `@db.json`, etc.) work with MongoDB as well. See [Annotations Reference](./annotations) for the full list.
 
 ## Primitives
 

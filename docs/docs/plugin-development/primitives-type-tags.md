@@ -116,10 +116,10 @@ export interface Location {
 
 ### Real-World Example: MongoDB Plugin
 
-The `@atscript/mongo` plugin adds two primitives:
+The `@atscript/db-mongo` plugin adds two primitives:
 
 ```typescript
-// from @atscript/mongo
+// from @atscript/db-mongo
 export const MongoPlugin = () =>
   createAtscriptPlugin({
     name: 'mongo',

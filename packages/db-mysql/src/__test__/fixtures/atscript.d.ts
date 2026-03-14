@@ -30,6 +30,19 @@ declare global {
     "expect.array.uniqueItems": { message?: string }
     "expect.array.key": { message?: string }
     "emit.jsonSchema": boolean
+    "ui.placeholder": string
+    "ui.component": string
+    "ui.hidden": boolean
+    "ui.group": string
+    "ui.order": number
+    "ui.width": string
+    "ui.icon": string
+    "ui.hint": string
+    "ui.disabled": boolean
+    "ui.type": string
+    "ui.attr": ({ key: string, value: string })[]
+    "ui.class": (string)[]
+    "ui.style": (string)[]
     "db.patch.strategy": string
     "db.table": string | true
     "db.table.renamed": string
@@ -67,19 +80,6 @@ declare global {
     "db.mysql.unsigned": boolean
     "db.mysql.type": string
     "db.mysql.onUpdate": string
-    "ui.placeholder": string
-    "ui.component": string
-    "ui.hidden": boolean
-    "ui.group": string
-    "ui.order": number
-    "ui.width": string
-    "ui.icon": string
-    "ui.hint": string
-    "ui.disabled": boolean
-    "ui.type": string
-    "ui.attr": ({ key: string, value: string })[]
-    "ui.class": (string)[]
-    "ui.style": (string)[]
   }
   type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "url" | "ipv4" | "ipv6" | "ip" | "char" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "int8" | "int16" | "int32" | "int64" | "uint8" | "byte" | "uint16" | "port" | "uint32" | "uint64" | "timestamp" | "created" | "updated" | "decimal" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom"
 }

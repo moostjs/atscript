@@ -35,13 +35,33 @@
       "import": "./dist/sync.mjs",
       "require": "./dist/sync.cjs"
     },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "import": "./dist/plugin.mjs"
+    },
+    "./rel": {
+      "types": "./dist/rel.d.ts",
+      "import": "./dist/rel.mjs"
+    },
+    "./agg": {
+      "types": "./dist/agg.d.ts",
+      "import": "./dist/agg.mjs"
+    },
+    "./shared": {
+      "types": "./dist/shared.d.ts",
+      "import": "./dist/shared.mjs"
+    },
     "./package.json": "./package.json"
   },
   "build": [
     {
       "entries": [
         "src/index.ts",
-        "src/sync.ts"
+        "src/sync.ts",
+        "src/plugin.ts",
+        "src/rel.ts",
+        "src/agg.ts",
+        "src/shared.ts"
       ]
     }
   ],

@@ -31,7 +31,8 @@ import type {
 import { TableMetadata } from './table-metadata'
 import { type FieldMappingStrategy, DocumentFieldMapper } from '../strategies/field-mapping'
 import { RelationalFieldMapper } from '../strategies/relational-field-mapper'
-import { type TRelationLoaderHost, loadRelationsImpl, findFKForRelation, findRemoteFK } from './relation-loader'
+import type { TRelationLoaderHost } from '../rel/relation-loader'
+import { findFKForRelation, findRemoteFK } from '../rel/relation-helpers'
 
 /**
  * Extracts nav prop names from a query's `$with` array.
@@ -681,6 +682,7 @@ export class AtscriptDbReadable<
     rows: Array<Record<string, unknown>>,
     withRelations: WithRelation[]
   ): Promise<void> {
+    const { loadRelationsImpl } = await import('../rel/relation-loader')
     return loadRelationsImpl(rows, withRelations, this as any as TRelationLoaderHost)
   }
 

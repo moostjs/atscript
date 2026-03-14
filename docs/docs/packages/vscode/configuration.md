@@ -30,7 +30,7 @@ The config file controls what the extension knows about your project:
 
 - **Annotations** — which annotations are available for completions and validation
 - **Primitives** — which primitive types are recognized
-- **Plugins** — extensions that add custom annotations and primitives (e.g., `@atscript/mongo`)
+- **Plugins** — extensions that add custom annotations and primitives (e.g., `@atscript/db-mongo`)
 
 Without a config file, the extension uses the default set of annotations and primitives from `@atscript/core`.
 

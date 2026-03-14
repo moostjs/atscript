@@ -23,7 +23,7 @@ import {
   batchInsertNestedTo, batchInsertNestedFrom, batchInsertNestedVia,
   batchReplaceNestedTo, batchReplaceNestedFrom, batchReplaceNestedVia,
   batchPatchNestedTo, batchPatchNestedFrom, batchPatchNestedVia,
-} from './nested-writer'
+} from '../rel/nested-writer'
 import { createDbValidatorPlugin, type DbValidationContext } from '../db-validator-plugin'
 import type { IntegrityStrategy } from '../strategies/integrity'
 import { NativeIntegrity } from '../strategies/integrity'

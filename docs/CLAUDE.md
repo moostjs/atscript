@@ -73,7 +73,7 @@ Atscript is **language-agnostic** — `@atscript/typescript` is the first langua
    - A TypeScript user should be able to read packages/typescript/ and have everything they need **without leaving that section**
    - A future Python user should read packages/python/ similarly
 
-2. **Plugin-specific** (packages/mongo/, packages/moost-db/, etc.):
+2. **Plugin-specific** (packages/db-mongo/, packages/moost-db/, etc.):
    - These are framework/database integrations nested under their language dropdown
    - Currently all TypeScript-ecosystem, but the pattern should allow for language-agnostic plugins too
 
@@ -112,7 +112,7 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 - **Progressive complexity**: Beginner-friendly for getting started, increasingly technical for advanced/plugin topics
 - **Target audience varies by section**:
   - packages/typescript/ — TypeScript developers using Atscript (full journey from intro to advanced)
-  - packages/mongo/ — MongoDB users (TypeScript-specific)
+  - packages/db-mongo/ — MongoDB users (TypeScript-specific)
   - packages/moost-\*/ — Moost framework users
   - packages/vscode/ — VSCode extension users
   - plugin-development/ — plugin/language extension developers
@@ -127,11 +127,11 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | Package Source                  | Documentation Location                         |
 | ------------------------------- | ---------------------------------------------- |
 | `packages/core/src/`            | `docs/docs/plugin-development/`                |
-| `packages/core/src/defaults/db-annotations.ts` | `docs/docs/db-integrations/annotations.md` |
+| `packages/db-utils/src/plugin/annotations/`    | `docs/docs/db-integrations/annotations.md` |
 | `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
 | `packages/db-utils/src/`        | `docs/docs/db-integrations/`                   |
 | `packages/db-sqlite/src/`       | `docs/docs/db-integrations/sqlite*.md`         |
-| `packages/mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
+| `packages/db-mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
 | `packages/moost-db/src/`        | `docs/docs/db-integrations/crud-http*.md`      |
 | `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
 | `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |

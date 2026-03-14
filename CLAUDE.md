@@ -12,7 +12,7 @@ Full-stack developers face a recurring problem: data models, metadata (labels, t
 packages/
   core/           - Parser, AST, plugin system, diagnostics, dependency tracking
   typescript/     - TypeScript language extension (codegen + runtime utils + CLI)
-  db-utils/       - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
+  db/             - Generic DB abstraction layer (AtscriptDbTable, BaseDbAdapter, embedded object flattening)
                     Sub-entries: /plugin (annotations), /rel (relations), /agg (aggregation), /shared (helpers)
   db-sync/        - Schema sync engine (dev-time tool: drift detection, migrations, CLI)
   db-sqlite/      - SQLite adapter (better-sqlite3 / node:sqlite driver, filter-to-SQL translation)
@@ -35,8 +35,8 @@ explorations/     - Sandbox/playground for testing features
   │    ├─ @atscript/db-mongo (metadata extension, + peer: mongodb)
   │    ├─ @atscript/moost-validator (+ peer: moost)
   │    └─ unplugin-atscript (build integration)
-  └─ @atscript/db-utils (generic DB abstraction)
-       ├── /plugin — dbPlugin({ rel?, agg? }) for @db.* annotations
+  └─ @atscript/db (generic DB abstraction)
+       ├── /plugin — dbPlugin() registers all @db.* annotations
        ├── /rel — relation loading + nested writes (dynamic import)
        ├── /agg — aggregation validation (dynamic import)
        ├── /shared — annotation helpers for adapter plugins
@@ -91,15 +91,15 @@ All packages under `packages/` follow a strict naming convention:
 
 | Category | Pattern | Examples |
 |----------|---------|----------|
-| **DB-related** | `db-*` | `db-utils`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools`, `db-sync` |
-| **DB utils sub-entries** | `db-utils/<feature>` | `db-utils/plugin`, `db-utils/rel`, `db-utils/agg`, `db-utils/shared` |
+| **DB-related** | `db-*` | `db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools`, `db-sync` |
+| **DB sub-entries** | `db/<feature>` | `db/plugin`, `db/rel`, `db/agg`, `db/shared` |
 | **DB adapters** | `db-<engine>` | `db-sqlite`, `db-mongo`, `db-mysql` |
 | **Moost integrations** | `moost-*` | `moost-db`, `moost-validator` |
 | **Non-DB packages** | descriptive name | `core`, `typescript`, `unplugin`, `vscode` |
 
 Key rules:
-- Every DB-related package starts with `db-`
-- `db-utils` features are exposed as sub-entries (`/plugin`, `/rel`, `/agg`, `/shared`), not separate packages
+- Every DB-related package starts with `db-` (except `db` itself, the primary DB package)
+- `db` features are exposed as sub-entries (`/plugin`, `/rel`, `/agg`, `/shared`), not separate packages
 - Adapter packages use `db-<engine>` (e.g. `db-mongo`, not `mongo`)
 - Moost framework integrations use `moost-*` prefix
 
@@ -126,7 +126,7 @@ Six domain expert agents exist in `.claude/agents/`:
 
 - `atscript-core-expert` — Core parser, AST, plugin system
 - `atscript-typescript-expert` — TypeScript compilation pipeline
-- `atscript-mongo-expert` — MongoDB plugin and annotations
+- `atscript-db-mongo-expert` — MongoDB plugin and annotations
 - `moost-atscript-expert` — Moost framework integration
 - `vscode-extension-expert` — VSCode extension
 - `vitepress-docs-architect` — Documentation site architecture
@@ -141,7 +141,7 @@ When fixing bugs, always investigate and fix the root cause first. Do not implem
 - Plugins extend the core by adding annotations, primitives, and metadata — they don't modify the parser
 - The core provides AST + utilities (annotation merging, type unwinding) that language extensions and LSPs consume
 - Moost integrations (`moost-db`, `moost-validator`) demonstrate how .as types flow into a real framework
-- **`@db.*` annotations** are provided by `@atscript/db-utils/plugin` via `dbPlugin({ rel?, agg? })`. Core ships NO db annotations. TypeScript codegen detects annotations by string key presence — no dependency on annotation specs
+- **`@db.*` annotations** are provided by `@atscript/db/plugin` via `dbPlugin()`. All annotations registered unconditionally; runtime dynamically imports `/rel` and `/agg` only when table metadata requires them. Core ships NO db annotations. TypeScript codegen detects annotations by string key presence — no dependency on annotation specs
 - **Primitive `annotations` map** — primitives use a generic `annotations: Record<string, TPrimitiveAnnotationValue>` to apply any annotation (the old hardcoded `expect` property was removed). The `applyAnnotations()` method is spec-aware: it resolves annotation specs, respects `multiple` flags, and maps object values by spec argument names
 - **`@meta.isKey` was renamed to `@expect.array.key`** — it's a validation constraint, not semantic metadata
 - **`@meta.id` takes no arguments** — multiple fields annotated with `@meta.id` form a composite primary key

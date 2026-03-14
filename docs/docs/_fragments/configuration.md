@@ -141,7 +141,7 @@ When `multiple: true` and `mergeStrategy: 'replace'` (the default), the higher-p
 
 ```javascript
 import ts from '@atscript/typescript'
-import { MongoPlugin } from '@atscript/mongo/plugin'
+import MongoPlugin from '@atscript/db-mongo/plugin'
 
 plugins: [ts(), MongoPlugin()]
 ```

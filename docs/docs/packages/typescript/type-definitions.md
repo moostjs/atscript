@@ -352,7 +352,7 @@ interface TFlattenOptions {
 }
 ```
 
-**`onField`** is called for every field after it is added to the flat map. This is the hook point for domain-specific logic — for example, `@atscript/mongo` uses it to extract index definitions from field metadata:
+**`onField`** is called for every field after it is added to the flat map. This is the hook point for domain-specific logic — for example, `@atscript/db-mongo` uses it to extract index definitions from field metadata:
 
 ```typescript
 const flatMap = flattenAnnotatedType(collectionType, {

@@ -3,6 +3,7 @@ import path from 'path'
 
 import { build } from '@atscript/core'
 import { tsPlugin as ts } from '@atscript/typescript'
+import dbPlugin from '../plugin'
 import type { FilterExpr } from '@uniqu/core'
 
 import { BaseDbAdapter } from '../base-adapter'
@@ -131,7 +132,7 @@ export async function prepareFixtures() {
   const repo = await build({
     rootDir: wd,
     include: ['**/*.as'],
-    plugins: [ts()],
+    plugins: [ts(), dbPlugin()],
   })
   const out = await repo.generate({
     outDir: '.',

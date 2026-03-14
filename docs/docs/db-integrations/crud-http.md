@@ -19,7 +19,7 @@ You also need a database adapter:
 ```bash
 # Pick one (or both)
 pnpm add @atscript/db-sqlite better-sqlite3   # SQLite
-pnpm add @atscript/mongo mongodb              # MongoDB
+pnpm add @atscript/db-mongo mongodb              # MongoDB
 ```
 
 ## Quick Start
@@ -416,7 +416,7 @@ The same controller code works identically regardless of which database adapter 
 
 ```typescript
 // Switch from SQLite to MongoDB — no controller changes needed
-import { MongoAdapter } from '@atscript/mongo'
+import { MongoAdapter } from '@atscript/db-mongo'
 
 const todosTable = new AtscriptDbTable(Todo, new MongoAdapter(db, client))
 ```
