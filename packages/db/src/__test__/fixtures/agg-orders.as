@@ -28,3 +28,23 @@ export interface PlainEvents {
     value: number
     label: string
 }
+
+@db.table "indexed_metrics"
+export interface IndexedMetrics {
+    @meta.id
+    id: number
+
+    @db.column.dimension
+    @db.index.plain
+    channel: string
+
+    @db.column.dimension
+    source: string
+
+    @db.column.dimension
+    @db.index.unique
+    code: string
+
+    @db.column.measure
+    revenue: number
+}

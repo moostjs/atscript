@@ -83,4 +83,43 @@ export declare class PlainEvents {
   
   static __pk: number
 }
+
+/**
+ * Atscript interface **IndexedMetrics**
+ * @see {@link ./agg-orders.as:33:18}
+ */
+export declare class IndexedMetrics {
+  id: number
+  channel: string
+  source: string
+  code: string
+  revenue: number
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof IndexedMetrics, IndexedMetrics>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof IndexedMetrics>
+  /** @deprecated JSON Schema support is disabled. Calling this method will throw a runtime error. To enable, set `jsonSchema: 'lazy'` or `jsonSchema: 'bundle'` in tsPlugin options, or add `@emit.jsonSchema` annotation to individual interfaces. */
+  static toJsonSchema: () => any
+  /** @deprecated Example Data support is disabled. To enable, set `exampleData: true` in tsPlugin options. */
+  static toExampleData?: () => any
+  static __flat: {
+    "id": number
+    "channel": string
+    "source": string
+    "code": string
+    "revenue": number
+  }
+  static __ownProps: {
+    "id": number
+    "channel": string
+    "source": string
+    "code": string
+    "revenue": number
+  }
+  
+  static __pk: number | string
+  
+  static __dim: "channel" | "source" | "code"
+  static __measure: "revenue"
+}
 // prettier-ignore-end

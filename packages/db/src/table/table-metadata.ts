@@ -391,23 +391,28 @@ export class TableMetadata {
       this._collateMap.set(fieldName, collate)
     }
 
+    const hasExplicitIndex = metadata.has('db.index.plain')
+      || metadata.has('db.index.unique')
+      || metadata.has('db.index.fulltext')
+
     // @db.json → mark as JSON storage
     if (metadata.has('db.json')) {
       this.jsonFields.add(fieldName)
 
-      const hasIndex = metadata.has('db.index.plain')
-        || metadata.has('db.index.unique')
-        || metadata.has('db.index.fulltext')
-      if (hasIndex) {
+      if (hasExplicitIndex) {
         logger.warn(
           `@db.index on a @db.json field "${fieldName}" — most databases cannot index into JSON columns`
         )
       }
     }
 
-    // @db.column.dimension → mark as dimension (groupable in aggregate queries)
+    // @db.column.dimension → mark as dimension + auto-index for GROUP BY performance
     if (metadata.has('db.column.dimension')) {
       this.dimensions.push(fieldName)
+
+      if (!hasExplicitIndex) {
+        this._addIndexField('plain', fieldName, fieldName)
+      }
     }
 
     // @db.column.measure → mark as measure (aggregatable in aggregate queries)

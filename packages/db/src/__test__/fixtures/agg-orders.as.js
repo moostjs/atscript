@@ -26,6 +26,19 @@ export class PlainEvents {
   }
 }
 
+
+export class IndexedMetrics {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "IndexedMetrics"
+  static toJsonSchema() {
+    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
+  }
+  static dimensions = ['channel', 'source', 'code']
+  static measures = ['revenue']
+}
+
 $("object", AggOrders)
   .prop(
     "id",
@@ -90,5 +103,41 @@ $("object", PlainEvents)
       .$type
   )
   .annotate("db.table", "plain_events")
+
+$("object", IndexedMetrics)
+  .prop(
+    "id",
+    $().designType("number")
+      .tags("number")
+      .annotate("meta.id", true)
+      .$type
+  ).prop(
+    "channel",
+    $().designType("string")
+      .tags("string")
+      .annotate("db.column.dimension", true)
+      .annotate("db.index.plain", { }, true)
+      .$type
+  ).prop(
+    "source",
+    $().designType("string")
+      .tags("string")
+      .annotate("db.column.dimension", true)
+      .$type
+  ).prop(
+    "code",
+    $().designType("string")
+      .tags("string")
+      .annotate("db.column.dimension", true)
+      .annotate("db.index.unique", true, true)
+      .$type
+  ).prop(
+    "revenue",
+    $().designType("number")
+      .tags("number")
+      .annotate("db.column.measure", true)
+      .$type
+  )
+  .annotate("db.table", "indexed_metrics")
 
 // prettier-ignore-end

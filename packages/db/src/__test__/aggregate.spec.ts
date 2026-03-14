@@ -10,12 +10,14 @@ import { MockAdapter, prepareFixtures } from './test-utils'
 
 let AggOrders: any
 let PlainEvents: any
+let IndexedMetrics: any
 
 beforeAll(async () => {
   await prepareFixtures()
   const aggModule = await import('./fixtures/agg-orders.as.js')
   AggOrders = aggModule.AggOrders
   PlainEvents = aggModule.PlainEvents
+  IndexedMetrics = aggModule.IndexedMetrics
 })
 
 // ── UniquSelect ──────────────────────────────────────────────────────────────
@@ -102,6 +104,76 @@ describe('TableMetadata dimensions/measures', () => {
 
     expect(table.dimensions).toEqual([])
     expect(table.measures).toEqual([])
+  })
+})
+
+// ── Auto-indexing for dimensions ─────────────────────────────────────────────
+
+describe('dimension auto-indexing', () => {
+  it('creates plain indexes for dimension fields', () => {
+    const adapter = new MockAdapter()
+    const table = new AtscriptDbTable(AggOrders, adapter)
+
+    // 'status' and 'region' are dimensions without explicit indexes → auto-indexed
+    expect(table.indexes.has('atscript__plain__status')).toBe(true)
+    expect(table.indexes.get('atscript__plain__status')).toMatchObject({
+      type: 'plain',
+      name: 'status',
+      fields: [{ name: 'status', sort: 'asc' }],
+    })
+
+    // 'region' has @db.column "region_code" → physical name resolved in index field
+    expect(table.indexes.has('atscript__plain__region')).toBe(true)
+    expect(table.indexes.get('atscript__plain__region')).toMatchObject({
+      type: 'plain',
+      name: 'region',
+      fields: [{ name: 'region_code', sort: 'asc' }],
+    })
+  })
+
+  it('skips auto-index when field has explicit @db.index.plain', () => {
+    const adapter = new MockAdapter()
+    const table = new AtscriptDbTable(IndexedMetrics, adapter)
+
+    // 'channel' has both @db.column.dimension and @db.index.plain → single index entry
+    expect(table.indexes.has('atscript__plain__channel')).toBe(true)
+    const channelIndexes = [...table.indexes.values()].filter(
+      idx => idx.fields.some(f => f.name === 'channel')
+    )
+    expect(channelIndexes).toHaveLength(1)
+  })
+
+  it('skips auto-index when field has explicit @db.index.unique', () => {
+    const adapter = new MockAdapter()
+    const table = new AtscriptDbTable(IndexedMetrics, adapter)
+
+    // 'code' has @db.column.dimension + @db.index.unique → no plain auto-index
+    const codePlainKey = 'atscript__plain__code'
+    expect(table.indexes.has(codePlainKey)).toBe(false)
+
+    // But the unique index exists
+    expect(table.indexes.has('atscript__unique__code')).toBe(true)
+  })
+
+  it('auto-indexes dimension without explicit index', () => {
+    const adapter = new MockAdapter()
+    const table = new AtscriptDbTable(IndexedMetrics, adapter)
+
+    // 'source' has @db.column.dimension but no explicit index → auto-indexed
+    expect(table.indexes.has('atscript__plain__source')).toBe(true)
+    expect(table.indexes.get('atscript__plain__source')).toMatchObject({
+      type: 'plain',
+      fields: [{ name: 'source', sort: 'asc' }],
+    })
+  })
+
+  it('no auto-indexes when no dimensions', () => {
+    const adapter = new MockAdapter()
+    const table = new AtscriptDbTable(PlainEvents, adapter)
+
+    // PlainEvents has no @db.column.dimension → no auto-indexes
+    const plainIndexes = [...table.indexes.values()].filter(idx => idx.type === 'plain')
+    expect(plainIndexes).toHaveLength(0)
   })
 })
 
