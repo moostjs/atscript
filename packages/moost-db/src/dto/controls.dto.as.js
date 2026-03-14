@@ -145,6 +145,12 @@ $("object", QueryControlsDto)
       .optional()
       .$type
   ).prop(
+    "$vector",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
     "$with",
     $("array")
       .of($()
@@ -196,6 +202,12 @@ $("object", PagesControlsDto)
       .$type
   ).prop(
     "$index",
+    $().designType("string")
+      .tags("string")
+      .optional()
+      .$type
+  ).prop(
+    "$vector",
     $().designType("string")
       .tags("string")
       .optional()

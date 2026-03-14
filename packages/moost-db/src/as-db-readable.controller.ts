@@ -156,6 +156,15 @@ export class AsDbReadableController<
   // ── Hooks (overridable) ────────────────────────────────────────────────
 
   /**
+   * Compute an embedding vector from a search term.
+   * Override in subclass to integrate with your embedding provider (OpenAI, etc.).
+   * Called when `$vector` is present in query controls.
+   */
+  protected computeEmbedding(_search: string, _fieldName?: string): Promise<number[]> {
+    throw new HttpError(501, 'Vector search requires computeEmbedding() to be implemented')
+  }
+
+  /**
    * Transform filter before querying. Override to add tenant filtering, etc.
    */
   protected transformFilter(filter: FilterExpr): FilterExpr {
@@ -242,18 +251,26 @@ export class AsDbReadableController<
 
     const searchTerm = controls.$search as string | undefined
     const indexName = controls.$index as string | undefined
+    const vectorField = controls.$vector as string | undefined
 
-    if (searchTerm && this.readable.isSearchable()) {
-      return this.readable.search(searchTerm, {
-        filter,
-        controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-      } as Uniquery<any, any>, indexName) as Promise<DataType[]>
-    }
-
-    return this.readable.findMany({
+    const queryObj = {
       filter,
       controls: { ...controls, $select: select, $limit: controls.$limit || 1000 },
-    } as Uniquery<any, any>) as Promise<DataType[]>
+    } as Uniquery<any, any>
+
+    if (vectorField !== undefined && searchTerm) {
+      const vector = await this.computeEmbedding(searchTerm, vectorField || undefined)
+      if (vectorField) {
+        return this.readable.vectorSearch(vectorField, vector, queryObj) as Promise<DataType[]>
+      }
+      return this.readable.vectorSearch(vector, queryObj) as Promise<DataType[]>
+    }
+
+    if (searchTerm && this.readable.isSearchable()) {
+      return this.readable.search(searchTerm, queryObj, indexName) as Promise<DataType[]>
+    }
+
+    return this.readable.findMany(queryObj) as Promise<DataType[]>
   }
 
   /**
@@ -285,6 +302,7 @@ export class AsDbReadableController<
 
     const searchTerm = controls.$search as string | undefined
     const indexName = controls.$index as string | undefined
+    const vectorField = controls.$vector as string | undefined
 
     const query = {
       filter,
@@ -292,7 +310,14 @@ export class AsDbReadableController<
     }
 
     let result: { data: DataType[]; count: number }
-    if (searchTerm && this.readable.isSearchable()) {
+    if (vectorField !== undefined && searchTerm) {
+      const vector = await this.computeEmbedding(searchTerm, vectorField || undefined)
+      if (vectorField) {
+        result = await this.readable.vectorSearchWithCount(vectorField, vector, query as Uniquery<any, any>) as { data: DataType[]; count: number }
+      } else {
+        result = await this.readable.vectorSearchWithCount(vector, query as Uniquery<any, any>) as { data: DataType[]; count: number }
+      }
+    } else if (searchTerm && this.readable.isSearchable()) {
       result = await this.readable.searchWithCount(searchTerm, query as Uniquery<any, any>, indexName) as { data: DataType[]; count: number }
     } else {
       result = await this.readable.findManyWithCount(query as Uniquery<any, any>) as { data: DataType[]; count: number }
