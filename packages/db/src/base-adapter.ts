@@ -26,6 +26,16 @@ interface TxContext { state: unknown }
 const txStorage = new AsyncLocalStorage<TxContext>()
 
 /**
+ * Runs `fn` outside any active transaction context.
+ * Used by FK validation to avoid turning read-only checks into
+ * multi-collection transactions (which can cause session counter
+ * mismatches on some adapters, e.g. MongoDB).
+ */
+export function runOutsideTx<T>(fn: () => T): T {
+  return txStorage.exit(fn)
+}
+
+/**
  * Abstract base class for database adapters.
  *
  * Adapter instances are 1:1 with readable instances (tables or views).

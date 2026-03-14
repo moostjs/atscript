@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { DbError } from '../db-error'
 import { DbSpace } from '../table/db-space'
 import { prepareFixtures, MockAdapter } from './test-utils'
+import type { DbQuery, TDbInsertManyResult } from '../types'
 
 let AuthorType: any
 let PostType: any
@@ -238,5 +239,57 @@ describe('FK Validation', () => {
       const paths = err.errors.map(e => e.path)
       expect(paths).toContain('comments.authorId')
     }
+  })
+
+  // ── Transaction context isolation (bug 04) ────────────────────────────
+
+  it('should run FK validation counts outside the transaction context', async () => {
+    // Custom adapter that tracks transaction state per operation
+    class TxTrackingAdapter extends MockAdapter {
+      countTxStates: unknown[] = []
+      insertTxStates: unknown[] = []
+
+      protected override async _beginTransaction(): Promise<unknown> {
+        return 'mock-session'
+      }
+
+      override async count(query: DbQuery): Promise<number> {
+        this.countTxStates.push(this._getTransactionState())
+        return super.count(query)
+      }
+
+      override async insertMany(data: Array<Record<string, unknown>>): Promise<TDbInsertManyResult> {
+        this.insertTxStates.push(this._getTransactionState())
+        return super.insertMany(data)
+      }
+    }
+
+    const store = new Map<string, Array<Record<string, unknown>>>()
+    const adapters: TxTrackingAdapter[] = []
+    const space = new DbSpace(() => {
+      const adapter = new TxTrackingAdapter()
+      adapter.store = store
+      adapters.push(adapter)
+      return adapter
+    })
+
+    store.set('authors', [{ id: 1, name: 'Alice', createdAt: 1000 }])
+    store.set('posts', [])
+
+    space.getTable(AuthorType)
+    const posts = space.getTable(PostType)
+
+    await posts.insertOne({ title: 'Test', authorId: 1 })
+
+    // The authors adapter should have been called for FK validation count
+    const authorsAdapter = adapters.find(a => a.countTxStates.length > 0)
+    expect(authorsAdapter).toBeDefined()
+    // FK validation count must run OUTSIDE the transaction context
+    expect(authorsAdapter!.countTxStates).toEqual([undefined])
+
+    // The posts adapter should have run insertMany INSIDE the transaction
+    const postsAdapter = adapters.find(a => a.insertTxStates.length > 0)
+    expect(postsAdapter).toBeDefined()
+    expect(postsAdapter!.insertTxStates).toEqual(['mock-session'])
   })
 })

@@ -125,13 +125,13 @@ export class MongoAdapter extends BaseDbAdapter {
   protected override async _commitTransaction(state: unknown): Promise<void> {
     if (!state) { return }
     const session = state as ClientSession
-    try { await session.commitTransaction() } finally { session.endSession() }
+    try { await session.commitTransaction() } finally { await session.endSession() }
   }
 
   protected override async _rollbackTransaction(state: unknown): Promise<void> {
     if (!state) { return }
     const session = state as ClientSession
-    try { await session.abortTransaction() } finally { session.endSession() }
+    try { await session.abortTransaction() } finally { await session.endSession() }
   }
 
   private static readonly _noSession: Record<string, never> = Object.freeze({}) as Record<string, never>
