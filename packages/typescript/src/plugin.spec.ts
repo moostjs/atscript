@@ -908,6 +908,38 @@ describe('ts-plugin', () => {
     )
   })
 
+  it('must render __dim/__measure for @db.table interfaces with dimension/measure annotations', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/db-table-agg.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].fileName).toBe('db-table-agg.as.d.ts')
+    const dts = outDts[0].content
+    // Order has dim/measure
+    expect(dts).toContain('static __dim: "status" | "currency"')
+    expect(dts).toContain('static __measure: "amount"')
+    // Product has neither
+    const productDts = dts.slice(dts.indexOf('class Product'))
+    expect(productDts).not.toContain('__dim')
+    expect(productDts).not.toContain('__measure')
+    await expect(dts).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/db-table-agg.as.d.ts')
+    )
+
+    const outJs = await repo.generate({ format: 'js' })
+    const js = outJs[0].content
+    // Order has dimensions/measures arrays
+    expect(js).toContain("static dimensions = ['status', 'currency']")
+    expect(js).toContain("static measures = ['amount']")
+    // Product has neither
+    const productJs = js.slice(js.indexOf('class Product'))
+    expect(productJs).not.toContain('dimensions')
+    expect(productJs).not.toContain('measures')
+  })
+
   it('must render ref annotation arguments as lazy getters', async () => {
     const refAnnotation = new AnnotationSpec({
       argument: { name: 'target', type: 'ref' },

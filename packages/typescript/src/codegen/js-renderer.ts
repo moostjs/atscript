@@ -200,6 +200,7 @@ export class JsRenderer extends BaseRenderer {
     }
     this.renderJsonSchemaMethod(node)
     this.renderExampleDataMethod(node)
+    this.renderDimMeasure(node)
   }
 
   renderInterface(node: SemanticInterfaceNode): void {
@@ -258,6 +259,38 @@ export class JsRenderer extends BaseRenderer {
       this.writeln('static toExampleData() {')
       this.indent().writeln('return $e(this, { mode: "example" })').unindent()
       this.writeln('}')
+    }
+  }
+
+  private renderDimMeasure(node: SemanticNode) {
+    if (!isInterface(node)) return
+    const interfaceNode = node as SemanticInterfaceNode
+    if (!interfaceNode.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')) return
+
+    let struct: SemanticNode | undefined
+    if (interfaceNode.hasExtends) {
+      struct = this.doc.resolveInterfaceExtends(interfaceNode)
+    }
+    if (!struct) {
+      struct = interfaceNode.getDefinition()
+    }
+    if (!struct || !isStructure(struct)) return
+
+    const structNode = struct as SemanticStructureNode
+    const dims: string[] = []
+    const measures: string[] = []
+
+    for (const [name, prop] of structNode.props) {
+      if (prop.token('identifier')?.pattern) continue
+      if (prop.countAnnotations('db.column.dimension') > 0) dims.push(name)
+      if (prop.countAnnotations('db.column.measure') > 0) measures.push(name)
+    }
+
+    if (dims.length > 0) {
+      this.writeln(`static dimensions = [${dims.map(d => `'${escapeQuotes(d)}'`).join(', ')}]`)
+    }
+    if (measures.length > 0) {
+      this.writeln(`static measures = [${measures.map(m => `'${escapeQuotes(m)}'`).join(', ')}]`)
     }
   }
 
