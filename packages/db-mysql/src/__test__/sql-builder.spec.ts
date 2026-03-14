@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
 
 import {
   buildInsert,
@@ -17,6 +17,9 @@ import {
 } from '../sql-builder'
 import { toSqlValue } from '@atscript/db-sql-tools'
 import type { TDbFieldMeta } from '@atscript/db-utils'
+import { prepareFixtures } from './test-utils'
+
+beforeAll(() => prepareFixtures())
 
 // ── Helper to create minimal TDbFieldMeta ─────────────────────────────────
 
@@ -40,11 +43,11 @@ function fieldWithTags(designType: string, tags: string[]): TDbFieldMeta {
   })
 }
 
-function fieldWithMetadata(designType: string, meta: Record<string, unknown>): TDbFieldMeta {
+function fieldWithMetadata(designType: string, meta: Partial<AtscriptMetadata>, tags: string[] = []): TDbFieldMeta {
   const map = new Map(Object.entries(meta))
   return field({
     designType,
-    type: { type: { tags: new Set() }, metadata: { get: (k: string) => map.get(k), has: (k: string) => map.has(k) } } as any,
+    type: { type: { tags: new Set(tags) }, metadata: { get: (k: string) => map.get(k), has: (k: string) => map.has(k) } } as any,
   })
 }
 
@@ -249,6 +252,26 @@ describe('mysqlTypeFromField', () => {
     }))).toBe('TIMESTAMP')
   })
 
+  it('should map number.int to INT (not DOUBLE)', () => {
+    expect(mysqlTypeFromField(fieldWithTags('number', ['int', 'number']))).toBe('INT')
+  })
+
+  it('should map number.int with @db.mysql.unsigned to INT UNSIGNED', () => {
+    expect(mysqlTypeFromField(fieldWithMetadata('number', {
+      'db.mysql.unsigned': true,
+    }, ['int', 'number']))).toBe('INT UNSIGNED')
+  })
+
+  it('should map number.int.int16 to SMALLINT', () => {
+    expect(mysqlTypeFromField(fieldWithTags('number', ['int', 'int16', 'number']))).toBe('SMALLINT')
+  })
+
+  it('should map number.int.int64 with @db.mysql.unsigned to BIGINT UNSIGNED', () => {
+    expect(mysqlTypeFromField(fieldWithMetadata('number', {
+      'db.mysql.unsigned': true,
+    }, ['int', 'int64', 'number']))).toBe('BIGINT UNSIGNED')
+  })
+
   it('should map number with precision to DECIMAL', () => {
     expect(mysqlTypeFromField(fieldWithMetadata('number', {
       'db.column.precision': { precision: 10, scale: 2 },
@@ -331,13 +354,13 @@ describe('mysqlTypeFromField', () => {
 
   it('should map string with maxLength to VARCHAR(N)', () => {
     expect(mysqlTypeFromField(fieldWithMetadata('string', {
-      'expect.maxLength': 500,
+      'expect.maxLength': { length: 500 },
     }))).toBe('VARCHAR(500)')
   })
 
   it('should map string with large maxLength to LONGTEXT', () => {
     expect(mysqlTypeFromField(fieldWithMetadata('string', {
-      'expect.maxLength': 100000,
+      'expect.maxLength': { length: 100000 },
     }))).toBe('LONGTEXT')
   })
 

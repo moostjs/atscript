@@ -61,6 +61,12 @@ declare global {
     "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
     "db.view.materialized": boolean
     "db.view.renamed": string
+    "db.mysql.engine": string
+    "db.mysql.charset": string
+    "db.mysql.collate": string
+    "db.mysql.unsigned": boolean
+    "db.mysql.type": string
+    "db.mysql.onUpdate": string
     "ui.placeholder": string
     "ui.component": string
     "ui.hidden": boolean

@@ -153,6 +153,19 @@ export function collationToMysql(collation: TDbCollation): string {
  * For FK fields, delegates to the target PK's type via `field.fkTargetField`
  * so the FK column type always matches the referenced column.
  */
+/** Maps integer primitive tags to MySQL integer types. */
+function intTypeFromTags(tags: Set<string> | undefined, unsigned: boolean): string {
+  if (tags?.has('int8')) { return unsigned ? 'TINYINT UNSIGNED' : 'TINYINT' }
+  if (tags?.has('uint8') || tags?.has('byte')) { return 'TINYINT UNSIGNED' }
+  if (tags?.has('int16')) { return unsigned ? 'SMALLINT UNSIGNED' : 'SMALLINT' }
+  if (tags?.has('uint16') || tags?.has('port')) { return 'SMALLINT UNSIGNED' }
+  if (tags?.has('int32')) { return unsigned ? 'INT UNSIGNED' : 'INT' }
+  if (tags?.has('uint32')) { return 'INT UNSIGNED' }
+  if (tags?.has('int64')) { return unsigned ? 'BIGINT UNSIGNED' : 'BIGINT' }
+  if (tags?.has('uint64')) { return 'BIGINT UNSIGNED' }
+  return unsigned ? 'INT UNSIGNED' : 'INT'
+}
+
 export function mysqlTypeFromField(field: TDbFieldMeta): string {
   // FK fields inherit their DB type from the referenced target column
   if (field.fkTargetField) {
@@ -187,19 +200,15 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       if (field.defaultValue?.kind === 'fn' && field.defaultValue.fn === 'now') {
         return 'TIMESTAMP'
       }
+      // number.int has designType "number" but carries the "int" tag —
+      // delegate to integer type logic for sized int tags and unsigned
+      if (tags?.has('int')) {
+        return intTypeFromTags(tags, unsigned)
+      }
       return 'DOUBLE'
     }
     case 'integer': {
-      // Sized integer detection via primitive tags
-      if (tags?.has('int8')) { return unsigned ? 'TINYINT UNSIGNED' : 'TINYINT' }
-      if (tags?.has('uint8') || tags?.has('byte')) { return 'TINYINT UNSIGNED' }
-      if (tags?.has('int16')) { return unsigned ? 'SMALLINT UNSIGNED' : 'SMALLINT' }
-      if (tags?.has('uint16') || tags?.has('port')) { return 'SMALLINT UNSIGNED' }
-      if (tags?.has('int32')) { return unsigned ? 'INT UNSIGNED' : 'INT' }
-      if (tags?.has('uint32')) { return 'INT UNSIGNED' }
-      if (tags?.has('int64')) { return unsigned ? 'BIGINT UNSIGNED' : 'BIGINT' }
-      if (tags?.has('uint64')) { return 'BIGINT UNSIGNED' }
-      return unsigned ? 'INT UNSIGNED' : 'INT'
+      return intTypeFromTags(tags, unsigned)
     }
     case 'decimal': {
       if (precision) {
@@ -214,7 +223,8 @@ export function mysqlTypeFromField(field: TDbFieldMeta): string {
       // char primitive → CHAR(1)
       if (tags?.has('char')) { return 'CHAR(1)' }
       // Check maxLength annotation to decide VARCHAR vs TEXT
-      const maxLen = metadata?.get('expect.maxLength') as number | undefined
+      // Compiled format: { length: number; message?: string }
+      const maxLen = (metadata?.get('expect.maxLength') as { length: number } | undefined)?.length
       if (maxLen !== undefined && maxLen <= 65535) { return `VARCHAR(${maxLen})` }
       if (maxLen !== undefined && maxLen > 65535) { return 'LONGTEXT' }
       // MySQL requires VARCHAR for primary keys and columns with DEFAULT values
