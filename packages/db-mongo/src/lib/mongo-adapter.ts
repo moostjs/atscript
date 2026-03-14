@@ -155,6 +155,21 @@ export class MongoAdapter extends BaseDbAdapter {
     return this.collection.aggregate(pipeline, this._getSessionOpts())
   }
 
+  override async aggregate(query: DbQuery): Promise<Array<Record<string, unknown>>> {
+    const { buildAggregatePipeline, buildCountPipeline } = await import('../agg')
+
+    if (query.controls?.$count) {
+      const pipeline = buildCountPipeline(query)
+      this._log('aggregate (count)', pipeline)
+      const result = await this.aggregatePipeline(pipeline).toArray()
+      return result.length > 0 ? result : [{ count: 0 }]
+    }
+
+    const pipeline = buildAggregatePipeline(query)
+    this._log('aggregate', pipeline)
+    return this.aggregatePipeline(pipeline).toArray()
+  }
+
 
   // ── ID handling ──────────────────────────────────────────────────────────
 

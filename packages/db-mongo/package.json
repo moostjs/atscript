@@ -34,6 +34,9 @@
       "plugin": [
         "dist/plugin.d.ts"
       ],
+      "agg": [
+        "dist/agg.d.ts"
+      ],
       "": [
         "dist/index.d.ts"
       ]
@@ -49,6 +52,11 @@
       "types": "./dist/plugin.d.ts",
       "import": "./dist/plugin.mjs",
       "require": "./dist/plugin.cjs"
+    },
+    "./agg": {
+      "types": "./dist/agg.d.ts",
+      "import": "./dist/agg.mjs",
+      "require": "./dist/agg.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -71,6 +79,12 @@
     {
       "entries": [
         "src/plugin.ts"
+      ],
+      "dts": true
+    },
+    {
+      "entries": [
+        "src/agg.ts"
       ],
       "dts": true
     }
