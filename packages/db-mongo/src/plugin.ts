@@ -1,1 +1,1 @@
-export { MongoPlugin } from './plugin/index'
+export { MongoPlugin, MongoPlugin as default } from './plugin/index'

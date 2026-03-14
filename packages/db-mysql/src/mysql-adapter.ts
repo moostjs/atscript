@@ -226,15 +226,18 @@ export class MysqlAdapter extends BaseDbAdapter {
 
     for (const change of changes) {
       switch (change.key) {
-        case 'engine':
+        case 'engine': {
           clauses.push(`ENGINE = ${change.newValue}`)
           break
-        case 'charset':
+        }
+        case 'charset': {
           clauses.push(`CHARACTER SET = ${change.newValue}`)
           break
-        case 'collation':
+        }
+        case 'collation': {
           clauses.push(`COLLATE = ${change.newValue}`)
           break
+        }
       }
     }
 

@@ -5,9 +5,6 @@ import type { TGenericLogger } from '../logger'
 import type { TDbForeignKey, TDbRelation, TTableResolver } from '../types'
 import { findFKForRelation, findRemoteFK, resolveRelationTargetTable } from './relation-helpers'
 
-// Re-export so existing consumers don't break
-export { findFKForRelation, findRemoteFK, resolveRelationTargetTable }
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 /** Host interface for the relation loader — matches AtscriptDbReadable property names. */

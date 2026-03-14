@@ -1,6 +1,5 @@
 import { AnnotationSpec } from '@atscript/core'
 import type { TAnnotationsTree } from '@atscript/core'
-import type { AtscriptDoc } from '@atscript/core'
 import {
   isArray,
   isInterface,

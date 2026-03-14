@@ -116,10 +116,9 @@ export class SchemaSync {
     const snapshots = allReadables.map(r => {
       if (r.isView) { return computeViewSnapshot(r as AtscriptDbView) }
       const tm = r.dbAdapter.typeMapper?.bind(r.dbAdapter)
-      // Trigger lazy metadata build — adapter hooks (onAfterFlatten) populate
-      // state that getDesiredTableOptions() depends on (e.g., _cappedOptions).
-      void r.fieldDescriptors
-      const opts = r.dbAdapter.getDesiredTableOptions?.()
+      // Access fieldDescriptors to trigger lazy metadata build — adapter hooks
+      // (onAfterFlatten) populate state that getDesiredTableOptions() depends on.
+      const opts = (r.fieldDescriptors, r.dbAdapter.getDesiredTableOptions?.())
       return computeTableSnapshot(r, tm, opts)
     })
     const hash = computeSchemaHash(snapshots)

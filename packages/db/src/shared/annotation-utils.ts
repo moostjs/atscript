@@ -7,7 +7,6 @@ import {
   isRef,
   isStructure,
   type SemanticNode,
-  type SemanticRefNode,
   type SemanticStructureNode,
   type Token,
   type TMessages,
