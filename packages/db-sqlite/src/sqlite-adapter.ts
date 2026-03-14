@@ -9,10 +9,11 @@ import type {
   TExistingColumn,
   TColumnDiff,
   TSyncColumnResult,
+  TSearchIndexInfo,
 } from '@atscript/db'
 import type { DbQuery, FilterExpr } from '@atscript/db'
 
-import { buildWhere } from './filter-builder'
+import { buildWhere, buildPrefixedWhere } from './filter-builder'
 import {
   buildAggregateCount,
   buildAggregateSelect,
@@ -368,6 +369,9 @@ export class SqliteAdapter extends BaseDbAdapter {
     const tableName = this.resolveTableName()
     const tempName = `${tableName}__tmp_${Date.now()}`
 
+    // Drop FTS tables before rebuild — syncIndexes() will recreate them
+    this._dropAllFtsTables(tableName)
+
     // Disable FK checks during recreation — referenced tables may be mid-sync
     this.driver.exec('PRAGMA foreign_keys = OFF')
     this.driver.exec('PRAGMA legacy_alter_table = ON')
@@ -415,6 +419,7 @@ export class SqliteAdapter extends BaseDbAdapter {
 
   async dropTable(): Promise<void> {
     const tableName = this.resolveTableName()
+    this._dropAllFtsTables(tableName)
     const ddl = `DROP TABLE IF EXISTS "${esc(tableName)}"`
     this._log(ddl)
     this.driver.exec(ddl)
@@ -432,6 +437,7 @@ export class SqliteAdapter extends BaseDbAdapter {
   }
 
   async dropTableByName(tableName: string): Promise<void> {
+    this._dropAllFtsTables(tableName)
     const ddl = `DROP TABLE IF EXISTS "${esc(tableName)}"`
     this._log(ddl)
     this.driver.exec(ddl)
@@ -496,6 +502,226 @@ export class SqliteAdapter extends BaseDbAdapter {
       },
       shouldSkipType: (type) => type === 'fulltext',
     })
+
+    // Sync FTS5 virtual tables for fulltext indexes
+    this._syncFtsIndexes(tableName)
+  }
+
+  // ── FTS5 Full-Text Search ─────────────────────────────────────────────────
+
+  override getSearchIndexes(): TSearchIndexInfo[] {
+    return this._getFulltextIndexes().map(idx => ({
+      name: idx.name,
+      description: `FTS5 index (${idx.fields.map(f => f.name).join(', ')})`,
+      type: 'text' as const,
+    }))
+  }
+
+  override async search(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<Array<Record<string, unknown>>> {
+    if (!text.trim()) { return [] }
+    const base = this._buildFtsBase(text, query.filter, indexName)
+    const controls = query.controls || {}
+
+    // Projection
+    let cols = 't.*'
+    if (controls.$select?.asArray?.length) {
+      cols = controls.$select.asArray.map((c: string) => `t."${esc(c)}"`).join(', ')
+    }
+
+    let sql = `SELECT ${cols} ${base.fromWhere}`
+    const params = [...base.params]
+
+    // Sort
+    if (controls.$sort) {
+      const orderParts: string[] = []
+      for (const [col, dir] of Object.entries(controls.$sort)) {
+        orderParts.push(`t."${esc(col)}" ${dir === -1 ? 'DESC' : 'ASC'}`)
+      }
+      if (orderParts.length > 0) {
+        sql += ` ORDER BY ${orderParts.join(', ')}`
+      }
+    }
+
+    // Limit / Offset
+    if (controls.$limit !== undefined) {
+      sql += ` LIMIT ?`
+      params.push(controls.$limit)
+    }
+    if (controls.$skip !== undefined) {
+      if (controls.$limit === undefined) {
+        sql += ` LIMIT -1`
+      }
+      sql += ` OFFSET ?`
+      params.push(controls.$skip)
+    }
+
+    this._log(sql, params)
+    return this.driver.all(sql, params)
+  }
+
+  override async searchWithCount(
+    text: string,
+    query: DbQuery,
+    indexName?: string
+  ): Promise<{ data: Array<Record<string, unknown>>; count: number }> {
+    if (!text.trim()) { return { data: [], count: 0 } }
+    const data = await this.search(text, query, indexName)
+
+    // Count query reuses the same FROM+WHERE base, without limit/skip
+    const base = this._buildFtsBase(text, query.filter, indexName)
+    const countSql = `SELECT COUNT(*) as cnt ${base.fromWhere}`
+    this._log(countSql, base.params)
+    const row = this.driver.get<{ cnt: number }>(countSql, base.params)
+    return { data, count: row?.cnt ?? 0 }
+  }
+
+  // ── FTS5 internals ────────────────────────────────────────────────────────
+
+  /** Builds FTS table name from index name: `<table>__fts__<indexName>`. */
+  private _ftsTableName(indexName: string): string {
+    return `${this.resolveTableName()}__fts__${indexName}`
+  }
+
+  /** Returns fulltext indexes from table metadata. */
+  private _getFulltextIndexes(): TDbIndex[] {
+    const result: TDbIndex[] = []
+    for (const index of this._table.indexes.values()) {
+      if (index.type === 'fulltext') { result.push(index) }
+    }
+    return result
+  }
+
+  /** Resolves a fulltext index by name, or returns the first available. */
+  private _resolveFtsIndex(indexName?: string): TDbIndex {
+    const ftIndexes = this._getFulltextIndexes()
+    if (ftIndexes.length === 0) {
+      throw new Error('No search index available')
+    }
+    if (indexName) {
+      const found = ftIndexes.find(idx => idx.name === indexName)
+      if (!found) {
+        throw new Error(`Search index "${indexName}" not found`)
+      }
+      return found
+    }
+    return ftIndexes[0]
+  }
+
+  /**
+   * Builds the shared FROM+JOIN+WHERE fragment for FTS5 queries.
+   * Both data and count queries reuse this to avoid duplicating index resolution and filter translation.
+   */
+  private _buildFtsBase(
+    text: string,
+    filter: FilterExpr,
+    indexName?: string
+  ): { fromWhere: string; params: unknown[] } {
+    const ftsIndex = this._resolveFtsIndex(indexName)
+    const ftsTable = this._ftsTableName(ftsIndex.name)
+    const tableName = this.resolveTableName()
+    const where = buildPrefixedWhere('t', filter)
+
+    let fromWhere = `FROM "${esc(tableName)}" AS t`
+    fromWhere += ` JOIN "${esc(ftsTable)}" AS fts ON t.rowid = fts.rowid`
+    fromWhere += ` WHERE fts."${esc(ftsTable)}" MATCH ?`
+    const params: unknown[] = [text]
+
+    if (where.sql !== '1=1') {
+      fromWhere += ` AND (${where.sql})`
+      params.push(...where.params)
+    }
+
+    return { fromWhere, params }
+  }
+
+  /**
+   * Creates/drops FTS5 virtual tables and sync triggers to match desired fulltext indexes.
+   */
+  private _syncFtsIndexes(tableName: string): void {
+    const ftIndexes = this._getFulltextIndexes()
+    const desiredFtsTables = new Set(ftIndexes.map(idx => this._ftsTableName(idx.name)))
+
+    // List existing FTS virtual tables for this content table (exclude shadow tables like _data, _idx)
+    const existingFts = this.driver
+      .all<{ name: string; sql: string }>(`SELECT name, sql FROM sqlite_master WHERE type='table' AND name LIKE ?`, [`${tableName}__fts__%`])
+      .filter(r => r.sql.startsWith('CREATE VIRTUAL TABLE'))
+      .map(r => r.name)
+
+    // Drop stale FTS tables
+    for (const name of existingFts) {
+      if (!desiredFtsTables.has(name)) {
+        this._dropFtsTable(name)
+      }
+    }
+
+    // Create missing FTS tables
+    const existingSet = new Set(existingFts)
+    for (const index of ftIndexes) {
+      const ftsTable = this._ftsTableName(index.name)
+      if (!existingSet.has(ftsTable)) {
+        this._createFtsTable(tableName, ftsTable, index)
+      }
+    }
+  }
+
+  /** Creates an FTS5 virtual table with sync triggers and rebuilds the index. */
+  private _createFtsTable(tableName: string, ftsTable: string, index: TDbIndex): void {
+    const fieldNames = index.fields.map(f => `"${esc(f.name)}"`)
+    const fieldList = fieldNames.join(', ')
+
+    // Create external-content FTS5 virtual table
+    const createSql = `CREATE VIRTUAL TABLE IF NOT EXISTS "${esc(ftsTable)}" USING fts5(${fieldList}, content='${tableName.replace(/'/g, "''")}', content_rowid='rowid')`
+    this._log(createSql)
+    this.driver.exec(createSql)
+
+    // Create sync triggers
+    const newFields = index.fields.map(f => `new."${esc(f.name)}"`).join(', ')
+    const oldFields = index.fields.map(f => `old."${esc(f.name)}"`).join(', ')
+    const ef = esc(ftsTable)
+
+    // AFTER INSERT
+    const aiSql = `CREATE TRIGGER IF NOT EXISTS "${esc(ftsTable + '__ai')}" AFTER INSERT ON "${esc(tableName)}" BEGIN INSERT INTO "${ef}"(rowid, ${fieldList}) VALUES (new.rowid, ${newFields}); END`
+    this._log(aiSql)
+    this.driver.exec(aiSql)
+
+    // AFTER DELETE
+    const adSql = `CREATE TRIGGER IF NOT EXISTS "${esc(ftsTable + '__ad')}" AFTER DELETE ON "${esc(tableName)}" BEGIN INSERT INTO "${ef}"("${ef}", rowid, ${fieldList}) VALUES ('delete', old.rowid, ${oldFields}); END`
+    this._log(adSql)
+    this.driver.exec(adSql)
+
+    // AFTER UPDATE
+    const auSql = `CREATE TRIGGER IF NOT EXISTS "${esc(ftsTable + '__au')}" AFTER UPDATE ON "${esc(tableName)}" BEGIN INSERT INTO "${ef}"("${ef}", rowid, ${fieldList}) VALUES ('delete', old.rowid, ${oldFields}); INSERT INTO "${ef}"(rowid, ${fieldList}) VALUES (new.rowid, ${newFields}); END`
+    this._log(auSql)
+    this.driver.exec(auSql)
+
+    // Rebuild index to pick up any existing rows
+    const rebuildSql = `INSERT INTO "${ef}"("${ef}") VALUES ('rebuild')`
+    this._log(rebuildSql)
+    this.driver.exec(rebuildSql)
+  }
+
+  /** Drops an FTS5 virtual table and its sync triggers. */
+  private _dropFtsTable(ftsTable: string): void {
+    for (const suffix of ['__ai', '__ad', '__au']) {
+      this.driver.exec(`DROP TRIGGER IF EXISTS "${esc(ftsTable + suffix)}"`)
+    }
+    const sql = `DROP TABLE IF EXISTS "${esc(ftsTable)}"`
+    this._log(sql)
+    this.driver.exec(sql)
+  }
+
+  /** Drops all FTS virtual tables and triggers for a content table. */
+  private _dropAllFtsTables(tableName: string): void {
+    const ftsTables = this.driver
+      .all<{ name: string; sql: string }>(`SELECT name, sql FROM sqlite_master WHERE type='table' AND name LIKE ?`, [`${tableName}__fts__%`])
+      .filter(r => r.sql.startsWith('CREATE VIRTUAL TABLE'))
+    for (const { name } of ftsTables) {
+      this._dropFtsTable(name)
+    }
   }
 }
 
