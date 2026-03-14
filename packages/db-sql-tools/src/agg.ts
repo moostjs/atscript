@@ -6,7 +6,7 @@ import type { SqlDialect, TSqlFragment } from './dialect'
 import { EMPTY_AND } from './dialect'
 import { buildWhere } from './filter-builder'
 
-const AGG_FN_SQL: Record<string, string> = {
+export const AGG_FN_SQL: Record<string, string> = {
   sum: 'SUM',
   avg: 'AVG',
   count: 'COUNT',

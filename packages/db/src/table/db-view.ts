@@ -18,6 +18,10 @@ export interface TViewColumnMapping {
   viewColumn: string
   sourceTable: string
   sourceColumn: string
+  /** Aggregate function name ('sum'|'avg'|'count'|'min'|'max') if this is an aggregate column. */
+  aggFn?: string
+  /** Source field for the aggregate function ('*' for COUNT(*)). */
+  aggField?: string
 }
 
 /**
@@ -116,6 +120,9 @@ export class AtscriptDbView<
     // Resolve filter from @db.view.filter
     const filter = metadata.get('db.view.filter') as AtscriptQueryNode | undefined
 
+    // Resolve having from @db.view.having
+    const having = metadata.get('db.view.having') as AtscriptQueryNode | undefined
+
     // Resolve materialized flag
     const materialized = metadata.has('db.view.materialized')
 
@@ -124,6 +131,7 @@ export class AtscriptDbView<
       entryTable,
       joins,
       filter,
+      having,
       materialized,
     }
 
@@ -159,16 +167,31 @@ export class AtscriptDbView<
 
     if (this._type.type.kind !== 'object') { return mappings }
 
+    const aggKeys = ['db.agg.sum', 'db.agg.avg', 'db.agg.count', 'db.agg.min', 'db.agg.max'] as const
+
     for (const [fieldName, fieldType] of this._type.type.props.entries()) {
+      // Detect aggregate annotations on this field
+      let aggFn: string | undefined
+      let aggField: string | undefined
+      for (const key of aggKeys) {
+        const val = fieldType.metadata?.get(key as any)
+        if (val !== undefined) {
+          aggFn = key.split('.')[2] // 'sum', 'avg', 'count', 'min', 'max'
+          aggField = typeof val === 'string' ? val : '*' // COUNT(*) when val is true
+          break
+        }
+      }
+
       if (fieldType.ref) {
         const resolved = fieldType.ref.type()
         const sourceTable = (resolved?.metadata?.get('db.table') as string)
           || resolved?.id || ''
         const sourceColumn = fieldType.ref.field || fieldName
-        mappings.push({ viewColumn: fieldName, sourceTable, sourceColumn })
+        mappings.push({ viewColumn: fieldName, sourceTable, sourceColumn, aggFn, aggField })
       } else {
         // No ref — assume entry table, same column name
-        mappings.push({ viewColumn: fieldName, sourceTable: plan.entryTable, sourceColumn: fieldName })
+        const sourceColumn = aggField && aggField !== '*' ? aggField : fieldName
+        mappings.push({ viewColumn: fieldName, sourceTable: plan.entryTable, sourceColumn, aggFn, aggField })
       }
     }
 

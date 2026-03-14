@@ -5,6 +5,7 @@ import {
   type TSyncColumnResult,
   type TDbFieldMeta,
   type TExistingTableOption,
+  type TViewColumnMapping,
   type AtscriptQueryNode,
   type AtscriptQueryFieldRef,
 } from '@atscript/db'
@@ -143,16 +144,53 @@ async function ensureView(host: TMongoSchemaSyncHost, view: AtscriptDbView): Pro
     pipeline.push({ $match: matchExpr })
   }
 
-  // $project for column mappings
-  const project: Record<string, unknown> = { _id: 0 }
-  for (const col of columns) {
-    if (col.sourceTable === plan.entryTable) {
-      project[col.viewColumn] = `$${col.sourceColumn}`
-    } else {
-      project[col.viewColumn] = `$${JOINED_PREFIX}${col.sourceTable}.${col.sourceColumn}`
+  // Check if any column has aggregate functions
+  const hasAggregates = columns.some(c => c.aggFn)
+
+  /** Resolves a column to its MongoDB source field path. */
+  const colSourceField = (col: TViewColumnMapping) =>
+    col.sourceTable === plan.entryTable
+      ? `$${col.sourceColumn}`
+      : `$${JOINED_PREFIX}${col.sourceTable}.${col.sourceColumn}`
+
+  if (hasAggregates) {
+    // $group stage — dimension columns into _id, aggregates as accumulators
+    const group: Record<string, unknown> = { _id: {} }
+    const project: Record<string, unknown> = { _id: 0 }
+
+    for (const col of columns) {
+      if (col.aggFn) {
+        if (col.aggFn === 'count' && col.aggField === '*') {
+          group[col.viewColumn] = { $sum: 1 }
+        } else {
+          group[col.viewColumn] = { [`$${col.aggFn}`]: colSourceField(col) }
+        }
+        project[col.viewColumn] = `$${col.viewColumn}`
+      } else {
+        // Dimension column — add to _id
+        ;(group._id as Record<string, unknown>)[col.viewColumn] = colSourceField(col)
+        project[col.viewColumn] = `$_id.${col.viewColumn}`
+      }
     }
+
+    pipeline.push({ $group: group })
+
+    // HAVING → $match (post-group filter)
+    // After $group, aggregate fields are top-level and dimension fields are under _id
+    if (plan.having) {
+      const havingMatch = queryNodeToHaving(plan.having, columns)
+      pipeline.push({ $match: havingMatch })
+    }
+
+    pipeline.push({ $project: project })
+  } else {
+    // Non-aggregate view — flat $project
+    const project: Record<string, unknown> = { _id: 0 }
+    for (const col of columns) {
+      project[col.viewColumn] = colSourceField(col)
+    }
+    pipeline.push({ $project: project })
   }
-  pipeline.push({ $project: project })
 
   host._log('createView', host._table.tableName, plan.entryTable, pipeline)
   await host.db.createCollection(host._table.tableName, {
@@ -228,6 +266,53 @@ function resolveViewFieldPath(ref: AtscriptQueryFieldRef, entryTable: string): s
   const table = (ref.type()?.metadata?.get('db.table') as string) || ''
   if (table === entryTable) { return ref.field }
   return `${JOINED_PREFIX}${table}.${ref.field}`
+}
+
+/**
+ * Translates an AtscriptQueryNode to a MongoDB $match for use after $group (HAVING).
+ * After $group, aggregate fields are top-level and dimension fields are under _id.
+ */
+function queryNodeToHaving(node: AtscriptQueryNode, columns: TViewColumnMapping[]): Document {
+  const colMap = new Map(columns.map(c => [c.viewColumn, c]))
+
+  const resolveHavingField = (ref: AtscriptQueryFieldRef): string => {
+    if (!ref.type) {
+      const col = colMap.get(ref.field)
+      // Aggregate fields are top-level after $group, dimension fields are under _id
+      if (col?.aggFn) { return ref.field }
+      if (col) { return `_id.${ref.field}` }
+    }
+    return ref.field
+  }
+
+  return queryNodeToHavingInner(node, resolveHavingField)
+}
+
+function queryNodeToHavingInner(
+  node: AtscriptQueryNode,
+  resolveField: (ref: AtscriptQueryFieldRef) => string,
+): Document {
+  if ('$and' in node) {
+    return { $and: (node as { $and: AtscriptQueryNode[] }).$and.map(n => queryNodeToHavingInner(n, resolveField)) }
+  }
+  if ('$or' in node) {
+    return { $or: (node as { $or: AtscriptQueryNode[] }).$or.map(n => queryNodeToHavingInner(n, resolveField)) }
+  }
+  if ('$not' in node) {
+    return { $not: queryNodeToHavingInner((node as { $not: AtscriptQueryNode }).$not, resolveField) }
+  }
+
+  const comp = node as { left: AtscriptQueryFieldRef; op: string; right?: unknown }
+  const fieldPath = resolveField(comp.left)
+
+  if (comp.right && typeof comp.right === 'object' && 'field' in (comp.right as object)) {
+    const rightPath = resolveField(comp.right as AtscriptQueryFieldRef)
+    return { $expr: { [comp.op]: [`$${fieldPath}`, `$${rightPath}`] } }
+  }
+
+  if (comp.op === '$eq') { return { [fieldPath]: comp.right } }
+  if (comp.op === '$ne') { return { [fieldPath]: { $ne: comp.right } } }
+  return { [fieldPath]: { [comp.op]: comp.right } }
 }
 
 // ── Drop / rename / recreate ─────────────────────────────────────────────────

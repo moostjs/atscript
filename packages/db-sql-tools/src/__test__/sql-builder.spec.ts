@@ -216,4 +216,85 @@ describe('buildCreateView', () => {
     const result = buildCreateView(customDialect, 'v', plan, columns, resolveFieldRef)
     expect(result.startsWith('CREATE OR REPLACE VIEW')).toBe(true)
   })
+
+  it('wraps aggregate columns with SQL functions', () => {
+    const plan: TViewPlan = { entryTable: 'orders', joins: [] }
+    const columns: TViewColumnMapping[] = [
+      { viewColumn: 'category', sourceTable: 'orders', sourceColumn: 'category' },
+      { viewColumn: 'totalRevenue', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'sum', aggField: 'amount' },
+      { viewColumn: 'orderCount', sourceTable: 'orders', sourceColumn: '*', aggFn: 'count', aggField: '*' },
+      { viewColumn: 'avgAmount', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'avg', aggField: 'amount' },
+    ]
+
+    const result = buildCreateView(mockDialect, 'order_stats', plan, columns, resolveFieldRef)
+    expect(result).toContain('SUM([orders].[amount]) AS [totalRevenue]')
+    expect(result).toContain('COUNT(*) AS [orderCount]')
+    expect(result).toContain('AVG([orders].[amount]) AS [avgAmount]')
+    expect(result).toContain('[orders].[category] AS [category]')
+  })
+
+  it('generates GROUP BY for dimension columns when aggregates present', () => {
+    const plan: TViewPlan = { entryTable: 'orders', joins: [] }
+    const columns: TViewColumnMapping[] = [
+      { viewColumn: 'category', sourceTable: 'orders', sourceColumn: 'category' },
+      { viewColumn: 'region', sourceTable: 'orders', sourceColumn: 'region' },
+      { viewColumn: 'total', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'sum', aggField: 'amount' },
+    ]
+
+    const result = buildCreateView(mockDialect, 'stats', plan, columns, resolveFieldRef)
+    expect(result).toContain('GROUP BY [orders].[category], [orders].[region]')
+  })
+
+  it('omits GROUP BY when all columns are aggregates', () => {
+    const plan: TViewPlan = { entryTable: 'orders', joins: [] }
+    const columns: TViewColumnMapping[] = [
+      { viewColumn: 'total', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'sum', aggField: 'amount' },
+      { viewColumn: 'cnt', sourceTable: 'orders', sourceColumn: '*', aggFn: 'count', aggField: '*' },
+    ]
+
+    const result = buildCreateView(mockDialect, 'totals', plan, columns, resolveFieldRef)
+    expect(result).not.toContain('GROUP BY')
+  })
+
+  it('generates HAVING clause with aggregate expression expansion', () => {
+    const plan: TViewPlan = {
+      entryTable: 'orders',
+      joins: [],
+      having: {
+        left: { field: 'totalRevenue' },
+        op: '$gt',
+        right: 100,
+      },
+    }
+    const columns: TViewColumnMapping[] = [
+      { viewColumn: 'category', sourceTable: 'orders', sourceColumn: 'category' },
+      { viewColumn: 'totalRevenue', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'sum', aggField: 'amount' },
+    ]
+
+    const result = buildCreateView(mockDialect, 'order_stats', plan, columns, resolveFieldRef)
+    expect(result).toContain('HAVING SUM([orders].[amount]) > 100')
+  })
+
+  it('generates full aggregate view SQL (SELECT + GROUP BY + HAVING)', () => {
+    const plan: TViewPlan = {
+      entryTable: 'orders',
+      joins: [],
+      having: {
+        left: { field: 'totalRevenue' },
+        op: '$gt',
+        right: 100,
+      },
+    }
+    const columns: TViewColumnMapping[] = [
+      { viewColumn: 'category', sourceTable: 'orders', sourceColumn: 'category' },
+      { viewColumn: 'totalRevenue', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'sum', aggField: 'amount' },
+      { viewColumn: 'orderCount', sourceTable: 'orders', sourceColumn: '*', aggFn: 'count', aggField: '*' },
+      { viewColumn: 'avgAmount', sourceTable: 'orders', sourceColumn: 'amount', aggFn: 'avg', aggField: 'amount' },
+    ]
+
+    const result = buildCreateView(mockDialect, 'order_stats', plan, columns, resolveFieldRef)
+    expect(result).toBe(
+      'CREATE VIEW [order_stats] AS SELECT [orders].[category] AS [category], SUM([orders].[amount]) AS [totalRevenue], COUNT(*) AS [orderCount], AVG([orders].[amount]) AS [avgAmount] FROM [orders] GROUP BY [orders].[category] HAVING SUM([orders].[amount]) > 100'
+    )
+  })
 })

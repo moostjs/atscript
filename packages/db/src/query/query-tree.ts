@@ -16,6 +16,7 @@ export interface TViewPlan {
   entryTable: string
   joins: TViewJoin[]
   filter?: AtscriptQueryNode
+  having?: AtscriptQueryNode
   materialized: boolean
 }
 
