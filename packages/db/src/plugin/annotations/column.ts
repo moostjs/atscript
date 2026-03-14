@@ -161,6 +161,23 @@ export const dbColumnAnnotations: TAnnotationsTree = {
         return validateFieldBaseType(token, doc, '@db.column.precision', ['number', 'decimal'])
       },
     }),
+
+    dimension: new AnnotationSpec({
+      description:
+        'Marks a field as a dimension — groupable in aggregate queries ($groupBy). '
+        + 'Dimension fields automatically receive a database index during schema sync.',
+      nodeType: ['prop'],
+    }),
+
+    measure: new AnnotationSpec({
+      description:
+        'Marks a field as a measure — aggregatable in aggregate queries '
+        + '(sum, avg, count, min, max). Only valid on numeric or decimal fields.',
+      nodeType: ['prop'],
+      validate(token, _args, doc) {
+        return validateFieldBaseType(token, doc, '@db.column.measure', ['number', 'decimal'])
+      },
+    }),
   },
 
   default: {

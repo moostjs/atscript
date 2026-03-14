@@ -1,4 +1,5 @@
 import type { TAtscriptPlugin } from '@atscript/core'
+import { dbAggAnnotations } from './annotations/agg'
 import { dbColumnAnnotations } from './annotations/column'
 import { dbIndexAnnotations } from './annotations/index-ann'
 import { dbRelAnnotations } from './annotations/rel'
@@ -23,6 +24,7 @@ export const dbPlugin: () => TAtscriptPlugin = () => ({
           sync: dbTableAnnotations.sync,
           rel: dbRelAnnotations.rel,
           view: dbViewAnnotations.view,
+          agg: dbAggAnnotations.agg,
         },
       },
     }

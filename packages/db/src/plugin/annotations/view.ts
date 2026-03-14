@@ -256,5 +256,36 @@ export const dbViewAnnotations: TAnnotationsTree = {
         return errors
       },
     }),
+
+    having: new AnnotationSpec({
+      description:
+        'Post-aggregation filter (HAVING clause) for analytical views. '
+        + 'References view field aliases with applied aggregate functions.\n\n'
+        + '**Example:**\n'
+        + '```atscript\n'
+        + '@db.view\n'
+        + '@db.view.for Order\n'
+        + '@db.view.having `totalRevenue > 100`\n'
+        + 'export interface TopCategories { ... }\n'
+        + '```\n',
+      nodeType: ['interface'],
+      argument: {
+        name: 'condition',
+        type: 'query',
+        description: 'HAVING condition referencing view aliases.',
+      },
+      validate(token, _args, _doc) {
+        const errors = [] as TMessages
+        const owner = token.parentNode!
+        if (!hasAnyViewAnnotation(owner)) {
+          errors.push({
+            message: '@db.view.having is only valid on @db.view interfaces',
+            severity: 1,
+            range: token.range,
+          })
+        }
+        return errors
+      },
+    }),
   },
 }
