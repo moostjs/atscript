@@ -227,8 +227,8 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       mysql2:
         specifier: ^3.11.0
@@ -243,8 +243,8 @@ importers:
         specifier: workspace:^
         version: link:../db-utils
       '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       vitest:
         specifier: 3.2.4
@@ -265,8 +265,8 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       '@types/better-sqlite3':
         specifier: ^7.6.13
@@ -287,8 +287,8 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       vitest:
         specifier: 3.2.4
@@ -322,11 +322,11 @@ importers:
         specifier: workspace:^
         version: link:../typescript
       '@uniqu/core':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
       '@uniqu/url':
-        specifier: ^0.0.6
-        version: 0.0.6
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       '@atscript/core':
         specifier: workspace:^
@@ -2169,14 +2169,14 @@ packages:
   '@uniqu/core@0.0.3':
     resolution: {integrity: sha512-Dl/5sqTsP57WRNzEXBhUQ2fE5tnLn2g6MUSzJeZr1yDLbXVmESwnRhlJ7PMI8VkNDj7fN6DBVEkMQiMuQFp79g==}
 
-  '@uniqu/core@0.0.6':
-    resolution: {integrity: sha512-uDf9YvrTZrVaX/fhFlu6+dynA0/Ay23B/Z0TOxJP+mJbqDQ/c7X2ub+X/8s7L3JSuXUQnWQuHV0nJb2v9YFL3Q==}
+  '@uniqu/core@0.1.0':
+    resolution: {integrity: sha512-MKnwAwdB2x8ihosLYAOaFYTlt4mW2pbQyeudnApbWbmhPb2gHqX3ZG37QQ8Rh9XfnCWDQ2Vc6N8m06tE5ZP3FQ==}
 
   '@uniqu/url@0.0.3':
     resolution: {integrity: sha512-Y4Y+oNqqMRc6KMA/XglGCNmMUGC9u291gLSwKtyR1Jh2Soz2RMpqPVth3atlMcOultdkUqT0r4qRgJA1lqoYSw==}
 
-  '@uniqu/url@0.0.6':
-    resolution: {integrity: sha512-sgV17FwKta8BCUfJE4H/h+A77V/3vRctfI95v6l7lETzr1ud4l7GTleyhrIs7Z4CAUO8E11WSNXvIcPvlI+CSA==}
+  '@uniqu/url@0.1.0':
+    resolution: {integrity: sha512-GsCX25N4Em8LVjONh9pcOQBN6IOZzU0rtK1tohGagQXXcBMeuCDwvOul14QXcUtmk7vEQDBMM5me3tMGSwAZag==}
 
   '@vitejs/plugin-vue@5.2.1':
     resolution: {integrity: sha512-cxh314tzaWwOLqVes2gnnCtvBDcM1UMdn+iFR+UjAn411dPT3tOmqrJjbMd7koZpMAmBM/GqeV4n9ge7JSiJJQ==}
@@ -5961,15 +5961,15 @@ snapshots:
 
   '@uniqu/core@0.0.3': {}
 
-  '@uniqu/core@0.0.6': {}
+  '@uniqu/core@0.1.0': {}
 
   '@uniqu/url@0.0.3':
     dependencies:
       '@uniqu/core': 0.0.3
 
-  '@uniqu/url@0.0.6':
+  '@uniqu/url@0.1.0':
     dependencies:
-      '@uniqu/core': 0.0.6
+      '@uniqu/core': 0.1.0
 
   '@vitejs/plugin-vue@5.2.1(vite@5.4.14(@types/node@22.19.11))(vue@3.5.21(typescript@5.9.3))':
     dependencies:

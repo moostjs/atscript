@@ -33,6 +33,6 @@
   },
   "peerDependencies": {
     "@atscript/db-utils": "workspace:^",
-    "@uniqu/core": "^0.0.6"
+    "@uniqu/core": "^0.1.0"
   }
 }
