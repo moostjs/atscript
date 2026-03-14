@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/db-utils'
+import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/db'
 import type {
   TDbDeleteResult,
   TDbIndex,
@@ -9,8 +9,8 @@ import type {
   TExistingColumn,
   TColumnDiff,
   TSyncColumnResult,
-} from '@atscript/db-utils'
-import type { DbQuery, FilterExpr } from '@atscript/db-utils'
+} from '@atscript/db'
+import type { DbQuery, FilterExpr } from '@atscript/db'
 
 import { buildWhere } from './filter-builder'
 import {

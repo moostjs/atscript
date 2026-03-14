@@ -1,4 +1,4 @@
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { BetterSqlite3Driver } from './better-sqlite3-driver'
 import { SqliteAdapter } from './sqlite-adapter'
 

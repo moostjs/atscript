@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
-import { AtscriptDbTable, DbError } from '@atscript/db-utils'
+import { AtscriptDbTable, DbError } from '@atscript/db'
 
 import { SqliteAdapter } from '../sqlite-adapter'
 import { BetterSqlite3Driver } from '../better-sqlite3-driver'

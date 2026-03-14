@@ -1,4 +1,4 @@
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { MongoClient } from 'mongodb'
 
 import { MongoAdapter } from './mongo-adapter'

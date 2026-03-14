@@ -53,7 +53,7 @@ export interface Todo {
 ### 2. Create DbSpace and Table
 
 ```typescript
-import { AtscriptDbTable } from '@atscript/db-utils'
+import { AtscriptDbTable } from '@atscript/db'
 import { BetterSqlite3Driver, SqliteAdapter } from '@atscript/db-sqlite'
 import { Todo } from './schema/todo.as'
 

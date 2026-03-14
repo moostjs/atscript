@@ -9,7 +9,7 @@ import {
   buildCreateView,
 } from '../sql-builder'
 import type { SqlDialect, TSqlFragment } from '../dialect'
-import type { UniquSelect, TViewPlan, TViewColumnMapping, AtscriptQueryFieldRef } from '@atscript/db-utils'
+import type { UniquSelect, TViewPlan, TViewColumnMapping, AtscriptQueryFieldRef } from '@atscript/db'
 
 const mockDialect: SqlDialect = {
   quoteIdentifier: (name) => `[${name}]`,

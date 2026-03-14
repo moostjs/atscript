@@ -1,4 +1,4 @@
-import type { TSyncPlan, TSyncResult, TSyncColors, SyncEntry } from '@atscript/db-utils/sync'
+import type { TSyncPlan, TSyncResult, TSyncColors, SyncEntry } from '@atscript/db/sync'
 
 // ── Dye colors ──────────────────────────────────────────────────────
 

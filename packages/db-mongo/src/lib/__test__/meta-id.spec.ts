@@ -1,4 +1,4 @@
-import type { DbValidationContext } from '@atscript/db-utils'
+import type { DbValidationContext } from '@atscript/db'
 import { ObjectId } from 'mongodb'
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
 

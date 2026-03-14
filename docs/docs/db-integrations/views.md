@@ -105,7 +105,7 @@ export interface ActiveUser {
 Use `db.getView()` to get a read-only `AtscriptDbView` instance. All read operations are available — `findOne`, `findMany`, `findById`, `count`, `findManyWithCount` — but no write operations:
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { ActiveTask } from './schema/active-task.as'
 
 const db = new DbSpace(adapterFactory)
@@ -214,7 +214,7 @@ export interface HighPriorityTask {
 ```
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { HighPriorityTask } from './schema/high-priority-task.as'
 
 const db = new DbSpace(adapterFactory)

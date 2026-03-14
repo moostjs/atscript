@@ -220,8 +220,8 @@ Entries involving destructive operations (drops, type changes, table recreations
 You can run sync from your own code using the `SchemaSync` class or the `syncSchema` convenience function:
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
-import { SchemaSync, syncSchema } from '@atscript/db-utils/sync'
+import { DbSpace } from '@atscript/db'
+import { SchemaSync, syncSchema } from '@atscript/db/sync'
 
 const db = new DbSpace(adapterFactory)
 

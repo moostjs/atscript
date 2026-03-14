@@ -26,7 +26,7 @@ import {
   type TMetadataOverrides,
   type TableMetadata,
   computeInsights,
-} from '@atscript/db-utils'
+} from '@atscript/db'
 import type {
   AggregationCursor,
   ClientSession,

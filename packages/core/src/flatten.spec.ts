@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import dbPlugin from '../../db-utils/src/plugin'
+import dbPlugin from '../../db/src/plugin'
 import type { TAtscriptDocConfig } from './document'
 import { AtscriptDoc } from './document'
 import { flattenInterfaceNode } from './flatten'

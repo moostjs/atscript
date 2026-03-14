@@ -19,7 +19,7 @@ If you are new to Atscript, start with the [TypeScript Quick Start](/packages/ty
 ## 1. Install Dependencies
 
 ```bash
-pnpm add @atscript/core @atscript/typescript @atscript/db-utils @atscript/db-sqlite better-sqlite3
+pnpm add @atscript/core @atscript/typescript @atscript/db @atscript/db-sqlite better-sqlite3
 ```
 
 ## 2. Configure Atscript
@@ -87,7 +87,7 @@ Schema sync inspects your `@db.*` annotations, compares them against the live da
 ## 6. Use in Your Application
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import { Todo } from './schema/todo.as'
 

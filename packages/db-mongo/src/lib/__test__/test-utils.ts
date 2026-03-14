@@ -3,7 +3,7 @@ import path from 'path'
 
 import { build } from '@atscript/core'
 import { tsPlugin as ts } from '@atscript/typescript'
-import dbPlugin from '@atscript/db-utils/plugin'
+import dbPlugin from '@atscript/db/plugin'
 import MongoPlugin from '../../plugin/index'
 import { createAdapter } from '../index'
 

@@ -6,7 +6,7 @@ outline: deep
 
 <!--@include: ./_experimental-warning.md-->
 
-Complete reference for all database annotations available in `.as` files. The generic `@db.*` annotations are provided by `@atscript/db-utils/plugin` via `dbPlugin()`. MongoDB-specific annotations require the `@atscript/db-mongo` plugin.
+Complete reference for all database annotations available in `.as` files. The generic `@db.*` annotations are provided by `@atscript/db/plugin` via `dbPlugin()`. MongoDB-specific annotations require the `@atscript/db-mongo` plugin.
 
 ## Tables & Columns
 

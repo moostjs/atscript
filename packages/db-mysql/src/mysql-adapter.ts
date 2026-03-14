@@ -1,5 +1,5 @@
 import type { TAtscriptAnnotatedType, TMetadataMap } from '@atscript/typescript/utils'
-import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/db-utils'
+import { BaseDbAdapter, AtscriptDbView, DbError } from '@atscript/db'
 import type {
   TDbDeleteResult,
   TDbIndex,
@@ -14,8 +14,8 @@ import type {
   TDbFieldMeta,
   TDbDefaultFn,
   TValueFormatterPair,
-} from '@atscript/db-utils'
-import type { DbQuery, FilterExpr } from '@atscript/db-utils'
+} from '@atscript/db'
+import type { DbQuery, FilterExpr } from '@atscript/db'
 
 import { buildWhere } from './filter-builder'
 import {
@@ -68,7 +68,7 @@ function epochMsToUtcDatetime(ms: number): string {
  * Usage:
  * ```typescript
  * import { Mysql2Driver, MysqlAdapter } from '@atscript/db-mysql'
- * import { DbSpace } from '@atscript/db-utils'
+ * import { DbSpace } from '@atscript/db'
  *
  * const driver = new Mysql2Driver('mysql://root@localhost:3306/mydb')
  * const space = new DbSpace(() => new MysqlAdapter(driver))

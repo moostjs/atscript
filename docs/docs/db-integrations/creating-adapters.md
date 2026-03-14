@@ -6,7 +6,7 @@ outline: deep
 
 <!--@include: ./_experimental-warning.md-->
 
-You can create adapters for any database by extending `BaseDbAdapter` from `@atscript/db-utils`. This guide covers the full interface — every abstract method you must implement, every optional hook you can override, and how your adapter plugs into the rest of the system.
+You can create adapters for any database by extending `BaseDbAdapter` from `@atscript/db`. This guide covers the full interface — every abstract method you must implement, every optional hook you can override, and how your adapter plugs into the rest of the system.
 
 ## Architecture
 
@@ -25,7 +25,7 @@ When an `AtscriptDbTable` is created with your adapter, it registers itself via 
 Extend `BaseDbAdapter` and implement the abstract methods:
 
 ```typescript
-import { BaseDbAdapter } from '@atscript/db-utils'
+import { BaseDbAdapter } from '@atscript/db'
 
 export class PostgresAdapter extends BaseDbAdapter {
   constructor(private pool: Pool) {
@@ -341,7 +341,7 @@ override resolveTableName(): string {
 Use your adapter with `DbSpace` to create tables:
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 
 const db = new DbSpace(() => new PostgresAdapter(pool))
 

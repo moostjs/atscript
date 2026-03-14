@@ -1,5 +1,5 @@
 import type { Collection, Document } from 'mongodb'
-import type { DbQuery, TSearchIndexInfo } from '@atscript/db-utils'
+import type { DbQuery, TSearchIndexInfo } from '@atscript/db'
 import type { TMongoIndex, TSearchIndex } from './mongo-types'
 import { buildMongoFilter } from './mongo-filter'
 

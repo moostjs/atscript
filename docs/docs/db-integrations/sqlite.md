@@ -31,7 +31,7 @@ pnpm add @atscript/db-sqlite better-sqlite3
 Three steps to get a typed table backed by SQLite:
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { SqliteAdapter, BetterSqlite3Driver } from '@atscript/db-sqlite'
 import { User } from './user.as.js'
 

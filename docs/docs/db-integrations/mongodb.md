@@ -43,7 +43,7 @@ export default defineConfig({
 Create a `DbSpace` with a `MongoAdapter` factory:
 
 ```typescript
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { MongoAdapter } from '@atscript/db-mongo'
 import { MongoClient } from 'mongodb'
 

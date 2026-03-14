@@ -24,7 +24,7 @@ src/
 
 ```typescript
 import { MongoAdapter } from '@atscript/db-mongo'
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 import { MongoClient } from 'mongodb'
 
 const client = new MongoClient('mongodb://localhost:27017/myapp')

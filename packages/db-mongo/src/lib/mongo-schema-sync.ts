@@ -7,7 +7,7 @@ import {
   type TExistingTableOption,
   type AtscriptQueryNode,
   type AtscriptQueryFieldRef,
-} from '@atscript/db-utils'
+} from '@atscript/db'
 import {
   INDEX_PREFIX,
   JOINED_PREFIX,

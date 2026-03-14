@@ -1,5 +1,5 @@
-import type { TDbReferentialAction } from '@atscript/db-utils'
-import type { AtscriptQueryNode, AtscriptQueryFieldRef } from '@atscript/db-utils'
+import type { TDbReferentialAction } from '@atscript/db'
+import type { AtscriptQueryNode, AtscriptQueryFieldRef } from '@atscript/db'
 
 /** Formats a string value as a SQL literal with single-quote escaping. */
 export function sqlStringLiteral(value: string): string {

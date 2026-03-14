@@ -127,9 +127,9 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | Package Source                  | Documentation Location                         |
 | ------------------------------- | ---------------------------------------------- |
 | `packages/core/src/`            | `docs/docs/plugin-development/`                |
-| `packages/db-utils/src/plugin/annotations/`    | `docs/docs/db-integrations/annotations.md` |
+| `packages/db/src/plugin/annotations/`    | `docs/docs/db-integrations/annotations.md` |
 | `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
-| `packages/db-utils/src/`        | `docs/docs/db-integrations/`                   |
+| `packages/db/src/`        | `docs/docs/db-integrations/`                   |
 | `packages/db-sqlite/src/`       | `docs/docs/db-integrations/sqlite*.md`         |
 | `packages/db-mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
 | `packages/moost-db/src/`        | `docs/docs/db-integrations/crud-http*.md`      |

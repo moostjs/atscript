@@ -1,5 +1,5 @@
-import type { DbControls, UniquSelect } from '@atscript/db-utils'
-import type { AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db-utils'
+import type { DbControls, UniquSelect } from '@atscript/db'
+import type { AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db'
 
 import type { SqlDialect, TSqlFragment } from './dialect'
 import { queryNodeToSql } from './common'

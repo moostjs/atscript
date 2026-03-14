@@ -4,7 +4,7 @@ import type {
   TDbForeignKey,
   TTableResolver,
   WithRelation,
-} from '@atscript/db-utils'
+} from '@atscript/db'
 import { buildMongoFilter } from './mongo-filter'
 
 // ── Host interface ───────────────────────────────────────────────────────────

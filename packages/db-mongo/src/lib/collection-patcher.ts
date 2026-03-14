@@ -6,7 +6,7 @@ import type {
   TValidatorOptions,
   Validator,
 } from '@atscript/typescript/utils'
-import { getKeyProps } from '@atscript/db-utils'
+import { getKeyProps } from '@atscript/db'
 import { type Document, type Filter, type UpdateFilter, type UpdateOptions } from 'mongodb'
 
 /**

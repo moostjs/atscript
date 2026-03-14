@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest'
-import { AtscriptDbTable, DbError } from '@atscript/db-utils'
+import { AtscriptDbTable, DbError } from '@atscript/db'
 
 import { MysqlAdapter } from '../mysql-adapter'
 import type { TMysqlDriver, TMysqlConnection, TMysqlRunResult } from '../types'

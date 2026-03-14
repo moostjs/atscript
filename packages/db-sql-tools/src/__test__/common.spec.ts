@@ -7,7 +7,7 @@ import {
   defaultValueForType,
   queryNodeToSql,
 } from '../common'
-import type { AtscriptQueryFieldRef } from '@atscript/db-utils'
+import type { AtscriptQueryFieldRef } from '@atscript/db'
 
 describe('sqlStringLiteral', () => {
   it('wraps a plain string in single quotes', () => {

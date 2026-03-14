@@ -1,6 +1,6 @@
-import type { TDbFieldMeta, TDbForeignKey } from '@atscript/db-utils'
-import type { DbControls } from '@atscript/db-utils'
-import type { AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db-utils'
+import type { TDbFieldMeta, TDbForeignKey } from '@atscript/db'
+import type { DbControls } from '@atscript/db'
+import type { AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db'
 import type { SqlDialect, TSqlFragment } from '@atscript/db-sql-tools'
 import {
   buildInsert as _buildInsert,

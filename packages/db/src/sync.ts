@@ -9,7 +9,7 @@ import type { TSyncOptions, TSyncResult } from './schema/schema-sync'
  * Safe to call from multiple concurrent processes/pods.
  *
  * ```typescript
- * import { syncSchema } from '@atscript/db-utils/sync'
+ * import { syncSchema } from '@atscript/db/sync'
  *
  * const db = new DbSpace(() => new SqliteAdapter(driver))
  * await syncSchema(db, [UsersType, PostsType, CommentsType])

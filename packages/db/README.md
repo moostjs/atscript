@@ -1,4 +1,4 @@
-# @atscript/db-utils
+# @atscript/db
 
 Generic database abstraction layer for Atscript. Provides a unified CRUD interface driven by `@db.*` annotations, with pluggable database adapters.
 
@@ -23,7 +23,7 @@ AtscriptDbTable ──delegates CRUD──▶ BaseDbAdapter
 ## Installation
 
 ```bash
-pnpm add @atscript/db-utils
+pnpm add @atscript/db
 ```
 
 Peer dependencies: `@atscript/core`, `@atscript/typescript`.
@@ -57,7 +57,7 @@ interface User {
 ### 2. Create an adapter and table
 
 ```typescript
-import { AtscriptDbTable } from '@atscript/db-utils'
+import { AtscriptDbTable } from '@atscript/db'
 import { MyAdapter } from './my-adapter'
 import { User } from './user.as'
 
@@ -86,7 +86,7 @@ import {
   type TDbInsertManyResult,
   type TDbUpdateResult,
   type TDbDeleteResult,
-} from '@atscript/db-utils'
+} from '@atscript/db'
 
 class SqliteAdapter extends BaseDbAdapter {
   constructor(private db: SqliteDatabase) {
@@ -258,7 +258,7 @@ Interfaces annotated with `@db.table` get a `__flat` static property in the gene
 Use `FlatOf<T>` to extract the flat type:
 
 ```typescript
-import type { FlatOf } from '@atscript/db-utils'
+import type { FlatOf } from '@atscript/db'
 
 type UserFlat = FlatOf<typeof User>
 // → { id: number; name: string; contact: never; "contact.email": string; ... }

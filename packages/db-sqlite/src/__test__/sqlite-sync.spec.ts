@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest'
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 
 import { SqliteAdapter } from '../sqlite-adapter'
 import { BetterSqlite3Driver } from '../better-sqlite3-driver'

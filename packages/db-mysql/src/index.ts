@@ -1,4 +1,4 @@
-import { DbSpace } from '@atscript/db-utils'
+import { DbSpace } from '@atscript/db'
 
 import { MysqlAdapter } from './mysql-adapter'
 import { Mysql2Driver } from './mysql2-driver'

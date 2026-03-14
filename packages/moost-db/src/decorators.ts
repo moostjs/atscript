@@ -1,4 +1,4 @@
-import type { AtscriptDbTable, AtscriptDbReadable } from '@atscript/db-utils'
+import type { AtscriptDbTable, AtscriptDbReadable } from '@atscript/db'
 import { Controller, Provide, ApplyDecorators, Inherit } from 'moost'
 
 /**

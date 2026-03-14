@@ -16,7 +16,7 @@ import {
   defaultValueForType,
 } from '../sql-builder'
 import { toSqlValue } from '@atscript/db-sql-tools'
-import type { TDbFieldMeta } from '@atscript/db-utils'
+import type { TDbFieldMeta } from '@atscript/db'
 import { prepareFixtures } from './test-utils'
 
 beforeAll(() => prepareFixtures())

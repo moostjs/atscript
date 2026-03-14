@@ -3,7 +3,7 @@ import path from 'path'
 
 import { build } from '@atscript/core'
 import { tsPlugin as ts } from '@atscript/typescript'
-import dbPlugin from '@atscript/db-utils/plugin'
+import dbPlugin from '@atscript/db/plugin'
 
 export async function prepareFixtures() {
   const wd = path.join(path.dirname(import.meta.url.slice(7)), 'fixtures')

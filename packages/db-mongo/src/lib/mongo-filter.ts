@@ -1,5 +1,5 @@
-import type { FilterExpr, FilterVisitor } from '@atscript/db-utils'
-import { walkFilter } from '@atscript/db-utils'
+import type { FilterExpr, FilterVisitor } from '@atscript/db'
+import { walkFilter } from '@atscript/db'
 import type { Document, Filter } from 'mongodb'
 
 const EMPTY: Filter<any> = {}
