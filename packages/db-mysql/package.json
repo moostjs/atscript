@@ -60,7 +60,7 @@
     "@atscript/typescript": "workspace:^",
     "@atscript/db-utils": "workspace:^",
     "@atscript/db-sql-tools": "workspace:^",
-    "@uniqu/core": "^0.1.0",
+    "@uniqu/core": "^0.1.1",
     "mysql2": ">=3.0.0"
   },
   "peerDependenciesMeta": {
