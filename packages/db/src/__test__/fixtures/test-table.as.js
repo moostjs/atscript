@@ -90,21 +90,21 @@ $("object", UsersTable)
     "email",
     $().designType("string")
       .tags("string")
-      .annotate("db.index.unique", "email_idx", true)
+      .annotate("db.index.unique", "email_idx")
       .annotate("db.column", "email_address")
       .$type
   ).prop(
     "name",
     $().designType("string")
       .tags("string")
-      .annotate("db.index.plain", { name: "name_idx",  }, true)
+      .annotate("db.index.plain", "name_idx")
       .$type
   ).prop(
     "createdAt",
     $().designType("number")
       .tags("number")
-      .annotate("db.index.plain", { name: "name_idx",  }, true)
-      .annotate("db.index.plain", { name: "created_idx",  sort: "desc" }, true)
+      .annotate("db.index.plain", "name_idx", true)
+      .annotate("db.index.plain", "created_idx", true)
       .annotate("db.default.now", true)
       .$type
   ).prop(
@@ -124,7 +124,7 @@ $("object", UsersTable)
     "bio",
     $().designType("string")
       .tags("string")
-      .annotate("db.index.fulltext", { name: "search_idx",  }, true)
+      .annotate("db.index.fulltext", "search_idx")
       .optional()
       .$type
   )
@@ -239,8 +239,8 @@ $("object", ActiveUsersView)
       .$type
   )
   .annotate("db.view", "active_users")
-  .annotate("db.view.for", () => UsersTable)
-  .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
+  .annotate("db.view.for", UsersTable)
+  .annotate("db.view.filter", )
 
 $("object", LegacyReportView)
   .prop(
@@ -291,7 +291,7 @@ $("object", RenamedView)
   )
   .annotate("db.view", "premium_users")
   .annotate("db.view.renamed", "vip_users")
-  .annotate("db.view.for", () => UsersTable)
-  .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
+  .annotate("db.view.for", UsersTable)
+  .annotate("db.view.filter", )
 
 // prettier-ignore-end
