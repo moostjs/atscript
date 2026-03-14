@@ -12,7 +12,6 @@ import {
 } from '../parser/nodes'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
-import { findFKFieldsPointingTo, hasAnyViewAnnotation } from './db-utils'
 
 /**
  * Traverse from annotation token → prop → structure → interface
@@ -183,5 +182,3 @@ export function refActionAnnotation(name: 'onDelete' | 'onUpdate'): AnnotationSp
   })
 }
 
-// Re-export utilities from db-utils that are used by annotation sub-modules
-export { findFKFieldsPointingTo, hasAnyViewAnnotation }

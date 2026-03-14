@@ -1,7 +1,7 @@
 import { AnnotationSpec } from '../annotations'
 import type { TAnnotationsTree } from '../config'
 import type { TMessages } from '../parser/types'
-import { hasAnyViewAnnotation } from './db-ann-utils'
+import { hasAnyViewAnnotation } from './db-utils'
 
 export const dbTableAnnotations: TAnnotationsTree = {
   table: {
