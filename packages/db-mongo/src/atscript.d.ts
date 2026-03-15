@@ -30,41 +30,6 @@ declare global {
     "expect.array.uniqueItems": { message?: string }
     "expect.array.key": { message?: string }
     "emit.jsonSchema": boolean
-    "db.patch.strategy": string
-    "db.table": string | true
-    "db.schema": string
-    "db.index.plain": ({ name?: string, sort?: string })[]
-    "db.index.unique": (string | true)[]
-    "db.index.fulltext": ({ name?: string, weight?: number })[]
-    "db.column.name": string
-    "db.column.from": string
-    "db.default.value": string
-    "db.default.increment": number | true
-    "db.default.uuid": true
-    "db.default.now": true
-    "db.column.collate": string
-    "db.column.precision": { precision: number; scale: number }
-    "db.json": boolean
-    "db.ignore": boolean
-    "db.sync.method": string
-    "db.rel.FK": string | true
-    "db.rel.to": string | true
-    "db.rel.from": string | true
-    "db.rel.onDelete": string
-    "db.rel.onUpdate": string
-    "db.rel.via": import("@atscript/typescript/utils").AtscriptRef
-    "db.rel.filter": import("@atscript/typescript/utils").AtscriptQueryNode
-    "db.view.name": string
-    "db.view.for": import("@atscript/typescript/utils").AtscriptRef
-    "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
-    "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
-    "db.view.materialized": boolean
-    "db.mongo.collection": boolean
-    "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
-    "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
-    "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]
-    "db.mongo.search.vector": { dimensions: number, similarity?: string, indexName?: string }
-    "db.mongo.search.filter": ({ indexName: string })[]
     "ui.placeholder": string
     "ui.component": string
     "ui.hidden": boolean
@@ -78,7 +43,54 @@ declare global {
     "ui.attr": ({ key: string, value: string })[]
     "ui.class": (string)[]
     "ui.style": (string)[]
+    "db.patch.strategy": string
+    "db.table": string | true
+    "db.table.renamed": string
+    "db.schema": string
+    "db.index.plain": ({ name?: string, sort?: string })[]
+    "db.index.unique": (string | true)[]
+    "db.index.fulltext": ({ name?: string, weight?: number })[]
+    "db.column": string
+    "db.column.renamed": string
+    "db.column.collate": string
+    "db.column.precision": { precision: number, scale: number }
+    "db.column.dimension": boolean
+    "db.column.measure": boolean
+    "db.default": string
+    "db.default.increment": number | true
+    "db.default.uuid": boolean
+    "db.default.now": boolean
+    "db.json": boolean
+    "db.ignore": boolean
+    "db.sync.method": string
+    "db.rel.FK": string | true
+    "db.rel.to": string | true
+    "db.rel.from": string | true
+    "db.rel.onDelete": string
+    "db.rel.onUpdate": string
+    "db.rel.via": import("@atscript/typescript/utils").AtscriptRef
+    "db.rel.filter": import("@atscript/typescript/utils").AtscriptQueryNode
+    "db.view": string | true
+    "db.view.for": import("@atscript/typescript/utils").AtscriptRef
+    "db.view.joins": ({ target: import("@atscript/typescript/utils").AtscriptRef, condition: import("@atscript/typescript/utils").AtscriptQueryNode })[]
+    "db.view.filter": import("@atscript/typescript/utils").AtscriptQueryNode
+    "db.view.materialized": boolean
+    "db.view.renamed": string
+    "db.view.having": import("@atscript/typescript/utils").AtscriptQueryNode
+    "db.agg.sum": string
+    "db.agg.avg": string
+    "db.agg.count": string | true
+    "db.agg.min": string
+    "db.agg.max": string
+    "db.search.vector": { dimensions: number, similarity?: string, indexName?: string }
+    "db.search.vector.threshold": number
+    "db.search.filter": (string)[]
+    "db.mongo.collection": boolean
+    "db.mongo.capped": { size: number, max?: number }
+    "db.mongo.search.dynamic": { analyzer?: string, fuzzy?: number }
+    "db.mongo.search.static": ({ analyzer?: string, fuzzy?: number, indexName?: string })[]
+    "db.mongo.search.text": ({ analyzer?: string, indexName?: string })[]
   }
-  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "timestamp" | "created" | "updated" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "mongo" | "objectId" | "vector"
+  type AtscriptPrimitiveTags = "never" | "string" | "email" | "phone" | "date" | "isoDate" | "uuid" | "url" | "ipv4" | "ipv6" | "ip" | "char" | "required" | "number" | "positive" | "negative" | "single" | "double" | "int" | "int8" | "int16" | "int32" | "int64" | "uint8" | "byte" | "uint16" | "port" | "uint32" | "uint64" | "timestamp" | "created" | "updated" | "decimal" | "boolean" | "true" | "false" | "null" | "void" | "undefined" | "phantom" | "db" | "vector" | "mongo" | "objectId"
 }
 // prettier-ignore-end

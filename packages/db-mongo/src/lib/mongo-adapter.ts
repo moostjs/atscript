@@ -294,7 +294,7 @@ export class MongoAdapter extends BaseDbAdapter {
       this._cappedOptions = { size: capped.size, max: capped.max }
     }
 
-    const dynamicText = typeMeta.get('db.mongo.search.dynamic') as any
+    const dynamicText = typeMeta.get('db.mongo.search.dynamic')
     if (dynamicText) {
       this._setSearchIndex('dynamic_text', '_', {
         mappings: { dynamic: true },
@@ -302,7 +302,7 @@ export class MongoAdapter extends BaseDbAdapter {
         text: { fuzzy: { maxEdits: dynamicText.fuzzy || 0 } },
       })
     }
-    for (const textSearch of (typeMeta.get('db.mongo.search.static') as any[]) || []) {
+    for (const textSearch of typeMeta.get('db.mongo.search.static') || []) {
       this._setSearchIndex('search_text', textSearch.indexName, {
         mappings: { fields: {} },
         analyzer: textSearch.analyzer,
@@ -330,22 +330,22 @@ export class MongoAdapter extends BaseDbAdapter {
     }
     // @db.default.increment → track for auto-increment on insert (with optional start value)
     if (metadata.has('db.default.increment')) {
-      const physicalName = (metadata.get('db.column') as string | undefined) ?? field
+      const physicalName = metadata.get('db.column') ?? field
       const startValue = metadata.get('db.default.increment')
       this._incrementFields.set(physicalName, typeof startValue === 'number' ? startValue : undefined)
     }
     // @db.index.fulltext → MongoDB text index (adapter-level, with weight)
-    for (const index of (metadata.get('db.index.fulltext') as any[]) || []) {
-      const name = index === true ? '' : (index.name || '')
-      const weight = (index !== true && typeof index === 'object') ? (index.weight || 1) : 1
+    for (const index of metadata.get('db.index.fulltext') || []) {
+      const name = typeof index === 'object' ? (index.name || '') : ''
+      const weight = typeof index === 'object' ? (index.weight || 1) : 1
       this._addMongoIndexField('text', name, field, weight)
     }
     // @db.mongo.search.text
-    for (const index of (metadata.get('db.mongo.search.text') as any[]) || []) {
+    for (const index of metadata.get('db.mongo.search.text') || []) {
       this._addFieldToSearchIndex('search_text', index.indexName, field, index.analyzer)
     }
     // @db.search.vector (generic)
-    const vectorIndex = metadata.get('db.search.vector') as any
+    const vectorIndex = metadata.get('db.search.vector')
     if (vectorIndex) {
       const indexName = vectorIndex.indexName || field
       this._setSearchIndex('vector', indexName, {
@@ -353,20 +353,20 @@ export class MongoAdapter extends BaseDbAdapter {
           {
             type: 'vector',
             path: field,
-            similarity: vectorIndex.similarity || 'cosine',
+            similarity: (vectorIndex.similarity || 'cosine') as 'cosine' | 'euclidean' | 'dotProduct',
             numDimensions: vectorIndex.dimensions,
           },
         ],
       })
       // @db.search.vector.threshold
-      const threshold = metadata.get('db.search.vector.threshold') as number | undefined
+      const threshold = metadata.get('db.search.vector.threshold')
       if (threshold !== undefined) {
         this._vectorThresholds.set(mongoIndexKey('vector', indexName), threshold)
       }
     }
-    // @db.search.filter (generic)
-    for (const index of (metadata.get('db.search.filter') as any[]) || []) {
-      this._vectorFilters.set(mongoIndexKey('vector', index.indexName), field)
+    // @db.search.filter (generic) — each entry is a plain string (the index name)
+    for (const indexName of metadata.get('db.search.filter') || []) {
+      this._vectorFilters.set(mongoIndexKey('vector', indexName), field)
     }
   }
 
