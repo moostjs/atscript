@@ -110,6 +110,24 @@ Key rules:
 - Snapshot tests: `__snapshots__/` directories
 - `.as` files compile to `.as.d.ts` (type declarations) and `.as.js` (runtime)
 
+### Annotation metadata types: use `atscript.d.ts`, never cast to `any`
+
+Each package that reads annotation metadata has a generated `atscript.d.ts` declaring the global `AtscriptMetadata` interface. This gives `metadata.get('db.search.vector')` a precise return type (e.g. `{ dimensions: number, similarity?: string, indexName?: string } | undefined`) — no manual type casts needed.
+
+**Do:**
+```typescript
+const vec = metadata.get('db.search.vector')        // correctly typed
+for (const name of metadata.get('db.search.filter') || []) { ... }  // string[]
+```
+
+**Don't:**
+```typescript
+const vec = metadata.get('db.search.vector') as any  // loses type safety
+const vec = metadata.get('db.search.vector') as AtscriptMetadata['db.search.vector'] | undefined  // redundant
+```
+
+If `atscript.d.ts` is stale (missing new annotations), regenerate it with `npx asc -f dts` from the package directory. The only valid cast is narrowing a broad type to a stricter union (e.g. `string` → `'cosine' | 'euclidean' | 'dotProduct'`) when the consuming API requires it.
+
 ## Documentation
 
 - **Site**: VitePress at `docs/`
