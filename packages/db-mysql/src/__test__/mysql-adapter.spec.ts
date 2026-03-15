@@ -146,13 +146,15 @@ describe('MysqlAdapter + AtscriptDbTable', () => {
       expect(driver.calls.some(c => c.sql === 'COMMIT')).toBe(true)
     })
 
-    it('should emit one INSERT per row', async () => {
+    it('should batch rows into a single multi-row INSERT', async () => {
       await table.insertMany([
         { id: 1, email: 'a@x.com', name: 'A', createdAt: 1000, status: 'active' },
         { id: 2, email: 'b@x.com', name: 'B', createdAt: 2000, status: 'active' },
       ] as any[])
       const inserts = driver.calls.filter(c => c.sql.includes('INSERT INTO'))
-      expect(inserts.length).toBe(2)
+      expect(inserts.length).toBe(1)
+      // Multi-row VALUES
+      expect(inserts[0].sql).toContain('), (')
     })
   })
 

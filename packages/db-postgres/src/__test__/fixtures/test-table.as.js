@@ -35,50 +35,6 @@ export class NoTableAnnotation {
   }
 }
 
-
-export class ActiveUsersView {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static id = "ActiveUsersView"
-  static toJsonSchema() {
-    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
-  }
-}
-
-
-export class LegacyReportView {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static id = "LegacyReportView"
-  static toJsonSchema() {
-    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
-  }
-}
-
-
-export class RenamedTable {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static id = "RenamedTable"
-  static toJsonSchema() {
-    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
-  }
-}
-
-
-export class RenamedView {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static id = "RenamedView"
-  static toJsonSchema() {
-    $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
-  }
-}
-
 $("object", UsersTable)
   .prop(
     "id",
@@ -220,78 +176,5 @@ $("object", NoTableAnnotation)
       .tags("string")
       .$type
   )
-
-$("object", ActiveUsersView)
-  .prop(
-    "id",
-    $()
-      .refTo(UsersTable, ["id"])
-      .$type
-  ).prop(
-    "name",
-    $()
-      .refTo(UsersTable, ["name"])
-      .$type
-  ).prop(
-    "email",
-    $()
-      .refTo(UsersTable, ["email"])
-      .$type
-  )
-  .annotate("db.view", "active_users")
-  .annotate("db.view.for", () => UsersTable)
-  .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
-
-$("object", LegacyReportView)
-  .prop(
-    "id",
-    $().designType("number")
-      .tags("number")
-      .$type
-  ).prop(
-    "total",
-    $().designType("number")
-      .tags("number")
-      .$type
-  )
-  .annotate("db.view", "legacy_report")
-
-$("object", RenamedTable)
-  .prop(
-    "id",
-    $().designType("number")
-      .tags("number")
-      .annotate("meta.id", true)
-      .$type
-  ).prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
-  .annotate("db.table", "app_users")
-  .annotate("db.table.renamed", "old_users")
-
-$("object", RenamedView)
-  .prop(
-    "id",
-    $()
-      .refTo(UsersTable, ["id"])
-      .$type
-  ).prop(
-    "name",
-    $()
-      .refTo(UsersTable, ["name"])
-      .$type
-  )
-  .annotate("db.view", "premium_users")
-  .annotate("db.view.renamed", "vip_users")
-  .annotate("db.view.for", () => UsersTable)
-  .annotate("db.view.filter", { left: { type: () => UsersTable, field: "status" }, op: "$eq", right: "active" })
 
 // prettier-ignore-end

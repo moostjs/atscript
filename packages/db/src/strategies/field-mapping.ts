@@ -322,8 +322,8 @@ export class DocumentFieldMapper extends FieldMappingStrategy {
 
   translatePatchKeys(
     update: Record<string, unknown>,
-    _meta: TableMetadata
+    meta: TableMetadata
   ): Record<string, unknown> {
-    return update
+    return this.formatWriteValues(update, meta)
   }
 }

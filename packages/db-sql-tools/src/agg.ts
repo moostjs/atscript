@@ -3,7 +3,7 @@ import type { DbControls } from '@atscript/db'
 import { resolveAlias } from '@atscript/db/agg'
 
 import type { SqlDialect, TSqlFragment } from './dialect'
-import { EMPTY_AND } from './dialect'
+import { EMPTY_AND, finalizeParams } from './dialect'
 import { buildWhere } from './filter-builder'
 
 export const AGG_FN_SQL: Record<string, string> = {
@@ -94,7 +94,7 @@ export function buildAggregateSelect(
     params.push(controls.$skip)
   }
 
-  return { sql, params }
+  return finalizeParams(dialect, { sql, params })
 }
 
 /**
@@ -111,10 +111,10 @@ export function buildAggregateCount(
   if (!groupFields?.length) {
     // No groupBy — just count all matching rows
     const sql = `SELECT COUNT(*) AS ${dialect.quoteIdentifier('count')} FROM ${dialect.quoteTable(table)} WHERE ${where.sql}`
-    return { sql, params: where.params }
+    return finalizeParams(dialect, { sql, params: where.params })
   }
 
   const groupCols = groupFields.map(f => dialect.quoteIdentifier(f)).join(', ')
   const sql = `SELECT COUNT(*) AS ${dialect.quoteIdentifier('count')} FROM (SELECT 1 FROM ${dialect.quoteTable(table)} WHERE ${where.sql} GROUP BY ${groupCols}) AS ${dialect.quoteIdentifier('_groups')}`
-  return { sql, params: where.params }
+  return finalizeParams(dialect, { sql, params: where.params })
 }

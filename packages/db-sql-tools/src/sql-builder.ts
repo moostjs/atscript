@@ -2,6 +2,7 @@ import type { DbControls, UniquSelect } from '@atscript/db'
 import type { AtscriptQueryFieldRef, TViewColumnMapping, TViewPlan } from '@atscript/db'
 
 import type { SqlDialect, TSqlFragment } from './dialect'
+import { finalizeParams } from './dialect'
 import { queryNodeToSql } from './common'
 import { AGG_FN_SQL } from './agg'
 
@@ -16,10 +17,10 @@ export function buildInsert(
   const keys = Object.keys(data)
   const cols = keys.map(k => dialect.quoteIdentifier(k)).join(', ')
   const placeholders = keys.map(() => '?').join(', ')
-  return {
+  return finalizeParams(dialect, {
     sql: `INSERT INTO ${dialect.quoteTable(table)} (${cols}) VALUES (${placeholders})`,
     params: keys.map(k => dialect.toValue(data[k])),
-  }
+  })
 }
 
 /**
@@ -58,7 +59,7 @@ export function buildSelect(
     params.push(controls.$skip)
   }
 
-  return { sql, params }
+  return finalizeParams(dialect, { sql, params })
 }
 
 /**
@@ -84,10 +85,10 @@ export function buildUpdate(
     sql += ` LIMIT ${limit}`
   }
 
-  return {
+  return finalizeParams(dialect, {
     sql,
     params: [...params, ...where.params],
-  }
+  })
 }
 
 /**
@@ -103,7 +104,7 @@ export function buildDelete(
   if (limit !== undefined) {
     sql += ` LIMIT ${limit}`
   }
-  return { sql, params: where.params }
+  return finalizeParams(dialect, { sql, params: where.params })
 }
 
 /**

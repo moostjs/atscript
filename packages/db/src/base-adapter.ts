@@ -601,6 +601,14 @@ export abstract class BaseDbAdapter {
    * Uses `this._table.foreignKeys` for the full FK definitions.
    * Optional — only relational adapters need to implement this.
    */
+  /**
+   * Post-sync hook called after all table operations (columns, indexes, FKs)
+   * are complete. Adapters can use this for finalization work such as
+   * resetting auto-increment sequences to match existing data.
+   * Optional — most adapters don't need this.
+   */
+  afterSyncTable?(): Promise<void>
+
   async syncForeignKeys?(): Promise<void>
 
   /**

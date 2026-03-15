@@ -34,6 +34,7 @@ import {
   quoteTableName,
   collationToMysql,
   refActionToSql,
+  mysqlDialect,
 } from './sql-builder'
 import type { TMysqlConnection, TMysqlDriver } from './types'
 
@@ -348,15 +349,53 @@ export class MysqlAdapter extends BaseDbAdapter {
   async insertMany(
     data: Array<Record<string, unknown>>
   ): Promise<TDbInsertManyResult> {
+    if (data.length === 0) {
+      return { insertedCount: 0, insertedIds: [] }
+    }
+
     return this.withTransaction(async () => {
-      const ids: unknown[] = []
-      for (const row of data) {
-        const { sql, params } = buildInsert(this.resolveTableName(), row)
+      const tableName = this.resolveTableName()
+
+      // Use column keys from the first row (all rows should have the same shape after flattening)
+      const keys = Object.keys(data[0])
+      const colsClause = keys.map(k => qi(k)).join(', ')
+
+      // Batch rows into multi-row INSERT statements to reduce round-trips.
+      // MySQL's ? placeholders don't need numbering; chunk to stay under max packet size.
+      const paramsPerRow = keys.length
+      const maxRowsPerBatch = paramsPerRow > 0 ? Math.floor(60000 / paramsPerRow) : data.length
+      const allIds: unknown[] = []
+
+      const rowPlaceholderClause = `(${keys.map(() => '?').join(', ')})`
+
+      for (let offset = 0; offset < data.length; offset += maxRowsPerBatch) {
+        const batchEnd = Math.min(offset + maxRowsPerBatch, data.length)
+        const batchSize = batchEnd - offset
+        const params: unknown[] = []
+
+        for (let i = offset; i < batchEnd; i++) {
+          const row = data[i]
+          for (const k of keys) {
+            params.push(mysqlDialect.toValue(row[k]))
+          }
+        }
+
+        const valuesClause = Array(batchSize).fill(rowPlaceholderClause).join(', ')
+        const sql = `INSERT INTO ${quoteTableName(tableName)} (${colsClause}) VALUES ${valuesClause}`
         this._log(sql, params)
         const result = await this._wrapConstraintError(() => this._exec().run(sql, params))
-        ids.push(this._resolveInsertedId(row, result.insertId))
+
+        // MySQL multi-row INSERT returns insertId = first auto-generated ID.
+        // Subsequent IDs are sequential with innodb_autoinc_lock_mode <= 1 (traditional/consecutive).
+        // With innodb_autoinc_lock_mode = 2 (MySQL 8.0+ default), IDs may have gaps under
+        // concurrent inserts. For user-supplied PKs, _resolveInsertedId ignores insertId.
+        const firstId = Number(result.insertId)
+        for (let i = 0; i < batchSize; i++) {
+          allIds.push(this._resolveInsertedId(data[offset + i], firstId > 0 ? firstId + i : 0))
+        }
       }
-      return { insertedCount: ids.length, insertedIds: ids }
+
+      return { insertedCount: allIds.length, insertedIds: allIds }
     })
   }
 
@@ -1033,10 +1072,11 @@ export class MysqlAdapter extends BaseDbAdapter {
 
     let sql = `SELECT * FROM (${inner}) _v`
     if (ctx.threshold !== undefined) {
-      // Distance threshold: lower distance = higher similarity. Similarity threshold (0-1)
-      // maps to max distance = 1 - threshold for cosine.
+      // Threshold is a normalized score matching MongoDB Atlas semantics:
+      // cosine score = (1 + cos_sim) / 2. VEC_DISTANCE_COSINE = 1 - cos_sim.
+      // Conversion: distance = 2 * (1 - score).
       sql += ` WHERE _distance <= ?`
-      params.push(1 - ctx.threshold)
+      params.push(2 * (1 - ctx.threshold))
     }
     sql += ` ORDER BY _distance ASC`
     if (ctx.controls.$skip) { sql += ` LIMIT ${ctx.controls.$limit || 1000} OFFSET ${ctx.controls.$skip}` }
@@ -1058,7 +1098,7 @@ export class MysqlAdapter extends BaseDbAdapter {
     let sql = `SELECT COUNT(*) AS cnt FROM (${inner}) _v`
     if (ctx.threshold !== undefined) {
       sql += ` WHERE _distance <= ?`
-      params.push(1 - ctx.threshold)
+      params.push(2 * (1 - ctx.threshold))
     }
 
     return { sql, params }

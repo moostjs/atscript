@@ -2,26 +2,23 @@
 /* eslint-disable */
 /* oxlint-disable */
 import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Tag } from "./rel-tag.as"
-import { TaskTag } from "./rel-task-tag.as"
 
-export class Task {
+export class ArticlesTable {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "Task"
+  static id = "ArticlesTable"
   static toJsonSchema() {
     $d("JSON Schema", "jsonSchema", "emit.jsonSchema")
   }
 }
 
-$("object", Task)
+$("object", ArticlesTable)
   .prop(
     "id",
-    $().designType("number")
-      .tags("number")
+    $().designType("string")
+      .tags("string")
       .annotate("meta.id", true)
-      .annotate("db.default.increment", true)
       .$type
   ).prop(
     "title",
@@ -29,16 +26,14 @@ $("object", Task)
       .tags("string")
       .$type
   ).prop(
-    "tags",
+    "embedding",
     $("array")
-      .of($()
-          .refTo(() => Tag)
-          .annotate("db.table", "tags")
+      .of($().designType("number")
+          .tags("number")
           .$type)
-      .annotate("db.rel.via", () => TaskTag)
-      .optional()
+      .annotate("db.search.vector", { dimensions: 1536,  similarity: "cosine",  })
       .$type
   )
-  .annotate("db.table", "tasks")
+  .annotate("db.table", "articles")
 
 // prettier-ignore-end

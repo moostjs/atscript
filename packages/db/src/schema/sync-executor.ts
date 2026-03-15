@@ -157,6 +157,11 @@ export async function executeSyncTable(
     await adapter.syncForeignKeys()
   }
 
+  // Post-sync finalization (e.g., reset identity sequences after data migration)
+  if (adapter.afterSyncTable) {
+    await adapter.afterSyncTable()
+  }
+
   return new SyncEntry(init)
 }
 

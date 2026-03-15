@@ -216,7 +216,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
     update: Record<string, unknown>,
     meta: TableMetadata
   ): Record<string, unknown> {
-    if (!meta.requiresMappings) {
+    if (!meta.requiresMappings && !meta.toStorageFormatters) {
       return update
     }
 
@@ -238,7 +238,7 @@ export class RelationalFieldMapper extends FieldMappingStrategy {
         result[finalKey] = value
       }
     }
-    return result
+    return this.formatWriteValues(result, meta)
   }
 
   // ── Private helpers (relational-only) ───────────────────────────────────

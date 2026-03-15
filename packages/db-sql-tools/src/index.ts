@@ -1,5 +1,5 @@
 export type { TSqlFragment, SqlDialect } from './dialect'
-export { EMPTY_AND, EMPTY_OR } from './dialect'
+export { EMPTY_AND, EMPTY_OR, finalizeParams } from './dialect'
 export { createFilterVisitor, buildWhere } from './filter-builder'
 export { buildInsert, buildSelect, buildUpdate, buildDelete, buildProjection, buildCreateView } from './sql-builder'
 export { sqlStringLiteral, toSqlValue, refActionToSql, defaultValueForType, defaultValueToSqlLiteral, queryOpToSql, queryNodeToSql } from './common'
