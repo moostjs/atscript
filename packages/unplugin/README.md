@@ -1,116 +1,57 @@
-# Atscript Unplugin
+<p align="center">
+  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+</p>
 
-An Unplugin for processing `.as` files using [Atscript](https://github.com/moostjs/atscript). This plugin enables seamless integration of Atscript into modern build tools like Vite and Rollup. Thanks to Unplugin, it also supports Webpack and other bundlers.
+<h1 align="center">unplugin-atscript</h1>
 
-## Features
+<p align="center">
+  <strong>Define your models once</strong> — get TypeScript types, runtime validation, and DB metadata from a single <code>.as</code> model.
+</p>
 
-- Supports `.as` file resolution and transformation
-- Loads and processes `.as` files with Atscript
-- Generates JavaScript output
-- Compatible with Vite, Rollup, Rolldown, Webpack, Rspack, esbuild, and Farm
-- Separate entry point for each bundler — import only what you need
+<p align="center">
+  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/typescript/build-setup">Build Setup Guide</a>
+</p>
+
+---
+
+Build tool plugin that compiles `.as` files during development. Works with Vite, Webpack, Rollup, Rolldown, esbuild, Rspack, and Farm via [Unplugin](https://unplugin.unjs.io/).
 
 ## Installation
 
-```sh
-npm install -D unplugin-atscript @atscript/typescript
+```bash
+pnpm add -D unplugin-atscript @atscript/typescript @atscript/core
 ```
 
-or
-
-```sh
-yarn add --dev unplugin-atscript @atscript/typescript
-```
-
-or
-
-```sh
-pnpm add -D unplugin-atscript @atscript/typescript
-```
-
-## Usage
-
-### Vite
+## Quick Start
 
 ```ts
 // vite.config.ts
-import { defineConfig } from 'vite'
 import atscript from 'unplugin-atscript/vite'
+export default { plugins: [atscript()] }
 
-export default defineConfig({
-  plugins: [atscript()],
-})
-```
-
-### Rollup
-
-```ts
 // rollup.config.js
 import atscript from 'unplugin-atscript/rollup'
+export default { plugins: [atscript()] }
 
-export default {
-  input: 'src/main.ts',
-  output: {
-    dir: 'dist',
-    format: 'esm',
-  },
-  plugins: [atscript()],
-}
-```
-
-### Webpack
-
-```js
 // webpack.config.js
 const atscript = require('unplugin-atscript/webpack')
-
-module.exports = {
-  plugins: [atscript()],
-}
+module.exports = { plugins: [atscript()] }
 ```
 
-### esbuild
+Also available: `unplugin-atscript/esbuild`, `unplugin-atscript/rolldown`, `unplugin-atscript/rspack`, `unplugin-atscript/farm`.
 
-```js
-import atscript from 'unplugin-atscript/esbuild'
-import { build } from 'esbuild'
+## Features
 
-build({
-  plugins: [atscript()],
-})
-```
+- Universal bundler support via dedicated entry points
+- Automatic `atscript.config.*` loading
+- Strict validation — build fails on `.as` errors by default (`strict: false` to disable)
+- Tree-shaking aware — marks non-mutating modules as side-effect-free
 
-### Rolldown
+## Documentation
 
-```js
-import atscript from 'unplugin-atscript/rolldown'
-
-export default {
-  plugins: [atscript()],
-}
-```
-
-### Rspack / Farm
-
-Use `unplugin-atscript/rspack` or `unplugin-atscript/farm` respectively — same pattern as above.
-
-## How It Works
-
-1. Resolves `.as` files in the project.
-2. Loads the Atscript configuration.
-3. Uses `@atscript/core` and `@atscript/typescript` to parse and transform `.as` files into JavaScript.
-4. Outputs the generated JavaScript for further processing.
-
-## Configuration
-
-The plugin automatically loads the Atscript configuration from your project. You can define additional options in your Atscript configuration file (`atscript.config.{js,mjs,cjs,ts,mts,cts}`).
-
-### Plugin Options
-
-| Option   | Type      | Default | Description                                                        |
-| -------- | --------- | ------- | ------------------------------------------------------------------ |
-| `strict` | `boolean` | `true`  | When `true`, throws an error if any `.as` document has diagnostics |
+- [Build Setup Guide](https://atscript.moost.org/packages/typescript/build-setup)
+- [Full Documentation](https://atscript.moost.org)
 
 ## License
 
-ISC
+MIT

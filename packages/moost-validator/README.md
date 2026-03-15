@@ -1,108 +1,55 @@
-# @atscript/moost-validator
+<p align="center">
+  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+</p>
 
-**Drop‑in atscript validation for Moost.** This package adds a tiny pipe and an interceptor that let you validate any handler argument, DTO, or DI‑injected value that comes from an `@mongo.collection` / `.as` model – no extra boilerplate, no manual `validate()` calls.
+<h1 align="center">@atscript/moost-validator</h1>
+
+<p align="center">
+  <strong>Define your models once</strong> — get TypeScript types, runtime validation, and DB metadata from a single <code>.as</code> model.
+</p>
+
+<p align="center">
+  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/moost-validator/">Moost Validator Guide</a>
+</p>
 
 ---
 
-## Features
-
-- 🛂 **Automatic validation** – if the parameter type has a `validator()` factory, we run it.
-- ⚡ **Fast & sync** – validation happens in the `VALIDATE` pipeline stage before business logic.
-- 🛠️ **Composable** – use as a decorator (`@UseValidatorPipe`) or apply globally.
-- 🧩 **Nice errors out of the box** – interceptor converts `ValidatorError` → `HttpError(400)`.
-
----
+Drop-in Atscript validation for the [Moost](https://moost.org) framework. Automatically validates handler parameters against `.as` model constraints — no manual `validate()` calls needed.
 
 ## Installation
 
 ```bash
-npm i @atscript/moost-validator
-# Or
 pnpm add @atscript/moost-validator
 ```
 
----
+Peer dependencies: `moost`, `@moostjs/event-http`, `@atscript/core`, `@atscript/typescript`.
 
-## Quick start
-
-### 1. Register the pipe (pick one)
-
-#### a) Globally – affects every parameter/property
+## Quick Start
 
 ```ts
 import { Moost } from 'moost'
-import { validatorPipe } from '@atscript/moost-validator'
+import { validatorPipe, validationErrorTransform } from '@atscript/moost-validator'
 
 const app = new Moost()
 app.applyGlobalPipes(validatorPipe())
-```
-
-#### b) Per controller / handler
-
-```ts
-import { Controller, Pipe } from 'moost'
-import { Post, Body } from '@moostjs/event-http'
-import { UseValidatorPipe } from '@atscript/moost-validator'
-import { CreateUserDto } from './user.dto.as'
-
-@UseValidatorPipe() // controller‑wide
-@Controller('users')
-export class UsersController {
-  @Post()
-  @UseValidatorPipe() // or per‑method
-  async create(@Body() dto: CreateUserDto) {}
-}
-```
-
-### 2. Catch validation errors (optional)
-
-Global:
-
-```ts
-import { validationErrorTransform } from '@atscript/moost-validator'
-
 app.applyGlobalInterceptors(validationErrorTransform())
 ```
 
-Per handler:
+Any handler parameter typed with an Atscript-compiled class is now automatically validated. On failure, a `400 Bad Request` response is returned with structured error details.
 
-```ts
-import { UseValidationErrorTransform } from '@atscript/moost-validator'
+## Features
 
-@Post()
-@UseValidationErrorTransform()
-async create(@Body() dto: CreateUserDto) {}
-```
+- **Automatic validation** — runs during the `VALIDATE` pipeline stage before business logic
+- **Composable** — apply globally or per-controller/handler via `@UseValidatorPipe()`
+- **Clean error responses** — interceptor converts `ValidatorError` to `HttpError(400)`
+- **Validator options** — `partial`, `unknownProps`, `errorLimit`, `plugins`
+- **Zero runtime dependencies** — everything via peer deps
 
----
+## Documentation
 
-## API reference
-
-| Export                          | Type             | Description                                                                                                                                                                       |
-| ------------------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `validatorPipe(opts?)`          | `TPipeFn`        | Low‑level factory. Returns a pipe that runs `type.validator(opts).validate(value)` on the argument **if** the type was produced by atscript. Registered with priority `VALIDATE`. |
-| `UseValidatorPipe(opts?)`       | `Decorator`      | Sugar over `validatorPipe`. Apply to a class, method, parameter, or property.                                                                                                     |
-| `validationErrorTransform()`    | `TInterceptorFn` | Catches `ValidatorError`, wraps it into `HttpError(400)` with `{ message, statusCode, _body }`. Priority `CATCH_ERROR`.                                                           |
-| `UseValidationErrorTransform()` | `Decorator`      | Sugar over `validationErrorTransform()`.                                                                                                                                          |
-
-### `opts` (`Partial<TValidatorOptions>`)
-
-Any options accepted by `atscript.validator(opts)`. E.g. `{ abortEarly: false }`.
-
----
-
-## How it works (under the hood)
-
-1. **Pipe** checks metadata that Moost attaches to every parameter/property.
-2. If the declared type has a `validator()` factory (i.e. it was generated from
-   `.as` file with atscript), the pipe instantiates the validator **once** and
-   runs `validate(value)`.
-3. On failure the validator throws `ValidatorError`.
-4. **Interceptor** catches that error and converts it to a standard Moost
-   `HttpError` so your REST adapter sends a clean `400 Bad Request` body.
-
----
+- [Moost Validator Guide](https://atscript.moost.org/packages/moost-validator/)
+- [Full Documentation](https://atscript.moost.org)
 
 ## License
 
-ISC © 2025 Artem Maltsev
+MIT

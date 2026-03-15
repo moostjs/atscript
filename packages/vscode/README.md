@@ -1,19 +1,22 @@
-# Atscript VS Code Extension
+<p align="center">
+  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+</p>
 
-**Atscript** is a type-safe annotation language that extends TypeScript-style type definitions with structured metadata. It compiles `.as` files into standard TypeScript and JavaScript with full runtime type information, enabling validation, documentation, schema generation, and more — all driven by annotations on your types.
+<h1 align="center">Atscript VS Code Extension</h1>
 
-This extension provides first-class editor support for Atscript in VS Code.
+<p align="center">
+  <strong>Define your models once</strong> — get TypeScript types, runtime validation, and DB metadata from a single <code>.as</code> model.
+</p>
+
+<p align="center">
+  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/vscode/">VSCode Extension Guide</a>
+</p>
+
+---
+
+First-class editor support for Atscript (`.as`) files in Visual Studio Code. Powered by a full LSP implementation backed by `@atscript/core`.
 
 ![Preview](https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/demo.png)
-
-## Features
-
-- **Syntax highlighting** — full grammar support for `.as` files including interfaces, types, annotations, imports, and ad-hoc annotate blocks
-- **Autocomplete** — context-aware suggestions for annotations and their arguments, type references, imported definitions, and top-level keywords (`import`, `export`, `annotate`, `interface`, `type`)
-- **Hover tooltips** — inline documentation for annotations, showing argument types and descriptions
-- **Diagnostics** — real-time error reporting for unknown identifiers, invalid annotation usage, unknown properties in annotate blocks, and more
-- **Go to definition** — navigate to type and interface declarations, including cross-file imports
-- **Find references** — locate all usages of a type or interface across your project
 
 ## Installation
 
@@ -21,18 +24,27 @@ This extension provides first-class editor support for Atscript in VS Code.
 2. Go to **Extensions** (`Ctrl+Shift+X`)
 3. Search for `"Atscript"` and install
 
-## Usage
+## Features
 
-- Open any `.as` file to activate Atscript language support
-- Define interfaces and types with `@annotations` for metadata
-- Use `annotate` blocks to attach metadata to existing types without modifying them
-- The extension picks up your project's `atscript.config.mts` for annotation definitions and primitives
+- **Syntax highlighting** — full grammar for `.as` files
+- **Autocomplete** — context-aware suggestions for annotations, types, imports, and keywords
+- **Hover tooltips** — inline docs for annotations with argument types
+- **Diagnostics** — real-time error and warning reporting
+- **Go to definition** — navigate to declarations across files
+- **Find references** — locate all usages of a type or interface
+- **Signature help** — annotation argument signatures
+- **Auto-generate `.d.ts`** — builds type declarations on save
+- **Config watching** — reloads on `atscript.config.*` changes
 
 ## Documentation
 
-- [Atscript Documentation](https://atscript.moost.org) — full language and tooling docs
-- [VSCode Extension Docs](https://atscript.moost.org/packages/vscode/) — installation, features, and configuration for this extension
+- [VSCode Extension Guide](https://atscript.moost.org/packages/vscode/)
+- [Full Documentation](https://atscript.moost.org)
 
-## Feedback & Contributions
+## Feedback
 
 Report issues or contribute on [GitHub](https://github.com/moostjs/atscript).
+
+## License
+
+MIT

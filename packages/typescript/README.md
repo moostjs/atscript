@@ -1,6 +1,20 @@
-# @atscript/typescript
+<p align="center">
+  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+</p>
 
-TypeScript language extension for [Atscript](https://atscript.moost.org). Compiles `.as` files into `.d.ts` type declarations and `.js` runtime modules with full metadata, validation, and JSON Schema support.
+<h1 align="center">@atscript/typescript</h1>
+
+<p align="center">
+  <strong>Define your models once</strong> — get TypeScript types, runtime validation, and DB metadata from a single <code>.as</code> model.
+</p>
+
+<p align="center">
+  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/typescript/">TypeScript Guide</a>
+</p>
+
+---
+
+TypeScript language extension for Atscript. Compiles `.as` files to `.d.ts` type declarations and `.js` runtime modules with validation, serialization, and JSON Schema support. Includes the `asc` CLI.
 
 ## Installation
 
@@ -8,43 +22,47 @@ TypeScript language extension for [Atscript](https://atscript.moost.org). Compil
 pnpm add @atscript/typescript @atscript/core
 ```
 
-For build-tool integration (Vite, Webpack, Rollup, esbuild, Rspack), also add:
+## Quick Start
 
 ```bash
-pnpm add unplugin-atscript
+# Compile .as files to .d.ts + .js
+npx asc -f js
+
+# Diagnostics only
+npx asc --noEmit
 ```
 
-## AI Agent Skills
+```ts
+// Runtime validation
+import { Validator, buildJsonSchema } from '@atscript/typescript/utils'
+import { User } from './schema/user.as'
 
-This package ships with structured skill files for AI coding agents (Claude Code, Cursor, Windsurf, Codex, etc.).
-
-```bash
-# Project-local (recommended — version-locked, commits with your repo)
-npx atscript-typescript-skill
-
-# Global (available across all your projects)
-npx atscript-typescript-skill --global
-```
-
-To keep skills automatically up-to-date, add a postinstall script to your `package.json`:
-
-```json
-{
-  "scripts": {
-    "postinstall": "atscript-typescript-skill --postinstall"
-  }
-}
+const errors = new Validator().validate(User, inputData)
+const schema = buildJsonSchema(User)
 ```
 
 ## Features
 
-- **Type declarations** — `.d.ts` files from `.as` interfaces and types
-- **Runtime metadata** — `.js` files with full metadata for validators and serializers
-- **JSON Schema** — Build, parse, and merge JSON schemas from annotated types
-- **Validation** — Validate data against types with plugin support
-- **Serialization** — JSON-safe round-trip serialization/deserialization
-- **CLI** — `asc` command for compiling `.as` files
+- Generates `.d.ts` type declarations and `.js` runtime modules from `.as` files
+- CLI (`asc`) for batch compilation with diagnostics
+- `Validator` class for runtime data validation against `@expect.*` constraints
+- JSON Schema generation (`buildJsonSchema`) and parsing (`fromJsonSchema`)
+- Serialization for JSON-safe round-trip of type definitions
+- Type-safe utility types: `FlatOf<T>`, `PrimaryKeyOf<T>`, `OwnPropsOf<T>`, `NavPropsOf<T>`
+- Global `atscript.d.ts` generation for typed metadata access
+
+## AI Agent Skills
+
+```bash
+npx atscript-typescript-skill          # Install skills locally
+npx atscript-typescript-skill --global # Install globally
+```
 
 ## Documentation
 
-Full documentation: [atscript.moost.org](https://atscript.moost.org)
+- [TypeScript Guide](https://atscript.moost.org/packages/typescript/)
+- [Full Documentation](https://atscript.moost.org)
+
+## License
+
+MIT
