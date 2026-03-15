@@ -1,3 +1,45 @@
+## [0.1.38](https://github.com/moostjs/atscript/compare/v0.1.37...v0.1.38) (2026-03-15)
+
+
+### Bug Fixes
+
+* **db-mysql:** handle number.int tags and expect.maxLength object format in type mapper ([e349220](https://github.com/moostjs/atscript/commit/e349220254fe8cdec28c5c8e0e1434ac9b21f280))
+* **db-utils:** trigger lazy metadata build before reading adapter table options in resolveAndHash ([4e2c430](https://github.com/moostjs/atscript/commit/4e2c430d3603962c51fdb622d5d013a55ab52b9d))
+* fix aggreagation with count * ([44565ce](https://github.com/moostjs/atscript/commit/44565ce23db73e5472b9e66129c80d3274335959))
+* fix aggregations with count * ([54ca6a8](https://github.com/moostjs/atscript/commit/54ca6a8a92739f43b210985b4d4c61472edd33ad))
+* fix collate bug ([3970eaa](https://github.com/moostjs/atscript/commit/3970eaa1c9acaa7426fdc49869c0634e7a403c62))
+* fix increment defaults ([31921cc](https://github.com/moostjs/atscript/commit/31921ccbfea76e61d96e8319af436bfef638fd6b))
+* fix mongo schema storing ([8327fe1](https://github.com/moostjs/atscript/commit/8327fe1e4ff5b9207e0f7d1805873587252896de))
+* lint errors, unused imports, dead code, and barrel re-exports ([c49cffa](https://github.com/moostjs/atscript/commit/c49cffaad04abae9b84938a341a1a013c55377a5))
+* mongodb collate option support ([756253f](https://github.com/moostjs/atscript/commit/756253f9682ca94db9332218cd854814a50ac8bf))
+* omit explicit column ordering for MySQL FULLTEXT indexes ([3f1b686](https://github.com/moostjs/atscript/commit/3f1b686fd3f276386675b522e3c57c7f6d7c33d2))
+* read db.search.filter as string[] not object[] and remove redundant type casts in MongoAdapter ([e1a6e39](https://github.com/moostjs/atscript/commit/e1a6e3991cb3f091e3cbbf97513b607b194cd640))
+* resolve lint errors and TS type mismatches in vector search code ([04f1ebd](https://github.com/moostjs/atscript/commit/04f1ebd718434bcff391138be4e14af5e91f9f12))
+* restore count(*) wildcard skip in validateInsights lost in 58481fe ([f05f1a2](https://github.com/moostjs/atscript/commit/f05f1a2974950ae14ed44f7b70d7cedc01ecdc0e))
+* run FK validation outside transaction context to prevent MongoDB session mismatch ([10d482d](https://github.com/moostjs/atscript/commit/10d482d8b121dab83c570a8b4c6d3a93878f1fad))
+* skip count(*) wildcard in validateInsights ([1eab608](https://github.com/moostjs/atscript/commit/1eab608d98d3883e608727f7784b4c1b52572678))
+* use MongoDB Convenient Transaction API and remove counter session participation ([92d7ef0](https://github.com/moostjs/atscript/commit/92d7ef05ea97e5c5e99e6e304bfca7079cdad673))
+
+
+### Features
+
+* add aggregate query dispatch to moost-db HTTP controller via $groupBy detection ([2467ce1](https://github.com/moostjs/atscript/commit/2467ce18b401922d2ce89ac64ff81af10b42c9be))
+* add aggregation annotations and [@db](https://github.com/db).view.having ([ac89380](https://github.com/moostjs/atscript/commit/ac893801398ed181f99bfd519475d7de2930965d))
+* add aggregation infrastructure — UniquSelect, dimensions/measures, field mapping, and aggregate() with validation ([28e3037](https://github.com/moostjs/atscript/commit/28e3037d5621271926a1eacddc69e59dd3a4afb4))
+* add aggregation pipeline support to MongoDB adapter (Phase 6) ([5689e01](https://github.com/moostjs/atscript/commit/5689e015063a769cc7a54512bb01f1720b1a32d9))
+* add aggregation support to MySQL adapter ([58481fe](https://github.com/moostjs/atscript/commit/58481fe22fbf82e0af02e551d901b178cfcef1e3))
+* add generic vector search annotations ([@db](https://github.com/db).search.vector, [@db](https://github.com/db).search.filter, db.vector) replacing mongo-specific ones ([f87efd4](https://github.com/moostjs/atscript/commit/f87efd43a23b2dec5da9ffd7522fb237bcf58725))
+* add GROUP BY and HAVING support to aggregate view SQL/pipeline generation ([d0ca5a0](https://github.com/moostjs/atscript/commit/d0ca5a01a7dff722e0c6f555182b9b57aa87203c))
+* add GROUP BY SQL generation and SqliteAdapter.aggregate() for aggregate queries ([2a95501](https://github.com/moostjs/atscript/commit/2a95501868efb08f21e62d9ca229275ddfacd15e))
+* add PostgreSQL adapter with pgvector, CITEXT, batched inserts, and paramPlaceholder support ([d2e6ee9](https://github.com/moostjs/atscript/commit/d2e6ee99d7bb294d728b542ff2c708d04f1b7a1b))
+* add vector search support to moost-db controller via $vector query param ([f7e135b](https://github.com/moostjs/atscript/commit/f7e135ba3641d63ac668b6305aac6071753dee4b))
+* auto-index dimension fields during schema sync (Phase 8) ([cb06ae4](https://github.com/moostjs/atscript/commit/cb06ae47e2c78c672739a6583ecf9f2d37cbc7a9))
+* **db-utils:** unified table option introspection and diffing for schema sync ([a11dfb0](https://github.com/moostjs/atscript/commit/a11dfb05d820a25b13d6f1c1f7908b6bfc01077f))
+* emit __dim/__measure types and dimensions/measures arrays in codegen ([bdaf591](https://github.com/moostjs/atscript/commit/bdaf591232050ce2180f51e3d53e1cef312239ad))
+* implement FTS5 full-text search in SQLite adapter ([f5d47c0](https://github.com/moostjs/atscript/commit/f5d47c04673daf521d3f1ecb5f35d37f9c3dd5a5))
+
+
+
 ## [0.1.37](https://github.com/moostjs/atscript/compare/v0.1.36...v0.1.37) (2026-03-11)
 
 
