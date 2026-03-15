@@ -365,7 +365,7 @@ describe('MysqlAdapter — schema sync', () => {
       expect(plainCall!.sql).toContain('`name`(255)')
     })
 
-    it('should NOT add key length prefix for fulltext indexes on string columns', async () => {
+    it('should NOT add key length prefix or explicit ordering for fulltext indexes', async () => {
       const driver = createSyncMockDriver({
         allResults: new Map([['INFORMATION_SCHEMA.STATISTICS', []]]),
       })
@@ -377,6 +377,8 @@ describe('MysqlAdapter — schema sync', () => {
       expect(fulltextCall).toBeDefined()
       expect(fulltextCall!.sql).toContain('search_idx')
       expect(fulltextCall!.sql).not.toContain('(255)')
+      expect(fulltextCall!.sql).not.toMatch(/\bASC\b/)
+      expect(fulltextCall!.sql).not.toMatch(/\bDESC\b/)
     })
 
     it('should skip existing indexes', async () => {

@@ -745,12 +745,13 @@ export class MysqlAdapter extends BaseDbAdapter {
         const fulltext = index.type === 'fulltext' ? 'FULLTEXT ' : ''
         // FULLTEXT indexes accept TEXT columns; others need a key length prefix
         // for string fields that may still be TEXT in pre-existing tables
-        const needsPrefix = index.type !== 'fulltext'
+        const isFulltext = index.type === 'fulltext'
         const cols = index.fields
           .map(f => {
             const col = qi(f.name)
-            const prefix = needsPrefix && stringFields.has(f.name) ? '(255)' : ''
-            return `${col}${prefix} ${f.sort === 'desc' ? 'DESC' : 'ASC'}`
+            const prefix = !isFulltext && stringFields.has(f.name) ? '(255)' : ''
+            const order = isFulltext ? '' : ` ${f.sort === 'desc' ? 'DESC' : 'ASC'}`
+            return `${col}${prefix}${order}`
           })
           .join(', ')
         const sql = `CREATE ${fulltext}${unique}INDEX ${qi(index.key)} ON ${quoteTableName(this.resolveTableName())} (${cols})`
