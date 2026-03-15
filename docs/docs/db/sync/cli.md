@@ -22,7 +22,7 @@ This will:
 4. Ask for confirmation before applying destructive changes
 5. Apply changes and show the result
 
-If the schema hash is unchanged since the last sync, the command exits immediately with no database access.
+If the schema hash is unchanged since the last sync, the command exits after a quick hash comparison — no schema introspection, no DDL, no locking.
 
 ## Flags
 

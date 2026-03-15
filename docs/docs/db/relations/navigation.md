@@ -241,7 +241,7 @@ Loading `comments` returns all comments for a post. Loading `visibleComments` on
 `@db.rel.filter` works with all navigation types — `@db.rel.to`, `@db.rel.from`, and `@db.rel.via`.
 
 ::: tip Query expression syntax
-The backtick-delimited syntax (`\`Comment.visible = true\``) follows the same expression format used in view filters and join conditions. See [Queries & Filters](/db/guide/queries) for the full syntax reference.
+The backtick-delimited syntax (`\`Comment.visible = true\``) follows the same expression format used in view filters and join conditions. See [Queries & Filters](/db/api/queries) for the full syntax reference.
 :::
 
 ## Complete Example

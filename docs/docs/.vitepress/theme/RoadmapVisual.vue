@@ -13,6 +13,18 @@ const todayItems = [
         desc: 'Syntax highlighting, diagnostics, and go-to-definition for .as files.',
     },
     {
+        icon: 'postgresql',
+        title: 'PostgreSQL adapter',
+        desc: 'Production relational workflows with schema sync, fulltext, and vector search.',
+        badge: 'Experimental',
+    },
+    {
+        icon: 'mysql',
+        title: 'MySQL adapter',
+        desc: 'Relational workflows with broad hosting support, FULLTEXT search, and schema sync.',
+        badge: 'Experimental',
+    },
+    {
         icon: 'sqlite',
         title: 'SQLite adapter',
         desc: 'Embedded relational workflows with schema sync and migration.',
@@ -41,16 +53,6 @@ const plannedItems = [
         icon: 'tableView',
         title: 'Table and list tools',
         desc: 'Drive table and list UIs from live schema instead of separate config.',
-    },
-    {
-        icon: 'postgresql',
-        title: 'PostgreSQL adapter',
-        desc: 'Networked relational target for production deployments.',
-    },
-    {
-        icon: 'mysql',
-        title: 'MySQL adapter',
-        desc: 'Broad hosting and deployment support as a relational companion.',
     },
     {
         icon: 'language',

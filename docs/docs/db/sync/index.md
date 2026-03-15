@@ -30,11 +30,11 @@ The sync pipeline follows a deterministic sequence of steps:
 
 Each step has a specific role in ensuring safe, repeatable schema updates:
 
-1. **Compile** — your `.as` files are compiled into annotated types with full metadata: field names, types, nullability, defaults, primary keys, [indexes](/db/guide/indexes), [foreign keys](/db/guide/tables), view definitions, and adapter-specific table options.
+1. **Compile** — your `.as` files are compiled into annotated types with full metadata: field names, types, nullability, defaults, primary keys, [indexes](/db/api/indexes), [foreign keys](/db/relations/), view definitions, and adapter-specific table options.
 
 2. **Hash** — a deterministic FNV-1a hash is computed from the entire schema structure. All tables, views, and their complete metadata are serialized into a canonical JSON form (fields sorted alphabetically, indexes sorted by key), then hashed.
 
-3. **Compare** — the computed hash is compared against the stored hash from the last successful sync. If they match, sync exits immediately with an `up-to-date` status — no lock, no introspection, no DDL.
+3. **Compare** — the computed hash is compared against the stored hash from the last successful sync. If they match, sync exits immediately with an `up-to-date` status — no lock acquisition, no schema introspection, no DDL. (The hash read itself requires a lightweight query to the control table.)
 
 4. **Lock** — a distributed lock is acquired in the `__atscript_control` table. This prevents concurrent sync operations across multiple application instances (see [Distributed Locking](#distributed-locking) below).
 
@@ -109,7 +109,7 @@ On each sync, the hash check follows this sequence:
 
 1. Compute hash from all current `.as` definitions
 2. Read the stored hash from `schema_version` in `__atscript_control`
-3. If they match, return `up-to-date` immediately — no database introspection, no DDL, no lock acquisition
+3. If they match, return `up-to-date` immediately — no schema introspection, no DDL, no lock acquisition
 4. If they differ (or `--force` is used), proceed with locking, introspection, and diffing
 
 When sync completes successfully, the new hash is written to `schema_version`. This means the next sync will exit at step 3 — making repeated syncs on an unchanged schema essentially free.

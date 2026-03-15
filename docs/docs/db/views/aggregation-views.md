@@ -166,7 +166,7 @@ const topCategories = await stats.findMany({
 const categoryCount = await stats.count({})
 ```
 
-Via HTTP, aggregation views use `AsDbReadableController` — the same read-only endpoints as regular views. See [HTTP — Advanced](/db/guide/http-advanced) for URL query syntax.
+Via HTTP, aggregation views use `AsDbReadableController` — the same read-only endpoints as regular views. See [HTTP — Advanced](/db/http/advanced) for URL query syntax.
 
 ## Complete Example
 
@@ -228,4 +228,4 @@ console.log(results.count)  // total matching categories
 - [Querying Views](./querying-views) — full API for reading view data
 - [Aggregation Annotations](./aggregations) — annotation reference for all aggregate functions
 - [Defining Views](./) — view structure, joins, and filters
-- [HTTP — Advanced](/db/guide/http-advanced) — accessing views over HTTP
+- [HTTP — Advanced](/db/http/advanced) — accessing views over HTTP

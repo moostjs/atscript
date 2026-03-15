@@ -15,10 +15,11 @@ Add a `db` section to your `atscript.config.mts`:
 ```typescript
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [ts()],
+  plugins: [ts(), dbPlugin()],
   format: 'dts',
   db: {
     adapter: '@atscript/db-sqlite',
@@ -28,7 +29,7 @@ export default defineConfig({
 ```
 
 ::: info
-The base config (`rootDir`, `plugins`, `format`) is covered in [Setup](/db/guide/setup). This page focuses on the `db` section only.
+`dbPlugin()` is required to register `@db.*` annotations. The full base config is covered in [Setup](/db/guide/setup). This page focuses on the `db` section only.
 :::
 
 ## Declarative Config

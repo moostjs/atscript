@@ -384,7 +384,7 @@ Schema sync handles structural schema changes only. The following are outside it
 
 - [CLI](./cli) — command-line usage and flags
 - [Configuration](./configuration) — config file setup and adapter options
-- [Tables & Fields](/db/guide/tables) — defining tables, columns, and constraints
-- [Indexes](/db/guide/indexes) — index annotations and types
+- [Tables & Fields](/db/api/tables) — defining tables, columns, and constraints
+- [Indexes](/db/api/indexes) — index annotations and types
 - [Foreign Keys](/db/relations/) — FK annotations and relation patterns
 - [Views](/db/views/) — view definitions and types

@@ -282,49 +282,20 @@ const atscriptGrammar = {
   },
 }
 
-const dbAdvancedSidebar = [
+// Sidebar 1: Getting Started
+const dbGuideSidebar = [
   {
-    text: 'Relations',
+    text: 'Getting Started',
     items: [
-      { text: 'Foreign Keys', link: '/db/relations/' },
-      { text: 'Navigation Properties', link: '/db/relations/navigation' },
-      { text: 'Referential Actions', link: '/db/relations/referential-actions' },
-      { text: 'Loading Relations', link: '/db/relations/loading' },
-      { text: 'Deep Operations', link: '/db/relations/deep-operations' },
-      { text: 'Relational Patches', link: '/db/relations/patches' },
-    ],
-  },
-  {
-    text: 'Views & Aggregations',
-    items: [
-      { text: 'Defining Views', link: '/db/views/' },
-      { text: 'View Types', link: '/db/views/view-types' },
-      { text: 'Querying Views', link: '/db/views/querying-views' },
-      { text: 'Aggregation Annotations', link: '/db/views/aggregations' },
-      { text: 'Aggregation Views', link: '/db/views/aggregation-views' },
-    ],
-  },
-  {
-    text: 'Search',
-    items: [
-      { text: 'Text Search', link: '/db/search/' },
-      { text: 'Vector Search', link: '/db/search/vector-search' },
+      { text: 'Overview', link: '/db/guide/' },
+      { text: 'Quick Start', link: '/db/guide/quick-start' },
+      { text: 'Setup', link: '/db/guide/setup' },
     ],
   },
 ]
 
-const dbOperationsSidebar = [
-  {
-    text: 'Schema Sync',
-    items: [
-      { text: 'How Sync Works', link: '/db/sync/' },
-      { text: 'CLI', link: '/db/sync/cli' },
-      { text: 'Configuration', link: '/db/sync/configuration' },
-      { text: 'What Gets Synced', link: '/db/sync/what-gets-synced' },
-      { text: 'Programmatic API', link: '/db/sync/programmatic' },
-      { text: 'CI/CD Integration', link: '/db/sync/ci-cd' },
-    ],
-  },
+// Sidebar 2: Adapters
+const dbAdaptersSidebar = [
   {
     text: 'Adapters',
     items: [
@@ -336,10 +307,74 @@ const dbOperationsSidebar = [
       { text: 'Creating Custom Adapters', link: '/db/adapters/creating-adapters' },
     ],
   },
+]
+
+// Sidebar 3: Schema, API & Annotations Reference
+const dbSchemaApiSidebar = [
+  {
+    text: 'Schema',
+    items: [
+      { text: 'Tables & Fields', link: '/db/api/tables' },
+      { text: 'Storage & Nested Objects', link: '/db/api/storage' },
+      { text: 'Defaults & Generated Values', link: '/db/api/defaults' },
+      { text: 'Indexes & Constraints', link: '/db/api/indexes' },
+      { text: 'Foreign Keys', link: '/db/relations/' },
+      { text: 'Navigation Properties', link: '/db/relations/navigation' },
+      { text: 'Referential Actions', link: '/db/relations/referential-actions' },
+      { text: 'Defining Views', link: '/db/views/' },
+      { text: 'View Types', link: '/db/views/view-types' },
+      { text: 'Aggregation Annotations', link: '/db/views/aggregations' },
+      { text: 'Aggregation Views', link: '/db/views/aggregation-views' },
+      { text: 'Text Search', link: '/db/search/' },
+      { text: 'Vector Search', link: '/db/search/vector-search' },
+    ],
+  },
+  {
+    text: 'API',
+    items: [
+      { text: 'CRUD Operations', link: '/db/api/crud' },
+      { text: 'Queries & Filters', link: '/db/api/queries' },
+      { text: 'Update & Patch', link: '/db/api/update-patch' },
+      { text: 'Transactions', link: '/db/api/transactions' },
+      { text: 'Loading Relations', link: '/db/relations/loading' },
+      { text: 'Deep Operations', link: '/db/relations/deep-operations' },
+      { text: 'Relational Patches', link: '/db/relations/patches' },
+      { text: 'Querying Views', link: '/db/views/querying-views' },
+    ],
+  },
   {
     text: 'Reference',
     items: [
       { text: 'Annotations Reference', link: '/db/adapters/annotations' },
+    ],
+  },
+]
+
+// Sidebar 4: Schema Sync
+const dbSyncSidebar = [
+  {
+    text: 'Schema Sync',
+    items: [
+      { text: 'How Sync Works', link: '/db/sync/' },
+      { text: 'CLI', link: '/db/sync/cli' },
+      { text: 'Configuration', link: '/db/sync/configuration' },
+      { text: 'What Gets Synced', link: '/db/sync/what-gets-synced' },
+      { text: 'Programmatic API', link: '/db/sync/programmatic' },
+      { text: 'CI/CD Integration', link: '/db/sync/ci-cd' },
+    ],
+  },
+]
+
+// Sidebar 5: HTTP API
+const dbHttpSidebar = [
+  {
+    text: 'HTTP API',
+    items: [
+      { text: 'Setup', link: '/db/http/' },
+      { text: 'CRUD Endpoints', link: '/db/http/crud' },
+      { text: 'URL Query Syntax', link: '/db/http/query-syntax' },
+      { text: 'Relations & Search', link: '/db/http/advanced' },
+      { text: 'Customization', link: '/db/http/customization' },
     ],
   },
 ]
@@ -390,12 +425,11 @@ export default defineConfig({
       {
         text: 'Database',
         items: [
-          { text: 'Guide', link: '/db/guide/' },
-          { text: 'Relations', link: '/db/relations/' },
-          { text: 'Views & Aggregations', link: '/db/views/' },
-          { text: 'Search', link: '/db/search/' },
-          { text: 'Schema Sync', link: '/db/sync/' },
+          { text: 'Getting Started', link: '/db/guide/quick-start' },
           { text: 'Adapters', link: '/db/adapters/' },
+          { text: 'API & Annotations', link: '/db/api/tables' },
+          { text: 'Schema Sync', link: '/db/sync/' },
+          { text: 'HTTP API', link: '/db/http/' },
         ],
       },
       { text: 'Roadmap', link: '/roadmap' },
@@ -457,54 +491,23 @@ export default defineConfig({
         },
       ],
 
-      // Sidebar 1: Guide
-      '/db/guide/': [
-        {
-          text: 'Getting Started',
-          items: [
-            { text: 'Overview', link: '/db/guide/' },
-            { text: 'Quick Start', link: '/db/guide/quick-start' },
-          ],
-        },
-        {
-          text: 'Defining Schema',
-          items: [
-            { text: 'Tables & Fields', link: '/db/guide/tables' },
-            { text: 'Storage & Nested Objects', link: '/db/guide/storage' },
-            { text: 'Defaults & Generated Values', link: '/db/guide/defaults' },
-            { text: 'Indexes & Constraints', link: '/db/guide/indexes' },
-          ],
-        },
-        {
-          text: 'Data Operations',
-          items: [
-            { text: 'Setup', link: '/db/guide/setup' },
-            { text: 'CRUD Operations', link: '/db/guide/crud' },
-            { text: 'Queries & Filters', link: '/db/guide/queries' },
-            { text: 'Update & Patch', link: '/db/guide/update-patch' },
-            { text: 'Transactions', link: '/db/guide/transactions' },
-          ],
-        },
-        {
-          text: 'HTTP API',
-          items: [
-            { text: 'Setup', link: '/db/guide/http-setup' },
-            { text: 'CRUD Endpoints', link: '/db/guide/http-crud' },
-            { text: 'URL Query Syntax', link: '/db/guide/http-query-syntax' },
-            { text: 'Relations & Search in URLs', link: '/db/guide/http-advanced' },
-            { text: 'Customization', link: '/db/guide/http-customization' },
-          ],
-        },
-      ],
+      // Sidebar 1: Getting Started
+      '/db/guide/': dbGuideSidebar,
 
-      // Sidebar 2: Advanced (shared across Relations, Views, Search)
-      '/db/relations/': dbAdvancedSidebar,
-      '/db/views/': dbAdvancedSidebar,
-      '/db/search/': dbAdvancedSidebar,
+      // Sidebar 2: Adapters
+      '/db/adapters/': dbAdaptersSidebar,
 
-      // Sidebar 3: Operations (shared across Sync, Adapters)
-      '/db/sync/': dbOperationsSidebar,
-      '/db/adapters/': dbOperationsSidebar,
+      // Sidebar 3: Schema, API & Annotations
+      '/db/api/': dbSchemaApiSidebar,
+      '/db/relations/': dbSchemaApiSidebar,
+      '/db/views/': dbSchemaApiSidebar,
+      '/db/search/': dbSchemaApiSidebar,
+
+      // Sidebar 4: Schema Sync
+      '/db/sync/': dbSyncSidebar,
+
+      // Sidebar 5: HTTP API
+      '/db/http/': dbHttpSidebar,
 
       '/packages/moost-validator/': [
         {

@@ -181,7 +181,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 ```
 
-The hash check makes this effectively free when nothing has changed — no database introspection occurs unless the schema actually differs.
+The hash check makes this very cheap when nothing has changed — only a lightweight control table read occurs, skipping all schema introspection and DDL.
 
 ## Error Handling
 

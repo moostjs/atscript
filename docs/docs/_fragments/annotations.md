@@ -219,4 +219,4 @@ Some annotations accept special argument types beyond strings and numbers:
 - **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Used by `@db.rel.FK` and `@db.view.for` to reference fields on other types.
 - **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Used by `@db.view.filter`, `@db.view.joins`, and `@db.rel.filter` for conditions.
 
-See [Queries & Filters](/db/guide/queries#query-expressions) for the full query syntax.
+See [Queries & Filters](/db/api/queries#query-expressions) for the full query syntax.

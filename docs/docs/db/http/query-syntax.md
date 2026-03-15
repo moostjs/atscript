@@ -103,7 +103,7 @@ The literal `null` is parsed as a null value, not the string `"null"`.
 
 ### Nested Fields
 
-For embedded objects that are [flattened to columns](/db/guide/tables), use the flattened field name with `__` separator:
+For embedded objects that are [flattened to columns](/db/api/tables), use the flattened field name with `__` separator:
 
 ```bash
 curl "http://localhost:3000/users/query?contact__email=alice@example.com"
@@ -234,7 +234,7 @@ Returns a plain number (e.g., `5`) instead of an array.
 | `$with` | string | query, pages, one | — | `$with=author,comments` |
 | `$groupBy` | string | query | — | `$groupBy=status` |
 
-See [Relations & Search in URLs](./http-advanced) for details on `$with`, `$search`, `$vector`, and `$groupBy`.
+See [Relations & Search in URLs](./advanced) for details on `$with`, `$search`, `$vector`, and `$groupBy`.
 
 ## Type Coercion
 
@@ -287,6 +287,6 @@ curl "http://localhost:3000/users/query?\$select=-password,-secret,-internalNote
 
 ## Next Steps
 
-- [Relations & Search in URLs](./http-advanced) — `$with`, `$search`, `$vector`, `$groupBy` details
-- [Queries & Filters](/db/guide/queries) — Programmatic query API (non-HTTP)
-- [CRUD Endpoints](./http-crud) — Endpoint reference
+- [Relations & Search in URLs](./advanced) — `$with`, `$search`, `$vector`, `$groupBy` details
+- [Queries & Filters](/db/api/queries) — Programmatic query API (non-HTTP)
+- [CRUD Endpoints](./crud) — Endpoint reference

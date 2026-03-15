@@ -52,7 +52,7 @@ Every managed view requires `@db.view.for`. Without it, the view is treated as [
 
 ## Joins
 
-Use `@db.view.joins` to bring in columns from related tables. Each join takes a target type and a condition written as a [query expression](/db/guide/queries):
+Use `@db.view.joins` to bring in columns from related tables. Each join takes a target type and a condition written as a [query expression](/db/api/queries):
 
 ```atscript
 @db.view 'active_tasks'
@@ -78,7 +78,7 @@ projectTitle: Project.title // required — every task has a project
 
 ## View Filters
 
-The `@db.view.filter` annotation adds a `WHERE` clause using backtick [query expression](/db/guide/queries) syntax:
+The `@db.view.filter` annotation adds a `WHERE` clause using backtick [query expression](/db/api/queries) syntax:
 
 ```atscript
 @db.view.filter `Task.status != 'done'`
@@ -177,4 +177,4 @@ Schema sync translates this into a `CREATE VIEW` statement with the appropriate 
 - [View Types](./view-types) — managed, materialized, and external views
 - [Aggregation Annotations](./aggregations) — computing sums, averages, and counts
 - [Querying Views](./querying-views) — read-only API for accessing view data
-- [Queries & Filters](/db/guide/queries) — query expression syntax used in joins and filters
+- [Queries & Filters](/db/api/queries) — query expression syntax used in joins and filters

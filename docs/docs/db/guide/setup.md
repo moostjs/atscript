@@ -237,8 +237,8 @@ All three methods are **lazy** — the table/view and its adapter are created on
 
 ## Next Steps
 
-- [Tables & Fields](/db/guide/tables) — Field types, nested objects, column mappings
-- [Storage & Nested Objects](/db/guide/storage) — How nested objects are stored
-- [CRUD Operations](/db/guide/crud) — Insert, read, update, delete
+- [Tables & Fields](/db/api/tables) — Field types, nested objects, column mappings
+- [Storage & Nested Objects](/db/api/storage) — How nested objects are stored
+- [CRUD Operations](/db/api/crud) — Insert, read, update, delete
 - [Schema Sync](/db/sync/) — Automatic schema migrations
 - [Adapters](/db/adapters/) — Adapter-specific configuration and features

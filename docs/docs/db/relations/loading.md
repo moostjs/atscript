@@ -306,10 +306,10 @@ curl "http://localhost:3000/tasks/query?\$with=project"
 curl "http://localhost:3000/tasks/query?\$with=project,assignee,tags"
 ```
 
-For nested loading and per-relation controls in URLs, see [CRUD Endpoints](/db/guide/http-crud).
+For nested loading and per-relation controls in URLs, see [CRUD Endpoints](/db/http/crud).
 
 ## Next Steps
 
 - [Navigation Properties](./navigation) — defining TO, FROM, VIA, and filter relations in the schema
 - [Referential Actions](./referential-actions) — cascade, restrict, and set-null behavior on delete/update
-- [CRUD Operations](/db/guide/crud) — the full programmatic API for inserts, reads, updates, and deletes
+- [CRUD Operations](/db/api/crud) — the full programmatic API for inserts, reads, updates, and deletes

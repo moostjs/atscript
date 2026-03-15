@@ -47,7 +47,7 @@ const db = createAdapter('./myapp.db')
 const users = db.getTable(User)
 ```
 
-Once you have a table, run `npx asc db sync` to create or update the database schema, then use `users.insertOne(...)`, `users.findMany(...)`, etc. See [CRUD Operations](/db/guide/crud) for the full API.
+Once you have a table, run `npx asc db sync` to create or update the database schema, then use `users.insertOne(...)`, `users.findMany(...)`, etc. See [CRUD Operations](/db/api/crud) for the full API.
 
 ## Adapter-Specific Annotations
 
@@ -134,7 +134,7 @@ export interface Article {
 The adapter creates a companion `articles__fts__<indexName>` virtual table and triggers for automatic synchronization. Use the `search()` method to query:
 
 ```typescript
-const results = await articles.search('database optimization')
+const results = await articles.search('database optimization', {})
 ```
 
 ::: info FTS5 Query Syntax

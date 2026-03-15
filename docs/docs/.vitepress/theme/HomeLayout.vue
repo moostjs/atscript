@@ -173,7 +173,7 @@ watch(() => route.path, setupScrollAnimations)
                             <h2 class="section-heading">DB + API Integrations</h2>
                             <p class="aspect-desc">
                                 The same model can drive schema annotations, relations, sync, CRUD helpers, and REST/CRUD integrations
-                                instead of splitting those concerns into separate definitions. SQLite and MongoDB adapters are available today.
+                                instead of splitting those concerns into separate definitions. SQLite, PostgreSQL, MySQL, and MongoDB adapters are available today.
                             </p>
                             <div class="aspect-tags">
                                 <span class="aspect-tag">@db.table</span>
@@ -184,11 +184,11 @@ watch(() => route.path, setupScrollAnimations)
                             <ul class="aspect-list">
                                 <li>Define tables, relations, defaults, and indexes in the model itself.</li>
                                 <li>Keep data-layer behavior aligned with the same types and validation rules.</li>
-                                <li>Use supported SQLite, MongoDB, and Moost-based integrations from one source of truth.</li>
+                                <li>Use SQLite, PostgreSQL, MySQL, MongoDB, and Moost-based integrations from one source of truth.</li>
                             </ul>
                             <div class="aspect-links">
                                 <a href="/db/guide/quick-start" class="aspect-link">Explore DB integrations</a>
-                                <a href="/db/guide/http-crud" class="aspect-link">See REST/CRUD docs</a>
+                                <a href="/db/http/crud" class="aspect-link">See REST/CRUD docs</a>
                             </div>
                         </div>
                         <div class="aspect-visual aspect-visual-plain animate-in">

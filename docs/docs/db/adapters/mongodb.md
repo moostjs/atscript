@@ -19,12 +19,15 @@ Register the MongoDB plugin in your `atscript.config.mts` to enable `@db.mongo.*
 ```typescript
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 import mongo from '@atscript/db-mongo/plugin'
 
 export default defineConfig({
-  plugins: [ts(), mongo()],
+  plugins: [ts(), dbPlugin(), mongo()],
 })
 ```
+
+`dbPlugin()` is **required** — it registers all portable `@db.*` annotations. See [Setup](/db/guide/setup) for full configuration details.
 
 ## Setup
 
@@ -50,7 +53,7 @@ import { createAdapter } from '@atscript/db-mongo'
 const db = createAdapter('mongodb://localhost:27017/myapp')
 ```
 
-`createAdapter` connects the client, extracts the database from the connection string, and returns a ready-to-use `DbSpace`.
+`createAdapter` creates a `MongoClient` (connection is lazy — established on first query), extracts the database from the connection string, and returns a ready-to-use `DbSpace`.
 
 Once you have a `DbSpace`, get a table handle for any `.as` type:
 
@@ -133,7 +136,7 @@ The adapter uses an `__atscript_counters` collection for atomic sequence allocat
 
 - On `insertOne`, the counter is atomically incremented by 1 and the value is assigned.
 - On `insertMany`, the counter is incremented by the batch size to pre-allocate a range. Values are assigned in order.
-- If a document already has an explicit value for the field, that value is kept and the counter is adjusted to stay ahead.
+- If a document already has an explicit value for the field, that value is used as-is and no counter allocation occurs. Note: this does **not** advance the counter, so subsequent auto-incremented values may collide with manually provided ones. Pair with `@db.index.unique` to catch duplicates.
 
 ::: warning
 Concurrent inserts under high contention could produce duplicate values in rare cases. For guaranteed uniqueness, combine `@db.default.increment` with `@db.index.unique`.
@@ -185,7 +188,7 @@ MongoDB uses aggregation pipelines for array patch operations instead of the rea
 
 This is transparent to your code — the same patch API works across all adapters, but MongoDB executes updates atomically on the server using `$concatArrays`, `$filter`, `$map`, and other aggregation operators.
 
-See [Patch Operations](/db/guide/update-patch) for the full API.
+See [Patch Operations](/db/api/update-patch) for the full API.
 
 ## Native Relation Loading
 
@@ -315,7 +318,7 @@ Both text indexes and Atlas Search use the same API:
 
 ```typescript
 // Basic search (uses the best available index)
-const results = await table.search('search query')
+const results = await table.search('search query', {})
 
 // Search with filters and pagination
 const { data, count } = await table.searchWithCount('query', {
@@ -378,7 +381,7 @@ Capped collections do not support document deletion or updates that increase doc
 
 ## Transactions
 
-MongoDB transactions require a replica set or mongos topology. On standalone instances, the adapter gracefully skips transactional wrapping — operations run normally without guarantees. See [Transactions](/db/guide/transactions#mongodb) for usage and behavioral details.
+MongoDB transactions require a replica set or mongos topology. On standalone instances, the adapter gracefully skips transactional wrapping — operations run normally without guarantees. See [Transactions](/db/api/transactions#mongodb) for usage and behavioral details.
 
 ## Schema Sync Notes
 
@@ -434,5 +437,5 @@ const collection = adapter.collection  // native MongoDB Collection
 - [Adapter Overview](./) — feature comparison across all adapters
 - [PostgreSQL](./postgresql) — full-featured adapter with pgvector and transactional DDL
 - [SQLite](./sqlite) — zero-config adapter for development and testing
-- [CRUD Operations](/db/guide/crud) — full `AtscriptDbTable` API reference
+- [CRUD Operations](/db/api/crud) — full `AtscriptDbTable` API reference
 - [Schema Sync](../sync/) — sync workflow, CLI, and CI/CD

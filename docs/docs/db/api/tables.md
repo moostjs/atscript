@@ -118,9 +118,9 @@ Atscript types map to database column types automatically:
 
 Semantic subtypes like `string.email`, `number.int`, and `number.timestamp` map to the same base column types. They carry meaning for validation and code generation, but the storage type follows the base type.
 
-The `decimal` type is stored as a string at runtime to preserve exact precision. This also means it passes through JSON transport without any loss. Use `@db.column.precision` to control the database column's precision and scale — see [Indexes & Constraints](/db/guide/indexes#column-precision).
+The `decimal` type is stored as a string at runtime to preserve exact precision. This also means it passes through JSON transport without any loss. Use `@db.column.precision` to control the database column's precision and scale — see [Indexes & Constraints](/db/api/indexes#column-precision).
 
-Nested objects and arrays have special storage modes — see [Storage & Nested Objects](/db/guide/storage) for details.
+Nested objects and arrays have special storage modes — see [Storage & Nested Objects](/db/api/storage) for details.
 
 ## Custom Column Names
 
@@ -197,8 +197,8 @@ These annotations are consumed during [Schema Sync](/db/sync/) and can be remove
 
 ## Next Steps
 
-- [Storage & Nested Objects](/db/guide/storage) — how nested objects and arrays are stored
-- [Defaults & Generated Values](/db/guide/defaults) — auto-generated values and static defaults
-- [Indexes & Constraints](/db/guide/indexes) — database indexes, precision, and collation
-- [CRUD Operations](/db/guide/crud) — reading and writing data
+- [Storage & Nested Objects](/db/api/storage) — how nested objects and arrays are stored
+- [Defaults & Generated Values](/db/api/defaults) — auto-generated values and static defaults
+- [Indexes & Constraints](/db/api/indexes) — database indexes, precision, and collation
+- [CRUD Operations](/db/api/crud) — reading and writing data
 - [Relations](/db/relations/) — foreign keys and table relationships

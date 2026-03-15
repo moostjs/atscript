@@ -108,7 +108,7 @@ export class ArticlesController extends AsDbController<typeof Article> {
 
 The `fieldName` parameter identifies which vector field was specified in `$vector`, allowing different embedding models per field if needed.
 
-See [Vector Search in URLs](./http-advanced#vector-search) for how this hook integrates with the URL parameters.
+See [Vector Search in URLs](./advanced#vector-search) for how this hook integrates with the URL parameters.
 
 ## Write Hooks
 
@@ -314,7 +314,7 @@ export class ProductController extends AsDbController<typeof Product> {
 
 ## Next Steps
 
-- [HTTP Setup](./http-setup) — Controller installation and wiring
-- [CRUD Endpoints](./http-crud) — Endpoint reference
-- [CRUD Operations](/db/guide/crud) — Programmatic `AtscriptDbTable` API
-- [Transactions](/db/guide/transactions) — Transaction integration
+- [HTTP Setup](./) — Controller installation and wiring
+- [CRUD Endpoints](./crud) — Endpoint reference
+- [CRUD Operations](/db/api/crud) — Programmatic `AtscriptDbTable` API
+- [Transactions](/db/api/transactions) — Transaction integration

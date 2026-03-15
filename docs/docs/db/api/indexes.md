@@ -145,6 +145,6 @@ This gives you a unique case-insensitive email constraint, composite and full-te
 
 ## Next Steps
 
-- [CRUD Operations](/db/guide/crud) — insert, read, update, and delete records
-- [Queries & Filters](/db/guide/queries) — filter, sort, and paginate results
+- [CRUD Operations](/db/api/crud) — insert, read, update, and delete records
+- [Queries & Filters](/db/api/queries) — filter, sort, and paginate results
 - [Schema Sync](/db/sync/) — apply schema changes to your database

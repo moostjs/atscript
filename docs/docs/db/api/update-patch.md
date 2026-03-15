@@ -249,7 +249,7 @@ Navigation property patches — operating on related records across foreign keys
 
 ## Next Steps
 
-- [CRUD Operations](/db/guide/crud) — Basic insert, read, update, delete
-- [Queries & Filters](/db/guide/queries) — Filtering, sorting, and projection
-- [Transactions](/db/guide/transactions) — Atomic multi-table operations
+- [CRUD Operations](/db/api/crud) — Basic insert, read, update, delete
+- [Queries & Filters](/db/api/queries) — Filtering, sorting, and projection
+- [Transactions](/db/api/transactions) — Atomic multi-table operations
 - [Relations — Relational Patches](/db/relations/patches) — Patching navigation properties

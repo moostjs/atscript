@@ -73,7 +73,7 @@ Your application code talks to the Table API. The adapter handles SQL generation
 - **[Vector search](/db/search/vector-search)** — similarity search with pgvector and MongoDB Atlas
 - **Array patch operators** — `$insert`, `$remove`, `$update`, `$upsert`, and `$replace` work across all adapters
 - **[Schema sync](/db/sync/)** — CLI-driven migrations with FNV-1a drift detection, column renames, and distributed locking
-- **[Transactions](/db/guide/transactions)** — adapter-agnostic transaction support via `AsyncLocalStorage`
+- **[Transactions](/db/api/transactions)** — adapter-agnostic transaction support via `AsyncLocalStorage`
 - **Adapter-agnostic design** — swap SQLite for PostgreSQL (or any other adapter) without changing application code
 
 ## Model-First, Not ORM-First
@@ -92,6 +92,6 @@ Atscript is a **model-first data layer**, not a traditional ORM. The `.as` model
 ## Next Steps
 
 - [Quick Start](/db/guide/quick-start) — build your first table in five minutes
-- [Tables & Fields](/db/guide/tables) — define columns, primary keys, and field types
+- [Tables & Fields](/db/api/tables) — define columns, primary keys, and field types
 - [Relations](/db/relations/) — connect tables with TO, FROM, and VIA relations
-- [CRUD Operations](/db/guide/crud) — insert, query, update, and delete data
+- [CRUD Operations](/db/api/crud) — insert, query, update, and delete data

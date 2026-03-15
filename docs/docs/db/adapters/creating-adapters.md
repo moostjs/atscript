@@ -508,8 +508,8 @@ import { DbSpace } from '@atscript/db'
 const db = new DbSpace(() => new PostgresAdapter(pool))
 
 // Create typed tables
-const users = db.table(UsersType)
-const posts = db.table(PostsType)
+const users = db.getTable(UsersType)
+const posts = db.getTable(PostsType)
 
 // Tables share the adapter factory — each gets its own instance
 await users.ensureTable()

@@ -95,7 +95,7 @@ const topCategories = await stats.findMany({
 - **Pagination** via `$skip` and `$limit` works as expected
 - **Field selection** via `$select` picks specific columns from the view output
 
-For the full query syntax, see [Queries & Filters](/db/guide/queries).
+For the full query syntax, see [Queries & Filters](/db/api/queries).
 
 ## HTTP Access
 
@@ -115,7 +115,7 @@ This provides:
 
 No `POST`, `PUT`, `PATCH`, or `DELETE` endpoints — views are read-only.
 
-The same URL query syntax applies (`$sort`, `$skip`, `$limit`, `$select`, `$filter`). See [HTTP — CRUD Endpoints](/db/guide/http-crud) for details.
+The same URL query syntax applies (`$sort`, `$skip`, `$limit`, `$select`, `$filter`). See [HTTP — CRUD Endpoints](/db/http/crud) for details.
 
 ## Refreshing Materialized Views
 
@@ -137,5 +137,5 @@ Materialized view refresh is currently an adapter-level operation — there is n
 - [Defining Views](./) — how to define views in `.as` files
 - [View Types](./view-types) — managed, materialized, and external views
 - [Aggregation Views](./aggregation-views) — views with computed aggregates
-- [CRUD Operations](/db/guide/crud) — table read operations (same API)
-- [HTTP — CRUD Endpoints](/db/guide/http-crud) — HTTP endpoint reference
+- [CRUD Operations](/db/api/crud) — table read operations (same API)
+- [HTTP — CRUD Endpoints](/db/http/crud) — HTTP endpoint reference

@@ -97,5 +97,5 @@ When `supportsNativeForeignKeys` is `false`, the generic layer implements cascad
 For general usage that applies to all adapters:
 
 - [Setup & Configuration](/db/guide/setup) — initial project setup
-- [CRUD Operations](/db/guide/crud) — create, read, update, delete
-- [Query Filters](/db/guide/queries) — filtering, sorting, pagination
+- [CRUD Operations](/db/api/crud) — create, read, update, delete
+- [Query Filters](/db/api/queries) — filtering, sorting, pagination

@@ -47,10 +47,11 @@ Create `atscript.config.mts` in your project root:
 ```typescript [SQLite]
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [ts()],
+  plugins: [ts(), dbPlugin()],
   format: 'dts',
   db: {
     adapter: '@atscript/db-sqlite',
@@ -62,10 +63,11 @@ export default defineConfig({
 ```typescript [PostgreSQL]
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [ts()],
+  plugins: [ts(), dbPlugin()],
   format: 'dts',
   db: {
     adapter: '@atscript/db-postgres',
@@ -77,10 +79,11 @@ export default defineConfig({
 ```typescript [MongoDB]
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [ts()],
+  plugins: [ts(), dbPlugin()],
   format: 'dts',
   db: {
     adapter: '@atscript/db-mongo',
@@ -92,10 +95,11 @@ export default defineConfig({
 ```typescript [MySQL]
 import { defineConfig } from '@atscript/core'
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 
 export default defineConfig({
   rootDir: 'src',
-  plugins: [ts()],
+  plugins: [ts(), dbPlugin()],
   format: 'dts',
   db: {
     adapter: '@atscript/db-mysql',
@@ -277,9 +281,9 @@ See [Relations](/db/relations/) for the full guide on TO, FROM, and VIA relation
 
 ## Next Steps
 
-- [Tables & Fields](/db/guide/tables) — field types, primary keys, column mappings
-- [Storage & Nested Objects](/db/guide/storage) — how nested objects and arrays are stored
-- [Defaults & Generated Values](/db/guide/defaults) — auto-generated values and static defaults
+- [Tables & Fields](/db/api/tables) — field types, primary keys, column mappings
+- [Storage & Nested Objects](/db/api/storage) — how nested objects and arrays are stored
+- [Defaults & Generated Values](/db/api/defaults) — auto-generated values and static defaults
 - [Relations](/db/relations/) — foreign keys, reverse relations, and many-to-many
-- [Queries & Filters](/db/guide/queries) — advanced filtering, sorting, and pagination
-- [HTTP API](/db/guide/http-setup) — expose your tables as REST endpoints
+- [Queries & Filters](/db/api/queries) — advanced filtering, sorting, and pagination
+- [HTTP API](/db/http/) — expose your tables as REST endpoints

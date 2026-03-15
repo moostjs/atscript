@@ -79,14 +79,15 @@ To use MySQL-specific annotations (`@db.mysql.*`), register the plugin in your A
 
 ```typescript
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 import mysql from '@atscript/db-mysql/plugin'
 
 export default {
-  plugins: [ts(), mysql()],
+  plugins: [ts(), dbPlugin(), mysql()],
 }
 ```
 
-The plugin is optional — you only need it if you use `@db.mysql.engine`, `@db.mysql.charset`, `@db.mysql.collate`, `@db.mysql.unsigned`, `@db.mysql.type`, or `@db.mysql.onUpdate` annotations. All portable `@db.*` annotations work without it.
+`dbPlugin()` is **required** — it registers all portable `@db.*` annotations. The MySQL plugin (`mysql()`) is optional and only needed if you use `@db.mysql.engine`, `@db.mysql.charset`, `@db.mysql.collate`, `@db.mysql.unsigned`, `@db.mysql.type`, or `@db.mysql.onUpdate`. See [Setup](/db/guide/setup) for full configuration details.
 
 ## MySQL-Specific Annotations
 
@@ -335,6 +336,6 @@ All rows within a batch insert are wrapped in a transaction for atomicity.
 
 - [Adapter Overview](./) — feature comparison across all adapters
 - [Schema Sync](/db/sync/) — automatic schema migration
-- [CRUD Operations](/db/guide/crud) — create, read, update, delete
+- [CRUD Operations](/db/api/crud) — create, read, update, delete
 - [Vector Search](/db/search/vector-search) — vector similarity search guide
 - [Text Search](/db/search/) — fulltext search guide

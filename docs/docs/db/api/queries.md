@@ -218,7 +218,7 @@ When using `$select` with relation loading (`$with`), foreign key fields needed 
 
 ### Paginated Results
 
-Use `findManyWithCount()` to get both data and total count in one call — see [CRUD Operations — Find Many with Count](/db/guide/crud#find-many-with-count) for the API and examples.
+Use `findManyWithCount()` to get both data and total count in one call — see [CRUD Operations — Find Many with Count](/db/api/crud#find-many-with-count) for the API and examples.
 
 ## Type-Safe Generics
 
@@ -334,7 +334,7 @@ This returns the first 20 non-done tasks with high or critical priority from act
 
 ## Next Steps
 
-- [CRUD Operations](/db/guide/crud) — Insert, read, update, delete
-- [Update & Patch](/db/guide/update-patch) — Embedded array and object patch operators
+- [CRUD Operations](/db/api/crud) — Insert, read, update, delete
+- [Update & Patch](/db/api/update-patch) — Embedded array and object patch operators
 - [Views](/db/views/) — Managed, external, and materialized views
 - [Relations](/db/relations/deep-operations) — Navigation property loading and deep operations

@@ -227,7 +227,7 @@ GET /documents/pages?$search=optimization&$vector=embedding&$page=1&$size=20
 When a table has only one vector field, `$vector=embedding` (the field name) is the minimal form. For multiple vector fields, `$vector` selects which one to search.
 
 ::: warning
-Your controller must override `computeEmbedding()` to convert the `$search` text into a vector. Without this override, vector search via HTTP returns `501 Not Implemented`. See [HTTP — Advanced](/db/guide/http-advanced) for setup details.
+Your controller must override `computeEmbedding()` to convert the `$search` text into a vector. Without this override, vector search via HTTP returns `501 Not Implemented`. See [HTTP — Advanced](/db/http/advanced) for setup details.
 :::
 
 ## Similarity Metrics
@@ -249,14 +249,14 @@ Cosine similarity is the default and works well for most text embedding models (
 | **PostgreSQL** | `vector(N)` via pgvector | HNSW index | Auto-provisions pgvector extension, distance operators `<->`, `<#>`, `<=>` |
 | **MongoDB** | Embedded array | Atlas `$vectorSearch` | Requires Atlas M10+ cluster |
 | **MySQL** | `VECTOR(N)` | Native (9.0+) | `VEC_DISTANCE_*` functions |
-| **SQLite** | JSON array | None | Stores vectors as JSON — no indexed similarity search |
+| **SQLite** | JSON array | None | Stores vectors as JSON — **no vector search support** |
 
 ::: warning
-SQLite stores vectors as JSON arrays but cannot perform indexed similarity search. Vector search queries on SQLite fall back to unindexed computation, which is not practical for large datasets.
+SQLite stores vector fields as JSON arrays but does **not** support vector search. Calling `vectorSearch()` on a SQLite adapter throws an error. If you need vector search, use PostgreSQL (pgvector), MongoDB (Atlas), or MySQL 9.0+.
 :::
 
 ## Next Steps
 
 - [Text Search](./) — full-text search with ranked results and field weighting
-- [HTTP — Advanced](/db/guide/http-advanced) — vector search URL parameters
-- [Indexes & Constraints](/db/guide/indexes) — other index types
+- [HTTP — Advanced](/db/http/advanced) — vector search URL parameters
+- [Indexes & Constraints](/db/api/indexes) — other index types

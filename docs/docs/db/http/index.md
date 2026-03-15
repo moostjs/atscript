@@ -4,7 +4,7 @@ outline: deep
 
 # HTTP Setup
 
-`@atscript/moost-db` provides zero-boilerplate REST controllers that expose your [tables](/db/guide/tables) and [views](/db/views/) as HTTP endpoints via the [Moost](https://moost.org) framework. Define your schema once in a `.as` file, wire up a table, and get a full CRUD API with no endpoint code to write.
+`@atscript/moost-db` provides zero-boilerplate REST controllers that expose your [tables](/db/api/tables) and [views](/db/views/) as HTTP endpoints via the [Moost](https://moost.org) framework. Define your schema once in a `.as` file, wire up a table, and get a full CRUD API with no endpoint code to write.
 
 ## Installation
 
@@ -57,7 +57,7 @@ import { Todo } from './schema/todo.as'
 
 const driver = new BetterSqlite3Driver('./todos.db')
 const dbSpace = new DbSpace(() => new SqliteAdapter(driver))
-const todosTable = dbSpace.table(Todo)
+const todosTable = dbSpace.getTable(Todo)
 ```
 
 ### 3. Create the Controller
@@ -126,7 +126,7 @@ Use `@TableController` to wire it up:
 export class TodoController extends AsDbController<typeof Todo> {}
 ```
 
-See [CRUD Endpoints](./http-crud) for detailed documentation of each endpoint.
+See [CRUD Endpoints](./crud) for detailed documentation of each endpoint.
 
 ### AsDbReadableController (Read-Only)
 
@@ -208,12 +208,12 @@ The same controller code works identically regardless of which database adapter 
 import { MongoAdapter } from '@atscript/db-mongo'
 
 const dbSpace = new DbSpace(() => new MongoAdapter(db, client))
-const todosTable = dbSpace.table(Todo)
+const todosTable = dbSpace.getTable(Todo)
 ```
 
 ## Next Steps
 
-- [CRUD Endpoints](./http-crud) — Detailed documentation for each endpoint
-- [URL Query Syntax](./http-query-syntax) — Filter, sort, and paginate via URL parameters
-- [Relations & Search in URLs](./http-advanced) — Relation loading, text search, vector search
-- [Customization](./http-customization) — Hooks for access control, data transformation, and extending controllers
+- [CRUD Endpoints](./crud) — Detailed documentation for each endpoint
+- [URL Query Syntax](./query-syntax) — Filter, sort, and paginate via URL parameters
+- [Relations & Search in URLs](./advanced) — Relation loading, text search, vector search
+- [Customization](./customization) — Hooks for access control, data transformation, and extending controllers

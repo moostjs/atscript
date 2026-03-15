@@ -94,7 +94,7 @@ const active = await users.findMany({
 })
 ```
 
-For a full reference on filter operators and controls, see [Queries & Filters](/db/guide/queries).
+For a full reference on filter operators and controls, see [Queries & Filters](/db/api/queries).
 
 ### Count
 
@@ -140,7 +140,7 @@ const result = await users.updateOne({
 ```
 
 ::: info Patch Operators
-For updating embedded arrays and nested objects with fine-grained control, see [Update & Patch](/db/guide/update-patch).
+For updating embedded arrays and nested objects with fine-grained control, see [Update & Patch](/db/api/update-patch).
 :::
 
 ### Update Many
@@ -277,7 +277,7 @@ This makes it straightforward to map errors back to specific fields in complex n
 
 ## Next Steps
 
-- [Queries & Filters](/db/guide/queries) — Advanced filtering, sorting, and projection
-- [Update & Patch](/db/guide/update-patch) — Embedded array and object patch operators
-- [Transactions](/db/guide/transactions) — Atomic multi-table operations
+- [Queries & Filters](/db/api/queries) — Advanced filtering, sorting, and projection
+- [Update & Patch](/db/api/update-patch) — Embedded array and object patch operators
+- [Transactions](/db/api/transactions) — Atomic multi-table operations
 - [Relations — Deep Operations](/db/relations/deep-operations) — Nested creation and replacement across relations

@@ -103,6 +103,6 @@ await todos.insertOne({ title: 'Learn Atscript' })
 
 ## Next Steps
 
-- [Indexes & Constraints](/db/guide/indexes) — database indexes, precision, and collation
-- [Tables & Fields](/db/guide/tables) — declaring tables, primary keys, and field types
-- [CRUD Operations](/db/guide/crud) — insert, query, update, and delete data
+- [Indexes & Constraints](/db/api/indexes) — database indexes, precision, and collation
+- [Tables & Fields](/db/api/tables) — declaring tables, primary keys, and field types
+- [CRUD Operations](/db/api/crud) — insert, query, update, and delete data

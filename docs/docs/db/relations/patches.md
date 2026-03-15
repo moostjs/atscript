@@ -8,7 +8,7 @@ outline: deep
 
 When using `updateOne` or `bulkUpdate` (PATCH), FROM and VIA navigation properties require explicit **patch operators** instead of plain arrays. This gives you fine-grained control over which related records to create, update, or remove.
 
-For single-table patch operations and embedded array patches, see [Update & Patch](/db/guide/update-patch).
+For single-table patch operations and embedded array patches, see [Update & Patch](/db/api/update-patch).
 
 ## Where Relational Patches Apply
 
@@ -22,7 +22,7 @@ Relational patches work on **navigation properties** — fields declared with `@
 
 ## Operators
 
-The same five patch operators used for [embedded array patches](/db/guide/update-patch#embedded-array-patches) apply to relational patches — but instead of modifying JSON data in a single column, they translate to real INSERT, UPDATE, and DELETE operations on related tables.
+The same five patch operators used for [embedded array patches](/db/api/update-patch#embedded-array-patches) apply to relational patches — but instead of modifying JSON data in a single column, they translate to real INSERT, UPDATE, and DELETE operations on related tables.
 
 When multiple operators appear on the same field, they are always applied in order: **remove -> update -> upsert -> insert** — regardless of the order they appear in the payload object.
 
@@ -255,4 +255,4 @@ You can mix scalar field updates with relational patch operators in the same `up
 
 - [Deep Operations](./deep-operations) — nested inserts, replaces, and full relation writes
 - [Navigation Properties](./navigation) — defining TO, FROM, and VIA relations
-- [Update & Patch](/db/guide/update-patch) — single-table patches, embedded arrays, `@db.patch.strategy`
+- [Update & Patch](/db/api/update-patch) — single-table patches, embedded arrays, `@db.patch.strategy`

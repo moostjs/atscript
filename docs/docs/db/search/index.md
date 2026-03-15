@@ -10,7 +10,7 @@ Full-text search lets you search across one or more string fields with ranked re
 
 ## Defining a Fulltext Index
 
-Fulltext search indexes are defined with `@db.index.fulltext` in your `.as` schema. See [Indexes & Constraints — Full-Text Search Index](/db/guide/indexes#full-text-search-index) for the annotation syntax, composite indexes, and field weighting.
+Fulltext search indexes are defined with `@db.index.fulltext` in your `.as` schema. See [Indexes & Constraints — Full-Text Search Index](/db/api/indexes#full-text-search-index) for the annotation syntax, composite indexes, and field weighting.
 
 Here's a quick example:
 
@@ -109,7 +109,7 @@ GET /articles/pages?$search=typescript&$page=1&$size=20
 
 The `$search` parameter provides the search text. Add `$index` to target a specific fulltext index when multiple exist. Regular filter parameters (like `category=tech`) combine with search results using AND logic.
 
-See [HTTP — Advanced](/db/guide/http-advanced) for the full URL query syntax.
+See [HTTP — Advanced](/db/http/advanced) for the full URL query syntax.
 
 ## Adapter Implementations
 
@@ -129,5 +129,5 @@ All adapters expose the same `search()` and `searchWithCount()` API — engine d
 ## Next Steps
 
 - [Vector Search](./vector-search) — similarity search with embedding vectors
-- [Indexes & Constraints](/db/guide/indexes) — other index types (plain, unique)
-- [HTTP — Advanced](/db/guide/http-advanced) — search and vector search URL parameters
+- [Indexes & Constraints](/db/api/indexes) — other index types (plain, unique)
+- [HTTP — Advanced](/db/http/advanced) — search and vector search URL parameters

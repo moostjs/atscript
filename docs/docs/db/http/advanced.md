@@ -4,7 +4,7 @@ outline: deep
 
 # Relations & Search in URLs
 
-This page covers the advanced URL query parameters for relation loading, text search, vector search, and aggregation. These work on top of the [basic query syntax](./http-query-syntax).
+This page covers the advanced URL query parameters for relation loading, text search, vector search, and aggregation. These work on top of the [basic query syntax](./query-syntax).
 
 ## Relation Loading ($with) {#with}
 
@@ -114,7 +114,7 @@ Combine filters, controls, and nesting inside parentheses:
 curl "http://localhost:3000/todos/query?\$with=comments(status=approved&\$sort=-createdAt&\$limit=3&\$with=author(\$select=name))"
 ```
 
-All [filter operators](./http-query-syntax) and control parameters work inside relation sub-queries.
+All [filter operators](./query-syntax) and control parameters work inside relation sub-queries.
 
 ### Validation
 
@@ -227,7 +227,7 @@ curl "http://localhost:3000/articles/query?\$vector=embedding&\$search=machine+l
 
 ### The computeEmbedding Hook
 
-Vector search via HTTP requires the `computeEmbedding()` hook to convert the search text into a vector. Without this override, vector search returns HTTP `501 Not Implemented`. See [Customization — computeEmbedding](./http-customization#computeembedding) for the full implementation guide.
+Vector search via HTTP requires the `computeEmbedding()` hook to convert the search text into a vector. Without this override, vector search returns HTTP `501 Not Implemented`. See [Customization — computeEmbedding](./customization#computeembedding) for the full implementation guide.
 
 For annotations and programmatic API, see [Vector Search](/db/search/vector-search).
 
@@ -315,7 +315,7 @@ For full details on how nested data is processed across foreign keys, see [Relat
 
 ## Next Steps
 
-- [Customization](./http-customization) — Hooks for search, access control, and extending controllers
+- [Customization](./customization) — Hooks for search, access control, and extending controllers
 - [Relations — Loading](/db/relations/loading) — Programmatic relation loading
 - [Text Search](/db/search/) — Search annotations and programmatic API
 - [Vector Search](/db/search/vector-search) — Vector search annotations and programmatic API

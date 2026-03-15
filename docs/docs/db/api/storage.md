@@ -170,6 +170,6 @@ You can filter on `dimensions.width` (it's a real column), but querying inside `
 
 ## Next Steps
 
-- [Defaults & Generated Values](/db/guide/defaults) — auto-generated values and static defaults
-- [Indexes & Constraints](/db/guide/indexes) — database indexes, precision, and collation
-- [Tables & Fields](/db/guide/tables) — declaring tables, primary keys, and field types
+- [Defaults & Generated Values](/db/api/defaults) — auto-generated values and static defaults
+- [Indexes & Constraints](/db/api/indexes) — database indexes, precision, and collation
+- [Tables & Fields](/db/api/tables) — declaring tables, primary keys, and field types

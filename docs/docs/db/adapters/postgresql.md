@@ -72,14 +72,15 @@ To use PostgreSQL-specific annotations (`@db.pg.*`), register the plugin in your
 
 ```typescript
 import ts from '@atscript/typescript'
+import { dbPlugin } from '@atscript/db/plugin'
 import pg from '@atscript/db-postgres/plugin'
 
 export default {
-  plugins: [ts(), pg()],
+  plugins: [ts(), dbPlugin(), pg()],
 }
 ```
 
-The plugin is optional — you only need it if you use `@db.pg.type`, `@db.pg.schema`, or `@db.pg.collate` annotations. All portable `@db.*` annotations work without it.
+`dbPlugin()` is **required** — it registers all portable `@db.*` annotations. The PostgreSQL plugin (`pg()`) is optional and only needed if you use `@db.pg.type`, `@db.pg.schema`, or `@db.pg.collate`. See [Setup](/db/guide/setup) for full configuration details.
 
 ## PostgreSQL-Specific Annotations
 
@@ -386,6 +387,6 @@ These parsers are applied per-pool (not globally), so they don't affect other `p
 
 - [Adapter Overview](./) — feature comparison across all adapters
 - [Schema Sync](/db/sync/) — automatic schema migration
-- [CRUD Operations](/db/guide/crud) — create, read, update, delete
+- [CRUD Operations](/db/api/crud) — create, read, update, delete
 - [Vector Search](/db/search/vector-search) — vector similarity search guide
 - [Text Search](/db/search/) — fulltext search guide

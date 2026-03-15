@@ -12,6 +12,6 @@ actions:
     text: Start with TypeScript
     link: /packages/typescript/quick-start
   - theme: alt
-    text: Explore DB Integrations
+    text: Explore Database
     link: /db/guide/quick-start
 ---

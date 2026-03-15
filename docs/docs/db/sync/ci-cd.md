@@ -108,10 +108,10 @@ await syncSchema(db, types, {
 Serverless functions (AWS Lambda, Vercel, Cloudflare Workers) present unique challenges:
 
 - **Cold starts** — multiple instances may start simultaneously. The distributed lock handles this.
-- **Short execution time** — sync must complete within the function timeout. The hash check (no DB access when schema is unchanged) helps.
+- **Short execution time** — sync must complete within the function timeout. The hash check (a single lightweight DB read when schema is unchanged) helps.
 - **Connection limits** — each function instance opens a connection for sync. Consider connection pooling (e.g., RDS Proxy, PgBouncer).
 
-For serverless, the hash check is critical — it ensures that the vast majority of cold starts skip sync entirely with zero database overhead.
+For serverless, the hash check is critical — it ensures that the vast majority of cold starts skip the expensive introspection and DDL phases, requiring only a lightweight hash comparison against the control table.
 
 ## Example CI Pipeline
 

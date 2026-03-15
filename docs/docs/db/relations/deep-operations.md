@@ -221,7 +221,7 @@ await adapter.withTransaction(async () => {
 })
 ```
 
-See [Transactions](/db/guide/transactions) for explicit transaction management and nesting behavior.
+See [Transactions](/db/api/transactions) for explicit transaction management and nesting behavior.
 
 ## Batch Deep Operations
 
