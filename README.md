@@ -20,7 +20,7 @@ Atscript is language-agnostic by design. Today, TypeScript is the first supporte
 ## Start Here
 
 - [TypeScript Quick Start](https://atscript.moost.org/packages/typescript/quick-start)
-- [DB Quick Start](https://atscript.moost.org/db-integrations/quick-start)
+- [DB Quick Start](https://atscript.moost.org/db/guide/quick-start)
 - [Why Atscript?](https://atscript.moost.org/packages/typescript/why-atscript)
 
 Full documentation lives at [atscript.moost.org](https://atscript.moost.org/).

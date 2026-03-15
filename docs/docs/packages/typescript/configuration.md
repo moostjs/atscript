@@ -23,7 +23,7 @@ export default defineConfig({
 | `format`            | `string`                       | Plugin-dependent | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted |
 | `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config                                                                |
 | `plugins`           | `TAtscriptPlugin[]`            | `[]`      | Active plugins                                                                                                 |
-| `annotations`       | `object`                       | —         | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))              |
+| `annotations`       | `object`                       | —        | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))              |
 
 ## Plugin Options
 

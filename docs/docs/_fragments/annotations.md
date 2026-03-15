@@ -197,7 +197,7 @@ Use `string.required` or `@meta.required` to ensure required string fields are n
 
 ### Database Annotations (@db.\*)
 
-Atscript ships a comprehensive set of database annotations for defining tables, relations, views, indexes, and more. These are covered in detail in the [DB Integrations](/db-integrations/) documentation:
+Atscript ships a comprehensive set of database annotations for defining tables, relations, views, indexes, and more. These are covered in detail in the [Database Layer](/db/guide/) documentation:
 
 - `@db.table`, `@db.schema` — Table definitions
 - `@db.column`, `@db.json`, `@db.ignore` — Column configuration
@@ -210,7 +210,7 @@ Atscript ships a comprehensive set of database annotations for defining tables, 
 - `@db.sync.method`, `@db.table.renamed`, `@db.column.renamed` — Schema sync
 - `@emit.jsonSchema` — Pre-compute and embed JSON Schema at build time
 
-See the [Annotations Reference](/db-integrations/annotations) for the complete list.
+See the [Annotations Reference](/db/adapters/annotations) for the complete list.
 
 ### Special Annotation Argument Types
 
@@ -219,4 +219,4 @@ Some annotations accept special argument types beyond strings and numbers:
 - **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Used by `@db.rel.FK` and `@db.view.for` to reference fields on other types.
 - **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Used by `@db.view.filter`, `@db.view.joins`, and `@db.rel.filter` for conditions.
 
-See [Queries & Filters](/db-integrations/queries#query-expressions) for the full query syntax.
+See [Queries & Filters](/db/guide/queries#query-expressions) for the full query syntax.

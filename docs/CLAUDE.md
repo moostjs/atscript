@@ -17,7 +17,13 @@ docs/docs/
 │   └── theme/             — Custom theme (index.ts, style.css, atscript-grammar.ts)
 ├── _fragments/            — Shared markdown snippets (included via <!--@include: -->)
 ├── index.md               — Homepage
-├── db-integrations/       — DB Integrations docs (23 pages — COMPLETE)
+├── db/                    — Database documentation (~42 pages across 6 URL prefixes, 3 sidebars)
+│   ├── guide/             — Guide: getting started, schema, data ops, HTTP API (~16 pages)
+│   ├── relations/         — Relations: FK, navigation, deep ops, patches (~6 pages)
+│   ├── views/             — Views & Aggregations (~5 pages)
+│   ├── search/            — Text search & vector search (~2 pages)
+│   ├── sync/              — Schema Sync: CLI, config, CI/CD (~6 pages)
+│   └── adapters/          — Adapters: PG, SQLite, MongoDB, MySQL, reference (~7 pages)
 ├── packages/
 │   ├── typescript/        — TypeScript Guide (18 pages — self-contained, COMPLETE)
 │   ├── moost-validator/   — Moost Validator docs (4 pages)
@@ -29,30 +35,45 @@ docs/docs/
 ## Navigation Structure
 
 ```
-TypeScript ▾              DB Integrations ▾      VSCode        Plugins ▾
-├── Guide                 ├── Overview           (top-level)   └── Creating a Plugin
-└── Moost Validator       ├── SQLite
-                          ├── MongoDB
-                          └── CRUD over HTTP
+TypeScript ▾              Database ▾             VSCode        Plugins ▾
+├── Guide                 ├── Guide              (top-level)   └── Creating a Plugin
+└── Moost Validator       ├── Relations
+                          ├── Views & Aggregations
+                          ├── Search
+                          ├── Schema Sync
+                          └── Adapters
 ```
+
+### Database sidebar layout (3 sidebars, 6 URL prefixes)
+
+| Sidebar | URL prefixes | Sections |
+|---------|-------------|----------|
+| Guide | `/db/guide/` | Getting Started, Schema, Data Ops, HTTP API |
+| Advanced | `/db/relations/`, `/db/views/`, `/db/search/` | Relations, Views & Aggs, Search |
+| Operations | `/db/sync/`, `/db/adapters/` | Schema Sync, Adapters, Annotations Reference |
 
 ## Current Coverage
 
-| Section                   | Status   | Pages                                        |
-| ------------------------- | -------- | -------------------------------------------- |
-| db-integrations/          | COMPLETE | 23 pages — tables, relations, views, sync    |
-| packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments)  |
-| packages/moost-validator/ | PARTIAL  | 4 pages                                      |
-| packages/vscode/          | PARTIAL  | 4 pages                                      |
-| plugin-development/       | STUBS    | 16 files, needs content                      |
-| \_fragments/              | COMPLETE | 7 shared fragments                           |
+| Section                   | Status      | Pages                                        |
+| ------------------------- | ----------- | -------------------------------------------- |
+| db/guide/                 | IN PROGRESS | ~16 pages — schema, CRUD, queries, HTTP      |
+| db/relations/             | IN PROGRESS | ~6 pages — FK, navigation, deep ops          |
+| db/views/                 | IN PROGRESS | ~5 pages — views, aggregations               |
+| db/search/                | IN PROGRESS | ~2 pages — text search, vector search        |
+| db/sync/                  | IN PROGRESS | ~6 pages — CLI, config, CI/CD                |
+| db/adapters/              | IN PROGRESS | ~7 pages — PG, SQLite, MongoDB, MySQL, ref   |
+| packages/typescript/      | COMPLETE    | 18 pages with full content (uses fragments)  |
+| packages/moost-validator/ | PARTIAL     | 4 pages                                      |
+| packages/vscode/          | PARTIAL     | 4 pages                                      |
+| plugin-development/       | STUBS       | 16 files, needs content                      |
+| \_fragments/              | COMPLETE    | 7 shared fragments                           |
 
 ## VitePress Config Key Details
 
 - **Config file**: `docs/docs/.vitepress/config.ts`
 - **Custom Atscript syntax highlighting grammar** embedded in config
 - **Plugin**: `vitepress-plugin-llmstxt` for LLM-friendly text generation
-- **Nav**: TypeScript dropdown (Guide, MongoDB, Moost), VSCode, Plugin Development
+- **Nav**: TypeScript dropdown, Database dropdown (6 entry points), VSCode, Plugin Development
 - **Sidebar**: Defined for all active sections
 - **Edit links**: Point to `https://github.com/moostjs/atscript/edit/main/docs/docs/:path`
 
@@ -124,15 +145,20 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 
 ## Mapping: Source Code → Documentation
 
-| Package Source                  | Documentation Location                         |
-| ------------------------------- | ---------------------------------------------- |
-| `packages/core/src/`            | `docs/docs/plugin-development/`                |
-| `packages/db/src/plugin/annotations/`    | `docs/docs/db-integrations/annotations.md` |
-| `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
-| `packages/db/src/`        | `docs/docs/db-integrations/`                   |
-| `packages/db-sqlite/src/`       | `docs/docs/db-integrations/sqlite*.md`         |
-| `packages/db-mongo/src/`           | `docs/docs/db-integrations/mongodb*.md`        |
-| `packages/moost-db/src/`        | `docs/docs/db-integrations/crud-http*.md`      |
-| `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
-| `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |
-| `packages/vscode/`              | `docs/docs/packages/vscode/`                   |
+| Package Source                         | Documentation Location                           |
+| -------------------------------------- | ------------------------------------------------ |
+| `packages/core/src/`                   | `docs/docs/plugin-development/`                  |
+| `packages/db/src/plugin/annotations/`  | `docs/docs/db/adapters/annotations.md`           |
+| `packages/db/src/`                     | `docs/docs/db/guide/`, `db/relations/`, `db/views/` |
+| `packages/db/src/schema/`              | `docs/docs/db/sync/`                             |
+| `packages/db/src/table/db-view.ts`     | `docs/docs/db/views/`                            |
+| `packages/db/src/rel/`                 | `docs/docs/db/relations/`                        |
+| `packages/db-postgres/src/`            | `docs/docs/db/adapters/postgresql.md`            |
+| `packages/db-sqlite/src/`              | `docs/docs/db/adapters/sqlite.md`                |
+| `packages/db-mongo/src/`              | `docs/docs/db/adapters/mongodb.md`               |
+| `packages/db-mysql/src/`              | `docs/docs/db/adapters/mysql.md`                 |
+| `packages/moost-db/src/`              | `docs/docs/db/guide/http-*.md`                   |
+| `packages/typescript/src/`             | `docs/docs/packages/typescript/`                 |
+| `packages/moost-validator/src/`        | `docs/docs/packages/moost-validator/`            |
+| `packages/unplugin/src/`              | `docs/docs/packages/typescript/build-setup.md`   |
+| `packages/vscode/`                    | `docs/docs/packages/vscode/`                     |

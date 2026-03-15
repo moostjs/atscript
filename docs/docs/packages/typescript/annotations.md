@@ -140,7 +140,7 @@ For deeper details like append-vs-replace behavior, repeatable annotations, and 
 - Put labels and descriptions on the model, not in a separate UI config file.
 - Keep validation rules close to the field they apply to.
 - Use custom annotations only when your app or tooling will actually read them.
-- For DB-specific annotations, use the [DB Integrations](/db-integrations/) docs.
+- For DB-specific annotations, use the [Database Layer](/db/guide/) docs.
 
 ## Next Steps
 

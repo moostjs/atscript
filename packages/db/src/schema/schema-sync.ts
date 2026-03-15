@@ -197,6 +197,55 @@ export class SchemaSync {
   }
 
   /**
+   * Starts a periodic heartbeat that extends the lock's TTL while sync runs.
+   * Returns a handle with `stop()` to cancel and `getAbortReason()` to check
+   * whether the lock was stolen or unexpectedly removed.
+   */
+  private startHeartbeat(podId: string, ttlMs: number): {
+    stop: () => void
+    getAbortReason: () => string | undefined
+  } {
+    let abortReason: string | undefined
+    let stopped = false
+    const intervalMs = Math.max(Math.floor(ttlMs / 3), 1000)
+
+    const timer = setInterval(async () => {
+      if (stopped) { return }
+      try {
+        const status = await this.store.refreshLock(podId, ttlMs)
+        if (stopped) { return }
+        if (status === 'stolen') {
+          abortReason = 'Schema sync lock was stolen by another pod'
+          this.logger.warn('[schema-sync] Lock stolen by another pod — aborting after current operation')
+        } else if (status === 'missing') {
+          abortReason = 'Schema sync lock was unexpectedly removed'
+          this.logger.warn('[schema-sync] Lock row missing — aborting after current operation')
+        }
+      } catch (error) {
+        if (stopped) { return }
+        this.logger.warn(
+          '[schema-sync] Failed to refresh lock heartbeat (will retry):',
+          error instanceof Error ? error.message : error,
+        )
+      }
+    }, intervalMs)
+
+    // Don't keep the Node.js process alive just for the heartbeat
+    if (typeof timer === 'object' && 'unref' in timer) { timer.unref() }
+
+    return {
+      stop() { stopped = true; clearInterval(timer) },
+      getAbortReason: () => abortReason,
+    }
+  }
+
+  /** Throws if the heartbeat detected a stolen/missing lock. */
+  private assertLockHeld(getAbortReason: () => string | undefined): void {
+    const reason = getAbortReason()
+    if (reason) { throw new Error(reason) }
+  }
+
+  /**
    * Runs schema synchronization with distributed locking.
    */
   async run(types: TAtscriptAnnotatedType[], opts?: TSyncOptions): Promise<TSyncResult> {
@@ -235,6 +284,9 @@ export class SchemaSync {
       }
     }
 
+    // Start heartbeat — extends lock TTL every ttl/3 while sync is in progress
+    const heartbeat = this.startHeartbeat(podId, lockTtlMs)
+
     try {
       // Double-check hash
       if (!force) {
@@ -252,13 +304,16 @@ export class SchemaSync {
       const deps = this.buildExecutorDeps()
       const entries: SyncEntry[] = []
       for (const readable of tables) {
+        this.assertLockHeld(heartbeat.getAbortReason)
         entries.push(await executeSyncTable(readable, safe, trackedNames, deps))
       }
 
       // Sync managed views
+      this.assertLockHeld(heartbeat.getAbortReason)
       const removed = await this.detectRemoved(allReadables, previouslyTracked)
 
       for (const readable of views) {
+        this.assertLockHeld(heartbeat.getAbortReason)
         entries.push(await executeSyncView(readable as AtscriptDbView, trackedNames, deps))
       }
 
@@ -267,6 +322,7 @@ export class SchemaSync {
       entries.push(...externalEntries)
 
       // Drop removed tables/views (unless safe mode) — never drop external views
+      this.assertLockHeld(heartbeat.getAbortReason)
       if (!safe) {
         for (const entry of removed) {
           if (entry.viewType === 'E') { continue }
@@ -280,6 +336,7 @@ export class SchemaSync {
       }
 
       // Store per-table snapshots
+      this.assertLockHeld(heartbeat.getAbortReason)
       for (const readable of allReadables) {
         const adapter = readable.dbAdapter
         const tm = adapter.typeMapper?.bind(adapter)
@@ -310,6 +367,7 @@ export class SchemaSync {
 
       return { status: 'synced', schemaHash: hash, entries }
     } finally {
+      heartbeat.stop()
       await this.store.releaseLock(podId)
     }
   }

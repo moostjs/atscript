@@ -13,5 +13,5 @@ What Atscript supports today, what is coming next, and how it all connects.
 ## Get started
 
 - [TypeScript Quick Start](/packages/typescript/quick-start)
-- [DB Quick Start](/db-integrations/quick-start)
+- [DB Quick Start](/db/guide/quick-start)
 - [Why Atscript?](/packages/typescript/why-atscript)

@@ -13,5 +13,5 @@ actions:
     link: /packages/typescript/quick-start
   - theme: alt
     text: Explore DB Integrations
-    link: /db-integrations/quick-start
+    link: /db/guide/quick-start
 ---

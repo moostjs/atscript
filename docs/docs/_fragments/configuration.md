@@ -124,9 +124,9 @@ annotations: {
 
 | Option          | Type                    | Default     | Description                                                                                 |
 | --------------- | ----------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `description`   | `string`                | —           | Documentation shown in IntelliSense                                                         |
-| `argument`      | `object \| object[]`    | —           | Argument definition(s) with `name`, `type`, optional `values`                               |
-| `nodeType`      | `string[]`              | —           | Restrict to node types (e.g., `['prop']`, `['interface']`)                                  |
+| `description`   | `string`                | —          | Documentation shown in IntelliSense                                                         |
+| `argument`      | `object \| object[]`    | —          | Argument definition(s) with `name`, `type`, optional `values`                               |
+| `nodeType`      | `string[]`              | —          | Restrict to node types (e.g., `['prop']`, `['interface']`)                                  |
 | `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node. Values are stored as arrays |
 | `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How same-named annotations combine during merging. Only relevant when `multiple: true`      |
 

@@ -130,6 +130,25 @@ export class SyncStore {
     }
   }
 
+  async refreshLock(podId: string, ttlMs: number): Promise<'refreshed' | 'stolen' | 'missing'> {
+    const existing = await this.controlTable!.findOne({
+      filter: { _id: { $eq: 'sync_lock' } },
+      controls: {},
+    }) as Record<string, unknown> | null
+
+    if (!existing) { return 'missing' }
+    if (existing.lockedBy !== podId) { return 'stolen' }
+
+    await this.controlTable!.replaceOne({
+      _id: 'sync_lock',
+      lockedBy: podId,
+      lockedAt: existing.lockedAt,
+      expiresAt: Date.now() + ttlMs,
+    } as any)
+
+    return 'refreshed'
+  }
+
   async releaseLock(podId: string): Promise<void> {
     try {
       const existing = await this.controlTable!.findOne({

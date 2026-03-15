@@ -282,6 +282,68 @@ const atscriptGrammar = {
   },
 }
 
+const dbAdvancedSidebar = [
+  {
+    text: 'Relations',
+    items: [
+      { text: 'Foreign Keys', link: '/db/relations/' },
+      { text: 'Navigation Properties', link: '/db/relations/navigation' },
+      { text: 'Referential Actions', link: '/db/relations/referential-actions' },
+      { text: 'Loading Relations', link: '/db/relations/loading' },
+      { text: 'Deep Operations', link: '/db/relations/deep-operations' },
+      { text: 'Relational Patches', link: '/db/relations/patches' },
+    ],
+  },
+  {
+    text: 'Views & Aggregations',
+    items: [
+      { text: 'Defining Views', link: '/db/views/' },
+      { text: 'View Types', link: '/db/views/view-types' },
+      { text: 'Querying Views', link: '/db/views/querying-views' },
+      { text: 'Aggregation Annotations', link: '/db/views/aggregations' },
+      { text: 'Aggregation Views', link: '/db/views/aggregation-views' },
+    ],
+  },
+  {
+    text: 'Search',
+    items: [
+      { text: 'Text Search', link: '/db/search/' },
+      { text: 'Vector Search', link: '/db/search/vector-search' },
+    ],
+  },
+]
+
+const dbOperationsSidebar = [
+  {
+    text: 'Schema Sync',
+    items: [
+      { text: 'How Sync Works', link: '/db/sync/' },
+      { text: 'CLI', link: '/db/sync/cli' },
+      { text: 'Configuration', link: '/db/sync/configuration' },
+      { text: 'What Gets Synced', link: '/db/sync/what-gets-synced' },
+      { text: 'Programmatic API', link: '/db/sync/programmatic' },
+      { text: 'CI/CD Integration', link: '/db/sync/ci-cd' },
+    ],
+  },
+  {
+    text: 'Adapters',
+    items: [
+      { text: 'Overview & Comparison', link: '/db/adapters/' },
+      { text: 'PostgreSQL', link: '/db/adapters/postgresql' },
+      { text: 'SQLite', link: '/db/adapters/sqlite' },
+      { text: 'MongoDB', link: '/db/adapters/mongodb' },
+      { text: 'MySQL', link: '/db/adapters/mysql' },
+      { text: 'Creating Custom Adapters', link: '/db/adapters/creating-adapters' },
+    ],
+  },
+  {
+    text: 'Reference',
+    items: [
+      { text: 'Annotations Reference', link: '/db/adapters/annotations' },
+    ],
+  },
+]
+
 export default defineConfig({
   title: 'Atscript',
   description:
@@ -326,12 +388,14 @@ export default defineConfig({
     nav: [
       { text: 'TypeScript', link: '/packages/typescript/' },
       {
-        text: 'DB Integrations',
+        text: 'Database',
         items: [
-          { text: 'Overview', link: '/db-integrations/' },
-          { text: 'SQLite', link: '/db-integrations/sqlite' },
-          { text: 'MongoDB', link: '/db-integrations/mongodb' },
-          { text: 'CRUD over HTTP', link: '/db-integrations/crud-http' },
+          { text: 'Guide', link: '/db/guide/' },
+          { text: 'Relations', link: '/db/relations/' },
+          { text: 'Views & Aggregations', link: '/db/views/' },
+          { text: 'Search', link: '/db/search/' },
+          { text: 'Schema Sync', link: '/db/sync/' },
+          { text: 'Adapters', link: '/db/adapters/' },
         ],
       },
       { text: 'Roadmap', link: '/roadmap' },
@@ -393,83 +457,54 @@ export default defineConfig({
         },
       ],
 
-      '/db-integrations/': [
+      // Sidebar 1: Guide
+      '/db/guide/': [
         {
           text: 'Getting Started',
           items: [
-            { text: 'Overview', link: '/db-integrations/' },
-            { text: 'Quick Start', link: '/db-integrations/quick-start' },
+            { text: 'Overview', link: '/db/guide/' },
+            { text: 'Quick Start', link: '/db/guide/quick-start' },
           ],
         },
         {
-          text: 'Defining Your Schema',
+          text: 'Defining Schema',
           items: [
-            { text: 'Tables & Fields', link: '/db-integrations/tables' },
-            { text: 'Defaults & Indexes', link: '/db-integrations/defaults-indexes' },
+            { text: 'Tables & Fields', link: '/db/guide/tables' },
+            { text: 'Storage & Nested Objects', link: '/db/guide/storage' },
+            { text: 'Defaults & Generated Values', link: '/db/guide/defaults' },
+            { text: 'Indexes & Constraints', link: '/db/guide/indexes' },
           ],
         },
         {
-          text: 'Working with Data',
+          text: 'Data Operations',
           items: [
-            { text: 'CRUD Operations', link: '/db-integrations/crud' },
-            { text: 'Queries & Filters', link: '/db-integrations/queries' },
+            { text: 'Setup', link: '/db/guide/setup' },
+            { text: 'CRUD Operations', link: '/db/guide/crud' },
+            { text: 'Queries & Filters', link: '/db/guide/queries' },
+            { text: 'Update & Patch', link: '/db/guide/update-patch' },
+            { text: 'Transactions', link: '/db/guide/transactions' },
           ],
         },
         {
-          text: 'Relations',
+          text: 'HTTP API',
           items: [
-            { text: 'Foreign Keys & Navigation', link: '/db-integrations/relations' },
-            { text: 'Deep Operations', link: '/db-integrations/deep-operations' },
-          ],
-        },
-        {
-          text: 'Array & Patch Operations',
-          items: [
-            { text: 'Patch Operations', link: '/db-integrations/patch-operations' },
-          ],
-        },
-        {
-          text: 'Views',
-          items: [
-            { text: 'Database Views', link: '/db-integrations/views' },
-          ],
-        },
-        {
-          text: 'Schema Sync',
-          items: [
-            { text: 'Schema Sync & Migrations', link: '/db-integrations/schema-sync' },
-          ],
-        },
-        {
-          text: 'Transactions',
-          items: [
-            { text: 'Transactions', link: '/db-integrations/transactions' },
-          ],
-        },
-        {
-          text: 'Adapters',
-          items: [
-            { text: 'SQLite', link: '/db-integrations/sqlite' },
-            { text: 'MongoDB', link: '/db-integrations/mongodb' },
-            { text: 'MongoDB Search & Vectors', link: '/db-integrations/mongodb-search' },
-            { text: 'Creating Custom Adapters', link: '/db-integrations/creating-adapters' },
-          ],
-        },
-        {
-          text: 'REST API (Moost)',
-          items: [
-            { text: 'HTTP Controllers', link: '/db-integrations/crud-http' },
-            { text: 'URL Query Syntax', link: '/db-integrations/crud-http-query-syntax' },
-            { text: 'Customization & Hooks', link: '/db-integrations/crud-http-customization' },
-          ],
-        },
-        {
-          text: 'Reference',
-          items: [
-            { text: 'Annotations Reference', link: '/db-integrations/annotations' },
+            { text: 'Setup', link: '/db/guide/http-setup' },
+            { text: 'CRUD Endpoints', link: '/db/guide/http-crud' },
+            { text: 'URL Query Syntax', link: '/db/guide/http-query-syntax' },
+            { text: 'Relations & Search in URLs', link: '/db/guide/http-advanced' },
+            { text: 'Customization', link: '/db/guide/http-customization' },
           ],
         },
       ],
+
+      // Sidebar 2: Advanced (shared across Relations, Views, Search)
+      '/db/relations/': dbAdvancedSidebar,
+      '/db/views/': dbAdvancedSidebar,
+      '/db/search/': dbAdvancedSidebar,
+
+      // Sidebar 3: Operations (shared across Sync, Adapters)
+      '/db/sync/': dbOperationsSidebar,
+      '/db/adapters/': dbOperationsSidebar,
 
       '/packages/moost-validator/': [
         {
