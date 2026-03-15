@@ -25,15 +25,6 @@ const EMPTY_DEFAULT_FNS: ReadonlySet<TDbDefaultFn> = new Set()
 interface TxContext { state: unknown }
 const txStorage = new AsyncLocalStorage<TxContext>()
 
-/**
- * Runs `fn` outside any active transaction context.
- * Used by FK validation to avoid turning read-only checks into
- * multi-collection transactions (which can cause session counter
- * mismatches on some adapters, e.g. MongoDB).
- */
-export function runOutsideTx<T>(fn: () => T): T {
-  return txStorage.exit(fn)
-}
 
 /**
  * Abstract base class for database adapters.
@@ -157,6 +148,18 @@ export abstract class BaseDbAdapter {
    */
   protected _getTransactionState(): unknown {
     return txStorage.getStore()?.state
+  }
+
+  /**
+   * Runs `fn` inside the transaction ALS context with the given state.
+   * Adapters that override `withTransaction` (e.g., to use MongoDB's
+   * `session.withTransaction()` Convenient API) use this to set up the
+   * shared context so that nested adapters see the same session.
+   * If a context already exists (nesting), it's reused.
+   */
+  protected _runInTransactionContext<T>(state: unknown, fn: () => Promise<T>): Promise<T> {
+    if (txStorage.getStore()) { return fn() }
+    return txStorage.run({ state }, fn)
   }
 
   /**

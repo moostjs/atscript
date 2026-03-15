@@ -96,45 +96,57 @@ export class MongoAdapter extends BaseDbAdapter {
     super()
   }
 
-  // ── Transaction primitives ────────────────────────────────────────────────
+  // ── Transaction support ──────────────────────────────────────────────────
 
   private get _client() { return this.client }
 
-  /** Whether transaction support has been detected as unavailable (standalone MongoDB). */
-  private _txDisabled = false
+  /**
+   * Per-client cache: whether transactions are unavailable (standalone MongoDB).
+   * Shared across all adapter instances for the same client so topology is probed once.
+   */
+  private static readonly _txDisabledClients = new WeakSet<MongoClient>()
 
-  protected override async _beginTransaction(): Promise<unknown> {
-    if (this._txDisabled || !this._client) { return undefined }
+  private get _txDisabled(): boolean {
+    return this.client ? MongoAdapter._txDisabledClients.has(this.client) : true
+  }
+
+  private set _txDisabled(value: boolean) {
+    if (value && this.client) { MongoAdapter._txDisabledClients.add(this.client) }
+  }
+
+  /**
+   * Uses MongoDB's Convenient Transaction API (`session.withTransaction()`).
+   * This handles txnNumber management and automatic retry for
+   * `TransientTransactionError` / `UnknownTransactionCommitResult`.
+   */
+  override async withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this._getTransactionState()) { return fn() }
+    if (this._txDisabled || !this._client) { return fn() }
     try {
-      // Transactions require replica set or mongos — check topology
       const topology = (this._client as any).topology
       if (topology) {
         const desc = topology.description ?? topology.s?.description
         const type = desc?.type
         if (type === 'Single' || type === 'Unknown') {
           this._txDisabled = true
-          return undefined
+          return fn()
         }
       }
-      const session = this._client.startSession()
-      session.startTransaction()
-      return session
     } catch {
       this._txDisabled = true
-      return undefined
+      return fn()
     }
-  }
 
-  protected override async _commitTransaction(state: unknown): Promise<void> {
-    if (!state) { return }
-    const session = state as ClientSession
-    try { await session.commitTransaction() } finally { await session.endSession() }
-  }
-
-  protected override async _rollbackTransaction(state: unknown): Promise<void> {
-    if (!state) { return }
-    const session = state as ClientSession
-    try { await session.abortTransaction() } finally { await session.endSession() }
+    const session = this._client.startSession()
+    try {
+      let result!: T
+      await session.withTransaction(async () => {
+        result = await this._runInTransactionContext(session, fn)
+      })
+      return result
+    } finally {
+      try { await session.endSession() } catch { /* preserve original error */ }
+    }
   }
 
   private static readonly _noSession: Record<string, never> = Object.freeze({}) as Record<string, never>
@@ -735,7 +747,7 @@ export class MongoAdapter extends BaseDbAdapter {
       const doc = await counters.findOneAndUpdate(
         { _id: counterId },
         { $inc: { seq: count } },
-        { upsert: true, returnDocument: 'after', ...this._getSessionOpts() }
+        { upsert: true, returnDocument: 'after' }
       )
       const seq = doc?.seq ?? count
       // If this was a fresh counter (upserted), check if collection already has data
@@ -750,7 +762,6 @@ export class MongoAdapter extends BaseDbAdapter {
           await counters.updateOne(
             { _id: counterId },
             { $max: { seq: adjusted } },
-            this._getSessionOpts()
           )
           result.set(field, effectiveBase)
           continue
@@ -766,8 +777,7 @@ export class MongoAdapter extends BaseDbAdapter {
   private async _getCurrentFieldMax(field: string): Promise<number> {
     const alias = `max__${field.replace(/\./g, '__')}`
     const agg = await this.collection.aggregate(
-      [{ $group: { _id: null, [alias]: { $max: `$${field}` } } }],
-      this._getSessionOpts()
+      [{ $group: { _id: null, [alias]: { $max: `$${field}` } } }]
     ).toArray()
     if (agg.length > 0) {
       const val = agg[0][alias]

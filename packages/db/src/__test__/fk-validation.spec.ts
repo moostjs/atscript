@@ -241,10 +241,12 @@ describe('FK Validation', () => {
     }
   })
 
-  // ── Transaction context isolation (bug 04) ────────────────────────────
+  // ── Transaction context (bug 04 + bug 07) ──────────────────────────────
 
-  it('should run FK validation counts outside the transaction context', async () => {
-    // Custom adapter that tracks transaction state per operation
+  it('should run FK validation counts inside the transaction context', async () => {
+    // FK counts must run inside the transaction so deep writes can see
+    // uncommitted TO inserts. Counter allocation (the original cause of
+    // multi-collection tx issues) is handled outside the session in the adapter.
     class TxTrackingAdapter extends MockAdapter {
       countTxStates: unknown[] = []
       insertTxStates: unknown[] = []
@@ -281,13 +283,12 @@ describe('FK Validation', () => {
 
     await posts.insertOne({ title: 'Test', authorId: 1 })
 
-    // The authors adapter should have been called for FK validation count
+    // FK validation count runs INSIDE the transaction context
     const authorsAdapter = adapters.find(a => a.countTxStates.length > 0)
     expect(authorsAdapter).toBeDefined()
-    // FK validation count must run OUTSIDE the transaction context
-    expect(authorsAdapter!.countTxStates).toEqual([undefined])
+    expect(authorsAdapter!.countTxStates).toEqual(['mock-session'])
 
-    // The posts adapter should have run insertMany INSIDE the transaction
+    // insertMany also runs INSIDE the transaction
     const postsAdapter = adapters.find(a => a.insertTxStates.length > 0)
     expect(postsAdapter).toBeDefined()
     expect(postsAdapter!.insertTxStates).toEqual(['mock-session'])

@@ -2,7 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 
 import type { FilterExpr } from '@uniqu/core'
 
-import { runOutsideTx, type BaseDbAdapter } from '../base-adapter'
+import { type BaseDbAdapter } from '../base-adapter'
 import { DbError } from '../db-error'
 import { UniquSelect } from '../query/uniqu-select'
 import type { TableMetadata } from '../table/table-metadata'
@@ -102,11 +102,7 @@ export class ApplicationIntegrity extends IntegrityStrategy {
       const expectedCount = valueArrays[0].length
 
       checks.push(async () => {
-        // Run FK lookups outside the transaction context so that read-only
-        // validation checks don't participate in the write transaction.
-        // This avoids multi-collection transactions that cause session
-        // counter mismatches on MongoDB.
-        const count = await runOutsideTx(() => target.count(filter))
+        const count = await target.count(filter)
         if (count < expectedCount) {
           const sample = valueArrays[0].slice(0, 3).join(', ')
           const suffix = valueArrays[0].length > 3 ? `, ... (${valueArrays[0].length} total)` : ''
