@@ -486,7 +486,7 @@ export class MongoAdapter extends BaseDbAdapter {
 
   /** Returns the default similarity threshold for a vector index (from @db.search.vector.threshold). */
   getVectorThreshold(indexName?: string): number | undefined {
-    const key = mongoIndexKey('vector', indexName)
+    const key = mongoIndexKey('vector', indexName || DEFAULT_INDEX_NAME)
     return this._vectorThresholds.get(key)
   }
 

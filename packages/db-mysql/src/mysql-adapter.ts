@@ -1015,7 +1015,7 @@ export class MysqlAdapter extends BaseDbAdapter {
     const distanceFn = similarityToMysqlFn(vec!.similarity)
     const where = buildWhere(query.filter)
     const controls = query.controls || {}
-    const threshold = this._resolveVectorThreshold(controls, vec!.indexName)
+    const threshold = this._resolveVectorThreshold(controls as Record<string, unknown>, vec!.indexName)
     return { field: field!, vec: vec!, distanceFn, where, controls, threshold, tableName: this.resolveTableName(), vectorStr: vectorToString(vector) }
   }
 
@@ -1027,7 +1027,7 @@ export class MysqlAdapter extends BaseDbAdapter {
     const ctx = this._prepareVectorSearch(vector, query, indexName)
 
     // Use subquery so distance is computed once per row, then filter/sort on the alias
-    let inner = `SELECT *, ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
+    const inner = `SELECT *, ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
     const params: unknown[] = [ctx.vectorStr, ...ctx.where.params]
 
     let sql = `SELECT * FROM (${inner}) _v`
@@ -1051,7 +1051,7 @@ export class MysqlAdapter extends BaseDbAdapter {
   ): { sql: string; params: unknown[] } {
     const ctx = this._prepareVectorSearch(vector, query, indexName)
 
-    let inner = `SELECT ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
+    const inner = `SELECT ${ctx.distanceFn}(${qi(ctx.field)}, STRING_TO_VECTOR(?)) AS _distance FROM ${quoteTableName(ctx.tableName)} WHERE ${ctx.where.sql}`
     const params: unknown[] = [ctx.vectorStr, ...ctx.where.params]
 
     let sql = `SELECT COUNT(*) AS cnt FROM (${inner}) _v`
@@ -1098,9 +1098,9 @@ function normalizeMysqlDefault(value: string | null): string | undefined {
 /** Maps generic similarity metric to MySQL 9+ distance function name. */
 function similarityToMysqlFn(similarity: string): string {
   switch (similarity) {
-    case 'euclidean': return 'VEC_DISTANCE_EUCLIDEAN'
-    case 'dotProduct': return 'VEC_DISTANCE_DOT'
-    default: return 'VEC_DISTANCE_COSINE'
+    case 'euclidean': { return 'VEC_DISTANCE_EUCLIDEAN' }
+    case 'dotProduct': { return 'VEC_DISTANCE_DOT' }
+    default: { return 'VEC_DISTANCE_COSINE' }
   }
 }
 

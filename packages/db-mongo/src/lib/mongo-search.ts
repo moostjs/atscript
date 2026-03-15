@@ -1,5 +1,5 @@
 import type { Collection, Document } from 'mongodb'
-import type { DbQuery, TSearchIndexInfo } from '@atscript/db'
+import type { DbControls, DbQuery, TSearchIndexInfo } from '@atscript/db'
 import type { TMongoIndex, TSearchIndex } from './mongo-types'
 import { buildMongoFilter } from './mongo-filter'
 
@@ -94,10 +94,10 @@ export async function vectorSearchWithCountImpl(
 /** Resolves the effective threshold: query-time $threshold > schema-level @db.search.vector.threshold. */
 function resolveThreshold(
   host: TMongoSearchHost,
-  controls: Record<string, unknown>,
+  controls: DbControls,
   indexName?: string
 ): number | undefined {
-  const queryThreshold = controls.$threshold as number | undefined
+  const queryThreshold = (controls as Record<string, unknown>).$threshold as number | undefined
   if (queryThreshold !== undefined) { return queryThreshold }
   return host.getVectorThreshold(indexName)
 }
