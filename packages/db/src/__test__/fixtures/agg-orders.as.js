@@ -116,7 +116,7 @@ $("object", IndexedMetrics)
     $().designType("string")
       .tags("string")
       .annotate("db.column.dimension", true)
-      .annotate("db.index.plain", true)
+      .annotate("db.index.plain", { }, true)
       .$type
   ).prop(
     "source",
@@ -129,7 +129,7 @@ $("object", IndexedMetrics)
     $().designType("string")
       .tags("string")
       .annotate("db.column.dimension", true)
-      .annotate("db.index.unique", true)
+      .annotate("db.index.unique", true, true)
       .$type
   ).prop(
     "revenue",
