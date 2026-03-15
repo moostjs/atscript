@@ -19,3 +19,5 @@ cache
 .specs
 *.local.md
 .claude/plans
+
+*.as.js
