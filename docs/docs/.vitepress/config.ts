@@ -400,6 +400,7 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#3c8772' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'Atscript — Define Your Data Once' }],
+    ['script', { async: '', src: 'https://scripts.simpleanalyticscdn.com/latest.js' }],
     [
       'meta',
       {
