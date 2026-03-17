@@ -70,7 +70,7 @@
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/db": "workspace:^"
+    "@atscript/db": "^0.1.39"
   },
   "peerDependenciesMeta": {
     "@atscript/db": {

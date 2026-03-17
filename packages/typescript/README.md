@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+  <img src="https://atscript.dev/logo.svg" alt="Atscript" width="120" />
 </p>
 
 <h1 align="center">@atscript/typescript</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/typescript/">TypeScript Guide</a>
+  <a href="https://atscript.dev">Documentation</a> · <a href="https://atscript.dev/packages/typescript/">TypeScript Guide</a>
 </p>
 
 ---
@@ -60,8 +60,8 @@ npx atscript-typescript-skill --global # Install globally
 
 ## Documentation
 
-- [TypeScript Guide](https://atscript.moost.org/packages/typescript/)
-- [Full Documentation](https://atscript.moost.org)
+- [TypeScript Guide](https://atscript.dev/packages/typescript/)
+- [Full Documentation](https://atscript.dev)
 
 ## License
 

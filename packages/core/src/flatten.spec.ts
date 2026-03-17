@@ -1,6 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import dbPlugin from '../../db/src/plugin'
 import type { TAtscriptDocConfig } from './document'
 import { AtscriptDoc } from './document'
 import { flattenInterfaceNode } from './flatten'
@@ -10,7 +9,7 @@ import { PluginManager } from './plugin/plugin-manager'
 let docConfig: TAtscriptDocConfig
 
 beforeAll(async () => {
-  const pm = new PluginManager({ plugins: [dbPlugin()] })
+  const pm = new PluginManager({ unknownAnnotation: 'allow' })
   docConfig = await pm.getDocConfig()
 })
 

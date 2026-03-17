@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+  <img src="https://atscript.dev/logo.svg" alt="Atscript" width="120" />
 </p>
 
 <h1 align="center">@atscript/core</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/plugin-development/">Plugin Development</a>
+  <a href="https://atscript.dev">Documentation</a> · <a href="https://atscript.dev/plugin-development/">Plugin Development</a>
 </p>
 
 ---
@@ -37,8 +37,8 @@ pnpm add @atscript/core
 
 ## Documentation
 
-- [Plugin Development Guide](https://atscript.moost.org/plugin-development/)
-- [Full Documentation](https://atscript.moost.org)
+- [Plugin Development Guide](https://atscript.dev/plugin-development/)
+- [Full Documentation](https://atscript.dev)
 
 ## License
 

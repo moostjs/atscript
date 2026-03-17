@@ -131,7 +131,7 @@ If `atscript.d.ts` is stale (missing new annotations), regenerate it with `npx a
 ## Documentation
 
 - **Site**: VitePress at `docs/`
-- **Published**: https://atscript.moost.org
+- **Published**: https://atscript.dev
 - **Style**: Progressive complexity — beginner-friendly in language guides, increasingly technical for plugin development
 - **Navigation**: TypeScript dropdown (Guide, MongoDB, Moost) | VSCode | Plugin Development
 - **Structure**: packages/typescript/ (complete, 18 pages), plugin-development/ (16 stubs), other package sections (stubs)
@@ -158,7 +158,7 @@ When fixing bugs, always investigate and fix the root cause first. Do not implem
 - Plugins extend the core by adding annotations, primitives, and metadata — they don't modify the parser
 - The core provides AST + utilities (annotation merging, type unwinding) that language extensions and LSPs consume
 - Moost integrations (`moost-db`, `moost-validator`) demonstrate how .as types flow into a real framework
-- **`@db.*` annotations** are provided by `@atscript/db/plugin` via `dbPlugin()`. All annotations registered unconditionally; runtime dynamically imports `/rel` and `/agg` only when table metadata requires them. Core ships NO db annotations. TypeScript codegen detects annotations by string key presence — no dependency on annotation specs
+- **`@db.*` annotations** are provided by `@atscripthttps://db.atscript.dev/plugin` via `dbPlugin()`. All annotations registered unconditionally; runtime dynamically imports `/rel` and `/agg` only when table metadata requires them. Core ships NO db annotations. TypeScript codegen detects annotations by string key presence — no dependency on annotation specs
 - **Primitive `annotations` map** — primitives use a generic `annotations: Record<string, TPrimitiveAnnotationValue>` to apply any annotation (the old hardcoded `expect` property was removed). The `applyAnnotations()` method is spec-aware: it resolves annotation specs, respects `multiple` flags, and maps object values by spec argument names
 - **`@meta.isKey` was renamed to `@expect.array.key`** — it's a validation constraint, not semantic metadata
 - **`@meta.id` takes no arguments** — multiple fields annotated with `@meta.id` form a composite primary key

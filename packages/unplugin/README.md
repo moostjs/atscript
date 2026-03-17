@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+  <img src="https://atscript.dev/logo.svg" alt="Atscript" width="120" />
 </p>
 
 <h1 align="center">unplugin-atscript</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/typescript/build-setup">Build Setup Guide</a>
+  <a href="https://atscript.dev">Documentation</a> · <a href="https://atscript.dev/packages/typescript/build-setup">Build Setup Guide</a>
 </p>
 
 ---
@@ -49,8 +49,8 @@ Also available: `unplugin-atscript/esbuild`, `unplugin-atscript/rolldown`, `unpl
 
 ## Documentation
 
-- [Build Setup Guide](https://atscript.moost.org/packages/typescript/build-setup)
-- [Full Documentation](https://atscript.moost.org)
+- [Build Setup Guide](https://atscript.dev/packages/typescript/build-setup)
+- [Full Documentation](https://atscript.dev)
 
 ## License
 

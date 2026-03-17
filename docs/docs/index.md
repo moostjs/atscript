@@ -13,5 +13,5 @@ actions:
     link: /packages/typescript/quick-start
   - theme: alt
     text: Explore Database
-    link: /db/guide/quick-start
+    link: https://db.atscript.dev/guide/quick-start
 ---

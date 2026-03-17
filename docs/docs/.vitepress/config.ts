@@ -282,103 +282,6 @@ const atscriptGrammar = {
   },
 }
 
-// Sidebar 1: Getting Started
-const dbGuideSidebar = [
-  {
-    text: 'Getting Started',
-    items: [
-      { text: 'Overview', link: '/db/guide/' },
-      { text: 'Quick Start', link: '/db/guide/quick-start' },
-      { text: 'Setup', link: '/db/guide/setup' },
-    ],
-  },
-]
-
-// Sidebar 2: Adapters
-const dbAdaptersSidebar = [
-  {
-    text: 'Adapters',
-    items: [
-      { text: 'Overview & Comparison', link: '/db/adapters/' },
-      { text: 'PostgreSQL', link: '/db/adapters/postgresql' },
-      { text: 'SQLite', link: '/db/adapters/sqlite' },
-      { text: 'MongoDB', link: '/db/adapters/mongodb' },
-      { text: 'MySQL', link: '/db/adapters/mysql' },
-      { text: 'Creating Custom Adapters', link: '/db/adapters/creating-adapters' },
-    ],
-  },
-]
-
-// Sidebar 3: Schema, API & Annotations Reference
-const dbSchemaApiSidebar = [
-  {
-    text: 'Schema',
-    items: [
-      { text: 'Tables & Fields', link: '/db/api/tables' },
-      { text: 'Storage & Nested Objects', link: '/db/api/storage' },
-      { text: 'Defaults & Generated Values', link: '/db/api/defaults' },
-      { text: 'Indexes & Constraints', link: '/db/api/indexes' },
-      { text: 'Foreign Keys', link: '/db/relations/' },
-      { text: 'Navigation Properties', link: '/db/relations/navigation' },
-      { text: 'Referential Actions', link: '/db/relations/referential-actions' },
-      { text: 'Defining Views', link: '/db/views/' },
-      { text: 'View Types', link: '/db/views/view-types' },
-      { text: 'Aggregation Annotations', link: '/db/views/aggregations' },
-      { text: 'Aggregation Views', link: '/db/views/aggregation-views' },
-      { text: 'Text Search', link: '/db/search/' },
-      { text: 'Vector Search', link: '/db/search/vector-search' },
-    ],
-  },
-  {
-    text: 'API',
-    items: [
-      { text: 'CRUD Operations', link: '/db/api/crud' },
-      { text: 'Queries & Filters', link: '/db/api/queries' },
-      { text: 'Update & Patch', link: '/db/api/update-patch' },
-      { text: 'Transactions', link: '/db/api/transactions' },
-      { text: 'Loading Relations', link: '/db/relations/loading' },
-      { text: 'Deep Operations', link: '/db/relations/deep-operations' },
-      { text: 'Relational Patches', link: '/db/relations/patches' },
-      { text: 'Querying Views', link: '/db/views/querying-views' },
-    ],
-  },
-  {
-    text: 'Reference',
-    items: [
-      { text: 'Annotations Reference', link: '/db/adapters/annotations' },
-    ],
-  },
-]
-
-// Sidebar 4: Schema Sync
-const dbSyncSidebar = [
-  {
-    text: 'Schema Sync',
-    items: [
-      { text: 'How Sync Works', link: '/db/sync/' },
-      { text: 'CLI', link: '/db/sync/cli' },
-      { text: 'Configuration', link: '/db/sync/configuration' },
-      { text: 'What Gets Synced', link: '/db/sync/what-gets-synced' },
-      { text: 'Programmatic API', link: '/db/sync/programmatic' },
-      { text: 'CI/CD Integration', link: '/db/sync/ci-cd' },
-    ],
-  },
-]
-
-// Sidebar 5: HTTP API
-const dbHttpSidebar = [
-  {
-    text: 'HTTP API',
-    items: [
-      { text: 'Setup', link: '/db/http/' },
-      { text: 'CRUD Endpoints', link: '/db/http/crud' },
-      { text: 'URL Query Syntax', link: '/db/http/query-syntax' },
-      { text: 'Relations & Search', link: '/db/http/advanced' },
-      { text: 'Customization', link: '/db/http/customization' },
-    ],
-  },
-]
-
 export default defineConfig({
   title: 'Atscript',
   description:
@@ -390,7 +293,7 @@ export default defineConfig({
   vite: {
     plugins: [
       llmstxtPlugin({
-        hostname: 'atscript.moost.org',
+        hostname: 'atscript.dev',
       }),
     ],
   },
@@ -423,16 +326,7 @@ export default defineConfig({
 
     nav: [
       { text: 'TypeScript', link: '/packages/typescript/' },
-      {
-        text: 'Database',
-        items: [
-          { text: 'Getting Started', link: '/db/guide/quick-start' },
-          { text: 'Adapters', link: '/db/adapters/' },
-          { text: 'API & Annotations', link: '/db/api/tables' },
-          { text: 'Schema Sync', link: '/db/sync/' },
-          { text: 'HTTP API', link: '/db/http/' },
-        ],
-      },
+      { text: 'Database', link: 'https://db.atscript.dev/' },
       { text: 'Roadmap', link: '/roadmap' },
       { text: 'VSCode', link: '/packages/vscode/' },
       { text: 'Moost Validator', link: '/packages/moost-validator/' },
@@ -491,24 +385,6 @@ export default defineConfig({
           ],
         },
       ],
-
-      // Sidebar 1: Getting Started
-      '/db/guide/': dbGuideSidebar,
-
-      // Sidebar 2: Adapters
-      '/db/adapters/': dbAdaptersSidebar,
-
-      // Sidebar 3: Schema, API & Annotations
-      '/db/api/': dbSchemaApiSidebar,
-      '/db/relations/': dbSchemaApiSidebar,
-      '/db/views/': dbSchemaApiSidebar,
-      '/db/search/': dbSchemaApiSidebar,
-
-      // Sidebar 4: Schema Sync
-      '/db/sync/': dbSyncSidebar,
-
-      // Sidebar 5: HTTP API
-      '/db/http/': dbHttpSidebar,
 
       '/packages/moost-validator/': [
         {

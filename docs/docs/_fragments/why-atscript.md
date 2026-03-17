@@ -56,7 +56,7 @@ From this single definition, Atscript can already drive several parts of your st
 - TypeScript types with full type safety
 - Runtime validators with model-defined constraints
 - JSON Schema and runtime metadata export
-- Database annotations and integrations via [Database Layer](/db/guide/)
+- Database annotations and integrations via [Database Layer](https://db.atscript.dev/guide/)
 - REST/CRUD integrations in the TypeScript ecosystem
 
 ## Where the Model Is Going

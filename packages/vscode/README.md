@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+  <img src="https://atscript.dev/logo.svg" alt="Atscript" width="120" />
 </p>
 
 <h1 align="center">Atscript VS Code Extension</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/vscode/">VSCode Extension Guide</a>
+  <a href="https://atscript.dev">Documentation</a> · <a href="https://atscript.dev/packages/vscode/">VSCode Extension Guide</a>
 </p>
 
 ---
@@ -38,8 +38,8 @@ First-class editor support for Atscript (`.as`) files in Visual Studio Code. Pow
 
 ## Documentation
 
-- [VSCode Extension Guide](https://atscript.moost.org/packages/vscode/)
-- [Full Documentation](https://atscript.moost.org)
+- [VSCode Extension Guide](https://atscript.dev/packages/vscode/)
+- [Full Documentation](https://atscript.dev)
 
 ## Feedback
 

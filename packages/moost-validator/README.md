@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://atscript.moost.org/logo.svg" alt="Atscript" width="120" />
+  <img src="https://atscript.dev/logo.svg" alt="Atscript" width="120" />
 </p>
 
 <h1 align="center">@atscript/moost-validator</h1>
@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://atscript.moost.org">Documentation</a> · <a href="https://atscript.moost.org/packages/moost-validator/">Moost Validator Guide</a>
+  <a href="https://atscript.dev">Documentation</a> · <a href="https://atscript.dev/packages/moost-validator/">Moost Validator Guide</a>
 </p>
 
 ---
@@ -47,8 +47,8 @@ Any handler parameter typed with an Atscript-compiled class is now automatically
 
 ## Documentation
 
-- [Moost Validator Guide](https://atscript.moost.org/packages/moost-validator/)
-- [Full Documentation](https://atscript.moost.org)
+- [Moost Validator Guide](https://atscript.dev/packages/moost-validator/)
+- [Full Documentation](https://atscript.dev)
 
 ## License
 

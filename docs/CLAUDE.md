@@ -1,6 +1,6 @@
 # Atscript Documentation Site
 
-VitePress-based documentation site published at https://atscript.moost.org
+VitePress-based documentation site published at https://atscript.dev
 
 ## Commands
 
@@ -17,13 +17,6 @@ docs/docs/
 │   └── theme/             — Custom theme (index.ts, style.css, atscript-grammar.ts)
 ├── _fragments/            — Shared markdown snippets (included via <!--@include: -->)
 ├── index.md               — Homepage
-├── db/                    — Database documentation (~42 pages across 6 URL prefixes, 3 sidebars)
-│   ├── guide/             — Guide: getting started, schema, data ops, HTTP API (~16 pages)
-│   ├── relations/         — Relations: FK, navigation, deep ops, patches (~6 pages)
-│   ├── views/             — Views & Aggregations (~5 pages)
-│   ├── search/            — Text search & vector search (~2 pages)
-│   ├── sync/              — Schema Sync: CLI, config, CI/CD (~6 pages)
-│   └── adapters/          — Adapters: PG, SQLite, MongoDB, MySQL, reference (~7 pages)
 ├── packages/
 │   ├── typescript/        — TypeScript Guide (18 pages — self-contained, COMPLETE)
 │   ├── moost-validator/   — Moost Validator docs (4 pages)
@@ -35,33 +28,17 @@ docs/docs/
 ## Navigation Structure
 
 ```
-TypeScript ▾              Database ▾             VSCode        Plugins ▾
-├── Guide                 ├── Guide              (top-level)   └── Creating a Plugin
-└── Moost Validator       ├── Relations
-                          ├── Views & Aggregations
-                          ├── Search
-                          ├── Schema Sync
-                          └── Adapters
+TypeScript ▾              Database ▾ (external)   VSCode        Plugins ▾
+├── Guide                 → db.atscript.dev       (top-level)   └── Creating a Plugin
+└── Moost Validator
 ```
 
-### Database sidebar layout (3 sidebars, 6 URL prefixes)
-
-| Sidebar | URL prefixes | Sections |
-|---------|-------------|----------|
-| Guide | `/db/guide/` | Getting Started, Schema, Data Ops, HTTP API |
-| Advanced | `/db/relations/`, `/db/views/`, `/db/search/` | Relations, Views & Aggs, Search |
-| Operations | `/db/sync/`, `/db/adapters/` | Schema Sync, Adapters, Annotations Reference |
+Database docs are hosted separately at https://db.atscript.dev. The nav dropdown links externally.
 
 ## Current Coverage
 
 | Section                   | Status      | Pages                                        |
 | ------------------------- | ----------- | -------------------------------------------- |
-| db/guide/                 | IN PROGRESS | ~16 pages — schema, CRUD, queries, HTTP      |
-| db/relations/             | IN PROGRESS | ~6 pages — FK, navigation, deep ops          |
-| db/views/                 | IN PROGRESS | ~5 pages — views, aggregations               |
-| db/search/                | IN PROGRESS | ~2 pages — text search, vector search        |
-| db/sync/                  | IN PROGRESS | ~6 pages — CLI, config, CI/CD                |
-| db/adapters/              | IN PROGRESS | ~7 pages — PG, SQLite, MongoDB, MySQL, ref   |
 | packages/typescript/      | COMPLETE    | 18 pages with full content (uses fragments)  |
 | packages/moost-validator/ | PARTIAL     | 4 pages                                      |
 | packages/vscode/          | PARTIAL     | 4 pages                                      |
@@ -73,8 +50,8 @@ TypeScript ▾              Database ▾             VSCode        Plugins ▾
 - **Config file**: `docs/docs/.vitepress/config.ts`
 - **Custom Atscript syntax highlighting grammar** embedded in config
 - **Plugin**: `vitepress-plugin-llmstxt` for LLM-friendly text generation
-- **Nav**: TypeScript dropdown, Database dropdown (6 entry points), VSCode, Plugin Development
-- **Sidebar**: Defined for all active sections
+- **Nav**: TypeScript dropdown, Database dropdown (external links to db.atscript.dev), VSCode, Plugin Development
+- **Sidebar**: Defined for local sections (TypeScript, Moost Validator, VSCode, Plugin Development)
 - **Edit links**: Point to `https://github.com/moostjs/atscript/edit/main/docs/docs/:path`
 
 ## Multi-Language Documentation Architecture
@@ -133,7 +110,6 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 - **Progressive complexity**: Beginner-friendly for getting started, increasingly technical for advanced/plugin topics
 - **Target audience varies by section**:
   - packages/typescript/ — TypeScript developers using Atscript (full journey from intro to advanced)
-  - packages/db-mongo/ — MongoDB users (TypeScript-specific)
   - packages/moost-\*/ — Moost framework users
   - packages/vscode/ — VSCode extension users
   - plugin-development/ — plugin/language extension developers
@@ -148,17 +124,9 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 | Package Source                         | Documentation Location                           |
 | -------------------------------------- | ------------------------------------------------ |
 | `packages/core/src/`                   | `docs/docs/plugin-development/`                  |
-| `packages/db/src/plugin/annotations/`  | `docs/docs/db/adapters/annotations.md`           |
-| `packages/db/src/`                     | `docs/docs/db/guide/`, `db/relations/`, `db/views/` |
-| `packages/db/src/schema/`              | `docs/docs/db/sync/`                             |
-| `packages/db/src/table/db-view.ts`     | `docs/docs/db/views/`                            |
-| `packages/db/src/rel/`                 | `docs/docs/db/relations/`                        |
-| `packages/db-postgres/src/`            | `docs/docs/db/adapters/postgresql.md`            |
-| `packages/db-sqlite/src/`              | `docs/docs/db/adapters/sqlite.md`                |
-| `packages/db-mongo/src/`              | `docs/docs/db/adapters/mongodb.md`               |
-| `packages/db-mysql/src/`              | `docs/docs/db/adapters/mysql.md`                 |
-| `packages/moost-db/src/`              | `docs/docs/db/guide/http-*.md`                   |
 | `packages/typescript/src/`             | `docs/docs/packages/typescript/`                 |
 | `packages/moost-validator/src/`        | `docs/docs/packages/moost-validator/`            |
 | `packages/unplugin/src/`              | `docs/docs/packages/typescript/build-setup.md`   |
 | `packages/vscode/`                    | `docs/docs/packages/vscode/`                     |
+
+DB packages (`db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-postgres`, `db-sql-tools`, `moost-db`) are documented at https://db.atscript.dev (separate repo).

@@ -82,10 +82,10 @@ export default defineConfig({
 })
 ```
 
-See the [Schema Sync guide](/db/sync/) for full documentation.
+See the [Schema Sync guide](https://db.atscript.dev/sync/) for full documentation.
 
 ## Next Steps
 
 - [Configuration](/packages/typescript/configuration) — config file options
 - [Build Setup](/packages/typescript/build-setup) — bundler integration
-- [Schema Sync](/db/sync/) — database migration guide
+- [Schema Sync](https://db.atscript.dev/sync/) — database migration guide
