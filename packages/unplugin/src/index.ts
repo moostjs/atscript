@@ -29,6 +29,11 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
 
     resolveId(id, importer) {
       if (importer && id.endsWith('.as')) {
+        // Bare specifiers (e.g., 'my-lib/user.as') — let bundler's native resolution handle it.
+        // The package.json exports will resolve to compiled .as.mjs/.as.js.
+        if (!id.startsWith('.') && !id.startsWith('/')) {
+          return null
+        }
         return path.join(path.dirname(importer), id)
       }
     },

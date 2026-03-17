@@ -19,6 +19,22 @@ const validator = User.validator()
 const metadata = User.metadata
 ```
 
+### Importing from Packages in TypeScript
+
+When importing `.as` types from an npm package in TypeScript, use the `.as` extension (added automatically by the Atscript compiler when generating `.js`/`.d.ts` output):
+
+```typescript
+// app.ts — importing .as types from a published package
+import { User } from '@my-org/models/user.as'
+import { Product } from 'shared-types/product.as'
+```
+
+The bundler (`unplugin-atscript`) and TypeScript resolve these through the package's `exports` field:
+- **Bundlers** use the `"import"` condition to find the compiled `.as.mjs`/`.as.js`
+- **TypeScript** uses the `"types"` condition to find the `.as.d.ts` declarations
+
+If the package doesn't use `exports`, bundlers resolve the `.as` file directly from `node_modules` and compile it on the fly via the unplugin `load()` hook.
+
 ## Setup for TypeScript Integration
 
 For TypeScript to import `.as` files:

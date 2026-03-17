@@ -1,12 +1,17 @@
 import path from 'path'
 import { URL } from 'url'
 
+import { isBareSpecifier } from '../resolve-bare'
+
 export type TVsCodeRange = {
   start: { line: number; character: number }
   end: { line: number; character: number }
 }
 
 export function resolveAtscriptFromPath(from: string, id: string) {
+  if (isBareSpecifier(from)) {
+    return `bare:${from}.as`
+  }
   return `file://${path.join(id.slice(7).split('/').slice(0, -1).join('/'), from)}.as`
 }
 

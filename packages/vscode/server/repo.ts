@@ -763,7 +763,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (token.fromPath) {
         let exporter = exporters.get(token.fromPath)
         if (!exporter) {
-          exporter = await this.openDocument(resolveAtscriptFromPath(token.fromPath, atscript.id))
+          exporter = await this.openDocument(atscript.resolveImportId(resolveAtscriptFromPath(token.fromPath, atscript.id)))
           exporters.set(token.fromPath, exporter)
         }
         t = exporter.registry.definitions.get(token.text)!
@@ -784,7 +784,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
           if (token && !importSet.has(token.text)) {
-            const fromPath = getRelPath(atscript.id, doc.id)
+            const fromPath = this.resolvedToBare.get(doc.id) ?? getRelPath(atscript.id, doc.id)
             const importEdit = addImport(text, token.text, fromPath)
             items.push({
               label: token.text,
@@ -836,7 +836,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     triggerKind?: 1 | 2 | 3
   ): Promise<CompletionItem[] | undefined> {
     const rule = createInsertTextRule(text, offset, triggerKind ?? 1)
-    const target = await this.openDocument(resolveAtscriptFromPath(block.fromPath!, atscript.id))
+    const target = await this.openDocument(atscript.resolveImportId(resolveAtscriptFromPath(block.fromPath!, atscript.id)))
     if (target) {
       const imports = atscript.imports.get(target.id)?.imports || []
       const importsSet = new Set(imports.map(i => i.text))

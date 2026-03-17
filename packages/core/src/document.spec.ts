@@ -60,8 +60,8 @@ primitives.set(
 describe('document', () => {
   it('should register import', () => {
     const doc = new AtscriptDoc('file:///home/test.as', {})
-    doc.update(`import { foo } from 'bar'`)
-    expect(doc.imports.get('file:///home/bar.as')?.from.text).toBe('bar')
+    doc.update(`import { foo } from './bar'`)
+    expect(doc.imports.get('file:///home/bar.as')?.from.text).toBe('./bar')
     expect(doc.imports.get('file:///home/bar.as')?.imports[0].text).toBe('foo')
     expect(doc.registry.definitions.has('foo')).toBeTruthy()
   })
@@ -78,10 +78,10 @@ describe('document', () => {
   it('should refer imports', () => {
     const doc = new AtscriptDoc('file:///home/test.as', {})
     doc.update(`
-      import { foo } from 'bar'
+      import { foo } from './bar'
       type Type = foo
       `)
-    expect(doc.imports.get('file:///home/bar.as')?.from.text).toBe('bar')
+    expect(doc.imports.get('file:///home/bar.as')?.from.text).toBe('./bar')
     expect(doc.imports.get('file:///home/bar.as')?.imports[0].text).toBe('foo')
     expect(doc.referred).toHaveLength(2)
     expect(doc.referred[1].range).toEqual({
@@ -94,6 +94,44 @@ describe('document', () => {
         character: 21,
       },
     })
+  })
+
+  it('should register bare specifier import with bare: placeholder key', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', {})
+    doc.update(`import { User } from 'my-lib/user'`)
+    expect(doc.imports.get('bare:my-lib/user.as')?.from.text).toBe('my-lib/user')
+    expect(doc.imports.get('bare:my-lib/user.as')?.imports[0].text).toBe('User')
+  })
+
+  it('should register scoped bare specifier import', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', {})
+    doc.update(`import { Model } from '@org/pkg/model'`)
+    expect(doc.imports.get('bare:@org/pkg/model.as')?.from.text).toBe('@org/pkg/model')
+    expect(doc.imports.get('bare:@org/pkg/model.as')?.imports[0].text).toBe('Model')
+  })
+
+  it('should rekey import from bare: to file: URI', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', {})
+    doc.update(`import { User } from 'my-lib/user'`)
+    expect(doc.imports.has('bare:my-lib/user.as')).toBe(true)
+
+    doc.rekeyImport('bare:my-lib/user.as', 'file:///resolved/node_modules/my-lib/src/user.as')
+    expect(doc.imports.has('bare:my-lib/user.as')).toBe(false)
+    expect(doc.imports.get('file:///resolved/node_modules/my-lib/src/user.as')?.from.text).toBe('my-lib/user')
+  })
+
+  it('should resolve import ID via resolvedImports cache', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', {})
+    doc.resolvedImports.set('bare:my-lib/user.as', 'file:///resolved/path/user.as')
+    expect(doc.resolveImportId('bare:my-lib/user.as')).toBe('file:///resolved/path/user.as')
+    expect(doc.resolveImportId('file:///home/bar.as')).toBe('file:///home/bar.as')
+  })
+
+  it('should clear resolvedImports on cleanup', () => {
+    const doc = new AtscriptDoc('file:///home/test.as', {})
+    doc.resolvedImports.set('bare:test.as', 'file:///resolved.as')
+    doc.update('')
+    expect(doc.resolvedImports.size).toBe(0)
   })
 
   it('should return local definitions 1', () => {

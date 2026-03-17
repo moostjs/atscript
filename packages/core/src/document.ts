@@ -86,6 +86,12 @@ export class AtscriptDoc {
   public imports = new Map<string, { from: Token; imports: Token[] }>()
 
   /**
+   * Maps bare specifier placeholder IDs (bare:xxx.as) to resolved file:// URIs.
+   * Populated during checkImport in AtscriptRepo.
+   */
+  public resolvedImports = new Map<string, string>()
+
+  /**
    * Map of imported definitions by type/interface identifier
    */
   public importedDefs = new Map<string, Token>()
@@ -130,6 +136,25 @@ export class AtscriptDoc {
 
   resolveAnnotation(name: string) {
     return resolveAnnotation(name, this.config.annotations)
+  }
+
+  /**
+   * Resolve a placeholder import ID (bare:xxx.as) to its actual file:// URI.
+   * Returns the input unchanged if no resolution is cached.
+   */
+  resolveImportId(rawId: string): string {
+    return this.resolvedImports.get(rawId) ?? rawId
+  }
+
+  /**
+   * Re-key an entry in the imports map (e.g., from bare: placeholder to file:// URI).
+   */
+  rekeyImport(oldKey: string, newKey: string) {
+    const entry = this.imports.get(oldKey)
+    if (entry) {
+      this.imports.delete(oldKey)
+      this.imports.set(newKey, entry)
+    }
   }
 
   updateDependencies(docs: AtscriptDoc[]) {
@@ -179,6 +204,7 @@ export class AtscriptDoc {
     this.referred = []
     this.queryFieldRefs = []
     this.imports.clear()
+    this.resolvedImports.clear()
     this._allMessages = undefined
     this.tokensIndex = new TokensIndex()
     this.blocksIndex = new BlocksIndex()
@@ -617,7 +643,7 @@ export class AtscriptDoc {
       return { uri: this.id, doc: this, token }
     }
     if (token.fromPath) {
-      const absolutePath = resolveAtscriptFromPath(token.fromPath, this.id)
+      const absolutePath = this.resolveImportId(resolveAtscriptFromPath(token.fromPath, this.id))
 
       return { uri: absolutePath, doc: this.dependenciesMap.get(absolutePath), token }
     }
@@ -627,7 +653,7 @@ export class AtscriptDoc {
       this.dependenciesMap.size > 0
     ) {
       const from = this.importedDefs.get(token.text)!.text
-      const absolutePath = resolveAtscriptFromPath(from, this.id)
+      const absolutePath = this.resolveImportId(resolveAtscriptFromPath(from, this.id))
       const targetDoc = this.dependenciesMap.get(absolutePath)
       if (targetDoc) {
         const target = targetDoc.registry.definitions.get(token.text)
@@ -825,7 +851,7 @@ export class AtscriptDoc {
     }
     const def = this.registry.definitions.get(identifier)
     if (def?.imported && def.fromPath) {
-      const absolutePath = resolveAtscriptFromPath(def.fromPath, this.id)
+      const absolutePath = this.resolveImportId(resolveAtscriptFromPath(def.fromPath, this.id))
       const doc = this.dependenciesMap.get(absolutePath)
       return doc?.getDeclarationOwnerNode(identifier)
     } else if (!def?.imported) {

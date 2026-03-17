@@ -11,6 +11,7 @@ import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
 import { resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
+import { isBareId, resolveBareSpecifier } from './resolve-bare'
 
 export interface TPluginManagers {
   manager: PluginManager
@@ -37,6 +38,11 @@ export class AtscriptRepo {
   protected readonly atscripts = new Map<string, Promise<AtscriptDoc>>()
 
   public sharedPluginManager: TPluginManagers | undefined
+
+  /**
+   * Maps resolved file:// URIs back to bare specifiers (for LSP auto-import).
+   */
+  public readonly resolvedToBare = new Map<string, string>()
 
   /**
    * cache for raw content of config files
@@ -281,7 +287,27 @@ export class AtscriptRepo {
     imports: Token[],
     checked?: Set<string>
   ): Promise<AtscriptDoc | undefined> {
-    const forId = resolveAtscriptFromPath(from.text, atscript.id)
+    let forId = resolveAtscriptFromPath(from.text, atscript.id)
+
+    // Resolve bare specifier placeholders (bare:xxx.as) to actual file:// URIs
+    if (isBareId(forId)) {
+      const fromDir = atscript.id.slice(7).split('/').slice(0, -1).join('/')
+      const resolved = await resolveBareSpecifier(from.text, fromDir)
+      if (!resolved) {
+        atscript.registerMessages([{
+          severity: 1,
+          message: `"${from.text}" not found`,
+          range: from.range,
+        }])
+        return
+      }
+      const resolvedUri = `file://${resolved}`
+      atscript.resolvedImports.set(forId, resolvedUri)
+      atscript.rekeyImport(forId, resolvedUri)
+      this.resolvedToBare.set(resolvedUri, from.text)
+      forId = resolvedUri
+    }
+
     if (forId === atscript.id) {
       atscript.registerMessages([{
         severity: 1,
