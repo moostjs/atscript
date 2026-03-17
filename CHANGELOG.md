@@ -1,3 +1,12 @@
+## [0.1.40](https://github.com/moostjs/atscript/compare/v0.1.39...v0.1.40) (2026-03-17)
+
+
+### Features
+
+* add node_modules resolution for .as imports ([70ec466](https://github.com/moostjs/atscript/commit/70ec466c584df45c975dad463778477e5f9c0761))
+
+
+
 ## [0.1.39](https://github.com/moostjs/atscript/compare/v0.1.38...v0.1.39) (2026-03-15)
 
 
