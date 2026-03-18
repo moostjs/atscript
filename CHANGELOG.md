@@ -1,3 +1,12 @@
+## [0.1.41](https://github.com/moostjs/atscript/compare/v0.1.40...v0.1.41) (2026-03-18)
+
+
+### Performance Improvements
+
+* optimize Validator — 3x faster than before, 1.3–2x faster than Zod ([0637e52](https://github.com/moostjs/atscript/commit/0637e52972aa29a2a54923f326a27ab5efd2d223))
+
+
+
 ## [0.1.40](https://github.com/moostjs/atscript/compare/v0.1.39...v0.1.40) (2026-03-17)
 
 
