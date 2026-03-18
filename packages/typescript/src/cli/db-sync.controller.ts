@@ -82,7 +82,7 @@ export class DbSyncController {
     this.printer.typeCount(dbTypes.length)
     this.printer.banner()
 
-    const { SchemaSync } = await this.importFromCwd('@atscripthttps://db.atscript.dev/sync', true) as typeof import('@atscripthttps://db.atscript.dev/sync')
+    const { SchemaSync } = await this.importFromCwd('@atscript/db/sync', true) as typeof import('@atscript/db/sync')
     const sync = new SchemaSync(dbSpace)
     const plan = await sync.plan(dbTypes, { force, safe })
 

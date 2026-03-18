@@ -66,11 +66,12 @@
     "moost": "^0.6.2"
   },
   "devDependencies": {
-    "vitest": "3.2.4"
+    "vitest": "3.2.4",
+    "@atscript/db": "^0.1.41"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/db": "^0.1.39"
+    "@atscript/db": "^0.1.41"
   },
   "peerDependenciesMeta": {
     "@atscript/db": {

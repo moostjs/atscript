@@ -143,6 +143,40 @@ describe('Validator at objects', () => {
     expect(o.dummy).toBeUndefined()
   })
 
+  it('should not mutate value when strip fails in union branch', () => {
+    const cardType = defineAnnotatedType('object')
+      .prop('number', defineAnnotatedType().designType('string').$type)
+      .prop('holderName', defineAnnotatedType().designType('string').$type)
+    const paypalType = defineAnnotatedType('object')
+      .prop('email', defineAnnotatedType().designType('string').$type)
+    const unionType = defineAnnotatedType('union')
+      .item(cardType.$type)
+      .item(paypalType.$type)
+    const rootType = defineAnnotatedType('object')
+      .prop('payment', unionType.$type)
+    const validator = new Validator(rootType.$type, { unknownProps: 'strip' })
+    const data = { payment: { email: 'test@test.com' } }
+    expect(validator.validate(data, true)).toBe(true)
+    expect(data.payment.email).toBe('test@test.com')
+  })
+
+  it('should strip unknown props from the matching union branch', () => {
+    const cardType = defineAnnotatedType('object')
+      .prop('number', defineAnnotatedType().designType('string').$type)
+    const paypalType = defineAnnotatedType('object')
+      .prop('email', defineAnnotatedType().designType('string').$type)
+    const unionType = defineAnnotatedType('union')
+      .item(cardType.$type)
+      .item(paypalType.$type)
+    const rootType = defineAnnotatedType('object')
+      .prop('payment', unionType.$type)
+    const validator = new Validator(rootType.$type, { unknownProps: 'strip' })
+    const data = { payment: { email: 'test@test.com', extra: 'junk' } as any }
+    expect(validator.validate(data, true)).toBe(true)
+    expect(data.payment.email).toBe('test@test.com')
+    expect(data.payment.extra).toBeUndefined()
+  })
+
   it('should validate object with wildcard props', () => {
     const t = defineAnnotatedType('object').propPattern(
       /./,

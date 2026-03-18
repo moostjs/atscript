@@ -8,7 +8,7 @@ import type {
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
-import { isAnnotatedType, isPhantomType } from './annotated-type'
+import { isPhantomType } from './annotated-type'
 
 interface TError {
   path: string
@@ -78,6 +78,8 @@ export class Validator<
   DataType = TAtscriptDataType<T>,
 > {
   protected opts: TValidatorOptions
+  protected hasPlugins: boolean
+  protected hasReplace: boolean
 
   constructor(
     protected readonly def: T,
@@ -90,45 +92,51 @@ export class Validator<
       ...opts,
       plugins: opts?.plugins || [],
     }
+    this.hasPlugins = this.opts.plugins.length > 0
+    this.hasReplace = typeof this.opts.replace === 'function'
   }
 
   /** Validation errors collected during the last {@link validate} call. */
   public errors: TError[] = []
   protected stackErrors: Array<TError[] | null> = []
-  protected stackPath: string[] = []
-  protected cachedPath = ''
+  protected pathSegments: string[] = []
+  protected depth = 0
+  protected limitExceeded = false
   protected context: unknown
 
-  protected isLimitExceeded() {
-    if (this.stackErrors.length > 0) {
-      const top = this.stackErrors[this.stackErrors.length - 1]
-      return top !== null && top.length >= this.opts.errorLimit
+  protected buildPath(): string {
+    if (this.depth <= 0) {
+      return ''
     }
-    return this.errors.length >= this.opts.errorLimit
+    let path = this.pathSegments[0]
+    for (let i = 1; i < this.depth; i++) {
+      path += `.${this.pathSegments[i]}`
+    }
+    return path
   }
 
   protected push(name: string) {
-    this.stackPath.push(name)
+    this.pathSegments[this.depth] = name
+    this.depth++
     this.stackErrors.push(null)
-    this.cachedPath =
-      this.stackPath.length <= 1 ? '' : this.stackPath[1] + (this.stackPath.length > 2 ? '.' + this.stackPath.slice(2).join('.') : '')
   }
 
   protected pop(saveErrors: boolean) {
-    this.stackPath.pop()
+    this.depth--
     const popped = this.stackErrors.pop()
     if (saveErrors && popped !== null && popped !== undefined && popped.length > 0) {
       for (const err of popped) {
         this.error(err.message, err.path, err.details)
       }
     }
-    this.cachedPath =
-      this.stackPath.length <= 1 ? '' : this.stackPath[1] + (this.stackPath.length > 2 ? '.' + this.stackPath.slice(2).join('.') : '')
     return popped
   }
 
   protected clear() {
     this.stackErrors[this.stackErrors.length - 1] = null
+    if (this.limitExceeded) {
+      this.limitExceeded = false
+    }
   }
 
   protected error(message: string, path?: string, details?: TError[]) {
@@ -142,13 +150,16 @@ export class Validator<
       }
     }
     const error: TError = {
-      path: path || this.cachedPath,
+      path: path || this.buildPath(),
       message,
     }
     if (details?.length) {
       error.details = details
     }
     errors.push(error)
+    if (errors.length >= this.opts.errorLimit) {
+      this.limitExceeded = true
+    }
   }
 
   protected throw() {
@@ -168,12 +179,11 @@ export class Validator<
    */
   public validate<TT = DataType>(value: any, safe?: boolean, context?: unknown): value is TT {
     this.errors = []
-    this.stackErrors = []
-    this.stackPath = ['']
-    this.cachedPath = ''
+    this.stackErrors.length = 0
+    this.depth = 0
+    this.limitExceeded = false
     this.context = context
     const passed = this.validateSafe(this.def, value)
-    this.pop(!passed)
     this.context = undefined
     if (!passed) {
       if (safe) {
@@ -185,30 +195,28 @@ export class Validator<
   }
 
   protected validateSafe(def: TAtscriptAnnotatedType, value: any): boolean {
-    if (this.isLimitExceeded()) {
+    if (this.limitExceeded) {
       return false
     }
-    if (!isAnnotatedType(def)) {
-      throw new Error('Can not validate not-annotated type')
-    }
-    if (typeof this.opts.replace === 'function') {
-      def = this.opts.replace(def, this.cachedPath)
+    if (this.hasReplace) {
+      def = this.opts.replace!(def, this.buildPath())
     }
     if (def.optional && (value === undefined || value === null)) {
       return true
     }
-
-    for (const plugin of this.opts.plugins) {
-      const result = plugin(this as unknown as TValidatorPluginContext, def, value)
-      if (result === false || result === true) {
-        return result
+    if (this.hasPlugins) {
+      for (const plugin of this.opts.plugins) {
+        const result = plugin(this as unknown as TValidatorPluginContext, def, value)
+        if (result === false || result === true) {
+          return result
+        }
       }
     }
     return this.validateAnnotatedType(def, value)
   }
 
   protected get path() {
-    return this.cachedPath
+    return this.buildPath()
   }
 
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
@@ -241,25 +249,41 @@ export class Validator<
   }
 
   protected validateUnion(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
-    let i = 0
-    const popped = [] as TError[]
-    for (const item of def.type.items) {
-      this.push(`[${item.type.kind || item.type.designType}(${i})]`)
+    const items = def.type.items
+    let details: TError[] | undefined
+
+    for (const item of items) {
+      // Use stackErrors for error isolation only — no depth/path tracking.
+      // Branch sub-errors get paths relative to the parent (e.g. "payment.number"
+      // instead of "payment.[object(0)].number"), which is cleaner since they're
+      // already grouped in the details array.
+      this.stackErrors.push(null)
+
       if (this.validateSafe(item, value)) {
-        this.pop(false)
+        this.stackErrors.pop()
         return true
       }
-      const errors = this.pop(false)
-      if (errors) {
-        popped.push(...errors)
+
+      const branchErrors = this.stackErrors.pop()
+      // Reset limit flag — discarded branch errors don't count toward the limit
+      if (this.limitExceeded) {
+        this.limitExceeded = false
       }
-      i++
+      if (branchErrors) {
+        if (details) {
+          for (const err of branchErrors) {
+            details.push(err)
+          }
+        } else {
+          details = branchErrors
+        }
+      }
     }
-    this.clear()
-    const expected = def.type.items
-      .map((item, i) => `[${item.type.kind || item.type.designType}(${i})]`)
+
+    const expected = items
+      .map((item, i) => `[${item.type.kind || (item.type as TAtscriptTypeFinal).designType}(${i})]`)
       .join(', ')
-    this.error(`Value does not match any of the allowed types: ${expected}`, undefined, popped)
+    this.error(`Value does not match any of the allowed types: ${expected}`, undefined, details)
     return false
   }
 
@@ -363,7 +387,7 @@ export class Validator<
       if (!this.validateSafe(def.type.of, item)) {
         passed = false
         this.pop(true)
-        if (this.isLimitExceeded()) {
+        if (this.limitExceeded) {
           return false
         }
       } else {
@@ -380,38 +404,35 @@ export class Validator<
       return false
     }
     let passed = true
-    const valueKeys = new Set(Object.keys(value))
-    const typeKeys = new Set()
+    let keysToStrip: string[] | undefined
 
-    // prepare skipList for this object
+    // prepare skipList for this object (rare)
     let skipList: Set<string> | undefined
     if (this.opts.skipList) {
-      const path = this.stackPath.length > 1 ? `${this.cachedPath}.` : ''
+      const path = this.depth > 0 ? `${this.buildPath()}.` : ''
       for (const item of this.opts.skipList) {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
           if (!skipList) { skipList = new Set() }
           skipList.add(key)
-          valueKeys.delete(key)
         }
       }
     }
 
     let partialFunctionMatched = false
     if (typeof this.opts.partial === 'function') {
-      partialFunctionMatched = this.opts.partial(def, this.cachedPath)
+      partialFunctionMatched = this.opts.partial(def, this.buildPath())
     }
 
     for (const [key, item] of def.type.props.entries()) {
       if ((skipList && skipList.has(key)) || isPhantomType(item)) {
         continue
       }
-      typeKeys.add(key)
       if (value[key] === undefined) {
         if (
           partialFunctionMatched ||
           this.opts.partial === 'deep' ||
-          (this.opts.partial === true && this.stackPath.length <= 1)
+          (this.opts.partial === true && this.depth === 0)
         ) {
           continue
         }
@@ -422,24 +443,32 @@ export class Validator<
       } else {
         passed = false
         this.pop(true)
-        if (this.isLimitExceeded()) {
+        if (this.limitExceeded) {
           return false
         }
       }
     }
-    for (const key of valueKeys) {
-      /** matched patterns for unknown keys */
-      if (!typeKeys.has(key)) {
+
+    // Handle unknown props — skip entirely when ignoring and no patterns
+    const hasPatterns = def.type.propsPatterns.length > 0
+    if (this.opts.unknownProps !== 'ignore' || hasPatterns) {
+      const keys = Object.keys(value)
+      for (const key of keys) {
+        if (skipList && skipList.has(key)) {
+          continue
+        }
+        const knownProp = def.type.props.get(key)
+        if (knownProp && !isPhantomType(knownProp)) {
+          continue
+        }
+        // key is unknown
         const matched: typeof def.type.propsPatterns = []
         for (const { pattern, def: propDef } of def.type.propsPatterns) {
-          // check if key matches any pattern
           if (pattern.test(key)) {
             matched.push({ pattern, def: propDef })
           }
         }
         if (matched.length > 0) {
-          // some patterns matched, we have to make sure that
-          // at least one type validation passes
           this.push(key)
           let keyPassed = false
           for (const { def: propDef } of matched) {
@@ -450,30 +479,34 @@ export class Validator<
             this.clear()
           }
           if (!keyPassed) {
-            // no type validations passed, re-validate first to capture error
             this.validateSafe(matched[0].def, value[key])
             this.pop(true)
             passed = false
-            if (this.isLimitExceeded()) {
+            if (this.limitExceeded) {
               return false
             }
           } else {
             this.pop(false)
           }
-        } else if (this.opts.unknownProps !== 'ignore') {
-          // no keys matched, no patterns matched:
-          if (this.opts.unknownProps === 'error') {
-            this.push(key)
-            this.error(`Unexpected property`)
-            this.pop(true)
-            if (this.isLimitExceeded()) {
-              return false
-            }
-            passed = false
-          } else if (this.opts.unknownProps === 'strip') {
-            delete value[key]
+        } else if (this.opts.unknownProps === 'error') {
+          this.push(key)
+          this.error(`Unexpected property`)
+          this.pop(true)
+          if (this.limitExceeded) {
+            return false
           }
+          passed = false
+        } else if (this.opts.unknownProps === 'strip') {
+          if (!keysToStrip) {
+            keysToStrip = []
+          }
+          keysToStrip.push(key)
         }
+      }
+    }
+    if (passed && keysToStrip) {
+      for (const key of keysToStrip) {
+        delete value[key]
       }
     }
     return passed
@@ -551,6 +584,9 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: string
   ): boolean {
+    if (def.metadata.size === 0) {
+      return true
+    }
     const filled = def.metadata.get('meta.required')
     if (filled) {
       if (value.trim().length === 0) {
@@ -610,6 +646,9 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: number
   ): boolean {
+    if (def.metadata.size === 0) {
+      return true
+    }
     const int = def.metadata.get('expect.int') as boolean | { message?: string }
     if (int && value % 1 !== 0) {
       const message =
@@ -648,6 +687,9 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: boolean
   ): boolean {
+    if (def.metadata.size === 0) {
+      return true
+    }
     const filled = def.metadata.get('meta.required')
     if (filled) {
       if (value !== true) {

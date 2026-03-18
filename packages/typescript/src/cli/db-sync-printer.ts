@@ -1,4 +1,4 @@
-import type { TSyncPlan, TSyncResult, TSyncColors, SyncEntry } from '@atscripthttps://db.atscript.dev/sync'
+import type { TSyncPlan, TSyncResult, TSyncColors, SyncEntry } from '@atscript/db/sync'
 
 // ── Dye colors ──────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ const BANNER = DYE_COLORS.cyan(`
 const PLAN_HEADER = [
   '',
   DYE_COLORS.bold('╔══════════════════════════════════════╗'),
-  DYE_COLORS.bold('║        Schema Sync Plan              ║'),
+  DYE_COLORS.bold('║           Schema Sync Plan           ║'),
   DYE_COLORS.bold('╚══════════════════════════════════════╝'),
   '',
 ]
