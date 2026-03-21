@@ -1,3 +1,12 @@
+## [0.1.42](https://github.com/moostjs/atscript/compare/v0.1.41...v0.1.42) (2026-03-21)
+
+
+### Performance Improvements
+
+* cache replace results in Validator and simplify build script ([216aaa9](https://github.com/moostjs/atscript/commit/216aaa9c49d9d09eac397b4f6fc98f687c96be61))
+
+
+
 ## [0.1.41](https://github.com/moostjs/atscript/compare/v0.1.40...v0.1.41) (2026-03-18)
 
 
