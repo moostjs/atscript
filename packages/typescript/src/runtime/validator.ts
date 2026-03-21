@@ -80,6 +80,7 @@ export class Validator<
   protected opts: TValidatorOptions
   protected hasPlugins: boolean
   protected hasReplace: boolean
+  private replaceCache?: WeakMap<TAtscriptAnnotatedType, TAtscriptAnnotatedType>
 
   constructor(
     protected readonly def: T,
@@ -94,6 +95,9 @@ export class Validator<
     }
     this.hasPlugins = this.opts.plugins.length > 0
     this.hasReplace = typeof this.opts.replace === 'function'
+    if (this.hasReplace) {
+      this.replaceCache = new WeakMap()
+    }
   }
 
   /** Validation errors collected during the last {@link validate} call. */
@@ -199,7 +203,12 @@ export class Validator<
       return false
     }
     if (this.hasReplace) {
-      def = this.opts.replace!(def, this.buildPath())
+      let replaced = this.replaceCache!.get(def)
+      if (replaced === undefined) {
+        replaced = this.opts.replace!(def, this.buildPath())
+        this.replaceCache!.set(def, replaced)
+      }
+      def = replaced
     }
     if (def.optional && (value === undefined || value === null)) {
       return true
