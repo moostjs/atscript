@@ -260,14 +260,14 @@ export class AtscriptDoc {
         }
       }
     } else {
-      let severity: 0 | 1 | 2 = 0
+      let severity: 0 | 1 | 2 = 1
       switch (this.config.unknownAnnotation) {
         case 'warn': {
           severity = 2
           break
         }
-        case 'error': {
-          severity = 1
+        case 'allow': {
+          severity = 0
           break
         }
         default:
