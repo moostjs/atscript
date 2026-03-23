@@ -78,27 +78,7 @@ If the field already reads naturally as `string.email` or `number.int.positive`,
 
 ## `@ui.*`: UI-Facing Hints
 
-Use `@ui.*` when the model should carry hints that UI tooling can read later.
-
-```atscript
-export interface ProfileForm {
-    @meta.label 'Biography'
-    @ui.placeholder 'Tell us about yourself'
-    @ui.type 'textarea'
-    bio?: string
-}
-```
-
-Common examples:
-
-- `@ui.placeholder`
-- `@ui.type`
-- `@ui.hint`
-- `@ui.group`
-- `@ui.order`
-- `@ui.hidden`
-
-These annotations do not generate UI by themselves. They keep the UI-relevant metadata on the model so tools can read it later.
+`@ui.*` annotations are provided by the [`@atscript/ui`](https://ui.atscript.dev) package. Install the `@atscript/ui/plugin` to register them in your project. See the [Atscript UI documentation](https://ui.atscript.dev) for the full annotation reference.
 
 ## Reuse Annotations Through Named Types
 
