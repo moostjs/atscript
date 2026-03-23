@@ -1,3 +1,12 @@
+## [0.1.45](https://github.com/moostjs/atscript/compare/v0.1.44...v0.1.45) (2026-03-23)
+
+
+### Bug Fixes
+
+* default unknownAnnotation to error instead of allow ([26579cd](https://github.com/moostjs/atscript/commit/26579cd138c05e1ff6746da8637a0082a241e6fc))
+
+
+
 ## [0.1.44](https://github.com/moostjs/atscript/compare/v0.1.43...v0.1.44) (2026-03-22)
 
 
