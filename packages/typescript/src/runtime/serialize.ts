@@ -13,7 +13,7 @@ import type { Validator } from './validator'
 // ---------------------------------------------------------------------------
 
 /** Current serialization format version. Bumped on breaking changes to the serialized shape. */
-export const SERIALIZE_VERSION = 1
+export const SERIALIZE_VERSION = 2
 
 /** Top-level serialized annotated type. JSON-safe representation of a {@link TAtscriptAnnotatedType}. */
 export interface TSerializedAnnotatedType extends TSerializedAnnotatedTypeInner {
@@ -27,6 +27,8 @@ export interface TSerializedAnnotatedTypeInner {
   metadata: Record<string, unknown>
   optional?: boolean
   id?: string
+  /** FK reference — present when serialized with `refDepth > 0` */
+  ref?: { type: TSerializedAnnotatedTypeInner; field: string }
 }
 
 export interface TSerializedTypeFinal {
@@ -99,6 +101,14 @@ export interface TSerializeOptions {
   processAnnotation?: (
     ctx: TProcessAnnotationContext
   ) => { key: string; value: unknown } | undefined | void
+
+  /**
+   * How many levels of `.ref` (FK references) to expand during serialization.
+   * - `0` (default): refs are stripped (backward-compatible)
+   * - `1`: immediate refs are serialized, but refs inside referenced types are stripped
+   * - `2+`: deeper expansion
+   */
+  refDepth?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +169,18 @@ function serializeNode(
   if (def.id) {
     result.id = def.id
   }
+
+  const refDepth = options?.refDepth ?? 0
+  if (refDepth > 0 && def.ref) {
+    const refTarget = def.ref.type()
+    if (refTarget) {
+      result.ref = {
+        type: serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
+        field: def.ref.field,
+      }
+    }
+  }
+
   return result
 }
 
@@ -296,22 +318,67 @@ export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscr
       `Unsupported serialized type version: ${data.$v} (expected ${SERIALIZE_VERSION})`
     )
   }
-  return deserializeNode(data)
+  const resolved = new Map<string, TAtscriptAnnotatedType>()
+  return deserializeNode(data, resolved)
 }
 
-function deserializeNode(data: TSerializedAnnotatedTypeInner): TAtscriptAnnotatedType {
-  const metadata = new Map(Object.entries(data.metadata)) as TMetadataMap<AtscriptMetadata>
-  const type = deserializeTypeDef(data.type)
+function deserializeNode(
+  data: TSerializedAnnotatedTypeInner,
+  resolved: Map<string, TAtscriptAnnotatedType>
+): TAtscriptAnnotatedType {
+  if (data.type.kind === '$ref') {
+    const refId = (data.type as TSerializedTypeRef).id
+    return resolved.get(refId) || createAnnotatedTypeNode(
+      { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef,
+      new Map() as TMetadataMap<AtscriptMetadata>,
+      { id: refId }
+    )
+  }
 
-  const result = createAnnotatedTypeNode(type, metadata, {
+  const metadata = new Map(Object.entries(data.metadata)) as TMetadataMap<AtscriptMetadata>
+
+  // Register placeholder before recursing to break cycles
+  let result: TAtscriptAnnotatedType | undefined
+  if (data.id) {
+    const existing = resolved.get(data.id)
+    if (existing) {
+      return existing
+    }
+    result = createAnnotatedTypeNode(
+      { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef,
+      metadata,
+      { optional: data.optional || undefined, id: data.id }
+    )
+    resolved.set(data.id, result)
+  }
+
+  const type = deserializeTypeDef(data.type, resolved)
+
+  let ref: { type: () => TAtscriptAnnotatedType; field: string } | undefined
+  if (data.ref) {
+    const deserializedRefTarget = deserializeNode(data.ref.type, resolved)
+    ref = { type: () => deserializedRefTarget, field: data.ref.field }
+  }
+
+  if (result) {
+    result.type = type
+    if (ref) {
+      result.ref = ref
+    }
+    return result
+  }
+
+  return createAnnotatedTypeNode(type, metadata, {
     optional: data.optional || undefined,
     id: data.id || undefined,
+    ref,
   })
-
-  return result
 }
 
-function deserializeTypeDef(t: TSerializedTypeDef): TAtscriptTypeDef {
+function deserializeTypeDef(
+  t: TSerializedTypeDef,
+  resolved: Map<string, TAtscriptAnnotatedType>
+): TAtscriptTypeDef {
   const tags = ('tags' in t ? new Set(t.tags) : new Set()) as Set<AtscriptPrimitiveTags>
 
   switch (t.kind) {
@@ -329,28 +396,32 @@ function deserializeTypeDef(t: TSerializedTypeDef): TAtscriptTypeDef {
     case 'object': {
       const props = new Map<string, TAtscriptAnnotatedType>()
       for (const [key, val] of Object.entries(t.props)) {
-        props.set(key, deserializeNode(val))
+        props.set(key, deserializeNode(val, resolved))
       }
       const propsPatterns = t.propsPatterns.map(pp => ({
         pattern: new RegExp(pp.pattern.source, pp.pattern.flags),
-        def: deserializeNode(pp.def),
+        def: deserializeNode(pp.def, resolved),
       }))
       return { kind: 'object', props, propsPatterns, tags }
     }
     case 'array': {
-      return { kind: 'array', of: deserializeNode(t.of), tags }
+      return { kind: 'array', of: deserializeNode(t.of, resolved), tags }
     }
     case 'union':
     case 'intersection':
     case 'tuple': {
       return {
         kind: t.kind,
-        items: t.items.map(item => deserializeNode(item)),
+        items: t.items.map(item => deserializeNode(item, resolved)),
         tags,
       }
     }
     case '$ref': {
-      // Circular reference — return a minimal placeholder
+      // Defensive fallback — $ref is normally handled in deserializeNode
+      const existing = resolved.get(t.id)
+      if (existing) {
+        return existing.type
+      }
       return { kind: 'object', props: new Map(), propsPatterns: [], tags }
     }
     default: {

@@ -674,3 +674,233 @@ describe('phantom type serialization', () => {
     expect(asFinal(info).tags.has('ui')).toBe(true)
   })
 })
+
+// ---------------------------------------------------------------------------
+// $ref resolution
+// ---------------------------------------------------------------------------
+
+describe('$ref resolution', () => {
+  it('should resolve $ref for recursive type (tree node)', () => {
+    // Build a self-referential type: TreeNode { value: string, children: TreeNode[] }
+    const handle = defineAnnotatedType('object').id('TreeNode')
+    handle.prop('value', defineAnnotatedType().designType('string').$type)
+    // children is an array of TreeNode — creates a cycle
+    handle.prop('children', defineAnnotatedType('array').of(handle.$type).$type)
+
+    const serialized = serializeAnnotatedType(handle.$type)
+    const restored = deserializeAnnotatedType(serialized)
+
+    expect(restored.type.kind).toBe('object')
+    const obj = asObject(restored)
+    expect(asFinal(obj.props.get('value')!).designType).toBe('string')
+
+    // children should be an array whose element is the TreeNode itself
+    const children = obj.props.get('children')!
+    expect(children.type.kind).toBe('array')
+    const childOf = asArray(children).of
+    // The $ref should resolve back to the same TreeNode node
+    expect(childOf).toBe(restored)
+  })
+
+  it('should resolve $ref for shared named type in union', () => {
+    // Shared type appears in two branches of a union
+    const shared = defineAnnotatedType('object')
+      .id('Shared')
+      .prop('x', defineAnnotatedType().designType('number').$type).$type
+
+    const root = defineAnnotatedType('object')
+      .prop('a', shared)
+      .prop('b', defineAnnotatedType('union').item(shared).item(defineAnnotatedType().designType('null').$type).$type)
+      .$type
+
+    const serialized = serializeAnnotatedType(root)
+    const restored = deserializeAnnotatedType(serialized)
+
+    const obj = asObject(restored)
+    const a = obj.props.get('a')!
+    const bUnion = asComplex(obj.props.get('b')!)
+    // Both references should resolve to the same object
+    expect(bUnion.items[0]).toBe(a)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// ref (FK reference) serialization
+// ---------------------------------------------------------------------------
+
+describe('ref serialization', () => {
+  it('should strip refs by default (refDepth 0)', () => {
+    const target = defineAnnotatedType('object')
+      .id('Target')
+      .prop('id', defineAnnotatedType().designType('string').$type).$type
+
+    const source = defineAnnotatedType('object')
+      .prop('targetId', defineAnnotatedType().refTo(target, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(source)
+    const serializedObj = serialized.type as TSerializedTypeObject
+    expect(serializedObj.props.targetId.ref).toBeUndefined()
+
+    const restored = deserializeAnnotatedType(serialized)
+    const restoredProp = asObject(restored).props.get('targetId')!
+    expect(restoredProp.ref).toBeUndefined()
+  })
+
+  it('should serialize FK ref with refDepth 1', () => {
+    const target = defineAnnotatedType('object')
+      .id('TargetTable')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .prop('name', defineAnnotatedType().designType('string').$type)
+      .annotate('meta.label', 'Target').$type
+
+    const source = defineAnnotatedType('object')
+      .prop('targetId', defineAnnotatedType().refTo(target, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(source, { refDepth: 1 })
+    const serializedObj = serialized.type as TSerializedTypeObject
+    const serializedRef = serializedObj.props.targetId.ref
+    expect(serializedRef).toBeDefined()
+    expect(serializedRef!.field).toBe('id')
+    expect(serializedRef!.type.metadata).toHaveProperty('meta.label', 'Target')
+
+    const restored = deserializeAnnotatedType(serialized)
+    const restoredProp = asObject(restored).props.get('targetId')!
+    expect(restoredProp.ref).toBeDefined()
+    expect(restoredProp.ref!.field).toBe('id')
+    const refTarget = restoredProp.ref!.type()
+    expect(refTarget.type.kind).toBe('object')
+    expect(refTarget.metadata.get('meta.label')).toBe('Target')
+    expect(asObject(refTarget).props.has('name')).toBe(true)
+  })
+
+  it('should not expand target refs at refDepth 1', () => {
+    // A -> ref to B -> ref to C
+    const typeC = defineAnnotatedType('object')
+      .id('TypeC')
+      .prop('id', defineAnnotatedType().designType('string').$type).$type
+
+    const typeB = defineAnnotatedType('object')
+      .id('TypeB')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
+
+    const typeA = defineAnnotatedType('object')
+      .prop('bId', defineAnnotatedType().refTo(typeB, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(typeA, { refDepth: 1 })
+    const serializedObj = serialized.type as TSerializedTypeObject
+
+    // A's ref to B should be present
+    expect(serializedObj.props.bId.ref).toBeDefined()
+    expect(serializedObj.props.bId.ref!.field).toBe('id')
+
+    // B's ref to C should NOT be present (depth exhausted)
+    const serializedB = serializedObj.props.bId.ref!.type
+    const serializedBObj = serializedB.type as TSerializedTypeObject
+    expect(serializedBObj.props.cId.ref).toBeUndefined()
+  })
+
+  it('should expand two levels with refDepth 2', () => {
+    const typeC = defineAnnotatedType('object')
+      .id('TypeC2')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .annotate('meta.label', 'C').$type
+
+    const typeB = defineAnnotatedType('object')
+      .id('TypeB2')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
+
+    const typeA = defineAnnotatedType('object')
+      .prop('bId', defineAnnotatedType().refTo(typeB, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(typeA, { refDepth: 2 })
+    const serializedObj = serialized.type as TSerializedTypeObject
+
+    // A -> B
+    expect(serializedObj.props.bId.ref).toBeDefined()
+    const serializedB = serializedObj.props.bId.ref!.type
+    const serializedBObj = serializedB.type as TSerializedTypeObject
+    // B -> C
+    expect(serializedBObj.props.cId.ref).toBeDefined()
+    expect(serializedBObj.props.cId.ref!.field).toBe('id')
+    expect(serializedBObj.props.cId.ref!.type.metadata).toHaveProperty('meta.label', 'C')
+  })
+
+  it('should handle self-referential FK via $ref', () => {
+    // Employee has a managerId FK pointing to Employee itself
+    const employee = defineAnnotatedType('object')
+      .id('Employee')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .prop('name', defineAnnotatedType().designType('string').$type)
+
+    employee.prop('managerId', defineAnnotatedType().refTo(employee.$type, ['id']).$type)
+
+    const serialized = serializeAnnotatedType(employee.$type, { refDepth: 1 })
+    const serializedObj = serialized.type as TSerializedTypeObject
+
+    // managerId.ref should exist, and its type should be a $ref to Employee
+    const managerRef = serializedObj.props.managerId.ref
+    expect(managerRef).toBeDefined()
+    expect(managerRef!.field).toBe('id')
+    expect(managerRef!.type.type.kind).toBe('$ref')
+
+    // Deserialization should resolve the $ref back to the Employee node
+    const restored = deserializeAnnotatedType(serialized)
+    const restoredObj = asObject(restored)
+    const managerProp = restoredObj.props.get('managerId')!
+    expect(managerProp.ref).toBeDefined()
+    expect(managerProp.ref!.type()).toBe(restored)
+  })
+
+  it('should apply processAnnotation to ref target metadata', () => {
+    const target = defineAnnotatedType('object')
+      .id('RefTarget')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .annotate('meta.label', 'Original Label')
+      .annotate('meta.description', 'secret').$type
+
+    const source = defineAnnotatedType('object')
+      .prop('fk', defineAnnotatedType().refTo(target, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(source, {
+      refDepth: 1,
+      processAnnotation(ctx) {
+        if (ctx.key === 'meta.label') {
+          return { key: 'label', value: ctx.value }
+        }
+        if (ctx.key === 'meta.description') {
+          return undefined
+        }
+        return { key: ctx.key, value: ctx.value }
+      },
+    })
+
+    const serializedObj = serialized.type as TSerializedTypeObject
+    const refMeta = serializedObj.props.fk.ref!.type.metadata
+    // meta.label should be renamed to label
+    expect(refMeta).toHaveProperty('label', 'Original Label')
+    // meta.description should be stripped
+    expect(refMeta).not.toHaveProperty('meta.description')
+  })
+
+  it('should survive full JSON round-trip with refs', () => {
+    const target = defineAnnotatedType('object')
+      .id('JsonTarget')
+      .prop('id', defineAnnotatedType().designType('string').$type)
+      .annotate('meta.label', 'My Target').$type
+
+    const source = defineAnnotatedType('object')
+      .prop('fk', defineAnnotatedType().refTo(target, ['id']).$type).$type
+
+    const serialized = serializeAnnotatedType(source, { refDepth: 1 })
+    const json = JSON.stringify(serialized)
+    const parsed = JSON.parse(json)
+    const restored = deserializeAnnotatedType(parsed)
+
+    const fk = asObject(restored).props.get('fk')!
+    expect(fk.ref).toBeDefined()
+    expect(fk.ref!.field).toBe('id')
+    expect(fk.ref!.type().metadata.get('meta.label')).toBe('My Target')
+  })
+})
