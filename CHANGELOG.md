@@ -1,3 +1,12 @@
+## [0.1.46](https://github.com/moostjs/atscript/compare/v0.1.45...v0.1.46) (2026-03-24)
+
+
+### Features
+
+* lossless serialization — fix $ref resolution and add refDepth option for FK refs ([61c6f3e](https://github.com/moostjs/atscript/commit/61c6f3eb714a14c46d0108d25a445ce979dc7928))
+
+
+
 ## [0.1.45](https://github.com/moostjs/atscript/compare/v0.1.44...v0.1.45) (2026-03-23)
 
 
