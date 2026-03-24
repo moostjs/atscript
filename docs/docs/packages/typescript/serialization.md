@@ -45,12 +45,28 @@ A deserialized type is a fully functional `TAtscriptAnnotatedType`:
 
 ## Versioning
 
-The serialized output includes a `$v` field with the format version (currently `1`). If the format changes in a future release, `deserializeAnnotatedType()` will throw when it encounters an incompatible version, so you know to re-serialize from the source types.
+The serialized output includes a `$v` field with the format version (currently `2`). If the format changes in a future release, `deserializeAnnotatedType()` will throw when it encounters an incompatible version, so you know to re-serialize from the source types.
 
 ```typescript
 import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
-// SERIALIZE_VERSION === 1
+// SERIALIZE_VERSION === 2
 ```
+
+## FK References
+
+By default, FK references (`.ref`) are stripped during serialization. Use the `refDepth` option to include them — this is useful when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields).
+
+```typescript
+const serialized = serializeAnnotatedType(Order, {
+  refDepth: 1, // include immediate FK refs
+})
+```
+
+- `0` (default) — refs are stripped (backward-compatible)
+- `1` — immediate refs are serialized, but refs inside referenced types are stripped
+- `2+` — deeper expansion
+
+Self-referential FKs (e.g., `Employee.managerId → Employee`) are handled automatically via `$ref` resolution.
 
 ## Filtering Annotations
 

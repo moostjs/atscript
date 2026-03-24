@@ -213,6 +213,9 @@ serializeAnnotatedType(User, {
     if (ctx.key.startsWith('mongo.')) return undefined
     return { key: ctx.key, value: ctx.value }
   },
+
+  // Include FK references (0 = strip, 1 = immediate refs, 2+ = deeper)
+  refDepth: 1,
 })
 ```
 
@@ -236,7 +239,7 @@ Throws if the serialized version doesn't match `SERIALIZE_VERSION`. The `id` fie
 
 ### `SERIALIZE_VERSION`
 
-Current serialization format version (currently `1`). Used for forward compatibility:
+Current serialization format version (currently `2`). Used for forward compatibility:
 
 ```ts
 import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
