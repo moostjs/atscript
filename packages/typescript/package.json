@@ -67,11 +67,11 @@
   },
   "devDependencies": {
     "vitest": "3.2.4",
-    "@atscript/db": "^0.1.41"
+    "@atscript/db": "^0.1.48"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/db": "^0.1.41"
+    "@atscript/db": "^0.1.48"
   },
   "peerDependenciesMeta": {
     "@atscript/db": {
