@@ -62,8 +62,8 @@
     "setup-skills": "node ./scripts/setup-skills.js"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.6.6",
-    "moost": "^0.6.6"
+    "@moostjs/event-cli": "^0.6.7",
+    "moost": "^0.6.7"
   },
   "devDependencies": {
     "vitest": "3.2.4",
