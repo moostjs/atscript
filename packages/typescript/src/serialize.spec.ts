@@ -903,4 +903,29 @@ describe('ref serialization', () => {
     expect(fk.ref!.field).toBe('id')
     expect(fk.ref!.type().metadata.get('meta.label')).toBe('My Target')
   })
+
+  // Regression guard: primitive `string.email` (and any pattern-carrying semantic type)
+  // stores its regex source with real backslash bytes. JSON.stringify must double-escape
+  // them so downstream JSON.parse succeeds. Previously asserted by a bug report against
+  // `serializeFormSchema` (which is a pure delegate to serializeAnnotatedType).
+  it('emits JSON-safe backslash escapes for regex-bearing metadata', () => {
+    const EMAIL_REGEX = '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$'
+    const source = defineAnnotatedType('object').prop(
+      'email',
+      defineAnnotatedType()
+        .designType('string')
+        .annotate(
+          'expect.pattern',
+          { pattern: EMAIL_REGEX, flags: '', message: 'Invalid email format.' },
+          true
+        ).$type
+    ).$type
+
+    const body = JSON.stringify(serializeAnnotatedType(source))
+    expect(() => JSON.parse(body)).not.toThrow()
+    const parsed = JSON.parse(body) as {
+      type: { props: { email: { metadata: { 'expect.pattern': Array<{ pattern: string }> } } } }
+    }
+    expect(parsed.type.props.email.metadata['expect.pattern'][0].pattern).toBe(EMAIL_REGEX)
+  })
 })
