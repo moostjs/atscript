@@ -1,5 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import path from 'path'
 
+import { build } from '@atscript/core'
+import { beforeAll, describe, it, expect } from 'vitest'
+
+import { tsPlugin } from './plugin'
 import {
   defineAnnotatedType,
   isAnnotatedType,
@@ -13,10 +18,31 @@ import {
   serializeAnnotatedType,
   deserializeAnnotatedType,
   SERIALIZE_VERSION,
+  type TSerializedAnnotatedTypeInner,
   type TSerializedTypeObject,
   type TSerializedTypeFinal,
 } from './runtime/serialize'
 import { Validator } from './runtime/validator'
+
+const fixturesDir = path.join(path.dirname(import.meta.url.slice(7)), '../test/fixtures')
+
+async function prepareFractionalRefFixtures() {
+  const repo = await build({
+    rootDir: fixturesDir,
+    entries: ['fractional-ref.as'],
+    plugins: [tsPlugin()],
+  })
+  const [outJs, outDts] = await Promise.all([
+    repo.generate({ outDir: '.', format: 'js' }),
+    repo.generate({ outDir: '.', format: 'dts' }),
+  ])
+  for (const file of [...outJs, ...outDts]) {
+    const target = file.target ?? path.join(fixturesDir, file.fileName)
+    if (!existsSync(target) || readFileSync(target, 'utf8') !== file.content) {
+      writeFileSync(target, file.content)
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -169,7 +195,9 @@ describe('serialize round-trip', () => {
       .tags('string', 'email', 'uuid').$type
     const serialized = serializeAnnotatedType(original)
     expect(serialized.type.kind).not.toBe('$ref')
-    if (serialized.type.kind === '$ref') { throw new Error('unreachable') }
+    if (serialized.type.kind === '$ref') {
+      throw new Error('unreachable')
+    }
     expect(Array.isArray(serialized.type.tags)).toBe(true)
     expect(serialized.type.tags).toContain('email')
 
@@ -710,8 +738,12 @@ describe('$ref resolution', () => {
 
     const root = defineAnnotatedType('object')
       .prop('a', shared)
-      .prop('b', defineAnnotatedType('union').item(shared).item(defineAnnotatedType().designType('null').$type).$type)
-      .$type
+      .prop(
+        'b',
+        defineAnnotatedType('union')
+          .item(shared)
+          .item(defineAnnotatedType().designType('null').$type).$type
+      ).$type
 
     const serialized = serializeAnnotatedType(root)
     const restored = deserializeAnnotatedType(serialized)
@@ -734,8 +766,10 @@ describe('ref serialization', () => {
       .id('Target')
       .prop('id', defineAnnotatedType().designType('string').$type).$type
 
-    const source = defineAnnotatedType('object')
-      .prop('targetId', defineAnnotatedType().refTo(target, ['id']).$type).$type
+    const source = defineAnnotatedType('object').prop(
+      'targetId',
+      defineAnnotatedType().refTo(target, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(source)
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -753,8 +787,10 @@ describe('ref serialization', () => {
       .prop('name', defineAnnotatedType().designType('string').$type)
       .annotate('meta.label', 'Target').$type
 
-    const source = defineAnnotatedType('object')
-      .prop('targetId', defineAnnotatedType().refTo(target, ['id']).$type).$type
+    const source = defineAnnotatedType('object').prop(
+      'targetId',
+      defineAnnotatedType().refTo(target, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(source, { refDepth: 1 })
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -784,8 +820,10 @@ describe('ref serialization', () => {
       .prop('id', defineAnnotatedType().designType('string').$type)
       .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
 
-    const typeA = defineAnnotatedType('object')
-      .prop('bId', defineAnnotatedType().refTo(typeB, ['id']).$type).$type
+    const typeA = defineAnnotatedType('object').prop(
+      'bId',
+      defineAnnotatedType().refTo(typeB, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(typeA, { refDepth: 1 })
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -795,7 +833,7 @@ describe('ref serialization', () => {
     expect(serializedObj.props.bId.ref!.field).toBe('id')
 
     // B's ref to C should NOT be present (depth exhausted)
-    const serializedB = serializedObj.props.bId.ref!.type
+    const serializedB = serializedObj.props.bId.ref!.type as TSerializedAnnotatedTypeInner
     const serializedBObj = serializedB.type as TSerializedTypeObject
     expect(serializedBObj.props.cId.ref).toBeUndefined()
   })
@@ -811,15 +849,17 @@ describe('ref serialization', () => {
       .prop('id', defineAnnotatedType().designType('string').$type)
       .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
 
-    const typeA = defineAnnotatedType('object')
-      .prop('bId', defineAnnotatedType().refTo(typeB, ['id']).$type).$type
+    const typeA = defineAnnotatedType('object').prop(
+      'bId',
+      defineAnnotatedType().refTo(typeB, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(typeA, { refDepth: 2 })
     const serializedObj = serialized.type as TSerializedTypeObject
 
     // A -> B
     expect(serializedObj.props.bId.ref).toBeDefined()
-    const serializedB = serializedObj.props.bId.ref!.type
+    const serializedB = serializedObj.props.bId.ref!.type as TSerializedAnnotatedTypeInner
     const serializedBObj = serializedB.type as TSerializedTypeObject
     // B -> C
     expect(serializedBObj.props.cId.ref).toBeDefined()
@@ -843,7 +883,8 @@ describe('ref serialization', () => {
     const managerRef = serializedObj.props.managerId.ref
     expect(managerRef).toBeDefined()
     expect(managerRef!.field).toBe('id')
-    expect(managerRef!.type.type.kind).toBe('$ref')
+    const managerRefTarget = managerRef!.type as TSerializedAnnotatedTypeInner
+    expect(managerRefTarget.type.kind).toBe('$ref')
 
     // Deserialization should resolve the $ref back to the Employee node
     const restored = deserializeAnnotatedType(serialized)
@@ -860,8 +901,10 @@ describe('ref serialization', () => {
       .annotate('meta.label', 'Original Label')
       .annotate('meta.description', 'secret').$type
 
-    const source = defineAnnotatedType('object')
-      .prop('fk', defineAnnotatedType().refTo(target, ['id']).$type).$type
+    const source = defineAnnotatedType('object').prop(
+      'fk',
+      defineAnnotatedType().refTo(target, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(source, {
       refDepth: 1,
@@ -890,8 +933,10 @@ describe('ref serialization', () => {
       .prop('id', defineAnnotatedType().designType('string').$type)
       .annotate('meta.label', 'My Target').$type
 
-    const source = defineAnnotatedType('object')
-      .prop('fk', defineAnnotatedType().refTo(target, ['id']).$type).$type
+    const source = defineAnnotatedType('object').prop(
+      'fk',
+      defineAnnotatedType().refTo(target, ['id']).$type
+    ).$type
 
     const serialized = serializeAnnotatedType(source, { refDepth: 1 })
     const json = JSON.stringify(serialized)
@@ -927,5 +972,145 @@ describe('ref serialization', () => {
       type: { props: { email: { metadata: { 'expect.pattern': Array<{ pattern: string }> } } } }
     }
     expect(parsed.type.props.email.metadata['expect.pattern'][0].pattern).toBe(EMAIL_REGEX)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// fractional refDepth (shallow ref target: { id, metadata } only)
+// ---------------------------------------------------------------------------
+
+describe('fractional refDepth', () => {
+  beforeAll(prepareFractionalRefFixtures)
+
+  it('refDepth 0.5 on a field with a single FK emits the exact shallow shape', async () => {
+    const { FractionalSourceRoles } = await import('../test/fixtures/fractional-ref.as')
+    const serialized = serializeAnnotatedType(
+      FractionalSourceRoles as unknown as TAtscriptAnnotatedType,
+      { refDepth: 0.5 }
+    )
+    const serializedObj = serialized.type as TSerializedTypeObject
+    const ref = serializedObj.props.roleId.ref
+
+    expect(ref).toEqual({
+      field: 'id',
+      type: {
+        id: 'FractionalRolesTable',
+        metadata: { 'meta.label': 'Roles', 'meta.description': '/api/db/tables/roles' },
+      },
+    })
+
+    // Structural body intentionally omitted
+    expect(ref!.type).not.toHaveProperty('type')
+    expect(ref!.type).not.toHaveProperty('optional')
+    expect(ref!.type).not.toHaveProperty('ref')
+  })
+
+  it('refDepth 0.5 on a target with empty metadata emits { id, metadata: {} }', async () => {
+    const { FractionalSourceBarren } = await import('../test/fixtures/fractional-ref.as')
+    const serialized = serializeAnnotatedType(
+      FractionalSourceBarren as unknown as TAtscriptAnnotatedType,
+      { refDepth: 0.5 }
+    )
+    const serializedObj = serialized.type as TSerializedTypeObject
+    const ref = serializedObj.props.barrenId.ref
+
+    expect(ref).toEqual({
+      field: 'id',
+      type: { id: 'FractionalBarrenTable', metadata: {} },
+    })
+    expect(ref!.type).not.toHaveProperty('type')
+  })
+
+  it('refDepth 1.5 emits one full level then shallow at the next', async () => {
+    const { FractionalSourceNested } = await import('../test/fixtures/fractional-ref.as')
+    const serialized = serializeAnnotatedType(
+      FractionalSourceNested as unknown as TAtscriptAnnotatedType,
+      { refDepth: 1.5 }
+    )
+    const serializedObj = serialized.type as TSerializedTypeObject
+
+    // fieldA: full target1 body
+    const aRef = serializedObj.props.fieldA.ref
+    expect(aRef).toBeDefined()
+    const aTarget = aRef!.type as TSerializedAnnotatedTypeInner
+    expect(aTarget.type).toBeDefined()
+    expect(aTarget.type.kind).toBe('object')
+    expect(aTarget.metadata).toHaveProperty('meta.label', 'T1')
+
+    // fieldB inside target1: shallow target2
+    const aTargetObj = aTarget.type as TSerializedTypeObject
+    const bRef = aTargetObj.props.fieldB.ref
+    expect(bRef).toBeDefined()
+    expect(bRef!.type).toEqual({
+      id: 'FractionalTarget2',
+      metadata: { 'meta.label': 'T2' },
+    })
+    expect(bRef!.type).not.toHaveProperty('type')
+  })
+
+  it('integer refDepth 0 and 1 outputs are byte-for-byte identical to the pre-change baseline', async () => {
+    const { FractionalSourceBaseline } = await import('../test/fixtures/fractional-ref.as')
+    const source = FractionalSourceBaseline as unknown as TAtscriptAnnotatedType
+
+    // Baseline for refDepth: 0 — refs entirely stripped.
+    const serialized0 = serializeAnnotatedType(source, { refDepth: 0 })
+    expect((serialized0.type as TSerializedTypeObject).props.fk.ref).toBeUndefined()
+    expect((serialized0.type as TSerializedTypeObject).props.fk.type).toEqual({
+      kind: '',
+      designType: 'string',
+      tags: ['string'],
+    })
+
+    // Baseline for refDepth: 1 — ref present with full target body, unchanged shape.
+    const serialized1 = serializeAnnotatedType(source, { refDepth: 1 })
+    const fkAtDepth1 = (serialized1.type as TSerializedTypeObject).props.fk
+    expect(fkAtDepth1.ref).toBeDefined()
+    const targetInner = fkAtDepth1.ref!.type as TSerializedAnnotatedTypeInner
+    // Full shape has id + type body + metadata
+    expect(targetInner.id).toBe('FractionalBaselineTarget')
+    expect(targetInner.type).toBeDefined()
+    expect(targetInner.type.kind).toBe('object')
+    expect(targetInner.metadata).toEqual({ 'meta.label': 'Target' })
+    // Target body preserves props (regression guard — integer path unchanged)
+    const targetObj = targetInner.type as TSerializedTypeObject
+    expect(Object.keys(targetObj.props).sort()).toEqual(['id', 'name'])
+  })
+
+  it('deserialize round-trip of a shallow-ref payload preserves field and target metadata', async () => {
+    const { FractionalSourceShallow } = await import('../test/fixtures/fractional-ref.as')
+    const source = FractionalSourceShallow as unknown as TAtscriptAnnotatedType
+
+    const serialized = serializeAnnotatedType(source, { refDepth: 0.5 })
+    const restored = deserializeAnnotatedType(serialized)
+
+    const fk = (restored.type as TAtscriptTypeObject).props.get('fk')!
+    expect(fk.ref).toBeDefined()
+    expect(fk.ref!.field).toBe('id')
+
+    const refTarget = fk.ref!.type()
+    expect(refTarget.id).toBe('FractionalShallowTarget')
+    expect(refTarget.metadata.get('meta.label')).toBe('Shallow')
+    expect(refTarget.metadata.get('meta.description')).toBe('/api/db/tables/shallow')
+
+    // Re-serializing the deserialized tree at refDepth 0.5 yields a structurally identical payload.
+    const reserialized = serializeAnnotatedType(restored, { refDepth: 0.5 })
+    expect(reserialized).toEqual(serialized)
+  })
+
+  it('deserialize round-trip of an integer-depth payload preserves the full target body', async () => {
+    const { FractionalSourceFull } = await import('../test/fixtures/fractional-ref.as')
+    const source = FractionalSourceFull as unknown as TAtscriptAnnotatedType
+
+    const serialized = serializeAnnotatedType(source, { refDepth: 1 })
+    const restored = deserializeAnnotatedType(serialized)
+
+    const fk = (restored.type as TAtscriptTypeObject).props.get('fk')!
+    expect(fk.ref).toBeDefined()
+    const refTarget = fk.ref!.type()
+    expect(refTarget.type.kind).toBe('object')
+    const refObj = refTarget.type as TAtscriptTypeObject
+    expect(refObj.props.has('id')).toBe(true)
+    expect(refObj.props.has('name')).toBe(true)
+    expect(refTarget.metadata.get('meta.label')).toBe('Full')
   })
 })

@@ -27,8 +27,14 @@ export interface TSerializedAnnotatedTypeInner {
   metadata: Record<string, unknown>
   optional?: boolean
   id?: string
-  /** FK reference — present when serialized with `refDepth > 0` */
-  ref?: { type: TSerializedAnnotatedTypeInner; field: string }
+  /** FK reference; shallow `{ id, metadata }` target when `refDepth` has a `.5` fractional part. */
+  ref?: { type: TSerializedAnnotatedTypeInner | TSerializedShallowRefTarget; field: string }
+}
+
+/** Shallow ref-target shape: identity + interface-level metadata only, no structural body. */
+export interface TSerializedShallowRefTarget {
+  id: string
+  metadata: Record<string, unknown>
 }
 
 export interface TSerializedTypeFinal {
@@ -103,10 +109,9 @@ export interface TSerializeOptions {
   ) => { key: string; value: unknown } | undefined | void
 
   /**
-   * How many levels of `.ref` (FK references) to expand during serialization.
-   * - `0` (default): refs are stripped (backward-compatible)
-   * - `1`: immediate refs are serialized, but refs inside referenced types are stripped
-   * - `2+`: deeper expansion
+   * How many levels of `.ref` (FK references) to expand. `0` (default) strips refs; integer
+   * `N` expands N levels with full target bodies. A `.5` fractional part (e.g. `0.5`, `1.5`)
+   * emits a shallow `{ id, metadata }` at the tail level instead of the full body.
    */
   refDepth?: number
 }
@@ -158,7 +163,9 @@ function serializeNode(
       id: def.id,
     }
   }
-  if (def.id) { visited.add(def.id) }
+  if (def.id) {
+    visited.add(def.id)
+  }
   const result: TSerializedAnnotatedTypeInner = {
     type: serializeTypeDef(def, path, options, visited),
     metadata: serializeMetadata(def.metadata, path, def.type.kind, options),
@@ -175,13 +182,23 @@ function serializeNode(
     const refTarget = def.ref.type()
     if (refTarget) {
       result.ref = {
-        type: serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
         field: def.ref.field,
+        type:
+          refDepth < 1 && isHalfStep(refDepth)
+            ? {
+                id: refTarget.id ?? '',
+                metadata: serializeMetadata(refTarget.metadata, [], refTarget.type.kind, options),
+              }
+            : serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
       }
     }
   }
 
   return result
+}
+
+function isHalfStep(refDepth: number): boolean {
+  return refDepth - Math.floor(refDepth) === 0.5
 }
 
 function serializeTypeDef(
@@ -322,20 +339,31 @@ export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscr
   return deserializeNode(data, resolved)
 }
 
+function emptyObjectTypeDef(): TAtscriptTypeDef {
+  return { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef
+}
+
+function toMetadataMap(record: Record<string, unknown>): TMetadataMap<AtscriptMetadata> {
+  return new Map(Object.entries(record)) as TMetadataMap<AtscriptMetadata>
+}
+
 function deserializeNode(
   data: TSerializedAnnotatedTypeInner,
   resolved: Map<string, TAtscriptAnnotatedType>
 ): TAtscriptAnnotatedType {
   if (data.type.kind === '$ref') {
     const refId = (data.type as TSerializedTypeRef).id
-    return resolved.get(refId) || createAnnotatedTypeNode(
-      { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef,
-      new Map() as TMetadataMap<AtscriptMetadata>,
-      { id: refId }
+    return (
+      resolved.get(refId) ||
+      createAnnotatedTypeNode(
+        emptyObjectTypeDef(),
+        new Map() as TMetadataMap<AtscriptMetadata>,
+        { id: refId }
+      )
     )
   }
 
-  const metadata = new Map(Object.entries(data.metadata)) as TMetadataMap<AtscriptMetadata>
+  const metadata = toMetadataMap(data.metadata)
 
   // Register placeholder before recursing to break cycles
   let result: TAtscriptAnnotatedType | undefined
@@ -344,11 +372,10 @@ function deserializeNode(
     if (existing) {
       return existing
     }
-    result = createAnnotatedTypeNode(
-      { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef,
-      metadata,
-      { optional: data.optional || undefined, id: data.id }
-    )
+    result = createAnnotatedTypeNode(emptyObjectTypeDef(), metadata, {
+      optional: data.optional || undefined,
+      id: data.id,
+    })
     resolved.set(data.id, result)
   }
 
@@ -356,8 +383,20 @@ function deserializeNode(
 
   let ref: { type: () => TAtscriptAnnotatedType; field: string } | undefined
   if (data.ref) {
-    const deserializedRefTarget = deserializeNode(data.ref.type, resolved)
-    ref = { type: () => deserializedRefTarget, field: data.ref.field }
+    const refTargetData = data.ref.type
+    if ('type' in refTargetData) {
+      const deserializedRefTarget = deserializeNode(refTargetData, resolved)
+      ref = { type: () => deserializedRefTarget, field: data.ref.field }
+    } else {
+      // Shallow ref: empty props is the "body unavailable" signal; consumers must fetch
+      // the body from the target's own meta endpoint using refTarget.id.
+      const sentinel = createAnnotatedTypeNode(
+        emptyObjectTypeDef(),
+        toMetadataMap(refTargetData.metadata),
+        { id: refTargetData.id || undefined }
+      )
+      ref = { type: () => sentinel, field: data.ref.field }
+    }
   }
 
   if (result) {
@@ -417,7 +456,7 @@ function deserializeTypeDef(
       }
     }
     case '$ref': {
-      // Defensive fallback — $ref is normally handled in deserializeNode
+      // $ref is normally handled in deserializeNode; this is a defensive fallback.
       const existing = resolved.get(t.id)
       if (existing) {
         return existing.type
