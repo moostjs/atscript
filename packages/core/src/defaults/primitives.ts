@@ -1,7 +1,9 @@
 import type { TPrimitiveConfig } from '../parser/nodes'
 
-const IPV4_PATTERN = '^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)$'
-const IPV6_PATTERN = '^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$'
+const IPV4_PATTERN =
+  '^((25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d{2}|[1-9]\\d|\\d)$'
+const IPV6_PATTERN =
+  '^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$'
 
 const positive: Partial<TPrimitiveConfig> = {
   documentation: 'Number that greater than or equal to zero.',
@@ -65,8 +67,7 @@ export const primitives: Record<string, TPrimitiveConfig> = {
               message: 'Invalid ISO date format.',
             }, // UTC ISO 8601
             {
-              pattern:
-                '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?([+-]\\d{2}:\\d{2})$',
+              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?([+-]\\d{2}:\\d{2})$',
               message: 'Invalid ISO date format.',
             }, // ISO 8601 with timezone
           ],
@@ -167,7 +168,10 @@ export const primitives: Record<string, TPrimitiveConfig> = {
           int64: {
             tags: ['int64'],
             documentation: 'Signed 64-bit integer (clamped to JS safe integer range).',
-            annotations: { 'expect.min': Number.MIN_SAFE_INTEGER, 'expect.max': Number.MAX_SAFE_INTEGER },
+            annotations: {
+              'expect.min': Number.MIN_SAFE_INTEGER,
+              'expect.max': Number.MAX_SAFE_INTEGER,
+            },
           },
           uint8: {
             tags: ['uint8'],
@@ -208,8 +212,7 @@ export const primitives: Record<string, TPrimitiveConfig> = {
         annotations: { 'expect.int': true },
         extensions: {
           created: {
-            documentation:
-              'Timestamp auto-set on creation. Auto-applies @db.default.now.',
+            documentation: 'Timestamp auto-set on creation. Auto-applies @db.default.now.',
             tags: ['created'],
             annotations: { 'db.default.now': true },
           },
@@ -225,7 +228,8 @@ export const primitives: Record<string, TPrimitiveConfig> = {
 
   decimal: {
     type: 'decimal',
-    documentation: 'Decimal number stored as string to preserve precision. Use with @db.column.precision.',
+    documentation:
+      'Decimal number stored as string to preserve precision. Use with @db.column.precision.',
   },
 
   boolean: {

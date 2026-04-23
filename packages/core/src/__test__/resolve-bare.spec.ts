@@ -1,6 +1,6 @@
 import { mkdir, writeFile, rm, symlink } from 'node:fs/promises'
-import path from 'node:path'
 import { tmpdir } from 'node:os'
+import path from 'node:path'
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
@@ -140,15 +140,15 @@ describe('resolveBareSpecifier', () => {
         },
       })
     )
-    await writeFile(path.join(wildcardDir, 'types', 'model.as'), 'export interface Model { id: number }')
+    await writeFile(
+      path.join(wildcardDir, 'types', 'model.as'),
+      'export interface Model { id: number }'
+    )
 
     // Create a package with no exports (direct file access fallback): simple-pkg
     const simpleDir = path.join(testDir, 'node_modules', 'simple-pkg')
     await mkdir(simpleDir, { recursive: true })
-    await writeFile(
-      path.join(simpleDir, 'package.json'),
-      JSON.stringify({ name: 'simple-pkg' })
-    )
+    await writeFile(path.join(simpleDir, 'package.json'), JSON.stringify({ name: 'simple-pkg' }))
     await writeFile(path.join(simpleDir, 'schema.as'), 'export interface Schema { data: string }')
 
     // Create a scoped package: @my-org/models

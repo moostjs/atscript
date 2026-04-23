@@ -9,7 +9,7 @@ In this guide, you will:
 2. generate the TypeScript and runtime files Atscript needs
 3. validate invalid input against that model
 4. wire Atscript into a real build once the basics make sense
-:::
+   :::
 
 ::: info Current Scope
 Atscript is language-agnostic by design, but TypeScript is the first supported target today. If you are evaluating Atscript right now, this is the best place to start.

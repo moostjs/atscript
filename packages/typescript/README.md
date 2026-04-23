@@ -34,11 +34,11 @@ npx asc --noEmit
 
 ```ts
 // Runtime validation
-import { Validator, buildJsonSchema } from '@atscript/typescript/utils'
+import { buildJsonSchema } from '@atscript/typescript/utils'
 import { User } from './schema/user.as'
 
-const errors = new Validator().validate(User, inputData)
-const schema = buildJsonSchema(User)
+User.validator().validate(inputData) // throws on failure
+const schema = buildJsonSchema(User.annotatedType)
 ```
 
 ## Features
@@ -51,12 +51,15 @@ const schema = buildJsonSchema(User)
 - Type-safe utility types: `FlatOf<T>`, `PrimaryKeyOf<T>`, `OwnPropsOf<T>`, `NavPropsOf<T>`
 - Global `atscript.d.ts` generation for typed metadata access
 
-## AI Agent Skills
+## AI Agent Skill
+
+Unified skill for AI coding agents (Claude Code, Cursor, Windsurf, Codex, etc.) covering all `@atscript/*` packages:
 
 ```bash
-npx atscript-typescript-skill          # Install skills locally
-npx atscript-typescript-skill --global # Install globally
+npx skills add moostjs/atscript
 ```
+
+Learn more at [skills.sh](https://skills.sh).
 
 ## Documentation
 

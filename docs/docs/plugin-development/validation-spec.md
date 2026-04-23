@@ -213,11 +213,11 @@ Applied when the value is a valid boolean:
 
 Applied at the array level (before element validation):
 
-| Annotation                    | Condition          | Default error                                       |
-| ----------------------------- | ------------------ | --------------------------------------------------- |
-| `@expect.minLength N`         | `value.length < N` | `"Expected minimum length of N items, got M items"` |
-| `@expect.maxLength N`         | `value.length > N` | `"Expected maximum length of N items, got M items"` |
-| `@expect.array.uniqueItems`   | duplicate found    | `"Duplicate items are not allowed"`                 |
+| Annotation                  | Condition          | Default error                                       |
+| --------------------------- | ------------------ | --------------------------------------------------- |
+| `@expect.minLength N`       | `value.length < N` | `"Expected minimum length of N items, got M items"` |
+| `@expect.maxLength N`       | `value.length > N` | `"Expected maximum length of N items, got M items"` |
+| `@expect.array.uniqueItems` | duplicate found    | `"Duplicate items are not allowed"`                 |
 
 Note: for strings, the messages say "characters"; for arrays, the messages say "items".
 

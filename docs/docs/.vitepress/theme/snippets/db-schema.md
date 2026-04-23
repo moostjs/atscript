@@ -30,7 +30,6 @@ export interface Task {
 
 ```ts
 @TableController(tasksTable)
-export class TaskController
-  extends AsDbController<typeof Task> {}
+export class TaskController extends AsDbController<typeof Task> {}
 // 8 REST endpoints — ready.
 ```

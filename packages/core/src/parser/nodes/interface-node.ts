@@ -1,9 +1,9 @@
 import { isStructure } from '.'
 /* eslint-disable @typescript-eslint/class-methods-use-this */
 import type { AtscriptDoc } from '../../document'
+import type { Token } from '../token'
 import type { SemanticPropNode } from './prop-node'
 import { SemanticNode } from './semantic-node'
-import type { Token } from '../token'
 
 export class SemanticInterfaceNode extends SemanticNode {
   private _extendsTokens: Token[] = []

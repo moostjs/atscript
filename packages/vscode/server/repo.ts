@@ -129,12 +129,20 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         return
       }
 
-      const [atscript] = await Promise.all([this.openDocument(params.textDocument.uri), this.currentCheck])
+      const [atscript] = await Promise.all([
+        this.openDocument(params.textDocument.uri),
+        this.currentCheck,
+      ])
       const refs = atscript.getUsageListAt(params.position.line, params.position.character)
-      if (!refs) { return undefined }
+      if (!refs) {
+        return undefined
+      }
       const results = refs.map(r => ({ uri: r.uri, range: r.range }))
       if (params.context.includeDeclaration) {
-        const defLocations = atscript.getToDefinitionAt(params.position.line, params.position.character)
+        const defLocations = atscript.getToDefinitionAt(
+          params.position.line,
+          params.position.character
+        )
         if (defLocations) {
           for (const loc of defLocations) {
             results.push({ uri: loc.targetUri, range: loc.targetSelectionRange })
@@ -258,58 +266,60 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             }
           }
           const parent = token.parentNode
-          return Object.keys(a).filter(k => k !== '$self').flatMap(key => {
-            const options = [
-              {
-                label: key,
-                kind: CompletionItemKind.Folder,
-              },
-            ] as CompletionItem[]
-            const child = a[key]
-            const selfSpec = !isAnnotationSpec(child) && child?.$self
-            if (isAnnotationSpec(child)) {
-              const nodeType = child.config.nodeType
-              if (nodeType?.length && parent) {
-                // filter out annotations not suitable for the parent node
-                // Annotate block entries are ref nodes referencing props,
-                // so treat 'ref' as equivalent to 'prop'
-                const effectiveEntity =
-                  parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
-                if (!nodeType.includes(effectiveEntity)) {
-                  return []
+          return Object.keys(a)
+            .filter(k => k !== '$self')
+            .flatMap(key => {
+              const options = [
+                {
+                  label: key,
+                  kind: CompletionItemKind.Folder,
+                },
+              ] as CompletionItem[]
+              const child = a[key]
+              const selfSpec = !isAnnotationSpec(child) && child?.$self
+              if (isAnnotationSpec(child)) {
+                const nodeType = child.config.nodeType
+                if (nodeType?.length && parent) {
+                  // filter out annotations not suitable for the parent node
+                  // Annotate block entries are ref nodes referencing props,
+                  // so treat 'ref' as equivalent to 'prop'
+                  const effectiveEntity =
+                    parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
+                  if (!nodeType.includes(effectiveEntity)) {
+                    return []
+                  }
                 }
-              }
-              const aName = `@${[...prev, key].join('.')}`
-              const documentation = {
-                kind: 'markdown',
-                value: child.renderDocs(aName) || '',
-              } as MarkupContent
-              options[0].documentation = documentation
-              options[0].kind = CompletionItemKind.Value
-              options[0].command = undefined
-              options[0].insertText = undefined
-            } else if (selfSpec && isAnnotationSpec(selfSpec)) {
-              // Branch with $self: show as both a folder and a leaf value
-              const nodeType = selfSpec.config.nodeType
-              if (nodeType?.length && parent) {
-                const effectiveEntity =
-                  parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
-                if (!nodeType.includes(effectiveEntity)) {
-                  return options
-                }
-              }
-              const aName = `@${[...prev, key].join('.')}`
-              options.push({
-                label: key,
-                kind: CompletionItemKind.Value,
-                documentation: {
+                const aName = `@${[...prev, key].join('.')}`
+                const documentation = {
                   kind: 'markdown',
-                  value: selfSpec.renderDocs(aName) || '',
-                } as MarkupContent,
-              } as CompletionItem)
-            }
-            return options
-          })
+                  value: child.renderDocs(aName) || '',
+                } as MarkupContent
+                options[0].documentation = documentation
+                options[0].kind = CompletionItemKind.Value
+                options[0].command = undefined
+                options[0].insertText = undefined
+              } else if (selfSpec && isAnnotationSpec(selfSpec)) {
+                // Branch with $self: show as both a folder and a leaf value
+                const nodeType = selfSpec.config.nodeType
+                if (nodeType?.length && parent) {
+                  const effectiveEntity =
+                    parent.entity === 'ref' && nodeType.includes('prop') ? 'prop' : parent.entity
+                  if (!nodeType.includes(effectiveEntity)) {
+                    return options
+                  }
+                }
+                const aName = `@${[...prev, key].join('.')}`
+                options.push({
+                  label: key,
+                  kind: CompletionItemKind.Value,
+                  documentation: {
+                    kind: 'markdown',
+                    value: selfSpec.renderDocs(aName) || '',
+                  } as MarkupContent,
+                } as CompletionItem)
+              }
+              return options
+            })
         }
         const aContext = await this.getAnnotationContextAt(document, position)
         const arg = aContext?.annotationSpec?.arguments[aContext.currentIndex]
@@ -377,15 +387,15 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         const lineText = text.slice(lineStartOffset, offset)
 
         // After "interface Name extends" or "interface Name extends A," → suggest type names
-        if (/^\s*(?:export\s+)?interface\s+\w+\s+extends\s+(?:[\w.]+\s*,\s*)*\w*$/u.test(lineText)) {
+        if (
+          /^\s*(?:export\s+)?interface\s+\w+\s+extends\s+(?:[\w.]+\s*,\s*)*\w*$/u.test(lineText)
+        ) {
           return this.getDeclarationsCompletions(atscript, text, false)
         }
 
         // After "interface Name " → suggest extends keyword
         if (/^\s*(?:export\s+)?interface\s+\w+\s+\w*$/u.test(lineText)) {
-          return [
-            { label: 'extends', kind: CompletionItemKind.Keyword },
-          ]
+          return [{ label: 'extends', kind: CompletionItemKind.Keyword }]
         }
 
         // After "annotate" keyword → suggest annotatable targets
@@ -425,7 +435,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         const unwound = atscript.unwindType(id.text, chain)
         if (unwound?.def) {
           const def = atscript.mergeIntersection(unwound.def)
-          const options = this.getPropsFromDef(def) ?? (isPrimitive(def) ? Array.from(def.props.values()) : undefined)
+          const options =
+            this.getPropsFromDef(def) ??
+            (isPrimitive(def) ? Array.from(def.props.values()) : undefined)
           return this.propsToCompletionItems(options)
         }
       }
@@ -691,7 +703,11 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     return builder.build()
   }
 
-  async getAnnotationContextAt(document: TextDocument, position: Position, existingDoc?: AtscriptDoc) {
+  async getAnnotationContextAt(
+    document: TextDocument,
+    position: Position,
+    existingDoc?: AtscriptDoc
+  ) {
     const text = document.getText()
     const offset = document.offsetAt(position)
 
@@ -704,7 +720,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     if (!annotationMatch) {
       return
     }
-    const atscript = existingDoc ?? await this.openDocument(document.uri)
+    const atscript = existingDoc ?? (await this.openDocument(document.uri))
     const annotationToken = atscript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
     if (!annotationToken?.parentNode) {
       return
@@ -730,7 +746,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           arg.queryNode &&
           arg.range.start.line <= position.line &&
           arg.range.end.line >= position.line &&
-          (arg.range.start.line < position.line || arg.range.start.character <= position.character) &&
+          (arg.range.start.line < position.line ||
+            arg.range.start.character <= position.character) &&
           (arg.range.end.line > position.line || arg.range.end.character >= position.character)
         ) {
           argToken = arg
@@ -763,7 +780,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (token.fromPath) {
         let exporter = exporters.get(token.fromPath)
         if (!exporter) {
-          exporter = await this.openDocument(atscript.resolveImportId(resolveAtscriptFromPath(token.fromPath, atscript.id)))
+          exporter = await this.openDocument(
+            atscript.resolveImportId(resolveAtscriptFromPath(token.fromPath, atscript.id))
+          )
           exporters.set(token.fromPath, exporter)
         }
         t = exporter.registry.definitions.get(token.text)!
@@ -836,7 +855,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     triggerKind?: 1 | 2 | 3
   ): Promise<CompletionItem[] | undefined> {
     const rule = createInsertTextRule(text, offset, triggerKind ?? 1)
-    const target = await this.openDocument(atscript.resolveImportId(resolveAtscriptFromPath(block.fromPath!, atscript.id)))
+    const target = await this.openDocument(
+      atscript.resolveImportId(resolveAtscriptFromPath(block.fromPath!, atscript.id))
+    )
     if (target) {
       const imports = atscript.imports.get(target.id)?.imports || []
       const importsSet = new Set(imports.map(i => i.text))
@@ -891,7 +912,12 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     document: TextDocument,
     position: Position,
     atscript: AtscriptDoc,
-    aContext: { annotationToken: Token; argToken?: Token; currentIndex: number; annotationSpec?: { arguments: Array<{ type: string }> } },
+    aContext: {
+      annotationToken: Token
+      argToken?: Token
+      currentIndex: number
+      annotationSpec?: { arguments: Array<{ type: string }> }
+    }
   ): CompletionItem[] | undefined {
     try {
       const text = document.getText()
@@ -899,15 +925,21 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
       // Find the backtick token containing cursor
       const queryArgToken = aContext.argToken
-      if (!queryArgToken) { return undefined }
+      if (!queryArgToken) {
+        return undefined
+      }
 
       const scope = getQueryCompletionScope(queryArgToken, atscript)
-      if (!scope) { return undefined }
+      if (!scope) {
+        return undefined
+      }
 
       // Extract text inside backticks up to cursor
       const textBefore = text.slice(0, offset)
       const backtickPos = textBefore.lastIndexOf('`')
-      if (backtickPos < 0) { return undefined }
+      if (backtickPos < 0) {
+        return undefined
+      }
       const textInQuery = textBefore.slice(backtickPos + 1)
 
       const context = analyzeQueryCursorContext(textInQuery)
@@ -931,7 +963,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
                 kind: CompletionItemKind.Property,
                 detail: `field of ${scope.unqualifiedTarget}`,
                 documentation: prop.documentation
-                  ? { kind: 'markdown', value: prop.documentation } as MarkupContent
+                  ? ({ kind: 'markdown', value: prop.documentation } as MarkupContent)
                   : undefined,
               })
             }
@@ -946,7 +978,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
               kind: CompletionItemKind.Property,
               detail: `field of ${typeName}`,
               documentation: prop.documentation
-                ? { kind: 'markdown', value: prop.documentation } as MarkupContent
+                ? ({ kind: 'markdown', value: prop.documentation } as MarkupContent)
                 : undefined,
             }))
           }
@@ -1061,7 +1093,10 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  resolveAnnotateTarget(atscript: AtscriptDoc, targetName: string): (SemanticNode & { props: Map<string, SemanticPropNode> }) | undefined {
+  resolveAnnotateTarget(
+    atscript: AtscriptDoc,
+    targetName: string
+  ): (SemanticNode & { props: Map<string, SemanticPropNode> }) | undefined {
     const unwound = atscript.unwindType(targetName)
     if (!unwound?.def) {
       return undefined

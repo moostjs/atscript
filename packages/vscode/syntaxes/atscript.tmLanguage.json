@@ -255,18 +255,14 @@
           "name": "string.quoted.single.atscript",
           "begin": "'",
           "end": "(?:'|(?=`))",
-          "patterns": [
-            { "match": "\\\\.", "name": "constant.character.escape.atscript" }
-          ]
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.atscript" }]
         },
         {
           "comment": "Double-quoted string constants",
           "name": "string.quoted.double.atscript",
           "begin": "\"",
           "end": "(?:\"|(?=`))",
-          "patterns": [
-            { "match": "\\\\.", "name": "constant.character.escape.atscript" }
-          ]
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.atscript" }]
         },
         {
           "comment": "Qualified field ref: TypeName.fieldName",

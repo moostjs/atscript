@@ -13,7 +13,7 @@ export function getExternals(ws) {
   const peerDeps = Object.keys(pkg.peerDependencies ?? {})
 
   // Use regex patterns so subpath imports (e.g. "mysql2/promise") are also externalized
-  const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const packages = [...deps, ...devDeps, ...peerDeps, 'vscode']
   return [
     ...packages.map(d => new RegExp(`^${escapeRe(d)}(/|$)`)),

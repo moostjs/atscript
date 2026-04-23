@@ -43,9 +43,7 @@ export const namesPlugin = () =>
     render(doc, format) {
       if (format !== 'names') return []
 
-      const lines = doc.nodes
-        .filter(isInterface)
-        .map(node => `interface ${node.id}`)
+      const lines = doc.nodes.filter(isInterface).map(node => `interface ${node.id}`)
 
       return [
         {

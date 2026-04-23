@@ -39,7 +39,7 @@ export const atscriptGrammar = {
     'strings': {
       patterns: [
         {
-          match: "'([^']*)'|\"([^\"]*)\"",
+          match: '\'([^\']*)\'|"([^"]*)"',
           name: 'variable.other.constant.atscript',
         },
       ],
@@ -76,7 +76,7 @@ export const atscriptGrammar = {
               ],
             },
             {
-              match: "'([^']*)'|\"([^\"]*)\"",
+              match: '\'([^\']*)\'|"([^"]*)"',
               name: 'string.quoted.import.atscript',
             },
           ],
@@ -234,18 +234,14 @@ export const atscriptGrammar = {
           name: 'string.quoted.single.atscript',
           begin: "'",
           end: "(?:'|(?=`))",
-          patterns: [
-            { match: '\\\\.', name: 'constant.character.escape.atscript' },
-          ],
+          patterns: [{ match: '\\\\.', name: 'constant.character.escape.atscript' }],
         },
         {
           comment: 'Double-quoted string constants',
           name: 'string.quoted.double.atscript',
           begin: '"',
           end: '(?:"|(?=`))',
-          patterns: [
-            { match: '\\\\.', name: 'constant.character.escape.atscript' },
-          ],
+          patterns: [{ match: '\\\\.', name: 'constant.character.escape.atscript' }],
         },
         {
           comment: 'Qualified field ref: TypeName.fieldName',
@@ -292,8 +288,7 @@ export const atscriptGrammar = {
       patterns: [
         {
           name: 'support.type.primitive.atscript',
-          match:
-            '\\b\\w+\\b(?!\\s*:)',
+          match: '\\b\\w+\\b(?!\\s*:)',
         },
         {
           name: 'support.type.primitive.atscript',

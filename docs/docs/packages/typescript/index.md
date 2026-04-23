@@ -9,7 +9,7 @@ If you are evaluating Atscript for the first time, read these in order:
 2. [Quick Start](/packages/typescript/quick-start)
 3. [Build Setup](/packages/typescript/build-setup)
 4. [Validation Guide](/packages/typescript/validation)
-:::
+   :::
 
 ## What You Can Do Today
 

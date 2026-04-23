@@ -55,7 +55,7 @@ BlockToken.recognize(
   IdentifierToken,
   TextToken,
   NumberToken,
-  PunctuationToken,
+  PunctuationToken
 )
 
 QueryToken.recognize(
@@ -65,7 +65,7 @@ QueryToken.recognize(
   IdentifierToken,
   TextToken,
   NumberToken,
-  PunctuationToken,
+  PunctuationToken
 )
 
 /**

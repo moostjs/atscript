@@ -42,10 +42,9 @@ bun add -D @atscript/core
 
 ### Optional Packages
 
-- **`unplugin-atscript`** — Build tool integration (Vite, Webpack, Rollup, esbuild). See [Build Setup](/packages/typescript/build-setup).
-- **`@atscript/db-mongo`** — MongoDB integration with index syncing. See [MongoDB](https://db.atscript.dev/adapters/mongodb).
-- **`@atscript/moost-db`** — Generic Moost framework database controller
-- **`@atscript/moost-validator`** — Moost framework validation integration
+- **`unplugin-atscript`** — Build tool integration (Vite, Webpack, Rollup, esbuild, Rolldown, Rspack, Farm). See [Build Setup](/packages/typescript/build-setup).
+- **`@atscript/moost-validator`** — Moost framework validation integration. See [Moost Validator](/packages/moost-validator/).
+- **Database integrations** — `@atscript/db`, `@atscript/db-sqlite`, `@atscript/db-mongo`, `@atscript/db-mysql`, `@atscript/moost-db`, etc. live in a [separate repo](https://db.atscript.dev) and are installed alongside `@atscript/typescript` when needed.
 
 ## Verify Installation
 
@@ -98,31 +97,15 @@ The extension provides:
 - Error checking
 - Auto-generation of `.d.ts` files on save
 
-## AI Agent Skills
+## AI Agent Skill
 
-`@atscript/typescript` ships an AI agent skill for Claude Code, Cursor, Windsurf, Codex, and other compatible agents. The skill teaches your agent the library's APIs, patterns, and best practices so it can help you write correct code without hallucinating.
-
-**Install the skill into your agent:**
+Atscript ships a unified skill for AI coding agents (Claude Code, Cursor, Windsurf, Codex, etc.) covering every `@atscript/*` package with progressive-disclosure reference docs.
 
 ```bash
-# Project-local (recommended — version-locked, commits with your repo)
-npx @atscript/typescript setup-skills
-
-# Global (available across all your projects)
-npx @atscript/typescript setup-skills --global
+npx skills add moostjs/atscript
 ```
 
-Restart your agent after installing.
-
-**Auto-update on install** — to keep the skill in sync whenever you upgrade the package, add this to your project's `package.json`:
-
-```jsonc
-{
-  "scripts": {
-    "postinstall": "npx @atscript/typescript setup-skills --postinstall",
-  },
-}
-```
+Restart your agent after installing. Learn more about AI agent skills at [skills.sh](https://skills.sh).
 
 ## Next Steps
 

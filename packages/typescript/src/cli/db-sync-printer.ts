@@ -64,14 +64,18 @@ export class DbSyncPrinter {
   }
 
   plan(plan: TSyncPlan) {
-    for (const line of PLAN_HEADER) { this.log(line) }
+    for (const line of PLAN_HEADER) {
+      this.log(line)
+    }
     this.printGrouped(plan.entries, 'plan')
     this.log('')
   }
 
   result(result: TSyncResult) {
     this.log('')
-    this.log(`${this.colors.green(this.colors.bold('Schema synced successfully.'))} Hash: ${result.schemaHash}`)
+    this.log(
+      `${this.colors.green(this.colors.bold('Schema synced successfully.'))} Hash: ${result.schemaHash}`
+    )
     this.log('')
     this.printGrouped(result.entries, 'result')
     this.log('')
@@ -86,15 +90,21 @@ export class DbSyncPrinter {
     if (tables.length > 0) {
       this.log(this.colors.bold('Tables:'))
       for (const e of tables) {
-        for (const line of e.print(mode, this.colors)) { this.log(line) }
+        for (const line of e.print(mode, this.colors)) {
+          this.log(line)
+        }
       }
     }
 
     if (views.length > 0) {
-      if (tables.length > 0) { this.log('') }
+      if (tables.length > 0) {
+        this.log('')
+      }
       this.log(this.colors.bold('Views:'))
       for (const e of views) {
-        for (const line of e.print(mode, this.colors)) { this.log(line) }
+        for (const line of e.print(mode, this.colors)) {
+          this.log(line)
+        }
       }
     }
   }

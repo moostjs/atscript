@@ -17,15 +17,15 @@ export default defineConfig({
 
 ### Options
 
-| Option              | Type                           | Default   | Description                                                                                                    |
-| ------------------- | ------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------- |
-| `rootDir`           | `string`                       | Config file's directory | Directory containing your `.as` files                                                                          |
-| `include`           | `string[]`                     | `['**/*.as']` | Glob patterns for `.as` files to compile. Exclude test-fixture directories (`**/test/**`, `**/__test__/**`, `**/__tests__/**`) — see [Testing Fixtures](/packages/typescript/testing-fixtures) for the dedicated fixture-compilation helper |
-| `exclude`           | `string[]`                     | `['node_modules']` | Glob patterns to ignore                                                                                        |
-| `format`            | `string`                       | Plugin-dependent | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted |
-| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config                                                                |
-| `plugins`           | `TAtscriptPlugin[]`            | `[]`      | Active plugins                                                                                                 |
-| `annotations`       | `object`                       | —        | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))              |
+| Option              | Type                           | Default                 | Description                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rootDir`           | `string`                       | Config file's directory | Directory containing your `.as` files                                                                                                                                                                                                       |
+| `include`           | `string[]`                     | `['**/*.as']`           | Glob patterns for `.as` files to compile. Exclude test-fixture directories (`**/test/**`, `**/__test__/**`, `**/__tests__/**`) — see [Testing Fixtures](/packages/typescript/testing-fixtures) for the dedicated fixture-compilation helper |
+| `exclude`           | `string[]`                     | `['node_modules']`      | Glob patterns to ignore                                                                                                                                                                                                                     |
+| `format`            | `string`                       | Plugin-dependent        | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted                                                             |
+| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'`               | How to handle annotations not defined in config                                                                                                                                                                                             |
+| `plugins`           | `TAtscriptPlugin[]`            | `[]`                    | Active plugins                                                                                                                                                                                                                              |
+| `annotations`       | `object`                       | —                       | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))                                                                                                                                           |
 
 ## Plugin Options
 

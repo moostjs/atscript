@@ -1,9 +1,9 @@
+import { existsSync, writeFileSync, mkdirSync, rmSync } from 'fs'
 // oxlint-disable max-params
 import { createRequire } from 'node:module'
 import { createInterface } from 'node:readline'
-import { existsSync, writeFileSync, mkdirSync, rmSync } from 'fs'
-import path from 'path'
 import { pathToFileURL } from 'node:url'
+import path from 'path'
 
 import type { TAtscriptConfig, TAtscriptConfigOutput, TDbConfigDeclarative } from '@atscript/core'
 import { build } from '@atscript/core'
@@ -20,9 +20,7 @@ import { DbSyncPrinter } from './db-sync-printer'
 export class DbSyncController {
   private readonly printer: DbSyncPrinter
 
-  constructor(
-    @InjectMoostLogger('asc') private readonly logger: TConsoleBase,
-  ) {
+  constructor(@InjectMoostLogger('asc') private readonly logger: TConsoleBase) {
     this.printer = new DbSyncPrinter()
   }
 
@@ -57,14 +55,14 @@ export class DbSyncController {
     @CliOption('safe')
     @Optional()
     @Description('Skip destructive operations (column/table drops)')
-    safe?: boolean,
+    safe?: boolean
   ) {
     const config = await getConfig(configFile, this.logger)
 
     if (!config.db) {
       this.logger.error(
         `${__DYE_RED__}No "db" field in atscript config. ` +
-        `Add a db configuration to use schema sync.${__DYE_COLOR_OFF__}`
+          `Add a db configuration to use schema sync.${__DYE_COLOR_OFF__}`
       )
       process.exit(1)
     }
@@ -82,7 +80,10 @@ export class DbSyncController {
     this.printer.typeCount(dbTypes.length)
     this.printer.banner()
 
-    const { SchemaSync } = await this.importFromCwd('@atscript/db/sync', true) as typeof import('@atscript/db/sync')
+    const { SchemaSync } = (await this.importFromCwd(
+      '@atscript/db/sync',
+      true
+    )) as typeof import('@atscript/db/sync')
     const sync = new SchemaSync(dbSpace)
     const plan = await sync.plan(dbTypes, { force, safe })
 
@@ -116,7 +117,9 @@ export class DbSyncController {
 
     if (hasDestructive) {
       if (!yes) {
-        const confirmed = await this.confirm('Apply these changes? (includes destructive operations)')
+        const confirmed = await this.confirm(
+          'Apply these changes? (includes destructive operations)'
+        )
         if (!confirmed) {
           this.logger.log('Aborted.')
           return
@@ -136,8 +139,12 @@ export class DbSyncController {
     const buildConfig: TAtscriptConfig = { ...config }
     if (typeof config.db === 'object' && 'adapter' in config.db) {
       const dbConfig = config.db as TDbConfigDeclarative
-      if (dbConfig.include) { buildConfig.include = dbConfig.include }
-      if (dbConfig.exclude) { buildConfig.exclude = dbConfig.exclude }
+      if (dbConfig.include) {
+        buildConfig.include = dbConfig.include
+      }
+      if (dbConfig.exclude) {
+        buildConfig.exclude = dbConfig.exclude
+      }
     }
     buildConfig.format = 'js'
 
@@ -161,7 +168,10 @@ export class DbSyncController {
       for (const file of writtenFiles) {
         const mod = await import(/* @vite-ignore */ pathToFileURL(file).href)
         for (const exp of Object.values(mod)) {
-          if (isAnnotatedType(exp) && (exp.metadata?.has('db.table') || exp.metadata?.has('db.view'))) {
+          if (
+            isAnnotatedType(exp) &&
+            (exp.metadata?.has('db.table') || exp.metadata?.has('db.view'))
+          ) {
             dbTypes.push(exp)
           }
         }
@@ -169,7 +179,9 @@ export class DbSyncController {
     } catch (error) {
       this.logger.warn?.(`Could not import compiled types: ${error}`)
     } finally {
-      try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+      try {
+        rmSync(tmpDir, { recursive: true, force: true })
+      } catch {}
     }
 
     return dbTypes
@@ -210,7 +222,9 @@ export class DbSyncController {
     let resolved = require.resolve(specifier)
     if (preferEsm) {
       const mjsPath = resolved.replace(/\.cjs$/, '.mjs')
-      if (existsSync(mjsPath)) { resolved = mjsPath }
+      if (existsSync(mjsPath)) {
+        resolved = mjsPath
+      }
     }
     return import(/* @vite-ignore */ pathToFileURL(resolved).href)
   }

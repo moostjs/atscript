@@ -15,3 +15,13 @@ actions:
     text: Explore Database
     link: https://db.atscript.dev/guide/quick-start
 ---
+
+## AI Agent Skill
+
+Atscript provides a unified skill for AI coding agents (Claude Code, Cursor, Windsurf, Codex, etc.) that covers all `@atscript/*` packages with progressive-disclosure reference docs.
+
+```bash
+npx skills add moostjs/atscript
+```
+
+Learn more about AI agent skills at [skills.sh](https://skills.sh).

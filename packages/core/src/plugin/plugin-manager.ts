@@ -104,9 +104,7 @@ export class PluginManager {
       if (plugin.render) {
         const newFiles = await plugin.render(doc, format)
         if (newFiles?.length > 0) {
-          files.push(
-            ...newFiles.map(f => ({ ...f, source }))
-          )
+          files.push(...newFiles.map(f => ({ ...f, source })))
         }
       }
     }
@@ -136,11 +134,17 @@ export class PluginManager {
       cb(prefix, annotations.$self)
     }
     for (const [key, value] of Object.entries(annotations)) {
-      if (key === '$self') { continue }
+      if (key === '$self') {
+        continue
+      }
       if (isAnnotationSpec(value)) {
         cb(prefix ? `${prefix}.${key}` : key, value)
       } else {
-        this._loopInAnnotationsSpec(value as TAnnotationsTree, cb, prefix ? `${prefix}.${key}` : key)
+        this._loopInAnnotationsSpec(
+          value as TAnnotationsTree,
+          cb,
+          prefix ? `${prefix}.${key}` : key
+        )
       }
     }
   }

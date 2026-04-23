@@ -8,7 +8,7 @@ import { tsPlugin } from '../plugin'
 
 export async function getConfig(
   configFile: string | undefined,
-  logger: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void },
+  logger: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
 ): Promise<TAtscriptConfig> {
   const root = process.cwd()
   if (configFile) {

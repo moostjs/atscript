@@ -3,10 +3,10 @@ import path from 'path'
 import { build } from '@atscript/core'
 import { describe, expect, it } from 'vitest'
 
+import { tsPlugin } from './plugin'
 import type { TAtscriptAnnotatedType } from './runtime/annotated-type'
 import { defineAnnotatedType as $ } from './runtime/annotated-type'
 import { buildJsonSchema as $$, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
-import { tsPlugin } from './plugin'
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
 // export interface JsonDeep {

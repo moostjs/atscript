@@ -22,7 +22,7 @@ it('validates compiled user', async () => {
 })
 ```
 
-`tsPlugin()` is injected for you — pass only the additional plugins your tests need (for example `dbPlugin()` from `@atscript/db`):
+`tsPlugin()` is injected for you — pass only the additional plugins your tests need. For example, `dbPlugin()` from [`@atscript/db`](https://db.atscript.dev) (sibling repo — install separately):
 
 ```ts
 import { dbPlugin } from '@atscript/db/plugin'
@@ -38,11 +38,11 @@ await prepareFixtures({
 
 ```ts
 interface PrepareFixturesOptions {
-  rootDir: string                       // absolute path to the fixtures directory
-  plugins?: TAtscriptPlugin[]           // additional plugins (tsPlugin is auto-injected)
-  include?: string[]                    // glob patterns; default ['**/*.as']
-  entries?: string[]                    // explicit filenames; takes precedence over include
-  formats?: Array<'js' | 'dts'>         // default ['js', 'dts']
+  rootDir: string // absolute path to the fixtures directory
+  plugins?: TAtscriptPlugin[] // additional plugins (tsPlugin is auto-injected)
+  include?: string[] // glob patterns; default ['**/*.as']
+  entries?: string[] // explicit filenames; takes precedence over include
+  formats?: Array<'js' | 'dts'> // default ['js', 'dts']
 }
 
 function prepareFixtures(options: PrepareFixturesOptions): Promise<void>
@@ -50,12 +50,12 @@ function prepareFixtures(options: PrepareFixturesOptions): Promise<void>
 
 Defaults applied when the option is omitted:
 
-| Option    | Default              | Notes                                                                 |
-| --------- | -------------------- | --------------------------------------------------------------------- |
-| `plugins` | `[]`                 | `tsPlugin()` is always injected before any caller-supplied plugin     |
-| `include` | `['**/*.as']`        | Used only when `entries` is not provided                              |
-| `entries` | `undefined`          | When set, narrows compilation to exactly those filenames              |
-| `formats` | `['js', 'dts']`      | Both formats are generated concurrently via `Promise.all`             |
+| Option    | Default         | Notes                                                             |
+| --------- | --------------- | ----------------------------------------------------------------- |
+| `plugins` | `[]`            | `tsPlugin()` is always injected before any caller-supplied plugin |
+| `include` | `['**/*.as']`   | Used only when `entries` is not provided                          |
+| `entries` | `undefined`     | When set, narrows compilation to exactly those filenames          |
+| `formats` | `['js', 'dts']` | Both formats are generated concurrently via `Promise.all`         |
 
 The two `generate()` calls (`js` and `dts`) run in parallel, not sequentially, so total elapsed time is approximately `max(js_time, dts_time)`.
 
@@ -127,9 +127,7 @@ Why the split: test fixtures frequently declare different plugin sets than produ
 Both output formats are generated concurrently:
 
 ```ts
-await Promise.all(
-  formats.map(format => repo.generate({ outDir: '.', format }))
-)
+await Promise.all(formats.map(format => repo.generate({ outDir: '.', format })))
 ```
 
 Since `generate()` is independent per format, this trims roughly half the total time vs. a sequential `await` pair — meaningful when fixtures grow.

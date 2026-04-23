@@ -925,9 +925,7 @@ describe('ts-plugin', () => {
     const productDts = dts.slice(dts.indexOf('class Product'))
     expect(productDts).not.toContain('__dim')
     expect(productDts).not.toContain('__measure')
-    await expect(dts).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/db-table-agg.as.d.ts')
-    )
+    await expect(dts).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/db-table-agg.as.d.ts'))
 
     const outJs = await repo.generate({ format: 'js' })
     const js = outJs[0].content

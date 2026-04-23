@@ -422,7 +422,9 @@ export class Validator<
       for (const item of this.opts.skipList) {
         if (item.startsWith(path)) {
           const key = item.slice(path.length)
-          if (!skipList) { skipList = new Set() }
+          if (!skipList) {
+            skipList = new Set()
+          }
           skipList.add(key)
         }
       }

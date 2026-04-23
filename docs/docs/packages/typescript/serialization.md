@@ -68,6 +68,30 @@ const serialized = serializeAnnotatedType(Order, {
 
 Self-referential FKs (e.g., `Employee.managerId → Employee`) are handled automatically via `$ref` resolution.
 
+### Shallow FK targets (`.5` increments)
+
+Fractional `.5` values emit a **shallow ref target** (`TSerializedShallowRefTarget`) at that level — just `{ id, metadata }`, no structural body. Use this when the client needs to identify the referenced table (to show its label, fetch it via a value-help dropdown, link to it) without paying the bandwidth cost of shipping its full field tree.
+
+```typescript
+// Order.customerId → Customer
+const serialized = serializeAnnotatedType(Order, {
+  refDepth: 0.5, // FK target serialized as { id: 'Customer', metadata: {...} } — no props tree
+})
+```
+
+- `0.5` — immediate FK is a shallow target.
+- `1.5` — immediate FK expanded fully; one level deeper is shallow.
+- …and so on for deeper levels.
+
+The shape is:
+
+```typescript
+interface TSerializedShallowRefTarget {
+  id: string // target type's id (e.g. 'Customer')
+  metadata: Record<string, unknown> // interface-level metadata of the target
+}
+```
+
 ## Filtering Annotations
 
 Use `TSerializeOptions` to control which annotations are included in the output. This is useful for stripping sensitive or server-only metadata before sending types to the client.

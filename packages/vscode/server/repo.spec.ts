@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest'
-
 import {
   AnnotationSpec,
   AtscriptDoc,
@@ -9,6 +5,9 @@ import {
   SemanticPrimitiveNode,
 } from '@atscript/core'
 import type { TAtscriptDocConfig } from '@atscript/core'
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { describe, expect, it, vi } from 'vitest'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CompletionItemKind } from 'vscode-languageserver/node'
 
@@ -19,26 +18,35 @@ import { VscodeAtscriptRepo } from './repo'
 // ---------------------------------------------------------------------------
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
-primitives.set('string', new SemanticPrimitiveNode('string', {
-  type: 'string',
-  extensions: {
-    email: { type: 'string', annotations: { 'expect.pattern': '^.+@.+$' } },
-  },
-}))
-primitives.set('number', new SemanticPrimitiveNode('number', {
-  type: 'number',
-  extensions: {
-    int: { type: 'number', annotations: { 'expect.int': true } },
-    positive: { type: 'number', annotations: { 'expect.min': 0 } },
-  },
-}))
+primitives.set(
+  'string',
+  new SemanticPrimitiveNode('string', {
+    type: 'string',
+    extensions: {
+      email: { type: 'string', annotations: { 'expect.pattern': '^.+@.+$' } },
+    },
+  })
+)
+primitives.set(
+  'number',
+  new SemanticPrimitiveNode('number', {
+    type: 'number',
+    extensions: {
+      int: { type: 'number', annotations: { 'expect.int': true } },
+      positive: { type: 'number', annotations: { 'expect.min': 0 } },
+    },
+  })
+)
 primitives.set('boolean', new SemanticPrimitiveNode('boolean', { type: 'boolean' }))
 primitives.set('phantom', new SemanticPrimitiveNode('phantom', { type: 'phantom' }))
-primitives.set('ui', new SemanticPrimitiveNode('ui', {
-  type: 'phantom',
-  isContainer: true,
-  extensions: { action: {}, divider: {} },
-}))
+primitives.set(
+  'ui',
+  new SemanticPrimitiveNode('ui', {
+    type: 'phantom',
+    isContainer: true,
+    extensions: { action: {}, divider: {} },
+  })
+)
 
 const annotations: Record<string, any> = {
   expect: {
@@ -55,7 +63,13 @@ const annotations: Record<string, any> = {
       defType: ['string'],
       argument: [
         { name: 'pattern', type: 'string' as const, description: 'The regex pattern.' },
-        { name: 'flags', optional: true, type: 'string' as const, description: 'Regex flags.', values: ['g', 'i', 'gi'] },
+        {
+          name: 'flags',
+          optional: true,
+          type: 'string' as const,
+          description: 'Regex flags.',
+          values: ['g', 'i', 'gi'],
+        },
       ],
     }),
   },
@@ -106,23 +120,41 @@ interface CapturedHandlers {
 function createMockConnection() {
   const handlers: CapturedHandlers = {}
   const connection = {
-    onCompletion: vi.fn((h: (...args: any[]) => any) => { handlers.onCompletion = h }),
+    onCompletion: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onCompletion = h
+    }),
     onCompletionResolve: vi.fn(),
-    onHover: vi.fn((h: (...args: any[]) => any) => { handlers.onHover = h }),
-    onDefinition: vi.fn((h: (...args: any[]) => any) => { handlers.onDefinition = h }),
-    onReferences: vi.fn((h: (...args: any[]) => any) => { handlers.onReferences = h }),
-    onRenameRequest: vi.fn((h: (...args: any[]) => any) => { handlers.onRenameRequest = h }),
-    onSignatureHelp: vi.fn((h: (...args: any[]) => any) => { handlers.onSignatureHelp = h }),
-    onDidSaveTextDocument: vi.fn((h: (...args: any[]) => any) => { handlers.onDidSaveTextDocument = h }),
+    onHover: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onHover = h
+    }),
+    onDefinition: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onDefinition = h
+    }),
+    onReferences: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onReferences = h
+    }),
+    onRenameRequest: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onRenameRequest = h
+    }),
+    onSignatureHelp: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onSignatureHelp = h
+    }),
+    onDidSaveTextDocument: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onDidSaveTextDocument = h
+    }),
     onDidChangeWatchedFiles: vi.fn(),
     onNotification: vi.fn((method: string, h: (...args: any[]) => any) => {
-      if (method === 'workspace/files') { handlers.workspaceFiles = h }
+      if (method === 'workspace/files') {
+        handlers.workspaceFiles = h
+      }
     }),
     listen: vi.fn(),
     sendDiagnostics: vi.fn(),
     languages: {
       semanticTokens: {
-        onRange: vi.fn((h: (...args: any[]) => any) => { handlers.semanticTokensOnRange = h }),
+        onRange: vi.fn((h: (...args: any[]) => any) => {
+          handlers.semanticTokensOnRange = h
+        }),
       },
     },
   }
@@ -146,7 +178,9 @@ class TestableRepo extends VscodeAtscriptRepo {
 
   protected async _openDocument(id: string): Promise<AtscriptDoc> {
     const doc = this.testDocs.get(id)
-    if (doc) { return doc }
+    if (doc) {
+      return doc
+    }
     throw new Error(`TestableRepo: doc not found for ${id}`)
   }
 
@@ -166,7 +200,9 @@ class TestableRepo extends VscodeAtscriptRepo {
     return this.resolveConfig()
   }
 
-  async checkImports() { /* no-op */ }
+  async checkImports() {
+    /* no-op */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +211,7 @@ class TestableRepo extends VscodeAtscriptRepo {
 
 function createTestableRepo(
   textDocs: Map<string, TextDocument>,
-  atscriptDocs: Map<string, AtscriptDoc>,
+  atscriptDocs: Map<string, AtscriptDoc>
 ) {
   const { handlers, connection } = createMockConnection()
   const documents = createMockDocuments(textDocs)
@@ -215,7 +251,10 @@ describe('helper methods', () => {
   })
 
   it('resolveAnnotateTarget follows type alias to interface', () => {
-    const doc = createDoc('file:///test.as', 'interface User {\n  name: string\n}\ntype Alias = User')
+    const doc = createDoc(
+      'file:///test.as',
+      'interface User {\n  name: string\n}\ntype Alias = User'
+    )
     const { repo } = singleDocRepo('file:///test.as', '')
     const target = repo.resolveAnnotateTarget(doc, 'Alias')
     expect(target).toBeDefined()
@@ -223,7 +262,10 @@ describe('helper methods', () => {
   })
 
   it('getPropsFromDef extracts from interface and structure', () => {
-    const doc = createDoc('file:///test.as', 'interface User {\n  name: string\n  address: { street: string }\n}')
+    const doc = createDoc(
+      'file:///test.as',
+      'interface User {\n  name: string\n  address: { street: string }\n}'
+    )
     const { repo } = singleDocRepo('file:///test.as', '')
 
     // Interface props
@@ -261,37 +303,48 @@ describe('go-to-definition', () => {
     const doc = createDoc('file:///test.as', 'type MyType = string\ninterface I { p: MyType }')
     const result = doc.getToDefinitionAt(1, 18)
     expect(result).toBeDefined()
-    expect(result![0]).toEqual(expect.objectContaining({
-      targetUri: 'file:///test.as',
-      targetRange: expect.objectContaining({
-        start: { line: 0, character: 5 },
-      }),
-    }))
+    expect(result![0]).toEqual(
+      expect.objectContaining({
+        targetUri: 'file:///test.as',
+        targetRange: expect.objectContaining({
+          start: { line: 0, character: 5 },
+        }),
+      })
+    )
   })
 
   it('jumps to cross-file import definition', () => {
     const doc1 = createDoc('file:///home/file1.as', 'export type Shared = string')
-    const doc2 = createDoc('file:///home/file2.as', "import { Shared } from './file1'\ntype T = Shared")
+    const doc2 = createDoc(
+      'file:///home/file2.as',
+      "import { Shared } from './file1'\ntype T = Shared"
+    )
     doc2.updateDependencies([doc1])
     // Line 1: "type T = Shared"  Shared ref at char 9
     const result = doc2.getToDefinitionAt(1, 10)
     expect(result).toBeDefined()
-    expect(result![0]).toEqual(expect.objectContaining({
-      targetUri: 'file:///home/file1.as',
-    }))
+    expect(result![0]).toEqual(
+      expect.objectContaining({
+        targetUri: 'file:///home/file1.as',
+      })
+    )
   })
 
   it('jumps to nested prop via ref chain', () => {
     // Line 0: "interface I { prop: { nested: string } }"
     // Line 1: "interface I2 { p: I.prop.nested }"
-    const doc = createDoc('file:///test.as',
-      'interface I { prop: { nested: string } }\ninterface I2 { p: I.prop.nested }')
+    const doc = createDoc(
+      'file:///test.as',
+      'interface I { prop: { nested: string } }\ninterface I2 { p: I.prop.nested }'
+    )
     // 'nested' starts at char 25 in line 1
     const result = doc.getToDefinitionAt(1, 26)
     expect(result).toBeDefined()
-    expect(result![0]).toEqual(expect.objectContaining({
-      targetUri: 'file:///test.as',
-    }))
+    expect(result![0]).toEqual(
+      expect.objectContaining({
+        targetUri: 'file:///test.as',
+      })
+    )
   })
 
   it('returns undefined for non-.as file', async () => {
@@ -308,7 +361,10 @@ describe('find references', () => {
   it('finds local references', () => {
     // Line 0: "type MyType = string"
     // Line 1: "interface I { p1: MyType; p2: MyType }"
-    const doc = createDoc('file:///test.as', 'type MyType = string\ninterface I { p1: MyType; p2: MyType }')
+    const doc = createDoc(
+      'file:///test.as',
+      'type MyType = string\ninterface I { p1: MyType; p2: MyType }'
+    )
     const defToken = doc.registry.definitions.get('MyType')!
     const refs = doc.usageListFor(defToken)
     expect(refs).toBeDefined()
@@ -317,8 +373,10 @@ describe('find references', () => {
 
   it('finds cross-file references', () => {
     const doc1 = createDoc('file:///home/file1.as', 'export type Shared = string')
-    const doc2 = createDoc('file:///home/file2.as',
-      "import { Shared } from './file1'\ntype T = Shared\ninterface I { p: Shared }")
+    const doc2 = createDoc(
+      'file:///home/file2.as',
+      "import { Shared } from './file1'\ntype T = Shared\ninterface I { p: Shared }"
+    )
     doc2.updateDependencies([doc1])
     const defToken = doc1.registry.definitions.get('Shared')!
     const refs = doc1.usageListFor(defToken)
@@ -452,8 +510,14 @@ describe('rename', () => {
     const doc2 = createDoc(uri2, source2)
     doc2.updateDependencies([doc1])
     const { handlers } = createTestableRepo(
-      new Map([[uri1, td(uri1, source1)], [uri2, td(uri2, source2)]]),
-      new Map([[uri1, doc1], [uri2, doc2]]),
+      new Map([
+        [uri1, td(uri1, source1)],
+        [uri2, td(uri2, source2)],
+      ]),
+      new Map([
+        [uri1, doc1],
+        [uri2, doc2],
+      ])
     )
     const result = await handlers.onRenameRequest!({
       textDocument: { uri: uri1 },
@@ -577,8 +641,14 @@ describe('completions', () => {
     const doc2 = createDoc(uri2, source2)
     doc2.updateDependencies([doc1])
     const { handlers } = createTestableRepo(
-      new Map([[uri1, td(uri1, source1)], [uri2, td(uri2, source2)]]),
-      new Map([[uri1, doc1], [uri2, doc2]]),
+      new Map([
+        [uri1, td(uri1, source1)],
+        [uri2, td(uri2, source2)],
+      ]),
+      new Map([
+        [uri1, doc1],
+        [uri2, doc2],
+      ])
     )
     // Position inside { } at char 9
     const result = await handlers.onCompletion!({
@@ -608,7 +678,8 @@ describe('completions', () => {
 
   it('suggests nested props in annotate block chain', async () => {
     const uri = 'file:///test.as'
-    const source = 'interface User {\n  address: { street: string; city: string }\n}\nannotate User {\n  address.\n}'
+    const source =
+      'interface User {\n  address: { street: string; city: string }\n}\nannotate User {\n  address.\n}'
     const { handlers } = singleDocRepo(uri, source)
     // Position after "address." — the dot at line 4
     const result = await handlers.onCompletion!({
@@ -747,7 +818,8 @@ describe('semantic tokens', () => {
 
   it('marks annotate block entry targeting phantom prop', async () => {
     const uri = 'file:///test.as'
-    const source = 'interface User {\n  tag: phantom\n  name: string\n}\nannotate User {\n  tag\n  name\n}'
+    const source =
+      'interface User {\n  tag: phantom\n  name: string\n}\nannotate User {\n  tag\n  name\n}'
     const { repo } = singleDocRepo(uri, source)
     const result = await repo.provideSemanticTokens(uri)
     // 'tag' entry in annotate block should be marked, 'name' should not contribute phantom tokens

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { SemanticPrimitiveNode } from '../parser/nodes/primitive-node'
 import { primitives } from '../defaults/primitives'
+import { SemanticPrimitiveNode } from '../parser/nodes/primitive-node'
 
 function getPrimitive(name: string): SemanticPrimitiveNode {
   return new SemanticPrimitiveNode(name, primitives[name])
@@ -11,7 +11,9 @@ function resolvePrimitive(rootName: string, chain: string[]): SemanticPrimitiveN
   let node = getPrimitive(rootName)
   for (const segment of chain) {
     const child = node.props.get(segment)
-    if (!child) { return undefined }
+    if (!child) {
+      return undefined
+    }
     // Child props are SemanticPrimitiveNode instances
     node = child as unknown as SemanticPrimitiveNode
   }
@@ -23,9 +25,7 @@ describe('sized integers', () => {
     const numPrim = getPrimitive('number')
     const intPrim = numPrim.props.get('int')
     expect(intPrim).toBeDefined()
-    expect(intPrim!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.int' })
-    )
+    expect(intPrim!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.int' }))
   })
 
   it('number.int.int8 should exist with correct range', () => {
@@ -34,12 +34,8 @@ describe('sized integers', () => {
     expect(intPrim).toBeDefined()
     const int8 = intPrim!.props?.get('int8') as SemanticPrimitiveNode | undefined
     expect(int8).toBeDefined()
-    expect(int8!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.min' })
-    )
-    expect(int8!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.max' })
-    )
+    expect(int8!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.min' }))
+    expect(int8!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.max' }))
     expect(int8!.config.tags).toContain('int8')
   })
 
@@ -100,27 +96,21 @@ describe('string extensions', () => {
     const strPrim = getPrimitive('string')
     const url = strPrim.props.get('url')
     expect(url).toBeDefined()
-    expect(url!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.pattern' })
-    )
+    expect(url!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.pattern' }))
   })
 
   it('string.ipv4 should exist with pattern annotation', () => {
     const strPrim = getPrimitive('string')
     const ipv4 = strPrim.props.get('ipv4')
     expect(ipv4).toBeDefined()
-    expect(ipv4!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.pattern' })
-    )
+    expect(ipv4!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.pattern' }))
   })
 
   it('string.ipv6 should exist with pattern annotation', () => {
     const strPrim = getPrimitive('string')
     const ipv6 = strPrim.props.get('ipv6')
     expect(ipv6).toBeDefined()
-    expect(ipv6!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.pattern' })
-    )
+    expect(ipv6!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.pattern' }))
   })
 
   it('string.ip should exist with multiple patterns (ipv4 + ipv6)', () => {
@@ -136,12 +126,8 @@ describe('string extensions', () => {
     const strPrim = getPrimitive('string')
     const char = strPrim.props.get('char')
     expect(char).toBeDefined()
-    expect(char!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.minLength' })
-    )
-    expect(char!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'expect.maxLength' })
-    )
+    expect(char!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.minLength' }))
+    expect(char!.annotations).toContainEqual(expect.objectContaining({ name: 'expect.maxLength' }))
   })
 })
 
@@ -152,9 +138,7 @@ describe('number.timestamp.created', () => {
     expect(timestamp).toBeDefined()
     const created = timestamp!.props?.get('created') as SemanticPrimitiveNode | undefined
     expect(created).toBeDefined()
-    expect(created!.annotations).toContainEqual(
-      expect.objectContaining({ name: 'db.default.now' })
-    )
+    expect(created!.annotations).toContainEqual(expect.objectContaining({ name: 'db.default.now' }))
     // Should NOT have old db.default.fn
     const fnAnno = created!.annotations?.find(a => a.name === 'db.default.fn')
     expect(fnAnno).toBeUndefined()

@@ -100,14 +100,20 @@ export {
 } from './query-nodes'
 export type { SemanticQueryExprNode, TQueryOperator, TQueryLogicalOperator } from './query-nodes'
 
-export function isQueryLogical(node?: SemanticNode): node is import('./query-nodes').SemanticQueryLogicalNode {
+export function isQueryLogical(
+  node?: SemanticNode
+): node is import('./query-nodes').SemanticQueryLogicalNode {
   return (node as import('./query-nodes').SemanticQueryLogicalNode)?.operands !== undefined
 }
 
-export function isQueryComparison(node?: SemanticNode): node is import('./query-nodes').SemanticQueryComparisonNode {
+export function isQueryComparison(
+  node?: SemanticNode
+): node is import('./query-nodes').SemanticQueryComparisonNode {
   return (node as import('./query-nodes').SemanticQueryComparisonNode)?.left !== undefined
 }
 
-export function isQueryFieldRef(node?: SemanticNode): node is import('./query-nodes').SemanticQueryFieldRefNode {
+export function isQueryFieldRef(
+  node?: SemanticNode
+): node is import('./query-nodes').SemanticQueryFieldRefNode {
   return (node as import('./query-nodes').SemanticQueryFieldRefNode)?.fieldRef !== undefined
 }

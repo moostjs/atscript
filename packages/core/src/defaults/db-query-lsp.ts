@@ -22,9 +22,13 @@ export interface TQueryScope {
  */
 export function getQueryScope(queryArgToken: Token, doc: AtscriptDoc): TQueryScope | undefined {
   const annotationRef = queryArgToken.annotationRef
-  if (!annotationRef) { return undefined }
+  if (!annotationRef) {
+    return undefined
+  }
   const owner = queryArgToken.parentNode
-  if (!owner) { return undefined }
+  if (!owner) {
+    return undefined
+  }
 
   const annotationName = annotationRef.text.slice(1) // remove '@'
 
@@ -46,7 +50,9 @@ export function getQueryScope(queryArgToken: Token, doc: AtscriptDoc): TQuerySco
 function getViewFilterScope(owner: SemanticNode): TQueryScope | undefined {
   const forAnnotations = owner.annotations?.filter(a => a.name === 'db.view.for')
   const entryTypeName = forAnnotations?.[0]?.args[0]?.text
-  if (!entryTypeName) { return undefined }
+  if (!entryTypeName) {
+    return undefined
+  }
 
   const allowedTypes = [entryTypeName]
   const joinsAnnotations = owner.annotations?.filter(a => a.name === 'db.view.joins')
@@ -64,15 +70,19 @@ function getViewFilterScope(owner: SemanticNode): TQueryScope | undefined {
 function getViewJoinsScope(owner: SemanticNode, queryArgToken: Token): TQueryScope | undefined {
   const forAnnotations = owner.annotations?.filter(a => a.name === 'db.view.for')
   const entryTypeName = forAnnotations?.[0]?.args[0]?.text
-  if (!entryTypeName) { return undefined }
+  if (!entryTypeName) {
+    return undefined
+  }
 
   // Find the join target from the same annotation instance
   // The queryArgToken is arg[1] (condition), arg[0] is the join target ref
-  const joinsAnnotation = owner.annotations?.find(a =>
-    a.name === 'db.view.joins' && a.args.includes(queryArgToken)
+  const joinsAnnotation = owner.annotations?.find(
+    a => a.name === 'db.view.joins' && a.args.includes(queryArgToken)
   )
   const joinTargetName = joinsAnnotation?.args[0]?.text
-  if (!joinTargetName) { return undefined }
+  if (!joinTargetName) {
+    return undefined
+  }
 
   return { allowedTypes: [joinTargetName, entryTypeName], unqualifiedTarget: entryTypeName }
 }
@@ -80,8 +90,12 @@ function getViewJoinsScope(owner: SemanticNode, queryArgToken: Token): TQuerySco
 function getRelFilterScope(owner: SemanticNode): TQueryScope | undefined {
   // owner is a prop node with @db.rel.to/@db.rel.from/@db.rel.via
   let def = owner.getDefinition()
-  if (isArray(def)) { def = def?.getDefinition() }
-  if (!isRef(def)) { return undefined }
+  if (isArray(def)) {
+    def = def?.getDefinition()
+  }
+  if (!isRef(def)) {
+    return undefined
+  }
 
   const targetTypeName = def.id!
   const allowedTypes = [targetTypeName]
@@ -101,10 +115,12 @@ function getRelFilterScope(owner: SemanticNode): TQueryScope | undefined {
 export function resolveQueryFieldRef(
   fieldRefNode: SemanticQueryFieldRefNode,
   doc: AtscriptDoc,
-  scope: TQueryScope,
+  scope: TQueryScope
 ): { targetUri: string; doc: AtscriptDoc; prop?: SemanticPropNode } | undefined {
   const typeName = fieldRefNode.typeRef?.text ?? scope.unqualifiedTarget
-  if (!typeName) { return undefined }
+  if (!typeName) {
+    return undefined
+  }
 
   const fieldPath = fieldRefNode.fieldRef.text
   const chain = fieldPath.split('.')
@@ -113,11 +129,15 @@ export function resolveQueryFieldRef(
   // to get the doc where the final prop is defined
   const parentChain = chain.slice(0, -1)
   const parentUnwound = doc.unwindType(typeName, parentChain)
-  if (!parentUnwound?.def) { return undefined }
+  if (!parentUnwound?.def) {
+    return undefined
+  }
 
   // Then resolve with the full chain to find the prop
   const unwound = doc.unwindType(typeName, chain)
-  if (!unwound?.node) { return undefined }
+  if (!unwound?.node) {
+    return undefined
+  }
 
   const prop = unwound.node as SemanticPropNode | undefined
   // Use the parent type's doc (where the prop is defined), not unwound.doc
@@ -134,13 +154,18 @@ export function resolveQueryFieldRef(
  */
 export function getFieldsForType(doc: AtscriptDoc, typeName: string): SemanticPropNode[] {
   const unwound = doc.unwindType(typeName)
-  if (!unwound?.def) { return [] }
+  if (!unwound?.def) {
+    return []
+  }
 
   let def: SemanticNode = doc.mergeIntersection(unwound.def)
   if (isInterface(def)) {
     const resolved = doc.resolveInterfaceExtends(def as SemanticInterfaceNode)
-    if (resolved) { def = resolved }
-    else { def = def.getDefinition() || def }
+    if (resolved) {
+      def = resolved
+    } else {
+      def = def.getDefinition() || def
+    }
   }
   if (isStructure(def) || isInterface(def)) {
     return Array.from(def.props.values())
@@ -151,13 +176,20 @@ export function getFieldsForType(doc: AtscriptDoc, typeName: string): SemanticPr
 /**
  * Get completion scope data for a query context.
  */
-export function getQueryCompletionScope(queryArgToken: Token, doc: AtscriptDoc): {
-  typeNames: string[]
-  unqualifiedTarget: string | null
-  getFields: (typeName: string) => SemanticPropNode[]
-} | undefined {
+export function getQueryCompletionScope(
+  queryArgToken: Token,
+  doc: AtscriptDoc
+):
+  | {
+      typeNames: string[]
+      unqualifiedTarget: string | null
+      getFields: (typeName: string) => SemanticPropNode[]
+    }
+  | undefined {
   const scope = getQueryScope(queryArgToken, doc)
-  if (!scope) { return undefined }
+  if (!scope) {
+    return undefined
+  }
 
   return {
     typeNames: scope.allowedTypes,
@@ -282,7 +314,9 @@ function tokenizeQueryText(text: string): string[] {
       const quote = text[i]
       let j = i + 1
       while (j < text.length && text[j] !== quote) {
-        if (text[j] === '\\') { j++ }
+        if (text[j] === '\\') {
+          j++
+        }
         j++
       }
       tokens.push(text.slice(i, j + 1))

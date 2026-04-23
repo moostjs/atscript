@@ -284,13 +284,17 @@ export function resolveAnnotation(
   const parts = name.split('.')
   let current: TAnnotationsTree | AnnotationSpec | undefined = annotationsTree
   for (const part of parts) {
-    if (part === '$self') { return undefined }
+    if (part === '$self') {
+      return undefined
+    }
     if (!current || isAnnotationSpec(current)) {
       return undefined
     }
     current = current[part]
   }
-  if (isAnnotationSpec(current)) { return current }
+  if (isAnnotationSpec(current)) {
+    return current
+  }
   if (current && !isAnnotationSpec(current) && current.$self) {
     return current.$self
   }

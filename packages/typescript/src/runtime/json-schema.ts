@@ -155,9 +155,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           const mapping: Record<string, string> = {}
           for (const [val, idx] of Object.entries(disc.indexMapping)) {
             const item = d.type.items[idx]
-            mapping[val] = item.id && defs[item.id]
-              ? `#/$defs/${item.id}`
-              : `#/oneOf/${idx}`
+            mapping[val] = item.id && defs[item.id] ? `#/$defs/${item.id}` : `#/oneOf/${idx}`
           }
           return {
             oneOf,

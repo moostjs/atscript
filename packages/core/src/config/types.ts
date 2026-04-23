@@ -10,9 +10,7 @@ export interface TDbConfigDeclarative {
   exclude?: string[]
 }
 
-export type TDbConfig =
-  | (() => unknown | Promise<unknown>)
-  | TDbConfigDeclarative
+export type TDbConfig = (() => unknown | Promise<unknown>) | TDbConfigDeclarative
 
 export interface TAtscriptConfigInput {
   rootDir: string

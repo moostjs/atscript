@@ -149,7 +149,7 @@ const validator = Product.validator({ plugins: [skipSensitive] })
 Plugins can receive context through the third argument to `validate()`:
 
 ```typescript
-const roleAware: TValidatorPlugin = (ctx) => {
+const roleAware: TValidatorPlugin = ctx => {
   const { context } = ctx
   if (context && (context as { role: string }).role === 'admin') {
     return true

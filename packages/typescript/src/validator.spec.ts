@@ -147,13 +147,12 @@ describe('Validator at objects', () => {
     const cardType = defineAnnotatedType('object')
       .prop('number', defineAnnotatedType().designType('string').$type)
       .prop('holderName', defineAnnotatedType().designType('string').$type)
-    const paypalType = defineAnnotatedType('object')
-      .prop('email', defineAnnotatedType().designType('string').$type)
-    const unionType = defineAnnotatedType('union')
-      .item(cardType.$type)
-      .item(paypalType.$type)
-    const rootType = defineAnnotatedType('object')
-      .prop('payment', unionType.$type)
+    const paypalType = defineAnnotatedType('object').prop(
+      'email',
+      defineAnnotatedType().designType('string').$type
+    )
+    const unionType = defineAnnotatedType('union').item(cardType.$type).item(paypalType.$type)
+    const rootType = defineAnnotatedType('object').prop('payment', unionType.$type)
     const validator = new Validator(rootType.$type, { unknownProps: 'strip' })
     const data = { payment: { email: 'test@test.com' } }
     expect(validator.validate(data, true)).toBe(true)
@@ -161,15 +160,16 @@ describe('Validator at objects', () => {
   })
 
   it('should strip unknown props from the matching union branch', () => {
-    const cardType = defineAnnotatedType('object')
-      .prop('number', defineAnnotatedType().designType('string').$type)
-    const paypalType = defineAnnotatedType('object')
-      .prop('email', defineAnnotatedType().designType('string').$type)
-    const unionType = defineAnnotatedType('union')
-      .item(cardType.$type)
-      .item(paypalType.$type)
-    const rootType = defineAnnotatedType('object')
-      .prop('payment', unionType.$type)
+    const cardType = defineAnnotatedType('object').prop(
+      'number',
+      defineAnnotatedType().designType('string').$type
+    )
+    const paypalType = defineAnnotatedType('object').prop(
+      'email',
+      defineAnnotatedType().designType('string').$type
+    )
+    const unionType = defineAnnotatedType('union').item(cardType.$type).item(paypalType.$type)
+    const rootType = defineAnnotatedType('object').prop('payment', unionType.$type)
     const validator = new Validator(rootType.$type, { unknownProps: 'strip' })
     const data = { payment: { email: 'test@test.com', extra: 'junk' } as any }
     expect(validator.validate(data, true)).toBe(true)

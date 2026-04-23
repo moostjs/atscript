@@ -2,6 +2,10 @@
 
 A universal type and metadata description language. Atscript unifies data model definitions, metadata, and data constraints into a single source of truth (`.as` files) that can be shared across languages, stacks, and frontend/backend boundaries.
 
+## AI agents
+
+The canonical agent skill lives at [skills/atscript/](skills/atscript/) (a lean `SKILL.md` index + progressive-disclosure `references/*.md`). Agents pull it in via `npx skills add moostjs/atscript`. Load the relevant reference file for the domain being edited — do not load the whole tree.
+
 ## Project Vision
 
 Full-stack developers face a recurring problem: data models, metadata (labels, types, indexed fields), and constraints (regexp, sizes, required/optional) are scattered across multiple places. Atscript solves this by providing a single `.as` definition that covers format, types, metadata, validation constraints, DB-related metadata (indexes, key fields), and UI-related metadata (labels, component names, visibility) — all shareable across languages and stacks.
@@ -79,6 +83,7 @@ Before reporting TypeScript errors or trying to fix type issues, always rebuild 
 When tests need Atscript types (annotated types with `@db.*`, `@meta.id`, etc.), always use `.as` fixture files compiled via `prepareFixtures()` from `@atscript/typescript/test-utils`. **Do not** hand-write `defineAnnotatedType` (`$()`) builder chains — the builder API is designed for generated code and has subtle behaviors (e.g. `$('object', Class)` resets the type, metadata propagation differs from compiled output, lazy flatten timing) that make hand-written types unreliable in tests.
 
 Pattern:
+
 1. Create `.as` files in `__test__/fixtures/` (e.g. `rel-task.as`)
 2. Call `await prepareFixtures({ rootDir, entries: ['rel-task.as'] })` in `beforeAll` — this compiles the selected `.as` files to `.as.js` + `.as.d.ts` on every test run. `tsPlugin()` is auto-injected; pass only extra plugins.
 3. Import compiled types: `const { Task } = await import('./fixtures/rel-task.as.js')`
@@ -103,15 +108,16 @@ Both `.as.js` and `.as.d.ts` for fixtures are gitignored (`*.as.js`, `*.as.d.ts`
 
 All packages under `packages/` follow a strict naming convention:
 
-| Category | Pattern | Examples |
-|----------|---------|----------|
-| **DB-related** | `db-*` | `db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools` |
-| **DB sub-entries** | `db/<feature>` | `db/plugin`, `db/rel`, `db/agg`, `db/sync`, `db/shared` |
-| **DB adapters** | `db-<engine>` | `db-sqlite`, `db-mongo`, `db-mysql` |
-| **Moost integrations** | `moost-*` | `moost-db`, `moost-validator` |
-| **Non-DB packages** | descriptive name | `core`, `typescript`, `unplugin`, `vscode` |
+| Category               | Pattern          | Examples                                                  |
+| ---------------------- | ---------------- | --------------------------------------------------------- |
+| **DB-related**         | `db-*`           | `db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-sql-tools` |
+| **DB sub-entries**     | `db/<feature>`   | `db/plugin`, `db/rel`, `db/agg`, `db/sync`, `db/shared`   |
+| **DB adapters**        | `db-<engine>`    | `db-sqlite`, `db-mongo`, `db-mysql`                       |
+| **Moost integrations** | `moost-*`        | `moost-db`, `moost-validator`                             |
+| **Non-DB packages**    | descriptive name | `core`, `typescript`, `unplugin`, `vscode`                |
 
 Key rules:
+
 - Every DB-related package starts with `db-` (except `db` itself, the primary DB package)
 - `db` features are exposed as sub-entries (`/plugin`, `/rel`, `/agg`, `/sync`, `/shared`), not separate packages
 - Adapter packages use `db-<engine>` (e.g. `db-mongo`, not `mongo`)
@@ -130,15 +136,17 @@ Key rules:
 Each package that reads annotation metadata has a generated `atscript.d.ts` declaring the global `AtscriptMetadata` interface. This gives `metadata.get('db.search.vector')` a precise return type (e.g. `{ dimensions: number, similarity?: string, indexName?: string } | undefined`) — no manual type casts needed.
 
 **Do:**
+
 ```typescript
 const vec = metadata.get('db.search.vector')        // correctly typed
 for (const name of metadata.get('db.search.filter') || []) { ... }  // string[]
 ```
 
 **Don't:**
+
 ```typescript
-const vec = metadata.get('db.search.vector') as any  // loses type safety
-const vec = metadata.get('db.search.vector') as AtscriptMetadata['db.search.vector'] | undefined  // redundant
+const vec = metadata.get('db.search.vector') as any // loses type safety
+const vec = metadata.get('db.search.vector') as AtscriptMetadata['db.search.vector'] | undefined // redundant
 ```
 
 If `atscript.d.ts` is stale (missing new annotations), regenerate it with `npx asc -f dts` from the package directory. The only valid cast is narrowing a broad type to a stricter union (e.g. `string` → `'cosine' | 'euclidean' | 'dotProduct'`) when the consuming API requires it.

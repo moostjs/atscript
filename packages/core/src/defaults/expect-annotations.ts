@@ -311,7 +311,8 @@ export const expectAnnotations: TAnnotationsTree = {
           name: 'message',
           optional: true,
           type: 'string',
-          description: 'Optional custom error message (used by @expect.array.uniqueItems when checking key-based uniqueness).',
+          description:
+            'Optional custom error message (used by @expect.array.uniqueItems when checking key-based uniqueness).',
         },
       ],
       validate(token, args, doc) {

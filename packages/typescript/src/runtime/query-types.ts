@@ -1,10 +1,12 @@
 import type { TAtscriptAnnotatedType } from './annotated-type'
 
 /** Runtime shape of a ref annotation argument (lazy type reference with optional chain). */
-export type AtscriptRef = {
-  type: () => TAtscriptAnnotatedType
-  field: string
-} | (() => TAtscriptAnnotatedType)
+export type AtscriptRef =
+  | {
+      type: () => TAtscriptAnnotatedType
+      field: string
+    }
+  | (() => TAtscriptAnnotatedType)
 
 /** Field reference within a query expression. */
 export interface AtscriptQueryFieldRef {

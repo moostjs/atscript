@@ -55,10 +55,7 @@ export function parseBareSpecifier(specifier: string): { packageName: string; su
  * Resolve a subpath against a package.json `exports` field using the `atscript` condition.
  * Returns the resolved file path relative to the package directory, or undefined.
  */
-export function resolvePackageExports(
-  exports: unknown,
-  subpath: string
-): string | undefined {
+export function resolvePackageExports(exports: unknown, subpath: string): string | undefined {
   if (!exports || typeof exports !== 'object') {
     return undefined
   }
@@ -216,9 +213,10 @@ async function _resolveBareSpecifier(
       }
 
       // Fallback: direct file access
-      const directPath = subpath === '.'
-        ? path.join(pkgDir, 'index.as')
-        : path.join(pkgDir, `${subpath.slice(2)}.as`)
+      const directPath =
+        subpath === '.'
+          ? path.join(pkgDir, 'index.as')
+          : path.join(pkgDir, `${subpath.slice(2)}.as`)
 
       if (await fileExists(directPath)) {
         return resolveRealPath(directPath)

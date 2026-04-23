@@ -30,7 +30,11 @@ export type {
  *
  * Use this for type-safe filters and selects with dot-notation field paths.
  */
-export type FlatOf<T> = T extends { __flat: infer F } ? F : T extends TAtscriptAnnotatedType ? TAtscriptDataType<T> : unknown
+export type FlatOf<T> = T extends { __flat: infer F }
+  ? F
+  : T extends TAtscriptAnnotatedType
+    ? TAtscriptDataType<T>
+    : unknown
 
 /**
  * Extracts the primary key type from an Atscript annotated type.
@@ -55,7 +59,9 @@ export type OwnPropsOf<T> = T extends { __ownProps: infer O } ? O : FlatOf<T>
  * `__navProps` maps nav prop names to their declared types (e.g., `{ author: Author, comments: Comment[] }`).
  * Returns `Record<string, never>` when no `__navProps` exists (no nav props or pre-feature type).
  */
-export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<string, unknown> } ? N : Record<string, never>
+export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<string, unknown> }
+  ? N
+  : Record<string, never>
 
 export * from './runtime/validator'
 
@@ -72,9 +78,18 @@ export { throwFeatureDisabled } from './runtime/throw-disabled'
 export { flattenAnnotatedType } from './runtime/flatten'
 export type { TFlattenOptions } from './runtime/flatten'
 
-export type { AtscriptRef, AtscriptQueryNode, AtscriptQueryFieldRef, AtscriptQueryComparison } from './runtime/query-types'
+export type {
+  AtscriptRef,
+  AtscriptQueryNode,
+  AtscriptQueryFieldRef,
+  AtscriptQueryComparison,
+} from './runtime/query-types'
 
-export { serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION } from './runtime/serialize'
+export {
+  serializeAnnotatedType,
+  deserializeAnnotatedType,
+  SERIALIZE_VERSION,
+} from './runtime/serialize'
 export type {
   TSerializedAnnotatedType,
   TSerializedAnnotatedTypeInner,

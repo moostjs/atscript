@@ -340,7 +340,12 @@ export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscr
 }
 
 function emptyObjectTypeDef(): TAtscriptTypeDef {
-  return { kind: 'object', props: new Map(), propsPatterns: [], tags: new Set() } as TAtscriptTypeDef
+  return {
+    kind: 'object',
+    props: new Map(),
+    propsPatterns: [],
+    tags: new Set(),
+  } as TAtscriptTypeDef
 }
 
 function toMetadataMap(record: Record<string, unknown>): TMetadataMap<AtscriptMetadata> {
@@ -355,11 +360,9 @@ function deserializeNode(
     const refId = (data.type as TSerializedTypeRef).id
     return (
       resolved.get(refId) ||
-      createAnnotatedTypeNode(
-        emptyObjectTypeDef(),
-        new Map() as TMetadataMap<AtscriptMetadata>,
-        { id: refId }
-      )
+      createAnnotatedTypeNode(emptyObjectTypeDef(), new Map() as TMetadataMap<AtscriptMetadata>, {
+        id: refId,
+      })
     )
   }
 

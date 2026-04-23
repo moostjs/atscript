@@ -4,8 +4,8 @@ import { parseAtscript } from '..'
 import { AnnotationSpec } from '../../annotations'
 import { AtscriptDoc } from '../../document'
 import { tokenize } from '../../tokenizer'
-import type { SemanticQueryComparisonNode, SemanticQueryLogicalNode } from '../nodes/query-nodes'
 import { SemanticPrimitiveNode } from '../nodes/primitive-node'
+import type { SemanticQueryComparisonNode, SemanticQueryLogicalNode } from '../nodes/query-nodes'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
 primitives.set('string', new SemanticPrimitiveNode('string', { type: 'string' }))

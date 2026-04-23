@@ -432,13 +432,13 @@ const withDbDefaults = createDataFromAnnotatedType(Product, { mode: 'db' })
 
 ### Modes
 
-| Mode        | Value source                                         | Optional props                          |
-| ----------- | ---------------------------------------------------- | --------------------------------------- |
-| `'empty'`   | Structural defaults (`''`, `0`, `false`, `[]`, `{}`) | Always skipped                          |
-| `'default'` | `@meta.default` annotations                          | Skipped unless annotated                |
-| `'example'` | `@meta.example` annotations                          | Always included                         |
-| `'db'`      | `@db.default` (parsed) or `@db.default.increment`/`uuid`/`now` (returns function name string) | Skipped unless annotated |
-| `function`  | Custom resolver callback                             | Skipped unless resolver returns a value |
+| Mode        | Value source                                                                                  | Optional props                          |
+| ----------- | --------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `'empty'`   | Structural defaults (`''`, `0`, `false`, `[]`, `{}`)                                          | Always skipped                          |
+| `'default'` | `@meta.default` annotations                                                                   | Skipped unless annotated                |
+| `'example'` | `@meta.example` annotations                                                                   | Always included                         |
+| `'db'`      | `@db.default` (parsed) or `@db.default.increment`/`uuid`/`now` (returns function name string) | Skipped unless annotated                |
+| `function`  | Custom resolver callback                                                                      | Skipped unless resolver returns a value |
 
 ### Annotations
 

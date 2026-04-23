@@ -43,7 +43,10 @@ export function parseQueryExpression(
     messages.push({
       severity: 1,
       message: `Unexpected token in query expression: "${ni.$.text}"`,
-      range: ni.$.getRange?.() ?? { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      range: ni.$.getRange?.() ?? {
+        start: { line: 0, character: 0 },
+        end: { line: 0, character: 0 },
+      },
     })
   }
 
@@ -142,10 +145,7 @@ function parseUnaryExpr(ni: NodeIterator, messages: TMessages): SemanticQueryExp
   return parseComparison(ni, messages)
 }
 
-function parseComparison(
-  ni: NodeIterator,
-  messages: TMessages
-): SemanticQueryExprNode | undefined {
+function parseComparison(ni: NodeIterator, messages: TMessages): SemanticQueryExprNode | undefined {
   const left = parseFieldRef(ni, messages)
   if (!left) {
     return undefined
@@ -402,7 +402,10 @@ function parseValueList(
 }
 
 function pushError(ni: NodeIterator, messages: TMessages, message: string): void {
-  const range = ni.$?.getRange?.() ?? { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } }
+  const range = ni.$?.getRange?.() ?? {
+    start: { line: 0, character: 0 },
+    end: { line: 0, character: 0 },
+  }
   messages.push({
     severity: 1,
     message,

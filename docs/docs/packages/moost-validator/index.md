@@ -13,7 +13,7 @@ If you are evaluating this package for the first time, read these in order:
 1. [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation)
 2. [Validation Pipe](/packages/moost-validator/validation-pipe)
 3. [Error Handling](/packages/moost-validator/error-handling)
-:::
+   :::
 
 ## What This Package Gives You
 

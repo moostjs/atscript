@@ -10,8 +10,12 @@ Create `atscript.config.js` in your project root. Supported formats:
 
 - `atscript.config.js` - CommonJS
 - `atscript.config.mjs` - ESM module
-- `atscript.config.ts` - TypeScript (requires tsx/ts-node)
+- `atscript.config.cjs` - Explicit CommonJS
+- `atscript.config.ts` - TypeScript (bundled with rolldown)
 - `atscript.config.mts` - TypeScript ESM
+- `atscript.config.cts` - TypeScript CommonJS
+
+When multiple formats coexist in the same directory, TypeScript variants (`.ts` / `.mts` / `.cts`) take precedence over JavaScript variants.
 
 ## defineConfig Helper
 
@@ -124,9 +128,9 @@ annotations: {
 
 | Option          | Type                    | Default     | Description                                                                                 |
 | --------------- | ----------------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `description`   | `string`                | —          | Documentation shown in IntelliSense                                                         |
-| `argument`      | `object \| object[]`    | —          | Argument definition(s) with `name`, `type`, optional `values`                               |
-| `nodeType`      | `string[]`              | —          | Restrict to node types (e.g., `['prop']`, `['interface']`)                                  |
+| `description`   | `string`                | —           | Documentation shown in IntelliSense                                                         |
+| `argument`      | `object \| object[]`    | —           | Argument definition(s) with `name`, `type`, optional `values`                               |
+| `nodeType`      | `string[]`              | —           | Restrict to node types (e.g., `['prop']`, `['interface']`)                                  |
 | `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node. Values are stored as arrays |
 | `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How same-named annotations combine during merging. Only relevant when `multiple: true`      |
 
@@ -141,17 +145,18 @@ When `multiple: true` and `mergeStrategy: 'replace'` (the default), the higher-p
 
 ```javascript
 import ts from '@atscript/typescript'
-import MongoPlugin from '@atscript/db-mongo/plugin'
 
-plugins: [ts(), MongoPlugin()]
+plugins: [ts()]
 ```
+
+Plugins from external ecosystems follow the same pattern — e.g. database plugins like `@atscript/db-*` live in a [separate repo](https://db.atscript.dev) and are imported the same way.
 
 ### Output Options
 
 #### `format`
 
 - **Type:** `string`
-- **Default:** Plugin-dependent (the TypeScript plugin defaults to `dts`)
+- **Default:** Plugin-dependent (the TypeScript plugin emits `.d.ts` when `format` is unset or set to `'dts'`; pass `'js'` to emit runtime metadata instead)
 - **Description:** Output format that plugins should generate
 
 ```javascript

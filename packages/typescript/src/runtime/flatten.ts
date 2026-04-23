@@ -89,14 +89,18 @@ export function flattenAnnotatedType(
     // Cycle detection for lazy refs resolved inside arrays
     const resolvedId = def.id
     if (resolvedId) {
-      if (visitedIds.has(resolvedId)) { return }
+      if (visitedIds.has(resolvedId)) {
+        return
+      }
       visitedIds.add(resolvedId)
     }
     switch (def.type.kind) {
       case 'object': {
         // Re-check id after lazy resolution (type getter may have set it)
         if (!resolvedId && def.id) {
-          if (visitedIds.has(def.id)) { return }
+          if (visitedIds.has(def.id)) {
+            return
+          }
           visitedIds.add(def.id)
         }
         const items = Array.from(def.type.props.entries())
@@ -134,7 +138,9 @@ export function flattenAnnotatedType(
       }
       return
     }
-    if (typeId) { visitedIds.add(typeId) }
+    if (typeId) {
+      visitedIds.add(typeId)
+    }
     const kind = def.type.kind
     // Re-check id after accessing .type (lazy refs resolve id on first .type access)
     if (!typeId && def.id) {

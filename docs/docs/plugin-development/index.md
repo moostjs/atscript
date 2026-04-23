@@ -27,7 +27,7 @@ If you are building your first plugin, read these in order:
 3. [Building a Code Generator](/plugin-development/code-generation)
 4. [Testing Plugins](/plugin-development/testing-plugins)
 5. [VSCode & Build Integration](/plugin-development/tooling-integration)
-:::
+   :::
 
 Keep [Plugin Architecture](/plugin-development/architecture) and [Plugin Hooks Reference](/plugin-development/plugin-hooks) for later, when you need the deeper model.
 

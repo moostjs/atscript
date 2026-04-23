@@ -150,11 +150,11 @@ Atscript provides common-purpose annotations:
 - `@expect.int "Custom error message"` - Must be integer (optional message)
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
 - `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
-- `@expect.array.key` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself)
+- `@expect.array.key "Custom error message"` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself; optional message)
 
 `@expect.array.key` has compile-time constraints: the field must be `string` or `number`, cannot be optional, and multiple key fields form a **composite key**.
 
-All validation annotations accept an optional custom error message as the last argument (except `@expect.array.key`). When validation fails, the custom message is used instead of the default error message.
+All validation annotations accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
 
 #### Array Annotations Example
 

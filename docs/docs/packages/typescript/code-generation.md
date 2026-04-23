@@ -71,8 +71,8 @@ Generates:
 
 ```typescript
 export declare class Post extends Base {
-  updatedBy: string  // from Auditable (second parent, inlined)
-  title: string      // own prop
+  updatedBy: string // from Auditable (second parent, inlined)
+  title: string // own prop
   // id and createdAt come via TS extends from Base
   static __is_atscript_annotated_type: true
   // ... static members
@@ -106,9 +106,9 @@ The same Product `.as` file generates:
 import {
   defineAnnotatedType as $,
   annotate as $a,
-  buildJsonSchema as $$,           // only with jsonSchema: 'lazy'
+  buildJsonSchema as $$, // only with jsonSchema: 'lazy'
   createDataFromAnnotatedType as $e, // only with exampleData: true
-  throwFeatureDisabled as $d,       // only with jsonSchema: false (default)
+  throwFeatureDisabled as $d, // only with jsonSchema: false (default)
 } from '@atscript/typescript/utils'
 
 export class Product {

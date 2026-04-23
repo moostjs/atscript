@@ -294,11 +294,13 @@ export class AtscriptRepo {
       const fromDir = atscript.id.slice(7).split('/').slice(0, -1).join('/')
       const resolved = await resolveBareSpecifier(from.text, fromDir)
       if (!resolved) {
-        atscript.registerMessages([{
-          severity: 1,
-          message: `"${from.text}" not found`,
-          range: from.range,
-        }])
+        atscript.registerMessages([
+          {
+            severity: 1,
+            message: `"${from.text}" not found`,
+            range: from.range,
+          },
+        ])
         return
       }
       const resolvedUri = `file://${resolved}`
@@ -309,11 +311,13 @@ export class AtscriptRepo {
     }
 
     if (forId === atscript.id) {
-      atscript.registerMessages([{
-        severity: 1,
-        message: '"import" cannot import itself',
-        range: from.range,
-      }])
+      atscript.registerMessages([
+        {
+          severity: 1,
+          message: '"import" cannot import itself',
+          range: from.range,
+        },
+      ])
       return
     }
     let external: AtscriptDoc | undefined
@@ -323,19 +327,23 @@ export class AtscriptRepo {
       await this.checkImports(external, checked)
       for (const token of imports) {
         if (!external.exports.has(token.text)) {
-          atscript.registerMessages([{
-            severity: 1,
-            message: `"${from.text}" has no exported member "${token.text}"`,
-            range: token.range,
-          }])
+          atscript.registerMessages([
+            {
+              severity: 1,
+              message: `"${from.text}" has no exported member "${token.text}"`,
+              range: token.range,
+            },
+          ])
         }
       }
     } catch (error) {
-      atscript.registerMessages([{
-        severity: 1,
-        message: `"${from.text}" not found`,
-        range: from.range,
-      }])
+      atscript.registerMessages([
+        {
+          severity: 1,
+          message: `"${from.text}" not found`,
+          range: from.range,
+        },
+      ])
     }
     return external
   }

@@ -156,5 +156,4 @@ export const metaAnnotations: TAnnotationsTree = {
       description: 'The example value. Strings are used as-is; other types are parsed as JSON.',
     },
   }),
-
 }

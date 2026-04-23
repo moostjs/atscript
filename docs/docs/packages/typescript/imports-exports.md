@@ -30,6 +30,7 @@ import { Product } from 'shared-types/product.as'
 ```
 
 The bundler (`unplugin-atscript`) and TypeScript resolve these through the package's `exports` field:
+
 - **Bundlers** use the `"import"` condition to find the compiled `.as.mjs`/`.as.js`
 - **TypeScript** uses the `"types"` condition to find the `.as.d.ts` declarations
 

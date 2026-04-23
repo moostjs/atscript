@@ -30,14 +30,14 @@ new AnnotationSpec({
 
 | Option          | Type                    | Default     | Description                                                                                        |
 | --------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `description`   | `string`                | —          | Documentation shown in IntelliSense hover                                                          |
-| `nodeType`      | `TNodeEntity[]`         | —          | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                     |
-| `argument`      | `object \| object[]`    | —          | Argument definition(s)                                                                             |
+| `description`   | `string`                | —           | Documentation shown in IntelliSense hover                                                          |
+| `nodeType`      | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                     |
+| `argument`      | `object \| object[]`    | —           | Argument definition(s)                                                                             |
 | `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                     |
 | `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                   |
-| `defType`       | `string[]`              | —          | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
-| `validate`      | `function`              | —          | Custom validation at parse time                                                                    |
-| `modify`        | `function`              | —          | AST mutation after validation                                                                      |
+| `defType`       | `string[]`              | —           | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
+| `validate`      | `function`              | —           | Custom validation at parse time                                                                    |
+| `modify`        | `function`              | —           | AST mutation after validation                                                                      |
 
 ## Registering Annotations via config()
 

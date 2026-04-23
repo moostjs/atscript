@@ -72,10 +72,13 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
             .map(t => {
               if (t.type === 'object' && 'props' in t) {
                 return `{ ${Object.entries(t.props)
-                  .map(([k, v]) => `${wrapProp(k)}${(v as { optional?: boolean }).optional ? '?' : ''}: ${(v as { type: string }).type}`)
+                  .map(
+                    ([k, v]) =>
+                      `${wrapProp(k)}${(v as { optional?: boolean }).optional ? '?' : ''}: ${(v as { type: string }).type}`
+                  )
                   .join(', ')} }`
               } else {
-                return ('optional' in t && t.optional) ? `${t.type} | true` : t.type
+                return 'optional' in t && t.optional ? `${t.type} | true` : t.type
               }
             })
             .join(' | ')

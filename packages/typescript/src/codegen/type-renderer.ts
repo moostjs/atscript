@@ -117,11 +117,18 @@ export class TypeRenderer extends BaseRenderer {
       return this.write('[]')
     }
     if (isPrimitive(def as SemanticNode)) {
-      return this.write(renderPrimitiveTypeDef((def as unknown as SemanticPrimitiveNode).config.type))
+      return this.write(
+        renderPrimitiveTypeDef((def as unknown as SemanticPrimitiveNode).config.type)
+      )
     }
   }
 
-  renderStructure(struct: SemanticStructureNode, asClass?: string, interfaceNode?: SemanticInterfaceNode, filterProps?: Map<string, SemanticPropNode>) {
+  renderStructure(
+    struct: SemanticStructureNode,
+    asClass?: string,
+    interfaceNode?: SemanticInterfaceNode,
+    filterProps?: Map<string, SemanticPropNode>
+  ) {
     this.blockln('{}')
     const patterns = [] as SemanticPropNode[]
     const propsDefs = new Set<string>()
@@ -236,12 +243,7 @@ export class TypeRenderer extends BaseRenderer {
           }
         }
         // Render only props NOT in first parent
-        this.renderStructure(
-          resolved as SemanticStructureNode,
-          node.id!,
-          node,
-          firstParentProps
-        )
+        this.renderStructure(resolved as SemanticStructureNode, node.id!, node, firstParentProps)
       } else {
         this.writeln('{}')
       }
@@ -345,7 +347,9 @@ export class TypeRenderer extends BaseRenderer {
    * and `$with` operations in the DB layer.
    */
   private hasDbEntity(node: SemanticInterfaceNode): boolean {
-    return !!node.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')
+    return !!node.annotations?.some(
+      a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for'
+    )
   }
 
   /**
@@ -371,7 +375,10 @@ export class TypeRenderer extends BaseRenderer {
    * Renders the `static __ownProps` property — table-owned fields only (no nav props).
    */
   private renderOwnProps(node: SemanticInterfaceNode) {
-    this.renderFlatMap('__ownProps', flattenInterfaceNode(this.doc, node, { skipNavProps: true }), { leadingNewline: true, trailingNewline: true })
+    this.renderFlatMap('__ownProps', flattenInterfaceNode(this.doc, node, { skipNavProps: true }), {
+      leadingNewline: true,
+      trailingNewline: true,
+    })
   }
 
   /**
@@ -410,9 +417,10 @@ export class TypeRenderer extends BaseRenderer {
         // and gives the renderer ref nodes it knows how to resolve to TS types).
         // Fall back to descriptor.def for synthetic union merges or missing propNode.
         const originalDef = descriptor.propNode?.getDefinition()
-        const defToRender = originalDef && !(isGroup(descriptor.def) && descriptor.def !== originalDef)
-          ? originalDef
-          : descriptor.def
+        const defToRender =
+          originalDef && !(isGroup(descriptor.def) && descriptor.def !== originalDef)
+            ? originalDef
+            : descriptor.def
         const renderedDef = this.renderTypeDefString(defToRender)
         renderedDef.split('\n').forEach(l => this.writeln(l))
       }
@@ -608,12 +616,20 @@ export class TypeRenderer extends BaseRenderer {
     const measures: string[] = []
 
     for (const [name, prop] of structNode.props) {
-      if (prop.token('identifier')?.pattern) { continue }
-      if (prop.countAnnotations('db.column.dimension') > 0) { dims.push(name) }
-      if (prop.countAnnotations('db.column.measure') > 0) { measures.push(name) }
+      if (prop.token('identifier')?.pattern) {
+        continue
+      }
+      if (prop.countAnnotations('db.column.dimension') > 0) {
+        dims.push(name)
+      }
+      if (prop.countAnnotations('db.column.measure') > 0) {
+        measures.push(name)
+      }
     }
 
-    if (dims.length === 0 && measures.length === 0) { return }
+    if (dims.length === 0 && measures.length === 0) {
+      return
+    }
 
     this.writeln()
     if (dims.length > 0) {

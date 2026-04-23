@@ -1,13 +1,15 @@
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
 import { nextTick } from 'vue'
+
 import HomeLayout from './HomeLayout.vue'
 import RoadmapVisual from './RoadmapVisual.vue'
-
 import './style.css'
 
 function colorizeAtscriptAnnotations() {
-  if (typeof window === 'undefined') { return }
+  if (typeof window === 'undefined') {
+    return
+  }
   const lines = window.document.querySelectorAll('.language-atscript code .line')
   lines.forEach((line: Element) => {
     const spans = line.querySelectorAll('span')

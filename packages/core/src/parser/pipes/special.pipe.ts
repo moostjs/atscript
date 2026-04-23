@@ -143,7 +143,10 @@ export function annotations() {
           ni.accepted()
           ni.move()
           // Chain ref continuation: consume .identifier segments for ref args
-          if (argToken.type === 'identifier' && !['true', 'false', 'undefined', 'null'].includes(argToken.text)) {
+          if (
+            argToken.type === 'identifier' &&
+            !['true', 'false', 'undefined', 'null'].includes(argToken.text)
+          ) {
             let chainText = argToken.text
             while (ni.satisfies(opts.dot) && ni.next()?.satisfies(opts.ident)) {
               ni.accepted()

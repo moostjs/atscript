@@ -147,7 +147,10 @@ async function rolldownPackages(ws) {
     // Build input map: { name: path } for code-splitting across entries
     const input = {}
     for (const entry of entries) {
-      const name = entry.split('/').pop().replace(/\.\w+$/u, '')
+      const name = entry
+        .split('/')
+        .pop()
+        .replace(/\.\w+$/u, '')
       input[name] = path.join(`packages/${ws}`, entry)
     }
     const inputOptions = {
@@ -169,16 +172,21 @@ async function rolldownPackages(ws) {
       const { ext, format } = FORMATS[f]
       const { output } = await bundle.generate({ format, comments: 'preserve-legal' })
       for (const chunk of output) {
-        if (chunk.type !== 'chunk') { continue }
+        if (chunk.type !== 'chunk') {
+          continue
+        }
         const chunkTarget = `./packages/${ws}/dist/${chunk.fileName.replace(/\.js$/, ext)}`
         // Rewrite chunk import paths from .js to the target extension
-        const code = ext === '.js' ? chunk.code : chunk.code.replace(
-          /((?:from|import)\s*\(?["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`
-        ).replace(
-          /(require\(["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`
-        )
+        const code =
+          ext === '.js'
+            ? chunk.code
+            : chunk.code
+                .replace(/((?:from|import)\s*\(?["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`)
+                .replace(/(require\(["']\.\/[^"']+)\.js(["'])/g, `$1${ext}$2`)
         writeFileSync(chunkTarget, code)
-        if (chunk.isEntry) { created.push(chunkTarget) }
+        if (chunk.isEntry) {
+          created.push(chunkTarget)
+        }
       }
     }
     done(created.join(' \t'))

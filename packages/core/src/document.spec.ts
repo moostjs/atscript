@@ -117,7 +117,9 @@ describe('document', () => {
 
     doc.rekeyImport('bare:my-lib/user.as', 'file:///resolved/node_modules/my-lib/src/user.as')
     expect(doc.imports.has('bare:my-lib/user.as')).toBe(false)
-    expect(doc.imports.get('file:///resolved/node_modules/my-lib/src/user.as')?.from.text).toBe('my-lib/user')
+    expect(doc.imports.get('file:///resolved/node_modules/my-lib/src/user.as')?.from.text).toBe(
+      'my-lib/user'
+    )
   })
 
   it('should resolve import ID via resolvedImports cache', () => {

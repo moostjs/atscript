@@ -51,12 +51,13 @@ function resolveValue(
 
   if (mode === 'db') {
     // Try @db.default first (static value, parsed like meta.default)
-    const dbValue = prop.metadata.get('db.default') as
-      | string
-      | undefined
+    const dbValue = prop.metadata.get('db.default') as string | undefined
     if (dbValue !== undefined) {
       const parsed = parseRawValue(dbValue, prop)
-      if (parsed !== undefined && prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)) {
+      if (
+        parsed !== undefined &&
+        prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)
+      ) {
         return { value: parsed }
       }
       return undefined

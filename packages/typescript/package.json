@@ -19,14 +19,11 @@
     "directory": "packages/typescript"
   },
   "bin": {
-    "asc": "./cli.cjs",
-    "atscript-typescript-skill": "./scripts/setup-skills.js"
+    "asc": "./cli.cjs"
   },
   "files": [
     "dist",
-    "cli.cjs",
-    "skills",
-    "scripts/setup-skills.js"
+    "cli.cjs"
   ],
   "type": "module",
   "main": "dist/index.mjs",
@@ -67,16 +64,15 @@
   },
   "scripts": {
     "pub": "pnpm publish --access public",
-    "test": "vitest",
-    "setup-skills": "node ./scripts/setup-skills.js"
+    "test": "vitest"
   },
   "dependencies": {
     "@moostjs/event-cli": "^0.6.8",
     "moost": "^0.6.8"
   },
   "devDependencies": {
-    "vitest": "3.2.4",
-    "@atscript/db": "^0.1.48"
+    "@atscript/db": "^0.1.48",
+    "vitest": "3.2.4"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",

@@ -72,7 +72,14 @@ export interface TPrimitiveTypeObject {
   optional?: boolean
 }
 
-export type TPrimitiveTypeFinal = 'string' | 'number' | 'boolean' | 'void' | 'null' | 'phantom' | 'decimal'
+export type TPrimitiveTypeFinal =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'void'
+  | 'null'
+  | 'phantom'
+  | 'decimal'
 export interface TPrimitiveTypeFinalOptional {
   kind: 'final'
   value: TPrimitiveTypeFinal

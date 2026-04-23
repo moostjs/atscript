@@ -15,7 +15,7 @@ export const BlockToken = new Node<TLexicalToken>({
   name: 'block',
   start: { token: /(?<text>[([{])/u, omit: true },
   end: {
-    token: ctx => pairs[(ctx.node.data.text) as '{'] || '',
+    token: ctx => pairs[ctx.node.data.text as '{'] || '',
     omit: true,
   },
   skip: /\s/u,

@@ -42,6 +42,7 @@
     "vitest": "3.2.4",
     "zx": "^8.8.5"
   },
+  "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
       "minimatch": ">=10.2.3",
@@ -50,6 +51,5 @@
     "onlyBuiltDependencies": [
       "better-sqlite3"
     ]
-  },
-  "packageManager": "pnpm@10.33.0"
+  }
 }

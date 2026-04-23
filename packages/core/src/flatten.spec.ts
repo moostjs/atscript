@@ -59,12 +59,7 @@ describe('flattenInterfaceNode', () => {
     const node = getInterface(doc)
     const flat = flattenInterfaceNode(doc, node)
 
-    expect(Array.from(flat.keys())).toEqual([
-      'name',
-      'address',
-      'address.street',
-      'address.city',
-    ])
+    expect(Array.from(flat.keys())).toEqual(['name', 'address', 'address.street', 'address.city'])
     // address is intermediate (structure)
     expect(flat.get('address')!.intermediate).toBe(true)
     // sub-paths are leaves
@@ -88,12 +83,7 @@ describe('flattenInterfaceNode', () => {
     const node = getInterface(doc, 'User')
     const flat = flattenInterfaceNode(doc, node)
 
-    expect(Array.from(flat.keys())).toEqual([
-      'name',
-      'home',
-      'home.street',
-      'home.city',
-    ])
+    expect(Array.from(flat.keys())).toEqual(['name', 'home', 'home.street', 'home.city'])
     expect(flat.get('home')!.intermediate).toBe(true)
     expect(flat.get('home.street')!.intermediate).toBeFalsy()
   })
@@ -112,12 +102,7 @@ describe('flattenInterfaceNode', () => {
     const node = getInterface(doc)
     const flat = flattenInterfaceNode(doc, node)
 
-    expect(Array.from(flat.keys())).toEqual([
-      'tags',
-      'contacts',
-      'contacts.name',
-      'contacts.email',
-    ])
+    expect(Array.from(flat.keys())).toEqual(['tags', 'contacts', 'contacts.name', 'contacts.email'])
     // tags is array of primitive — leaf
     expect(flat.get('tags')!.intermediate).toBeFalsy()
     // contacts is array of structure — intermediate
@@ -248,11 +233,7 @@ describe('flattenInterfaceNode', () => {
     const node = getInterface(doc)
     const flat = flattenInterfaceNode(doc, node)
 
-    expect(Array.from(flat.keys())).toEqual([
-      'level1',
-      'level1.level2',
-      'level1.level2.level3',
-    ])
+    expect(Array.from(flat.keys())).toEqual(['level1', 'level1.level2', 'level1.level2.level3'])
     expect(flat.get('level1')!.intermediate).toBe(true)
     expect(flat.get('level1.level2')!.intermediate).toBe(true)
     expect(flat.get('level1.level2.level3')!.intermediate).toBeFalsy()

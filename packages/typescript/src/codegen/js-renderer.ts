@@ -23,22 +23,37 @@ import type {
   Token,
   TPrimitiveTypeDef,
 } from '@atscript/core'
-import { isGroup, isInterface, isPrimitive, isQueryLogical, isRef, isStructure } from '@atscript/core'
+import {
+  isGroup,
+  isInterface,
+  isPrimitive,
+  isQueryLogical,
+  isRef,
+  isStructure,
+} from '@atscript/core'
 
+import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import {
   defineAnnotatedType,
   type TAtscriptAnnotatedType,
   type TAnnotatedTypeHandle,
 } from '../runtime/annotated-type'
 import { buildJsonSchema } from '../runtime/json-schema'
-import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
 
 const QUERY_OP_MAP: Record<string, string> = {
-  '=': '$eq', '!=': '$ne', '>': '$gt', '>=': '$gte', '<': '$lt', '<=': '$lte',
-  'in': '$in', 'not in': '$nin', 'matches': '$regex',
-  'exists': '$exists', 'not exists': '$exists',
+  '=': '$eq',
+  '!=': '$ne',
+  '>': '$gt',
+  '>=': '$gte',
+  '<': '$lt',
+  '<=': '$lte',
+  'in': '$in',
+  'not in': '$nin',
+  'matches': '$regex',
+  'exists': '$exists',
+  'not exists': '$exists',
 }
 
 export class JsRenderer extends BaseRenderer {
@@ -151,9 +166,7 @@ export class JsRenderer extends BaseRenderer {
             let def = this.doc.mergeIntersection(unwound.def)
             if (isInterface(def)) {
               if ((def as SemanticInterfaceNode).hasExtends) {
-                const resolved = unwound.doc.resolveInterfaceExtends(
-                  def as SemanticInterfaceNode
-                )
+                const resolved = unwound.doc.resolveInterfaceExtends(def as SemanticInterfaceNode)
                 if (resolved) {
                   def = resolved
                 } else {
@@ -263,9 +276,17 @@ export class JsRenderer extends BaseRenderer {
   }
 
   private renderDimMeasure(node: SemanticNode) {
-    if (!isInterface(node)) { return }
+    if (!isInterface(node)) {
+      return
+    }
     const interfaceNode = node as SemanticInterfaceNode
-    if (!interfaceNode.annotations?.some(a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for')) { return }
+    if (
+      !interfaceNode.annotations?.some(
+        a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for'
+      )
+    ) {
+      return
+    }
 
     let struct: SemanticNode | undefined
     if (interfaceNode.hasExtends) {
@@ -274,16 +295,24 @@ export class JsRenderer extends BaseRenderer {
     if (!struct) {
       struct = interfaceNode.getDefinition()
     }
-    if (!struct || !isStructure(struct)) { return }
+    if (!struct || !isStructure(struct)) {
+      return
+    }
 
     const structNode = struct as SemanticStructureNode
     const dims: string[] = []
     const measures: string[] = []
 
     for (const [name, prop] of structNode.props) {
-      if (prop.token('identifier')?.pattern) { continue }
-      if (prop.countAnnotations('db.column.dimension') > 0) { dims.push(name) }
-      if (prop.countAnnotations('db.column.measure') > 0) { measures.push(name) }
+      if (prop.token('identifier')?.pattern) {
+        continue
+      }
+      if (prop.countAnnotations('db.column.dimension') > 0) {
+        dims.push(name)
+      }
+      if (prop.countAnnotations('db.column.measure') > 0) {
+        measures.push(name)
+      }
     }
 
     if (dims.length > 0) {
@@ -890,8 +919,12 @@ export class JsRenderer extends BaseRenderer {
         return `"${escapeQuotes(match ? match[1] : token.text)}"`
       }
       case 'identifier': {
-        if (token.text === 'true' || token.text === 'false') { return token.text }
-        if (token.text === 'null' || token.text === 'undefined') { return 'null' }
+        if (token.text === 'true' || token.text === 'false') {
+          return token.text
+        }
+        if (token.text === 'null' || token.text === 'undefined') {
+          return 'null'
+        }
         return token.text
       }
       default: {

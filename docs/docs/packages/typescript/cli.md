@@ -10,13 +10,13 @@ npx asc [options]
 
 ## Options
 
-| Option                  | Description                                                                                         |
-| ----------------------- | --------------------------------------------------------------------------------------------------- |
-| `-c, --config <path>`   | Path to config file. If omitted, auto-detects `atscript.config.js` / `.ts` in the current directory |
-| `-f, --format <format>` | Output format: `dts` or `js` (default: `dts`)                                                       |
-| `--noEmit`              | Run diagnostics only, don't write files                                                             |
-| `--skipDiag`            | Skip diagnostics, always emit files                                                                 |
-| `--help`                | Display help                                                                                        |
+| Option                  | Description                                                                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `-c, --config <path>`   | Path to config file. If omitted, auto-detects `atscript.config.{ts,mts,cts,js,mjs,cjs}` walking up from the CWD.                       |
+| `-f, --format <format>` | Output format (`dts` or `js`). If omitted, the TypeScript plugin emits `.d.ts` (its default branch); pass `-f js` to get `.js` output. |
+| `--noEmit`              | Run diagnostics only, don't write files                                                                                                |
+| `--skipDiag`            | Skip diagnostics, always emit files                                                                                                    |
+| `--help`                | Display help                                                                                                                           |
 
 ## Examples
 
@@ -28,7 +28,7 @@ npx asc
 npx asc -f js
 
 # Use a specific config file
-npx asc -c path/to/atscript.config.js
+npx asc -c path/to/atscript.config.ts
 
 # Validate without writing files (CI/lint check)
 npx asc --noEmit
@@ -40,24 +40,28 @@ npx asc --skipDiag
 The CLI logs created files, errors, and warnings with color-coded output. It exits with code `1` if any errors are found (unless `--skipDiag` is set).
 
 ::: tip
-If no config file is found, the CLI defaults to `format: 'dts'` with the TypeScript plugin enabled — so `npx asc` works out of the box.
+If no config file is found, the CLI still runs with the TypeScript plugin enabled and emits `.d.ts` — so `npx asc` works out of the box.
 :::
 
 ## Database Schema Sync
 
-The CLI also includes a `db sync` command for synchronizing your database schema with your `.as` definitions:
+The CLI also includes a `db sync` command for synchronizing your database schema with your `.as` definitions.
+
+::: info
+The `db sync` subcommand is bundled with `@atscript/typescript` so that a single `asc` binary covers both codegen and schema sync, but it drives adapters from the separate [`@atscript/db-*`](https://db.atscript.dev) packages — the adapter (`@atscript/db-sqlite`, `@atscript/db-mongo`, …) must be installed and referenced from the config's `db` section for this command to do anything. Full reference at [db.atscript.dev](https://db.atscript.dev/).
+:::
 
 ```bash
 npx asc db sync [options]
 ```
 
-| Option | Description |
-|--------|-------------|
-| `-c, --config <path>` | Path to config file |
-| `--dry-run` | Show planned changes without applying |
-| `--yes` | Skip confirmation prompt (for CI/CD) |
-| `--force` | Re-sync even if schema hash matches |
-| `--safe` | Skip destructive operations (drops) |
+| Option                | Description                           |
+| --------------------- | ------------------------------------- |
+| `-c, --config <path>` | Path to config file                   |
+| `--dry-run`           | Show planned changes without applying |
+| `--yes`               | Skip confirmation prompt (for CI/CD)  |
+| `--force`             | Re-sync even if schema hash matches   |
+| `--safe`              | Skip destructive operations (drops)   |
 
 ```bash
 # Preview changes

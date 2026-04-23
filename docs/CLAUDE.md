@@ -37,13 +37,13 @@ Database docs are hosted separately at https://db.atscript.dev. The nav dropdown
 
 ## Current Coverage
 
-| Section                   | Status      | Pages                                        |
-| ------------------------- | ----------- | -------------------------------------------- |
-| packages/typescript/      | COMPLETE    | 18 pages with full content (uses fragments)  |
-| packages/moost-validator/ | PARTIAL     | 4 pages                                      |
-| packages/vscode/          | PARTIAL     | 4 pages                                      |
-| plugin-development/       | STUBS       | 16 files, needs content                      |
-| \_fragments/              | COMPLETE    | 7 shared fragments                           |
+| Section                   | Status   | Pages                                       |
+| ------------------------- | -------- | ------------------------------------------- |
+| packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments) |
+| packages/moost-validator/ | PARTIAL  | 4 pages                                     |
+| packages/vscode/          | PARTIAL  | 4 pages                                     |
+| plugin-development/       | STUBS    | 16 files, needs content                     |
+| \_fragments/              | COMPLETE | 7 shared fragments                          |
 
 ## VitePress Config Key Details
 
@@ -121,12 +121,12 @@ A language-specific page (`packages/typescript/annotations.md`) includes `<!--@i
 
 ## Mapping: Source Code → Documentation
 
-| Package Source                         | Documentation Location                           |
-| -------------------------------------- | ------------------------------------------------ |
-| `packages/core/src/`                   | `docs/docs/plugin-development/`                  |
-| `packages/typescript/src/`             | `docs/docs/packages/typescript/`                 |
-| `packages/moost-validator/src/`        | `docs/docs/packages/moost-validator/`            |
-| `packages/unplugin/src/`              | `docs/docs/packages/typescript/build-setup.md`   |
-| `packages/vscode/`                    | `docs/docs/packages/vscode/`                     |
+| Package Source                  | Documentation Location                         |
+| ------------------------------- | ---------------------------------------------- |
+| `packages/core/src/`            | `docs/docs/plugin-development/`                |
+| `packages/typescript/src/`      | `docs/docs/packages/typescript/`               |
+| `packages/moost-validator/src/` | `docs/docs/packages/moost-validator/`          |
+| `packages/unplugin/src/`        | `docs/docs/packages/typescript/build-setup.md` |
+| `packages/vscode/`              | `docs/docs/packages/vscode/`                   |
 
 DB packages (`db`, `db-sqlite`, `db-mongo`, `db-mysql`, `db-postgres`, `db-sql-tools`, `moost-db`) are documented at https://db.atscript.dev (separate repo).

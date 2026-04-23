@@ -34,10 +34,10 @@ export class SemanticQueryNode extends SemanticNode {
 
   private propagateQueryArgToken(expr: SemanticQueryExprNode): void {
     if ('left' in expr) {
-      (expr as SemanticQueryComparisonNode).left.queryArgToken = this.sourceToken
+      ;(expr as SemanticQueryComparisonNode).left.queryArgToken = this.sourceToken
       const right = (expr as SemanticQueryComparisonNode).right
       if (right && 'fieldRef' in right) {
-        (right as SemanticQueryFieldRefNode).queryArgToken = this.sourceToken
+        ;(right as SemanticQueryFieldRefNode).queryArgToken = this.sourceToken
       }
     } else if ('operands' in expr) {
       for (const operand of (expr as SemanticQueryLogicalNode).operands) {

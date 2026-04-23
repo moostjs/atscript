@@ -1,21 +1,12 @@
 import type { AtscriptDoc } from './document'
-import type { SemanticNode } from './parser/nodes/semantic-node'
-import type { SemanticPropNode } from './parser/nodes/prop-node'
-import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
-import type { SemanticStructureNode } from './parser/nodes/structure-node'
+import { isArray, isGroup, isInterface, isPrimitive, isRef, isStructure } from './parser/nodes'
 import type { SemanticArrayNode } from './parser/nodes/array-node'
+import { SemanticGroup } from './parser/nodes/group-node'
+import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
+import type { SemanticPropNode } from './parser/nodes/prop-node'
 import type { SemanticRefNode } from './parser/nodes/ref-node'
-import {
-  SemanticGroup,
-} from './parser/nodes/group-node'
-import {
-  isArray,
-  isGroup,
-  isInterface,
-  isPrimitive,
-  isRef,
-  isStructure,
-} from './parser/nodes'
+import type { SemanticNode } from './parser/nodes/semantic-node'
+import type { SemanticStructureNode } from './parser/nodes/structure-node'
 
 /**
  * Descriptor for a single field in the flattened interface map.
@@ -110,8 +101,8 @@ export function hasNavPropAnnotation(prop: SemanticPropNode): boolean {
   if (!prop.annotations) {
     return false
   }
-  return prop.annotations.some(a =>
-    a.name === 'db.rel.to' || a.name === 'db.rel.from' || a.name === 'db.rel.via'
+  return prop.annotations.some(
+    a => a.name === 'db.rel.to' || a.name === 'db.rel.from' || a.name === 'db.rel.via'
   )
 }
 
@@ -228,7 +219,13 @@ function walkStructure(
 
     // @db.json fields are always leaves — do not recurse
     if (dbJson) {
-      addToFlatMap(flatMap, path, { def: resolved.def, doc: resolved.doc, optional, propNode: prop, dbJson: true })
+      addToFlatMap(flatMap, path, {
+        def: resolved.def,
+        doc: resolved.doc,
+        optional,
+        propNode: prop,
+        dbJson: true,
+      })
       continue
     }
 
@@ -262,7 +259,11 @@ function walkNode(
       // Check if array element is a complex type (structure/group/array)
       const elementDef = (def as SemanticArrayNode).getDefinition()
       const resolvedElement = elementDef ? resolveNode(doc, elementDef) : undefined
-      const isComplexElement = resolvedElement && (isStructure(resolvedElement.def) || (isGroup(resolvedElement.def) && resolvedElement.def.entity !== 'tuple') || isArray(resolvedElement.def))
+      const isComplexElement =
+        resolvedElement &&
+        (isStructure(resolvedElement.def) ||
+          (isGroup(resolvedElement.def) && resolvedElement.def.entity !== 'tuple') ||
+          isArray(resolvedElement.def))
       if (isComplexElement) {
         // Array of complex type — intermediate entry, then recurse element sub-paths
         addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
@@ -278,7 +279,15 @@ function walkNode(
         const merged = doc.mergeIntersection(def)
         if (merged !== def && isStructure(merged)) {
           addToFlatMap(flatMap, path, { def: merged, doc, optional, propNode, intermediate: true })
-          walkStructure(doc, merged as SemanticStructureNode, path, optional, flatMap, stack, options)
+          walkStructure(
+            doc,
+            merged as SemanticStructureNode,
+            path,
+            optional,
+            flatMap,
+            stack,
+            options
+          )
         } else {
           addToFlatMap(flatMap, path, { def, doc, optional, propNode })
         }
@@ -363,7 +372,15 @@ function walkBranch(
   options?: TFlattenOptions
 ) {
   if (isStructure(def)) {
-    walkStructure(doc, def as SemanticStructureNode, prefix, parentOptional, flatMap, stack, options)
+    walkStructure(
+      doc,
+      def as SemanticStructureNode,
+      prefix,
+      parentOptional,
+      flatMap,
+      stack,
+      options
+    )
   } else if (isArray(def)) {
     walkArrayElement(doc, def as SemanticArrayNode, prefix, parentOptional, flatMap, stack, options)
   } else if (isGroup(def) && def.entity !== 'structure') {
@@ -371,7 +388,15 @@ function walkBranch(
     if (group.op === '&') {
       const merged = doc.mergeIntersection(def)
       if (isStructure(merged)) {
-        walkStructure(doc, merged as SemanticStructureNode, prefix, parentOptional, flatMap, stack, options)
+        walkStructure(
+          doc,
+          merged as SemanticStructureNode,
+          prefix,
+          parentOptional,
+          flatMap,
+          stack,
+          options
+        )
       }
     } else if (group.op === '|') {
       for (const branch of group.unwrap()) {

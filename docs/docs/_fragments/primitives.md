@@ -167,8 +167,9 @@ It is useful for advanced UI tooling and type traversal, but most application co
 5. Save advanced primitives like `phantom` and timestamp variants for pages or features that really need them.
 
 ::: tip Combining Extensions
+
 - `number.int.positive` — positive integers only
 - `number.double.negative` — negative double-precision numbers
 - `number.single.positive` — positive single-precision numbers
 - `number.int.uint16.port` — network port number
-:::
+  :::
