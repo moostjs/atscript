@@ -19,5 +19,8 @@ cache
 .specs
 *.local.md
 .claude/plans
+.claude/skills
+.claude/commands
 
 *.as.js
+openspec
