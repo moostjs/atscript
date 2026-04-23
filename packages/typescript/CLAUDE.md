@@ -9,6 +9,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 | `src/plugin.ts`                  | Plugin entry point; implements `TAtscriptPlugin` with `render()` and `buildEnd()` hooks                             |
 | `src/index.ts`                   | Main export; re-exports the plugin as default                                                                       |
 | `src/utils.ts`                   | Secondary export (`@atscript/typescript/utils`); re-exports runtime utilities for generated code                    |
+| `src/test-utils.ts`              | Secondary export (`@atscript/typescript/test-utils`); ships `prepareFixtures()` for compiling `.as` test fixtures   |
 | `src/annotated-type.ts`          | Core runtime type system: `TAtscriptAnnotatedType`, `defineAnnotatedType()` builder, `annotate()`, type guards      |
 | `src/traverse.ts`                | `forAnnotatedType()` -- type-safe kind-dispatch used by validator, json-schema, and serializer                      |
 | `src/validator.ts`               | `Validator` class -- validates values against annotated types with plugin support                                   |
@@ -28,6 +29,10 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 ### Default export (`@atscript/typescript`)
 
 - `tsPlugin(opts?)` -- factory returning a `TAtscriptPlugin` (the codegen plugin)
+
+### `@atscript/typescript/test-utils` (dev-time, for compiling `.as` fixtures in tests)
+
+- `prepareFixtures(options)` — compiles `.as` files under `options.rootDir` and writes the generated `.as.js` / `.as.d.ts` artifacts next to their sources. `tsPlugin()` is auto-injected. Writes are unconditional — fixture artifacts are test-run outputs, gitignored (`*.as.js`, `*.as.d.ts`) and regenerated on every run. Use in `beforeAll` or Vitest `globalSetup`. This package has no `postinstall` hook (no production `.as` in its `src/`), so fixtures are produced exclusively at test time.
 
 ### `@atscript/typescript/utils` (runtime, used by generated .js files)
 
@@ -76,7 +81,7 @@ vitest run -u                            # Update snapshots
 
 ## Important patterns
 
-- **Two entry points**: `index.ts` (plugin) and `utils.ts` (runtime) are separate bundle entries for tree-shaking.
+- **Three entry points**: `index.ts` (plugin), `utils.ts` (runtime), and `test-utils.ts` (test-time `prepareFixtures`) are separate bundle entries for tree-shaking.
 - **Snapshot testing**: every `.as` fixture produces `.js` and `.d.ts` snapshots in `test/__snapshots__/`.
 - **`forAnnotatedType()` dispatcher**: canonical pattern for switching on type kind.
 - **`defineAnnotatedType()` fluent builder**: all generated JS uses this API.

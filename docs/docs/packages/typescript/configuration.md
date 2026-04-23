@@ -20,6 +20,8 @@ export default defineConfig({
 | Option              | Type                           | Default   | Description                                                                                                    |
 | ------------------- | ------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------- |
 | `rootDir`           | `string`                       | Config file's directory | Directory containing your `.as` files                                                                          |
+| `include`           | `string[]`                     | `['**/*.as']` | Glob patterns for `.as` files to compile. Exclude test-fixture directories (`**/test/**`, `**/__test__/**`, `**/__tests__/**`) — see [Testing Fixtures](/packages/typescript/testing-fixtures) for the dedicated fixture-compilation helper |
+| `exclude`           | `string[]`                     | `['node_modules']` | Glob patterns to ignore                                                                                        |
 | `format`            | `string`                       | Plugin-dependent | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted |
 | `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'` | How to handle annotations not defined in config                                                                |
 | `plugins`           | `TAtscriptPlugin[]`            | `[]`      | Active plugins                                                                                                 |
@@ -106,6 +108,7 @@ Run `npx asc -f dts` whenever you change your `atscript.config` — for example,
 ## Next Steps
 
 - [CLI](/packages/typescript/cli) — build from the command line
+- [Testing Fixtures](/packages/typescript/testing-fixtures) — compile `.as` files in tests with `prepareFixtures()`
 - [Build Setup](/packages/typescript/build-setup) — bundler integration
 - [Custom Annotations](/packages/typescript/custom-annotations) — define your own annotation types
 - [Custom Primitives](/packages/typescript/custom-primitives) — define your own primitive extensions

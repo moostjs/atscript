@@ -76,13 +76,28 @@ Before reporting TypeScript errors or trying to fix type issues, always rebuild 
 
 ### Test fixtures: use `.as` files, not `$()` builder
 
-When tests need Atscript types (annotated types with `@db.*`, `@meta.id`, etc.), always use `.as` fixture files compiled via `prepareFixtures()` from `test-utils.ts`. **Do not** hand-write `defineAnnotatedType` (`$()`) builder chains — the builder API is designed for generated code and has subtle behaviors (e.g. `$('object', Class)` resets the type, metadata propagation differs from compiled output, lazy flatten timing) that make hand-written types unreliable in tests.
+When tests need Atscript types (annotated types with `@db.*`, `@meta.id`, etc.), always use `.as` fixture files compiled via `prepareFixtures()` from `@atscript/typescript/test-utils`. **Do not** hand-write `defineAnnotatedType` (`$()`) builder chains — the builder API is designed for generated code and has subtle behaviors (e.g. `$('object', Class)` resets the type, metadata propagation differs from compiled output, lazy flatten timing) that make hand-written types unreliable in tests.
 
 Pattern:
 1. Create `.as` files in `__test__/fixtures/` (e.g. `rel-task.as`)
-2. Call `await prepareFixtures()` in `beforeAll` — this compiles all `.as` files in the fixtures directory to `.as.js` + `.as.d.ts`
+2. Call `await prepareFixtures({ rootDir, entries: ['rel-task.as'] })` in `beforeAll` — this compiles the selected `.as` files to `.as.js` + `.as.d.ts` on every test run. `tsPlugin()` is auto-injected; pass only extra plugins.
 3. Import compiled types: `const { Task } = await import('./fixtures/rel-task.as.js')`
-4. The `.as.js` files are committed (generated once, updated by `prepareFixtures()` when `.as` files change)
+4. Fixture artifacts (`.as.js`, `.as.d.ts`) are gitignored and regenerated on every test run — they are not committed.
+
+```ts
+import { prepareFixtures } from '@atscript/typescript/test-utils'
+
+beforeAll(() => prepareFixtures({ rootDir, entries: ['rel-task.as'] }))
+```
+
+### Project `.as` vs test `.as` fixtures
+
+Atscript consumer projects typically contain two kinds of `.as` files, each with its own lifecycle:
+
+1. **Production `.as`** (under `src/`): configure `atscript.config.ts` with `include: ['src/**/*.as']` and add a `postinstall: "asc"` script to `package.json` so `.as.d.ts` artifacts exist for lint/build/IDE tooling on fresh install.
+2. **Test fixtures** (under `**/test/**`, `**/__test__/**`, `**/__tests__/**`): exclude those directories from `atscript.config.ts`. Compile them via `prepareFixtures()` from `@atscript/typescript/test-utils` in test-setup hooks, using whatever plugin set the tests require (feature-flag or WIP plugins would break a production `asc` run).
+
+Both `.as.js` and `.as.d.ts` for fixtures are gitignored (`*.as.js`, `*.as.d.ts`) and produced only at test time. `@atscript/typescript` itself has no production `.as` in its `src/`, so it ships no `postinstall`.
 
 ## Package Naming Convention
 

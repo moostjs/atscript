@@ -1,10 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 
-import { build } from '@atscript/core'
 import { beforeAll, describe, it, expect } from 'vitest'
 
-import { tsPlugin } from './plugin'
 import {
   defineAnnotatedType,
   isAnnotatedType,
@@ -23,26 +20,9 @@ import {
   type TSerializedTypeFinal,
 } from './runtime/serialize'
 import { Validator } from './runtime/validator'
+import { prepareFixtures } from './test-utils'
 
 const fixturesDir = path.join(path.dirname(import.meta.url.slice(7)), '../test/fixtures')
-
-async function prepareFractionalRefFixtures() {
-  const repo = await build({
-    rootDir: fixturesDir,
-    entries: ['fractional-ref.as'],
-    plugins: [tsPlugin()],
-  })
-  const [outJs, outDts] = await Promise.all([
-    repo.generate({ outDir: '.', format: 'js' }),
-    repo.generate({ outDir: '.', format: 'dts' }),
-  ])
-  for (const file of [...outJs, ...outDts]) {
-    const target = file.target ?? path.join(fixturesDir, file.fileName)
-    if (!existsSync(target) || readFileSync(target, 'utf8') !== file.content) {
-      writeFileSync(target, file.content)
-    }
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -980,7 +960,7 @@ describe('ref serialization', () => {
 // ---------------------------------------------------------------------------
 
 describe('fractional refDepth', () => {
-  beforeAll(prepareFractionalRefFixtures)
+  beforeAll(() => prepareFixtures({ rootDir: fixturesDir, entries: ['fractional-ref.as'] }))
 
   it('refDepth 0.5 on a field with a single FK emits the exact shallow shape', async () => {
     const { FractionalSourceRoles } = await import('../test/fixtures/fractional-ref.as')

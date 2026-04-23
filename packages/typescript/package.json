@@ -36,6 +36,9 @@
       "utils": [
         "dist/utils.d.ts"
       ],
+      "test-utils": [
+        "dist/test-utils.d.ts"
+      ],
       "": [
         "dist/index.d.ts"
       ]
@@ -53,6 +56,12 @@
       "import": "./dist/utils.mjs",
       "require": "./dist/utils.cjs",
       "default": "./dist/utils.mjs"
+    },
+    "./test-utils": {
+      "types": "./dist/test-utils.d.ts",
+      "import": "./dist/test-utils.mjs",
+      "require": "./dist/test-utils.cjs",
+      "default": "./dist/test-utils.mjs"
     },
     "./package.json": "./package.json"
   },
@@ -82,7 +91,8 @@
     {
       "entries": [
         "src/index.ts",
-        "src/utils.ts"
+        "src/utils.ts",
+        "src/test-utils.ts"
       ]
     },
     {
