@@ -1,3 +1,13 @@
+## [0.1.50](https://github.com/moostjs/atscript/compare/v0.1.49...v0.1.50) (2026-04-23)
+
+
+### Features
+
+* **typescript:** add @atscript/typescript/test-utils with prepareFixtures helper and gitignore fixture artifacts ([2c425f5](https://github.com/moostjs/atscript/commit/2c425f5752530a9fe2d2d49a59a4ba88f1f22cae))
+* **typescript:** add fractional refDepth for shallow serialized ref targets ([f41d9d9](https://github.com/moostjs/atscript/commit/f41d9d95d830720037635c9684b90e978ec5383f))
+
+
+
 ## [0.1.49](https://github.com/moostjs/atscript/compare/v0.1.48...v0.1.49) (2026-04-22)
 
 ## [0.1.48](https://github.com/moostjs/atscript/compare/v0.1.47...v0.1.48) (2026-04-16)
