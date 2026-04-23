@@ -1,13 +1,13 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "./packages",
     "outDir": ".types"
   },
   "include": [
     "packages/*/src/**/*.ts",
     "packages/*/server/**/*.ts",
     "packages/*/client/**/*.ts",
-    "globals.d.ts",
     "packages/typescript/test/global.d.ts"
   ],
   "exclude": ["**/*.spec.ts", "__snapshots__"]
