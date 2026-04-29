@@ -54,43 +54,7 @@ import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
 
 ## FK References
 
-By default, FK references (`.ref`) are stripped during serialization. Use the `refDepth` option to include them — this is useful when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields).
-
-```typescript
-const serialized = serializeAnnotatedType(Order, {
-  refDepth: 1, // include immediate FK refs
-})
-```
-
-- `0` (default) — refs are stripped (backward-compatible)
-- `1` — immediate refs are serialized, but refs inside referenced types are stripped
-- `2+` — deeper expansion
-
-Self-referential FKs (e.g., `Employee.managerId → Employee`) are handled automatically via `$ref` resolution.
-
-### Shallow FK targets (`.5` increments)
-
-Fractional `.5` values emit a **shallow ref target** (`TSerializedShallowRefTarget`) at that level — just `{ id, metadata }`, no structural body. Use this when the client needs to identify the referenced table (to show its label, fetch it via a value-help dropdown, link to it) without paying the bandwidth cost of shipping its full field tree.
-
-```typescript
-// Order.customerId → Customer
-const serialized = serializeAnnotatedType(Order, {
-  refDepth: 0.5, // FK target serialized as { id: 'Customer', metadata: {...} } — no props tree
-})
-```
-
-- `0.5` — immediate FK is a shallow target.
-- `1.5` — immediate FK expanded fully; one level deeper is shallow.
-- …and so on for deeper levels.
-
-The shape is:
-
-```typescript
-interface TSerializedShallowRefTarget {
-  id: string // target type's id (e.g. 'Customer')
-  metadata: Record<string, unknown> // interface-level metadata of the target
-}
-```
+FK references (`.ref`) are stripped from serialized output by default. Pass `refDepth: 1` to include immediate refs when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields). For the full ref-control semantics — deeper expansion, fractional `.5` shallow targets — see the [`@atscript/db` docs](https://db.atscript.dev).
 
 ## Filtering Annotations
 

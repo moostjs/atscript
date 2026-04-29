@@ -127,47 +127,7 @@ The optional `phantom` handler intercepts [phantom](/packages/typescript/primiti
 
 ### Recursive Walking
 
-`forAnnotatedType` dispatches a single node — recursion is up to you. This gives full control over how deep to walk and what to collect. Here's a general pattern:
-
-```typescript
-import { forAnnotatedType, isPhantomType } from '@atscript/typescript/utils'
-import type { TAtscriptAnnotatedType } from '@atscript/typescript/utils'
-
-function walkType(
-  def: TAtscriptAnnotatedType,
-  path: string,
-  visit: (path: string, def: TAtscriptAnnotatedType) => void
-) {
-  visit(path, def)
-
-  forAnnotatedType(def, {
-    final() {}, // leaf node — nothing to recurse into
-    phantom() {}, // non-data leaf — skip or handle separately
-
-    object(d) {
-      for (const [key, prop] of d.type.props.entries()) {
-        walkType(prop, path ? `${path}.${key}` : key, visit)
-      }
-    },
-
-    array(d) {
-      walkType(d.type.of, `${path}[]`, visit)
-    },
-
-    union(d) {
-      d.type.items.forEach((item, i) => walkType(item, `${path}|${i}`, visit))
-    },
-
-    intersection(d) {
-      d.type.items.forEach((item, i) => walkType(item, `${path}&${i}`, visit))
-    },
-
-    tuple(d) {
-      d.type.items.forEach((item, i) => walkType(item, `${path}[${i}]`, visit))
-    },
-  })
-}
-```
+`forAnnotatedType` dispatches a single node — recursion is up to you. For most cases reach for the built-in [`flattenAnnotatedType()`](#flattenannotatedtype) below; if you need full control over path formatting and what to collect, recurse into `props` (objects), `of` (arrays), and `items` (unions/intersections/tuples) and call `forAnnotatedType` again on each child.
 
 ### Example: Collecting Form Field Metadata
 
@@ -368,24 +328,6 @@ const flatMap = flattenAnnotatedType(collectionType, {
 **`topLevelArrayTag`** marks array fields that are direct properties of the root object (not arrays nested inside other arrays or unions). This is useful for systems like MongoDB that treat top-level arrays differently.
 
 **`excludePhantomTypes`** controls whether [phantom](/packages/typescript/primitives#phantom-type) properties appear in the result. By default phantom types are included — form builders may want to render them as non-data UI elements (links, headings). Set to `true` when only data-bearing fields matter (e.g. database schemas).
-
-## Building Types at Runtime
-
-`defineAnnotatedType()` creates types programmatically using a fluent builder:
-
-```typescript
-import { defineAnnotatedType } from '@atscript/typescript/utils'
-
-const userType = defineAnnotatedType('object')
-  .prop('name', defineAnnotatedType().designType('string').$type)
-  .prop('age', defineAnnotatedType().designType('number').$type)
-  .annotate('meta.label', 'User').$type
-
-// userType is a fully functional TAtscriptAnnotatedType
-userType.validator().validate({ name: 'Alice', age: 30 })
-```
-
-The handle provides methods like `.designType()`, `.value()`, `.tags()`, `.of()` (arrays), `.item()` (unions/tuples), `.prop()` / `.propPattern()` (objects), `.optional()`, `.annotate()`, and `.refTo()`.
 
 ## Type Guards
 

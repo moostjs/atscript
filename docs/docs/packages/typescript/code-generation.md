@@ -50,104 +50,15 @@ Key points:
 
 ### Interface Extends
 
-When an interface uses `extends`, the first parent becomes the TypeScript `extends` target. Properties from additional parents and own properties are rendered in the class body:
+When an interface uses `extends`, the first parent becomes the TypeScript `extends` target; properties from additional parents and own properties are merged into the class body. Inherited annotations are merged into the runtime metadata tree, so `metadata.get(...)` works on every inherited prop without you needing to think about how it was assembled.
 
-```atscript
-interface Base {
-    id: string
-    createdAt: string
-}
-
-interface Auditable {
-    updatedBy: string
-}
-
-export interface Post extends Base, Auditable {
-    title: string
-}
-```
-
-Generates:
-
-```typescript
-export declare class Post extends Base {
-  updatedBy: string // from Auditable (second parent, inlined)
-  title: string // own prop
-  // id and createdAt come via TS extends from Base
-  static __is_atscript_annotated_type: true
-  // ... static members
-}
-```
-
-The JS output resolves all parent properties into a single merged type tree, so runtime metadata includes all inherited props and their annotations.
-
-For types (not interfaces), a companion `namespace` carries the same static members:
-
-```typescript
-export type Status = 'active' | 'inactive'
-declare namespace Status {
-  type DataType = Status
-  const __is_atscript_annotated_type: true
-  const type: TAtscriptTypeComplex<Status>
-  const metadata: TMetadataMap<AtscriptMetadata>
-  const validator: (opts?: Partial<TValidatorOptions>) => Validator<TAtscriptAnnotatedType, Status>
-  const toJsonSchema: () => any
-  const toExampleData: (() => any) | undefined
-}
-```
+For types (not interfaces), a companion `namespace` carries the same `__is_atscript_annotated_type`, `type`, `metadata`, `validator`, `toJsonSchema`, and `toExampleData` static members.
 
 ## JS Format
 
 Generates JavaScript files with full runtime metadata. Use this when you need validation, metadata access, or serialization.
 
-The same Product `.as` file generates:
-
-```javascript
-import {
-  defineAnnotatedType as $,
-  annotate as $a,
-  buildJsonSchema as $$, // only with jsonSchema: 'lazy'
-  createDataFromAnnotatedType as $e, // only with exampleData: true
-  throwFeatureDisabled as $d, // only with jsonSchema: false (default)
-} from '@atscript/typescript/utils'
-
-export class Product {
-  static __is_atscript_annotated_type = true
-  static type = {}
-  static metadata = new Map()
-  static id = 'Product'
-  static toJsonSchema() {
-    return this._jsonSchema ?? (this._jsonSchema = $$(this))
-  }
-  static toExampleData() {
-    return $e(this, { mode: 'example' })
-  }
-}
-
-$('object', Product)
-  .prop(
-    'name',
-    $()
-      .designType('string')
-      .tags('string')
-      .annotate('meta.label', 'Product Name')
-      .annotate('expect.minLength', 3).$type
-  )
-  .prop('price', $().designType('number').tags('number').annotate('expect.min', 0).$type)
-  .prop('inStock', $().designType('boolean').tags('boolean').$type)
-  .annotate('meta.description', 'A product in the catalog')
-```
-
-The `defineAnnotatedType()` calls build the type structure and attach all annotations as runtime metadata. Semantic types (like `string.email`) automatically add validation rules and tags.
-
-::: info Imports depend on config
-The example above shows imports for `jsonSchema: 'lazy'` and `exampleData: true`. By default:
-
-- **JSON Schema** is disabled (`jsonSchema: false`) — `toJsonSchema()` calls `throwFeatureDisabled()` (aliased as `$d`) instead, and the `buildJsonSchema` import is omitted. With `jsonSchema: 'bundle'`, the schema is pre-computed and embedded as a static return value (no import needed).
-- **Example Data** is disabled (`exampleData: false`) — `toExampleData()` is not rendered at all, and the `createDataFromAnnotatedType` import is omitted.
-
-See [Configuration](/packages/typescript/configuration#plugin-options) for details.
-:::
+The generated `.js` registers the type tree at module load via internal builder calls — you should not need to read or hand-write it. The `.d.ts` is the consumer-facing surface; the `.js` exists to make the static members on each generated class actually work at runtime. Set [`jsonSchema`](/packages/typescript/configuration#jsonschema) and [`exampleData`](/packages/typescript/configuration#exampledata) in plugin options to control what runtime helpers get pulled in.
 
 ## When to Use Which
 

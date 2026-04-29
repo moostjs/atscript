@@ -1,6 +1,6 @@
 # Custom Primitives
 
-You can extend the built-in primitive types with your own semantic extensions via `atscript.config.ts`. Custom primitives work exactly like built-in ones — they appear in IntelliSense, carry validation constraints, and generate appropriate type tags.
+You can extend the built-in primitive types with your own semantic extensions via `atscript.config.ts`. Custom primitives work exactly like built-in ones — they appear in IntelliSense, carry validation constraints, and generate appropriate type tags. For the full primitive system (complex shapes, container primitives, semantic tags, phantom design), see [Custom Primitives — Plugin Development](/plugin-development/primitives-type-tags).
 
 ## Quick Example
 
@@ -120,16 +120,6 @@ export interface CheckoutForm {
     street: string
 }
 ```
-
-## Full Reference
-
-The primitives system is covered in depth in the plugin development guide:
-
-- **[Custom Primitives — Plugin Development](/plugin-development/primitives-type-tags)** — the complete `TPrimitiveConfig` interface, complex type definitions (arrays, tuples, unions, objects), semantic tags, container primitives, inheritance rules, and phantom type design.
-
-::: tip Re-generate after config changes
-Run `npx asc` after adding custom primitives to regenerate output files. This updates IntelliSense with your new type tags. See [Configuration](/packages/typescript/configuration) for details.
-:::
 
 ## Next Steps
 

@@ -1,6 +1,6 @@
 # Custom Annotations
 
-You can define your own annotation types in `atscript.config.ts`. Custom annotations get full IntelliSense support, type checking, and are available in runtime metadata — just like the built-in `@meta.*`, `@expect.*`, and `@ui.*` annotations.
+You can define your own annotation types in `atscript.config.ts`. Custom annotations get full IntelliSense support, type checking, and are available in runtime metadata — just like the built-in `@meta.*`, `@expect.*`, and `@ui.*` annotations. For the full `AnnotationSpec` API — argument shapes, merge strategies, parse-time validation, AST-modifying hooks — see [Custom Annotations — Plugin Development](/plugin-development/annotation-system).
 
 ## Allowing Unknown Annotations
 
@@ -93,16 +93,6 @@ nameProp?.metadata.get('grid.tag') // ['primary', 'searchable']
 | `defType`       | `string[]`              | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc.                                |
 | `validate`      | `function`              | Custom validation function for complex checks                                                                                     |
 | `modify`        | `function`              | Hook to modify the AST after annotation is parsed                                                                                 |
-
-## Full Reference
-
-The annotation system is covered in depth in the plugin development guide:
-
-- **[Custom Annotations — Plugin Development](/plugin-development/annotation-system)** — complete `AnnotationSpec` API, argument types, merge strategies, custom parse-time validation, AST modification with `modify()`, and full plugin examples.
-
-::: tip Re-generate after config changes
-Run `npx asc` after adding custom annotations to regenerate output files. This updates IntelliSense with your new annotation types. See [Configuration](/packages/typescript/configuration) for details.
-:::
 
 ## Next Steps
 

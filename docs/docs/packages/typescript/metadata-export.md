@@ -49,21 +49,11 @@ Tags let you make runtime decisions based on semantic types — for example, ren
 
 ## Nested Types
 
-For arrays, unions, and nested objects, metadata lives on each nested `TAtscriptAnnotatedType`:
+Every nested node — array element, union member, nested-object property — is itself a `TAtscriptAnnotatedType` with its own `.metadata.get(...)`. Reach into the right field on the parent (`type.of` for arrays, `type.items` for unions/intersections/tuples, `type.props.get(...)` for objects) and call `metadata.get` on what you find:
 
 ```typescript
-import { OrderList, StatusUnion, User } from './models.as'
+import { User } from './models.as'
 
-// Array element type
-const itemsType = OrderList.type.of // TAtscriptAnnotatedType for array element
-itemsType.metadata.get('meta.label')
-
-// Union members
-for (const item of StatusUnion.type.items) {
-  item.metadata.get('meta.label')
-}
-
-// Nested object properties
 const addressProp = User.type.props.get('address')
 if (addressProp?.type.kind === 'object') {
   const cityProp = addressProp.type.props.get('city')

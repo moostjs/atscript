@@ -55,30 +55,15 @@ Defaults applied when the option is omitted:
 | `plugins` | `[]`            | `tsPlugin()` is always injected before any caller-supplied plugin |
 | `include` | `['**/*.as']`   | Used only when `entries` is not provided                          |
 | `entries` | `undefined`     | When set, narrows compilation to exactly those filenames          |
-| `formats` | `['js', 'dts']` | Both formats are generated concurrently via `Promise.all`         |
+| `formats` | `['js', 'dts']` | Both formats are written on every call                            |
 
-The two `generate()` calls (`js` and `dts`) run in parallel, not sequentially, so total elapsed time is approximately `max(js_time, dts_time)`.
-
-Every generated file is written with `writeFileSync` — there is no compare-and-skip optimization. Fixture artifacts are treated as test-run outputs whose mtime is expected to advance on every call.
-
-## How fixtures are tracked in git
-
-Fixture artifacts — the generated `.as.js` and `.as.d.ts` that sit next to every `.as` source — are **gitignored** in the Atscript repo:
-
-```
-*.as.js
-*.as.d.ts
-```
-
-`prepareFixtures()` is the single source of both formats on every test run. A fresh clone has no fixture artifacts until the first time a test suite calls `prepareFixtures()` in its `beforeAll` (or Vitest `globalSetup`). The one-time UX cost is a transient window of IDE red squiggles on unrun spec files that reference `./fixtures/foo.as.js` — the first test run regenerates them and the squiggles disappear.
-
-Rationale: `.as.js` and `.as.d.ts` are compilation outputs, not source. Committing them invites silent drift when core or codegen changes — the committed artifact stays frozen while test runs keep passing against stale files. Regenerating on every run guarantees tests always exercise the current codegen.
+Generated `.as.js` / `.as.d.ts` artifacts are intended as test-run outputs — gitignore them (`*.as.js`, `*.as.d.ts`) and let `prepareFixtures()` rewrite them on every run.
 
 ## Production `.as` vs test fixtures
 
-Consumer projects that have both production `.as` files (under `src/`) and `.as` test fixtures get a clean separation of lifecycles.
+If your project has both production `.as` files (under `src/`) and `.as` test fixtures, separate their lifecycles:
 
-**Production `.as` lifecycle** — configure `atscript.config.ts` to target production globs only, and add a `postinstall` script so `.as.d.ts` exists for lint/build/IDE tooling on fresh install:
+**Production `.as`** — point `atscript.config.ts` at the production globs and add a `postinstall` script so `.as.d.ts` exists on fresh install:
 
 ```ts
 // atscript.config.ts
@@ -101,7 +86,7 @@ export default defineConfig({
 }
 ```
 
-**Test fixture lifecycle** — exclude test directories from the config above (they are already excluded in the example), then compile fixtures in test-setup hooks using whatever plugin set the tests require:
+**Test fixtures** — compile in test-setup hooks with whatever plugin set the tests need (often a different set than production — feature-flag plugins, WIP plugins, or test-only mocks):
 
 ```ts
 // src/__tests__/setup.ts
@@ -117,20 +102,6 @@ beforeAll(() =>
   })
 )
 ```
-
-Why the split: test fixtures frequently declare different plugin sets than production code — a WIP plugin being developed in isolation, a feature-flag plugin tests enable explicitly, or a mock plugin used only for fixtures. Running `asc` over fixtures with the production config would either fail (missing plugins) or quietly produce wrong codegen.
-
-`@atscript/typescript` itself has no production `.as` in its `src/` — fixtures are the only consumers — so the package ships **no `postinstall`**. `prepareFixtures()` running in test setup is sufficient.
-
-## Parallel js + dts generation
-
-Both output formats are generated concurrently:
-
-```ts
-await Promise.all(formats.map(format => repo.generate({ outDir: '.', format })))
-```
-
-Since `generate()` is independent per format, this trims roughly half the total time vs. a sequential `await` pair — meaningful when fixtures grow.
 
 ## See also
 
