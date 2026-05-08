@@ -1,3 +1,12 @@
+## [0.1.52](https://github.com/moostjs/atscript/compare/v0.1.51...v0.1.52) (2026-05-08)
+
+
+### Bug Fixes
+
+* **typescript:** synthesize imports for helpers reachable through cross-file extends ([c2c3ff6](https://github.com/moostjs/atscript/commit/c2c3ff65eeeac099194363f784738874f8e155ff))
+
+
+
 ## [0.1.51](https://github.com/moostjs/atscript/compare/v0.1.50...v0.1.51) (2026-05-07)
 
 
