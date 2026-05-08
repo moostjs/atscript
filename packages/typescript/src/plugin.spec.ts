@@ -972,6 +972,321 @@ describe('ts-plugin', () => {
     )
   })
 
+  it('must keep imports referenced only via cross-file `extends` parent prop tree', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-cross-helper-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    expect(out[0].fileName).toBe('extends-cross-helper-child.as.js')
+    // Codegen must emit a refTo() for the inherited prop's helper type
+    expect(out[0].content).toContain('() => Helper')
+    // Helper must survive in the import list — it is only referenced through
+    // Base's resolved prop tree, never directly in the child source.
+    const importMatch = out[0].content.match(
+      /import \{([^}]+)\} from "\.\/extends-cross-helper-base\.as"/
+    )
+    expect(importMatch).not.toBeNull()
+    const importedNames = importMatch![1].split(',').map(s => s.trim())
+    expect(importedNames).toContain('Helper')
+    expect(importedNames).toContain('Base')
+    await expect(out[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-cross-helper-child.js')
+    )
+  })
+
+  it('must synthesize import for cross-file `extends` parent prop helper when not user-imported', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-synth-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    const js = out[0].content
+    // Synthesized import for Helper from parent module
+    expect(js).toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-synth-base\.as"/)
+    // refTo uses Helper (no clash, no alias needed)
+    expect(js).toContain('() => Helper')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-synth-child.js')
+    )
+  })
+
+  it('must alias synthesized import when local def shadows parent helper name', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-synth-clash-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    const js = out[0].content
+    // Synthesized import aliases parent's Helper to Helper_1
+    expect(js).toMatch(
+      /import \{[^}]*Helper as Helper_1[^}]*\} from "\.\/extends-synth-clash-base\.as"/
+    )
+    // Parent-originated payload prop refTo uses the aliased Helper_1
+    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"own"'))
+    expect(payloadSection).toContain('() => Helper_1')
+    expect(payloadSection).not.toMatch(/refTo\(\(\) => Helper\b\)/)
+    // Child's own prop refers to the local Helper class — eager, no alias
+    const ownSection = js.slice(js.indexOf('"own"'))
+    expect(ownSection).toContain('.refTo(Helper)')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-synth-clash-child.js')
+    )
+  })
+
+  it('must give distinct aliases when two parents define same-named helper in different files', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-synth-multi-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    const js = out[0].content
+    // First parent's Helper imported under original name
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-synth-multi-base1\.as"/)
+    // Second parent's Helper aliased to Helper_1
+    expect(js).toMatch(
+      /import \{ Helper as Helper_1 \} from "\.\/extends-synth-multi-base2\.as"/
+    )
+    const propASection = js.slice(js.indexOf('"propA"'), js.indexOf('"propB"'))
+    const propBSection = js.slice(js.indexOf('"propB"'))
+    expect(propASection).toContain('() => Helper')
+    expect(propASection).not.toContain('Helper_1')
+    expect(propBSection).toContain('() => Helper_1')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-synth-multi-child.js')
+    )
+  })
+
+  it('must alias synthesized helper when user already imports same name from a different path', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-xpath-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // User's own Helper import preserved unchanged (no alias on user's side)
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-xpath-a\.as"/)
+    // Parent's Helper synthesized under Helper_1 from the OTHER path
+    expect(js).toMatch(
+      /import \{ Helper as Helper_1 \} from "\.\/extends-xpath-b\.as"/
+    )
+    // Parent-origin payload uses aliased name
+    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"fromUser"'))
+    expect(payloadSection).toContain('() => Helper_1')
+    // Child's own fromUser uses the user-imported (same name, different module)
+    const fromUserSection = js.slice(js.indexOf('"fromUser"'))
+    expect(fromUserSection).toContain('() => Helper')
+    expect(fromUserSection).not.toContain('Helper_1')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-xpath-child.js')
+    )
+  })
+
+  it('must synthesize imports for helpers nested deep in parent prop tree (object/array/union)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-nested-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-nested-base\.as"/)
+    // Helper appears via three different containers — confirm the walker reaches each
+    const stateSection = js.slice(js.indexOf('"state"'), js.indexOf('"id"'))
+    // context: Helper (direct prop in nested struct)
+    expect(stateSection).toContain('"context"')
+    expect(stateSection).toMatch(/"context"[\s\S]*?refTo\(\(\) => Helper\)/)
+    // items: Helper[] (inside array)
+    expect(stateSection).toContain('"items"')
+    expect(stateSection).toMatch(/"items"[\s\S]*?\.of\(\$\(\)[\s\S]*?refTo\(\(\) => Helper\)/)
+    // union: Helper | string (inside group)
+    expect(stateSection).toContain('"union"')
+    expect(stateSection).toMatch(/"union"[\s\S]*?union[\s\S]*?refTo\(\(\) => Helper\)/)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-nested-child.js')
+    )
+  })
+
+  it('must synthesize import through multi-level extends (Child → Mid → Grand)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-grand-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // Helper lives in Grand's file — synth should target that file directly
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-grand-grand\.as"/)
+    // Inherited prop g comes from Grand and references Helper
+    expect(js).toContain('"g"')
+    expect(js).toMatch(/"g"[\s\S]*?refTo\(\(\) => Helper\)/)
+    // Mid is imported by the user (line for it stays); Helper must NOT be sourced from mid
+    expect(js).not.toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-grand-mid\.as"/)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-grand-child.js')
+    )
+  })
+
+  it('must re-emit type-level annotations on synthesized helper using parent doc context', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-annot-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-annot-base\.as"/)
+    // The refTo for the inherited payload should be followed by Helper's type-level annotation
+    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"id"'))
+    expect(payloadSection).toContain('refTo(() => Helper)')
+    expect(payloadSection).toContain('.annotate("label", "Helper Label")')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-annot-child.js')
+    )
+  })
+
+  it('must not duplicate the import line when user imports helper from the same path as synth target', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-dedup-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // Exactly ONE import line targeting the base module
+    const baseImports = js.match(/import \{[^}]*\} from "\.\/extends-dedup-base\.as"/g) || []
+    expect(baseImports).toHaveLength(1)
+    // Both Base and Helper present in that line
+    expect(baseImports[0]).toContain('Base')
+    expect(baseImports[0]).toContain('Helper')
+    // No aliasing — user's name matches what synth would have picked
+    expect(js).not.toContain('Helper as ')
+    // payload (parent-origin) and own (child-origin) both refer to same Helper
+    expect(js).toContain('() => Helper')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-dedup-child.js')
+    )
+  })
+
+  it('must skip past taken `_1` and use `_2` when both base name and `_1` are reserved', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-fallback-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // Both Helper and Helper_1 are local in child; synth must fall through to Helper_2
+    expect(js).toMatch(
+      /import \{ Helper as Helper_2 \} from "\.\/extends-fallback-base\.as"/
+    )
+    // Local Helper and Helper_1 still rendered as classes
+    expect(js).toContain('export class Helper {')
+    expect(js).toContain('export class Helper_1 {')
+    // Parent-originated payload uses Helper_2
+    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"a"'))
+    expect(payloadSection).toContain('() => Helper_2')
+    // Child's own a/b refer to local classes
+    const aSection = js.slice(js.indexOf('"a"'), js.indexOf('"b"'))
+    const bSection = js.slice(js.indexOf('"b"'))
+    expect(aSection).toContain('.refTo(Helper)')
+    expect(bSection).toContain('.refTo(Helper_1)')
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-fallback-child.js')
+    )
+  })
+
+  it('must synthesize import from ultimate owner doc when parent re-exports through a chain', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-reexport-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // Helper's actual declaration is in leaf; synth must point there, not at mid
+    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-reexport-leaf\.as"/)
+    expect(js).not.toMatch(/import \{ Helper \} from "\.\/extends-reexport-mid\.as"/)
+    expect(js).toMatch(/refTo\(\(\) => Helper\)/)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-reexport-child.js')
+    )
+  })
+
+  it('must synthesize the outer type for chain refs sourced from parent prop tree', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-chain-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // Outer User must be importable for `() => User` to resolve
+    expect(js).toMatch(/import \{ User \} from "\.\/extends-chain-base\.as"/)
+    // Chain ref preserved — refTo with chain array
+    expect(js).toMatch(/refTo\(\(\) => User, \["name"\]\)/)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-chain-child.js')
+    )
+  })
+
+  it('must synthesize a recursive type alias used through `extends` (matches atscript-ui JsonValue pattern)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-recursive-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // JsonValue is a recursive type alias — synth should still work.
+    expect(js).toMatch(/import \{ JsonValue \} from "\.\/extends-recursive-base\.as"/)
+    // Both context and meta values should refTo JsonValue
+    const stateSection = js.slice(js.indexOf('"state"'), js.indexOf('"id"'))
+    const refToCount = (stateSection.match(/refTo\(\(\) => JsonValue\)/g) || []).length
+    expect(refToCount).toBeGreaterThanOrEqual(2)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-recursive-child.js')
+    )
+  })
+
+  it('must synthesize a type-alias helper (not just interface) used through `extends`', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/extends-typealias-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    expect(js).toMatch(/import \{ MyAlias \} from "\.\/extends-typealias-base\.as"/)
+    expect(js).toMatch(/refTo\(\(\) => MyAlias\)/)
+    await expect(js).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/extends-typealias-child.js')
+    )
+  })
+
   it('must render query annotation arguments as query tree objects', async () => {
     const filterAnnotation = new AnnotationSpec({
       argument: { name: 'filter', type: 'query' },

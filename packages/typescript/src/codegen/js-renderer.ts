@@ -24,9 +24,13 @@ import type {
   TPrimitiveTypeDef,
 } from '@atscript/core'
 import {
+  getRelPath,
+  isArray,
+  isBareId,
   isGroup,
   isInterface,
   isPrimitive,
+  isProp,
   isQueryLogical,
   isRef,
   isStructure,
@@ -56,17 +60,230 @@ const QUERY_OP_MAP: Record<string, string> = {
   'not exists': '$exists',
 }
 
+interface TSynthRefInfo {
+  alias: string
+  ownerDoc: AtscriptDoc
+  ownerNode?: SemanticNode
+}
+
 export class JsRenderer extends BaseRenderer {
   private postAnnotate = [] as SemanticNode[]
   private _adHocAnnotations: Map<string, TAnnotationTokens[]> | null = null
   private _propPath: string[] = []
   private typeIds = new Map<SemanticNode, string>()
+  private _unusedJs?: Set<string>
+  private _extendsRefs?: Map<SemanticRefNode, AtscriptDoc>
+  private _refSynthInfo = new Map<SemanticRefNode, TSynthRefInfo>()
+  private _synthImports = new Map<string, Array<{ name: string; alias: string }>>()
+  private _synthComputed = false
+  private _ownerCache = new Map<string, ReturnType<AtscriptDoc['getDeclarationOwnerNode']>>()
 
   constructor(
     doc: AtscriptDoc,
     private opts?: TTsPluginOptions
   ) {
     super(doc)
+  }
+
+  /**
+   * Override base `unused` to subtract symbols that the JS output references
+   * transitively through `extends`-resolved parent prop trees. Without this,
+   * cross-file `extends` strips the imports needed by inherited `.refTo()` calls.
+   */
+  protected override get unused(): Set<string> {
+    if (this._unusedJs) {
+      return this._unusedJs
+    }
+    const base = new Set(this.doc.getUnusedTokens().map(t => t.text))
+    for (const ref of this.getExtendsRefs().keys()) {
+      if (ref.id) {
+        base.delete(ref.id)
+      }
+    }
+    return (this._unusedJs = base)
+  }
+
+  // Cached: walked twice (the `unused`-set override and the synth pre-pass).
+  private getExtendsRefs(): Map<SemanticRefNode, AtscriptDoc> {
+    if (this._extendsRefs) {
+      return this._extendsRefs
+    }
+    const out = new Map<SemanticRefNode, AtscriptDoc>()
+    const visitedInterfaces = new Set<SemanticInterfaceNode>()
+    for (const node of this.doc.nodes) {
+      if (isInterface(node) && node.hasExtends) {
+        this.walkExtendsParents(node, this.doc, out, visitedInterfaces)
+      }
+    }
+    return (this._extendsRefs = out)
+  }
+
+  private walkRefs(
+    node: SemanticNode | undefined,
+    visited: Set<SemanticNode>,
+    visit: (ref: SemanticRefNode) => void
+  ): void {
+    if (!node || visited.has(node)) {
+      return
+    }
+    visited.add(node)
+    if (isRef(node)) {
+      visit(node)
+      return
+    }
+    if (isGroup(node)) {
+      for (const item of node.unwrap()) {
+        this.walkRefs(item, visited, visit)
+      }
+      return
+    }
+    if (isArray(node) || isProp(node)) {
+      this.walkRefs(node.getDefinition(), visited, visit)
+    }
+  }
+
+  private walkExtendsParents(
+    iface: SemanticInterfaceNode,
+    doc: AtscriptDoc,
+    out: Map<SemanticRefNode, AtscriptDoc>,
+    visited: Set<SemanticInterfaceNode>
+  ): void {
+    if (visited.has(iface)) {
+      return
+    }
+    visited.add(iface)
+    const visitedNodes = new Set<SemanticNode>()
+    for (const token of iface.extendsTokens) {
+      const unwound = doc.unwindType(token.text)
+      if (!unwound?.def || !isInterface(unwound.def)) {
+        continue
+      }
+      const parentInterface = unwound.def
+      const parentDoc = unwound.doc
+      this.walkRefs(parentInterface.getDefinition(), visitedNodes, ref => {
+        if (!out.has(ref)) {
+          out.set(ref, parentDoc)
+        }
+      })
+      if (parentInterface.hasExtends) {
+        this.walkExtendsParents(parentInterface, parentDoc, out, visited)
+      }
+    }
+  }
+
+  // Pre-pass: for each ref reachable through an `extends` parent prop tree,
+  // assign a JS-side binding (alias) so rendered `.refTo()` calls resolve even
+  // when the user didn't manually import the helper. Name clashes get suffixed
+  // `_1`, `_2`, … against locals, existing imports, and earlier synth aliases.
+  private computeSynthesizedImports() {
+    if (this._synthComputed) {
+      return
+    }
+    this._synthComputed = true
+
+    const refToOriginDoc = this.getExtendsRefs()
+    if (refToOriginDoc.size === 0) {
+      return
+    }
+
+    const taken = new Set<string>(this.doc.registry.definitions.keys())
+    const allocated = new Map<string, TSynthRefInfo>()
+    const synthPathCache = new Map<AtscriptDoc, string | undefined>()
+
+    for (const [refNode, originDoc] of refToOriginDoc) {
+      const refId = refNode.id
+      if (!refId) {
+        continue
+      }
+      const ownerInfo = this.resolveOwner(originDoc, refId)
+      if (!ownerInfo?.doc || ownerInfo.doc === this.doc) {
+        continue
+      }
+      if (ownerInfo.node && isPrimitive(ownerInfo.node)) {
+        continue
+      }
+      const ownerDoc = ownerInfo.doc
+      let synthPath: string | undefined
+      if (synthPathCache.has(ownerDoc)) {
+        synthPath = synthPathCache.get(ownerDoc)
+      } else {
+        synthPath = this.computeSynthPath(ownerDoc)
+        synthPathCache.set(ownerDoc, synthPath)
+      }
+      if (!synthPath) {
+        continue
+      }
+
+      const allocKey = `${synthPath}::${refId}`
+      let info = allocated.get(allocKey)
+      if (!info) {
+        info = this.allocateSynthInfo(refId, synthPath, ownerInfo, taken)
+        allocated.set(allocKey, info)
+      }
+      this._refSynthInfo.set(refNode, info)
+    }
+  }
+
+  // Memoize `getDeclarationOwnerNode` across the synth pre-pass and the
+  // per-ref `.refTo()` emit site (each ref otherwise resolves the owner twice).
+  private resolveOwner(
+    fromDoc: AtscriptDoc,
+    refId: string
+  ): ReturnType<AtscriptDoc['getDeclarationOwnerNode']> {
+    const key = `${fromDoc.id}::${refId}`
+    let v = this._ownerCache.get(key)
+    if (v === undefined && !this._ownerCache.has(key)) {
+      v = fromDoc.getDeclarationOwnerNode(refId)
+      this._ownerCache.set(key, v)
+    }
+    return v
+  }
+
+  private allocateSynthInfo(
+    refId: string,
+    synthPath: string,
+    ownerInfo: { doc: AtscriptDoc; node?: SemanticNode },
+    taken: Set<string>
+  ): TSynthRefInfo {
+    const ownerDoc = ownerInfo.doc
+    const ownerNode = ownerInfo.node
+    // If the user already imports this exact (name, path), reuse that binding instead of synthesizing a duplicate.
+    const existing = this.doc.importedDefs.get(refId)
+    if (existing?.text === synthPath) {
+      return { alias: refId, ownerDoc, ownerNode }
+    }
+    const alias = this.allocAlias(refId, taken)
+    let group = this._synthImports.get(synthPath)
+    if (!group) {
+      group = []
+      this._synthImports.set(synthPath, group)
+    }
+    group.push({ name: refId, alias })
+    return { alias, ownerDoc, ownerNode }
+  }
+
+  private allocAlias(name: string, taken: Set<string>): string {
+    if (!taken.has(name)) {
+      taken.add(name)
+      return name
+    }
+    let n = 1
+    while (taken.has(`${name}_${n}`)) {
+      n++
+    }
+    const alias = `${name}_${n}`
+    taken.add(alias)
+    return alias
+  }
+
+  private computeSynthPath(ownerDoc: AtscriptDoc): string | undefined {
+    if (isBareId(ownerDoc.id)) {
+      return ownerDoc.id.slice('bare:'.length, -'.as'.length)
+    }
+    if (!ownerDoc.id.startsWith('file://')) {
+      return undefined
+    }
+    return getRelPath(this.doc.id, ownerDoc.id)
   }
 
   pre() {
@@ -114,6 +331,15 @@ export class JsRenderer extends BaseRenderer {
       imports.push('throwFeatureDisabled as $d')
     }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
+
+    // Synthesized imports for symbols only reachable through `extends` parent prop trees.
+    this.computeSynthesizedImports()
+    for (const [synthPath, names] of this._synthImports) {
+      const list = names
+        .map(n => (n.alias === n.name ? n.name : `${n.name} as ${n.alias}`))
+        .join(', ')
+      this.writeln(`import { ${list} } from "${this.transformFromPath(synthPath)}"`)
+    }
   }
 
   private buildAdHocMap(annotateNodes: SemanticAnnotateNode[]) {
@@ -522,7 +748,7 @@ export class JsRenderer extends BaseRenderer {
         if (isPrimitive(decl)) {
           // Only inline as primitive if the ref directly targets a built-in primitive,
           // not a named type alias that resolves to a primitive (e.g. `type MyString = string`).
-          const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
+          const ownerDecl = this.resolveOwner(this.doc, ref.id!)
           if (
             !ownerDecl?.node ||
             (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')
@@ -549,9 +775,15 @@ export class JsRenderer extends BaseRenderer {
           : ''
         // Always use lazy ref for imported types to avoid circular import/bundle TDZ issues.
         // Local types use eager ref since they're always defined before use in the same file.
-        const ownerDecl = this.doc.getDeclarationOwnerNode(ref.id!)
-        const isImported = ownerDecl ? ownerDecl.doc !== this.doc : false
-        const refExpr = isImported ? `() => ${ref.id!}` : ref.id!
+        // Synth pre-pass binding (if any) wins over child-doc lookup, which would otherwise
+        // resolve to a clashing local definition.
+        const synth = this._refSynthInfo.get(ref)
+        const ownerDecl = synth
+          ? { doc: synth.ownerDoc, node: synth.ownerNode }
+          : this.resolveOwner(this.doc, ref.id!)
+        const refName = synth?.alias ?? ref.id!
+        const isImported = !!synth || (ownerDecl ? ownerDecl.doc !== this.doc : false)
+        const refExpr = isImported ? `() => ${refName}` : refName
         this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
           .writeln(`.refTo(${refExpr}${chain})`)
