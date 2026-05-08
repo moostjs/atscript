@@ -33,6 +33,22 @@ export interface User {
 
 Interfaces → class-like types in `.d.ts` with attached runtime metadata namespace. `readonly` honored.
 
+### `extends`
+
+```atscript
+interface Base { id: string.uuid }
+interface Audited { createdAt: string.isoDate }
+
+export interface Post extends Base, Audited {
+  title: string
+}
+```
+
+- Multiple parents (comma-separated). Own props add to inherited.
+- Prop-level annotations inherit; interface-level annotations don't.
+- No overrides — redeclaring a parent prop is a diagnostic. Self/circular extends detected.
+- For inline composition use `&` intersection instead.
+
 ## `type`
 
 ```atscript
