@@ -11,15 +11,30 @@ import { forAnnotatedType } from './traverse'
 export type TJsonSchema = Record<string, any>
 
 /**
+ * Describes a discriminator property shared by all variants of a union.
+ *
+ * Returned by {@link detectDiscriminator} when a union qualifies as a
+ * discriminated (a.k.a. tagged) union — every variant is an object that
+ * carries the same literal-valued property with a distinct value.
+ */
+export type TUnionDiscriminator = {
+  /** Name of the discriminator property shared by all variants. */
+  propertyName: string
+  /** Maps the literal value of `propertyName` → variant index in `items`. */
+  indexMapping: Record<string, number>
+}
+
+/**
  * Detects a discriminator property across union items.
  *
  * Scans all items for object-typed members that share a common property
  * with distinct const/literal values. If exactly one such property exists,
- * it is returned as the discriminator.
+ * it is returned as the discriminator. Returns `null` when no qualifying
+ * property exists, or when more than one does (ambiguous).
  */
-function detectDiscriminator(
+export function detectDiscriminator(
   items: TAtscriptAnnotatedType[]
-): { propertyName: string; indexMapping: Record<string, number> } | null {
+): TUnionDiscriminator | null {
   if (items.length < 2) {
     return null
   }
@@ -41,7 +56,7 @@ function detectDiscriminator(
   }
 
   // Filter candidates: must exist with a const value in ALL items, all values must be distinct
-  let result: { propertyName: string; indexMapping: Record<string, number> } | null = null
+  let result: TUnionDiscriminator | null = null
 
   for (const candidate of candidates) {
     const values = new Set<string | number | boolean>()

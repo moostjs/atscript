@@ -65,8 +65,13 @@ export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<strin
 
 export * from './runtime/validator'
 
-export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
-export type { TJsonSchema } from './runtime/json-schema'
+export {
+  buildJsonSchema,
+  detectDiscriminator,
+  fromJsonSchema,
+  mergeJsonSchemas,
+} from './runtime/json-schema'
+export type { TJsonSchema, TUnionDiscriminator } from './runtime/json-schema'
 
 export { forAnnotatedType } from './runtime/traverse'
 
