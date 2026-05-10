@@ -57,7 +57,7 @@ import {
   defineAnnotatedType,             // fluent builder (in generated code)
   forAnnotatedType,                // kind-dispatched walker
   Validator, ValidatorError,
-  buildJsonSchema, fromJsonSchema, mergeJsonSchemas,
+  buildJsonSchema, fromJsonSchema, mergeJsonSchemas, detectDiscriminator,
   serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION,
   isAnnotatedType, isAnnotatedTypeOfPrimitive,
 } from '@atscript/typescript/utils'

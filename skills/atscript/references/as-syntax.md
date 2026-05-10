@@ -67,7 +67,7 @@ export type Role = 'admin' | 'editor' | 'viewer'
 export type Project = { id: string.uuid; name: string } & WithAudit
 ```
 
-`|`, `&` as in TS. Discriminated unions (members share a literal-valued prop) are auto-detected by `buildJsonSchema`.
+`|`, `&` as in TS. Discriminated unions (members share a literal-valued prop) are auto-detected by `buildJsonSchema` and exposed via `detectDiscriminator()` for downstream consumers.
 
 ## Tuples / arrays
 

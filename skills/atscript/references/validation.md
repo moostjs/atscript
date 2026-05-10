@@ -108,6 +108,20 @@ const combined = mergeJsonSchemas([User.annotatedType, Project.annotatedType, Te
 // combined.$defs has User, Project, Team; top-level members as $ref
 ```
 
+### `detectDiscriminator(items)`
+
+Detects the discriminator property of a union: every variant must be an object carrying the same literal-valued property with a distinct value. Returns `TUnionDiscriminator | null` (`null` when no qualifying property exists or more than one does — ambiguous). Used internally by `buildJsonSchema`; exposed for consumers (e.g. form layers) that need a fast-path for tagged unions instead of brute-forcing every variant's validator.
+
+```ts
+import { detectDiscriminator } from '@atscript/typescript/utils'
+import type { TUnionDiscriminator } from '@atscript/typescript/utils'
+
+// MediaSource = { kind: 'url', url: string } | { kind: 'upload', file: Blob }
+const disc = detectDiscriminator(MediaSource.annotatedType.type.items)
+// → { propertyName: 'kind', indexMapping: { url: 0, upload: 1 } }
+const idx = disc?.indexMapping[value[disc.propertyName]] // O(1) variant lookup
+```
+
 ## Validator plugins
 
 Custom rules via `plugins: TValidatorPlugin[]`. A plugin is a **function** — not an object — called per visited node. Returns `boolean | undefined`: `true`/`false` = pass/fail, `undefined` = no opinion.
