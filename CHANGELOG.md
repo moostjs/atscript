@@ -1,3 +1,12 @@
+## [0.1.53](https://github.com/moostjs/atscript/compare/v0.1.52...v0.1.53) (2026-05-10)
+
+
+### Features
+
+* **typescript:** expose detectDiscriminator and TUnionDiscriminator from utils ([ce9055e](https://github.com/moostjs/atscript/commit/ce9055ee8f291eef876c05b6306655eb7547774a))
+
+
+
 ## [0.1.52](https://github.com/moostjs/atscript/compare/v0.1.51...v0.1.52) (2026-05-08)
 
 
