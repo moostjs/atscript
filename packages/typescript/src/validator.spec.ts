@@ -40,6 +40,36 @@ describe('Validator at primitives', () => {
     expect(validator.validate(123, true)).toBe(false)
     expect(validator.validate(7, true)).toBe(true)
   })
+  it('should validate primitive decimal', () => {
+    const validator = new Validator(defineAnnotatedType().designType('decimal').$type)
+
+    // accepted
+    expect(validator.validate('0', true)).toBe(true)
+    expect(validator.validate('0.000', true)).toBe(true)
+    expect(validator.validate('-0', true)).toBe(true)
+    expect(validator.validate('123', true)).toBe(true)
+    expect(validator.validate('-12.34', true)).toBe(true)
+    expect(validator.validate('+5', true)).toBe(true)
+
+    // rejected: empty / malformed strings
+    expect(validator.validate('', true)).toBe(false)
+    expect(validator.validate('abc', true)).toBe(false)
+    expect(validator.validate('.5', true)).toBe(false)
+    expect(validator.validate('5.', true)).toBe(false)
+    expect(validator.validate('1.2.3', true)).toBe(false)
+    expect(validator.validate(' 1.5 ', true)).toBe(false)
+    expect(validator.validate('1,000', true)).toBe(false)
+    expect(validator.validate('1e3', true)).toBe(false)
+    expect(validator.validate('NaN', true)).toBe(false)
+    expect(validator.validate('-Infinity', true)).toBe(false)
+
+    // rejected: wrong type
+    expect(validator.validate(123, true)).toBe(false)
+    expect(validator.validate(0.5, true)).toBe(false)
+    expect(validator.validate(true, true)).toBe(false)
+    expect(validator.validate(null, true)).toBe(false)
+    expect(validator.validate(undefined, true)).toBe(false)
+  })
 })
 
 describe('Validator at objects', () => {

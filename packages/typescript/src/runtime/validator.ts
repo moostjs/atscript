@@ -583,6 +583,10 @@ export class Validator<
           this.error(`Expected string (decimal), got ${typeOfValue}`)
           return false
         }
+        if (!/^[+-]?\d+(\.\d+)?$/.test(value as string)) {
+          this.error(`Invalid decimal format: ${JSON.stringify(value)}`)
+          return false
+        }
         return true
       }
       default: {
