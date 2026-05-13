@@ -12,7 +12,7 @@ npx asc [options]
 
 | Option                  | Description                                                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `-c, --config <path>`   | Path to config file. If omitted, auto-detects `atscript.config.{ts,mts,cts,js,mjs,cjs}` walking up from the CWD.                       |
+| `-c, --config <path>`   | Path to config file. If omitted, auto-detects `atscript.config.{js,mjs,cjs,ts,mts,cts}` walking up from the CWD (JS variants are checked first in each directory). |
 | `-f, --format <format>` | Output format (`dts` or `js`). If omitted, the TypeScript plugin emits `.d.ts` (its default branch); pass `-f js` to get `.js` output. |
 | `--noEmit`              | Run diagnostics only, don't write files                                                                                                |
 | `--skipDiag`            | Skip diagnostics, always emit files                                                                                                    |

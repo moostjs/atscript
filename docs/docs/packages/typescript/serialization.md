@@ -54,7 +54,7 @@ import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
 
 ## FK References
 
-FK references (`.ref`) are stripped from serialized output by default. Pass `refDepth: 1` to include immediate refs when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields). For the full ref-control semantics — deeper expansion, fractional `.5` shallow targets — see the [`@atscript/db` docs](https://db.atscript.dev).
+FK references (`.ref`) are stripped from serialized output by default. Pass `refDepth: 1` to include immediate refs when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields). Integer values expand `N` full levels; a fractional `.5` part (e.g. `refDepth: 0.5` or `refDepth: 1.5`) emits a shallow `{ id, metadata }` target at the tail level instead of the full body — handy for keeping payloads small when the client only needs the target's identity. For the full ref-control semantics, see the [`@atscript/db` docs](https://db.atscript.dev).
 
 ## Filtering Annotations
 

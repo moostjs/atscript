@@ -45,7 +45,9 @@ Maximum number of errors to collect before stopping. Default: `10`.
 
 ### `skipList`
 
-Skip specific property paths:
+- **Type:** `Set<string>`
+
+Skip specific property paths. The set matches dot-separated paths (relative to each object) — entries like `'internalId'` skip a top-level prop, `'audit.createdBy'` skips a nested prop:
 
 ```typescript
 Product.validator({
@@ -55,7 +57,9 @@ Product.validator({
 
 ### `replace`
 
-Replace a type definition dynamically during validation:
+- **Type:** `(type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType`
+
+Replace a type definition dynamically during validation. Useful when one field should validate against a different type per request — for example, swapping a generic `unknown`-shaped payload for a concrete schema chosen at runtime. The function is called once per encountered type (results are cached), receives the original `TAtscriptAnnotatedType` and the dot-separated path, and must return either the original type or a replacement annotated type:
 
 ```typescript
 Product.validator({
@@ -80,6 +84,10 @@ Annotations from `.as` files are enforced automatically:
 | `@expect.array.key`         | array element properties | Marks identity fields for uniqueness and patch operations              |
 
 Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions.
+
+::: tip Decimal format
+Values typed as `decimal` are stored as strings to preserve precision. The validator enforces the regex `/^[+-]?\d+(\.\d+)?$/` — anything else (NaN, scientific notation, leading/trailing whitespace) is rejected with `Invalid decimal format`.
+:::
 
 ## Array Uniqueness
 
@@ -161,6 +169,28 @@ Product.validator({ plugins: [roleAware] }).validate(data, true, { role: 'admin'
 ```
 
 The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, and `context`.
+
+### Reporting Custom Errors from a Plugin
+
+Plugins may push their own structured errors into the active validator via `ctx.error(message, path?, details?)`:
+
+| Argument  | Type      | Notes                                                                                  |
+| --------- | --------- | -------------------------------------------------------------------------------------- |
+| `message` | `string`  | Required. Becomes the `message` of a `TError` entry.                                   |
+| `path`    | `string?` | Optional. Defaults to the current dot-separated path being validated.                  |
+| `details` | `TError[]?` | Optional. Nested error breakdown — useful when an alternative-tested branch fails. |
+
+```typescript
+const requirePositiveAmount: TValidatorPlugin = (ctx, def, value) => {
+  if (def.metadata.get('meta.label') === 'Amount' && typeof value === 'number' && value <= 0) {
+    ctx.error('Amount must be positive', ctx.path, [
+      { path: ctx.path, message: `Got ${value}` },
+    ])
+    return false
+  }
+  return undefined
+}
+```
 
 ## Manual Validator Construction
 

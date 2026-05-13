@@ -177,12 +177,17 @@ That is hard to model with `class-validator`, because its validation model is ce
 
 Most useful options:
 
-- `partial`
-- `unknownProps`
-- `errorLimit`
-- `skipList`
-- `replace`
-- `plugins`
+- `partial` — allow missing properties (PATCH)
+- `unknownProps` — `'strip' | 'ignore' | 'error'`
+- `errorLimit` — stop after N errors
+
+### Advanced options
+
+These are available but rarely needed in HTTP request validation. Reach for them only when you understand the underlying validator behavior:
+
+- `skipList` — paths to skip during validation
+- `replace` — value-replacement hook used by validator plugins
+- `plugins` — custom validator plugin functions
 
 If you already know the TypeScript validator API, the same options work here. See [Validation Reference](/packages/typescript/validation-reference) for the full low-level option details.
 

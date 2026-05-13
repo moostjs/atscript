@@ -16,6 +16,7 @@ interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<
   validator: (opts?) => Validator // creates a validator instance
   optional?: boolean
   id?: string // stable type name (e.g. "Cat") — used for $defs/$ref in JSON Schema
+  ref?: { type: () => TAtscriptAnnotatedType; field: string } // FK reference to another type/field (set on @db.rel.FK)
 }
 ```
 

@@ -35,8 +35,8 @@ Keep [Plugin Architecture](/plugin-development/architecture) and [Plugin Hooks R
 
 | Capability                       | Hook           | Example                                     |
 | -------------------------------- | -------------- | ------------------------------------------- |
-| Add semantic types (primitives)  | `config()`     | `mongo.objectId`, `mongo.vector`            |
-| Define annotation specs          | `config()`     | `@db.mongo.collection`, `@db.index.unique`  |
+| Add semantic types (primitives)  | `config()`     | `geo.latitude`, `color.hex`                 |
+| Define annotation specs          | `config()`     | `@api.endpoint`, `@store.collection`        |
 | Remap or virtualize module paths | `resolve()`    | Path aliases, virtual modules               |
 | Provide virtual file content     | `load()`       | Synthetic `.as` modules                     |
 | Post-process parsed documents    | `onDocument()` | Inject virtual props, run custom checks     |
@@ -124,7 +124,7 @@ interface TAtscriptPlugin {
   render?(
     doc: AtscriptDoc,
     format: TAtscriptRenderFormat
-  ): Promise<TPluginOutput[]> | TPluginOutput[]
+  ): Promise<TPluginOutput[] | undefined> | TPluginOutput[] | undefined
   buildEnd?(
     output: TOutput[],
     format: TAtscriptRenderFormat,

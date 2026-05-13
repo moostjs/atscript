@@ -4,12 +4,11 @@ The VSCode extension does not have its own settings. Instead, it uses the same `
 
 ## Config File
 
-The extension looks for a configuration file named `atscript.config` with one of these extensions (checked in this order):
+The extension looks for a configuration file named `atscript.config` with one of these extensions:
 
-- `.js`, `.mjs`, `.cjs`
-- `.ts`, `.mts`, `.cts`
+- `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`
 
-The config file is resolved by walking up the directory tree from the `.as` file's location. This means different subdirectories in a monorepo can have different configurations.
+JS variants are checked before TS variants in each directory. The config file is resolved by walking up the directory tree from the `.as` file's location. This means different subdirectories in a monorepo can have different configurations.
 
 ### Minimal Example
 

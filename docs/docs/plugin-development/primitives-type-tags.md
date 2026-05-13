@@ -1,28 +1,28 @@
 # Custom Primitives
 
-Primitives are the fundamental scalar types in Atscript — `string`, `number`, `boolean`, and their semantic extensions like `string.email` or `number.int`. Plugins can add new primitive types and extensions that work identically to built-in ones: they appear in IntelliSense, carry validation constraints, and generate appropriate type tags at runtime.
+Primitives are the fundamental scalar types in Atscript — `string`, `number`, `boolean`, `decimal`, and their semantic extensions like `string.email` or `number.int`. Plugins can add new primitive types and extensions that work identically to built-in ones: they appear in IntelliSense, carry constraint annotations, and generate appropriate type tags at runtime.
 
 For a first plugin, keep the scope small:
 
 - start with one scalar extension like `geo.latitude`
-- add validation through `expect`
+- attach validation through built-in `@expect.*` annotations via the primitive's `annotations` map
 - only reach for object, tuple, or phantom primitives when your plugin really needs them
 
 ## What Primitives Are
 
 A primitive in Atscript has:
 
-- An underlying **type** — one of the scalar types (`string`, `number`, `boolean`, `void`, `null`, `phantom`) or a complex type definition
+- An underlying **type** — one of the final scalar types (`string`, `number`, `boolean`, `decimal`, `void`, `null`, `phantom`) or a complex type definition
 - Optional **documentation** — shown in hover tooltips in the editor
-- Optional **validation constraints** (`expect`) — automatically enforced at runtime
+- Optional **annotations** — applied automatically to every use of the primitive (e.g., `expect.min: 0`)
 - Optional **semantic tags** — string identifiers for runtime type discrimination
 - Optional **extensions** — sub-primitives accessed via dot notation (e.g., `string.email`)
 
-When a primitive has extensions, it becomes a namespace. `string` is a usable type on its own, but `string.email` is a more specific variant that inherits everything from `string` and adds its own constraints.
+When a primitive has extensions, it becomes a namespace. `string` is a usable type on its own, and `string.email` is a more specific variant that inherits everything from `string` plus its own annotations.
 
 ## The TPrimitiveConfig Interface
 
-Primitives are defined using `TPrimitiveConfig`:
+Primitives are defined with `TPrimitiveConfig`:
 
 ```typescript
 interface TPrimitiveConfig {
@@ -30,28 +30,58 @@ interface TPrimitiveConfig {
   documentation?: string
   tags?: string[]
   isContainer?: boolean
-  expect?: {
-    min?: number // for number types
-    max?: number // for number types
-    int?: boolean // for number types
-    minLength?: number // for string or array types
-    maxLength?: number // for string or array types
-    pattern?: string | RegExp | (string | RegExp)[] // for string types
-    required?: boolean // for string or boolean types
-    message?: string // custom error message
-  }
+  annotations?: Record<string, TPrimitiveAnnotationValue>
   extensions?: Record<string, Partial<TPrimitiveConfig>>
 }
 ```
 
-| Field           | Type                  | Description                                                                              |
-| --------------- | --------------------- | ---------------------------------------------------------------------------------------- |
-| `type`          | `TPrimitiveTypeDef`   | Underlying scalar or complex type. Inherited from parent if omitted.                     |
-| `documentation` | `string`              | Markdown text shown in IntelliSense. Inherited from parent if omitted.                   |
-| `tags`          | `string[]`            | Semantic tags for runtime discrimination (e.g., `['email']`).                            |
-| `isContainer`   | `boolean`             | If `true`, the primitive itself can't be used — one of its extensions must be chosen.    |
-| `expect`        | `object`              | Validation constraints automatically enforced at runtime. Merged with parent's `expect`. |
-| `extensions`    | `Record<string, ...>` | Sub-primitives accessible via dot notation.                                              |
+| Field           | Type                                       | Description                                                                                  |
+| --------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `type`          | `TPrimitiveTypeDef`                        | Underlying scalar or complex type. Inherited from parent if omitted.                         |
+| `documentation` | `string`                                   | Markdown text shown in IntelliSense. Inherited from parent if omitted.                       |
+| `tags`          | `string[]`                                 | Semantic tags for runtime discrimination (e.g., `['email']`).                                |
+| `isContainer`   | `boolean`                                  | If `true`, the primitive itself cannot be used — one of its extensions must be chosen.       |
+| `annotations`   | `Record<string, TPrimitiveAnnotationValue>` | Annotations applied automatically wherever this primitive is used. Merged with parent's map. |
+| `extensions`    | `Record<string, Partial<TPrimitiveConfig>>` | Sub-primitives accessible via dot notation.                                                  |
+
+### The `annotations` Map
+
+Each entry maps a fully-qualified annotation name (the same name used in `.as` files) to its value. The value shape matches the annotation's argument list:
+
+```typescript
+type TPrimitiveAnnotationArg = string | number | boolean
+type TPrimitiveAnnotationArgs = Record<string, TPrimitiveAnnotationArg>
+type TPrimitiveAnnotationValue =
+  | boolean                              // no-arg annotation (e.g., 'expect.int': true)
+  | string                               // single string arg
+  | number                               // single number arg (e.g., 'expect.min': 0)
+  | TPrimitiveAnnotationArgs             // multi named args (e.g., { pattern: '...', message: '...' })
+  | (TPrimitiveAnnotationArg | TPrimitiveAnnotationArgs)[] // multiple occurrences (with multiple: true)
+```
+
+Annotations declared in a primitive's `annotations` map are **identical** to writing the same annotation in `.as` source on every field that uses the primitive. They participate in normal validation and inheritance.
+
+## The Final Scalar Types
+
+`TPrimitiveTypeFinal` is the set of underlying scalar kinds a primitive can resolve to:
+
+```typescript
+type TPrimitiveTypeFinal =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'decimal'
+  | 'void'
+  | 'null'
+  | 'phantom'
+```
+
+- `string`, `number`, `boolean` — the standard scalars
+- `decimal` — string-backed arbitrary-precision numeric (`^[+-]?\d+(\.\d+)?$`). See [Validation Specification](/plugin-development/validation-spec#decimal-format-check).
+- `void`, `null` — terminal value types
+- `phantom` — non-data primitive used for runtime-discoverable metadata fields (see [Phantom Primitives](#phantom-primitives))
+
+`never` is also a valid primitive name (no `type` field — represents the impossible type).
 
 ## Adding Primitives via config()
 
@@ -74,21 +104,24 @@ export const geoPlugin = () =>
                 type: 'number',
                 documentation: 'Latitude coordinate (-90 to 90)',
                 tags: ['latitude'],
-                expect: { min: -90, max: 90 },
+                annotations: { 'expect.min': -90, 'expect.max': 90 },
               },
               longitude: {
                 type: 'number',
                 documentation: 'Longitude coordinate (-180 to 180)',
                 tags: ['longitude'],
-                expect: { min: -180, max: 180 },
+                annotations: { 'expect.min': -180, 'expect.max': 180 },
               },
               postalCode: {
                 type: 'string',
                 documentation: 'Postal/ZIP code',
                 tags: ['postalCode'],
-                expect: {
-                  pattern: /^[A-Z0-9 -]{3,10}$/i,
-                  message: 'Invalid postal code format',
+                annotations: {
+                  'expect.pattern': {
+                    pattern: '^[A-Z0-9 -]{3,10}$',
+                    flags: 'i',
+                    message: 'Invalid postal code format',
+                  },
                 },
               },
             },
@@ -99,7 +132,7 @@ export const geoPlugin = () =>
   })
 ```
 
-Now `.as` files can use these types:
+Usage in `.as` files:
 
 ```atscript
 export interface Location {
@@ -114,38 +147,44 @@ export interface Location {
 }
 ```
 
-### Real-World Example: MongoDB Plugin
+### Real-World Example: Built-In `string.email`
 
-The `@atscript/db-mongo` plugin adds two primitives:
+The built-in `string` primitive ships with several extensions, including `string.email`:
 
 ```typescript
-// from @atscript/db-mongo
-export const MongoPlugin = () =>
-  createAtscriptPlugin({
-    name: 'mongo',
-    config() {
-      return {
-        primitives: {
-          mongo: {
-            extensions: {
-              objectId: {
-                type: 'string',
-                documentation: 'MongoDB ObjectId',
-                expect: { pattern: /^[a-fA-F0-9]{24}$/ },
-              },
-              vector: {
-                type: { kind: 'array', of: 'number' },
-                documentation: 'Vector embedding array for vector search',
-              },
-            },
+// Shape used by Atscript's built-in primitives (excerpt)
+primitives: {
+  string: {
+    type: 'string',
+    documentation: 'Represents textual data.',
+    extensions: {
+      email: {
+        documentation: 'Represents an email address.',
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$',
+            message: 'Invalid email format.',
           },
         },
-      }
+      },
+      uuid: {
+        documentation: 'Represents a UUID.',
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            flags: 'i',
+            message: 'Invalid UUID format.',
+          },
+        },
+      },
     },
-  })
+  },
+}
 ```
 
-Notice how `mongo.vector` uses a complex type definition (`{ kind: 'array', of: 'number' }`) rather than a simple scalar string.
+::: tip Pattern strings, not regex literals
+`expect.pattern` accepts the pattern as a **string** (matching how `.as` source writes it), with an optional `flags` field. JavaScript `RegExp` literals are not the wire form — write `pattern: '^[A-Z]+$'`, not `/^[A-Z]+$/`.
+:::
 
 ## Complex Type Definitions
 
@@ -156,12 +195,13 @@ The `type` field accepts `TPrimitiveTypeDef`, which can be:
 A plain string for simple types:
 
 ```typescript
-type: 'string' // textual data
-type: 'number' // numeric data
-type: 'boolean' // true/false
-type: 'void' // no value
-type: 'null' // null value
-type: 'phantom' // metadata-only (excluded from generated types and validation)
+type: 'string'   // textual data
+type: 'number'   // numeric data
+type: 'boolean'  // true/false
+type: 'decimal'  // arbitrary-precision string-backed numeric
+type: 'void'     // no value
+type: 'null'     // null value
+type: 'phantom'  // metadata-only (excluded from generated types and validation)
 ```
 
 ### Array Type
@@ -169,8 +209,8 @@ type: 'phantom' // metadata-only (excluded from generated types and validation)
 An array of a given element type:
 
 ```typescript
-type: { kind: 'array', of: 'number' }         // number[]
-type: { kind: 'array', of: 'string' }         // string[]
+type: { kind: 'array', of: 'number' }   // number[]
+type: { kind: 'array', of: 'string' }   // string[]
 ```
 
 ### Union Type
@@ -180,7 +220,7 @@ One of several possible types:
 ```typescript
 type: {
   kind: 'union',
-  items: ['string', 'number']                  // string | number
+  items: ['string', 'number'],          // string | number
 }
 ```
 
@@ -191,7 +231,7 @@ A combination of types:
 ```typescript
 type: {
   kind: 'intersection',
-  items: ['string', 'number']                  // string & number
+  items: ['string', 'number'],          // string & number
 }
 ```
 
@@ -202,7 +242,7 @@ A fixed-length array with typed positions:
 ```typescript
 type: {
   kind: 'tuple',
-  items: ['number', 'number']                  // [number, number]
+  items: ['number', 'number'],          // [number, number]
 }
 ```
 
@@ -218,13 +258,13 @@ type: {
     y: 'number',
     label: { kind: 'final', value: 'string', optional: true },
   },
-  propsPatterns: {}
+  propsPatterns: {},
 }
 ```
 
 ### Optional Wrapper
 
-Any scalar can be made optional:
+Any final scalar can be wrapped as optional:
 
 ```typescript
 type: { kind: 'final', value: 'string', optional: true }  // string | undefined
@@ -241,10 +281,10 @@ geo: {
       type: {
         kind: 'object',
         props: {
-          type: 'string',                      // "Point"
+          type: 'string',                  // "Point"
           coordinates: {
             kind: 'tuple',
-            items: ['number', 'number'],       // [longitude, latitude]
+            items: ['number', 'number'],   // [longitude, latitude]
           },
         },
         propsPatterns: {},
@@ -255,51 +295,53 @@ geo: {
 }
 ```
 
-## Validation Constraints
+## Annotation-Backed Validation
 
-The `expect` field defines constraints that are automatically enforced by the runtime validator. You don't need to add `@expect.*` annotations manually — they're built into the primitive.
+Primitives don't run validation themselves. Instead, they declare annotations in their `annotations` map, and the runtime validator enforces those annotations exactly as if they had been written in `.as` source.
+
+The built-in `@expect.*` and `@meta.*` annotations cover the common cases:
 
 ### For String Types
 
 ```typescript
-expect: {
-  pattern: /^[a-z0-9-]+$/,          // regex pattern (or array of patterns)
-  minLength: 1,                      // minimum length
-  maxLength: 255,                    // maximum length
-  required: true,                    // non-empty, non-whitespace
-  message: 'Invalid format',        // custom error message for pattern
+annotations: {
+  'expect.pattern': { pattern: '^[a-z0-9-]+$', message: 'Invalid format' },
+  'expect.minLength': 1,
+  'expect.maxLength': 255,
+  'meta.required': true,             // non-empty, non-whitespace
 }
 ```
 
-Multiple patterns can be provided as an array — the value must match **at least one**:
+Multiple patterns are expressed as an array — the value must match **at least one**:
 
 ```typescript
-expect: {
-  pattern: [
-    /^\d{4}-\d{2}-\d{2}$/,          // YYYY-MM-DD
-    /^\d{2}\/\d{2}\/\d{4}$/,        // MM/DD/YYYY
+annotations: {
+  'expect.pattern': [
+    { pattern: '^\\d{4}-\\d{2}-\\d{2}$', message: 'Invalid date format' },
+    { pattern: '^\\d{2}/\\d{2}/\\d{4}$', message: 'Invalid date format' },
   ],
-  message: 'Invalid date format',
 }
 ```
 
 ### For Number Types
 
 ```typescript
-expect: {
-  min: 0,                           // minimum value (inclusive)
-  max: 100,                         // maximum value (inclusive)
-  int: true,                        // must be integer
+annotations: {
+  'expect.min': 0,
+  'expect.max': 100,
+  'expect.int': true,
 }
 ```
 
 ### For Boolean Types
 
 ```typescript
-expect: {
-  required: true,                   // must be true (useful for "accept terms" checkboxes)
+annotations: {
+  'meta.required': true,             // must be true (e.g. "accept terms" checkbox)
 }
 ```
+
+For full semantics (evaluation order, error formats, partial mode, etc.) see [Validation Specification](/plugin-development/validation-spec).
 
 ## Container Primitives and Inheritance
 
@@ -316,13 +358,15 @@ config() {
           hex: {
             type: 'string',
             documentation: 'Hex color (#RGB or #RRGGBB)',
-            expect: { pattern: /^#[\da-f]{3,8}$/i },
+            annotations: {
+              'expect.pattern': {
+                pattern: '^#[\\da-f]{3,8}$',
+                flags: 'i',
+              },
+            },
           },
           rgb: {
-            type: {
-              kind: 'tuple',
-              items: ['number', 'number', 'number'],
-            },
+            type: { kind: 'tuple', items: ['number', 'number', 'number'] },
             documentation: 'RGB color as [r, g, b]',
           },
           name: {
@@ -352,7 +396,7 @@ Extensions inherit from their parent:
 
 - **`type`** — inherited if not specified (so `string.email` has `type: 'string'`)
 - **`documentation`** — inherited if not specified
-- **`expect`** — merged with parent's constraints (child constraints are added, not replaced)
+- **`annotations`** — merged with parent's map (child entries are added on top)
 - **`tags`** — inherited from parent
 
 This means you can define a base type once and specialize it:
@@ -362,22 +406,25 @@ primitives: {
   id: {
     type: 'string',
     documentation: 'An identifier string',
-    expect: { minLength: 1 },
+    annotations: { 'expect.minLength': 1 },
     extensions: {
       uuid: {
         documentation: 'UUID v4 identifier',
-        expect: {
-          pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+        annotations: {
+          'expect.pattern': {
+            pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+            flags: 'i',
+          },
         },
-        // inherits type: 'string' and expect.minLength: 1 from parent
+        // inherits type: 'string' and expect.minLength: 1
       },
       slug: {
         documentation: 'URL-safe slug',
-        expect: {
-          pattern: /^[a-z0-9-]+$/,
-          maxLength: 100,
+        annotations: {
+          'expect.pattern': { pattern: '^[a-z0-9-]+$' },
+          'expect.maxLength': 100,
         },
-        // inherits type: 'string' and expect.minLength: 1 from parent
+        // inherits type: 'string' and expect.minLength: 1
       },
     },
   },
@@ -394,10 +441,10 @@ primitives: {
     type: 'number',
     extensions: {
       int: {
-        expect: { int: true },
+        annotations: { 'expect.int': true },
         extensions: {
-          positive: { expect: { min: 0 } },
-          negative: { expect: { max: 0 } },
+          positive: { annotations: { 'expect.min': 0 } },
+          negative: { annotations: { 'expect.max': 0 } },
         },
       },
     },
@@ -405,11 +452,11 @@ primitives: {
 }
 ```
 
-This gives you `number.int`, `number.int.positive`, and `number.int.negative` — each inheriting and accumulating constraints from the levels above.
+This gives you `number.int`, `number.int.positive`, and `number.int.negative` — each inheriting and accumulating annotations from the levels above.
 
 ## Semantic Tags
 
-Tags are string identifiers attached to primitive instances. They provide a way for runtime code to discriminate between primitives that share the same underlying scalar type. For example, `string.email` and `string.uuid` both have `type: 'string'` — but their tags (`['email']` vs `['uuid']`) let runtime code tell them apart without inspecting the primitive name.
+Tags are string identifiers attached to primitive instances. They give runtime code a way to discriminate between primitives that share the same underlying scalar type. For example, `string.email` and `string.uuid` both have `type: 'string'` — but their tags (`['email']` vs `['uuid']`) let runtime code tell them apart without inspecting the primitive name.
 
 ```typescript
 primitives: {
@@ -425,7 +472,7 @@ primitives: {
 }
 ```
 
-Tags are inherited — `currency.usd` would have both the `'currency'` tag from its parent and its own `'usd'` tag. Your code generator should make these tags available at runtime so that consuming code can query them (e.g., to choose a currency formatter based on the tag).
+Tags are inherited — `currency.usd` carries both the `'currency'` tag from its parent and its own `'usd'` tag. Your code generator should make these tags available at runtime so that consuming code can query them (e.g., to choose a currency formatter based on the tag).
 
 ## Phantom Primitives
 
@@ -486,5 +533,5 @@ You can detect phantom types in your code generator by checking if a property's 
 
 ## Next Steps
 
-- [Custom Annotations](/plugin-development/annotation-system) — define annotation specs with validation and AST modification
+- [Custom Annotations](/plugin-development/annotation-system) — define your own annotation specs with validation
 - [Building a Code Generator](/plugin-development/code-generation) — generate output files from your custom types

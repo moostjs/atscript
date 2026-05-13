@@ -35,12 +35,12 @@ export interface User {
   @meta.id
   id: string.uuid
 
-  @meta.label('Full name')
-  @expect.minLength(1)
-  @expect.maxLength(200)
+  @meta.label 'Full name'
+  @expect.minLength 1
+  @expect.maxLength 200
   name: string
 
-  @expect.pattern(/^[^@]+@[^@]+$/)
+  @expect.pattern '^[^@]+@[^@]+$'
   email: string.email
 
   age?: number.int.positive
@@ -57,9 +57,9 @@ npx asc -f js      # .js runtime metadata
 
 Outputs next to `user.as`:
 
-- `user.as.d.ts` — TS types. `User` is a class-like value with metadata on its namespace.
+- `user.as.d.ts` — TS types. `User` is a `declare class` with static `type`, `metadata`, `validator()`.
 - `user.as.js` — runtime tree (`defineAnnotatedType()` chains). Only on `-f js`.
-- `atscript.d.ts` at project root — global `AtscriptMetadata`. Emitted by the dts `buildEnd`.
+- `atscript.d.ts` at project root — global `AtscriptMetadata` + `AtscriptPrimitiveTags`. Emitted by the dts `buildEnd`.
 
 Typical: `asc -f dts` in `postinstall`; let `unplugin-atscript` produce `.js` inside the bundler. Run `-f js` only when runtime metadata is needed outside a bundler.
 
@@ -75,9 +75,9 @@ validator.validate(u)            // throws on failure
 const ok = validator.validate(u, true)  // safe mode → boolean
 
 import { forAnnotatedType } from '@atscript/typescript/utils'
-forAnnotatedType(User.annotatedType, {
+forAnnotatedType(User, {
   object(node) {
-    const nameLabel = node.props.get('name')?.metadata.get('meta.label') // 'Full name'
+    const nameLabel = node.type.props.get('name')?.metadata.get('meta.label') // 'Full name'
   },
 })
 ```

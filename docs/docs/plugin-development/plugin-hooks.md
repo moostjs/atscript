@@ -10,7 +10,7 @@ This page documents all six hooks in the `TAtscriptPlugin` interface — their s
 | `resolve(id)`                    | Opening a document      | `string \| undefined`          | Sequential, last non-undefined wins  |
 | `load(id)`                       | Loading source content  | `string \| undefined`          | Sequential, first non-undefined wins |
 | `onDocument(doc)`                | After parsing           | `void`                         | Sequential, all plugins called       |
-| `render(doc, format)`            | Code generation         | `TPluginOutput[]`              | Sequential, outputs concatenated     |
+| `render(doc, format)`            | Code generation         | `TPluginOutput[] \| undefined` | Sequential, outputs concatenated     |
 | `buildEnd(output, format, repo)` | After all docs rendered | `void`                         | Sequential, all plugins called       |
 
 All hooks can be synchronous or async (return `Promise`). All are optional — implement only the ones you need.
@@ -35,8 +35,14 @@ config() {
     primitives: {
       geo: {
         extensions: {
-          latitude: { type: 'number', expect: { min: -90, max: 90 } },
-          longitude: { type: 'number', expect: { min: -180, max: 180 } },
+          latitude: {
+            type: 'number',
+            annotations: { 'expect.min': -90, 'expect.max': 90 },
+          },
+          longitude: {
+            type: 'number',
+            annotations: { 'expect.min': -180, 'expect.max': 180 },
+          },
         },
       },
     },
@@ -161,7 +167,7 @@ onDocument(doc) {
 render?(
   doc: AtscriptDoc,
   format: TAtscriptRenderFormat
-): Promise<TPluginOutput[]> | TPluginOutput[]
+): Promise<TPluginOutput[] | undefined> | TPluginOutput[] | undefined
 ```
 
 Called once per document per format during the build phase. This is the primary code generation hook.

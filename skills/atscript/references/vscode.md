@@ -4,10 +4,10 @@
 
 ## Install
 
-Marketplace: search **"Atscript"** (publisher: Moost), or:
+Marketplace: search **"Atscript"** (publisher: `moost`, ID `moost.atscript-as`), or:
 
 ```
-ext install moostjs.atscript
+ext install moost.atscript-as
 ```
 
 No configuration needed — walks up from the open `.as` to find `atscript.config.*`.
@@ -17,15 +17,16 @@ No configuration needed — walks up from the open `.as` to find `atscript.confi
 - **Syntax highlighting** — TextMate grammar for annotations, primitives, keywords, regex literals in pattern properties.
 - **Diagnostics** — parse errors + plugin messages surface as VSCode problems with file/line/column.
 - **Completions**:
-  - `@` → every registered `@meta.*`, `@expect.*`, and plugin-contributed annotation, with docstrings.
-  - `.` in type position → primitive extensions (`string.` → `email`, `uuid`, `required`).
-  - Inside `import { … } from ''` → filenames + exported identifiers.
+  - `@` → every registered annotation namespace (`@meta.*`, `@expect.*`, `@emit.*`, plugin-contributed), with docstrings.
+  - `.` in type position → primitive extensions (e.g. `string.` → `email`, `uuid`, `required`, …).
+  - Inside `import { … } from ''` → file paths + exported identifiers (auto-import on type references).
+  - Annotate-block property completions + context-aware keywords.
 - **Hover** — annotation → `AnnotationSpec.description`; type/interface → one-line summary.
 - **Go-to-definition** — cross-file.
 - **Find-references** — all usages of a type/primitive.
 - **Rename** — refactor-safe across all `.as`.
-- **Signature help** — inside annotation args (`@expect.pattern(|)`), shows expected types.
-- **Generate on save** — emits `.as.d.ts` + `.as.js` whenever a `.as` is saved. Always on; no toggle.
+- **Signature help** — inside annotation args, shows expected parameter types. Triggers: `,` and space.
+- **Generate on save** — runs `BuildRepo.write({ format: DEFAULT_FORMAT })` whenever a `.as` is saved. The TS plugin treats `DEFAULT_FORMAT` like `'dts'`, so only `.as.d.ts` is written (plus `atscript.d.ts` via `buildEnd`). Runtime `.as.js` is **not** emitted on save — bundlers via `unplugin-atscript` produce that.
 
 ## Commands & settings
 
@@ -55,11 +56,10 @@ Server extends `AtscriptRepo` from `@atscript/core` with LSP bookkeeping (file U
 
 Extension needs `@atscript/core` at runtime. Resolution order:
 
-1. Workspace-local (`node_modules/@atscript/core` in the open project).
-2. Globally-installed.
-3. Bundled fallback.
+1. Workspace-local `node_modules/@atscript/core` (any open workspace folder).
+2. Extension's own `node_modules/@atscript/core`.
 
-If none found, extension offers to install locally.
+If neither resolves, the extension shows a warning ("`@atscript/core` not found … Retrying in 60s") and re-checks every 60 seconds. No global lookup, no bundled fallback, no auto-install prompt. Install `@atscript/core` in the workspace to enable the LSP.
 
 ## Troubleshooting
 

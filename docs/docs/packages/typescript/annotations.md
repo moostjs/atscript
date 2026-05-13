@@ -78,7 +78,7 @@ If the field already reads naturally as `string.email` or `number.int.positive`,
 
 ## `@ui.*`: UI-Facing Hints
 
-`@ui.*` annotations are provided by the [`@atscript/ui`](https://ui.atscript.dev) package. Install the `@atscript/ui/plugin` to register them in your project. See the [Atscript UI documentation](https://ui.atscript.dev) for the full annotation reference.
+`@ui.*` annotations (placeholders, component overrides, form layout hints) are not built into `@atscript/typescript`. They are provided by a separate UI plugin in a sibling package — see that plugin's documentation for the full reference and installation steps. The `@meta.*` and `@expect.*` namespaces shown above ship in the core toolkit and work without any additional plugin.
 
 ## Reuse Annotations Through Named Types
 

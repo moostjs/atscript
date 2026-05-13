@@ -49,14 +49,11 @@ module.exports = {
 
 ## Options
 
-| Option       | Type            | Default                | Effect                                                                                                            |
-| ------------ | --------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `strict`     | `boolean`       | `true`                 | Fail build on parse/diagnostic errors. `false` = warn-only (useful during refactors).                             |
-| `configPath` | `string`        | auto-discovered        | Specific `atscript.config.*`. Default: walk up from project root.                                                 |
-| `include`    | `FilterPattern` | `**/*.as`              | Files to transform.                                                                                               |
-| `exclude`    | `FilterPattern` | `node_modules`, `dist` | Files to skip.                                                                                                    |
+| Option   | Type      | Default | Effect                                                                                |
+| -------- | --------- | ------- | ------------------------------------------------------------------------------------- |
+| `strict` | `boolean` | `true`  | Fail build on parse/diagnostic errors. `false` = warn-only (useful during refactors). |
 
-Configure actual atscript behavior (primitives, annotations, plugins) in `atscript.config.*`. The unplugin only bridges the bundler to the atscript pipeline.
+That is the entire surface. Atscript config (primitives, annotations, plugins) lives in `atscript.config.*`, auto-discovered by walking up from `process.cwd()`. The unplugin is a thin bridge between the bundler and the atscript pipeline; per-file `include`/`exclude` is delegated to the bundler's own resolution (only `*.as` is intercepted).
 
 ## Behavior
 
@@ -101,9 +98,9 @@ HMR respects `@atscript/core`'s `AtscriptRepo` dependency graph — editing a ty
 
 ## Troubleshooting
 
-- **"Cannot find atscript.config"** — pass `configPath` explicitly, or ensure the config lives at/above `process.cwd()`.
+- **"Cannot find atscript.config"** — ensure the config lives at/above `process.cwd()`.
 - **Type errors on `.as` imports** — runtime is fine, `.d.ts` is stale. Run `asc -f dts`.
-- **`.as` changes not picked up** — HMR depends on the bundler's watcher. Check `include`/`exclude`.
+- **`.as` changes not picked up** — HMR depends on the bundler's watcher. Verify the bundler sees the file at all.
 
 ## See also
 

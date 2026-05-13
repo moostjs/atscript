@@ -35,7 +35,7 @@ new AnnotationSpec({
 | `argument`      | `object \| object[]`    | —           | Argument definition(s)                                                                             |
 | `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                     |
 | `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                   |
-| `defType`       | `string[]`              | —           | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc. |
+| `defType`       | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).   |
 | `validate`      | `function`              | —           | Custom validation at parse time                                                                    |
 | `modify`        | `function`              | —           | AST mutation after validation                                                                      |
 
@@ -99,12 +99,22 @@ Each argument is defined with `TAnnotationArgument`:
 ```typescript
 interface TAnnotationArgument {
   name: string
-  type: 'string' | 'number' | 'boolean'
+  type: 'string' | 'number' | 'boolean' | 'ref' | 'query'
   optional?: boolean
   description?: string
   values?: string[] // Enum — restrict to specific values
 }
 ```
+
+The argument types correspond to the tokens accepted in `.as` source:
+
+| `type`      | Accepts                                                                              |
+| ----------- | ------------------------------------------------------------------------------------ |
+| `'string'`  | Quoted string literal (`"text"`)                                                     |
+| `'number'`  | Numeric literal (`42`, `-1.5`)                                                       |
+| `'boolean'` | Identifier `true` / `false`                                                          |
+| `'ref'`     | Bare identifier referencing another type (e.g. `User`)                               |
+| `'query'`   | Backtick-delimited query expression — used by DB plugins for SQL-like filter syntax |
 
 ### No Arguments (Flag Annotation)
 
@@ -253,42 +263,47 @@ interface TMessage {
 Built-in validation runs before your `validate` callback. The `AnnotationSpec` class automatically checks `multiple`, `nodeType`, argument count, argument types, `values`, and `defType`. Your callback only needs to handle domain-specific logic.
 :::
 
-### Example: Validate Collection ID Type
+### Example: Validate a Required Sibling Property
 
-The MongoDB plugin's `@db.mongo.collection` validates that the `_id` field (if present) has the right type:
+A `@store.collection` annotation that requires an `id` field of type `string` or `number`:
 
 ```typescript
 new AnnotationSpec({
   nodeType: ['interface'],
   validate(token, args, doc) {
     const parent = token.parentNode
-    if (!isInterface(parent) || !parent.props.has('_id')) {
-      return // no _id field — nothing to validate
+    if (!isInterface(parent) || !parent.props.has('id')) {
+      return [
+        {
+          severity: 1,
+          message: '@store.collection requires an "id" property',
+          range: token.range,
+        },
+      ]
     }
 
     const errors = []
-    const _id = parent.props.get('_id')!
+    const idProp = parent.props.get('id')!
 
-    // Check _id is not optional
-    if (_id.token('optional')) {
+    if (idProp.token('optional')) {
       errors.push({
         severity: 1,
-        message: '_id cannot be optional in a MongoDB collection',
-        range: _id.token('identifier')!.range,
+        message: '"id" cannot be optional on a @store.collection',
+        range: idProp.token('identifier')!.range,
       })
     }
 
-    // Check _id is string or number
-    const definition = _id.getDefinition()
-    if (isRef(definition)) {
-      const resolved = doc.unwindType(definition.id!, definition.chain)?.def
-      if (isPrimitive(resolved) && !['string', 'number'].includes(resolved.type)) {
-        errors.push({
-          severity: 1,
-          message: '_id must be of type string, number, or mongo.objectId',
-          range: _id.token('identifier')!.range,
-        })
-      }
+    // Resolve the property type and check it is string or number
+    let def = idProp.getDefinition()
+    if (isRef(def)) {
+      def = doc.unwindType(def.id!, def.chain)?.def || def
+    }
+    if (isPrimitive(def) && !['string', 'number'].includes(def.type!)) {
+      errors.push({
+        severity: 1,
+        message: '"id" must be of type string or number',
+        range: idProp.token('identifier')!.range,
+      })
     }
 
     return errors.length > 0 ? errors : undefined
@@ -344,7 +359,12 @@ new AnnotationSpec({
 })
 ```
 
-Available `defType` values: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, `'union'`, `'intersection'`.
+Available `defType` values:
+
+- Final scalar kinds: `'string'`, `'number'`, `'boolean'`, `'decimal'`, `'phantom'`, `'null'`, `'void'`, `'never'`
+- Composite kinds: `'object'`, `'array'`, `'union'`, `'intersection'`
+
+`'object'` matches both interfaces and inline structures; `'union'` / `'intersection'` match group nodes.
 
 ## AST Modification with modify()
 
@@ -354,9 +374,9 @@ The `modify` hook runs after successful validation and can mutate the AST. This 
 modify(mainToken: Token, args: Token[], doc: AtscriptDoc): void
 ```
 
-### Example: Auto-Add \_id Property
+### Example: Auto-Add an ID Property
 
-The MongoDB plugin uses `modify` on `@db.mongo.collection` to automatically add an `_id` property when the interface doesn't already have one:
+An `@store.collection` annotation that automatically adds an `id` property when the interface doesn't already have one:
 
 ```typescript
 new AnnotationSpec({
@@ -364,24 +384,23 @@ new AnnotationSpec({
   modify(token, args, doc) {
     const parent = token.parentNode
     const struc = parent?.getDefinition()
-    if (isInterface(parent) && !parent.props.has('_id') && isStructure(struc)) {
+    if (isInterface(parent) && !parent.props.has('id') && isStructure(struc)) {
       struc.addVirtualProp({
-        name: '_id',
-        type: 'mongo.objectId',
-        documentation: 'MongoDB Primary Key ObjectId',
+        name: 'id',
+        type: 'string',
+        documentation: 'Primary identifier',
       })
     }
   },
 })
 ```
 
-Now every `@db.mongo.collection` interface automatically gets `_id: mongo.objectId` without the author writing it explicitly:
+Now every `@store.collection` interface automatically gets `id: string` without the author writing it explicitly:
 
 ```atscript
-@db.table "users"
-@db.mongo.collection
+@store.collection "users"
 export interface User {
-    // _id: mongo.objectId — injected automatically
+    // id: string — injected automatically
     email: string.email
     name: string
 }
@@ -441,18 +460,22 @@ export const openApiPlugin = () =>
                 type: 'string',
                 documentation: 'ISO 8601 date string (format: date)',
                 tags: ['date'],
-                expect: {
-                  pattern: /^\d{4}-\d{2}-\d{2}$/,
-                  message: 'Expected ISO date format (YYYY-MM-DD)',
+                annotations: {
+                  'expect.pattern': {
+                    pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                    message: 'Expected ISO date format (YYYY-MM-DD)',
+                  },
                 },
               },
               dateTime: {
                 type: 'string',
                 documentation: 'ISO 8601 date-time string (format: date-time)',
                 tags: ['dateTime'],
-                expect: {
-                  pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/,
-                  message: 'Expected ISO date-time format',
+                annotations: {
+                  'expect.pattern': {
+                    pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}',
+                    message: 'Expected ISO date-time format',
+                  },
                 },
               },
             },

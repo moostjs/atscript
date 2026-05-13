@@ -12,8 +12,8 @@ Peer deps: `moost`, `@moostjs/event-http` (HTTP apps), `@atscript/core`, `@atscr
 
 ## Two primitives
 
-1. **`validatorPipe(opts?)`** — Moost pipe, runs during param resolution. Per param, checks if the TS type is an atscript interface; if yes, runs `Validator.validate(...)` and replaces the value with the narrowed/coerced output. Otherwise passes through.
-2. **`validationErrorTransform()`** — Moost interceptor. Catches `ValidatorError` from the pipe; raises `new HttpError(400, { statusCode, message, _body: error.errors })`. Moost serializes `_body` as the response body — clients get the raw `[{ path, message }, …]` array as the 400 payload.
+1. **`validatorPipe(opts?)`** — Moost pipe at `TPipePriority.VALIDATE`. Per param, checks `isAnnotatedType(targetMeta.type)`; if yes, runs `validator.validate(value)` and **returns the original `value` unchanged** (no coercion, no narrowing). Otherwise passes through.
+2. **`validationErrorTransform()`** — Moost interceptor. Catches `ValidatorError` from the pipe; raises an `HttpError` carrying the raw `error.errors` array as the 400 payload.
 
 ## Global setup
 
@@ -39,7 +39,8 @@ Typical: every method validates every atscript-typed param; every `ValidatorErro
 - `@UseValidationErrorTransform()` — apply the error interceptor to a single handler.
 
 ```ts
-import { Controller, Post, Body } from 'moost'
+import { Controller } from 'moost'
+import { Post, Body } from '@moostjs/event-http'
 import { UseValidatorPipe } from '@atscript/moost-validator'
 import { User } from './models/user.as'
 
@@ -48,7 +49,7 @@ import { User } from './models/user.as'
 export class UsersController {
   @Post()
   create(@Body() user: User) {
-    // `user` is validated + stripped before this line
+    // `user` is validated (and stripped in-place when unknownProps: 'strip') before this line
   }
 }
 ```

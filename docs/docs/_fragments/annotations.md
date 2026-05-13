@@ -69,11 +69,11 @@ export interface Config {
 **Append** — Both values are kept, accumulating into an array:
 
 ```atscript
-@expect.pattern '^[a-z]+$', '', 'Must be lowercase'
+@expect.pattern '^[a-z]+$'
 export type SafeString = string
 
 export interface Form {
-    @expect.pattern '^\S+$', '', 'No spaces'
+    @expect.pattern '^\S+$', 'i', 'No spaces'
     code: SafeString
     // Result: both patterns are validated
 }
@@ -87,8 +87,8 @@ Annotations marked with `multiple: true` can appear more than once on the same n
 
 ```atscript
 export interface User {
-    @expect.pattern '^[A-Z]', '', 'Must start with uppercase'
-    @expect.pattern '.{3,}', '', 'Must be at least 3 characters'
+    @expect.pattern '^[A-Z]'
+    @expect.pattern '.{3,}'
     name: string
 }
 ```
@@ -127,19 +127,7 @@ Atscript provides common-purpose annotations:
 
 ### UI Annotations (@ui.\*)
 
-- `@ui.placeholder 'text'` - Input placeholder text
-- `@ui.component 'name'` - UI component hint (e.g., `"select"`, `"datepicker"`)
-- `@ui.hidden` - Hide field from UI forms and tables
-- `@ui.group 'name'` - Group fields into form sections
-- `@ui.order 1` - Display order for form and table tools
-- `@ui.width 'half'` - Layout width hint (e.g., `"half"`, `"full"`, `"third"`)
-- `@ui.icon 'name'` - Icon hint for the field or entity
-- `@ui.hint 'text'` - Help text or tooltip
-- `@ui.disabled` - Mark field as non-interactive
-- `@ui.type 'textarea'` - Input type (maps to HTML input types: `"text"`, `"textarea"`, `"password"`, etc.)
-- `@ui.attr 'key', 'value'` - Pass arbitrary HTML/component attributes (repeatable)
-- `@ui.class 'names'` - CSS class names (repeatable)
-- `@ui.style 'css'` - Inline CSS styles (repeatable)
+`@ui.*` annotations (placeholders, form layout hints, component overrides) are provided by a separate UI plugin, not by `@atscript/typescript` itself. See the UI plugin docs for the full reference. The annotation _shape_ shown in this guide (`@ui.placeholder 'text'`, `@ui.component 'name'`, etc.) follows the same syntax rules as the other namespaces above.
 
 ### Validation Annotations (@expect.\*)
 
@@ -195,28 +183,17 @@ interface Product {
 Use `string.required` or `@meta.required` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@meta.required` catches this common form validation gap. For checkboxes, `@meta.required` on a `boolean` field ensures the value is `true` (e.g., "accept terms").
 :::
 
+### Emit Annotations (@emit.\*)
+
+- `@emit.jsonSchema` — Pre-compute and embed the JSON Schema for an interface at build time, regardless of the global `jsonSchema` plugin setting
+
 ### Database Annotations (@db.\*)
 
-Atscript ships a comprehensive set of database annotations for defining tables, relations, views, indexes, and more. These are covered in detail in the [Database Layer](https://db.atscript.dev/guide/) documentation:
-
-- `@db.table`, `@db.schema` — Table definitions
-- `@db.column`, `@db.json`, `@db.ignore` — Column configuration
-- `@db.default`, `@db.default.increment`, `@db.default.uuid`, `@db.default.now` — Default values
-- `@db.column.collate`, `@db.column.precision` — Column storage hints
-- `@db.index.plain`, `@db.index.unique`, `@db.index.fulltext` — Indexes
-- `@db.rel.FK`, `@db.rel.to`, `@db.rel.from`, `@db.rel.via`, `@db.rel.onDelete`, `@db.rel.onUpdate`, `@db.rel.filter` — Relations
-- `@db.view`, `@db.view.for`, `@db.view.joins`, `@db.view.filter`, `@db.view.materialized`, `@db.view.renamed` — Views
-- `@db.patch.strategy` — Patch behavior for nested objects
-- `@db.sync.method`, `@db.table.renamed`, `@db.column.renamed` — Schema sync
-- `@emit.jsonSchema` — Pre-compute and embed JSON Schema at build time
-
-See the [Annotations Reference](https://db.atscript.dev/adapters/annotations) for the complete list.
+Database annotations (tables, columns, indexes, relations, views, schema sync) are provided by a separate package, `@atscript/db/plugin`, and are documented at [https://db.atscript.dev](https://db.atscript.dev). Install the DB plugin from that ecosystem to register `@db.*` annotations in your project.
 
 ### Special Annotation Argument Types
 
 Some annotations accept special argument types beyond strings and numbers:
 
-- **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Used by `@db.rel.FK` and `@db.view.for` to reference fields on other types.
-- **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Used by `@db.view.filter`, `@db.view.joins`, and `@db.rel.filter` for conditions.
-
-See [Queries & Filters](https://db.atscript.dev/api/queries#query-expressions) for the full query syntax.
+- **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Custom annotations can declare `type: 'ref'` arguments.
+- **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Custom annotations can declare `type: 'query'` arguments.

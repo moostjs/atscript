@@ -8,7 +8,7 @@ TypeScript-like but distinct grammar. Annotations are first-class.
 // line comment
 /* block comment */
 
-import { OtherType } from './other.as'
+import { OtherType } from './other'
 
 export interface Foo { ... }
 export type Bar = ...
@@ -18,7 +18,7 @@ type Helper = string   // file-local, not exported
 
 - Only `export`ed declarations are visible to other `.as` files.
 - Comments preserved as JSDoc on generated `.d.ts`.
-- Import paths resolve relative; extension optional (`'./x'` → `./x.as`).
+- Import paths resolve relative; **omit the `.as` extension** — the resolver always appends `.as`. Writing `'./x.as'` resolves to `./x.as.as`.
 
 ## `interface`
 
@@ -26,12 +26,12 @@ type Helper = string   // file-local, not exported
 export interface User {
   id: string
   name?: string              // optional → `name?: string`
-  readonly createdAt: string
+  createdAt: string
   tags: string[]
 }
 ```
 
-Interfaces → class-like types in `.d.ts` with attached runtime metadata namespace. `readonly` honored.
+Interfaces → `declare class X { … }` in `.d.ts`; the class itself carries runtime statics (`type`, `metadata`, `validator()`).
 
 ### `extends`
 
@@ -73,9 +73,11 @@ export type Project = { id: string.uuid; name: string } & WithAudit
 
 ```atscript
 export type Coordinates = [number, number]
-export type Labeled = [string, ...number[]]   // rest element
+export type Pair = [string, number]
 export type Tags = string[]
 ```
+
+Fixed-length tuples only — no rest element (`...T[]`).
 
 Array constraints go on the property via `@expect.minLength` / `@expect.maxLength` / `@expect.array.key` / `@expect.array.uniqueItems`.
 
@@ -112,6 +114,8 @@ Full list → [primitives.md](primitives.md).
 
 ## Imports / exports
 
+Extension MUST be omitted — the resolver always appends `.as`.
+
 ```atscript
 import { User, Project } from './models'
 
@@ -132,6 +136,8 @@ export type MaybeUser = User | null
 - Function / method types.
 - `Record<K, V>` — use pattern properties.
 - Mapped, conditional, template-literal types.
+- `readonly` prop modifier.
+- Tuple rest elements (`[A, ...B[]]`).
 
 Unsupported constructs → parser diagnostic (accumulated in `TMessages`, not thrown).
 

@@ -26,7 +26,7 @@ TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before load — i
 | ------------- | ------------------- | ---------------------------------------------------------------------------------------------------- |
 | `rootDir`     | `string`            | Base dir; `include`/`exclude` resolve against it. Default: CWD.                                      |
 | `include`     | `string[]`          | Globs of `.as` to parse. Default: `['**/*.as']`.                                                     |
-| `exclude`     | `string[]`          | Globs to skip. `node_modules` + `dist` excluded by default.                                          |
+| `exclude`     | `string[]`          | Globs to skip. Default: `['node_modules']`.                                                          |
 | `entries`     | `string[]`          | Explicit entry files (relative to `rootDir`) — replaces glob discovery. Used by `prepareFixtures()`. |
 | `outDir`      | `string`            | Where generated outputs go. Default: next to sources.                                                |
 | `format`      | `string`            | Default format (`'dts'`, `'js'`, …). CLI `-f` overrides.                                             |
@@ -74,7 +74,7 @@ export default defineConfig({
 
 CLI + unplugin look for `atscript.config.{ts,mts,cts,js,mjs,cjs}` walking up from CWD (or the `.as` file). `asc -c <path>` overrides.
 
-When multiple formats coexist in the same dir, TS variants (`.ts` / `.mts` / `.cts`) load before JS variants (`.js` / `.mjs` / `.cjs`).
+When multiple formats coexist in the same dir, JS variants (`.js` / `.mjs` / `.cjs`) are checked first, then TS variants (`.ts` / `.mts` / `.cts`).
 
 - VSCode reloads LSP on `atscript.config.*` changes.
 - Unresolvable or throwing config → server falls back to defaults (parsing works, plugins contribute nothing).
@@ -82,7 +82,7 @@ When multiple formats coexist in the same dir, TS variants (`.ts` / `.mts` / `.c
 ## Defaults (no config found)
 
 - Built-in primitives (`string`, `number`, `boolean`, …) with standard extensions.
-- Built-in annotation specs (`@meta.*`, `@expect.*`).
+- Built-in annotation specs (`@meta.*`, `@expect.*`, `@emit.*`).
 - Zero plugins — nothing generated until a plugin is added (usually `ts()`).
 
 ## See also

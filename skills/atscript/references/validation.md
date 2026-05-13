@@ -21,28 +21,32 @@ if (!ok) {
 }
 ```
 
-`User.validator(opts?)` is **cached** per options object — cheap to call repeatedly.
+`User.validator(opts?)` constructs a fresh `Validator` each call (not cached). Reuse the instance if you call it in a hot path.
 
-## `ValidatorOptions`
+## `TValidatorOptions`
 
 ```ts
-interface ValidatorOptions {
-  partial?: boolean | 'deep' | ((path: string) => boolean)
-  unknownProps?: 'strip' | 'ignore' | 'error'
-  errorLimit?: number
-  plugins?: TValidatorPlugin[]
+interface TValidatorOptions {
+  partial: boolean | 'deep' | ((type: TAtscriptAnnotatedType, path: string) => boolean)
+  replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
+  plugins: TValidatorPlugin[]
+  unknownProps: 'strip' | 'ignore' | 'error'
+  errorLimit: number
+  skipList?: Set<string>
 }
 ```
 
 - `partial` — allow missing required fields.
   - `true` → shallow (top-level only).
   - `'deep'` → partial at every nesting level.
-  - function → per-path predicate; return `true` to treat as optional.
+  - function `(type, path) => boolean` → return `true` to treat as optional.
+- `replace?` — `(type, path) => TAtscriptAnnotatedType` substitutes the type to validate against at a given path. Results cached per-type via `WeakMap`.
 - `unknownProps`:
   - `'strip'` → remove (mutates the object).
   - `'ignore'` → leave silently.
   - `'error'` → fail. **Default.**
-- `errorLimit` — stop accumulating after N. Useful for UI feedback.
+- `errorLimit` — stop accumulating after N. Default `10`.
+- `skipList?` — `Set<string>` of property paths to skip entirely.
 - `plugins` — custom checks (see below).
 
 ## `ValidatorError`
@@ -82,13 +86,13 @@ assertUser(input)
 
 ### `buildJsonSchema(annotatedType)`
 
-Runtime type → JSON Schema (Draft 2020-12). Named interfaces → `$defs` + `$ref`. Discriminated unions detected when members share a literal-valued property.
+Runtime type → JSON Schema. Named nested object types (with an `id`) are extracted into `$defs` + `$ref`. The root is **not** extracted — the returned object is the schema itself (e.g. `{ type: 'object', properties, $defs? }`). No `$schema` field. Discriminated unions detected when members share a literal-valued property.
 
 ```ts
 import { buildJsonSchema } from '@atscript/typescript/utils'
 
-const schema = buildJsonSchema(User.annotatedType)
-// { $schema, $ref: '#/$defs/User', $defs: { User: { … } } }
+const schema = buildJsonSchema(User)
+// { type: 'object', properties: { … }, $defs?: { … } }
 ```
 
 ### `fromJsonSchema(schema)`
@@ -101,11 +105,10 @@ const annotatedType = fromJsonSchema(mySchema)
 
 ### `mergeJsonSchemas(types)`
 
-Combine types into one schema with shared `$defs`. Useful for a single OpenAPI doc covering many models.
+Combines types into `{ schemas: Record<id, schema>, $defs: Record<id, schema> }` — every type must have an `id`. Useful for a single OpenAPI doc covering many models.
 
 ```ts
-const combined = mergeJsonSchemas([User.annotatedType, Project.annotatedType, Team.annotatedType])
-// combined.$defs has User, Project, Team; top-level members as $ref
+const { schemas, $defs } = mergeJsonSchemas([User, Project, Team])
 ```
 
 ### `detectDiscriminator(items)`
@@ -117,7 +120,7 @@ import { detectDiscriminator } from '@atscript/typescript/utils'
 import type { TUnionDiscriminator } from '@atscript/typescript/utils'
 
 // MediaSource = { kind: 'url', url: string } | { kind: 'upload', file: Blob }
-const disc = detectDiscriminator(MediaSource.annotatedType.type.items)
+const disc = detectDiscriminator((MediaSource.type as any).items)
 // → { propertyName: 'kind', indexMapping: { url: 0, upload: 1 } }
 const idx = disc?.indexMapping[value[disc.propertyName]] // O(1) variant lookup
 ```
@@ -153,7 +156,7 @@ validator.validate(data, true)
 
 Plugin receives:
 
-- `ctx` — `TValidatorPluginContext` with `ctx.error(msg, details?)`, `ctx.path`, `ctx.opts`.
+- `ctx` — `TValidatorPluginContext` with `ctx.error(message, path?, details?)`, `ctx.path`, `ctx.opts`, `ctx.validateAnnotatedType`, `ctx.context` (user-supplied via `validate(value, safe, context)`).
 - `def` — current `TAtscriptAnnotatedType`.
 - `value` — actual value at this location.
 

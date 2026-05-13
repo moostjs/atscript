@@ -13,7 +13,7 @@ description: >-
 
 `.as` = single source of truth for types + metadata + validation. `@atscript/typescript` compiles `.as` → `.d.ts` (types) + `.js` (runtime metadata). Consumers use those for validation, JSON Schema, serialization, ORM mapping.
 
-Language-agnostic. Core ships only `@meta.*` + `@expect.*`; `@db.*`, `@ui.*`, and custom namespaces come from plugins.
+Language-agnostic. Core ships `@meta.*`, `@expect.*`, `@emit.*`; `@db.*`, `@ui.*`, and custom namespaces come from plugins.
 
 ## Quick start
 
@@ -77,8 +77,8 @@ import atscript from 'unplugin-atscript/vite'      // or /rollup /rolldown /webp
 
 1. `@meta.id` takes no arguments. Multiple `@meta.id` on different props = composite PK. Never `@meta.id(...)`.
 2. Generated files (`*.as.d.ts`, `*.as.js`, `atscript.d.ts`) are never hand-edited. Fix the `.as` source or plugin. Regenerate with `npx asc -f dts`.
-3. Core ships `@meta.*` + `@expect.*` only. All other namespaces come from plugins.
-4. Default CLI format is `dts`. Runtime `.js` requires `-f js` (or let `unplugin-atscript` produce it at bundle time).
+3. Core ships `@meta.*`, `@expect.*`, `@emit.*` only. All other namespaces come from plugins.
+4. `asc` without `-f` runs every plugin's default output (TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js` (or let `unplugin-atscript` produce it at bundle time).
 5. `@atscript/typescript/utils` is the runtime entry; `@atscript/typescript` default export is `tsPlugin()` (build-time factory).
 
 ## Dependency chain

@@ -56,12 +56,17 @@ Annotations from `.as` files are translated into JSON Schema constraints:
 
 | Annotation          | JSON Schema              | Notes                                                          |
 | ------------------- | ------------------------ | -------------------------------------------------------------- |
+| `@meta.required`    | `minLength: 1`           | For string fields. Ensures at least one non-whitespace char    |
 | `@expect.minLength` | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays                 |
 | `@expect.maxLength` | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays                 |
 | `@expect.min`       | `minimum`                |                                                                |
 | `@expect.max`       | `maximum`                |                                                                |
 | `@expect.int`       | `type: 'integer'`        | Changes `number` to `integer`                                  |
 | `@expect.pattern`   | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
+
+::: warning Pattern properties are dropped
+Atscript's wildcard-key syntax (`[/regex/]: Type`) has no equivalent in `buildJsonSchema` output — those entries are silently omitted from the generated schema. If you need pattern-keyed maps in JSON Schema, model them as `additionalProperties` with an external post-process step.
+:::
 
 ## Example
 
@@ -176,6 +181,20 @@ Detection is fully automatic — no annotations required. The rules are:
 - All literal values for that property must be **distinct**
 
 If these conditions aren't met, the union falls back to `anyOf`.
+
+::: tip Advanced: `detectDiscriminator`
+For tooling that needs to inspect discriminated unions without going through full JSON Schema generation, `@atscript/typescript/utils` exports a public helper:
+
+```typescript
+import { detectDiscriminator } from '@atscript/typescript/utils'
+
+const info = detectDiscriminator(unionType.type.items)
+// info is undefined when no discriminator is detected,
+// or { propertyName, mapping: Record<literal, TAtscriptAnnotatedType> }
+```
+
+This is the same detection used internally by `buildJsonSchema`.
+:::
 
 ## Converting from JSON Schema
 

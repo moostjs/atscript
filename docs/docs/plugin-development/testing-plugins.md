@@ -144,22 +144,34 @@ Each fixture has a corresponding snapshot file. This makes it easy to review gen
 
 ### Verifying Registration
 
-Test that your plugin's `config()` hook registers the expected primitives and annotations:
+The easiest way to verify a primitive is registered is to use it in a fixture and check that it parses with no diagnostics:
+
+```atscript
+// test/fixtures/uses-geo.as
+export interface Location {
+    lat: geo.latitude
+    lng: geo.longitude
+}
+```
 
 ```typescript
-import { PluginManager } from '@atscript/core'
+import { build } from '@atscript/core'
 import { myPlugin } from './plugin'
 
-it('should register primitives', async () => {
-  const manager = new PluginManager({
+it('should expose geo.latitude / geo.longitude', async () => {
+  const repo = await build({
+    rootDir: wd,
+    entries: ['test/fixtures/uses-geo.as'],
     plugins: [myPlugin()],
   })
-  const docConfig = await manager.getDocConfig()
 
-  expect(docConfig.primitives?.has('geo')).toBe(true)
-  expect(docConfig.primitives?.get('geo')?.children?.has('latitude')).toBe(true)
+  const diagnostics = await repo.diagnostics()
+  const [, messages] = [...diagnostics.entries()][0]
+  expect(messages.filter(m => m.severity === 1)).toHaveLength(0)
 })
 ```
+
+The same trick works for annotations — write a fixture that uses each annotation and assert that no errors are produced. A fixture referencing an unregistered primitive or annotation yields a diagnostic, so the absence of errors confirms the registration.
 
 ### Verifying Annotation Behavior
 

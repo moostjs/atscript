@@ -33,17 +33,16 @@ In `package.json`:
 | Flag           | Shape                         | Effect                                                                                  |
 | -------------- | ----------------------------- | --------------------------------------------------------------------------------------- |
 | `-c <path>`    | path                          | Use a specific config. Default: walk up from CWD.                                       |
-| `-f <format>`  | `dts` / `js` / plugin-defined | Output format. Default with `ts()`: `.d.ts` only. Pass `-f js` for runtime `.js`.       |
+| `-f <format>`  | `dts` / `js` / plugin-defined | Output format. Omit → `DEFAULT_FORMAT` (each plugin emits its primary output; TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js`. |
 | `--noEmit`     | flag                          | Parse + diagnose, write nothing. Exit code mirrors diagnostic severity. Use in CI.      |
 | `--skipDiag`   | flag                          | Skip diagnostics, always emit.                                                          |
 | `--help`, `-h` | flag                          | Usage.                                                                                  |
-| `--version`, `-v` | flag                       | Version.                                                                                |
 
 ## Outputs
 
 Per `foo.as`:
 
-- **`foo.as.d.ts`** — TS types. Companion `namespace` so `Foo.metadata.get(...)` and `Foo.validator()` are typed. Comments → JSDoc.
+- **`foo.as.d.ts`** — TS types. `declare class Foo` with static `type`, `metadata`, `validator()` (plus a `declare namespace Foo` for type-aliases). Comments → JSDoc.
 - **`foo.as.js`** — runtime metadata (`defineAnnotatedType()` chains). What `import { Foo } from './foo.as'` evaluates to.
 
 Project root (or config-specified location):

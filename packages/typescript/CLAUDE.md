@@ -66,7 +66,9 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 ```
 asc [options]
   -c, --config    Path to config file (auto-resolved if omitted)
-  -f, --format    Output format: js | dts (default: dts)
+  -f, --format    Output format. Omit → DEFAULT_FORMAT sentinel: each plugin
+                  emits its primary output (TS plugin emits .d.ts). Pass
+                  `-f js` for runtime .js, or any plugin-defined format.
   --noEmit        Only run diagnostics, no file output
   --skipDiag      Skip diagnostics, always emit
 ```

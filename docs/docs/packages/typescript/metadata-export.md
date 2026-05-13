@@ -15,7 +15,7 @@ Product.metadata.get('meta.description') // 'A product in the catalog'
 // Property-level annotations
 const nameProp = Product.type.props.get('name')
 nameProp?.metadata.get('meta.label') // 'Product Name'
-nameProp?.metadata.get('expect.minLength') // 3
+nameProp?.metadata.get('expect.minLength') // { length: 3, message?: string }
 ```
 
 The metadata map is typed via the global `AtscriptMetadata` interface, so you get IntelliSense for annotation keys and their value types.

@@ -8,6 +8,7 @@ First-class in `.as`. Attach metadata + validation to types, properties, primiti
 - [Built-in namespaces](#built-in-namespaces)
 - [`@meta.*`](#meta) — id, label, description, documentation, sensitive, readonly, required, default, example
 - [`@expect.*`](#expect) — min, max, int, pattern, minLength, maxLength, array.uniqueItems, array.key
+- [`@emit.*`](#emit) — jsonSchema
 - [Merge](#merge) — replace (default) vs append
 - [Pattern-property annotations](#pattern-property-annotations)
 - [Custom annotations](#custom-annotations) — `AnnotationSpec` shape, inline registration
@@ -15,44 +16,44 @@ First-class in `.as`. Attach metadata + validation to types, properties, primiti
 
 ## Syntax
 
-`@namespace.name(args)` above the target.
+`@namespace.name arg1, arg2, …` on its **own line** above the target. Annotations CANNOT appear inline on the right-hand side of a `type` alias.
 
 ```atscript
-@meta.label('User')
-@meta.description('A registered user account')
+@meta.label 'User'
+@meta.description 'A registered user account'
 export interface User {
   @meta.id
-  @expect.pattern(/^[A-Z0-9]{8}$/)
+  @expect.pattern '^[A-Z0-9]{8}$'
   id: string
 
-  @meta.label('Full name')
-  @expect.minLength(1)
-  @expect.maxLength(200)
+  @meta.label 'Full name'
+  @expect.minLength 1
+  @expect.maxLength 200
   name: string
 }
 ```
 
-- Stack freely; order of unrelated annotations irrelevant.
-- Args are parsed literals: strings, numbers, booleans, regex, arrays, inline objects. No expressions.
-- Omit parens only when the spec has no argument.
+- Arguments are **space-separated** (and comma-separated when more than one). NOT `@meta.label('User')`.
+- Args are parsed literal tokens: `string` (quoted), `number`, `boolean` (`true` / `false`), `ref` (identifier), `query` (backticked). No regex literals, no expressions.
+- Omit args entirely for no-arg annotations: `@meta.id`, `@meta.sensitive`.
 
 ## Built-in namespaces
 
-Core ships **only** `@meta.*` (semantic metadata) and `@expect.*` (validation constraints checked by `Validator`). All other namespaces come from plugins.
+Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints checked by `Validator`), and `@emit.*` (codegen flags). All other namespaces come from plugins.
 
 ## `@meta.*`
 
-| Annotation                  | Args       | Effect                                                                                                |
-| --------------------------- | ---------- | ----------------------------------------------------------------------------------------------------- |
-| `@meta.id`                  | _none_     | Primary-key member. Multiple `@meta.id` on different props = composite key. Never `@meta.id(...)`.    |
-| `@meta.label(text)`         | `string`   | Human label.                                                                                          |
-| `@meta.description(text)`   | `string`   | Description. Propagates to JSON Schema `description`.                                                 |
-| `@meta.documentation(text)` | `string`   | Multi-line docs. `multiple: true` — repeat to accumulate.                                             |
-| `@meta.sensitive`           | _none_     | Sensitive value (plugins mask/redact).                                                                |
-| `@meta.readonly`            | _none_     | Read-only at API/DB layer (plugins decide).                                                           |
-| `@meta.required(msg?)`      | `string?`  | For `string`: rejects empty/whitespace-only. For `boolean`: requires `true`. Optional error message.  |
-| `@meta.default(value)`      | literal    | Default. Strings as-is; other types parsed as JSON.                                                   |
-| `@meta.example(value)`      | literal    | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON.                                    |
+| Annotation                | Args            | Effect                                                                                              |
+| ------------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
+| `@meta.id`                | _none_          | Primary-key member. Multiple `@meta.id` on different props = composite key. Never `@meta.id(...)`.  |
+| `@meta.label 'text'`      | `string`        | Human label.                                                                                        |
+| `@meta.description 'text'` | `string`       | Description.                                                                                        |
+| `@meta.documentation 'text'` | `string`     | Multi-line docs. `multiple: true` — repeat to accumulate.                                           |
+| `@meta.sensitive`         | _none_          | Sensitive value (plugins mask/redact). Applies to `prop` / `type`.                                  |
+| `@meta.readonly`          | _none_          | Read-only at API/DB layer (plugins decide). Applies to `prop` / `type`.                             |
+| `@meta.required 'msg?'`   | `string?`       | For `string`: rejects empty/whitespace-only. For `boolean`: requires `true`. Optional error message. `defType: ['string', 'boolean']`. |
+| `@meta.default 'value'`   | `string`        | Default. Strings as-is; other types parsed as JSON. Applies to `prop` / `type`.                     |
+| `@meta.example 'value'`   | `string`        | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON. Applies to `prop` / `type`.      |
 
 Composite key:
 
@@ -72,16 +73,18 @@ export interface MembershipRow {
 
 Validation, translated to JSON Schema. Every `@expect.*` takes an **optional error message** as its last argument.
 
-| Annotation                   | Args                  | Target                                                                   |
-| ---------------------------- | --------------------- | ------------------------------------------------------------------------ |
-| `@expect.min(n, msg?)`       | `number`, `string?`   | `number`, `decimal`                                                      |
-| `@expect.max(n, msg?)`       | `number`, `string?`   | `number`, `decimal`                                                      |
-| `@expect.int(msg?)`          | `string?`             | `number` (prefer `number.int`)                                           |
-| `@expect.pattern(re, msg?)`  | `RegExp`, `string?`   | `string`                                                                 |
-| `@expect.minLength(n, msg?)` | `number`, `string?`   | `string`, arrays                                                         |
-| `@expect.maxLength(n, msg?)` | `number`, `string?`   | `string`, arrays                                                         |
-| `@expect.array.uniqueItems`  | `string?`             | arrays — distinct items (or, with `@expect.array.key`, key-based)        |
-| `@expect.array.key`          | `string?`             | Identity key inside array element type. Target: `string`/`number`, non-optional. Pair with `uniqueItems` for key-based uniqueness. |
+| Annotation                          | Args                              | Target                                                                   |
+| ----------------------------------- | --------------------------------- | ------------------------------------------------------------------------ |
+| `@expect.min n, 'msg?'`             | `number`, `string?`               | `number` only (`defType: ['number']`)                                    |
+| `@expect.max n, 'msg?'`             | `number`, `string?`               | `number` only                                                            |
+| `@expect.int`                       | _none_                            | `number` (prefer `number.int`)                                           |
+| `@expect.pattern 'pat', 'flags?', 'msg?'` | `string`, `string?`, `string?` | `string`. Pattern is a **string** (not a regex literal). `flags` from a fixed allow-list (`'g'`, `'i'`, `'u'`, combos). `multiple: true`, `mergeStrategy: 'append'`. |
+| `@expect.minLength n, 'msg?'`       | `number`, `string?`               | `string`, arrays (`defType: ['array', 'string']`)                        |
+| `@expect.maxLength n, 'msg?'`       | `number`, `string?`               | `string`, arrays                                                         |
+| `@expect.array.uniqueItems 'msg?'`  | `string?`                         | array props — distinct items (or, with `@expect.array.key`, key-based)   |
+| `@expect.array.key 'msg?'`          | `string?`                         | Identity key inside array element type. Target: `string`/`number`, non-optional. Pair with `uniqueItems` for key-based uniqueness. |
+
+`@expect.min` / `@expect.max` apply to `number` only — NOT `decimal`.
 
 Key + uniqueItems:
 
@@ -99,18 +102,24 @@ export interface Cart {
 }
 ```
 
+## `@emit.*`
+
+| Annotation         | Args   | Effect                                                                              |
+| ------------------ | ------ | ----------------------------------------------------------------------------------- |
+| `@emit.jsonSchema` | _none_ | Pre-compute and embed JSON Schema at build time for this interface/type/annotate, regardless of the global `jsonSchema` plugin option. |
+
 ## Merge
 
-Property types resolve through aliases; annotations merge along the chain. Default = `replace` (child overrides parent same-name). Specs can opt into `append` for array-valued metadata.
+Property types resolve through aliases; annotations merge along the chain. Default = `replace` (child overrides parent same-name). Specs can opt into `mergeStrategy: 'append'` for repeatable annotations (e.g. `@expect.pattern`).
 
 ```atscript
-type Email = @expect.pattern(/^.+@.+$/) string.email
+type Email = string.email
 
 export interface Contact {
-  @expect.maxLength(254)     // adds to Email's expect set
+  @expect.maxLength 254     // adds to Email's expect set
   primary: Email
 
-  @expect.pattern(/^corp-/)  // replaces Email's pattern for this prop
+  @expect.pattern '^corp-' // appended to Email's pattern (pattern uses 'append')
   workInternal: Email
 }
 ```
@@ -121,7 +130,7 @@ Apply to every matched value:
 
 ```atscript
 export interface I18n {
-  @expect.minLength(1)
+  @expect.minLength 1
   [/^[a-z]{2}$/]: string
 }
 ```
@@ -132,9 +141,9 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 
 `AnnotationSpec` fields:
 
-- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query'`. Regex literals accepted for `'string'` (see `@expect.pattern`). Omit for no-arg annotations.
-- `nodeType` — `'prop' | 'interface' | 'type' | 'primitive' | …`. Validated at parse time.
-- `defType` — restrict to specific primitive bases (e.g. only `string`).
+- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query'`. Omit for no-arg annotations.
+- `nodeType` — `TNodeEntity[]` (e.g. `['prop', 'interface', 'type', 'primitive']`). Validated at parse time.
+- `defType` — restrict to specific primitive bases / kinds (e.g. `['string']`, `['number']`, `['array', 'string']`).
 - `multiple` — repeatable on same node.
 - `mergeStrategy` — `'replace'` (default) or `'append'`.
 - `description` — VSCode hover text.
@@ -166,6 +175,13 @@ export default defineConfig({
     },
   },
 })
+```
+
+Use:
+
+```atscript
+@ui.widget 'select'
+role: 'admin' | 'editor'
 ```
 
 ## Typed metadata access

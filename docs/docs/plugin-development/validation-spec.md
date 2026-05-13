@@ -2,7 +2,7 @@
 
 This page is a **language-agnostic specification** for implementing data validation against Atscript type definitions. It defines the exact behavior your validator must follow — what to check, in what order, and what errors to produce.
 
-The TypeScript `Validator` class in `packages/typescript/src/validator.ts` is the reference implementation that follows this specification.
+The TypeScript `Validator` class in `packages/typescript/src/runtime/validator.ts` is the reference implementation that follows this specification.
 
 ## Two Constraint Dimensions
 

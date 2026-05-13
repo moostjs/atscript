@@ -15,23 +15,18 @@ Plugins can register primitives, annotations, emit new output formats (another l
 ## `TAtscriptPlugin`
 
 ```ts
-import type { TAtscriptPlugin } from '@atscript/core'
+import type { TAtscriptPlugin, TPluginOutput, TAtscriptRenderFormat, TAtscriptConfig } from '@atscript/core'
+import type { AtscriptDoc, AtscriptRepo } from '@atscript/core'
+import type { TOutput } from '@atscript/core'   // TOutput = TPluginOutput + { source, target }
 
 export interface TAtscriptPlugin {
-  name: string                                       // required
-  config?(config: TAtscriptConfig): TAtscriptConfig | void
-  resolve?(id: string): string | null | undefined    // virtual modules
-  load?(id: string): string | null | undefined       // virtual file content
-  onDocument?(doc: AtscriptDoc): void                // per-document post-parse
-  render?(
-    doc: AtscriptDoc,
-    format: TAtscriptRenderFormat,
-  ): Promise<TPluginOutput[]> | TPluginOutput[]
-  buildEnd?(
-    output: TPluginOutput[],
-    format: TAtscriptRenderFormat,
-    repo: AtscriptRepo,
-  ): Promise<void> | void
+  name: string                                                        // required
+  config?(config: TAtscriptConfig): Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
+  resolve?(id: string): Promise<string | undefined> | string | undefined
+  load?(id: string): Promise<string | undefined> | string | undefined
+  onDocument?(doc: AtscriptDoc): Promise<void> | void
+  render?(doc: AtscriptDoc, format: TAtscriptRenderFormat): Promise<TPluginOutput[]> | TPluginOutput[]
+  buildEnd?(output: TOutput[], format: TAtscriptRenderFormat, repo: AtscriptRepo): Promise<void> | void
 }
 ```
 
@@ -39,12 +34,12 @@ All hooks optional except `name`. Plugins run in the order they appear in `plugi
 
 ### `config(config)`
 
-Called once on `PluginManager` init. Returns partial config; merged via `defu`.
+Called once on `PluginManager` init. Returns partial config (or `undefined`); merged via `defu`.
 
 Use to register:
 - Primitives ([primitives.md](primitives.md))
 - `AnnotationSpec`s ([annotations.md](annotations.md))
-- Defaults (e.g. `outDir`)
+- Defaults
 
 ```ts
 config(config) {
@@ -57,14 +52,14 @@ config(config) {
 
 ### `resolve(id)` / `load(id)`
 
-- `resolve(id)` — import specifier → absolute URI / stable ID. `null`/`undefined` falls through to default.
+- `resolve(id)` — import specifier → absolute URI / stable ID. Return `undefined` to fall through to default resolution.
 - `load(id)` — source text for a resolved ID. Use for virtual `.as` (schema registry, DB, …).
 
 Document IDs typically `file:///absolute/path.as`. Non-file IDs need `resolve` to return a stable string.
 
 ### `onDocument(doc)`
 
-Called after parse + semantic-node registration. Use for:
+Called after parse + semantic-node registration. Returns `Promise<void> | void`. Use for:
 
 - Validating invariants, pushing messages to `doc.getDiagMessages()`.
 - Synthesizing virtual properties (e.g. `@db.rel.via` reads the relation table, injects synthetic fields).
@@ -74,23 +69,40 @@ Never mutate destructively — append, don't delete. Unexpected mutations break 
 
 ### `render(doc, format)`
 
-Per-document, per-format. Return zero or more:
+Per-document, per-format. Return zero or more outputs:
 
 ```ts
 interface TPluginOutput {
-  fileName: string   // path relative to outDir
+  fileName: string   // relative to outDir (or the source dir)
   content: string
-  format?: string
 }
 ```
 
-TS plugin emits `foo.as.d.ts` on `format === 'dts'`, `foo.as.js` on `format === 'js'`. New formats should use a unique name (`'sql'`, `'openapi'`) or opt into an existing one.
+`TPluginOutput` has **only** `fileName` + `content`. The `source` + `target` fields appear later (added by `BuildRepo` when materializing files into `TOutput`).
 
-`format` is the CLI `-f` value (or `undefined` → emit all supported). Plugins ignore formats they don't handle.
+- `format` is the CLI `-f` value, or the `DEFAULT_FORMAT` sentinel (`'__default__'`) when `-f` is omitted.
+- Plugins should accept `format === DEFAULT_FORMAT` for their primary output (the editor sends this on save):
+
+```ts
+import { DEFAULT_FORMAT } from '@atscript/core'
+
+render(doc, format) {
+  if (format === 'dts' || format === DEFAULT_FORMAT) {
+    return [{ fileName: `${doc.name}.d.ts`, content: renderTypes(doc) }]
+  }
+  if (format === 'js') {
+    return [{ fileName: `${doc.name}.js`, content: renderJs(doc) }]
+  }
+}
+```
+
+New language formats should use a unique name (`'py'`, `'sql'`, `'openapi'`).
 
 ### `buildEnd(output, format, repo)`
 
-Once per format after all docs rendered. Use for:
+Once per format after all docs rendered. Argument order: `output` (the `TOutput[]` produced by every plugin's `render`), `format`, `repo`. Returns `Promise<void> | void`.
+
+Use for:
 
 - Per-project index (e.g. `atscript.d.ts` from the TS plugin).
 - Aggregating interfaces into a single GraphQL schema / OpenAPI doc.
@@ -104,6 +116,7 @@ Plugin = factory returning `TAtscriptPlugin`:
 
 ```ts
 import type { TAtscriptPlugin } from '@atscript/core'
+import { DEFAULT_FORMAT } from '@atscript/core'
 
 export interface MyPluginOptions { /* … */ }
 
@@ -111,7 +124,11 @@ export default function myPlugin(opts: MyPluginOptions = {}): TAtscriptPlugin {
   return {
     name: 'my-plugin',
     config(config) { /* … */ },
-    render(doc, format) { /* … */ },
+    render(doc, format) {
+      if (format === DEFAULT_FORMAT || format === 'dts') {
+        /* … */
+      }
+    },
     buildEnd(output, format, repo) { /* … */ },
   }
 }
@@ -136,21 +153,19 @@ Peer deps: `@atscript/core` always; `@atscript/typescript` if extending TS outpu
 A language extension = plugin whose `render()` emits another language. Pattern:
 
 1. `config()` → register primitive extensions / annotations (`@python.pydantic.*`).
-2. `render(doc, 'py')` → walk `doc.nodes` with a code printer.
+2. `render(doc, 'py')` → walk `doc.nodes` with a code printer. Also accept `DEFAULT_FORMAT` if this is the user's primary language.
 3. `buildEnd('py', outputs, repo)` → emit a project-level index if useful.
-4. Ship a CLI only if the workflow isn't `asc -f py`. Otherwise `asc -f py` is sufficient — `asc` exposes arbitrary formats.
+4. Ship a CLI only if the workflow isn't `asc -f py`. Otherwise `asc -f py` is sufficient — `asc` accepts any format string.
 
 ## `AnnotationSpec` and primitive annotations
 
 `AnnotationSpec` shape, arg types (`'string' | 'number' | 'boolean' | 'ref' | 'query'`), full example → [annotations.md](annotations.md#custom-annotations).
 
-Primitives use generic `annotations: Record<string, TPrimitiveAnnotationValue>` — no hardcoded `expect` property. See [primitives.md](primitives.md#extending-primitives-via-config).
-
-`PluginManager.applyAnnotations()` resolves each key against its registered `AnnotationSpec`, validates the value, attaches to primitive metadata. After `config()` registers a spec, any primitive's `annotations` map can reference it.
+Primitives use generic `annotations: Record<string, TPrimitiveAnnotationValue>` — no hardcoded `expect` property. See [primitives.md](primitives.md#extending-via-config). Annotation values on primitives are resolved against the registered `AnnotationSpec` (spec arg names → object keys, `multiple: true` → array).
 
 ## Message convention
 
-Errors/warnings never throw. Push to `doc.getDiagMessages()` (or return from `buildEnd`) as `TMessages`. Core aggregates diagnostics across plugins → CLI exit code, LSP, build tooling.
+Errors/warnings never throw. Push to `doc.getDiagMessages()` (or return them from `validate`/`modify` spec hooks) as `TMessages`. Core aggregates diagnostics across plugins → CLI exit code, LSP, build tooling.
 
 ## Type guards
 

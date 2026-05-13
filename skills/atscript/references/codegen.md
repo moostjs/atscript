@@ -9,23 +9,20 @@ How `.as` → `.as.d.ts` + `.as.js`. Job of `@atscript/typescript`.
   ↓ @atscript/core tokenizer + parser
 AtscriptDoc (AST + diagnostics + token index)
   ↓ plugin hooks:
-      onDocument(doc)      per-document post-processing
-      render(doc, 'dts')   TypeRenderer → .as.d.ts
-      render(doc, 'js')    JsRenderer → .as.js
+      onDocument(doc)              per-document post-processing
+      render(doc, 'dts' | DEFAULT) TypeRenderer → .as.d.ts
+      render(doc, 'js')            JsRenderer → .as.js
   ↓ aggregation
-      buildEnd('dts', …)   emits per-project atscript.d.ts
-      buildEnd('js',  …)   (reserved)
+      buildEnd('dts' | DEFAULT, …) emits per-project atscript.d.ts
   ↓ writer
 foo.as.d.ts  +  foo.as.js  +  atscript.d.ts
 ```
 
+The TS plugin treats `format === 'dts'` and `format === DEFAULT_FORMAT` identically. `format === 'js'` emits the runtime tree.
+
 ## `.d.ts` shape
 
-For `interface X`, renderer emits:
-
-- TS type / class-like matching the shape.
-- Companion `namespace X` with annotated-type metadata (`metadata`, `validator()`, `TAtscriptDataType`, `annotatedType` pointer into the JS runtime tree).
-- JSDoc preserved from `.as` comments.
+For `interface X`, renderer emits a **`declare class` with static members**:
 
 Input:
 
@@ -40,40 +37,44 @@ export interface User {
 Approximate output:
 
 ```ts
-import type { TAtscriptAnnotatedType, Validator } from '@atscript/typescript'
-import type { TMetadataMap } from '@atscript/typescript'
-
-export type User = {
-  id: string // string.uuid narrows at runtime, not in TS type
+export declare class User {
+  id: string
   name: string
-}
-export const User: {
-  annotatedType: TAtscriptAnnotatedType
-  metadata: TMetadataMap<'user.User'>
-  validator(opts?: ValidatorOptions): Validator<User>
+
+  static __is_atscript_annotated_type: true
+  static type: TAtscriptTypeObject<keyof User, User>
+  static metadata: TMetadataMap<AtscriptMetadata>
+  static validator: (opts?: Partial<TValidatorOptions>) => Validator<typeof User>
+  static toJsonSchema: () => any
+  static toExampleData?: () => any
 }
 ```
 
-For `type X = …` aliases: plain `export type X = …` plus the same runtime-facing companion const.
+For `export type X = …` aliases: `export type X = …` plus a `declare namespace X` carrying `const type`, `const metadata`, `const validator`, etc.
+
+JSDoc is preserved from `.as` comments.
 
 ## `.js` shape
 
-Runtime tree via `defineAnnotatedType()` chains from `@atscript/typescript/utils`:
+Runtime tree via `defineAnnotatedType()` chains from `@atscript/typescript/utils`. Each declaration becomes a `class` with the same statics (`__is_atscript_annotated_type`, `type`, `metadata`, `id`, `validator`, `toJsonSchema`):
 
 ```js
 import { defineAnnotatedType as $ } from '@atscript/typescript/utils'
 
-const _User = $('object', class User {})
-  .prop('id', $('string').annotate('meta.id', true).annotate('primitive.tag', 'string.uuid'))
-  .prop('name', $('string'))
-  .annotate('meta.interface', 'user.User')
+export class User {
+  static __is_atscript_annotated_type = true
+  static type = {}
+  static metadata = new Map()
+  static id = "User"
+  static toJsonSchema() { /* … */ }
+}
 
-export const User = _User
+// Type & metadata populated post-class via $(...).prop(...).annotate(...) chains.
 ```
 
-- Every property has a stable `id` (collision-safe within the document).
-- Ref-typed props (`foo: OtherType`) → `$('ref', OtherType)`, walked lazily.
-- Structures, unions/intersections, tuples, arrays each have their own constructor in `defineAnnotatedType`.
+- Every interface/type/annotate-alias gets a stable `static id` string (collision-safe within the document).
+- Ref-typed props (`foo: OtherType`) → `.refTo(OtherType)`, walked lazily.
+- Structures, unions/intersections, tuples, arrays each use their dedicated `defineAnnotatedType` constructor.
 
 Consumer APIs: [runtime.md](runtime.md). Validation: [validation.md](validation.md).
 
@@ -87,26 +88,20 @@ declare global {
     'meta.id': boolean
     'meta.label': string
     'meta.description': string
-    'expect.min': number
-    'expect.max': number
-    'expect.pattern': RegExp
-    'expect.array.key': boolean
+    'expect.min': number | { minValue: number; message?: string }
+    'expect.max': number | { maxValue: number; message?: string }
+    'expect.pattern': Array<{ pattern: string; flags?: string; message?: string }>
+    'expect.array.key': boolean | { message?: string }
     // … one entry per registered annotation spec (including plugin-contributed) …
   }
 
-  interface AtscriptPrimitiveTags {
-    'string': string
-    'string.email': string
-    'string.uuid': string
-    'number': number
-    'number.int': number
-    'decimal': string
-    // … one entry per primitive + extension …
-  }
+  type AtscriptPrimitiveTags = 'int8' | 'int16' | 'byte' | 'port' | 'created' | 'updated' | …
 }
 ```
 
-Gives `User.metadata.get('meta.label')` a `string | undefined` return type (not `unknown`). Regenerated by `buildEnd('dts', …)` in the TS plugin. After config/plugin changes, rerun `asc -f dts` and commit.
+`AtscriptPrimitiveTags` is a **string union type**, not an interface. `AtscriptMetadata` is an interface keyed by annotation name; its value type matches what `metadata.get(...)` returns.
+
+Gives `User.metadata.get('meta.label')` a `string | undefined` return type (not `unknown`). Regenerated by `buildEnd('dts' | DEFAULT_FORMAT, …)` in the TS plugin. After config/plugin changes, rerun `asc -f dts` and commit.
 
 **Never hand-edit.** It is generated.
 

@@ -148,7 +148,7 @@ In SQL databases, `decimal` maps to the native `DECIMAL` type (with precision/sc
 
 Atscript provides timestamp-oriented numeric tags: `number.timestamp`, `number.timestamp.created`, and `number.timestamp.updated`.
 
-Timestamps are stored as `number` (Unix epoch milliseconds). This is a deliberate choice — numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. Using `Date` objects would require walking every response to convert strings back to `Date` instances on both sides of the transport layer.
+Timestamps are stored as `number` and constrained to integers — the unit (seconds, milliseconds, microseconds) is project-decided. The primitive itself does not enforce a unit. Storing timestamps as numbers is a deliberate choice — numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. Using `Date` objects would require walking every response to convert strings back to `Date` instances on both sides of the transport layer.
 
 These are advanced because they matter more for DB integrations than for basic TypeScript usage.
 

@@ -43,7 +43,11 @@ You also need:
 - `@atscript/core`
 - `@atscript/typescript`
 - `moost`
-- `@moostjs/event-http` if you want the built-in HTTP error transform
+- `@moostjs/event-http`
+
+::: tip Non-HTTP setups
+`@moostjs/event-http` is a hard peer because the package re-exports `validationErrorTransform()`, which references `HttpError` from that package. If you build a non-HTTP Moost app you can still install `@moostjs/event-http` to satisfy the peer and simply ignore the HTTP transform — only `validatorPipe()` is used in that case.
+:::
 
 ## Quick Start
 

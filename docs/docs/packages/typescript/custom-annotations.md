@@ -87,10 +87,10 @@ nameProp?.metadata.get('grid.tag') // ['primary', 'searchable']
 | --------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `description`   | `string`                | Shown in IntelliSense hover                                                                                                       |
 | `nodeType`      | `string[]`              | Where annotation can be applied: `'interface'`, `'type'`, `'prop'`                                                                |
-| `argument`      | `object \| object[]`    | Argument definition(s): `{ name, type, optional?, description?, values? }`                                                        |
+| `argument`      | `object \| object[]`    | Argument definition(s): `{ name, type, optional?, description?, values? }`. `type` must be one of `'string' \| 'number' \| 'boolean' \| 'ref' \| 'query'` |
 | `multiple`      | `boolean`               | Whether the annotation can appear more than once on the same node                                                                 |
 | `mergeStrategy` | `'replace' \| 'append'` | How values combine during [annotation inheritance](/packages/typescript/annotations#annotation-inheritance). Default: `'replace'` |
-| `defType`       | `string[]`              | Restrict to specific value types: `'string'`, `'number'`, `'boolean'`, `'array'`, `'object'`, etc.                                |
+| `defType`       | `string[]`              | Restrict to the underlying definition type. Valid values: `'string'`, `'number'`, `'boolean'`, `'decimal'`, `'phantom'`, `'null'`, `'void'`, `'never'`, `'object'`, `'array'`, `'union'`, `'intersection'`                                |
 | `validate`      | `function`              | Custom validation function for complex checks                                                                                     |
 | `modify`        | `function`              | Hook to modify the AST after annotation is parsed                                                                                 |
 

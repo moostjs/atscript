@@ -117,8 +117,8 @@ if (isRef(def)) {
   if (resolved?.def) {
     if (isPrimitive(resolved.def)) {
       // Terminal: it's a primitive like string, number, string.email, etc.
-      resolved.def.type // underlying scalar: 'string', 'number', 'boolean', etc.
-      resolved.def.config // full TPrimitiveConfig with expect, tags, documentation
+      resolved.def.type   // underlying scalar: 'string', 'number', 'boolean', 'decimal', etc.
+      resolved.def.config // full TPrimitiveConfig (type, tags, documentation, annotations, …)
     } else {
       // It references another interface/type — use the resolved name
       resolved.name
@@ -149,7 +149,7 @@ function resolveType(def: SemanticNode | undefined, doc: AtscriptDoc): string {
 
   if (isPrimitive(def)) {
     // A scalar primitive — map def.type to your target language
-    // def.type is 'string' | 'number' | 'boolean' | 'void' | 'null' | 'phantom'
+    // def.type is 'string' | 'number' | 'boolean' | 'decimal' | 'void' | 'null' | 'phantom'
     // def.config.tags provides semantic tags for finer discrimination
     return mapToTargetLanguage(def.type)
   }
@@ -186,7 +186,9 @@ function resolveType(def: SemanticNode | undefined, doc: AtscriptDoc): string {
 
   if (isConst(def)) {
     // A literal constant value: "hello", 42, true
-    return JSON.stringify(def.value)
+    // The raw text is on the identifier token.
+    const literal = def.token('identifier')?.text ?? ''
+    return literal
   }
 
   return 'unknown'
@@ -199,7 +201,7 @@ When resolving types, check for `def.type === 'phantom'` on primitives. Phantom 
 
 ### Union vs Intersection vs Tuple
 
-`SemanticGroupNode` represents all three. Distinguish them:
+`SemanticGroup` covers unions and intersections; tuples are their own node class (`SemanticTupleNode`) but `isGroup()` returns `true` for both. Distinguish them by `entity` and `op`:
 
 ```typescript
 if (isGroup(def)) {
@@ -234,18 +236,20 @@ for (const ann of prop.annotations) {
 
 ### Merged Annotations (With Inheritance)
 
-`doc.evalAnnotationsForNode(node)` returns the complete annotation set including annotations inherited through type references and annotate blocks:
+`doc.evalAnnotationsForNode(node)` returns the complete annotation set including annotations inherited through type references and annotate blocks. The return value is `TAnnotationTokens[] | undefined`:
 
 ```typescript
-const merged = doc.evalAnnotationsForNode(prop)
-// Map<string, TAnnotationTokens[]>
+const merged = doc.evalAnnotationsForNode(prop) // TAnnotationTokens[] | undefined
 
-for (const [annotationName, tokensList] of merged) {
-  for (const tokens of tokensList) {
-    const value = tokens.args[0]?.text
-  }
+for (const ann of merged || []) {
+  ann.name        // e.g. 'meta.label', 'expect.minLength', 'db.index.unique'
+  ann.token       // the @-prefixed annotation token (with .range, .text, .parentNode)
+  ann.args        // Token[] — argument tokens, each with .text / .type / .range
+  const value = ann.args[0]?.text
 }
 ```
+
+The same annotation name can appear multiple times in the array when the annotation spec uses `multiple: true, mergeStrategy: 'append'`.
 
 ### When to Use Which
 

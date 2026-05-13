@@ -66,7 +66,7 @@ include: ['**/*.as', '!**/*.test.as']
 #### `exclude`
 
 - **Type:** `string[]`
-- **Default:** `['**/node_modules/**']`
+- **Default:** `['node_modules']`
 - **Description:** Glob patterns for files to exclude
 
 ```javascript
@@ -97,14 +97,29 @@ primitives: {
       url: {
         type: 'string',
         documentation: 'URL format',
-        expect: {
-          pattern: ['^https?://.+$', '', 'Invalid URL']
+        annotations: {
+          'expect.pattern': {
+            pattern: '^https?://.+$',
+            message: 'Invalid URL'
+          }
+        }
+      },
+      coord: {
+        type: 'number',
+        documentation: 'Geographic coordinate',
+        annotations: {
+          'expect.min': -180,
+          'expect.max': 180
         }
       }
     }
   }
 }
 ```
+
+::: tip Annotations map
+Custom primitives apply implicit annotations via the `annotations` map. Each key is the annotation name (e.g., `'expect.pattern'`, `'expect.min'`); each value matches the annotation's argument shape — a single primitive for one-argument annotations, an object keyed by argument name when there are multiple arguments, or an array when the annotation is repeatable. The legacy `expect: { ... }` shape was removed.
+:::
 
 #### `annotations`
 

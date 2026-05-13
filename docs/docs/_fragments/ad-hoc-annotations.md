@@ -132,6 +132,10 @@ annotate Config {
 // Result: feature's tags are ['production'], not ['alpha', 'beta', 'production']
 ```
 
+::: info `@tag` is a user-registered annotation
+`@tag` is not built in — it stands in for any custom repeatable annotation you register in `atscript.config`. See [Custom Annotations](/packages/typescript/custom-annotations) for how to define one.
+:::
+
 ### Append Strategy
 
 For annotations configured with `mergeStrategy: 'append'`, ad-hoc values are **added** to the existing ones:

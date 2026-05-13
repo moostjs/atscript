@@ -196,7 +196,7 @@ my-atscript-plugin/
   },
   "devDependencies": {
     "@atscript/core": "^0.1.0",
-    "vitest": "^2.0.0"
+    "vitest": "^3.0.0"
   }
 }
 ```

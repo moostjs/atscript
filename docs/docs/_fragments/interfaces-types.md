@@ -130,12 +130,12 @@ interface Timestamped {
     createdAt: string
 }
 
-interface Post {
+export type Post = {
     title: string
 } & Timestamped
 ```
 
-Intersections are useful when you want to combine types inline instead of declaring a new parent interface.
+Intersections are useful when you want to combine types inline instead of declaring a new parent interface. Use `type` (not `interface`) for the intersection itself — interfaces cannot end with a trailing `& Other`.
 
 ## Practical Example
 

@@ -35,15 +35,16 @@ For a practical first plugin, this is the minimum mental model:
 
 That is enough to build annotation plugins, primitive plugins, and many generators without going deeper into parser internals.
 
-## Key Classes
+## Key Classes You Interact With
 
-| Class           | Package          | Role                                                                                                      |
-| --------------- | ---------------- | --------------------------------------------------------------------------------------------------------- |
-| `AtscriptRepo`  | `@atscript/core` | Manages a collection of documents. Resolves config, loads plugins, opens documents, tracks dependencies.  |
-| `AtscriptDoc`   | `@atscript/core` | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods.     |
-| `BuildRepo`     | `@atscript/core` | Build orchestrator. Iterates documents, calls `render()` per format, resolves output paths, writes files. |
-| `PluginManager` | `@atscript/core` | Executes plugin hooks in order. Merges config, converts primitives to semantic nodes.                     |
-| `SemanticNode`  | `@atscript/core` | Base class for all AST nodes. Subclasses represent interfaces, types, props, refs, etc.                   |
+Plugin authors mainly work with two classes from `@atscript/core`:
+
+| Class          | Where you see it                          | Role                                                                                                  |
+| -------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `AtscriptDoc`  | `onDocument(doc)`, `render(doc, format)`  | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods. |
+| `SemanticNode` | Returned from doc queries (`doc.nodes`, …) | Base class for all AST nodes. Subclasses represent interfaces, types, props, refs, etc.               |
+
+The `buildEnd(output, format, repo)` hook also receives an `AtscriptRepo` — useful for cross-document queries (`repo.getUsedAnnotations()`, `repo.getPrimitivesTags()`) — but you do not construct or own it directly.
 
 ## AST Node Types
 
@@ -56,7 +57,8 @@ The parsed AST is a tree of `SemanticNode` subclasses. Each node has an `entity`
 | `'prop'`      | `SemanticPropNode`      | A property within an interface                        |
 | `'ref'`       | `SemanticRefNode`       | A reference to another type by name                   |
 | `'structure'` | `SemanticStructureNode` | An inline object structure (the body of an interface) |
-| `'group'`     | `SemanticGroupNode`     | A union (`\|`), intersection (`&`), or tuple          |
+| `'group'`     | `SemanticGroup`         | A union (`\|`) or intersection (`&`) of nodes         |
+| `'tuple'`     | `SemanticTupleNode`     | A tuple type (`[A, B, C]`)                            |
 | `'array'`     | `SemanticArrayNode`     | An array type                                         |
 | `'const'`     | `SemanticConstNode`     | A literal value (`"hello"`, `42`)                     |
 | `'primitive'` | `SemanticPrimitiveNode` | A built-in or plugin-defined primitive type           |
@@ -92,7 +94,7 @@ if (isInterface(node)) {
 if (isRef(node)) {
   // node is SemanticRefNode
   console.log(node.id) // referenced type name
-  console.log(node.chain) // property access chain (e.g., ["address", "street"])
+  console.log(node.chain.map(t => t.text)) // property access chain (e.g., ["address", "street"])
 }
 ```
 
@@ -198,8 +200,12 @@ Returns the complete set of annotations for a node, including inherited annotati
 
 ```typescript
 const annotations = doc.evalAnnotationsForNode(propNode)
-// Returns a map of annotation name → token values
-// Includes annotations inherited through type references
+// Returns: TAnnotationTokens[] | undefined
+// Each entry has { name, token, args } — args is Token[]
+for (const ann of annotations || []) {
+  ann.name        // e.g. 'meta.label'
+  ann.args[0]?.text // first argument as raw text
+}
 ```
 
 ### `doc.getUnusedTokens()`
@@ -208,7 +214,7 @@ Returns identifiers that are imported but never referenced — useful for import
 
 ### `doc.getDeclarationOwnerNode(name)`
 
-Looks up a top-level declaration by name. Returns the `SemanticNode` that owns that identifier, or `undefined` if not found.
+Looks up a top-level declaration by name. Returns `{ doc, node?, token? }` — the document that owns the identifier, the owning semantic node (if any), and the defining token — or `undefined` if not found. Follows imports across files.
 
 ## Next Steps
 

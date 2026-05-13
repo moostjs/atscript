@@ -1,12 +1,13 @@
 # Runtime
 
-What the generated `.as.js` does at runtime, and how consumers use it.
+What the generated `.as.js` exports at runtime, and how consumers use it.
 
 All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescript` exports only the build-time `tsPlugin`.
 
 ## Contents
 
 - [`TAtscriptAnnotatedType`](#tatscriptannotatedtype) — core shape
+- [Runtime vs serialized form](#runtime-vs-serialized-form)
 - [`defineAnnotatedType`](#defineannotatedtype) — builder used by generated code
 - [`TAtscriptDataType<T>`](#tatscriptdatatype-t) — extract TS data shape
 - [`forAnnotatedType`](#foranotatedtype) — kind-dispatched walker
@@ -16,45 +17,57 @@ All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescr
 
 ## `TAtscriptAnnotatedType`
 
-Every `.as.js` export:
+Every generated `.as` export conforms to:
 
 ```ts
 interface TAtscriptAnnotatedType {
+  __is_atscript_annotated_type: true
   id?: string
-  type: TTypeDef
-  metadata: TMetadataMap
+  type: TAtscriptTypeDef
+  metadata: TMetadataMap<AtscriptMetadata>
   optional?: boolean
-  ref?: { type: TAtscriptAnnotatedType; field: string }
-  validator(opts?: ValidatorOptions): Validator
+  ref?: { type: () => TAtscriptAnnotatedType; field: string }
+  validator(opts?: Partial<TValidatorOptions>): Validator
 }
 ```
 
-- `type` — structural def: `{ kind: 'object' | 'array' | 'union' | 'intersection' | 'tuple' | 'ref' | '' /* primitive */; … }`.
-- `metadata` — typed `Map<string, unknown>` keyed by annotation name. `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md)).
-- `optional` — optional at the referring site.
-- `ref` — alias to another interface/type; walked lazily.
-- `validator(opts?)` — cached, typed `Validator<this>`. See [validation.md](validation.md).
+- `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the *serialized* form.
+- `'' (final)` — primitive/literal node. Has `designType`, optional `value`, `tags`.
+- `'object'` — has `props: Map<string, TAtscriptAnnotatedType>`, `propsPatterns`, `tags`.
+- `'array'` — has `of: TAtscriptAnnotatedType`, `tags`.
+- `'union' | 'intersection' | 'tuple'` — has `items: TAtscriptAnnotatedType[]`, `tags`.
+- `metadata` — typed `Map<keyof AtscriptMetadata, …>`. `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md)).
+- `ref` — present only when this node was authored as a reference to another type. `type` is a **function** (lazy) that resolves to the target; `field` is a dot-joined chain into the target.
+- `validator(opts?)` — constructs `new Validator(this, opts)`. **Not cached.**
+
+## Runtime vs serialized form
+
+| Concept            | Runtime                                                   | Serialized                                                     |
+| ------------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
+| Ref to another type | `ref: { type: () => Target; field: '…' }`                 | `type: { kind: '$ref', id: 'Target' }` (also `ref` shallow target form when `refDepth` ends in `.5`) |
+| Primitive node     | `type.kind = ''`                                          | `type.kind = ''`                                               |
+| Object node        | `type.kind = 'object'`, `props: Map`                      | `type.kind = 'object'`, `props: Record`                        |
 
 ## `defineAnnotatedType`
 
-Builder used by generated code. Normally not called by hand (use `.as` + `asc`):
+Builder used by generated code. Returns a handle (not the annotated type directly) — read `.\$type`:
 
 ```ts
 import { defineAnnotatedType as $ } from '@atscript/typescript/utils'
 
 const _User = $('object', class User {})
-  .prop('id', $('string').annotate('meta.id', true).annotate('primitive.tag', 'string.uuid'))
-  .prop('name', $('string').annotate('meta.label', 'Full name'))
+  .id('User')
+  .prop('id', $().designType('string').annotate('meta.id', true).$type)
+  .prop('name', $().designType('string').annotate('meta.label', 'Full name').$type)
   .annotate('meta.interface', 'user.User')
 
-export const User = _User
+export const User = _User.$type
 ```
 
 Subtleties:
 
-- `$('object', Class)` **resets** the node. Never reuse a `$()` instance across declarations.
+- `$('object', Class)` **resets** the node. Never reuse a handle across declarations.
 - Metadata propagation is lazy; inspecting `metadata.get(...)` before the tree is fully built may miss later entries.
-- `.prop()` flatten is lazy (queued until first read).
 
 Prefer `.as` fixtures compiled via `prepareFixtures()` over hand-written `$()` chains in tests — hand-written builders are fragile.
 
@@ -72,18 +85,19 @@ type UserData = TAtscriptDataType<typeof User>
 
 ## `forAnnotatedType`
 
-Kind-dispatched walker:
+Kind-dispatched walker. Each handler receives the full `TAtscriptAnnotatedType` node — access the structural body via `node.type`.
 
 ```ts
 import { forAnnotatedType } from '@atscript/typescript/utils'
 
-forAnnotatedType(User.annotatedType, {
-  'object'(node) { for (const [name, child] of node.props) { /* … */ } },
-  'array'(node) { /* node.items */ },
-  'union'(node) { /* node.variants */ },
-  'intersection'(node) { /* node.variants */ },
-  'tuple'(node) { /* node.items */ },
-  ''(node) { /* primitive — node.primitive is the tag */ },
+forAnnotatedType(User, {
+  object(node) { for (const [name, child] of node.type.props) { /* … */ } },
+  array(node)  { /* node.type.of */ },
+  union(node)  { /* node.type.items */ },
+  intersection(node) { /* node.type.items */ },
+  tuple(node)  { /* node.type.items */ },
+  final(node)  { /* primitive — node.type.designType, node.type.value, node.type.tags */ },
+  phantom(node) { /* optional — diverts phantoms away from final */ },
 })
 ```
 
@@ -100,7 +114,7 @@ import {
   SERIALIZE_VERSION,
 } from '@atscript/typescript/utils'
 
-const json = serializeAnnotatedType(User.annotatedType)
+const json = serializeAnnotatedType(User)
 // json.$v === SERIALIZE_VERSION
 const restored = deserializeAnnotatedType(json)
 ```
@@ -123,7 +137,7 @@ Bumped when the serialized JSON shape changes. Validate `json.$v === SERIALIZE_V
 serializeAnnotatedType(Order, { refDepth: 0.5 })
 ```
 
-Self-referential FKs handled via `$ref` resolution.
+Self-referential FKs handled via the serialized `kind: '$ref'` node.
 
 ### Annotation filtering
 
@@ -154,9 +168,9 @@ import { User } from './user.as'
 const label = User.metadata.get('meta.label') // string | undefined (via AtscriptMetadata)
 const idFlag = User.metadata.get('meta.id')   // boolean — true if this node is a @meta.id member
 
-forAnnotatedType(User.annotatedType, {
+forAnnotatedType(User, {
   object(node) {
-    for (const [name, child] of node.props) {
+    for (const [name, child] of node.type.props) {
       const childLabel = child.metadata.get('meta.label')
     }
   },
@@ -167,13 +181,14 @@ Never cast `metadata.get(...)` to `any`. If the type is wrong/missing, `atscript
 
 ## What `.as.js` exports
 
-Each top-level `.as` export → constant of the same name, a `TAtscriptAnnotatedType`-bearing class/object:
-
-- `interface X` → `export const X` (class-like, with `.annotatedType`, `.metadata`, `.validator(...)`, nested prop types).
-- `export type X = …` → same surface, data type = alias target.
+Each top-level `.as` export → a `class` of the same name with `static __is_atscript_annotated_type`, `static id`, `static type`, `static metadata`, `static validator`. The class itself **is** the `TAtscriptAnnotatedType`:
 
 ```ts
 import { User } from './models/user.as'
+
+User.metadata.get('meta.label')
+User.validator().validate(data)
+User.type.kind          // 'object' | 'array' | 'union' | …
 ```
 
 `.as` resolution: `unplugin-atscript` in bundlers, VSCode extension in editors, or pre-generated `.as.js` on disk (Node ESM with loader).

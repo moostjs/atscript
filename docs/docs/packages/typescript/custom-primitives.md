@@ -19,15 +19,21 @@ export default defineConfig({
         url: {
           type: 'string',
           documentation: 'URL format',
-          expect: {
-            pattern: ['^https?://.+$', '', 'Invalid URL'],
+          annotations: {
+            'expect.pattern': {
+              pattern: '^https?://.+$',
+              message: 'Invalid URL',
+            },
           },
         },
         slug: {
           type: 'string',
           documentation: 'URL-safe slug',
-          expect: {
-            pattern: ['^[a-z0-9-]+$', '', 'Invalid slug'],
+          annotations: {
+            'expect.pattern': {
+              pattern: '^[a-z0-9-]+$',
+              message: 'Invalid slug',
+            },
           },
         },
       },
@@ -37,9 +43,9 @@ export default defineConfig({
         percentage: {
           type: 'number',
           documentation: 'Percentage value (0–100)',
-          expect: {
-            min: 0,
-            max: 100,
+          annotations: {
+            'expect.min': 0,
+            'expect.max': 100,
           },
         },
       },
@@ -68,11 +74,10 @@ Each primitive extension supports:
 | --------------- | ------------------------------------------------------------------------------------------------------------- |
 | `type`          | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, etc.) — **inherited** from parent if omitted |
 | `documentation` | Description shown in IntelliSense — inherited from parent if omitted                                          |
-| `expect`        | Implicit validation constraints — merged with parent's `expect`                                               |
 | `extensions`    | Nested sub-extensions (e.g., `number.int.positive`)                                                           |
 | `isContainer`   | If `true`, the primitive cannot be used directly — one of its extensions must be chosen                       |
 | `tags`          | Array of semantic tags (e.g., `['created']`) — inherited from parent, used by DB adapters and runtime tools   |
-| `annotations`   | Implicit annotations applied to any field using this primitive (e.g., `{ 'expect.int': true }`)               |
+| `annotations`   | Implicit annotations applied to any field using this primitive (e.g., `{ 'expect.int': true, 'expect.min': 0 }`) — merged with parent's annotations |
 
 ::: warning isContainer
 When `isContainer: true`, the primitive itself cannot be used as a type — only its extensions are valid:
@@ -85,7 +90,7 @@ field: ui.action      // ✓ Correct — uses the extension
 :::
 
 ::: tip Inheritance
-Extensions automatically inherit `type`, `documentation`, `expect`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own constraints.
+Extensions automatically inherit `type`, `documentation`, `annotations`, and `tags` from their parent primitive. You only need to specify fields you want to override or add. This is how built-in extensions like `string.email` work — they inherit `type: 'string'` from `string` and only add their own `expect.pattern` annotation.
 :::
 
 ## Phantom Namespaces
@@ -109,17 +114,18 @@ primitives: {
 
 ```atscript
 export interface CheckoutForm {
-    @label "Email"
+    @meta.label 'Email'
     email: string.email
 
-    @label "Shipping Address"
-    @component "section-header"
+    @meta.label 'Shipping Address'
     shippingHeader: ui.divider
 
-    @label "Street"
+    @meta.label 'Street'
     street: string
 }
 ```
+
+Annotations are always namespaced — use `@meta.label` (built-in), not bare `@label`. Custom annotations follow the same rule (`@grid.column`, `@form.section`, etc.).
 
 ## Next Steps
 
