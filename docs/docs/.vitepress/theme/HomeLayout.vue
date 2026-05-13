@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, nextTick, watch } from 'vue'
+import { onMounted, nextTick, ref, watch } from 'vue'
 // oxlint-disable-next-line import/named -- vitepress re-exports these
 import { useData, useRoute } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
@@ -13,6 +13,21 @@ import PlannedUiPreview from './PlannedUiPreview.vue'
 const { Layout } = DefaultTheme
 const { frontmatter } = useData()
 const route = useRoute()
+
+const copiedCmd = ref('')
+let copyTimer
+async function copyCmd(cmd) {
+  try {
+    await navigator.clipboard.writeText(cmd)
+    copiedCmd.value = cmd
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => {
+      copiedCmd.value = ''
+    }, 1400)
+  } catch {
+    // ignore
+  }
+}
 
 function setupScrollAnimations() {
   nextTick(() => {
@@ -336,6 +351,160 @@ watch(() => route.path, setupScrollAnimations)
         </div>
       </section>
 
+      <!-- ═══════════════════ AI Agent Skill ═══════════════════ -->
+      <section class="section-skill">
+        <div class="section-inner">
+          <div class="skill-block animate-in">
+            <div class="skill-head">
+              <span class="story-eyebrow">AI Agent Skill</span>
+              <h2 class="section-heading section-heading-center">
+                Your AI already speaks Atscript.
+              </h2>
+              <p class="aspect-desc skill-desc">
+                One command teaches Claude Code, Cursor, Windsurf, and Codex the entire
+                <code>.as</code> language — annotations, primitives, codegen, and the runtime
+                <code>Validator</code>.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              class="install-card"
+              :class="{ copied: copiedCmd === 'npx skills add moostjs/atscript' }"
+              @click="copyCmd('npx skills add moostjs/atscript')"
+              aria-label="Copy install command: npx skills add moostjs/atscript"
+            >
+              <span class="install-prompt">$</span>
+              <span class="install-cmd">npx skills add <strong>moostjs/atscript</strong></span>
+              <span class="install-action" aria-hidden="true">
+                <span class="install-action-icon">
+                  <svg
+                    v-if="copiedCmd !== 'npx skills add moostjs/atscript'"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="9" y="9" width="11" height="11" rx="2" />
+                    <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                  </svg>
+                  <svg
+                    v-else
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.6"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                </span>
+                <span class="install-action-label">
+                  {{
+                    copiedCmd === 'npx skills add moostjs/atscript' ? 'Copied!' : 'Click to copy'
+                  }}
+                </span>
+              </span>
+            </button>
+
+            <ul class="install-bullets">
+              <li>
+                <span class="bullet-dot"></span><code>.as</code> syntax &amp; primitives
+              </li>
+              <li>
+                <span class="bullet-dot"></span><code>@meta.*</code> / <code>@expect.*</code>
+                annotations
+              </li>
+              <li><span class="bullet-dot"></span><code>asc</code> codegen &amp; plugin model</li>
+              <li>runtime <code>Validator</code> &amp; type guards</li>
+            </ul>
+
+            <div class="skill-companions">
+              <span class="companions-label">Companions</span>
+              <div class="companions-list">
+                <button
+                  type="button"
+                  class="companions-pill"
+                  :class="{ copied: copiedCmd === 'npx skills add moostjs/atscript-db' }"
+                  @click="copyCmd('npx skills add moostjs/atscript-db')"
+                  aria-label="Copy: npx skills add moostjs/atscript-db"
+                >
+                  <span class="pill-tag">DATA</span>
+                  <code>npx skills add moostjs/atscript-db</code>
+                  <span class="pill-icon" aria-hidden="true">
+                    <svg
+                      v-if="copiedCmd !== 'npx skills add moostjs/atscript-db'"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                    </svg>
+                    <svg
+                      v-else
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12.5l4.5 4.5L19 7.5" />
+                    </svg>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  class="companions-pill"
+                  :class="{ copied: copiedCmd === 'npx skills add moostjs/atscript-ui' }"
+                  @click="copyCmd('npx skills add moostjs/atscript-ui')"
+                  aria-label="Copy: npx skills add moostjs/atscript-ui"
+                >
+                  <span class="pill-tag">UI</span>
+                  <code>npx skills add moostjs/atscript-ui</code>
+                  <span class="pill-icon" aria-hidden="true">
+                    <svg
+                      v-if="copiedCmd !== 'npx skills add moostjs/atscript-ui'"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                    </svg>
+                    <svg
+                      v-else
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M5 12.5l4.5 4.5L19 7.5" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <a href="https://skills.sh" class="story-link skill-link"
+              >Learn about AI agent skills</a
+            >
+          </div>
+        </div>
+      </section>
+
       <section class="section-architecture bg-diagonal">
         <div class="section-inner">
           <div class="architecture-block animate-in">
@@ -383,10 +552,362 @@ watch(() => route.path, setupScrollAnimations)
   color: var(--vp-c-text-1);
   margin-bottom: 24px;
 }
+.section-heading-center {
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
 @media (min-width: 640px) {
   .section-heading {
     font-size: 30px;
   }
+}
+
+/* ---- AI Agent Skill section ---- */
+.section-skill {
+  position: relative;
+  padding: 56px 24px 64px;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in srgb, var(--vp-c-brand-1) 8%, transparent),
+      transparent 60%
+    ),
+    var(--vp-c-bg);
+}
+:global(.dark) .section-skill {
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in srgb, var(--vp-c-brand-1) 14%, transparent),
+      transparent 65%
+    ),
+    var(--vp-c-bg);
+}
+@media (min-width: 640px) {
+  .section-skill {
+    padding: 72px 48px 80px;
+  }
+}
+@media (min-width: 960px) {
+  .section-skill {
+    padding: 80px 64px 88px;
+  }
+}
+.story-eyebrow {
+  display: inline-block;
+  font-family: var(--vp-font-family-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--vp-c-brand-1);
+  background: rgba(71, 26, 236, 0.08);
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+:global(.dark) .story-eyebrow {
+  background: rgba(174, 153, 252, 0.14);
+}
+.skill-block {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.skill-head {
+  text-align: center;
+  margin-bottom: 28px;
+}
+.skill-desc {
+  margin: 0 auto;
+  max-width: 600px;
+  text-align: center;
+}
+.skill-desc code {
+  font-size: 13px;
+  color: var(--vp-c-brand-1);
+  background: rgba(71, 26, 236, 0.08);
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-family: var(--vp-font-family-mono);
+}
+:global(.dark) .skill-desc code {
+  background: rgba(174, 153, 252, 0.14);
+}
+
+.install-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+  padding: 12px 12px 12px 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(71, 26, 236, 0.28);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font-family: var(--vp-font-family-mono);
+  cursor: pointer;
+  text-align: left;
+  box-shadow:
+    0 12px 32px rgba(71, 26, 236, 0.12),
+    0 0 0 4px rgba(71, 26, 236, 0.05);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+:global(.dark) .install-card {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(174, 153, 252, 0.32);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 4px rgba(174, 153, 252, 0.06);
+}
+.install-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--vp-c-brand-1);
+  box-shadow:
+    0 18px 40px rgba(71, 26, 236, 0.18),
+    0 0 0 4px rgba(71, 26, 236, 0.08);
+}
+.install-card.copied {
+  border-color: #18a674;
+  box-shadow:
+    0 12px 32px rgba(24, 166, 116, 0.18),
+    0 0 0 4px rgba(24, 166, 116, 0.08);
+}
+.install-prompt {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--vp-c-brand-1);
+  line-height: 1;
+}
+.install-cmd {
+  flex: 1;
+  font-size: 14px;
+  letter-spacing: -0.1px;
+  color: var(--vp-c-text-1);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.install-cmd strong {
+  color: var(--vp-c-brand-1);
+  font-weight: 700;
+}
+@media (min-width: 640px) {
+  .install-cmd {
+    font-size: 15px;
+  }
+}
+.install-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
+  border-radius: 999px;
+  background: rgba(71, 26, 236, 0.08);
+  color: var(--vp-c-brand-1);
+  font-family: var(--vp-font-family-sans);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+:global(.dark) .install-action {
+  background: rgba(174, 153, 252, 0.14);
+}
+.install-card.copied .install-action {
+  background: rgba(24, 166, 116, 0.12);
+  color: #18a674;
+}
+.install-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+.install-action-icon svg {
+  width: 13px;
+  height: 13px;
+}
+@media (max-width: 520px) {
+  .install-action-label {
+    display: none;
+  }
+}
+
+.install-bullets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  margin: 18px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.install-bullets li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--vp-c-text-2);
+}
+.install-bullets li code {
+  font-size: 12.5px;
+  color: var(--vp-c-brand-1);
+  background: rgba(71, 26, 236, 0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: var(--vp-font-family-mono);
+}
+:global(.dark) .install-bullets li code {
+  background: rgba(174, 153, 252, 0.14);
+}
+.bullet-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vp-c-brand-1);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.skill-companions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 28px 0 8px;
+  width: 100%;
+}
+.companions-label {
+  font-family: var(--vp-font-family-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--vp-c-text-3);
+}
+.companions-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.companions-pill {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 6px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-2);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+.companions-pill:hover {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-text-1);
+  transform: translateY(-1px);
+}
+.companions-pill:active {
+  transform: translateY(0);
+}
+.companions-pill.copied {
+  border-color: #18a674;
+  background: color-mix(in srgb, #18a674 6%, transparent);
+}
+:global(.dark) .companions-pill {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.pill-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(71, 26, 236, 0.1);
+  color: var(--vp-c-brand-1);
+  font-family: var(--vp-font-family-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+:global(.dark) .pill-tag {
+  background: rgba(174, 153, 252, 0.18);
+}
+.companions-pill code {
+  font-family: var(--vp-font-family-mono);
+  font-size: 12px;
+  background: transparent;
+  padding: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--vp-c-text-3);
+  background: transparent;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease;
+}
+.pill-icon svg {
+  width: 14px;
+  height: 14px;
+}
+.companions-pill:hover .pill-icon {
+  color: var(--vp-c-brand-1);
+  background: rgba(71, 26, 236, 0.08);
+}
+.companions-pill.copied .pill-icon {
+  color: #18a674;
+  background: rgba(24, 166, 116, 0.12);
+}
+.story-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--vp-c-brand-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.story-link::after {
+  content: '->';
+  margin-left: 8px;
+  font-size: 12px;
+}
+.story-link:hover {
+  text-decoration: underline;
+}
+.skill-link {
+  margin-top: 18px;
 }
 .hl {
   color: var(--vp-c-brand-1);
@@ -452,7 +973,7 @@ watch(() => route.path, setupScrollAnimations)
 }
 .hero-image {
   order: 1;
-  margin: -76px -24px -48px;
+  margin: -76px -24px -16px;
 }
 @media (min-width: 640px) {
   .hero-image {
@@ -519,6 +1040,21 @@ watch(() => route.path, setupScrollAnimations)
   bottom: 6%;
   right: 4%;
   animation-delay: 4.8s;
+}
+/* On phones, lift the bottom glyphs so they don't collide with the kicker. */
+@media (max-width: 639px) {
+  .hero-glyph-1 {
+    top: 12%;
+  }
+  .hero-glyph-2 {
+    top: 24%;
+  }
+  .hero-glyph-3 {
+    bottom: 28%;
+  }
+  .hero-glyph-4 {
+    bottom: 18%;
+  }
 }
 @keyframes glyph-drift {
   0%,
