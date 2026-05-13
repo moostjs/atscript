@@ -1,4 +1,6 @@
 import asLogo from '../../public/logo.svg?raw'
+import asUiLogo from '../../public/atscript-ui-logo.svg?raw'
+import asDbLogo from '../../public/atscript-db-logo.svg?raw'
 import code from './icons/code.svg?raw'
 import mongodb from './icons/mongodb.svg?raw'
 import mysql from './icons/mysql.svg?raw'
@@ -53,6 +55,21 @@ export const roadmapIcons = {
   },
   tableView: {
     svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="15.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.75" d="M3.5 8.7h17M9 8.7v10.8m6 0V8.7"/></svg>',
+    color: '#D97706',
+    background: 'rgba(217, 119, 6, 0.11)',
+  },
+  atscriptUi: {
+    svg: asUiLogo,
+    color: '#471AEC',
+    background: 'rgba(71, 26, 236, 0.11)',
+  },
+  atscriptDb: {
+    svg: asDbLogo,
+    color: '#0F80CC',
+    background: 'rgba(15, 128, 204, 0.11)',
+  },
+  framework: {
+    svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 3l8.5 4.9v8.2L12 21l-8.5-4.9V7.9z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3.5 7.9L12 12.8m0 0l8.5-4.9M12 12.8V21"/></svg>',
     color: '#D97706',
     background: 'rgba(217, 119, 6, 0.11)',
   },

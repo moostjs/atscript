@@ -6,58 +6,48 @@ const todayItems = [
     icon: 'typescript',
     title: 'TypeScript plugin',
     desc: 'Full code generation, runtime validation, metadata export, and JSON Schema.',
+    chips: [
+      'asc CLI',
+      'Validator',
+      'JSON Schema',
+      'unplugin-atscript',
+    ],
+    href: '/packages/typescript/',
   },
   {
     icon: 'visualstudiocode',
     title: 'VSCode tooling',
-    desc: 'Syntax highlighting, diagnostics, and go-to-definition for .as files.',
+    desc: 'Syntax highlighting, diagnostics, go-to-definition, and live error checking for .as files.',
+    href: '/packages/vscode/',
   },
   {
-    icon: 'postgresql',
-    title: 'PostgreSQL adapter',
-    desc: 'Production relational workflows with schema sync, fulltext, and vector search.',
-    badge: 'Experimental',
+    icon: 'atscriptDb',
+    title: 'Atscript DB',
+    desc: 'Tables, relations, views, full-text and vector search, schema sync, and REST/CRUD endpoints — all driven by the same .as model.',
+    chips: ['SQLite', 'PostgreSQL', 'MySQL', 'MongoDB', 'REST'],
+    href: 'https://db.atscript.dev/',
+    accent: true,
   },
   {
-    icon: 'mysql',
-    title: 'MySQL adapter',
-    desc: 'Relational workflows with broad hosting support, FULLTEXT search, and schema sync.',
-    badge: 'Experimental',
-  },
-  {
-    icon: 'sqlite',
-    title: 'SQLite adapter',
-    desc: 'Embedded relational workflows with schema sync and migration.',
-    badge: 'Experimental',
-  },
-  {
-    icon: 'mongodb',
-    title: 'MongoDB adapter',
-    desc: 'Document workflows, nested objects, Atlas Search, and vector search.',
-    badge: 'Experimental',
-  },
-  {
-    icon: 'api',
-    title: 'REST / CRUD layer',
-    desc: 'Typed HTTP controllers generated from the same .as model.',
+    icon: 'atscriptUi',
+    title: 'Atscript UI',
+    desc: 'Forms, smart tables, and multi-step HTTP workflow flows — rendered straight from .as annotations. Vue 3 today, framework-agnostic core.',
+    chips: ['Forms', 'Tables', 'Workflows', 'Styling'],
+    href: 'https://ui.atscript.dev/',
+    accent: true,
   },
 ]
 
 const plannedItems = [
   {
-    icon: 'uiForm',
-    title: 'Form tools',
-    desc: 'Auto-generate forms from labels, structure, and validation metadata on the model.',
-  },
-  {
-    icon: 'tableView',
-    title: 'Table and list tools',
-    desc: 'Drive table and list UIs from live schema instead of separate config.',
+    icon: 'framework',
+    title: 'More UI framework adapters',
+    desc: 'React and Svelte renderers on top of the framework-agnostic @atscript/ui core.',
   },
   {
     icon: 'language',
     title: 'More language targets',
-    desc: 'Python, Java, and others — the plugin architecture is designed to support them.',
+    desc: 'Python, Java, Go, and others — the plugin architecture is designed to support them.',
   },
 ]
 
@@ -66,7 +56,7 @@ const hubSpokes = [
   { label: 'DB adapters', icon: 'database', tone: 'today' },
   { label: 'REST / CRUD', icon: 'api', tone: 'today' },
   { label: 'IDE tooling', icon: 'ideTooling', tone: 'today' },
-  { label: 'UI generation', icon: 'uiForm', tone: 'planned' },
+  { label: 'UI generation', icon: 'atscriptUi', tone: 'today' },
   { label: 'More languages', icon: 'language', tone: 'planned' },
 ]
 
@@ -82,20 +72,7 @@ const getIconStyle = name => {
 
 <template>
   <div class="roadmap-visual">
-    <div class="legend">
-      <span class="legend-chip legend-chip-now">Available today</span>
-      <span class="legend-chip legend-chip-next">Planned next</span>
-    </div>
-
     <section class="rv-section">
-      <div class="rv-heading">
-        <h2 class="rv-title">How it connects</h2>
-        <p class="rv-copy">
-          One <code>.as</code> model feeds every output — types, validation, database adapters, HTTP
-          layer, and IDE tooling today, with UI generation and more languages planned.
-        </p>
-      </div>
-
       <div class="rv-hub">
         <div class="rv-hub-center">
           <div class="rv-hub-badge">
@@ -149,14 +126,24 @@ const getIconStyle = name => {
         <h2 class="rv-title">Available today</h2>
       </div>
       <div class="rv-grid">
-        <article v-for="item in todayItems" :key="item.title" class="rv-card">
+        <component
+          :is="item.href ? 'a' : 'article'"
+          v-for="item in todayItems"
+          :key="item.title"
+          :href="item.href"
+          class="rv-card"
+          :class="{ 'rv-card-accent': item.accent, 'rv-card-link': item.href }"
+        >
           <div class="rv-icon" :style="getIconStyle(item.icon)">
             <span class="rv-icon-markup" v-html="getIcon(item.icon).svg" />
           </div>
           <span v-if="item.badge" class="rv-badge">{{ item.badge }}</span>
           <div class="rv-card-title">{{ item.title }}</div>
           <p class="rv-card-desc">{{ item.desc }}</p>
-        </article>
+          <div v-if="item.chips" class="rv-card-chips">
+            <span v-for="chip in item.chips" :key="chip" class="rv-card-chip">{{ chip }}</span>
+          </div>
+        </component>
       </div>
     </section>
 
@@ -380,18 +367,12 @@ const getIconStyle = name => {
 .rv-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 14px;
+  gap: 16px;
 }
 
 @media (min-width: 640px) {
   .rv-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 960px) {
-  .rv-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -403,6 +384,37 @@ const getIconStyle = name => {
   border-radius: 18px;
   border: 1px solid var(--vp-c-divider);
   background: var(--vp-c-bg);
+}
+
+.rv-card-link {
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 0.25s ease,
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.rv-card-link:hover {
+  border-color: var(--vp-c-brand-1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(71, 26, 236, 0.1);
+}
+
+:global(.dark) .rv-card-link:hover {
+  box-shadow: 0 4px 16px rgba(174, 153, 252, 0.12);
+}
+
+.rv-card-accent {
+  border-color: rgba(71, 26, 236, 0.28);
+  background: linear-gradient(135deg, rgba(71, 26, 236, 0.06), rgba(71, 26, 236, 0.02));
+  box-shadow: 0 4px 18px rgba(71, 26, 236, 0.08);
+}
+
+:global(.dark) .rv-card-accent {
+  border-color: rgba(174, 153, 252, 0.32);
+  background: linear-gradient(135deg, rgba(174, 153, 252, 0.12), rgba(174, 153, 252, 0.04));
+  box-shadow: 0 4px 18px rgba(174, 153, 252, 0.12);
 }
 
 .rv-card-next {
@@ -466,5 +478,29 @@ const getIconStyle = name => {
   font-size: 14px;
   line-height: 1.65;
   color: var(--vp-c-text-2);
+}
+
+.rv-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.rv-card-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(71, 26, 236, 0.08);
+  color: var(--vp-c-brand-1);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--vp-font-family-mono);
+  letter-spacing: 0.01em;
+}
+
+:global(.dark) .rv-card-chip {
+  background: rgba(174, 153, 252, 0.14);
 }
 </style>

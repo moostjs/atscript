@@ -2,10 +2,9 @@
 layout: home
 
 hero2:
-  kicker: 'TypeScript first. Language-agnostic by design.'
-  text: 'Define your models once'
-  tagline: 'Get TypeScript types, runtime validation, and DB metadata from a single `.as` model.'
-  note: 'Atscript is built to power a broader model-driven stack over time. Today, TypeScript is the first supported plugin.'
+  kicker: 'One model. Types · DB · UI.'
+  text: 'Define your data once.'
+  tagline: 'Generate TypeScript types, runtime validation, DB schema, REST routes, and a full UI — forms, tables and multi-step flows — from a single `.as` model.'
 
 actions:
   - theme: brand
@@ -14,6 +13,9 @@ actions:
   - theme: alt
     text: Explore Database
     link: https://db.atscript.dev/guide/quick-start
+  - theme: alt
+    text: Explore UI
+    link: https://ui.atscript.dev/
 ---
 
 ## AI Agent Skill
@@ -22,6 +24,13 @@ Atscript provides a unified skill for AI coding agents (Claude Code, Cursor, Win
 
 ```bash
 npx skills add moostjs/atscript
+```
+
+The DB and UI layers ship their own skill bundles too:
+
+```bash
+npx skills add moostjs/atscript-db   # @db.* annotations, adapters, moost-db REST, browser client
+npx skills add moostjs/atscript-ui   # @ui.* annotations, <AsForm> / <AsTable> / <AsWfForm>, styling
 ```
 
 Learn more about AI agent skills at [skills.sh](https://skills.sh).

@@ -327,7 +327,8 @@ export default defineConfig({
     nav: [
       { text: 'TypeScript', link: '/packages/typescript/' },
       { text: 'Database', link: 'https://db.atscript.dev/' },
-      { text: 'Roadmap', link: '/roadmap' },
+      { text: 'UI', link: 'https://ui.atscript.dev/' },
+      { text: 'Ecosystem', link: '/roadmap' },
       { text: 'VSCode', link: '/packages/vscode/' },
       { text: 'Moost Validator', link: '/packages/moost-validator/' },
       {

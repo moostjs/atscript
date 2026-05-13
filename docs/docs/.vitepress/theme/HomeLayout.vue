@@ -67,6 +67,10 @@ watch(() => route.path, setupScrollAnimations)
           </div>
           <div class="hero-image">
             <div class="image-container">
+              <span class="hero-glyph hero-glyph-1" aria-hidden="true">@meta.label</span>
+              <span class="hero-glyph hero-glyph-2" aria-hidden="true">@expect.minLength</span>
+              <span class="hero-glyph hero-glyph-3" aria-hidden="true">@meta.required</span>
+              <span class="hero-glyph hero-glyph-4" aria-hidden="true">@expect.pattern</span>
               <img src="/logo.svg" alt="Atscript" class="image-src" />
             </div>
           </div>
@@ -92,8 +96,8 @@ watch(() => route.path, setupScrollAnimations)
               </div>
               <h3 class="feature-title">TypeScript from One Model</h3>
               <p class="feature-desc">
-                Start with one <code>.as</code> file and use it for TypeScript types, validators,
-                and runtime metadata.
+                One <code>.as</code> file becomes TypeScript types, validators, and runtime
+                metadata.
               </p>
             </a>
             <a href="/packages/typescript/validation" class="feature-card">
@@ -119,8 +123,8 @@ watch(() => route.path, setupScrollAnimations)
               </div>
               <h3 class="feature-title">Validation + Runtime Metadata</h3>
               <p class="feature-desc">
-                Keep constraints, labels, and other hints on the model instead of scattering them
-                across schemas and UI code.
+                Constraints, labels and hints live on the model — not scattered across schema and UI
+                code.
               </p>
             </a>
             <a href="https://db.atscript.dev/guide/" class="feature-card">
@@ -136,10 +140,38 @@ watch(() => route.path, setupScrollAnimations)
                   />
                 </svg>
               </div>
-              <h3 class="feature-title">DB Schema and CRUD Integrations</h3>
+              <h3 class="feature-title">DB Schema and REST</h3>
               <p class="feature-desc">
-                Drive tables, relations, schema sync, and REST/CRUD integrations from the same model
-                definition.
+                Tables, relations, schema sync, and CRUD endpoints from the same model definition.
+              </p>
+            </a>
+            <a href="https://ui.atscript.dev/" class="feature-card">
+              <div class="feature-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+                  <rect
+                    x="3.5"
+                    y="3.5"
+                    width="17"
+                    height="17"
+                    rx="3"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                  <path
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-width="1.5"
+                    d="M7 8h7m-7 4h3.5m-3.5 4h7"
+                  />
+                  <circle cx="15" cy="12" r="1.5" fill="currentColor" />
+                </svg>
+              </div>
+              <h3 class="feature-title">Forms, Tables, Workflows</h3>
+              <p class="feature-desc">
+                Render <code>&lt;AsForm&gt;</code>, <code>&lt;AsTable&gt;</code>, and multi-step
+                HTTP flows straight from <code>.as</code> types.
               </p>
             </a>
           </div>
@@ -195,7 +227,6 @@ watch(() => route.path, setupScrollAnimations)
         <div class="section-inner">
           <div class="aspect-grid">
             <div class="aspect-copy animate-in">
-              <div class="aspect-status aspect-status-today">Available today</div>
               <h2 class="section-heading">TypeScript + Validation</h2>
               <p class="aspect-desc">
                 Start with one <code>.as</code> model. Atscript turns that model into TypeScript
@@ -232,7 +263,6 @@ watch(() => route.path, setupScrollAnimations)
         <div class="section-inner">
           <div class="aspect-grid aspect-grid-reverse">
             <div class="aspect-copy animate-in">
-              <div class="aspect-status aspect-status-today">Available today</div>
               <h2 class="section-heading">DB + API Integrations</h2>
               <p class="aspect-desc">
                 The same model can drive schema annotations, relations, sync, CRUD helpers, and
@@ -273,26 +303,30 @@ watch(() => route.path, setupScrollAnimations)
         <div class="section-inner">
           <div class="aspect-grid">
             <div class="aspect-copy animate-in">
-              <div class="aspect-status aspect-status-planned">Planned</div>
-              <h2 class="section-heading">UI Forms + Table Views</h2>
+              <h2 class="section-heading">Forms, Tables &amp; Workflows</h2>
               <p class="aspect-desc">
-                The long-term direction is one model across UI, API, TypeScript, and DB. The same
-                metadata that powers runtime tooling today is the basis for automated forms and
-                data-table views later.
+                The same <code>.as</code> model that drives your types, validation, and DB now
+                renders <code>&lt;AsForm&gt;</code>, smart <code>&lt;AsTable&gt;</code> data grids,
+                and multi-step HTTP workflow forms — straight from the annotations. No render
+                boilerplate, no manual wiring.
               </p>
               <div class="aspect-tags">
-                <span class="aspect-tag">@meta.label</span>
-                <span class="aspect-tag">field hints</span>
-                <span class="aspect-tag">validation rules</span>
-                <span class="aspect-tag">table views</span>
+                <span class="aspect-tag">&lt;AsForm&gt;</span>
+                <span class="aspect-tag">&lt;AsTable&gt;</span>
+                <span class="aspect-tag">&lt;AsWfForm&gt;</span>
+                <span class="aspect-tag">@ui.*</span>
+                <span class="aspect-tag">vunor theming</span>
               </div>
               <ul class="aspect-list">
-                <li>Reuse labels and constraints instead of rewriting them in UI config.</li>
-                <li>Keep forms and tables aligned with the model as the schema evolves.</li>
-                <li>Build toward a model-driven data flow from UI to API to TypeScript to DB.</li>
+                <li>Labels, placeholders, validation, layout — declared once on the model.</li>
+                <li>Smart tables: server-driven queries, filtering, sorting, virtualised scrolling.</li>
+                <li>Workflow forms: long, branching HTTP flows the server decides screen by screen.</li>
               </ul>
               <div class="aspect-links">
-                <a href="/roadmap" class="aspect-link">See roadmap</a>
+                <a href="https://ui.atscript.dev/" class="aspect-link">Explore Atscript UI</a>
+                <a href="https://ui.atscript.dev/guide/quick-start" class="aspect-link"
+                  >UI Quick Start</a
+                >
               </div>
             </div>
             <div class="aspect-visual animate-in">
@@ -387,6 +421,8 @@ watch(() => route.path, setupScrollAnimations)
   }
 }
 .hero-inner {
+  position: relative;
+  z-index: 1;
   max-width: 1152px;
   margin: 0 auto;
   display: flex;
@@ -436,6 +472,62 @@ watch(() => route.path, setupScrollAnimations)
   margin: 0 auto;
   width: 320px;
   height: 320px;
+}
+.hero-glyph {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--vp-c-bg);
+  border: 1px solid rgba(71, 26, 236, 0.22);
+  font-family: var(--vp-font-family-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vp-c-brand-1);
+  white-space: nowrap;
+  box-shadow:
+    0 6px 18px rgba(71, 26, 236, 0.12),
+    0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  z-index: 1;
+  animation: glyph-drift 8s ease-in-out infinite;
+  pointer-events: none;
+}
+:global(.dark) .hero-glyph {
+  background: rgba(36, 29, 66, 0.85);
+  border-color: rgba(174, 153, 252, 0.3);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+.hero-glyph-1 {
+  top: 8%;
+  left: -2%;
+  animation-delay: 0s;
+}
+.hero-glyph-2 {
+  top: 22%;
+  right: -8%;
+  animation-delay: 1.6s;
+}
+.hero-glyph-3 {
+  bottom: 18%;
+  left: -10%;
+  animation-delay: 3.2s;
+}
+.hero-glyph-4 {
+  bottom: 6%;
+  right: 4%;
+  animation-delay: 4.8s;
+}
+@keyframes glyph-drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(1.5deg);
+  }
 }
 @media (min-width: 640px) {
   .image-container {
@@ -567,7 +659,6 @@ watch(() => route.path, setupScrollAnimations)
   flex-shrink: 0;
   padding: 6px;
 }
-
 /* ---- Aspect Sections ---- */
 .section-aspect {
   padding: 56px 24px;
@@ -933,9 +1024,9 @@ watch(() => route.path, setupScrollAnimations)
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (min-width: 960px) {
+@media (min-width: 1100px) {
   .features-grid {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 .feature-card {
