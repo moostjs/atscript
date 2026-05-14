@@ -1,3 +1,12 @@
+## [0.1.55](https://github.com/moostjs/atscript/compare/v0.1.54...v0.1.55) (2026-05-14)
+
+
+### Bug Fixes
+
+* **moost-validator:** skip validation for @Optional params with undefined/null values ([9467be9](https://github.com/moostjs/atscript/commit/9467be95e8706bc88916995a9179a2a08b96b678))
+
+
+
 ## [0.1.54](https://github.com/moostjs/atscript/compare/v0.1.53...v0.1.54) (2026-05-12)
 
 
