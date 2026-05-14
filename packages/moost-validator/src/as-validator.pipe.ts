@@ -33,6 +33,9 @@ import { definePipeFn, Pipe, TPipePriority } from 'moost'
  */
 export const validatorPipe = (opts?: Partial<TValidatorOptions>) =>
   definePipeFn<any>((value, metas, level) => {
+    if (metas?.targetMeta?.optional && (value === undefined || value === null)) {
+      return value
+    }
     if (
       isAnnotatedType(metas?.targetMeta?.type) &&
       typeof metas.targetMeta.type.validator === 'function'
