@@ -90,6 +90,32 @@ export interface User {
 }
 ```
 
+## Aliases as decorated param types
+
+Primitive type aliases compile to **runtime classes**, so they work as decorator-aware parameter types under `emitDecoratorMetadata` — exactly like atscript interfaces. The pipe in `@atscript/moost-validator` (or any framework reading `design:paramtypes` through `reflect-metadata`) sees them and runs validation automatically.
+
+```atscript
+// src/wiki.as
+@expect.minLength 1
+@expect.maxLength 64
+@expect.pattern '^[a-zA-Z0-9_-]+$'
+export type WikiName = string
+```
+
+```ts
+// HTTP
+@Post(':name')
+create(@Param('name') name: WikiName) { /* validated before this body runs */ }
+
+// CLI
+@Cli('create/:name')
+create(@Param('name') name: WikiName) { /* same pipe, same validation */ }
+```
+
+At the TS level, `name` is `string`. In the bundled output, `WikiName` is a class whose `metadata` carries the merged `@expect.*` constraints; `TypeScript`'s `__decorateMetadata` emit guards `typeof WikiName !== 'undefined' && typeof WikiName === 'function' ? WikiName : Object`, which resolves to the class. The `.as.d.ts` looks like `export type WikiName = string` + a `declare namespace WikiName { ... }`, but the runtime `.as.js` emits a real class — that's why this works.
+
+Use anywhere `design:paramtypes` is read: `@Body()`, `@Query()`, `@Param()`, `@CliOption()`, custom decorators in your own framework integrations.
+
 ## Extending via config
 
 Custom extensions under `primitives` in `atscript.config.*`. Identified by dotted name (`string.slug`, `number.int.port`). Declares base type + annotations.

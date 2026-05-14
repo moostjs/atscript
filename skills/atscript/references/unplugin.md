@@ -96,6 +96,26 @@ HMR respects `@atscript/core`'s `AtscriptRepo` dependency graph — editing a ty
 - `dev` — unplugin handles runtime JS on demand; VSCode extension handles `.d.ts`.
 - `build` — `asc -f dts` first (materializes types + `atscript.d.ts`), then bundler.
 
+## Bundling for production
+
+`@atscript/typescript` ships two entries:
+
+- main: `tsPlugin()` factory — build-time only.
+- `/utils`: runtime helpers (`Validator`, `ValidatorError`, `isAnnotatedType`, `forAnnotatedType`, `defineAnnotatedType`, …).
+
+When bundling your app (Rolldown, Rollup, esbuild, Rspack, …) and externalizing `@atscript/typescript` to keep build-time code out of the bundle, you **must also** externalize `@atscript/typescript/utils`. Otherwise the runtime helpers get inlined while downstream consumers (`@atscript/moost-validator`, plugins, your own code) import them from `node_modules` — two copies of `ValidatorError`, `instanceof` returns `false`, error interceptors silently fail, validation errors escape as 500s.
+
+Recommended: regex-externalize the whole namespace so every subpath comes along.
+
+```ts
+// rolldown.config.ts (same shape for rollup, esbuild, rspack)
+export default defineConfig({
+  external: [/^@atscript\//],
+})
+```
+
+The same applies if you subpath-import from any other `@atscript/*` package (`@atscript/core`, `@atscript/db`, etc.).
+
 ## Troubleshooting
 
 - **"Cannot find atscript.config"** — ensure the config lives at/above `process.cwd()`.

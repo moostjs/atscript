@@ -63,6 +63,15 @@ Outputs next to `user.as`:
 
 Typical: `asc -f dts` in `postinstall`; let `unplugin-atscript` produce `.js` inside the bundler. Run `-f js` only when runtime metadata is needed outside a bundler.
 
+### When `.as.d.ts` regenerates
+
+After every `.as` edit, the companion `.as.d.ts` must be regenerated for TS to see the change. This happens automatically in:
+
+- the [VSCode extension](vscode.md) on save,
+- [`unplugin-atscript`](unplugin.md) at bundle / dev-server time (runtime `.js` only — `.d.ts` is **not** produced by the unplugin, see [unplugin.md](unplugin.md)).
+
+Run `npx asc -f dts` manually when you edit `.as` outside those environments — e.g. running `tsc` standalone, troubleshooting stale type errors on imports of new types, or in CI before type-check. A `"postinstall": "asc -f dts"` script keeps fresh clones / CI runs honest.
+
 ## 5. Consume
 
 ```ts

@@ -143,6 +143,29 @@ export class UsersController {
 
 If a param or query needs numeric validation, parse it before it reaches this pipe or validate it as a string-shaped contract instead.
 
+## Optional Params
+
+Parameters marked with Moost's `@Optional()` decorator are skipped by the pipe when their value is `undefined` or `null`. This matters for slots that are genuinely missing at the framework level — optional query strings, optional CLI flags — where the underlying Atscript type itself is not nullable.
+
+```typescript
+import { Controller, Optional } from 'moost'
+import { Get, Query } from '@moostjs/event-http'
+import { WikiName } from './types.as'
+
+@Controller('search')
+export class SearchController {
+  @Get()
+  async search(@Query('wiki') @Optional() wiki?: WikiName) {
+    // `wiki` is undefined when the query string is absent — no validation runs.
+    // When present, `WikiName` constraints (minLength, pattern, ...) are enforced.
+  }
+}
+```
+
+The pipe still validates the value whenever one **is** provided, so `?wiki=` (empty) or `?wiki=bad name` will fail with `ValidatorError` as usual.
+
+For request bodies, this is rarely needed — bodies are usually required at the framework level, and individual properties can be marked optional inside the Atscript interface itself.
+
 ## Use Reusable Validated Primitive Types
 
 This is one of the nicest patterns in Atscript + Moost.
