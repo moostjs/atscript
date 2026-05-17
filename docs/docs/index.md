@@ -16,4 +16,7 @@ actions:
   - theme: alt
     text: Explore UI
     link: https://ui.atscript.dev/
+  - theme: alt
+    text: Explore Auth + RBAC
+    link: https://aooth.moost.org
 ---
