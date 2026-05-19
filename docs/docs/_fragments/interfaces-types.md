@@ -120,7 +120,7 @@ Rules:
 - Own properties are added to the inherited ones
 - Prop-level annotations are inherited from parents
 - Interface-level annotations are not inherited
-- Overriding a parent property in a child is not allowed
+- Overriding a parent property in a child is not allowed — to **add** annotations to an inherited property without redeclaring it, use a mutating [`annotate`](/packages/typescript/ad-hoc-annotations) block on the parent
 - Self-extends and circular extends are detected as errors
 
 ### Intersection Types
