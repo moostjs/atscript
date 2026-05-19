@@ -46,7 +46,7 @@ export interface Post extends Base, Audited {
 
 - Multiple parents (comma-separated). Own props add to inherited.
 - Prop-level annotations inherit; interface-level annotations don't.
-- No overrides — redeclaring a parent prop is a diagnostic. Self/circular extends detected.
+- No overrides — redeclaring a parent prop is a diagnostic. Self/circular extends detected. To **add** annotations to an inherited prop without redeclaring it, use a mutating [`annotate`](#annotate) block (see below).
 - For inline composition use `&` intersection instead.
 
 ## `type`
@@ -129,6 +129,53 @@ export type MaybeUser = User | null
 
 - Imports are local; re-export explicitly via `export type A = B`.
 - Circular imports OK unless they produce infinite expansion (parser reports diagnostic).
+
+## `annotate`
+
+Patch annotations onto an existing type **without redeclaring its props**. Two forms — mutating (modifies target in place) and non-mutating (creates a new aliased export with merged annotations, target untouched).
+
+```atscript
+// Mutating — patches MyInterface in place. Use to add annotations to inherited
+// or imported props you can't redeclare under `extends`.
+@meta.description 'Mutated Interface'
+annotate MyInterface {
+  @label 'Mutated Name'
+  @mul 42
+  name                // each entry: `<annotations>` then the property path
+  @label 'Mutated Age'
+  age
+  @label 'Mutated City'
+  address.city        // dotted paths reach into nested objects
+}
+
+// Non-mutating — leaves MyInterface alone, exports a new merged view.
+@meta.description 'Annotated'
+export annotate MyInterface as AnnotatedInterface {
+  @label 'Custom Name'
+  name
+}
+```
+
+- Top-level annotations on the `annotate` block apply to the type itself; entries inside the block apply to the named property path.
+- Works on `interface`, `type` aliases, and unions. Body may be empty (`annotate T {}`) when you only want to add type-level annotations.
+- Works across files — `import { T } from './m'` then `annotate T { … }` patches the imported type for the consuming module's compilation unit.
+- Multi-value annotations merge per their declared strategy (replace vs append) — re-emit them to add additional values.
+- This is the canonical way to attach plugin annotations (`@arbac.userId`, `@db.index.unique`, `@ui.form.*`, etc.) to fields inherited from a shipped base type — `extends` can't redeclare, but `annotate` can patch.
+
+```atscript
+// Concrete pattern: tag an inherited username field as the arbac user id.
+import { AoothUserCredentials } from '@aooth/user/atscript'
+
+annotate AoothUserCredentials {
+  @meta.id
+  @arbac.userId
+  username
+}
+
+export interface AppUser extends AoothUserCredentials {
+  firstName?: string
+}
+```
 
 ## Not supported
 

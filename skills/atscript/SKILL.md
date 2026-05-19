@@ -107,7 +107,7 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Domain            | File                                                      | When                                                                                        |
 | ----------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | First contact     | [getting-started.md](references/getting-started.md)       | Install, first `.as`, first codegen run, consume snippet, troubleshooting                   |
-| `.as` syntax      | [as-syntax.md](references/as-syntax.md)                   | interface/type, unions, intersections, tuples, arrays, imports, pattern properties          |
+| `.as` syntax      | [as-syntax.md](references/as-syntax.md)                   | interface/type, unions, intersections, tuples, arrays, imports, pattern properties, `annotate` blocks |
 | Annotations       | [annotations.md](references/annotations.md)               | `@meta.*`, `@expect.*`, merge, custom `AnnotationSpec`                                      |
 | Primitives        | [primitives.md](references/primitives.md)                 | Built-ins, semantic extensions, decimal, phantom, extending via config                      |
 | Config            | [config.md](references/config.md)                         | `atscript.config.*`, `defineConfig`, entries/globs, plugin wiring, output                   |
