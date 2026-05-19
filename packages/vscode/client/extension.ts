@@ -128,12 +128,14 @@ export function activate(context: ExtensionContext) {
     )
     client.start()
 
-    workspace.findFiles('**/*.as').then(files => {
-      client!.sendNotification(
-        'workspace/files',
-        files.map(file => file.toString())
-      )
-    })
+    workspace
+      .findFiles('**/*.as', '**/{node_modules,dist,build,out,cdk.out,.cdk.staging,coverage,.next,.nuxt,.turbo,.cache}/**')
+      .then(files => {
+        client!.sendNotification(
+          'workspace/files',
+          files.map(file => file.toString())
+        )
+      })
 
     context.subscriptions.push(client)
   }

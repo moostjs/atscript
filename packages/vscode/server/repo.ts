@@ -56,6 +56,9 @@ import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } fr
 
 const CHECKS_DELAY = 100
 
+const IGNORED_DIR_RE =
+  /\/(?:node_modules|dist|build|out|cdk\.out|\.cdk\.staging|coverage|\.next|\.nuxt|\.turbo|\.cache)\//u
+
 export class VscodeAtscriptRepo extends AtscriptRepo {
   private readonly changeQueue = [] as string[]
 
@@ -76,7 +79,6 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     private readonly documents: TextDocuments<TextDocument>
   ) {
     super()
-    this.configFormat = 'cjs'
     this.documents.onDidChangeContent(change => {
       this.addToChangeQueue(change.document.uri)
     })
@@ -105,7 +107,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
     connection.onNotification('workspace/files', async (fileUris: string[]) => {
       fileUris
-        .filter(uri => uri.search('node_modules') < 0)
+        .filter(uri => !IGNORED_DIR_RE.test(uri))
         .forEach(uri => {
           this.addToRevalidateQueue(uri)
         })

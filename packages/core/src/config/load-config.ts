@@ -17,6 +17,10 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
   const bundle = await rolldown({
     input: configFile,
     platform: 'node',
+    // Don't auto-discover the user's tsconfig — atscript config files are simple TS modules
+    // and the user's tsconfig may be broken (missing extends target, etc.), which would
+    // otherwise abort the bundle and prevent the config from loading.
+    tsconfig: false,
     resolve: {
       mainFields: ['main'],
     },
