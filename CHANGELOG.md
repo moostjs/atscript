@@ -1,3 +1,13 @@
+## [0.1.57](https://github.com/moostjs/atscript/compare/v0.1.56...v0.1.57) (2026-05-20)
+
+
+### Bug Fixes
+
+* fix atscript vscode extension ([e4e5638](https://github.com/moostjs/atscript/commit/e4e5638251e5b758f7334b4d4cd1df1ae7e55734))
+* **vscode:** decode file:// URIs before fs access and surface inherited props in completions ([dcd2324](https://github.com/moostjs/atscript/commit/dcd232421bb11bd26c9cc8f088ade5bc12a8ef8c))
+
+
+
 ## [0.1.56](https://github.com/moostjs/atscript/compare/v0.1.55...v0.1.56) (2026-05-15)
 
 
