@@ -4,7 +4,7 @@ export * from './document'
 export * from './parser/nodes'
 export * from './parser/token'
 export type { TMessages } from './parser/types'
-export { getRelPath, resolveAtscriptFromPath } from './parser/utils'
+export { fileUriToPath, getRelPath, resolveAtscriptFromPath } from './parser/utils'
 export {
   isBareSpecifier,
   isBareId,

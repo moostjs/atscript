@@ -9,6 +9,7 @@ import type { TAnnotationsTree, TAtscriptConfig } from '../config'
 import { getDefaultAtscriptConfig } from '../default-atscript-config'
 import type { AtscriptDoc, TAtscriptDocConfig } from '../document'
 import { SemanticPrimitiveNode } from '../parser/nodes'
+import { fileUriToPath } from '../parser/utils'
 import type { AtscriptRepo } from '../repo'
 import type { TAtscriptRenderFormat, TPluginOutput } from './types'
 
@@ -77,7 +78,7 @@ export class PluginManager {
   }
 
   async load(id: string) {
-    const filePath = id.startsWith('file://') ? id.slice(7) : id
+    const filePath = fileUriToPath(id)
     for (const plugin of this.plugins) {
       if (plugin.load) {
         const content = await plugin.load(id)
@@ -98,7 +99,7 @@ export class PluginManager {
   }
 
   async render(doc: AtscriptDoc, format: TAtscriptRenderFormat) {
-    const source = doc.id.startsWith('file://') ? doc.id.slice(7) : doc.id
+    const source = fileUriToPath(doc.id)
     const files: TOutputWithSource[] = []
     for (const plugin of this.plugins) {
       if (plugin.render) {

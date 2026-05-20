@@ -10,7 +10,7 @@
 import fs from 'fs'
 import path from 'path'
 
-import { getRelPath } from '@atscript/core'
+import { fileUriToPath, getRelPath } from '@atscript/core'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function debounce<A>(fn: (a: A) => any, delay: number) {
@@ -62,10 +62,7 @@ export async function getItnFileCompletions(
   uri: string,
   word: string
 ): Promise<Array<{ path: string; isDirectory: boolean }>> {
-  // Convert "file:///..." => absolute path
-  const docPath = decodeURIComponent(uri.slice(7))
-
-  // For historical consistency, replicate original logic:
+  const docPath = fileUriToPath(uri)
   const targetPath = path.join(path.dirname(docPath), `${word || './'}.as`)
   const dir = path.dirname(targetPath)
 

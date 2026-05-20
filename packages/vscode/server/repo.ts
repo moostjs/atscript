@@ -13,6 +13,7 @@ import {
   AtscriptDoc,
   AtscriptRepo,
   BuildRepo,
+  fileUriToPath,
   getRelPath,
   isAnnotate,
   isAnnotationSpec,
@@ -379,6 +380,27 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (block?.blockType === 'structure' && before && [':', '|', '&'].includes(before)) {
         return this.getDeclarationsCompletions(atscript, text)
       }
+
+      // Atscript forbids overriding inherited fields in `extends`, so the
+      // child's own props are filtered out of the suggestion list.
+      if (block?.blockType === 'structure' && before !== '.') {
+        const owner = block.parentNode?.ownerNode
+        if (owner && isInterface(owner) && owner.hasExtends) {
+          const lineStartOffset = document.offsetAt({ line: position.line, character: 0 })
+          const lineText = text.slice(lineStartOffset, offset)
+          if (/^\s*\w*$/u.test(lineText)) {
+            const merged = atscript.resolveInterfaceExtends(owner)
+            const allProps =
+              merged && (isInterface(merged) || isStructure(merged))
+                ? Array.from(merged.props.values())
+                : []
+            const inherited = allProps.filter(p => p.id && !owner.props.has(p.id))
+            if (inherited.length > 0) {
+              return this.propsToCompletionItems(inherited)
+            }
+          }
+        }
+      }
       if (block?.blockType === undefined && before && ['=', '|', '&'].includes(before)) {
         return this.getDeclarationsCompletions(atscript, text)
       }
@@ -612,7 +634,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   }
 
   async onConfigChanged(_configFile: string) {
-    const configFile = _configFile.startsWith('file://') ? _configFile.slice(7) : _configFile
+    const configFile = fileUriToPath(_configFile)
     console.log(`Reloading config: ${configFile}`)
     this.configFiles.delete(configFile)
     for (const [id, cache] of Array.from(this.configs.entries())) {
@@ -1105,7 +1127,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
     let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
     if (isInterface(targetDef)) {
-      targetDef = targetDef.getDefinition() || targetDef
+      const withExtends = unwound.doc.resolveInterfaceExtends(targetDef)
+      targetDef = withExtends || targetDef.getDefinition() || targetDef
     }
     if (!isStructure(targetDef) && !isInterface(targetDef)) {
       return undefined

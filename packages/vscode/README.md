@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/as-logo.png" alt="Atscript" width="120" />
-</p>
-
 <h1 align="center">Atscript VS Code Extension</h1>
 
 <p align="center">

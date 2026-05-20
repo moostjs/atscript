@@ -12,7 +12,19 @@ export function resolveAtscriptFromPath(from: string, id: string) {
   if (isBareSpecifier(from)) {
     return `bare:${from}.as`
   }
-  return `file://${path.join(id.slice(7).split('/').slice(0, -1).join('/'), from)}.as`
+  return `file://${path.join(fileUriToPath(id).split('/').slice(0, -1).join('/'), from)}.as`
+}
+
+// LSP clients (VSCode) percent-encode `@`/`+` etc. in URIs, but on-disk paths
+// are unencoded — decode before any fs access. Non-`file://` ids pass through.
+export function fileUriToPath(id: string): string {
+  if (!id.startsWith('file://')) return id
+  const raw = id.slice(7)
+  try {
+    return decodeURIComponent(raw)
+  } catch {
+    return raw
+  }
 }
 
 export function getRelPath(fromUri: string, toUri: string): string {

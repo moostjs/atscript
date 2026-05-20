@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import type { OutputChunk } from 'rolldown'
 import { rolldown } from 'rolldown'
 
+import { fileUriToPath } from '../parser/utils'
 import type { TAtscriptConfig } from './types'
 
 async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
@@ -103,8 +104,7 @@ export async function resolveConfigFile(
 }
 
 async function findConfigFileName(d: string): Promise<string | undefined> {
-  const p = d.startsWith('file://') ? d.slice(7) : d
-  const filesInWorkingDirectory = new Set(await readdir(decodeURIComponent(p)))
+  const filesInWorkingDirectory = new Set(await readdir(fileUriToPath(d)))
   for (const extension of SUPPORTED_CONFIG_FORMATS) {
     const fileName = `${DEFAULT_CONFIG_BASE}${extension}`
     if (filesInWorkingDirectory.has(fileName)) {

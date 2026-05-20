@@ -9,7 +9,7 @@ import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AtscriptDoc } from './document'
 import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
-import { resolveAtscriptFromPath } from './parser/utils'
+import { fileUriToPath, resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { isBareId, resolveBareSpecifier } from './resolve-bare'
 
@@ -291,7 +291,7 @@ export class AtscriptRepo {
 
     // Resolve bare specifier placeholders (bare:xxx.as) to actual file:// URIs
     if (isBareId(forId)) {
-      const fromDir = atscript.id.slice(7).split('/').slice(0, -1).join('/')
+      const fromDir = fileUriToPath(atscript.id).split('/').slice(0, -1).join('/')
       const resolved = await resolveBareSpecifier(from.text, fromDir)
       if (!resolved) {
         atscript.registerMessages([

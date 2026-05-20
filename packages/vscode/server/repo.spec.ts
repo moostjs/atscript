@@ -250,6 +250,26 @@ describe('helper methods', () => {
     expect(repo.resolveAnnotateTarget(doc, 'NonExistent')).toBeUndefined()
   })
 
+  it('resolveAnnotateTarget includes inherited props from extends chain', () => {
+    const source = [
+      'interface Credentials {',
+      '  username: string',
+      '  password: string',
+      '}',
+      'interface ArbacCredentials extends Credentials {',
+      '  roles: string[]',
+      '}',
+    ].join('\n')
+    const doc = createDoc('file:///test.as', source)
+    const { repo } = singleDocRepo('file:///test.as', '')
+    const target = repo.resolveAnnotateTarget(doc, 'ArbacCredentials')
+    expect(target).toBeDefined()
+    const propNames = Array.from(target!.props.keys())
+    expect(propNames).toContain('roles')
+    expect(propNames).toContain('username')
+    expect(propNames).toContain('password')
+  })
+
   it('resolveAnnotateTarget follows type alias to interface', () => {
     const doc = createDoc(
       'file:///test.as',
@@ -674,6 +694,58 @@ describe('completions', () => {
     const labels = result.map((i: any) => i.label)
     expect(labels).toContain('name')
     expect(labels).toContain('age')
+  })
+
+  it('suggests inherited props in annotate block of an extending interface', async () => {
+    const uri = 'file:///test.as'
+    const source = [
+      'interface Credentials {',
+      '  username: string',
+      '  password: string',
+      '}',
+      'interface ArbacCredentials extends Credentials {',
+      '  roles: string[]',
+      '}',
+      'annotate ArbacCredentials {',
+      '  ',
+      '}',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, source)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 8, character: 2 },
+    })
+    expect(result).toBeDefined()
+    const labels = result.map((i: any) => i.label)
+    expect(labels).toContain('roles')
+    expect(labels).toContain('username')
+    expect(labels).toContain('password')
+  })
+
+  it('suggests inherited prop names inside the body of an extending interface', async () => {
+    const uri = 'file:///test.as'
+    const source = [
+      'interface Credentials {',
+      '  username: string',
+      '  password: string',
+      '}',
+      'interface ArbacCredentials extends Credentials {',
+      '  roles: string[]',
+      '}',
+      'interface AppUser extends ArbacCredentials {',
+      '  ',
+      '}',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, source)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 8, character: 2 },
+    })
+    expect(result).toBeDefined()
+    const labels = result.map((i: any) => i.label)
+    expect(labels).toContain('roles')
+    expect(labels).toContain('username')
+    expect(labels).toContain('password')
   })
 
   it('suggests nested props in annotate block chain', async () => {
