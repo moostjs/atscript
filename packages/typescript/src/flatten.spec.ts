@@ -247,6 +247,74 @@ describe('flattenAnnotatedType optional preservation', () => {
   })
 })
 
+describe('flattenAnnotatedType cycle guard (path-local ancestors)', () => {
+  // Repro of BUG.md: two sibling refs to the same target type should each expand.
+  // Previously a shared `visitedIds` set caused the second sibling to be truncated
+  // to a leaf, dropping all of its descendants from the flat map.
+  function buildSiblingRefs() {
+    const Target = $('object')
+      .id('Target')
+      .prop('id', $().designType('number').tags('number').$type)
+      .prop('name', $().designType('string').tags('string').$type).$type
+
+    const Middle = $('object')
+      .id('Middle')
+      .prop('id', $().designType('number').tags('number').$type)
+      .prop('label', $().designType('string').tags('string').$type)
+      .prop('target', $().refTo(Target).$type).$type
+
+    return $('object')
+      .id('Source')
+      // Visited first — recurses into Middle, then into Middle.target (Target).
+      .prop('middle', $().refTo(Middle).$type)
+      // Visited second — must NOT be truncated just because Target was already
+      // reached via the middle.target path.
+      .prop('target', $().refTo(Target).$type)
+      .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+  }
+
+  it('expands sibling refs to the same target type on both paths', () => {
+    const flatMap = flattenAnnotatedType(buildSiblingRefs())
+
+    expect(flatMap.has('middle')).toBe(true)
+    expect(flatMap.has('middle.target')).toBe(true)
+    expect(flatMap.has('middle.target.id')).toBe(true)
+    expect(flatMap.has('middle.target.name')).toBe(true)
+
+    // The bug: this path was dropped because Target.id was already in the
+    // module-level visitedIds set after the middle.target walk.
+    expect(flatMap.has('target')).toBe(true)
+    expect(flatMap.has('target.id')).toBe(true)
+    expect(flatMap.has('target.name')).toBe(true)
+  })
+
+  it('still breaks true self-referential cycles', () => {
+    // User -> friend -> User -> friend ... must terminate.
+    // Path-local ancestors break the cycle at the first re-encounter, matching
+    // the prior (global visitedIds) behavior for the self-ref case.
+    const User = $('object')
+      .id('User')
+      .prop('name', $().designType('string').tags('string').$type).$type
+    ;(User.type as TAtscriptTypeObject).props.set(
+      'friend',
+      $().refTo(() => User).$type
+    )
+
+    const flatMap = flattenAnnotatedType(
+      $('object').id('Root').prop('user', $().refTo(User).$type)
+        .$type as TAtscriptAnnotatedType<TAtscriptTypeObject>
+    )
+
+    expect(flatMap.has('user')).toBe(true)
+    expect(flatMap.has('user.name')).toBe(true)
+    // friend is the re-encounter of User in the ancestry chain → emitted as a
+    // leaf, descendants NOT walked. No infinite recursion.
+    expect(flatMap.has('user.friend')).toBe(true)
+    expect(flatMap.has('user.friend.name')).toBe(false)
+    expect(flatMap.has('user.friend.friend')).toBe(false)
+  })
+})
+
 describe('refTo metadata propagation', () => {
   it('should share type structure through refTo for array elements', () => {
     // refTo no longer copies metadata at runtime — metadata is emitted at build time

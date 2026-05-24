@@ -55,13 +55,26 @@ export interface TFlattenOptions {
  * @param options - Optional hooks for domain-specific processing.
  * @returns A map of dot-separated field paths to their annotated types.
  */
+const EMPTY_ANCESTORS: ReadonlySet<string> = new Set<string>()
+
+function extendAncestors(
+  ancestors: ReadonlySet<string>,
+  id: string | undefined
+): ReadonlySet<string> {
+  if (!id || ancestors.has(id)) {
+    return ancestors
+  }
+  const next = new Set(ancestors)
+  next.add(id)
+  return next
+}
+
 export function flattenAnnotatedType(
   type: TAtscriptAnnotatedType<TAtscriptTypeObject>,
   options?: TFlattenOptions
 ): Map<string, TAtscriptAnnotatedType> {
   const flatMap = new Map<string, TAtscriptAnnotatedType>()
   const skipPhantom = !!options?.excludePhantomTypes
-  const visitedIds = new Set<string>()
 
   function addFieldToFlatMap(name: string, def: TAtscriptAnnotatedType) {
     const existing = flatMap.get(name) as
@@ -85,30 +98,34 @@ export function flattenAnnotatedType(
     }
   }
 
-  function flattenArray(def: TAtscriptAnnotatedType, name: string) {
-    // Cycle detection for lazy refs resolved inside arrays
+  function flattenArray(
+    def: TAtscriptAnnotatedType,
+    name: string,
+    ancestors: ReadonlySet<string>
+  ) {
+    // Cycle detection for lazy refs resolved inside arrays: only treat as a
+    // cycle if the id is already in the current ancestry chain. Siblings
+    // referencing the same type are distinct paths and must each expand.
     const resolvedId = def.id
-    if (resolvedId) {
-      if (visitedIds.has(resolvedId)) {
-        return
-      }
-      visitedIds.add(resolvedId)
+    if (resolvedId && ancestors.has(resolvedId)) {
+      return
     }
+    let childAncestors = extendAncestors(ancestors, resolvedId)
     switch (def.type.kind) {
       case 'object': {
         // Re-check id after lazy resolution (type getter may have set it)
         if (!resolvedId && def.id) {
-          if (visitedIds.has(def.id)) {
+          if (ancestors.has(def.id)) {
             return
           }
-          visitedIds.add(def.id)
+          childAncestors = extendAncestors(ancestors, def.id)
         }
         const items = Array.from(def.type.props.entries())
         for (const [key, value] of items) {
           if (skipPhantom && isPhantomType(value)) {
             continue
           }
-          flattenType(value, name ? `${name}.${key}` : key, true)
+          flattenType(value, name ? `${name}.${key}` : key, true, childAncestors)
         }
         break
       }
@@ -116,43 +133,52 @@ export function flattenAnnotatedType(
       case 'intersection':
       case 'tuple': {
         for (const item of def.type.items) {
-          flattenArray(item, name)
+          flattenArray(item, name, childAncestors)
         }
         break
       }
       case 'array': {
-        flattenArray((def as TAtscriptAnnotatedType<TAtscriptTypeArray>).type.of, name)
+        flattenArray(
+          (def as TAtscriptAnnotatedType<TAtscriptTypeArray>).type.of,
+          name,
+          childAncestors
+        )
         break
       }
       default:
     }
   }
 
-  function flattenType(def: TAtscriptAnnotatedType, prefix = '', inComplexTypeOrArray = false) {
-    // Cycle detection: if this type has an id we've already visited, treat as leaf
+  function flattenType(
+    def: TAtscriptAnnotatedType,
+    prefix = '',
+    inComplexTypeOrArray = false,
+    ancestors: ReadonlySet<string> = EMPTY_ANCESTORS
+  ) {
+    // Cycle detection: only short-circuit if this type's id is in the current
+    // ancestry chain (would infinite-loop). Siblings reaching the same type
+    // are distinct navigation paths and must each expand independently.
     let typeId = def.id
-    if (typeId && visitedIds.has(typeId)) {
+    if (typeId && ancestors.has(typeId)) {
       addFieldToFlatMap(prefix || '', def)
       if (prefix) {
         options?.onField?.(prefix, def, def.metadata)
       }
       return
     }
-    if (typeId) {
-      visitedIds.add(typeId)
-    }
+    let childAncestors = extendAncestors(ancestors, typeId)
     const kind = def.type.kind
     // Re-check id after accessing .type (lazy refs resolve id on first .type access)
     if (!typeId && def.id) {
       typeId = def.id
-      if (visitedIds.has(typeId)) {
+      if (ancestors.has(typeId)) {
         addFieldToFlatMap(prefix || '', def)
         if (prefix) {
           options?.onField?.(prefix, def, def.metadata)
         }
         return
       }
-      visitedIds.add(typeId)
+      childAncestors = extendAncestors(ancestors, typeId)
     }
     switch (kind) {
       case 'object': {
@@ -161,7 +187,12 @@ export function flattenAnnotatedType(
           if (skipPhantom && isPhantomType(value)) {
             continue
           }
-          flattenType(value, prefix ? `${prefix}.${key}` : key, inComplexTypeOrArray)
+          flattenType(
+            value,
+            prefix ? `${prefix}.${key}` : key,
+            inComplexTypeOrArray,
+            childAncestors
+          )
         }
         break
       }
@@ -180,7 +211,7 @@ export function flattenAnnotatedType(
         }
         addFieldToFlatMap(prefix || '', typeArray)
         if (!isAnnotatedTypeOfPrimitive(typeArray.type.of)) {
-          flattenArray(typeArray.type.of, prefix)
+          flattenArray(typeArray.type.of, prefix, childAncestors)
         }
         break
       }
@@ -188,7 +219,7 @@ export function flattenAnnotatedType(
       case 'tuple':
       case 'union': {
         for (const item of def.type.items) {
-          flattenType(item, prefix, true)
+          flattenType(item, prefix, true, childAncestors)
         }
         addFieldToFlatMap(prefix || '', def)
         if (def.optional) {
