@@ -1,3 +1,12 @@
+## [0.1.60](https://github.com/moostjs/atscript/compare/v0.1.59...v0.1.60) (2026-05-24)
+
+
+### Bug Fixes
+
+* **typescript:** use path-local ancestors in flattenAnnotatedType cycle guard so sibling refs to the same target type each expand ([fa12866](https://github.com/moostjs/atscript/commit/fa1286647751356eccf7d9dc8a63de7d062a1af4))
+
+
+
 ## [0.1.59](https://github.com/moostjs/atscript/compare/v0.1.58...v0.1.59) (2026-05-21)
 
 
