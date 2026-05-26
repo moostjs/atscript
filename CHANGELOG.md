@@ -1,3 +1,12 @@
+## [0.1.63](https://github.com/moostjs/atscript/compare/v0.1.62...v0.1.63) (2026-05-26)
+
+
+### Bug Fixes
+
+* **core:** propagate annotate-block annotations to inherited props through extends ([25ef7e4](https://github.com/moostjs/atscript/commit/25ef7e45b1cd39af7db43895fe0951fb4939167b))
+
+
+
 ## [0.1.62](https://github.com/moostjs/atscript/compare/v0.1.61...v0.1.62) (2026-05-26)
 
 
