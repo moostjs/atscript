@@ -501,34 +501,22 @@ export class AtscriptDoc {
       // Fold annotate-block contributions targeting this parent into its struct's props
       // before merging, so inherited fields see annotate-block metadata in the child view.
       const annotateNodes: SemanticAnnotateNode[] = []
-      const seenAnnotates = new Set<SemanticAnnotateNode>()
       const collect = (doc: AtscriptDoc, name: string | undefined) => {
         if (!name) {
           return
         }
         for (const n of doc.getAnnotateNodesFor(name)) {
-          if (n.isMutating && !seenAnnotates.has(n)) {
-            seenAnnotates.add(n)
+          if (n.isMutating) {
             annotateNodes.push(n)
           }
         }
       }
-      // 1) The parent's own document (by the parent's declaration name)
       collect(unwound.doc, parentDeclName)
-      // 2) The current document we're resolving from (by the local extends token text)
       if (this !== unwound.doc) {
         collect(this, extendsToken.text)
       }
-      // 3) The origin document, when threading through chained extends across files.
-      //    Look up by the parent's declaration name AND by the origin's local alias for it.
       if (originDoc !== this && originDoc !== unwound.doc) {
         collect(originDoc, parentDeclName)
-        if (parentDeclName) {
-          const originAlias = originDoc.getLocalAliasForExternal(parentDeclName, unwound.doc)
-          if (originAlias && originAlias !== parentDeclName) {
-            collect(originDoc, originAlias)
-          }
-        }
       }
       if (annotateNodes.length > 0) {
         parentDef = this.applyAnnotateBlocksToStructure(parentDef, annotateNodes)
@@ -550,27 +538,6 @@ export class AtscriptDoc {
     }
 
     return mergedStruct || ownDef
-  }
-
-  /**
-   * Returns the local identifier under which `externalName` (declared in `externalDoc`)
-   * is imported into this document. Walks the import statements and matches by the
-   * declaration owner of each imported token. Returns `undefined` when this document
-   * doesn't import the symbol, or when the import name matches the declaration name.
-   */
-  private getLocalAliasForExternal(
-    externalName: string,
-    externalDoc: AtscriptDoc
-  ): string | undefined {
-    for (const [, entry] of this.imports) {
-      for (const t of entry.imports) {
-        const decl = this.getDeclarationOwnerNode(t.text)
-        if (decl?.doc === externalDoc && decl.token?.text === externalName) {
-          return t.text
-        }
-      }
-    }
-    return undefined
   }
 
   /**
