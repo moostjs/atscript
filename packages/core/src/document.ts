@@ -444,15 +444,18 @@ export class AtscriptDoc {
    * Parents are merged left-to-right, then own props overlay on top (own takes priority).
    * Only merges props and their annotations; interface-level annotations are NOT inherited.
    *
-   * Mutating `annotate <Parent> { @x field }` blocks contribute to the merged view, so
-   * inherited fields carry annotate-block metadata in the child's flat prop view. Two
-   * sources are consulted per parent: the parent's own document (using the parent's
-   * declaration name) and the child's document (using the local extends token, which may
-   * differ from the canonical name due to import aliasing).
+   * Mutating `annotate <Ancestor> { @x field }` blocks contribute to the merged view, so
+   * inherited fields carry annotate-block metadata in the child's flat prop view. At each
+   * level of the chain we consult: (1) the immediate parent's own document and (2) the
+   * `_originDoc` — the document that started the resolution (typically the leaf child).
+   * Threading `_originDoc` is what lets `annotate <Grandparent> { ... }` blocks living in
+   * the child's file apply to grandparent-inherited fields, even when the chain crosses
+   * package boundaries (child → mid → grandparent, all in different .as files).
    */
   resolveInterfaceExtends(
     node: SemanticInterfaceNode,
-    _visited?: Set<string>
+    _visited?: Set<string>,
+    _originDoc?: AtscriptDoc
   ): SemanticNode | undefined {
     if (!node.hasExtends) {
       return undefined
@@ -465,6 +468,8 @@ export class AtscriptDoc {
     if (node.id) {
       visited.add(node.id)
     }
+
+    const originDoc = _originDoc ?? this
 
     let mergedStruct: SemanticNode | undefined
 
@@ -483,7 +488,8 @@ export class AtscriptDoc {
       if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
         const resolved = unwound.doc.resolveInterfaceExtends(
           parentDef as SemanticInterfaceNode,
-          visited
+          visited,
+          originDoc
         )
         parentDef = resolved || parentDef.getDefinition() || parentDef
       } else if (isInterface(parentDef)) {
@@ -495,17 +501,32 @@ export class AtscriptDoc {
       // Fold annotate-block contributions targeting this parent into its struct's props
       // before merging, so inherited fields see annotate-block metadata in the child view.
       const annotateNodes: SemanticAnnotateNode[] = []
-      if (parentDeclName) {
-        for (const n of unwound.doc.getAnnotateNodesFor(parentDeclName)) {
-          if (n.isMutating) {
+      const seenAnnotates = new Set<SemanticAnnotateNode>()
+      const collect = (doc: AtscriptDoc, name: string | undefined) => {
+        if (!name) {
+          return
+        }
+        for (const n of doc.getAnnotateNodesFor(name)) {
+          if (n.isMutating && !seenAnnotates.has(n)) {
+            seenAnnotates.add(n)
             annotateNodes.push(n)
           }
         }
       }
+      // 1) The parent's own document (by the parent's declaration name)
+      collect(unwound.doc, parentDeclName)
+      // 2) The current document we're resolving from (by the local extends token text)
       if (this !== unwound.doc) {
-        for (const n of this.getAnnotateNodesFor(extendsToken.text)) {
-          if (n.isMutating) {
-            annotateNodes.push(n)
+        collect(this, extendsToken.text)
+      }
+      // 3) The origin document, when threading through chained extends across files.
+      //    Look up by the parent's declaration name AND by the origin's local alias for it.
+      if (originDoc !== this && originDoc !== unwound.doc) {
+        collect(originDoc, parentDeclName)
+        if (parentDeclName) {
+          const originAlias = originDoc.getLocalAliasForExternal(parentDeclName, unwound.doc)
+          if (originAlias && originAlias !== parentDeclName) {
+            collect(originDoc, originAlias)
           }
         }
       }
@@ -529,6 +550,27 @@ export class AtscriptDoc {
     }
 
     return mergedStruct || ownDef
+  }
+
+  /**
+   * Returns the local identifier under which `externalName` (declared in `externalDoc`)
+   * is imported into this document. Walks the import statements and matches by the
+   * declaration owner of each imported token. Returns `undefined` when this document
+   * doesn't import the symbol, or when the import name matches the declaration name.
+   */
+  private getLocalAliasForExternal(
+    externalName: string,
+    externalDoc: AtscriptDoc
+  ): string | undefined {
+    for (const [, entry] of this.imports) {
+      for (const t of entry.imports) {
+        const decl = this.getDeclarationOwnerNode(t.text)
+        if (decl?.doc === externalDoc && decl.token?.text === externalName) {
+          return t.text
+        }
+      }
+    }
+    return undefined
   }
 
   /**
