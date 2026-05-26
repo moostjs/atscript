@@ -443,6 +443,12 @@ export class AtscriptDoc {
    * Resolves an interface with `extends` by merging parent structures with own props.
    * Parents are merged left-to-right, then own props overlay on top (own takes priority).
    * Only merges props and their annotations; interface-level annotations are NOT inherited.
+   *
+   * Mutating `annotate <Parent> { @x field }` blocks contribute to the merged view, so
+   * inherited fields carry annotate-block metadata in the child's flat prop view. Two
+   * sources are consulted per parent: the parent's own document (using the parent's
+   * declaration name) and the child's document (using the local extends token, which may
+   * differ from the canonical name due to import aliasing).
    */
   resolveInterfaceExtends(
     node: SemanticInterfaceNode,
@@ -469,6 +475,10 @@ export class AtscriptDoc {
       }
 
       let parentDef = unwound.def
+      // Capture the parent's declaration name from its own doc before any mutation
+      // of `parentDef`. For a plain interface ref this is `parentDef.id`; for a type
+      // alias chain `unwindType` already set `unwound.node` to the alias node.
+      const parentDeclName = unwound.node?.id ?? parentDef.id
       // If parent is also an interface with extends, resolve recursively
       if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
         const resolved = unwound.doc.resolveInterfaceExtends(
@@ -481,6 +491,27 @@ export class AtscriptDoc {
       }
 
       parentDef = this.mergeIntersection(parentDef)
+
+      // Fold annotate-block contributions targeting this parent into its struct's props
+      // before merging, so inherited fields see annotate-block metadata in the child view.
+      const annotateNodes: SemanticAnnotateNode[] = []
+      if (parentDeclName) {
+        for (const n of unwound.doc.getAnnotateNodesFor(parentDeclName)) {
+          if (n.isMutating) {
+            annotateNodes.push(n)
+          }
+        }
+      }
+      if (this !== unwound.doc) {
+        for (const n of this.getAnnotateNodesFor(extendsToken.text)) {
+          if (n.isMutating) {
+            annotateNodes.push(n)
+          }
+        }
+      }
+      if (annotateNodes.length > 0) {
+        parentDef = this.applyAnnotateBlocksToStructure(parentDef, annotateNodes)
+      }
 
       if (!mergedStruct) {
         mergedStruct = parentDef
@@ -498,6 +529,73 @@ export class AtscriptDoc {
     }
 
     return mergedStruct || ownDef
+  }
+
+  /**
+   * Returns a structure equivalent to `struct` with annotate-block contributions
+   * folded into matching props' annotation arrays. Skips chained entries
+   * (e.g. `annotate Parent { user.address.city }`) — only root-level entries apply.
+   * Original prop nodes are reused by reference when no extra annotations apply.
+   */
+  private applyAnnotateBlocksToStructure(
+    struct: SemanticNode,
+    annotateNodes: SemanticAnnotateNode[]
+  ): SemanticNode {
+    if (!isStructure(struct)) {
+      return struct
+    }
+    const annotationsByProp = new Map<string, TAnnotationTokens[]>()
+    for (const annotateNode of annotateNodes) {
+      for (const entry of annotateNode.entries) {
+        if (entry.hasChain) {
+          continue
+        }
+        const propName = entry.id
+        const anns = entry.annotations
+        if (!propName || !anns || anns.length === 0) {
+          continue
+        }
+        const existing = annotationsByProp.get(propName)
+        annotationsByProp.set(propName, existing ? [...existing, ...anns] : [...anns])
+      }
+    }
+    if (annotationsByProp.size === 0) {
+      return struct
+    }
+
+    const structNode = struct as SemanticStructureNode
+    const newProps: SemanticPropNode[] = []
+    let changed = false
+    for (const [name, prop] of structNode.props) {
+      const extras = annotationsByProp.get(name)
+      if (!extras) {
+        newProps.push(prop)
+        continue
+      }
+      const cloned = new SemanticPropNode()
+      const idToken = prop.token('identifier')
+      if (idToken) {
+        cloned.saveToken(idToken, 'identifier')
+      }
+      const propDef = prop.getDefinition()
+      if (propDef) {
+        cloned.define(propDef)
+      }
+      cloned.annotations = this.mergeNodesAnnotations(prop.annotations, extras)
+      const optionalToken = prop.token('optional')
+      if (optionalToken) {
+        cloned.saveToken(optionalToken, 'optional')
+      }
+      newProps.push(cloned)
+      changed = true
+    }
+    if (!changed) {
+      return struct
+    }
+    const newStruct = new SemanticStructureNode()
+    newStruct.setProps(newProps)
+    newStruct.annotations = structNode.annotations
+    return newStruct
   }
 
   usageListFor(

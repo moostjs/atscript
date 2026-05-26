@@ -1162,6 +1162,31 @@ describe('ts-plugin', () => {
     )
   })
 
+  it('must bake annotate-block contributions into inherited props of an extending child', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/annotate-extends-child.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const js = out[0].content
+    // The annotate-block targets the imported parent, but the child must carry the
+    // annotation on its own inherited `username` prop — otherwise consumers reading
+    // the child's flat prop view at runtime won't see it.
+    const usernameSection = js.slice(
+      js.indexOf('"username"'),
+      js.indexOf('"extra"')
+    )
+    expect(usernameSection).toContain('"username"')
+    expect(usernameSection).toMatch(/\.annotate\("meta\.id"/)
+    // The annotate block in the same file still emits its mutating $a() call against
+    // the parent type (existing behavior; not removed).
+    expect(js).toMatch(
+      /\$a\(AnnotateExtendsBase\.type\.props\.get\("username"\)\?\.metadata, "meta\.id"/
+    )
+  })
+
   it('must not duplicate the import line when user imports helper from the same path as synth target', async () => {
     const repo = await build({
       rootDir: wd,

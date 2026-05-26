@@ -12,13 +12,15 @@
 
 First-class editor support for Atscript (`.as`) files in Visual Studio Code. Powered by a full LSP implementation backed by `@atscript/core`.
 
-![Preview](https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/demo.png)
+![Preview](https://raw.githubusercontent.com/moostjs/atscript/main/packages/vscode/as-demo.png)
 
 ## Installation
 
 1. Open **VS Code**
 2. Go to **Extensions** (`Ctrl+Shift+X`)
 3. Search for `"Atscript"` and install
+
+> **Note:** `@atscript/core` must be installed either globally (`npm i -g @atscript/core`) or at the root of the project you open in VS Code. If it cannot be found, language features (diagnostics, completions, go-to-definition, etc.) will not work.
 
 ## Features
 
@@ -35,7 +37,9 @@ First-class editor support for Atscript (`.as`) files in Visual Studio Code. Pow
 ## Documentation
 
 - [VSCode Extension Guide](https://atscript.dev/packages/vscode/)
-- [Full Documentation](https://atscript.dev)
+- [Full Atscript Documentation](https://atscript.dev)
+- [Atscript DB](https://db.atscript.dev)
+- [Atscript UI](https://ui.atscript.dev)
 
 ## Feedback
 

@@ -1,11 +1,15 @@
 // eslint-disable no-unsafe-optional-chaining
 /* eslint-disable @typescript-eslint/no-non-null-asserted-optional-chain */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 
 import { parseAtscript } from '..'
+import type { TAtscriptDocConfig } from '../../document'
 import { AtscriptDoc } from '../../document'
+import { PluginManager } from '../../plugin/plugin-manager'
 import type { SemanticInterfaceNode } from '../nodes/interface-node'
+import type { SemanticPropNode } from '../nodes/prop-node'
+import type { SemanticStructureNode } from '../nodes/structure-node'
 
 describe('interfaces', () => {
   it('simple interface', () => {
@@ -370,5 +374,88 @@ interface C extends B { x: boolean }`)
         message: 'Property "x" already exists in parent "B" — override in extends is not allowed',
       })
     )
+  })
+})
+
+describe('annotate-through-extends', () => {
+  let docConfig: TAtscriptDocConfig
+
+  beforeAll(async () => {
+    const pm = new PluginManager({ unknownAnnotation: 'allow' })
+    docConfig = await pm.getDocConfig()
+  })
+
+  function getChildProp(doc: AtscriptDoc, childName: string, propName: string): SemanticPropNode {
+    const node = doc.nodes.find(
+      n => n.entity === 'interface' && n.id === childName
+    ) as SemanticInterfaceNode
+    const resolved = doc.resolveInterfaceExtends(node) as SemanticStructureNode
+    return resolved.props.get(propName)!
+  }
+
+  it('folds annotate-block annotations from same doc into inherited prop', () => {
+    const doc = new AtscriptDoc('test.as', docConfig)
+    doc.update(`
+interface Parent { username: string }
+interface Child extends Parent { other: string }
+annotate Parent {
+  @meta.id
+  username
+}
+`)
+    const prop = getChildProp(doc, 'Child', 'username')
+    const ann = prop.annotations?.find(a => a.name === 'meta.id')
+    expect(ann).toBeDefined()
+  })
+
+  it('annotate-block on parent in same doc applies even when child also extends', () => {
+    const doc = new AtscriptDoc('test.as', docConfig)
+    doc.update(`
+interface Parent {
+  @label 'parent-label'
+  username: string
+}
+interface Child extends Parent {}
+annotate Parent {
+  @label 'annotate-label'
+  username
+}
+`)
+    const prop = getChildProp(doc, 'Child', 'username')
+    const labels = prop.annotations?.filter(a => a.name === 'label') ?? []
+    // Right-side wins: annotate-block label overrides parent's own
+    const lastLabel = labels[labels.length - 1]
+    expect(lastLabel?.args[0]?.text).toBe('annotate-label')
+  })
+
+  it('does not apply non-mutating annotate (with alias)', () => {
+    const doc = new AtscriptDoc('test.as', docConfig)
+    doc.update(`
+interface Parent { username: string }
+interface Child extends Parent {}
+export annotate Parent as ParentTagged {
+  @meta.id
+  username
+}
+`)
+    const prop = getChildProp(doc, 'Child', 'username')
+    const ann = prop.annotations?.find(a => a.name === 'meta.id')
+    expect(ann).toBeUndefined()
+  })
+
+  it('folds annotate-block contributions through chained extends', () => {
+    const doc = new AtscriptDoc('test.as', docConfig)
+    doc.update(`
+interface Grand { username: string }
+interface Mid extends Grand {}
+interface Child extends Mid { other: string }
+annotate Grand {
+  @meta.id
+  username
+}
+`)
+    const prop = getChildProp(doc, 'Child', 'username')
+    const ann = prop.annotations?.find(a => a.name === 'meta.id')
+    expect(ann).toBeDefined()
   })
 })
