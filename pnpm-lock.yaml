@@ -136,11 +136,11 @@ importers:
         version: link:../typescript
     devDependencies:
       '@moostjs/event-http':
-        specifier: ^0.6.16
-        version: 0.6.16(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(moost@0.6.16)(wooks@0.7.14)
+        specifier: ^0.6.17
+        version: 0.6.17(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(moost@0.6.17)(wooks@0.7.15)
       moost:
-        specifier: ^0.6.16
-        version: 0.6.16
+        specifier: ^0.6.17
+        version: 0.6.17
       vitest:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.19.11)(esbuild@0.27.3)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
@@ -151,15 +151,15 @@ importers:
         specifier: workspace:^
         version: link:../core
       '@moostjs/event-cli':
-        specifier: ^0.6.16
-        version: 0.6.16(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(moost@0.6.16)(wooks@0.7.14)
+        specifier: ^0.6.17
+        version: 0.6.17(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(moost@0.6.17)(wooks@0.7.15)
       moost:
-        specifier: ^0.6.16
-        version: 0.6.16
+        specifier: ^0.6.17
+        version: 0.6.17
     devDependencies:
       '@atscript/db':
         specifier: ^0.1.74
-        version: 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.60)(@uniqu/core@0.1.6)
+        version: 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.61)(@uniqu/core@0.1.6)
       '@uniqu/core':
         specifier: ^0.1.6
         version: 0.1.6
@@ -289,11 +289,11 @@ packages:
       '@atscript/typescript': ^0.1.53
       '@uniqu/core': ^0.1.6
 
-  '@atscript/typescript@0.1.60':
-    resolution: {integrity: sha512-Hkk5QGSuLw92VulHM0kdUNHnoIPCniYsxYYcZUTSmtNpz0Z3o4O+9t5AZU38zzGSnG3vehyhOQ9yCaeToqEVlQ==}
+  '@atscript/typescript@0.1.61':
+    resolution: {integrity: sha512-Ne7ItN4Snvwp7URwcKYfxugxqCN2Gpv952ao/NZ4/MFEUwPVFGU4Au8lVDO3otfKiYqOLFQkfvW/HZoXXJgtNQ==}
     hasBin: true
     peerDependencies:
-      '@atscript/core': ^0.1.60
+      '@atscript/core': ^0.1.61
       '@atscript/db': ^0.1.74
     peerDependenciesMeta:
       '@atscript/db':
@@ -941,19 +941,19 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@moostjs/event-cli@0.6.16':
-    resolution: {integrity: sha512-DuoBtZk4f7LndpP2iK4usZV/xBRXQEvumrvQs64qXrSeTdmBmVzqzfz6nOssPjuHZtAUQbyGOQO48TgXZcxOmg==}
+  '@moostjs/event-cli@0.6.17':
+    resolution: {integrity: sha512-czAbE5dAttwylYO9JvFS76gAHq9R8DBAbG+/4inDLXGF/Fx8apAc8IvF/hmZRtsnFLkZw7dnWNjuWw0Vuv4QvQ==}
     peerDependencies:
-      '@wooksjs/event-core': ^0.7.14
-      moost: ^0.6.16
-      wooks: ^0.7.14
+      '@wooksjs/event-core': ^0.7.15
+      moost: ^0.6.17
+      wooks: ^0.7.15
 
-  '@moostjs/event-http@0.6.16':
-    resolution: {integrity: sha512-H+ca1/5jeJoL0EV+ohB2Le5X0MWTopznp4Eo/Lq3nlPQcHx7GJKW2qmPDuI+abRSC40gRoETdcNL7d/+YbZldQ==}
+  '@moostjs/event-http@0.6.17':
+    resolution: {integrity: sha512-QjJ0xKAeEX6mKXdh0R6MxPny0hjRdxDGe6yqtAfl1z7KBWiaHsbtXODmxhfKKMXByoG0ef0d9MlRgDLy0GWksA==}
     peerDependencies:
       '@prostojs/infact': ^0.4.1
-      '@wooksjs/event-core': ^0.7.14
-      moost: ^0.6.16
+      '@wooksjs/event-core': ^0.7.15
+      moost: ^0.6.17
 
   '@napi-rs/wasm-runtime@0.2.12':
     resolution: {integrity: sha512-ZVWUcfwY4E/yPitQJl481FjFo3K22D6qF0DuFH6Y/nbnE11GY5uguDxZMGXPQ8WQ0128MXQD7TnfHyK4oWoIJQ==}
@@ -2079,30 +2079,30 @@ packages:
   '@vueuse/shared@12.5.0':
     resolution: {integrity: sha512-vMpcL1lStUU6O+kdj6YdHDixh0odjPAUM15uJ9f7MY781jcYkIwFA4iv2EfoIPO6vBmvutI1HxxAwmf0cx5ISQ==}
 
-  '@wooksjs/event-cli@0.7.14':
-    resolution: {integrity: sha512-+P+ZNJ8oTsfkepRibXkPqGqIta1jPDAz6g/4AvMS6EFpEWe/jdj6F0LB7N5bQSGugMXIwZoXq11VEbY1SDjrcA==}
+  '@wooksjs/event-cli@0.7.15':
+    resolution: {integrity: sha512-/Iq1GEzDlLYj3/VPKMDuH7/mDNTxgg1f4sUtmM4qRCTC0NTl7LO4e5qzMVYcimWh5tVEfsEw/ZFzOkG2JJgJpw==}
     peerDependencies:
       '@prostojs/logger': ^0.4.3
       '@prostojs/router': ^0.3.4
-      '@wooksjs/event-core': ^0.7.14
-      wooks: ^0.7.14
+      '@wooksjs/event-core': ^0.7.15
+      wooks: ^0.7.15
 
-  '@wooksjs/event-core@0.7.14':
-    resolution: {integrity: sha512-4PMVv7CYANiyA3H/cg+BXwkQNIlbFohW+TN0Ai5/BqeQpf4gY2K+fmoPXp48WqEK3O/qFD23cQyfBt08APgHzg==}
+  '@wooksjs/event-core@0.7.15':
+    resolution: {integrity: sha512-hbXHzjAQak81MachYNaxh/BWgtWW2JPwYhaK2OK5bRXKZns6LHkf93JHlI7QLyAdliG7obOzL/BJVNss8eh28A==}
 
-  '@wooksjs/event-http@0.7.14':
-    resolution: {integrity: sha512-PmyH/ghM0tFQ7zymH97tH+O02Y73BHsDwQQNAw8X6WLOUTkhtYaQPtwjVlOCqdnJjlOUwscgktlup/7Nht+oBw==}
+  '@wooksjs/event-http@0.7.15':
+    resolution: {integrity: sha512-210nGYh2ogK7iL5sH/tgljMrTcSsH5/NYtGOCwPN+ILHK1y56rvMdcU5j/BUDLPgHYxqs5f2KLlztGH3Dsbsyg==}
     peerDependencies:
       '@prostojs/logger': ^0.4.3
       '@prostojs/router': ^0.3.4
-      '@wooksjs/event-core': ^0.7.14
-      wooks: ^0.7.14
+      '@wooksjs/event-core': ^0.7.15
+      wooks: ^0.7.15
 
-  '@wooksjs/http-body@0.7.14':
-    resolution: {integrity: sha512-f0uOgH7GL10h3rVsElkp3DY5E02QKLJPGZe4OV72crFgHPrWVf89XaAaFg1pbpQ5d7NyCTFF47WgrxOeU012aQ==}
+  '@wooksjs/http-body@0.7.15':
+    resolution: {integrity: sha512-75s/T9v3iwhbilsWr8KaB8JsKA+zfEIG9IoqSnMT0nNL/jecKueLr6/qmGmnVzWsoQjsy9Re/yL0B2Zg8J4fAg==}
     peerDependencies:
-      '@wooksjs/event-core': ^0.7.14
-      '@wooksjs/event-http': ^0.7.14
+      '@wooksjs/event-core': ^0.7.15
+      '@wooksjs/event-http': ^0.7.15
 
   JSONStream@1.3.5:
     resolution: {integrity: sha512-E+iruNOY8VV9s4JEbe1aNEm6MiszPRr/UfcHMz0TQh1BXSxHK+ASV1R6W4HpjBhSeS+54PIsAMCBmwD06LLsqQ==}
@@ -3166,8 +3166,8 @@ packages:
   mkdirp-classic@0.5.3:
     resolution: {integrity: sha512-gKLcREMhtuZRwRAfqP3RFW+TK4JqApVBtOIftVgjuABpAtpxhPGaDcfvbhNvD0B8iD1oUr/txX35NjcaY6Ns/A==}
 
-  moost@0.6.16:
-    resolution: {integrity: sha512-Vilx1IjCD5/HXgSvIHxCR7SZdfSQIRj4Eo7GMiAagFhI+ouE2BgInEhc4gV1OpiUYJL0ojO5XNbrFxR2dO1deg==}
+  moost@0.6.17:
+    resolution: {integrity: sha512-HOMH3+qgLZzafH4RBYRhOhGUQ34GdyCeDnLFYn8TzJ55ASDjfqT+HPpu7qd9wJQ+i/cUU/MxdusYNsprWdl2cw==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -3985,8 +3985,8 @@ packages:
     engines: {node: '>=8'}
     hasBin: true
 
-  wooks@0.7.14:
-    resolution: {integrity: sha512-Nc4uVOy+0m46Y+usPgAJlWeoiz9i8P91k6DtdtgghtpAJhsbYX5doPVoBndHIluhhwWxBL++qkSMxiOJui9tcA==}
+  wooks@0.7.15:
+    resolution: {integrity: sha512-ICL6/myI801MrSs8sq3P6IUbgqkI8ebg/7l4KHlKjYfa+jndObNWsqrRA5EnRhU401D+Ih3yIKHEdF0bVbxmzg==}
 
   wordwrap@1.0.0:
     resolution: {integrity: sha512-gvVzJFlPycKc5dZN4yPkP8w7Dc37BtP1yczEneOb4uq34pXZcvrtRTmWV8W+Ume+XCxKgbjM+nevkyFPMybd4Q==}
@@ -4166,19 +4166,19 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.20.0
 
-  '@atscript/db@0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.60)(@uniqu/core@0.1.6)':
+  '@atscript/db@0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.61)(@uniqu/core@0.1.6)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@atscript/typescript': 0.1.60(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)
+      '@atscript/typescript': 0.1.61(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)
       '@uniqu/core': 0.1.6
 
-  '@atscript/typescript@0.1.60(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)':
+  '@atscript/typescript@0.1.61(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@moostjs/event-cli': 0.6.16(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(moost@0.6.16)(wooks@0.7.14)
-      moost: 0.6.16
+      '@moostjs/event-cli': 0.6.17(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(moost@0.6.17)(wooks@0.7.15)
+      moost: 0.6.17
     optionalDependencies:
-      '@atscript/db': 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.60)(@uniqu/core@0.1.6)
+      '@atscript/db': 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.61)(@uniqu/core@0.1.6)
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
@@ -4752,23 +4752,23 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@moostjs/event-cli@0.6.16(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(moost@0.6.16)(wooks@0.7.14)':
+  '@moostjs/event-cli@0.6.17(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(moost@0.6.17)(wooks@0.7.15)':
     dependencies:
-      '@wooksjs/event-cli': 0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)
-      '@wooksjs/event-core': 0.7.14
-      moost: 0.6.16
-      wooks: 0.7.14
+      '@wooksjs/event-cli': 0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)
+      '@wooksjs/event-core': 0.7.15
+      moost: 0.6.17
+      wooks: 0.7.15
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
 
-  '@moostjs/event-http@0.6.16(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(moost@0.6.16)(wooks@0.7.14)':
+  '@moostjs/event-http@0.6.17(@prostojs/infact@0.4.1)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(moost@0.6.17)(wooks@0.7.15)':
     dependencies:
       '@prostojs/infact': 0.4.1
-      '@wooksjs/event-core': 0.7.14
-      '@wooksjs/event-http': 0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)
-      '@wooksjs/http-body': 0.7.14(@wooksjs/event-core@0.7.14)(@wooksjs/event-http@0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14))
-      moost: 0.6.16
+      '@wooksjs/event-core': 0.7.15
+      '@wooksjs/event-http': 0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)
+      '@wooksjs/http-body': 0.7.15(@wooksjs/event-core@0.7.15)(@wooksjs/event-http@0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15))
+      moost: 0.6.17
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
@@ -5680,28 +5680,28 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@wooksjs/event-cli@0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)':
+  '@wooksjs/event-cli@0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)':
     dependencies:
       '@prostojs/cli-help': 0.0.12
       '@prostojs/logger': 0.4.3
       '@prostojs/router': 0.3.4
-      '@wooksjs/event-core': 0.7.14
+      '@wooksjs/event-core': 0.7.15
       minimist: 1.2.8
-      wooks: 0.7.14
+      wooks: 0.7.15
 
-  '@wooksjs/event-core@0.7.14': {}
+  '@wooksjs/event-core@0.7.15': {}
 
-  '@wooksjs/event-http@0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)':
+  '@wooksjs/event-http@0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)':
     dependencies:
       '@prostojs/logger': 0.4.3
       '@prostojs/router': 0.3.4
-      '@wooksjs/event-core': 0.7.14
-      wooks: 0.7.14
+      '@wooksjs/event-core': 0.7.15
+      wooks: 0.7.15
 
-  '@wooksjs/http-body@0.7.14(@wooksjs/event-core@0.7.14)(@wooksjs/event-http@0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14))':
+  '@wooksjs/http-body@0.7.15(@wooksjs/event-core@0.7.15)(@wooksjs/event-http@0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15))':
     dependencies:
-      '@wooksjs/event-core': 0.7.14
-      '@wooksjs/event-http': 0.7.14(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.14)(wooks@0.7.14)
+      '@wooksjs/event-core': 0.7.15
+      '@wooksjs/event-http': 0.7.15(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.15)(wooks@0.7.15)
 
   JSONStream@1.3.5:
     dependencies:
@@ -6793,14 +6793,14 @@ snapshots:
   mkdirp-classic@0.5.3:
     optional: true
 
-  moost@0.6.16:
+  moost@0.6.17:
     dependencies:
       '@prostojs/infact': 0.4.1
       '@prostojs/logger': 0.4.3
       '@prostojs/mate': 0.4.0
-      '@wooksjs/event-core': 0.7.14
+      '@wooksjs/event-core': 0.7.15
       hookable: 5.5.3
-      wooks: 0.7.14
+      wooks: 0.7.15
 
   ms@2.1.3: {}
 
@@ -7764,11 +7764,11 @@ snapshots:
       siginfo: 2.0.0
       stackback: 0.0.2
 
-  wooks@0.7.14:
+  wooks@0.7.15:
     dependencies:
       '@prostojs/logger': 0.4.3
       '@prostojs/router': 0.3.4
-      '@wooksjs/event-core': 0.7.14
+      '@wooksjs/event-core': 0.7.15
 
   wordwrap@1.0.0: {}
 
