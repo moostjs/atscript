@@ -1,3 +1,12 @@
+## [0.1.64](https://github.com/moostjs/atscript/compare/v0.1.63...v0.1.64) (2026-05-26)
+
+
+### Bug Fixes
+
+* **core:** thread origin doc through extends so annotate-block annotations on a grandparent reach a child's flat prop view across files ([a9be5f9](https://github.com/moostjs/atscript/commit/a9be5f9ab58c3e06f7caa96ddfbd94d1693dce71))
+
+
+
 ## [0.1.63](https://github.com/moostjs/atscript/compare/v0.1.62...v0.1.63) (2026-05-26)
 
 
