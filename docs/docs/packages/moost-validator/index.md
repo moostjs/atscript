@@ -22,6 +22,19 @@ If you are evaluating this package for the first time, read these in order:
 - the same Atscript validator options you already use elsewhere
 - optional HTTP-friendly error conversion when you use `@moostjs/event-http`
 
+## Public API
+
+Each integration point has a global form (apply app-wide) and a decorator form (apply to one controller or handler):
+
+| Export                          | Form                | Use it to                                                              |
+| ------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| `validatorPipe(opts?)`          | global pipe         | Validate handler args against their `.as` type — see [Validation Pipe](/packages/moost-validator/validation-pipe) |
+| `UseValidatorPipe(opts?)`       | parameter decorator | Same validation, scoped to a single handler argument                  |
+| `validationErrorTransform()`    | global interceptor  | Convert `ValidatorError` → `HttpError(400)` — see [Error Handling](/packages/moost-validator/error-handling) |
+| `UseValidationErrorTransform()` | method decorator    | Same conversion, scoped to one handler                                |
+
+Both pipes accept `Partial<TValidatorOptions>` (the standard Atscript [validator options](/packages/typescript/validation)).
+
 ## Installation
 
 ::: code-group

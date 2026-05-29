@@ -38,6 +38,10 @@ In `package.json`:
 | `--skipDiag`   | flag                          | Skip diagnostics, always emit.                                                          |
 | `--help`, `-h` | flag                          | Usage.                                                                                  |
 
+## `db sync` subcommand
+
+`asc db sync` ships in `@atscript/typescript` so one `asc` binary covers both codegen and schema sync. It drives the DB adapters from the **separate** `@atscript/db-*` packages (`@atscript/db` repo) and needs a `db` section in `atscript.config.*` plus an installed adapter to do anything. Flags: `--dry-run`, `--yes` (CI), `--force`, `--safe` (skip drops), `-c <path>`. Full semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
+
 ## Outputs
 
 Per `foo.as`:

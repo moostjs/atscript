@@ -111,7 +111,7 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Annotations       | [annotations.md](references/annotations.md)               | `@meta.*`, `@expect.*`, merge, custom `AnnotationSpec`                                      |
 | Primitives        | [primitives.md](references/primitives.md)                 | Built-ins, semantic extensions, decimal, phantom, extending via config                      |
 | Config            | [config.md](references/config.md)                         | `atscript.config.*`, `defineConfig`, entries/globs, plugin wiring, output                   |
-| `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, scripts                                                      |
+| `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, scripts, `db sync` pointer                                   |
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType`, `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth    |
 | Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, JSON Schema helpers, plugins                                 |

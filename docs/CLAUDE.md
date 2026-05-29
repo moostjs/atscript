@@ -21,7 +21,7 @@ docs/docs/
 │   ├── typescript/        — TypeScript Guide (18 pages — self-contained, COMPLETE)
 │   ├── moost-validator/   — Moost Validator docs (4 pages)
 │   └── vscode/            — VSCode extension docs (4 pages)
-├── plugin-development/    — Plugin Development Guide (16 STUB files)
+├── plugin-development/    — Plugin Development Guide (9 pages, written — labeled "Early" in nav)
 └── public/                — Static assets (logo, images)
 ```
 
@@ -42,7 +42,7 @@ Database docs are hosted separately at https://db.atscript.dev. The nav dropdown
 | packages/typescript/      | COMPLETE | 18 pages with full content (uses fragments) |
 | packages/moost-validator/ | PARTIAL  | 4 pages                                     |
 | packages/vscode/          | PARTIAL  | 4 pages                                     |
-| plugin-development/       | STUBS    | 16 files, needs content                     |
+| plugin-development/       | WRITTEN  | 9 pages (labeled "Early" in nav)            |
 | \_fragments/              | COMPLETE | 7 shared fragments                          |
 
 ## VitePress Config Key Details

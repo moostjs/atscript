@@ -12,6 +12,7 @@ All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescr
 - [`TAtscriptDataType<T>`](#tatscriptdatatype-t) — extract TS data shape
 - [`forAnnotatedType`](#foranotatedtype) — kind-dispatched walker
 - [`serializeAnnotatedType` / `deserializeAnnotatedType`](#serializeannotatedtype--deserializeannotatedtype) — JSON round-trip, `SERIALIZE_VERSION`, `refDepth` shallow FK targets, annotation filtering
+- [`createDataFromAnnotatedType`](#createdatafromannotatedtype) — build empty/default/example data objects from a type
 - [Metadata access](#metadata-access) — typed `metadata.get(...)` via `AtscriptMetadata`
 - [What `.as.js` exports](#what-asjs-exports)
 
@@ -192,6 +193,28 @@ User.type.kind          // 'object' | 'array' | 'union' | …
 ```
 
 `.as` resolution: `unplugin-atscript` in bundlers, VSCode extension in editors, or pre-generated `.as.js` on disk (Node ESM with loader).
+
+## `createDataFromAnnotatedType`
+
+Builds a plain data object matching a type's shape. `opts.mode` (default `'empty'`):
+
+- `'empty'` — structural defaults (`''`, `0`, `false`, `[]`, `{}`); optional props skipped.
+- `'default'` — values from `@meta.default`; optional props skipped unless annotated.
+- `'example'` — values from `@meta.example`; optional props always included; arrays get one sample item. This is what the generated `.toExampleData()` calls when `exampleData: true` is set in the TS plugin config.
+- `'db'` — `@db.default` / `@db.default.increment|uuid|now` (DB layer — see https://db.atscript.dev).
+- a `TValueResolver` — `(prop, path) => value` for full control.
+
+```ts
+import { createDataFromAnnotatedType } from '@atscript/typescript/utils'
+const blank = createDataFromAnnotatedType(Product)                       // empty
+const sample = createDataFromAnnotatedType(Product, { mode: 'example' })
+```
+
+Full reference: the docs `type-definitions` page.
+
+## DB-oriented helpers (documented elsewhere)
+
+`@atscript/typescript/utils` also exports type helpers consumed by the DB layer — `FlatOf`, `OwnPropsOf`, `NavPropsOf`, `PrimaryKeyOf`, and the query-AST types (`AtscriptRef`, `AtscriptQueryFieldRef`, `AtscriptQueryComparison`, `AtscriptQueryNode`). They ship from this package but are only meaningful with `@atscript/db`. Documented in the `atscript-db` skill and https://db.atscript.dev — not here.
 
 ## See also
 
