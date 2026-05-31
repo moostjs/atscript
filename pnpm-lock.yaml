@@ -160,7 +160,7 @@ importers:
     devDependencies:
       '@atscript/db':
         specifier: ^0.1.74
-        version: 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.64)(@uniqu/core@0.1.6)
+        version: 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.65)(@uniqu/core@0.1.6)
       '@uniqu/core':
         specifier: ^0.1.6
         version: 0.1.6
@@ -290,11 +290,11 @@ packages:
       '@atscript/typescript': ^0.1.53
       '@uniqu/core': ^0.1.6
 
-  '@atscript/typescript@0.1.64':
-    resolution: {integrity: sha512-OTt6LNF1XXY40jmJ/Z+Vc/LGH79WF/y2EVGy+Bo+ZCrZ6RQ/og81a9zMVBvEhLHbIDRJlwtveiTRUAGkN5mvZg==}
+  '@atscript/typescript@0.1.65':
+    resolution: {integrity: sha512-FHTGcFdzl56BOzAcsxMYqKDLnnc/l686+M3cVmdsoyqPpMLhuEH1gHDi9lhgoYLbeJbHr9bkeVx28TVf4FgOSw==}
     hasBin: true
     peerDependencies:
-      '@atscript/core': ^0.1.64
+      '@atscript/core': ^0.1.65
       '@atscript/db': ^0.1.74
     peerDependenciesMeta:
       '@atscript/db':
@@ -947,6 +947,13 @@ packages:
     peerDependencies:
       '@wooksjs/event-core': ^0.7.16
       moost: ^0.6.18
+      wooks: ^0.7.16
+
+  '@moostjs/event-cli@0.6.20':
+    resolution: {integrity: sha512-aBnq4lz3p653MMbj6cgPa8P+Eyz8prQkW1qU9JBdfR+Rd/9HBbBjwfbuDuXSuT3rCn4se0lpkoRuSCUZBeJt9g==}
+    peerDependencies:
+      '@wooksjs/event-core': ^0.7.16
+      moost: ^0.6.20
       wooks: ^0.7.16
 
   '@moostjs/event-http@0.6.18':
@@ -1823,8 +1830,8 @@ packages:
   '@swc/counter@0.1.3':
     resolution: {integrity: sha512-e2BR4lsJkkRlKZ/qCHPw9ZaSxc0MVUd7gtbtaB7aMvHeJVYe8sOB8DBZkP2DtISHGSku9sCK6T6cnY0CtXrOCQ==}
 
-  '@swc/types@0.1.25':
-    resolution: {integrity: sha512-iAoY/qRhNH8a/hBvm3zKj9qQ4oc2+3w1unPJa2XvTK3XjeLXtzcCingVPw/9e5mn1+0yPqxcBGp9Jf0pkfMb1g==}
+  '@swc/types@0.1.26':
+    resolution: {integrity: sha512-lyMwd7WGgG79RS7EERZV3T8wMdmPq3xwyg+1nmAM64kIhx5yl+juO2PYIHb7vTiPgPCj8LYjsNV2T5wiQHUEaw==}
 
   '@textlint/ast-node-types@15.5.1':
     resolution: {integrity: sha512-2ABQSaQoM9u9fycXLJKcCv4XQulJWTUSwjo6F0i/ujjqOH8/AZ2A0RDKKbAddqxDhuabVB20lYoEsZZgzehccg==}
@@ -2660,8 +2667,8 @@ packages:
     resolution: {integrity: sha512-sTSfBjoXBp89JvIKIefqw7U2CCebsc74kiY6awiGogKtoSGbgjYE/G/+l9sF3MWFPNc9IcoOC4ODfKHfxFmp0g==}
     engines: {node: '>= 0.4'}
 
-  get-tsconfig@4.13.6:
-    resolution: {integrity: sha512-shZT/QMiSHc/YBLxxOkMtgSid5HFoauqCE3/exfsEcwg1WkeqjG+V40yBbBrsD+jW2HDXcs28xOfcbm2jI8Ddw==}
+  get-tsconfig@4.14.0:
+    resolution: {integrity: sha512-yTb+8DXzDREzgvYmh6s9vHsSVCHeC0G3PI5bEXNBHtmshPnO+S5O7qgLEOn0I5QvMy6kpZN8K1NKGyilLb93wA==}
 
   git-raw-commits@4.0.0:
     resolution: {integrity: sha512-ICsMM1Wk8xSGMowkOmPrzo2Fgmfo4bMHLNX6ytHjajRJUqvHOw/TFapQ+QG75c3X/tTDDhOSRPGC52dDbNM8FQ==}
@@ -3169,6 +3176,9 @@ packages:
 
   moost@0.6.18:
     resolution: {integrity: sha512-7cDyTvXG3eP0cXymIArFKlM7L59I4r3GZvFc8MEXi4dIgU9SYKT3SUApbjibg82UJc8o09l3dLsnwi2KhkPrHA==}
+
+  moost@0.6.20:
+    resolution: {integrity: sha512-8Zm72oSZiL7q/jS2HlEhtW++c0+dRiosLfdPsDgQYrcQ+cSjD9AXQK6lCHb0S4v7copmPWGEzNZJnM7Vlw1WLw==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -4167,19 +4177,19 @@ snapshots:
     dependencies:
       '@algolia/client-common': 5.20.0
 
-  '@atscript/db@0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.64)(@uniqu/core@0.1.6)':
+  '@atscript/db@0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.65)(@uniqu/core@0.1.6)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@atscript/typescript': 0.1.64(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)
+      '@atscript/typescript': 0.1.65(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)
       '@uniqu/core': 0.1.6
 
-  '@atscript/typescript@0.1.64(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)':
+  '@atscript/typescript@0.1.65(@atscript/core@packages+core)(@atscript/db@0.1.74)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@moostjs/event-cli': 0.6.18(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(moost@0.6.18)(wooks@0.7.16)
-      moost: 0.6.18
+      '@moostjs/event-cli': 0.6.20(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(moost@0.6.20)(wooks@0.7.16)
+      moost: 0.6.20
     optionalDependencies:
-      '@atscript/db': 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.64)(@uniqu/core@0.1.6)
+      '@atscript/db': 0.1.74(@atscript/core@packages+core)(@atscript/typescript@0.1.65)(@uniqu/core@0.1.6)
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
@@ -4758,6 +4768,16 @@ snapshots:
       '@wooksjs/event-cli': 0.7.16(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)
       '@wooksjs/event-core': 0.7.16
       moost: 0.6.18
+      wooks: 0.7.16
+    transitivePeerDependencies:
+      - '@prostojs/logger'
+      - '@prostojs/router'
+
+  '@moostjs/event-cli@0.6.20(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(moost@0.6.20)(wooks@0.7.16)':
+    dependencies:
+      '@wooksjs/event-cli': 0.7.16(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.16)(wooks@0.7.16)
+      '@wooksjs/event-core': 0.7.16
+      moost: 0.6.20
       wooks: 0.7.16
     transitivePeerDependencies:
       - '@prostojs/logger'
@@ -5350,7 +5370,7 @@ snapshots:
   '@swc/core@1.10.12':
     dependencies:
       '@swc/counter': 0.1.3
-      '@swc/types': 0.1.25
+      '@swc/types': 0.1.26
     optionalDependencies:
       '@swc/core-darwin-arm64': 1.10.12
       '@swc/core-darwin-x64': 1.10.12
@@ -5365,7 +5385,7 @@ snapshots:
 
   '@swc/counter@0.1.3': {}
 
-  '@swc/types@0.1.25':
+  '@swc/types@0.1.26':
     dependencies:
       '@swc/counter': 0.1.3
 
@@ -6318,7 +6338,7 @@ snapshots:
       dunder-proto: 1.0.1
       es-object-atoms: 1.1.1
 
-  get-tsconfig@4.13.6:
+  get-tsconfig@4.14.0:
     dependencies:
       resolve-pkg-maps: 1.0.0
     optional: true
@@ -6795,6 +6815,15 @@ snapshots:
     optional: true
 
   moost@0.6.18:
+    dependencies:
+      '@prostojs/infact': 0.4.1
+      '@prostojs/logger': 0.4.3
+      '@prostojs/mate': 0.4.0
+      '@wooksjs/event-core': 0.7.16
+      hookable: 5.5.3
+      wooks: 0.7.16
+
+  moost@0.6.20:
     dependencies:
       '@prostojs/infact': 0.4.1
       '@prostojs/logger': 0.4.3
@@ -7473,7 +7502,7 @@ snapshots:
   tsx@4.21.0:
     dependencies:
       esbuild: 0.27.3
-      get-tsconfig: 4.13.6
+      get-tsconfig: 4.14.0
     optionalDependencies:
       fsevents: 2.3.3
     optional: true
