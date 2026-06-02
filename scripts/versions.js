@@ -52,20 +52,31 @@ async function main() {
       major: `${major + 1}.0.0`,
     }
 
-    // Step 3: Prompt the user to select a version bump
+    // Step 3: Determine the version bump — non-interactive via CLI arg
+    // (`node ./scripts/versions patch|minor|major`), falling back to a prompt.
     step('Selecting version bump type...')
-    const { bump } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'bump',
-        message: `Current version: ${currentVersion}. Select version bump:`,
-        choices: [
-          { name: `Patch (${currentVersion} → ${versions.patch})`, value: 'patch' },
-          { name: `Minor (${currentVersion} → ${versions.minor})`, value: 'minor' },
-          { name: `Major (${currentVersion} → ${versions.major})`, value: 'major' },
-        ],
-      },
-    ])
+    const argBump = process.argv[2]
+    let bump
+    if (argBump) {
+      if (!['patch', 'minor', 'major'].includes(argBump)) {
+        info(`❌ Invalid bump type "${argBump}" (expected patch | minor | major).`)
+        process.exit(1)
+      }
+      bump = argBump
+    } else {
+      ;({ bump } = await inquirer.prompt([
+        {
+          type: 'list',
+          name: 'bump',
+          message: `Current version: ${currentVersion}. Select version bump:`,
+          choices: [
+            { name: `Patch (${currentVersion} → ${versions.patch})`, value: 'patch' },
+            { name: `Minor (${currentVersion} → ${versions.minor})`, value: 'minor' },
+            { name: `Major (${currentVersion} → ${versions.major})`, value: 'major' },
+          ],
+        },
+      ]))
+    }
 
     step(`🚀 Bumping version: ${bump} (${currentVersion} → ${versions[bump]})\n`)
 

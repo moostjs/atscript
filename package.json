@@ -18,7 +18,9 @@
     "test:cov": "vitest run --coverage",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "version": "pnpm changelog && git add CHANGELOG.md && git commit -m 'chore: update changelog'",
-    "release": "pnpm build && pnpm test && node ./scripts/versions && pnpm -r run pub",
+    "release": "pnpm build && pnpm test && node ./scripts/versions patch && pnpm -r run pub",
+    "release:minor": "pnpm build && pnpm test && node ./scripts/versions minor && pnpm -r run pub",
+    "release:major": "pnpm build && pnpm test && node ./scripts/versions major && pnpm -r run pub",
     "vscode": "node ./scripts/vscode-publish",
     "sync": "node ./scripts/versions"
   },
