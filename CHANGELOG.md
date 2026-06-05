@@ -1,3 +1,12 @@
+## [0.1.70](https://github.com/moostjs/atscript/compare/v0.1.69...v0.1.70) (2026-06-05)
+
+
+### Bug Fixes
+
+* lazy+guarded atscript config probe in unplugin to avoid unhandled rejection when no config is found ([aef4c42](https://github.com/moostjs/atscript/commit/aef4c422f407649aba305deccd65a20b9a561543))
+
+
+
 ## [0.1.69](https://github.com/moostjs/atscript/compare/v0.1.68...v0.1.69) (2026-06-05)
 
 
