@@ -17,13 +17,20 @@ export interface atscriptPluginOptions {
 
 export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
   const root = process.cwd()
-  const atscriptConfig = new Promise<TAtscriptConfig>(resolve => {
-    resolveConfigFile(root).then(p => {
-      loadConfig(p!).then(resolve)
-    })
-  })
   const strict = opts?.strict ?? true
   let repo: AtscriptRepo
+  let configPromise: Promise<TAtscriptConfig> | undefined
+
+  // Lazy + guarded: only probes for a config when an .as file is actually loaded.
+  // A missing config resolves to an empty config (the `load` hook fills in the
+  // default `ts()` plugin) instead of crashing the host process with an unhandled
+  // rejection. Errors now surface inside `load()`, where the bundler can report them.
+  const getConfig = () =>
+    (configPromise ??= (async () => {
+      const p = await resolveConfigFile(root)
+      return p ? loadConfig(p) : {}
+    })())
+
   return {
     name: 'unplugin-atscript',
 
@@ -41,7 +48,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     async load(id) {
       if (id.endsWith('.as')) {
         if (!repo) {
-          const config = await atscriptConfig
+          const config = await getConfig()
           if (!config.plugins) {
             config.plugins = [ts()]
           }

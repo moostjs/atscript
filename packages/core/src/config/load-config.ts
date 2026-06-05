@@ -134,7 +134,9 @@ export async function loadConfig(
   configPath: string,
   forceFormat?: 'cjs' | 'esm'
 ): Promise<TAtscriptConfig> {
-  // eslint-disable-next-line no-param-reassign
+  if (!configPath) {
+    throw new Error('loadConfig: no config path provided (resolveConfigFile returned undefined).')
+  }
   const ext = path.extname(configPath)
   try {
     if (SUPPORTED_JS_CONFIG_FORMATS.includes(ext)) {
