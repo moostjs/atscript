@@ -67,17 +67,17 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.6.23",
-    "moost": "^0.6.23"
+    "@moostjs/event-cli": "^0.6.24",
+    "moost": "^0.6.24"
   },
   "devDependencies": {
-    "@atscript/db": "^0.1.74",
+    "@atscript/db": "^0.1.97",
     "@uniqu/core": "^0.1.6",
     "vitest": "3.2.4"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/db": "^0.1.74"
+    "@atscript/db": "^0.1.97"
   },
   "peerDependenciesMeta": {
     "@atscript/db": {
