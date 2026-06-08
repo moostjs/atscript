@@ -1,3 +1,12 @@
+## [0.1.74](https://github.com/moostjs/atscript/compare/v0.1.73...v0.1.74) (2026-06-08)
+
+
+### Bug Fixes
+
+* **core:** resolve annotate-entry target type for imported and union/intersection targets ([67ffad0](https://github.com/moostjs/atscript/commit/67ffad0cec7545f16ffe18e6cb5fb020b780ec23))
+
+
+
 ## [0.1.73](https://github.com/moostjs/atscript/compare/v0.1.72...v0.1.73) (2026-06-08)
 
 
