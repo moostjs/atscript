@@ -1031,6 +1031,52 @@ describe('document', () => {
     expect(labelAnnotations).toHaveLength(1)
     expect(labelAnnotations[0].args[0]!.text).toBe('mutated')
   })
+
+  it('folds a NESTED-field mutating annotate into an extends child (and not the base)', () => {
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Base {
+      username: string
+      account: {
+        active: boolean
+        other: string
+      }
+    }
+
+    export interface Child extends Base {
+      extra: string
+    }
+
+    annotate Base {
+      @label 'Top'
+      username
+
+      @label 'Nested'
+      account.active
+    }
+`)
+    const childNode = doc.nodes[1] as SemanticInterfaceNode
+    const resolved = doc.resolveInterfaceExtends(childNode) as SemanticStructureNode
+    expect(resolved).toBeDefined()
+
+    // Top-level inherited prop keeps its annotate-block label (regression guard)
+    const usernameProp = resolved.props.get('username')!
+    const usernameAnns = doc.evalAnnotationsForNode(usernameProp)!
+    expect(usernameAnns.find(a => a.name === 'label')?.args[0]!.text).toBe('Top')
+
+    // Nested inherited prop now carries the annotate-block label (the bug)
+    const accountDef = resolved.props.get('account')!.getDefinition() as SemanticStructureNode
+    const activeProp = accountDef.props.get('active')!
+    const activeAnns = doc.evalAnnotationsForNode(activeProp)!
+    expect(activeAnns.find(a => a.name === 'label')?.args[0]!.text).toBe('Nested')
+
+    // The base's own nested `active` node must stay untouched (path-only cloning)
+    const baseNode = doc.nodes[0].getDefinition() as SemanticInterfaceNode
+    const baseAccountDef = baseNode.props.get('account')!.getDefinition() as SemanticStructureNode
+    const baseActiveProp = baseAccountDef.props.get('active')!
+    expect(baseActiveProp).not.toBe(activeProp)
+    expect((baseActiveProp.annotations ?? []).some(a => a.name === 'label')).toBe(false)
+  })
 })
 
 describe('document/merging intersections', () => {

@@ -178,6 +178,7 @@ export class AtscriptDoc {
 
   public nodes: SemanticNode[] = []
   private _text: string = ''
+  private _annotateNodesByTarget: Map<string, SemanticAnnotateNode[]> | undefined
   get text() {
     return this._text
   }
@@ -208,6 +209,7 @@ export class AtscriptDoc {
     this.imports.clear()
     this.resolvedImports.clear()
     this._allMessages = undefined
+    this._annotateNodesByTarget = undefined
     this.tokensIndex = new TokensIndex()
     this.blocksIndex = new BlocksIndex()
     this.resolvedAnnotations = []
@@ -430,13 +432,21 @@ export class AtscriptDoc {
    * For entries without a chain (root-level), the key is the entry identifier.
    */
   getAnnotateNodesFor(targetName: string): SemanticAnnotateNode[] {
-    const result: SemanticAnnotateNode[] = []
-    for (const node of this.nodes) {
-      if (isAnnotate(node) && node.targetName === targetName) {
-        result.push(node)
+    if (!this._annotateNodesByTarget) {
+      const index = new Map<string, SemanticAnnotateNode[]>()
+      for (const node of this.nodes) {
+        if (isAnnotate(node)) {
+          const existing = index.get(node.targetName)
+          if (existing) {
+            existing.push(node)
+          } else {
+            index.set(node.targetName, [node])
+          }
+        }
       }
+      this._annotateNodesByTarget = index
     }
-    return result
+    return this._annotateNodesByTarget.get(targetName) ?? []
   }
 
   /**
@@ -542,9 +552,11 @@ export class AtscriptDoc {
 
   /**
    * Returns a structure equivalent to `struct` with annotate-block contributions
-   * folded into matching props' annotation arrays. Skips chained entries
-   * (e.g. `annotate Parent { user.address.city }`) — only root-level entries apply.
-   * Original prop nodes are reused by reference when no extra annotations apply.
+   * folded into matching props' annotation arrays. Chained entries
+   * (e.g. `annotate Parent { account.active }`) are folded recursively into the
+   * matching inline-object prop's nested structure. Only props/structures along a
+   * touched path are cloned — siblings are reused by reference, so the base's own
+   * (shared) nodes are never mutated.
    */
   private applyAnnotateBlocksToStructure(
     struct: SemanticNode,
@@ -553,31 +565,71 @@ export class AtscriptDoc {
     if (!isStructure(struct)) {
       return struct
     }
-    const annotationsByProp = new Map<string, TAnnotationTokens[]>()
+    const entries: Array<{ parts: string[]; anns: TAnnotationTokens[] }> = []
     for (const annotateNode of annotateNodes) {
       for (const entry of annotateNode.entries) {
-        if (entry.hasChain) {
-          continue
-        }
-        const propName = entry.id
         const anns = entry.annotations
-        if (!propName || !anns || anns.length === 0) {
+        if (!entry.id || !anns || anns.length === 0) {
           continue
         }
-        const existing = annotationsByProp.get(propName)
-        annotationsByProp.set(propName, existing ? [...existing, ...anns] : [...anns])
+        const parts = entry.hasChain ? [entry.id, ...entry.chain.map(c => c.text)] : [entry.id]
+        entries.push({ parts, anns })
       }
     }
-    if (annotationsByProp.size === 0) {
+    if (entries.length === 0) {
       return struct
     }
+    return this.foldAnnotationsIntoStructure(struct as SemanticStructureNode, entries) ?? struct
+  }
 
-    const structNode = struct as SemanticStructureNode
+  /**
+   * Recursively folds annotate-block entries into a structure's props. Each entry's
+   * `parts[0]` names a prop in `struct`; remaining parts target a nested inline-object
+   * prop. Returns a new structure with cloned props/structures along touched paths, or
+   * `undefined` when nothing matched (so callers can reuse the original by reference).
+   */
+  private foldAnnotationsIntoStructure(
+    struct: SemanticStructureNode,
+    entries: Array<{ parts: string[]; anns: TAnnotationTokens[] }>
+  ): SemanticStructureNode | undefined {
+    const byHead = new Map<
+      string,
+      { own: TAnnotationTokens[]; nested: Array<{ parts: string[]; anns: TAnnotationTokens[] }> }
+    >()
+    for (const entry of entries) {
+      const head = entry.parts[0]
+      let group = byHead.get(head)
+      if (!group) {
+        group = { own: [], nested: [] }
+        byHead.set(head, group)
+      }
+      if (entry.parts.length === 1) {
+        group.own.push(...entry.anns)
+      } else {
+        group.nested.push({ parts: entry.parts.slice(1), anns: entry.anns })
+      }
+    }
+
     const newProps: SemanticPropNode[] = []
     let changed = false
-    for (const [name, prop] of structNode.props) {
-      const extras = annotationsByProp.get(name)
-      if (!extras) {
+    for (const [name, prop] of struct.props) {
+      const group = byHead.get(name)
+      if (!group) {
+        newProps.push(prop)
+        continue
+      }
+      const propDef = prop.getDefinition()
+      let newDef = propDef
+      // Recurse only into inline-object props. A nested entry whose prop is a `ref`
+      // to a named type is not folded here (we must not mutate the shared definition);
+      // that case is covered at runtime by the codegen's `$a()` / `cloneRefProp` path.
+      if (group.nested.length > 0 && propDef && isStructure(propDef)) {
+        const foldedNested = this.foldAnnotationsIntoStructure(propDef, group.nested)
+        if (foldedNested) {
+          newDef = foldedNested
+        }
+      }
+      if (group.own.length === 0 && newDef === propDef) {
         newProps.push(prop)
         continue
       }
@@ -586,11 +638,13 @@ export class AtscriptDoc {
       if (idToken) {
         cloned.saveToken(idToken, 'identifier')
       }
-      const propDef = prop.getDefinition()
-      if (propDef) {
-        cloned.define(propDef)
+      if (newDef) {
+        cloned.define(newDef)
       }
-      cloned.annotations = this.mergeNodesAnnotations(prop.annotations, extras)
+      cloned.annotations =
+        group.own.length > 0
+          ? this.mergeNodesAnnotations(prop.annotations, group.own)
+          : prop.annotations
       const optionalToken = prop.token('optional')
       if (optionalToken) {
         cloned.saveToken(optionalToken, 'optional')
@@ -599,11 +653,11 @@ export class AtscriptDoc {
       changed = true
     }
     if (!changed) {
-      return struct
+      return undefined
     }
     const newStruct = new SemanticStructureNode()
     newStruct.setProps(newProps)
-    newStruct.annotations = structNode.annotations
+    newStruct.annotations = struct.annotations
     return newStruct
   }
 
