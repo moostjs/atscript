@@ -1,6 +1,6 @@
 {
   "name": "@atscript/typescript",
-  "version": "0.1.73",
+  "version": "0.1.74",
   "description": "Atscript: typescript-gen support.",
   "keywords": [
     "annotations",
