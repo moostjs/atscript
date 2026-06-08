@@ -8,6 +8,7 @@ import {
   isPrimitive,
   isRef,
   isStructure,
+  type SemanticNode,
   type SemanticPrimitiveNode,
   type TNodeEntity,
 } from '../parser/nodes'
@@ -202,42 +203,21 @@ export class AnnotationSpec {
       // 4. Validate type of node def
       if (this.config.defType?.length) {
         const parentNode = mainToken.parentNode
-        let def = parentNode.getDefinition()
-        // Annotate-block entries are ref nodes with no inline definition; the
-        // target type lives on the referenced prop of the block's target
-        // interface. Resolve through the target interface (mirroring the
-        // annotate-entry resolution in getDiagMessages) so type-guarded
-        // annotations see the real declared type instead of "unknown".
-        if (!def && isRef(parentNode)) {
-          const idToken = parentNode.token('identifier')
-          const annotateBlock = idToken
-            ? doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
-            : undefined
-          if (annotateBlock) {
-            const chain = [parentNode.id!, ...parentNode.chain.map(c => c.text)]
-            def = doc.unwindType(annotateBlock.targetName, chain)?.def || def
+        const idToken = isRef(parentNode) ? parentNode.token('identifier') : undefined
+        const isAnnotateEntry =
+          !!idToken &&
+          !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
+        // Annotate-block entries reference a prop of a (possibly imported)
+        // target interface whose type can't be resolved at parse time —
+        // cross-file dependencies aren't wired yet. Defer their target-type
+        // guard to diagnostic time (AtscriptDoc.getDiagMessages), where imports
+        // are resolved. Inline props resolve locally and are checked here.
+        if (!isAnnotateEntry) {
+          let def = parentNode.getDefinition()
+          if (isRef(def)) {
+            def = doc.unwindType(def.id!, def.chain)?.def || def
           }
-        }
-        if (isRef(def)) {
-          def = doc.unwindType(def.id!, def.chain)?.def || def
-        }
-        let defEntity = def?.entity || 'unknown'
-        if (isInterface(def) || isStructure(def)) {
-          defEntity = 'object'
-        } else if (isGroup(def) && def.entity !== 'tuple') {
-          defEntity = def.op === '&' ? 'intersection' : 'union'
-        }
-        if (
-          (!isPrimitive(def) && !this.config.defType.includes(defEntity as 'array')) ||
-          (isPrimitive(def) && !this.config.defType.includes(def.type))
-        ) {
-          messages.push({
-            message: `Expected type is (${this.config.defType.join(' | ')}), got "${
-              isPrimitive(def) ? def.type : def?.entity || 'unknown'
-            }"`,
-            severity: 1,
-            range: mainToken.range,
-          })
+          messages.push(...(this.validateTargetType(def, mainToken.range) || []))
         }
       }
     }
@@ -247,6 +227,41 @@ export class AnnotationSpec {
     }
 
     return messages.length > 0 ? messages : undefined
+  }
+
+  /**
+   * Checks an already-resolved target node against this annotation's `defType`
+   * guard (e.g. `@expect.minLength` requires `string | array`). Returns a
+   * diagnostic when the type doesn't match, or `undefined` when it matches or no
+   * guard is configured. Shared by the parse-time check (for inline props) and
+   * the deferred annotate-entry check in `AtscriptDoc.getDiagMessages`, where
+   * imported target types finally resolve.
+   */
+  validateTargetType(def: SemanticNode | undefined, range: Token['range']): TMessages | undefined {
+    if (!this.config.defType?.length) {
+      return undefined
+    }
+    let defEntity = def?.entity || 'unknown'
+    if (isInterface(def) || isStructure(def)) {
+      defEntity = 'object'
+    } else if (isGroup(def) && def.entity !== 'tuple') {
+      defEntity = def.op === '&' ? 'intersection' : 'union'
+    }
+    if (
+      (!isPrimitive(def) && !this.config.defType.includes(defEntity as 'array')) ||
+      (isPrimitive(def) && !this.config.defType.includes(def.type))
+    ) {
+      return [
+        {
+          message: `Expected type is (${this.config.defType.join(' | ')}), got "${
+            isPrimitive(def) ? def.type : def?.entity || 'unknown'
+          }"`,
+          severity: 1,
+          range,
+        },
+      ]
+    }
+    return undefined
   }
 
   renderDocs(index: number | string) {

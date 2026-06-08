@@ -1238,10 +1238,14 @@ export class AtscriptDoc {
               ? [t.text, ...t.parentNode.chain.map(c => c.text)]
               : [t.text]
           const unwound = this.unwindType(targetName, chain)
-          // unwindType may return the group node itself when it can't resolve
-          // the chain through a union/intersection — treat that as unresolved
+          // unwindType returns the group node itself when it can't walk the
+          // chain through a union/intersection; in that case fall back to the
+          // merge-aware resolver, which also yields the actual leaf type.
           const chainResolved = unwound?.def && !isGroup(unwound.def)
-          if (!chainResolved && !this.resolveChainWithMerge(targetName, chain)) {
+          const resolvedType = chainResolved
+            ? unwound!.def
+            : this.resolveChainWithMerge(targetName, chain)
+          if (!resolvedType) {
             const lastToken =
               chain.length > 1 && isRef(t.parentNode)
                 ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
@@ -1265,6 +1269,20 @@ export class AtscriptDoc {
                   message: `Unknown property "${memberChain.join('.')}" in "${targetName}"`,
                   range: token.range,
                 })
+              }
+            }
+          }
+          // Deferred from parse time: validate type-guarded annotations on the
+          // entry (e.g. `@expect.minLength` wants string|array) against the
+          // resolved target prop type. Imported targets — and union/intersection
+          // or chained targets — only resolve here, after cross-file
+          // dependencies are wired.
+          if (resolvedType && isRef(t.parentNode) && t.parentNode.annotations) {
+            for (const a of t.parentNode.annotations) {
+              const spec = this.resolveAnnotation(a.token.text.slice(1))
+              const msgs = spec?.validateTargetType(resolvedType, a.token.range)
+              if (msgs) {
+                this._allMessages.push(...msgs)
               }
             }
           }
@@ -1322,11 +1340,15 @@ export class AtscriptDoc {
    * Walks a property chain step-by-step, applying mergeIntersection at each
    * level. Mirrors the completion logic in the LSP server so that intersection
    * types like `{ a: string } & { b: number }` are handled correctly.
+   *
+   * Returns the resolved leaf definition (unwound through refs, parity with
+   * `unwindType`), or `undefined` when the chain can't be resolved. Callers that
+   * only need a yes/no resolution check use the truthiness of the result.
    */
-  private resolveChainWithMerge(targetName: string, chain: string[]): boolean {
+  private resolveChainWithMerge(targetName: string, chain: string[]): SemanticNode | undefined {
     let def: SemanticNode | undefined = this.unwindType(targetName)?.def
     if (!def) {
-      return false
+      return undefined
     }
     for (const prop of chain) {
       def = this.mergeIntersection(def)
@@ -1339,21 +1361,26 @@ export class AtscriptDoc {
       if (isStructure(def) || isInterface(def)) {
         const next = def.props.get(prop)
         if (!next) {
-          return false
+          return undefined
         }
         def = next.getDefinition() || next
       } else if (isGroup(def)) {
         // Search union/intersection items for the prop
         const found = this.findPropInGroup(def as SemanticGroup, prop)
         if (!found) {
-          return false
+          return undefined
         }
         def = found
       } else {
-        return false
+        return undefined
       }
     }
-    return true
+    // Unwind a leaf ref to its underlying type so callers see e.g. the `number`
+    // primitive rather than the `number` ref (matches unwindType's leaf).
+    if (isRef(def)) {
+      def = this.unwindType(def.id!, def.chain)?.def || def
+    }
+    return def
   }
 
   private findPropInGroup(group: SemanticGroup, propName: string): SemanticNode | undefined {
