@@ -1,3 +1,12 @@
+## [0.1.72](https://github.com/moostjs/atscript/compare/v0.1.71...v0.1.72) (2026-06-08)
+
+
+### Bug Fixes
+
+* **core:** fold nested annotate-block fields into extends child ([8ee2c1b](https://github.com/moostjs/atscript/commit/8ee2c1b6be980e95c7ebde723a1b9334ecb1f316))
+
+
+
 ## [0.1.71](https://github.com/moostjs/atscript/compare/v0.1.70...v0.1.71) (2026-06-07)
 
 
