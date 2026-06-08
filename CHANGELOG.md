@@ -1,3 +1,12 @@
+## [0.1.73](https://github.com/moostjs/atscript/compare/v0.1.72...v0.1.73) (2026-06-08)
+
+
+### Bug Fixes
+
+* **core:** resolve annotate-entry target type for type-guarded annotations ([f5e5b5f](https://github.com/moostjs/atscript/commit/f5e5b5fc8516f5a82778c265e9d1008a5f5e7a9e))
+
+
+
 ## [0.1.72](https://github.com/moostjs/atscript/compare/v0.1.71...v0.1.72) (2026-06-08)
 
 
