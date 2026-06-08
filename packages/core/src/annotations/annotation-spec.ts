@@ -201,7 +201,23 @@ export class AnnotationSpec {
 
       // 4. Validate type of node def
       if (this.config.defType?.length) {
-        let def = mainToken.parentNode.getDefinition()
+        const parentNode = mainToken.parentNode
+        let def = parentNode.getDefinition()
+        // Annotate-block entries are ref nodes with no inline definition; the
+        // target type lives on the referenced prop of the block's target
+        // interface. Resolve through the target interface (mirroring the
+        // annotate-entry resolution in getDiagMessages) so type-guarded
+        // annotations see the real declared type instead of "unknown".
+        if (!def && isRef(parentNode)) {
+          const idToken = parentNode.token('identifier')
+          const annotateBlock = idToken
+            ? doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
+            : undefined
+          if (annotateBlock) {
+            const chain = [parentNode.id!, ...parentNode.chain.map(c => c.text)]
+            def = doc.unwindType(annotateBlock.targetName, chain)?.def || def
+          }
+        }
         if (isRef(def)) {
           def = doc.unwindType(def.id!, def.chain)?.def || def
         }

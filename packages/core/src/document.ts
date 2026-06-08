@@ -427,6 +427,18 @@ export class AtscriptDoc {
   }
 
   /**
+   * If the position falls inside an `annotate` block, returns that block's node
+   * (whose `targetName` is the annotated interface). Entry refs within the block
+   * resolve through the target interface rather than as top-level definitions.
+   */
+  annotateBlockAt(line: number, character: number): SemanticAnnotateNode | undefined {
+    const block = this.blocksIndex.at(line, character)
+    return block?.blockType === 'annotate' && isAnnotate(block.parentNode)
+      ? block.parentNode
+      : undefined
+  }
+
+  /**
    * Collects ad-hoc annotations from all `annotate` blocks targeting a given type/interface.
    * Returns a map of property path (dot-joined) → annotations array.
    * For entries without a chain (root-level), the key is the entry identifier.
@@ -857,13 +869,9 @@ export class AtscriptDoc {
     const token = this.tokensIndex.at(line, character)
     if (token) {
       // Annotate entry refs resolve through the target interface
-      const block = this.blocksIndex.at(line, character)
-      if (
-        block?.blockType === 'annotate' &&
-        isAnnotate(block.parentNode) &&
-        isRef(token.parentNode)
-      ) {
-        const targetName = block.parentNode.targetName
+      const annotateBlock = this.annotateBlockAt(line, character)
+      if (annotateBlock && isRef(token.parentNode)) {
+        const targetName = annotateBlock.targetName
         const entryRef = token.parentNode
         // Build chain: [entryId, ...chainUpToToken] for chains, or [tokenText] for identifiers
         const chain: string[] =
@@ -1219,9 +1227,9 @@ export class AtscriptDoc {
       for (const t of this.referred) {
         // Annotate entry refs resolve through the target interface
         // e.g. `annotate User { firstName }` → validates firstName as User.firstName
-        const block = this.blocksIndex.at(t.range.start.line, t.range.start.character)
-        if (block?.blockType === 'annotate' && isAnnotate(block.parentNode)) {
-          const targetName = block.parentNode.targetName
+        const annotateBlock = this.annotateBlockAt(t.range.start.line, t.range.start.character)
+        if (annotateBlock) {
+          const targetName = annotateBlock.targetName
           if (!this.registry.isDefined(targetName)) {
             continue // target itself is unknown, already reported separately
           }
