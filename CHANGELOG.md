@@ -1,3 +1,12 @@
+## [0.1.75](https://github.com/moostjs/atscript/compare/v0.1.74...v0.1.75) (2026-06-10)
+
+
+### Bug Fixes
+
+* **core:** make string.date/isoDate single alternation regex and revalidate docs/skill/wiki ([8a7c10e](https://github.com/moostjs/atscript/commit/8a7c10ec86bc770ccc35056d27e055216b2c66a5))
+
+
+
 ## [0.1.74](https://github.com/moostjs/atscript/compare/v0.1.73...v0.1.74) (2026-06-08)
 
 
