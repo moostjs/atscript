@@ -18,28 +18,23 @@ All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescr
 
 ## `TAtscriptAnnotatedType`
 
-Every generated `.as` export conforms to:
+Every generated `.as` export conforms to this shape (type importable from `@atscript/typescript/utils`):
 
-```ts
-interface TAtscriptAnnotatedType {
-  __is_atscript_annotated_type: true
-  id?: string
-  type: TAtscriptTypeDef
-  metadata: TMetadataMap<AtscriptMetadata>
-  optional?: boolean
-  ref?: { type: () => TAtscriptAnnotatedType; field: string }
-  validator(opts?: Partial<TValidatorOptions>): Validator
-}
-```
+| Field                                 | Use                                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__is_atscript_annotated_type: true` | Brand — what `isAnnotatedType()` checks                                                                                                              |
+| `type`                                | Type tree node — dispatch on `type.kind` (see below)                                                                                                 |
+| `metadata`                            | Typed `Map` — `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md))                     |
+| `id?`                                 | Stable type name; used by `buildJsonSchema()` for `$defs`/`$ref`                                                                                     |
+| `optional?`                           | Set when the node is an optional object prop                                                                                                         |
+| `ref?`                                | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it |
+| `validator(opts?)`                    | Constructs `new Validator(this, opts)`. **Not cached.**                                                                                              |
 
 - `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the *serialized* form.
 - `'' (final)` — primitive/literal node. Has `designType`, optional `value`, `tags`.
 - `'object'` — has `props: Map<string, TAtscriptAnnotatedType>`, `propsPatterns`, `tags`.
 - `'array'` — has `of: TAtscriptAnnotatedType`, `tags`.
 - `'union' | 'intersection' | 'tuple'` — has `items: TAtscriptAnnotatedType[]`, `tags`.
-- `metadata` — typed `Map<keyof AtscriptMetadata, …>`. `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md)).
-- `ref` — present only when this node was authored as a reference to another type. `type` is a **function** (lazy) that resolves to the target; `field` is a dot-joined chain into the target.
-- `validator(opts?)` — constructs `new Validator(this, opts)`. **Not cached.**
 
 ## Runtime vs serialized form
 

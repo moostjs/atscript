@@ -20,7 +20,7 @@ export interface User {
   address: {
     street: string
     city: string
-    @expect.pattern /^\d{5}$/
+    @expect.pattern "^\\d{5}$"
     zip: string
   }
 }

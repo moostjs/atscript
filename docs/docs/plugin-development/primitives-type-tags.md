@@ -312,14 +312,25 @@ annotations: {
 }
 ```
 
-Multiple patterns are expressed as an array — the value must match **at least one**:
+Multiple patterns can be expressed as an array, but they are **conjunctive** — the value must match **all of them** (same as stacking `@expect.pattern` in `.as` source). Use an array when each rule is a separate requirement with its own error message:
 
 ```typescript
 annotations: {
   'expect.pattern': [
-    { pattern: '^\\d{4}-\\d{2}-\\d{2}$', message: 'Invalid date format' },
-    { pattern: '^\\d{2}/\\d{2}/\\d{4}$', message: 'Invalid date format' },
+    { pattern: '[0-9]', message: 'Must contain a digit' },
+    { pattern: '[A-Z]', message: 'Must contain an uppercase letter' },
   ],
+}
+```
+
+For *alternative* formats ("either this shape or that one"), combine them into a single alternation regex — this is how the built-in `string.date` and `string.ip` primitives are defined:
+
+```typescript
+annotations: {
+  'expect.pattern': {
+    pattern: '^(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}/\\d{2}/\\d{4})$',
+    message: 'Invalid date format',
+  },
 }
 ```
 

@@ -19,7 +19,7 @@ export interface User {
     @meta.label 'Email Address'
     email: string.email
 
-    @ui.placeholder 'Optional biography'
+    @ui.placeholder 'Optional biography'   // @ui.* requires the UI plugin — see below
     bio?: string
 }
 ```

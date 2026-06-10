@@ -46,7 +46,7 @@ In `package.json`:
 
 Per `foo.as`:
 
-- **`foo.as.d.ts`** — TS types. `declare class Foo` with static `type`, `metadata`, `validator()` (plus a `declare namespace Foo` for type-aliases). Comments → JSDoc.
+- **`foo.as.d.ts`** — TS types. `declare class Foo` with static `type`, `metadata`, `validator()` (plus a `declare namespace Foo` for type-aliases). JSDoc headers are generated (entity name + `@see`); source comments are not preserved.
 - **`foo.as.js`** — runtime metadata (`defineAnnotatedType()` chains). What `import { Foo } from './foo.as'` evaluates to.
 
 Project root (or config-specified location):

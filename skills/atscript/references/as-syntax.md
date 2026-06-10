@@ -17,7 +17,7 @@ type Helper = string   // file-local, not exported
 ```
 
 - Only `export`ed declarations are visible to other `.as` files.
-- Comments preserved as JSDoc on generated `.d.ts`.
+- Comments are source-only — they are **not** carried into generated `.as.d.ts`/`.as.js` (the JSDoc seen in `.d.ts` is generated entity headers, not your comments).
 - Import paths resolve relative; **omit the `.as` extension** — the resolver always appends `.as`. Writing `'./x.as'` resolves to `./x.as.as`.
 
 ## `interface`

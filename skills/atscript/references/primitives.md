@@ -24,8 +24,8 @@ Chained via dots. Each narrows the parent with annotation-based constraints; TS 
 | ----------------- | --------------------------------------------------------------------------------- |
 | `string.email`    | `expect.pattern` for email format.                                                |
 | `string.phone`    | `expect.pattern` `^\+?[0-9\s-]{10,15}$`.                                          |
-| `string.date`     | `expect.pattern` (multiple): `YYYY-MM-DD` / `MM/DD/YYYY` / `DD-MM-YYYY` / `D Month YYYY`. |
-| `string.isoDate`  | `expect.pattern` (multiple): ISO 8601 UTC or with timezone.                       |
+| `string.date`     | `expect.pattern` (single alternation): `YYYY-MM-DD` / `MM/DD/YYYY` / `DD-MM-YYYY` / `D Month YYYY`. |
+| `string.isoDate`  | `expect.pattern` (single alternation): ISO 8601, UTC `Z` or numeric offset.       |
 | `string.uuid`     | `expect.pattern` UUID (any version, case-insensitive).                            |
 | `string.url`      | `expect.pattern` `^https?:\/\/[^\s]+$`.                                           |
 | `string.ip`       | `expect.pattern` IPv4 or IPv6.                                                    |

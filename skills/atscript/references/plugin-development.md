@@ -18,19 +18,20 @@ Plugins can register primitives, annotations, emit new output formats (another l
 import type { TAtscriptPlugin, TPluginOutput, TAtscriptRenderFormat, TAtscriptConfig } from '@atscript/core'
 import type { AtscriptDoc, AtscriptRepo } from '@atscript/core'
 import type { TOutput } from '@atscript/core'   // TOutput = TPluginOutput + { source, target }
-
-export interface TAtscriptPlugin {
-  name: string                                                        // required
-  config?(config: TAtscriptConfig): Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
-  resolve?(id: string): Promise<string | undefined> | string | undefined
-  load?(id: string): Promise<string | undefined> | string | undefined
-  onDocument?(doc: AtscriptDoc): Promise<void> | void
-  render?(doc: AtscriptDoc, format: TAtscriptRenderFormat): Promise<TPluginOutput[]> | TPluginOutput[]
-  buildEnd?(output: TOutput[], format: TAtscriptRenderFormat, repo: AtscriptRepo): Promise<void> | void
-}
 ```
 
-All hooks optional except `name`. Plugins run in the order they appear in `plugins: [...]`.
+A plugin is a plain object: required `name` + optional hooks, each sync or async:
+
+| Hook         | Args → returns                                                          |
+| ------------ | ----------------------------------------------------------------------- |
+| `config`     | `(config: TAtscriptConfig)` → partial config to merge, or `undefined`   |
+| `resolve`    | `(id: string)` → resolved stable ID, or `undefined` to fall through     |
+| `load`       | `(id: string)` → source text, or `undefined` to fall through            |
+| `onDocument` | `(doc: AtscriptDoc)` → void                                             |
+| `render`     | `(doc: AtscriptDoc, format: TAtscriptRenderFormat)` → `TPluginOutput[]` |
+| `buildEnd`   | `(output: TOutput[], format, repo: AtscriptRepo)` → void                |
+
+Plugins run in the order they appear in `plugins: [...]`. Per-hook usage below.
 
 ### `config(config)`
 

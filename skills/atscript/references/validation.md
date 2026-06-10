@@ -23,31 +23,18 @@ if (!ok) {
 
 `User.validator(opts?)` constructs a fresh `Validator` each call (not cached). Reuse the instance if you call it in a hot path.
 
-## `TValidatorOptions`
+## Options (`TValidatorOptions`)
 
-```ts
-interface TValidatorOptions {
-  partial: boolean | 'deep' | ((type: TAtscriptAnnotatedType, path: string) => boolean)
-  replace?: (type: TAtscriptAnnotatedType, path: string) => TAtscriptAnnotatedType
-  plugins: TValidatorPlugin[]
-  unknownProps: 'strip' | 'ignore' | 'error'
-  errorLimit: number
-  skipList?: Set<string>
-}
-```
+All optional — pass any subset to `.validator(opts)`:
 
-- `partial` — allow missing required fields.
-  - `true` → shallow (top-level only).
-  - `'deep'` → partial at every nesting level.
-  - function `(type, path) => boolean` → return `true` to treat as optional.
-- `replace?` — `(type, path) => TAtscriptAnnotatedType` substitutes the type to validate against at a given path. Results cached per-type via `WeakMap`.
-- `unknownProps`:
-  - `'strip'` → remove (mutates the object).
-  - `'ignore'` → leave silently.
-  - `'error'` → fail. **Default.**
-- `errorLimit` — stop accumulating after N. Default `10`.
-- `skipList?` — `Set<string>` of property paths to skip entirely.
-- `plugins` — custom checks (see below).
+| Option         | Values (default first)                                                                            | Effect                                                                                            |
+| -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `partial`      | `false` · `true` (top-level only) · `'deep'` (every level) · `(type, path) => boolean`             | Allow missing required fields                                                                       |
+| `unknownProps` | `'error'` · `'strip'` (removes — **mutates the object**) · `'ignore'`                               | How unknown properties are treated                                                                  |
+| `errorLimit`   | `10`                                                                                                | Stop accumulating errors after N                                                                    |
+| `replace`      | `(type, path) => TAtscriptAnnotatedType`                                                            | Substitute the type validated against at a path; results cached per-type via `WeakMap`              |
+| `skipList`     | `Set<string>` of property paths                                                                     | Skip those paths entirely                                                                           |
+| `plugins`      | `TValidatorPlugin[]`                                                                                | Custom checks (see below)                                                                           |
 
 ## `ValidatorError`
 

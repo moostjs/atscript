@@ -20,7 +20,7 @@ export const users = pgTable(
 
 ```ts
 import { createInsertSchema } from 'drizzle-zod'
-import { users } from '..https://db.atscript.dev/schema'
+import { users } from '../db/schema'
 
 export const insertUserSchema = createInsertSchema(users, {
   email: s => s.email.email(),

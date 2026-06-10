@@ -148,6 +148,13 @@ The most common validation rules come from:
 
 For array uniqueness and other less common rules, see the [Validation Reference](/packages/typescript/validation-reference).
 
+## DOs and DON'Ts
+
+- **DO expect extra fields to fail validation by default.** `unknownProps` defaults to `'error'` — if a payload may carry extra fields, choose `'strip'` or `'ignore'` deliberately.
+- **DON'T forget that `'strip'` mutates your input.** It deletes the extra fields from the object you passed in — clone the payload first if you still need the original.
+- **DO create the validator once and reuse it in hot paths.** `.validator()` builds a fresh instance on every call. Reuse is safe: each `validate()` call resets `validator.errors` before running.
+- **DO raise `errorLimit` when a form needs every message.** Validation stops collecting after 10 errors by default, so long forms may show an incomplete error list.
+
 ## When To Read The Reference
 
 Use the reference page when you need:

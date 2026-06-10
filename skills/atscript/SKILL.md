@@ -6,7 +6,9 @@ description: >-
   syntax, `@meta.*` / `@expect.*` / custom annotations, primitives, the `asc`
   CLI + `atscript.config.*`, generated `.as.d.ts` / `.as.js` / `atscript.d.ts`,
   runtime helpers (`Validator`, JSON Schema, serialize), `unplugin-atscript`,
-  `@atscript/moost-validator`, VSCode LSP, and plugin authoring.
+  `@atscript/moost-validator`, VSCode LSP, and plugin authoring. Out of scope:
+  `@db.*` annotations, schema sync, DB adapters → use the atscript-db skill;
+  `@ui.*` annotations, vue-form, vue-table → use the atscript-ui skill.
 ---
 
 # atscript

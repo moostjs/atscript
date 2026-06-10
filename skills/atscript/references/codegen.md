@@ -52,7 +52,7 @@ export declare class User {
 
 For `export type X = …` aliases: `export type X = …` plus a `declare namespace X` carrying `const type`, `const metadata`, `const validator`, etc.
 
-JSDoc is preserved from `.as` comments.
+The JSDoc blocks in generated `.d.ts` are produced by codegen (entity name + `@see` source link, deprecation notices); source `.as` comments are **not** preserved in output.
 
 ## `.js` shape
 

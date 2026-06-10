@@ -50,27 +50,25 @@ export const primitives: Record<string, TPrimitiveConfig> = {
       date: {
         documentation: 'Represents a date string.',
         annotations: {
-          'expect.pattern': [
-            { pattern: '^\\d{4}-\\d{2}-\\d{2}$', message: 'Invalid date format.' }, // YYYY-MM-DD
-            { pattern: '^\\d{2}/\\d{2}/\\d{4}$', message: 'Invalid date format.' }, // MM/DD/YYYY
-            { pattern: '^\\d{2}-\\d{2}-\\d{4}$', message: 'Invalid date format.' }, // DD-MM-YYYY
-            { pattern: '^\\d{1,2} [A-Za-z]+ \\d{4}$', message: 'Invalid date format.' }, // D Month YYYY
-          ],
+          // multiple expect.pattern entries are conjunctive (all must match),
+          // so alternative formats live in a single alternation regex
+          'expect.pattern': {
+            // YYYY-MM-DD | MM/DD/YYYY | DD-MM-YYYY | D Month YYYY
+            pattern:
+              '^(?:\\d{4}-\\d{2}-\\d{2}|\\d{2}/\\d{2}/\\d{4}|\\d{2}-\\d{2}-\\d{4}|\\d{1,2} [A-Za-z]+ \\d{4})$',
+            message: 'Invalid date format.',
+          },
         },
       },
       isoDate: {
         documentation: 'Represents a date string in ISO format.',
         annotations: {
-          'expect.pattern': [
-            {
-              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$',
-              message: 'Invalid ISO date format.',
-            }, // UTC ISO 8601
-            {
-              pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?([+-]\\d{2}:\\d{2})$',
-              message: 'Invalid ISO date format.',
-            }, // ISO 8601 with timezone
-          ],
+          'expect.pattern': {
+            // ISO 8601, UTC ("Z") or numeric timezone offset
+            pattern:
+              '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$',
+            message: 'Invalid ISO date format.',
+          },
         },
       },
       uuid: {
