@@ -1,4 +1,4 @@
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 
 import { build } from '@atscript/core'
@@ -24,7 +24,8 @@ export interface PrepareFixturesOptions {
  * artifacts (`.as.js` and/or `.as.d.ts`) next to their sources.
  *
  * `tsPlugin()` is injected automatically — callers pass only extra plugins.
- * Writes are unconditional; artifacts are treated as test-run outputs.
+ * Files are only written when their content changed, so repeat runs
+ * don't touch mtimes of up-to-date artifacts.
  */
 export async function prepareFixtures(options: PrepareFixturesOptions): Promise<void> {
   const { rootDir, plugins = [], entries, include, formats = ['js', 'dts'] } = options
@@ -40,7 +41,15 @@ export async function prepareFixtures(options: PrepareFixturesOptions): Promise<
   for (const files of results) {
     for (const file of files) {
       const target = file.target ?? path.join(rootDir, file.fileName)
-      writeFileSync(target, file.content)
+      let existing: string | undefined
+      try {
+        existing = readFileSync(target, 'utf8')
+      } catch {
+        // file does not exist yet
+      }
+      if (existing !== file.content) {
+        writeFileSync(target, file.content)
+      }
     }
   }
 }

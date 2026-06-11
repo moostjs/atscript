@@ -83,7 +83,7 @@ describe('prepareFixtures', () => {
     rmSync(scoped, { recursive: true, force: true })
   })
 
-  it('writes unconditionally — rewrites identical content and bumps mtime', async () => {
+  it('skips unchanged files — repeat run leaves mtime intact, stale content is rewritten', async () => {
     const scoped = mkdtempSync(path.join(tmpdir(), 'atscript-test-utils-mtime-'))
     writeFixture(scoped, 'm.as', SOURCE_A)
 
@@ -98,11 +98,13 @@ describe('prepareFixtures', () => {
     })
 
     await prepareFixtures({ rootDir: scoped })
-    const secondContent = readFileSync(targetJs, 'utf8')
-    const secondMtime = statSync(targetJs).mtimeMs
+    expect(readFileSync(targetJs, 'utf8')).toBe(firstContent)
+    expect(statSync(targetJs).mtimeMs).toBe(firstMtime)
 
-    expect(secondContent).toBe(firstContent)
-    expect(secondMtime).toBeGreaterThan(firstMtime)
+    // stale artifact content must still be refreshed
+    writeFileSync(targetJs, '// stale')
+    await prepareFixtures({ rootDir: scoped })
+    expect(readFileSync(targetJs, 'utf8')).toBe(firstContent)
 
     rmSync(scoped, { recursive: true, force: true })
   })
