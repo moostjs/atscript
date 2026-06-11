@@ -139,9 +139,41 @@ Everything else (primitives, annotations, plugins, `include`/`exclude`) lives in
 
 In development the plugin compiles on demand with hot module replacement (native on Vite/Webpack/Rspack/Farm; via watch mode on Rollup/Rolldown). In production it pre-compiles during the build.
 
-::: warning Types are not emitted by the bundler plugin
-`unplugin-atscript` produces **runtime JS only** — it never writes `.as.d.ts` or the project-level `atscript.d.ts`. For type checking and IDE support, generate types with the [CLI](/packages/typescript/cli): `asc -f dts` (e.g. as a `postinstall` and pre-build step), or let the [VSCode extension](/packages/vscode/) regenerate them on save.
+::: warning Type artifacts are not written by the bundler plugin
+`unplugin-atscript` never writes `.as.d.ts` or the project-level `atscript.d.ts` to disk. For type checking and IDE support, generate types with the [CLI](/packages/typescript/cli): `asc -f dts` (e.g. as a `postinstall` and pre-build step), or let the [VSCode extension](/packages/vscode/) regenerate them on save. (Declaration *bundling* in library builds is a separate concern — see [below](#library-builds-with-declaration-bundling).)
 :::
+
+## Library Builds with Declaration Bundling
+
+If you build a **library** whose TypeScript entries re-export `.as` symbols and bundle declarations with `rolldown-plugin-dts` (used by `tsdown`) or `rollup-plugin-dts`, the plugin serves type declarations to the declaration pass automatically: when the declaration bundler resolves an `.as` import from a generated declaration module, `unplugin-atscript` responds with the same declarations `asc -f dts` would produce, rendered fresh from the `.as` source. Re-exported symbols stay fully typed in the bundled `.d.ts`.
+
+```typescript
+// src/index.ts — a library entry re-exporting an Atscript model
+export { User } from './models/user.as'
+```
+
+```typescript
+// tsdown.config.ts
+import { defineConfig } from 'tsdown'
+import atscript from 'unplugin-atscript/rolldown'
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  dts: true,
+  plugins: [atscript()],
+})
+```
+
+The only requirement is that `atscript()` is present in the plugin list of the build that bundles declarations — the same plugin instance covers both the runtime and declaration passes.
+
+**Symptom of a missing plugin:** a re-exported `.as` symbol works as a *value* but loses all properties in a *type* position, and the emitted declaration imports it from a JS chunk:
+
+```typescript
+// dist/index.d.mts — broken: no declaration exists for the .mjs chunk
+import { t as User } from './user-ABC123.mjs'
+```
+
+If you see this, the plugin was not wired into the declaration build (or you are on an `unplugin-atscript` version that predates declaration support).
 
 ## Bundling for Production
 

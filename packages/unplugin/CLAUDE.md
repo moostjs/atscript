@@ -42,12 +42,16 @@ Vite, Rollup, Rolldown, Webpack, esbuild, Rspack, Farm (via Unplugin 2.x)
 
 ## How It Works
 
-1. **resolveId** -- Resolves relative `.as` file imports
-2. **load** -- For each `.as` file:
+1. **resolveId** -- Resolves relative `.as` file imports. When the importer is a
+   declaration module (`.d.ts`/`.d.mts`/`.d.cts` — the dts graph of
+   rolldown-plugin-dts/tsdown or rollup-plugin-dts), resolves to a `<file>.as.d.ts`
+   id instead, so re-exported `.as` symbols stay typed in bundled declarations
+2. **load** -- For each `.as` file (or `.as.d.ts` id from the dts graph):
    - Reads Atscript config via `@atscript/core`
    - Creates `AtscriptRepo` instance
    - Loads and validates the document
-   - Renders output to JavaScript via `doc.render('js')`
+   - Renders output via `doc.render('js')` (or `doc.render('dts')` for `.as.d.ts`
+     ids, with the `/// <reference path>` directive stripped)
    - Handles diagnostics (errors in strict mode, warnings always logged)
    - Returns JS with proper `moduleSideEffects` flag
 

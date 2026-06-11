@@ -62,8 +62,17 @@ Per matching `.as`:
 1. `resolveId` — resolves `.as` imports (incl. relative without extension).
 2. `load` / `transform` — parses, runs configured plugins, returns generated JS (= `asc -f js` output).
 3. Tags the module `moduleSideEffects: false` where appropriate for tree-shaking.
+4. **Declaration bundling**: when the importer is a declaration module (`.d.ts`/`.d.mts`/`.d.cts` — the dts graph of `rolldown-plugin-dts`/`tsdown` or `rollup-plugin-dts`), serves the type declaration (= `asc -f dts` output, rendered fresh) instead of JS, so `.as` symbols re-exported through TS entries stay typed in bundled declarations.
 
-`.d.ts` outputs and the project-level `atscript.d.ts` are **not** produced by the unplugin — only runtime JS. Run `asc -f dts` (manually or in a pre-dev / pre-build script) to keep types in sync. VSCode extension regenerates `.d.ts` on save.
+`.as.d.ts` files and the project-level `atscript.d.ts` are **not written to disk** by the unplugin. Run `asc -f dts` (manually or in a pre-dev / pre-build script) to keep IDE/typecheck types in sync. VSCode extension regenerates `.d.ts` on save.
+
+## Library builds that re-export `.as` symbols
+
+| # | Rule |
+| - | ---- |
+| 1 | A TS entry doing `export { Model } from './model.as'` + declaration bundling (tsdown / rolldown-plugin-dts / rollup-plugin-dts) requires `atscript()` in the **declaration build's** plugin list — same plugin, no extra option. |
+| 2 | Symptom of missing plugin (or pre-declaration-support version): emitted `.d.mts` imports the symbol from a JS chunk (`import { t as Model } from './chunk-XYZ.mjs'`) — value works, type position collapses to no properties. |
+| 3 | Bare `.as` specifiers from other packages (`my-lib/model.as`) are left to package `exports` resolution — the dependency must ship a `types` condition on its `.as` subpath. |
 
 ## HMR
 
@@ -121,6 +130,7 @@ The same applies if you subpath-import from any other `@atscript/*` package (`@a
 - **"Cannot find atscript.config"** — ensure the config lives at/above `process.cwd()`.
 - **Type errors on `.as` imports** — runtime is fine, `.d.ts` is stale. Run `asc -f dts`.
 - **`.as` changes not picked up** — HMR depends on the bundler's watcher. Verify the bundler sees the file at all.
+- **Re-exported `.as` symbol untyped in a consumer / dist `.d.mts` imports it from a `.mjs` chunk** — see [Library builds that re-export `.as` symbols](#library-builds-that-re-export-as-symbols).
 
 ## See also
 

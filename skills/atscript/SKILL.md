@@ -117,7 +117,7 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType`, `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth    |
 | Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, JSON Schema helpers, plugins                                 |
-| Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict                               |
+| Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
 | Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes, error transform                                                                |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |
 | Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd                                        |

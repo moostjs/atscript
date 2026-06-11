@@ -15,6 +15,13 @@ export interface atscriptPluginOptions {
   strict?: boolean
 }
 
+// Matches declaration-module ids (.d.ts / .d.mts / .d.cts). Declaration bundlers
+// (rolldown-plugin-dts via tsdown, rollup-plugin-dts) resolve the imports of
+// generated .d.ts modules through the same plugin container, so a `.d.ts`
+// importer is the in-band signal that the dts graph — not the JS graph — is
+// asking for the module.
+const RE_DTS = /\.d\.[cm]?ts$/
+
 export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
   const root = process.cwd()
   const strict = opts?.strict ?? true
@@ -41,12 +48,24 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
         if (!id.startsWith('.') && !id.startsWith('/')) {
           return null
         }
-        return path.join(path.dirname(importer), id)
+        const resolved = path.join(path.dirname(importer), id)
+        // In the dts graph, serving the JS render would bind the symbol to a JS
+        // chunk and ship it untyped — resolve to a `<file>.as.d.ts` id instead,
+        // which `load` serves via render('dts').
+        if (RE_DTS.test(importer)) {
+          return `${resolved}.d.ts`
+        }
+        return resolved
       }
     },
 
     async load(id) {
-      if (id.endsWith('.as')) {
+      // `<file>.as.d.ts` ids are produced by `resolveId` for the dts graph; the
+      // declaration is rendered fresh from the `.as` source, so it never depends
+      // on (possibly stale) asc-emitted artifacts on disk.
+      const isDts = id.endsWith('.as.d.ts')
+      const sourceId = isDts ? id.slice(0, -'.d.ts'.length) : id
+      if (sourceId.endsWith('.as')) {
         if (!repo) {
           const config = await getConfig()
           if (!config.plugins) {
@@ -54,8 +73,8 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
           }
           repo = new AtscriptRepo(root, config as TAtscriptConfigInput)
         }
-        const code = (await readFile(id, 'utf8')).toString()
-        const doc = await repo.openDocument(`file://${id}`, code)
+        const code = (await readFile(sourceId, 'utf8')).toString()
+        const doc = await repo.openDocument(`file://${sourceId}`, code)
         await repo.checkDoc(doc)
         const messages = doc.getDiagMessages().reverse()
         let error = ''
@@ -75,6 +94,20 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
         }
         if (error) {
           throw new Error(error)
+        }
+        if (isDts) {
+          const out = await doc.render('dts')
+          // Strip the `/// <reference path="./<name>.as" />` editor association:
+          // the declaration bundler re-emits reference directives into the final
+          // chunk, where the relative .as path would not exist.
+          const content = (out?.[0]?.content || '').replace(
+            /^\/{3}\s*<reference\s+path=[^\n]*\n/m,
+            ''
+          )
+          return {
+            code: content,
+            map: null,
+          }
         }
         const out = await doc.render('js')
         const hasMutatingAnnotates = doc.nodes.some(n => isAnnotate(n) && n.isMutating)
