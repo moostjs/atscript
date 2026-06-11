@@ -1,3 +1,12 @@
+## [0.1.76](https://github.com/moostjs/atscript/compare/v0.1.75...v0.1.76) (2026-06-11)
+
+
+### Features
+
+* **unplugin:** serve dts render for .as re-exports in declaration bundling and bump moost to ^0.6.27 ([bf479f6](https://github.com/moostjs/atscript/commit/bf479f61c0c694daefad3729e33d03d6ec87a4e3))
+
+
+
 ## [0.1.75](https://github.com/moostjs/atscript/compare/v0.1.74...v0.1.75) (2026-06-10)
 
 
