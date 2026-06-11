@@ -55,9 +55,9 @@ Defaults applied when the option is omitted:
 | `plugins` | `[]`            | `tsPlugin()` is always injected before any caller-supplied plugin |
 | `include` | `['**/*.as']`   | Used only when `entries` is not provided                          |
 | `entries` | `undefined`     | When set, narrows compilation to exactly those filenames          |
-| `formats` | `['js', 'dts']` | Both formats are written on every call                            |
+| `formats` | `['js', 'dts']` | Both formats generated each call; written only when content changed |
 
-Generated `.as.js` / `.as.d.ts` artifacts are intended as test-run outputs — gitignore them (`*.as.js`, `*.as.d.ts`) and let `prepareFixtures()` rewrite them on every run.
+Generated `.as.js` / `.as.d.ts` artifacts are intended as test-run outputs — gitignore them (`*.as.js`, `*.as.d.ts`). `prepareFixtures()` recompiles them each run and rewrites only the ones whose content changed, so up-to-date artifacts keep their mtime.
 
 ## Production `.as` vs test fixtures
 

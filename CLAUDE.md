@@ -79,7 +79,7 @@ Pattern:
 1. Create `.as` files in `__test__/fixtures/` (e.g. `user.as`)
 2. Call `await prepareFixtures({ rootDir, entries: ['user.as'] })` in `beforeAll` — this compiles the selected `.as` files to `.as.js` + `.as.d.ts` on every test run. `tsPlugin()` is auto-injected; pass only extra plugins.
 3. Import compiled types: `const { User } = await import('./fixtures/user.as.js')`
-4. Fixture artifacts (`.as.js`, `.as.d.ts`) are gitignored and regenerated on every test run — they are not committed.
+4. Fixture artifacts (`.as.js`, `.as.d.ts`) are gitignored and recompiled each test run (rewritten only when their content changed) — they are not committed.
 
 ```ts
 import { prepareFixtures } from '@atscript/typescript/test-utils'

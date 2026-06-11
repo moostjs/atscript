@@ -32,7 +32,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 
 ### `@atscript/typescript/test-utils` (dev-time, for compiling `.as` fixtures in tests)
 
-- `prepareFixtures(options)` — compiles `.as` files under `options.rootDir` and writes the generated `.as.js` / `.as.d.ts` artifacts next to their sources. `tsPlugin()` is auto-injected. Writes are unconditional — fixture artifacts are test-run outputs, gitignored (`*.as.js`, `*.as.d.ts`) and regenerated on every run. Use in `beforeAll` or Vitest `globalSetup`. This package has no `postinstall` hook (no production `.as` in its `src/`), so fixtures are produced exclusively at test time.
+- `prepareFixtures(options)` — compiles `.as` files under `options.rootDir` and writes the generated `.as.js` / `.as.d.ts` artifacts next to their sources. `tsPlugin()` is auto-injected. Artifacts are recompiled every run but written only when their content changed (a no-op rerun leaves up-to-date files — and their mtimes — untouched). They are test-run outputs, gitignored (`*.as.js`, `*.as.d.ts`). Use in `beforeAll` or Vitest `globalSetup`. This package has no `postinstall` hook (no production `.as` in its `src/`), so fixtures are produced exclusively at test time.
 
 ### `@atscript/typescript/utils` (runtime, used by generated .js files)
 
