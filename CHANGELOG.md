@@ -1,3 +1,12 @@
+## [0.1.77](https://github.com/moostjs/atscript/compare/v0.1.76...v0.1.77) (2026-06-14)
+
+
+### Bug Fixes
+
+* **core:** defer type-introspecting annotation validation to diagnostic time so cross-file imported field types resolve ([820aeaf](https://github.com/moostjs/atscript/commit/820aeaf5cf1e397c5012b7abba19127854f6eb57))
+
+
+
 ## [0.1.76](https://github.com/moostjs/atscript/compare/v0.1.75...v0.1.76) (2026-06-11)
 
 
