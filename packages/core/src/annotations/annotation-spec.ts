@@ -199,26 +199,43 @@ export class AnnotationSpec {
           range: token.range,
         })
       }
+    }
 
-      // 4. Validate type of node def
-      if (this.config.defType?.length) {
-        const parentNode = mainToken.parentNode
-        const idToken = isRef(parentNode) ? parentNode.token('identifier') : undefined
-        const isAnnotateEntry =
-          !!idToken &&
-          !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
-        // Annotate-block entries reference a prop of a (possibly imported)
-        // target interface whose type can't be resolved at parse time —
-        // cross-file dependencies aren't wired yet. Defer their target-type
-        // guard to diagnostic time (AtscriptDoc.getDiagMessages), where imports
-        // are resolved. Inline props resolve locally and are checked here.
-        if (!isAnnotateEntry) {
-          let def = parentNode.getDefinition()
-          if (isRef(def)) {
-            def = doc.unwindType(def.id!, def.chain)?.def || def
-          }
-          messages.push(...(this.validateTargetType(def, mainToken.range) || []))
+    // Type-introspecting checks (the `defType` target-type guard and the plugin
+    // `validate` hook) are deferred to diagnostic time — see `validateDeferred`.
+
+    return messages.length > 0 ? messages : undefined
+  }
+
+  /**
+   * Cross-file-dependent validation, deferred to diagnostic time
+   * (`AtscriptDoc.getDiagMessages`) where imported target types finally resolve.
+   *
+   * Runs the `defType` target-type guard for inline props and the
+   * plugin-provided `validate` hook. Both introspect the field's resolved type
+   * via `doc.unwindType`, so running them at parse time — before cross-file
+   * dependencies are wired — yielded unresolved imports and spurious
+   * diagnostics. Annotate-block entries' `defType` guard is handled separately
+   * by `getDiagMessages` (the `referred` loop) and is skipped here.
+   */
+  validateDeferred(mainToken: Token, args: Token[], doc: AtscriptDoc): TMessages | undefined {
+    if (!mainToken.parentNode) {
+      return undefined
+    }
+    const messages: TMessages = []
+
+    if (this.config.defType?.length) {
+      const parentNode = mainToken.parentNode
+      const idToken = isRef(parentNode) ? parentNode.token('identifier') : undefined
+      const isAnnotateEntry =
+        !!idToken &&
+        !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
+      if (!isAnnotateEntry) {
+        let def = parentNode.getDefinition()
+        if (isRef(def)) {
+          def = doc.unwindType(def.id!, def.chain)?.def || def
         }
+        messages.push(...(this.validateTargetType(def, mainToken.range) || []))
       }
     }
 

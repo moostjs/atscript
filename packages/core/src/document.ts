@@ -1332,6 +1332,19 @@ export class AtscriptDoc {
           }
         }
       }
+      // Deferred annotation validation: type-introspecting checks (the `defType`
+      // guard on inline props and plugin `validate` hooks) run here, after
+      // cross-file dependencies are wired, so imported field types resolve the
+      // same way they do at codegen time. Running them at parse time
+      // (registerAnnotation) saw unresolved imports and produced spurious
+      // diagnostics. Annotate-block entries' `defType` guard is handled by the
+      // `referred` loop above and skipped inside `validateDeferred`.
+      for (const a of this.annotations) {
+        const spec = this.resolveAnnotation(a.name)
+        if (spec) {
+          this._allMessages.push(...(spec.validateDeferred(a.token, a.args, this) || []))
+        }
+      }
     }
     return this._allMessages
   }
