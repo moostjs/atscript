@@ -284,6 +284,11 @@ type TKind = '' | 'array' | 'object' | 'union' | 'intersection' | 'tuple'
  */
 export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHandle {
   const kind = _kind || ''
+  // Whether a named-type `base` (a generated class being patched) was provided.
+  // Captured before `base` is reassigned to the payload below. Gates the in-place
+  // contract in refTo(): only when patching a named base do we clone the referenced
+  // type def (to avoid shared-reference leaks) and preserve the base's own id.
+  const baseProvided = base !== undefined
   const type = (base?.type || {}) as { kind: TKind } & Omit<TAtscriptTypeComplex, 'kind'> &
     Omit<TAtscriptTypeFinal, 'kind'> &
     Omit<TAtscriptTypeArray, 'kind'> &
@@ -357,6 +362,13 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
         | (() => TAtscriptAnnotatedType & { name?: string }),
       chain?: string[]
     ) {
+      // refTo must honor the same in-place contract as every other builder method:
+      // when defineAnnotatedType(kind, base) was given a named-type `base` (a generated
+      // class being patched), the resolved type/ref/id must be written ONTO this.$type
+      // (the base node) — NOT onto a fresh detached node. Codegen emits the alias patch
+      // as a bare `$("", X).refTo(...)` statement whose return value is unused, so
+      // reassigning this.$type would silently lose the patch and leave X with type = {}.
+      const node = this.$type
       // Check isAnnotatedType first — ES classes are typeof 'function' but should be treated as eager refs
       if (isAnnotatedType(type)) {
         let newBase = type
@@ -378,18 +390,27 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
         // Metadata is NOT copied from the referenced type at runtime.
         // Type-level annotations are emitted at build time by the code generator,
         // making metadata resolution independent of declaration order.
-        this.$type = createAnnotatedTypeNode(newBase.type, metadata, {
-          id: newBase.id,
-          ref: chain && chain.length > 0 ? { type: () => type, field: chain.join('.') } : undefined,
-        })
+        //
+        // When patching a named base, CLONE the target type def so the alias does not
+        // share the referenced type's nodes/maps by reference — otherwise mutating ad-hoc
+        // annotations applied to the alias would leak onto the referenced type (codegen
+        // only $c-clones intermediate ref boundaries, never leaf props). Anonymous
+        // (field/prop) refs keep sharing by reference, as before.
+        node.type = baseProvided ? cloneTypeDef(newBase.type) : newBase.type
+        // Preserve the base's own id (e.g. the alias name); only adopt the target's id for
+        // anonymous refs that have none. Overwriting it would collapse distinct object
+        // aliases into a single json-schema $def.
+        node.id = node.id ?? newBase.id
+        if (chain && chain.length > 0) {
+          node.ref = { type: () => type, field: chain.join('.') }
+        }
       } else if (typeof type === 'function') {
-        // Lazy ref — type will be resolved on first access (avoids circular import/bundle issues)
+        // Lazy ref — type resolved on first access (avoids circular import/bundle TDZ issues).
+        // The resolving getter is installed on this.$type (the base) so the named class is
+        // patched in place; resolution stays deferred (no forced access at install time).
         const lazyType = type as () => TAtscriptAnnotatedType & { name?: string }
-        this.$type = createAnnotatedTypeNode({ kind: '' } as TAtscriptTypeDef, metadata, {
-          ref: { type: lazyType, field: chain ? chain.join('.') : '' },
-        })
-        // Patch the type lazily — resolves chain traversal on first access
-        const node = this.$type
+        const ownId = node.id
+        node.ref = { type: lazyType, field: chain ? chain.join('.') : '' }
         const placeholder = node.type
         Object.defineProperty(node, 'type', {
           get() {
@@ -418,14 +439,19 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
                 }
               }
             }
-            node.id = chain ? target.id : target.id || t.id
+            // Preserve the base's own id; only adopt the target's id for anonymous refs.
+            // (Without a chain `target === t`, so the resolved target id covers both cases —
+            // this mirrors the eager branch's `node.id ?? newBase.id`.)
+            node.id = ownId ?? target.id
+            // Clone when patching a named base (see eager branch); anonymous refs share.
+            const resolved = baseProvided ? cloneTypeDef(target.type) : target.type
             // Replace getter with resolved value for zero-overhead subsequent access
             Object.defineProperty(node, 'type', {
-              value: target.type,
+              value: resolved,
               writable: false,
               configurable: true,
             })
-            return target.type
+            return resolved
           },
           configurable: true,
         })
