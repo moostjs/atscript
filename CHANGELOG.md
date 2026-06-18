@@ -1,3 +1,12 @@
+## [0.1.78](https://github.com/moostjs/atscript/compare/v0.1.77...v0.1.78) (2026-06-18)
+
+
+### Bug Fixes
+
+* **typescript:** refTo patches the named base in place so type aliases keep their runtime type ([4e1f8db](https://github.com/moostjs/atscript/commit/4e1f8db4fa0fb4fad10adc717b40d06cea3fe3d3))
+
+
+
 ## [0.1.77](https://github.com/moostjs/atscript/compare/v0.1.76...v0.1.77) (2026-06-14)
 
 
