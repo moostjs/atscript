@@ -1,3 +1,12 @@
+## [0.1.79](https://github.com/moostjs/atscript/compare/v0.1.78...v0.1.79) (2026-07-02)
+
+
+### Features
+
+* scope annotation inheritance at ref boundaries via passedWhenReferred spec flag ([6a9d6c2](https://github.com/moostjs/atscript/commit/6a9d6c2556a4624759353bffe8fb0d6175d38cec))
+
+
+
 ## [0.1.78](https://github.com/moostjs/atscript/compare/v0.1.77...v0.1.78) (2026-06-18)
 
 
