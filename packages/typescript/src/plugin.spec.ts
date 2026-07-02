@@ -234,6 +234,49 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/inherit-chain.annotations.d.ts')
     )
   })
+  it('must not pass annotations flagged passedWhenReferred:false across ref boundaries', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/ref-scope.as'],
+      plugins: [tsPlugin()],
+      annotations: {
+        ...annotations,
+        structural: new AnnotationSpec({
+          multiple: true,
+          mergeStrategy: 'append',
+          passedWhenReferred: false,
+          argument: {
+            name: 'value',
+            type: 'string',
+          },
+        }),
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    const code = out[0].content
+    // Slice per-interface metadata blocks: from `$("object", Name)` to the next block
+    const block = (name: string) => {
+      const start = code.indexOf(`$("object", ${name})`)
+      expect(start).toBeGreaterThanOrEqual(0)
+      const end = code.indexOf('$("object",', start + 1)
+      return end === -1 ? code.slice(start) : code.slice(start, end)
+    }
+    // Source keeps its own declarations
+    expect(block('Source')).toContain('.annotate("structural", "by_code", true)')
+    expect(block('Source')).toContain('.annotate("label", "Code")')
+    // One-hop ref: presentation rides, structural does not
+    expect(block('OneHop')).toContain('.annotate("label", "Code")')
+    expect(block('OneHop')).not.toContain('"structural"')
+    // Two-hop ref (through Dict): presentation still rides, inherited structural
+    // still dropped, local structural declaration untouched
+    expect(block('TwoHop')).toContain('.annotate("label", "Code")')
+    expect(block('TwoHop')).toContain('.annotate("structural", "local_idx", true)')
+    expect(block('TwoHop')).not.toContain('"by_code"')
+    // extends is not a ref boundary: structural inherits with the prop
+    expect(block('Extended')).toContain('.annotate("structural", "by_code", true)')
+    expect(block('Extended')).toContain('.annotate("label", "Code")')
+  })
   it('must render real-world example (entity with address)', async () => {
     const repo = await build({
       rootDir: wd,

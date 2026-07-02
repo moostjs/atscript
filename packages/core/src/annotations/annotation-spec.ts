@@ -28,6 +28,16 @@ export interface TAnnotationArgument {
 export interface TAnnotationSpecConfig {
   multiple?: boolean
   mergeStrategy?: 'append' | 'replace' // default 'replace'
+  /**
+   * Whether this annotation is inherited by a field that references the annotated
+   * node via a chain-ref (e.g. `ownerId: User.id`). Defaults to `true`
+   * (value/presentation annotations describe the value and travel with it).
+   * Set to `false` for annotations that describe the declaring scope itself
+   * (indexes, storage options, primary keys) — those must not leak into
+   * referring fields. Only affects ref boundaries; `extends`/intersection
+   * merging always inherits.
+   */
+  passedWhenReferred?: boolean
   description?: string
   nodeType?: TNodeEntity[]
   defType?: Array<SemanticPrimitiveNode['type']>

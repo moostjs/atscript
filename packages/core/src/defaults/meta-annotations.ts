@@ -27,6 +27,7 @@ export const metaAnnotations: TAnnotationsTree = {
       'id: string' +
       '```',
     nodeType: ['prop'],
+    passedWhenReferred: false, // an FK referencing a PK must not become an id itself
   }),
 
   description: new AnnotationSpec({
@@ -85,6 +86,7 @@ export const metaAnnotations: TAnnotationsTree = {
       '```',
     nodeType: ['prop', 'type'],
     multiple: false,
+    passedWhenReferred: false,
   }),
 
   required: new AnnotationSpec({
@@ -109,6 +111,7 @@ export const metaAnnotations: TAnnotationsTree = {
         description: 'Optional error message to display if the validation fails.',
       },
     ],
+    passedWhenReferred: false,
   }),
 
   default: new AnnotationSpec({
@@ -132,6 +135,7 @@ export const metaAnnotations: TAnnotationsTree = {
       type: 'string',
       description: 'The default value. Strings are used as-is; other types are parsed as JSON.',
     },
+    passedWhenReferred: false,
   }),
 
   example: new AnnotationSpec({

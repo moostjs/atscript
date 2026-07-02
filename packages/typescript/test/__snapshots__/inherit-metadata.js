@@ -50,6 +50,7 @@ $("object", ITarget)
     "firstName",
     $()
       .refTo(ISource, ["firstName"])
+      .annotate("label", "First Name")
       .$type
   ).prop(
     "lastName",
@@ -63,6 +64,7 @@ $("object", ITarget)
     "age",
     $()
       .refTo(ISource, ["age"])
+      .annotate("min", 18)
       .$type
   )
 

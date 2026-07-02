@@ -6,6 +6,7 @@
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { resolveAnnotation } from './annotations'
+import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { getQueryScope, resolveQueryFieldRef } from './defaults/db-query-lsp'
 import { IdRegistry } from './parser/id-registry'
@@ -136,8 +137,15 @@ export class AtscriptDoc {
     return this.manager?.render(this, format)
   }
 
+  private readonly _annotationSpecCache = new Map<string, AnnotationSpec | undefined>()
+
   resolveAnnotation(name: string) {
-    return resolveAnnotation(name, this.config.annotations)
+    let spec = this._annotationSpecCache.get(name)
+    if (spec === undefined && !this._annotationSpecCache.has(name)) {
+      spec = resolveAnnotation(name, this.config.annotations)
+      this._annotationSpecCache.set(name, spec)
+    }
+    return spec
   }
 
   /**
@@ -410,20 +418,69 @@ export class AtscriptDoc {
     let right = givenNode.annotations
     let def = givenNode.getDefinition()
     if (def) {
-      if (isRef(def)) {
-        const unwound = this.unwindType(def.token('identifier')!.text, def.chain, intermediate => {
-          if (intermediate?.annotations) {
-            right = this.mergeNodesAnnotations(intermediate.annotations, right)
+      const refDef = isRef(def) ? def : undefined
+      if (refDef) {
+        // Collect the nodes of the ref chain and merge them nearest-first, so
+        // that annotations declared closer to the referring field win over
+        // deeper ones (local > hop-1 > hop-2 > … > resolved type).
+        // unwindType reports hop-2+ nodes through the callback (nearest first)
+        // but returns the directly referred prop only as `node` — prepend it.
+        const chainNodes: SemanticNode[] = []
+        const unwound = this.unwindType(
+          refDef.token('identifier')!.text,
+          refDef.chain,
+          intermediate => {
+            if (intermediate?.annotations?.length) {
+              chainNodes.push(intermediate)
+            }
           }
-        })
+        )
+        if (
+          unwound?.node &&
+          unwound.node !== givenNode &&
+          unwound.node.annotations?.length &&
+          !chainNodes.includes(unwound.node)
+        ) {
+          chainNodes.unshift(unwound.node)
+        }
+        for (const chainNode of chainNodes) {
+          right = this.mergeNodesAnnotations(
+            this.filterPassedWhenReferred(chainNode.annotations),
+            right
+          )
+        }
         def = unwound?.def || def
       }
       if (def) {
         const merged = this.mergeIntersection(def)
-        right = this.mergeNodesAnnotations(merged.annotations, right)
+        right = this.mergeNodesAnnotations(
+          refDef ? this.filterPassedWhenReferred(merged.annotations) : merged.annotations,
+          right
+        )
       }
     }
     return right
+  }
+
+  /**
+   * Drops annotations whose spec declares `passedWhenReferred: false` — used
+   * when folding annotations across a ref boundary. Annotations without a
+   * resolvable spec pass through (default is to inherit). Returns the input
+   * array unchanged when nothing is dropped.
+   */
+  filterPassedWhenReferred(annotations?: TAnnotationTokens[]) {
+    if (!annotations?.length) {
+      return annotations
+    }
+    let filtered: TAnnotationTokens[] | undefined
+    for (let i = 0; i < annotations.length; i++) {
+      if (this.resolveAnnotation(annotations[i].name)?.config.passedWhenReferred === false) {
+        filtered ??= annotations.slice(0, i)
+      } else {
+        filtered?.push(annotations[i])
+      }
+    }
+    return filtered ?? annotations
   }
 
   /**
