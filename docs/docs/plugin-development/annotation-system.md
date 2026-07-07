@@ -28,16 +28,17 @@ new AnnotationSpec({
 
 ### TAnnotationSpecConfig Options
 
-| Option          | Type                    | Default     | Description                                                                                        |
-| --------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------- |
-| `description`   | `string`                | —           | Documentation shown in IntelliSense hover                                                          |
-| `nodeType`      | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                     |
-| `argument`      | `object \| object[]`    | —           | Argument definition(s)                                                                             |
-| `multiple`      | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                     |
-| `mergeStrategy` | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                   |
-| `defType`       | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).   |
-| `validate`      | `function`              | —           | Custom validation at parse time                                                                    |
-| `modify`        | `function`              | —           | AST mutation after validation                                                                      |
+| Option                | Type                    | Default     | Description                                                                                              |
+| --------------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
+| `description`         | `string`                | —           | Documentation shown in IntelliSense hover                                                                |
+| `nodeType`             | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                           |
+| `argument`             | `object \| object[]`    | —           | Argument definition(s)                                                                                   |
+| `multiple`             | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                           |
+| `mergeStrategy`        | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                        |
+| `passedWhenReferred`   | `boolean`               | `true`      | Whether fields referencing the annotated node inherit this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred). |
+| `defType`              | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).         |
+| `validate`             | `function`              | —           | Custom validation at parse time                                                                          |
+| `modify`               | `function`              | —           | AST mutation after validation                                                                            |
 
 ## Registering Annotations via config()
 
@@ -234,6 +235,28 @@ annotate Base as Tagged {
 ::: tip
 `mergeStrategy: 'append'` almost always pairs with `multiple: true` — otherwise the base annotation would error on duplicates.
 :::
+
+## Ref Boundaries (`passedWhenReferred`)
+
+When a field references another declaration's field (`ownerId: User.id`, directly or through intermediate refs), the referenced field's annotations fold into the referring field — merged nearest-first, so precedence is: local declaration → nearest ref → deeper refs → resolved type.
+
+That inheritance is right for annotations that describe the **value or its presentation** (labels, validation constraints, UI hints) and wrong for annotations that describe the **declaring scope itself** — a database index, a storage option, a primary-key marker. `passedWhenReferred: false` opts an annotation out of crossing ref boundaries:
+
+```typescript
+new AnnotationSpec({
+  description: 'Unique index on this column',
+  nodeType: ['prop'],
+  multiple: true,
+  mergeStrategy: 'append',
+  passedWhenReferred: false, // an index on User.id must not follow refs into other tables
+})
+```
+
+Rules:
+
+- Applies **only** at ref boundaries. `extends` and intersection merging always inherit the full annotation set — the child owns the inherited props.
+- Default is `true`: value/presentation annotations travel with the field they describe.
+- Built-in specs that declare `false`: `@meta.id`, `@meta.required`, `@meta.default`, `@meta.readonly` — a field referencing a primary key is not itself a primary key, and requiredness/defaults/mutability are the referring declaration's own contract.
 
 ## Custom Validation
 

@@ -112,6 +112,12 @@ export interface Cart {
 
 Property types resolve through aliases; annotations merge along the chain. Default = `replace` (child overrides parent same-name). Specs can opt into `mergeStrategy: 'append'` for repeatable annotations (e.g. `@expect.pattern`).
 
+Ref-boundary rules (field referencing another declaration's field, e.g. `ownerId: User.id`, any depth):
+
+1. Precedence is nearest-first: local declaration > nearest ref > deeper refs > resolved type.
+2. Specs with `passedWhenReferred: false` never cross a ref — the referring field does not inherit them. Built-ins flagged: `@meta.id`, `@meta.required`, `@meta.default`, `@meta.readonly` (a field referencing a PK is not a PK; requiredness/defaults/mutability belong to the referring declaration).
+3. `extends`/intersection always inherit the full set — the flag applies only to refs.
+
 ```atscript
 type Email = string.email
 
@@ -146,6 +152,7 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 - `defType` — restrict to specific primitive bases / kinds (e.g. `['string']`, `['number']`, `['array', 'string']`).
 - `multiple` — repeatable on same node.
 - `mergeStrategy` — `'replace'` (default) or `'append'`.
+- `passedWhenReferred` — default `true`; set `false` for declaring-scope annotations (indexes, storage, keys) that must not be inherited by fields referencing the annotated node (see [Merge](#merge)).
 - `description` — VSCode hover text.
 - `validate(mainToken, args, doc)` / `modify(mainToken, args, doc)` — post-parse hooks.
 
