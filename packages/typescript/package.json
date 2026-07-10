@@ -72,7 +72,7 @@
   },
   "devDependencies": {
     "@atscript/db": "^0.1.97",
-    "@uniqu/core": "^0.1.6",
+    "@uniqu/core": "^0.1.7",
     "vitest": "3.2.4"
   },
   "peerDependencies": {
