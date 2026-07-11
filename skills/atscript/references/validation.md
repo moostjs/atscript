@@ -69,6 +69,17 @@ assertUser(input)
 // `input` is `User` from here
 ```
 
+## `decimal` format
+
+`decimal` values are **strings** at runtime, validated against a strict canonical shape — `^[+-]?\d+(\.\d+)?$` — never JS number coercion:
+
+- Pass: `"0"`, `"0.000"`, `"-12.34"`, `"+5"`.
+- Fail: `""`, `".5"`, `"5."`, `"1e3"`, `"1,000"`, `" 1.5 "`, `"NaN"`, `"Infinity"`, and any actual `number` (`123`).
+- The validator never normalizes — trim whitespace, strip locale separators, and expand scientific notation **before** validating.
+- Two distinct messages let you tell type bugs from bad input: `Expected string (decimal), got <kind>` (wrong runtime type) vs `Invalid decimal format: <value>` (string, but malformed).
+
+Rationale + full sample table: docs → `plugin-development/validation-spec.md` → "`decimal` format check".
+
 ## JSON Schema
 
 ### `buildJsonSchema(annotatedType)`

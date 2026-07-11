@@ -65,7 +65,7 @@ Subtleties:
 - `$('object', Class)` **resets** the node. Never reuse a handle across declarations.
 - Metadata propagation is lazy; inspecting `metadata.get(...)` before the tree is fully built may miss later entries.
 
-Prefer `.as` fixtures compiled via `prepareFixtures()` over hand-written `$()` chains in tests — hand-written builders are fragile.
+Prefer `.as` fixtures compiled via `prepareFixtures()` over hand-written `$()` chains in tests — hand-written builders are fragile. It recompiles `.as.js` + `.as.d.ts` next to the source on every run but **writes only files whose content changed** (up-to-date artifacts keep their mtime — no watch-mode churn, no cache busting). Gitignore `*.as.js` / `*.as.d.ts` and let it regenerate.
 
 ## `TAtscriptDataType<T>`
 
