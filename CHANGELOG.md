@@ -1,3 +1,14 @@
+## [0.1.84](https://github.com/moostjs/atscript/compare/v0.1.83...v0.1.84) (2026-07-16)
+
+
+### Features
+
+* **moost-validator:** add coercionPipe/UseCoercionPipe for route/query param coercion ([dcd8b7e](https://github.com/moostjs/atscript/commit/dcd8b7ebf884e791069606dd578cf56947309caa))
+* **typescript:** add coerceForType/coerceScalar string-transport coercion utils ([5011252](https://github.com/moostjs/atscript/commit/50112524d3971d1c366c053eda242fb1f206c670))
+* **typescript:** asc db sync --check/--format json|markdown/--out for CI gating ([911e75b](https://github.com/moostjs/atscript/commit/911e75b79a62e830f6f4e49e67271aa2fe4be70b))
+
+
+
 ## [0.1.83](https://github.com/moostjs/atscript/compare/v0.1.82...v0.1.83) (2026-07-11)
 
 
