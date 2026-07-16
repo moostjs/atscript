@@ -14,14 +14,23 @@ import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 import { isAnnotatedType } from '../runtime/annotated-type'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { getConfig } from './config'
-import { DbSyncPrinter } from './db-sync-printer'
+import { DbSyncPrinter, planFlags } from './db-sync-printer'
 
 @Controller()
 export class DbSyncController {
   private readonly printer: DbSyncPrinter
 
+  /** Muted when structured --format output goes to stdout, to keep it parseable. */
+  private quiet = false
+
   constructor(@InjectMoostLogger('asc') private readonly logger: TConsoleBase) {
     this.printer = new DbSyncPrinter()
+  }
+
+  private info(message: string) {
+    if (!this.quiet) {
+      this.logger.log(message)
+    }
   }
 
   @Cli('db sync')
@@ -31,6 +40,9 @@ export class DbSyncController {
   @CliExample('db sync --yes', 'Skip confirmation prompt (CI mode)')
   @CliExample('db sync --force', 'Re-sync even if schema hash matches')
   @CliExample('db sync --safe', 'Skip destructive operations (column/table drops)')
+  @CliExample('db sync --check', 'Exit 1 when changes are needed, 2 when destructive (CI gate)')
+  @CliExample('db sync --format json', 'Emit the plan as JSON to stdout, do not apply')
+  @CliExample('db sync --format markdown --out plan.md', 'Write the plan as Markdown to a file')
   async dbSync(
     @CliOption('c', 'config')
     @Optional()
@@ -55,9 +67,39 @@ export class DbSyncController {
     @CliOption('safe')
     @Optional()
     @Description('Skip destructive operations (column/table drops)')
-    safe?: boolean
+    safe?: boolean,
+
+    @CliOption('check')
+    @Optional()
+    @Description(
+      'Plan only; exit 1 when changes are needed, 2 when destructive changes are present'
+    )
+    check?: boolean,
+
+    @CliOption('f', 'format')
+    @Optional()
+    @Description('Emit the plan as "json" or "markdown" instead of applying (plan-only mode)')
+    format?: string,
+
+    @CliOption('out')
+    @Optional()
+    @Description('Write --format output to a file instead of stdout')
+    out?: string
   ) {
-    const config = await getConfig(configFile, this.logger)
+    if (format && format !== 'json' && format !== 'markdown') {
+      this.logger.error(
+        `${__DYE_RED__}Unknown --format "${format}". Use "json" or "markdown".${__DYE_COLOR_OFF__}`
+      )
+      process.exit(1)
+    }
+    // Structured output on stdout must stay parseable — mute decorative logs
+    this.quiet = Boolean(format) && !out
+    this.printer.muted = this.quiet
+
+    const cfgLogger = this.quiet
+      ? (Object.create(this.logger, { log: { value: () => {} } }) as TConsoleBase)
+      : this.logger
+    const config = await getConfig(configFile, cfgLogger)
 
     if (!config.db) {
       this.logger.error(
@@ -73,7 +115,7 @@ export class DbSyncController {
     ])
 
     if (dbTypes.length === 0) {
-      this.logger.log(`No types with @db.table or @db.view found. Nothing to sync.`)
+      this.info(`No types with @db.table or @db.view found. Nothing to sync.`)
       return
     }
 
@@ -87,20 +129,44 @@ export class DbSyncController {
     const sync = new SchemaSync(dbSpace)
     const plan = await sync.plan(dbTypes, { force, safe })
 
+    const { destructive: hasDestructive, hasChanges, hasErrors } = planFlags(plan)
+
+    if (format) {
+      const doc =
+        format === 'json' ? this.printer.renderJson(plan) : this.printer.renderMarkdown(plan)
+      if (out) {
+        writeFileSync(out, doc)
+        this.info(`Plan written to ${out}`)
+      } else {
+        process.stdout.write(doc)
+      }
+    }
+
     if (plan.status === 'up-to-date') {
       this.printer.planUpToDate(plan)
+    } else {
+      this.printer.plan(plan)
+      if (hasErrors) {
+        this.logger.error(`Schema has errors. Fix the issues above before syncing.`)
+        process.exit(1)
+      }
+    }
+
+    // --check / --format are plan-only modes: gate here and return, never apply
+    if (check || format) {
+      if (check && hasChanges) {
+        this.logger.error(
+          hasDestructive
+            ? `Schema changes needed (includes destructive operations).`
+            : `Schema changes needed.`
+        )
+        process.exit(hasDestructive ? 2 : 1)
+      }
       return
     }
 
-    const hasDestructive = plan.entries.some(e => e.destructive)
-    const hasChanges = plan.entries.some(e => e.hasChanges)
-    const hasErrors = plan.entries.some(e => e.hasErrors)
-
-    this.printer.plan(plan)
-
-    if (hasErrors) {
-      this.logger.error(`Schema has errors. Fix the issues above before syncing.`)
-      process.exit(1)
+    if (plan.status === 'up-to-date') {
+      return
     }
 
     if (!hasChanges) {
@@ -148,7 +214,7 @@ export class DbSyncController {
     }
     buildConfig.format = 'js'
 
-    this.logger.log(`Compiling .as files...`)
+    this.info(`Compiling .as files...`)
     const builder = await build(buildConfig)
     const outputs = await builder.generate(buildConfig as TAtscriptConfigOutput)
 
@@ -189,12 +255,12 @@ export class DbSyncController {
 
   private async resolveDbSpace(dbConfig: NonNullable<TAtscriptConfig['db']>): Promise<any> {
     if (typeof dbConfig === 'function') {
-      this.logger.log(`Resolving database space from callback...`)
+      this.info(`Resolving database space from callback...`)
       return await dbConfig()
     }
 
     const { adapter, connection, options } = dbConfig as TDbConfigDeclarative
-    this.logger.log(`Using adapter: ${__DYE_CYAN__}${adapter}${__DYE_COLOR_OFF__}`)
+    this.info(`Using adapter: ${__DYE_CYAN__}${adapter}${__DYE_COLOR_OFF__}`)
 
     let mod: any
     try {
