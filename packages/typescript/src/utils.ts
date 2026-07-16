@@ -65,6 +65,8 @@ export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<strin
 
 export * from './runtime/validator'
 
+export { coerceForType, coerceScalar } from './runtime/coerce'
+
 export {
   buildJsonSchema,
   detectDiscriminator,
