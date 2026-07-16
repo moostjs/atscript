@@ -40,6 +40,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 - `annotate(metadata, key, value, asArray?)` -- set/append metadata on annotated types
 - `isAnnotatedType(type)` / `isAnnotatedTypeOfPrimitive(type)` -- type guards
 - `Validator` class + `ValidatorError`
+- `coerceForType(def, value)` -- pure string-transport coercion (route params/query strings → scalar shapes); never throws or validates, returns input untouched when unparsable
 - `buildJsonSchema(type)` -- JSON Schema generation with `$defs`/`$ref` for named types
 - `fromJsonSchema(schema)` -- converts JSON Schema back to annotated types (resolves `$ref`/`$defs`)
 - `mergeJsonSchemas(types)` -- combines multiple schemas with shared `$defs` (for OpenAPI)

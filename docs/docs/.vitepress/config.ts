@@ -398,6 +398,7 @@ export default defineConfig({
               link: '/packages/moost-validator/why-atscript-validation',
             },
             { text: 'Validation Pipe', link: '/packages/moost-validator/validation-pipe' },
+            { text: 'Coercion Pipe', link: '/packages/moost-validator/coercion-pipe' },
             { text: 'Error Handling', link: '/packages/moost-validator/error-handling' },
           ],
         },

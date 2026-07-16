@@ -119,7 +119,7 @@ The pipe validates the value it receives. It does not coerce strings into number
 That means:
 
 - body payloads are usually a good fit because JSON parsing already gives you numbers, booleans, arrays, and objects
-- raw HTTP params and query values are often strings, so string-based Atscript types fit best there
+- raw HTTP params and query values arrive as strings, so on their own only string-based Atscript types fit there
 
 Good example:
 
@@ -141,7 +141,7 @@ export class UsersController {
 }
 ```
 
-If a param or query needs numeric validation, parse it before it reaches this pipe or validate it as a string-shaped contract instead.
+If a param or query needs numeric or boolean validation, register the [Coercion Pipe](/packages/moost-validator/coercion-pipe) ahead of this one — it converts `"42"` to `42` before validation runs, so numeric `.as` aliases work directly as param types.
 
 ## Optional Params
 
@@ -222,6 +222,7 @@ What is HTTP-specific is the built-in error transform, because that part returns
 
 ## Next Steps
 
+- [Coercion Pipe](/packages/moost-validator/coercion-pipe) — coerce string params/query before this pipe validates them
 - [Error Handling](/packages/moost-validator/error-handling) — convert `ValidatorError` into HTTP responses
 - [Validation Guide](/packages/typescript/validation) — deeper validator behavior and options
 - [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation) — when this package is the right fit

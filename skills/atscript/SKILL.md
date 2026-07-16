@@ -5,8 +5,9 @@ description: >-
   source of truth for types, metadata, and validation constraints. Covers `.as`
   syntax, `@meta.*` / `@expect.*` / custom annotations, primitives, the `asc`
   CLI + `atscript.config.*`, generated `.as.d.ts` / `.as.js` / `atscript.d.ts`,
-  runtime helpers (`Validator`, JSON Schema, serialize), `unplugin-atscript`,
-  `@atscript/moost-validator`, VSCode LSP, and plugin authoring. Out of scope:
+  runtime helpers (`Validator`, `coerceForType`, JSON Schema, serialize),
+  `unplugin-atscript`, `@atscript/moost-validator` (validation + coercion
+  pipes), VSCode LSP, and plugin authoring. Out of scope:
   `@db.*` annotations, schema sync, DB adapters → use the atscript-db skill;
   `@ui.*` annotations, vue-form, vue-table → use the atscript-ui skill.
 ---
@@ -69,7 +70,7 @@ import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescr
 import { prepareFixtures } from '@atscript/typescript/test-utils'
 
 // Moost HTTP integration
-import { validatorPipe, validationErrorTransform } from '@atscript/moost-validator'
+import { coercionPipe, validatorPipe, validationErrorTransform } from '@atscript/moost-validator'
 
 // Bundler integration (pick one)
 import atscript from 'unplugin-atscript/vite'      // or /rollup /rolldown /webpack /esbuild /rspack /farm
@@ -113,12 +114,12 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Annotations       | [annotations.md](references/annotations.md)               | `@meta.*`, `@expect.*`, merge, custom `AnnotationSpec`                                      |
 | Primitives        | [primitives.md](references/primitives.md)                 | Built-ins, semantic extensions, decimal, phantom, extending via config                      |
 | Config            | [config.md](references/config.md)                         | `atscript.config.*`, `defineConfig`, entries/globs, plugin wiring, output                   |
-| `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, scripts, `db sync` pointer                                   |
+| `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, scripts, `db sync` flags (`--check`, `--format`) + pointer   |
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType`, `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth    |
-| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, JSON Schema helpers, plugins                                 |
+| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, `coerceForType`, JSON Schema helpers, plugins               |
 | Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
-| Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes, error transform                                                                |
+| Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform                            |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |
 | Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd                                        |
 

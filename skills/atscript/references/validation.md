@@ -69,6 +69,26 @@ assertUser(input)
 // `input` is `User` from here
 ```
 
+## `coerceForType` — string-transport coercion
+
+```ts
+import { coerceForType } from '@atscript/typescript/utils'
+
+coerceForType(KafkaOffset, '42') // → 42
+coerceForType(KafkaOffset, 'abc') // → 'abc' — validate afterwards for the proper error
+```
+
+Converts string input (route params, query strings) toward the annotated type's scalar shapes. Pure, never throws, never validates — always pair with `validate()` after.
+
+| #   | Rule                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Only strings are converted: number ← `Number()` on trimmed non-empty (finite only); boolean ← `"true"/"1"/"false"/"0"`. `string`/`decimal` input never changed. |
+| 2   | Unions: branches in declared order, first successful parse wins; literal branches must equal the literal after parse.             |
+| 3   | Objects: recurses into props for plain-object input (`@Query()` DTO case). Returns a new object — input never mutated. Arrays/tuples: per item. |
+| 4   | Constraints (`@expect.*`) are NOT checked — coercion is representation-only; unparsable input returns unchanged for `Validator` to report. |
+
+In Moost apps use `coercionPipe` from `@atscript/moost-validator` instead of calling this directly — see [moost-validator.md](moost-validator.md#coercion-rules-coercionpipe).
+
 ## `decimal` format
 
 `decimal` values are **strings** at runtime, validated against a strict canonical shape — `^[+-]?\d+(\.\d+)?$` — never JS number coercion:

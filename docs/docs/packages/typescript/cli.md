@@ -55,13 +55,16 @@ The `db sync` subcommand is bundled with `@atscript/typescript` so that a single
 npx asc db sync [options]
 ```
 
-| Option                | Description                           |
-| --------------------- | ------------------------------------- |
-| `-c, --config <path>` | Path to config file                   |
-| `--dry-run`           | Show planned changes without applying |
-| `--yes`               | Skip confirmation prompt (for CI/CD)  |
-| `--force`             | Re-sync even if schema hash matches   |
-| `--safe`              | Skip destructive operations (drops)   |
+| Option                  | Description                                                                       |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `-c, --config <path>`   | Path to config file                                                               |
+| `--dry-run`             | Show planned changes without applying                                             |
+| `--yes`                 | Skip confirmation prompt (for CI/CD)                                              |
+| `--force`               | Re-sync even if schema hash matches                                               |
+| `--safe`                | Skip destructive operations (drops)                                               |
+| `--check`               | Plan only; exit `1` when changes are needed, `2` when destructive changes are present |
+| `-f, --format <format>` | Emit the plan as `json` or `markdown` instead of applying (plan-only mode)        |
+| `--out <path>`          | Write `--format` output to a file instead of stdout                               |
 
 ```bash
 # Preview changes
@@ -72,7 +75,24 @@ npx asc db sync --yes
 
 # Safe mode — only additive changes
 npx asc db sync --safe
+
+# CI gate — fail the build when the schema has drifted
+npx asc db sync --check
+
+# Attach the plan to a PR
+npx asc db sync --format markdown --out schema-plan.md
+
+# Machine-readable plan on stdout (decorative logs are muted)
+npx asc db sync --format json
 ```
+
+### CI usage
+
+`--check` and `--format` never apply changes — both are plan-only modes:
+
+- `--check` exits `0` when the schema is up to date, `1` when changes are needed, and `2` when the pending changes include destructive operations (column/table drops, type changes). Use the distinct codes to require manual approval for destructive migrations only. It differs from `--dry-run`, which also never applies but always exits `0` — `--dry-run` is the human preview, `--check` is the CI gate.
+- `--format json` emits a structured plan document (`status`, `schemaHash`, `destructive`, per-entry column/type/FK changes) on stdout; `--format markdown` renders the same plan for PR comments. Combine with `--out <file>` to keep the console output intact and write the document to a file.
+- The two compose: `asc db sync --check --format json --out plan.json` gates the build *and* saves the plan artifact.
 
 This requires a `db` section in your config:
 

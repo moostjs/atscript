@@ -40,7 +40,18 @@ In `package.json`:
 
 ## `db sync` subcommand
 
-`asc db sync` ships in `@atscript/typescript` so one `asc` binary covers both codegen and schema sync. It drives the DB adapters from the **separate** `@atscript/db-*` packages (`@atscript/db` repo) and needs a `db` section in `atscript.config.*` plus an installed adapter to do anything. Flags: `--dry-run`, `--yes` (CI), `--force`, `--safe` (skip drops), `-c <path>`. Full semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
+`asc db sync` ships in `@atscript/typescript` so one `asc` binary covers both codegen and schema sync. It drives the DB adapters from the **separate** `@atscript/db-*` packages (`@atscript/db` repo) and needs a `db` section in `atscript.config.*` plus an installed adapter to do anything. Flags: `--dry-run`, `--yes` (CI), `--force`, `--safe` (skip drops), `-c <path>`.
+
+CI-grade plan output (all plan-only — never apply):
+
+| Flag                       | Effect                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `--check`                  | Exit `0` up-to-date, `1` changes needed, `2` destructive changes present. Gate builds / require approval on `2`. (`--dry-run` also never applies but always exits `0` — human preview vs CI gate.) |
+| `-f, --format json`        | Structured plan (`status`, `schemaHash`, `destructive`, per-entry column/type/FK diffs) on stdout; decorative logs muted. |
+| `-f, --format markdown`    | Same plan rendered for PR comments.                                                                     |
+| `--out <file>`             | Write `--format` output to a file (console output stays intact). Composable: `--check --format json --out plan.json`. |
+
+Full sync semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
 
 ## Outputs
 

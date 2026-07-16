@@ -2,8 +2,9 @@
 
 Use Atscript models as runtime validation contracts in Moost handlers.
 
-`@atscript/moost-validator` gives you two small integration points:
+`@atscript/moost-validator` gives you three small integration points:
 
+- `coercionPipe()` converts string route params and query values into the scalar shapes the handler's type expects
 - `validatorPipe()` validates handler arguments whose runtime type comes from an `.as` model
 - `validationErrorTransform()` turns `ValidatorError` into `HttpError(400)` for HTTP apps
 
@@ -12,7 +13,8 @@ If you are evaluating this package for the first time, read these in order:
 
 1. [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation)
 2. [Validation Pipe](/packages/moost-validator/validation-pipe)
-3. [Error Handling](/packages/moost-validator/error-handling)
+3. [Coercion Pipe](/packages/moost-validator/coercion-pipe)
+4. [Error Handling](/packages/moost-validator/error-handling)
    :::
 
 ## What This Package Gives You
@@ -28,12 +30,14 @@ Each integration point has a global form (apply app-wide) and a decorator form (
 
 | Export                          | Form                | Use it to                                                              |
 | ------------------------------- | ------------------- | --------------------------------------------------------------------- |
+| `coercionPipe(opts?)`           | global pipe         | Coerce string params/query toward the handler's type — see [Coercion Pipe](/packages/moost-validator/coercion-pipe) |
+| `UseCoercionPipe(opts?)`        | method/class decorator | Same coercion, scoped to one controller or handler                  |
 | `validatorPipe(opts?)`          | global pipe         | Validate handler args against their `.as` type — see [Validation Pipe](/packages/moost-validator/validation-pipe) |
-| `UseValidatorPipe(opts?)`       | parameter decorator | Same validation, scoped to a single handler argument                  |
+| `UseValidatorPipe(opts?)`       | method/class decorator | Same validation, scoped to one controller or handler               |
 | `validationErrorTransform()`    | global interceptor  | Convert `ValidatorError` → `HttpError(400)` — see [Error Handling](/packages/moost-validator/error-handling) |
 | `UseValidationErrorTransform()` | method decorator    | Same conversion, scoped to one handler                                |
 
-Both pipes accept `Partial<TValidatorOptions>` (the standard Atscript [validator options](/packages/typescript/validation)).
+`validatorPipe` accepts `Partial<TValidatorOptions>` (the standard Atscript [validator options](/packages/typescript/validation)); `coercionPipe` accepts `TCoercionOptions` (`sources` — which param sources to coerce). The two compose: coercion runs at `TRANSFORM` priority, validation at `VALIDATE`, so `applyGlobalPipes(coercionPipe(), validatorPipe())` coerces first, then validates.
 
 ## Installation
 
@@ -127,4 +131,5 @@ If you are not building an HTTP app, keep `validatorPipe()` and use your own err
 
 - [Why Atscript In Moost?](/packages/moost-validator/why-atscript-validation) — what this package removes from your handlers
 - [Validation Pipe](/packages/moost-validator/validation-pipe) — global setup, PATCH payloads, unknown props, and common options
+- [Coercion Pipe](/packages/moost-validator/coercion-pipe) — numeric/boolean route params and query DTOs without manual parsing
 - [Error Handling](/packages/moost-validator/error-handling) — how the built-in HTTP error transform works

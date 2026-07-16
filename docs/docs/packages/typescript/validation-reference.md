@@ -205,6 +205,35 @@ const validator = new Validator(type)
 validator.validate(someValue)
 ```
 
+## Input Coercion: `coerceForType()`
+
+```typescript
+import { coerceForType } from '@atscript/typescript/utils'
+
+coerceForType(def: TAtscriptAnnotatedType, value: unknown): unknown
+```
+
+Converts string-transport input (route params, query strings) toward the scalar shapes an annotated type expects, so a numeric `.as` alias can accept `"42"` from a URL. Pure and non-throwing — when a value can't be coerced it is returned untouched for the validator to report:
+
+```typescript
+import { coerceForType } from '@atscript/typescript/utils'
+import { KafkaOffset } from './types.as' // @expect.int @expect.min 0 → number
+
+coerceForType(KafkaOffset, '42') // → 42
+coerceForType(KafkaOffset, 'abc') // → 'abc' (validate afterwards for the proper error)
+```
+
+Coercion rules:
+
+- **number** — trimmed, non-empty strings parsed with `Number()`; only finite results accepted
+- **boolean** — `"true"`/`"1"` → `true`, `"false"`/`"0"` → `false`
+- **unions** — branches tried in declared order, first successful parse wins; literal branches must match the literal exactly
+- **objects** — recurses into props when the input is a plain object (returns a new object, never mutates the input)
+- **arrays / tuples** — items coerced individually
+- **string / decimal** — string input is never changed
+
+Coercion converts representation only — constraint checks (`@expect.int`, `@expect.min`, patterns) remain the validator's job, so the intended flow is always `coerceForType` → `validate`. In Moost apps, prefer the ready-made [Coercion Pipe](/packages/moost-validator/coercion-pipe) over calling this directly.
+
 ## Next Steps
 
 - [Validation Guide](/packages/typescript/validation) — the practical application flow
