@@ -1,6 +1,6 @@
 {
   "name": "@atscript/moost-validator",
-  "version": "0.1.84",
+  "version": "0.1.85",
   "description": "Validator pipe and utils for Moost.",
   "keywords": [
     "annotations",
