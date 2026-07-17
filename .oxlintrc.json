@@ -372,7 +372,10 @@
     "@typescript-eslint/consistent-type-assertions": "error",
     "@typescript-eslint/consistent-type-definitions": "warn",
     "@typescript-eslint/consistent-type-exports": "error",
-    "@typescript-eslint/consistent-type-imports": "warn",
+    // off: .as artifacts are classes used as both value and type (decorators,
+    // DI, validation). Auto-fixing a value import to `import type` makes
+    // design:paramtypes emit `Object` and silently breaks decorator metadata.
+    "@typescript-eslint/consistent-type-imports": "off",
     "@typescript-eslint/no-array-constructor": "error",
     "@typescript-eslint/no-confusing-non-null-assertion": "warn",
     "@typescript-eslint/no-dupe-class-members": "error",
