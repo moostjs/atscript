@@ -83,6 +83,7 @@ import atscript from 'unplugin-atscript/vite'      // or /rollup /rolldown /webp
 3. Core ships `@meta.*`, `@expect.*`, `@emit.*` only. All other namespaces come from plugins.
 4. `asc` without `-f` runs every plugin's default output (TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js` (or let `unplugin-atscript` produce it at bundle time).
 5. `@atscript/typescript/utils` is the runtime entry; `@atscript/typescript` default export is `tsPlugin()` (build-time factory).
+6. **Never `import type` a compiled `.as` artifact.** `.as` exports are classes — value AND type in one name — consumed at runtime (`.validator()`, `.metadata`, decorators, DI by param type via `design:paramtypes`). A type-only import elides the value: decorator metadata emits `Object` and validation/DI/form binding break silently. Keep lint rules that force type-only imports (`typescript/consistent-type-imports` and equivalents) **off** in projects importing `.as` files — the create-moost preset and ecosystem repos already disable it.
 
 ## Dependency chain
 
