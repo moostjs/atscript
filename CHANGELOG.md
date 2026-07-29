@@ -1,3 +1,9 @@
+## [0.1.88](https://github.com/moostjs/atscript/compare/v0.1.87...v0.1.88) (2026-07-29)
+
+
+### Bug Fixes
+
+* pin @prostojs/dye to 0.4.9 for rolldown define compatibility ([d8fc0f4](https://github.com/moostjs/atscript/commit/d8fc0f45cffdfad925daedcc2ca0bfdec084b109))
 ## [0.1.87](https://github.com/moostjs/atscript/compare/v0.1.86...v0.1.87) (2026-07-29)
 ## [0.1.86](https://github.com/moostjs/atscript/compare/v0.1.85...v0.1.86) (2026-07-24)
 
