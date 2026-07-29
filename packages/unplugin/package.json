@@ -78,12 +78,12 @@
     "test": "vitest"
   },
   "dependencies": {
-    "unplugin": "^2.1.2"
+    "unplugin": "^2.3.11"
   },
   "devDependencies": {
-    "rolldown": "^1.0.0-rc.9",
+    "rolldown": "^1.2.0",
     "rolldown-plugin-dts": "^0.22.5",
-    "vitest": "3.2.4"
+    "vitest": "3.2.7"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",

@@ -40,12 +40,12 @@
   },
   "dependencies": {
     "@prostojs/parser": "^0.6.0",
-    "defu": "^6.1.5",
-    "glob": "^13.0.2",
+    "defu": "^6.1.7",
+    "glob": "^13.0.6",
     "rolldown": "1.0.0-rc.4"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
-    "vitest": "3.2.4"
+    "@types/node": "^22.20.1",
+    "vitest": "3.2.7"
   }
 }

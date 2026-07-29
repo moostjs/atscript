@@ -27,21 +27,21 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@prostojs/dye": "^0.4.9",
-    "@types/node": "^22.19.11",
-    "@vscode/vsce": "^3.7.1",
+    "@prostojs/dye": "^0.4.10",
+    "@types/node": "^22.20.1",
+    "@vscode/vsce": "^3.9.2",
     "conventional-changelog-cli": "^5.0.0",
     "husky": "^9.1.7",
     "inquirer": "^12.11.1",
     "oxfmt": "^0.34.0",
-    "oxlint": "^1.49.0",
+    "oxlint": "^1.76.0",
     "rolldown": "1.0.0-beta.1",
-    "rollup": "^4.59.0",
-    "rollup-plugin-dts": "^6.3.0",
+    "rollup": "^4.62.3",
+    "rollup-plugin-dts": "^6.4.1",
     "typescript": "^5.9.3",
     "unplugin-swc": "^1.5.9",
-    "vitepress": "^1.6.4",
-    "vitest": "3.2.4",
+    "vitepress": "2.0.0-alpha.17",
+    "vitest": "3.2.7",
     "zx": "^8.8.5"
   },
   "packageManager": "pnpm@10.33.0",
@@ -56,7 +56,8 @@
       "vitest>vite": ">=7.3.2",
       "@vitest/mocker>vite": ">=7.3.2",
       "vite-node>vite": ">=7.3.2",
-      "tmp": ">=0.2.6"
+      "tmp": ">=0.2.6",
+      "esbuild": ">=0.28.1"
     },
     "onlyBuiltDependencies": [
       "better-sqlite3"
