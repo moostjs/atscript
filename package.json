@@ -27,7 +27,7 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
-    "@prostojs/dye": "^0.4.10",
+    "@prostojs/dye": "0.4.9",
     "@types/node": "^22.20.1",
     "@vscode/vsce": "^3.9.2",
     "conventional-changelog-cli": "^5.0.0",
