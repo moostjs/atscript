@@ -156,12 +156,13 @@ async function rolldownPackages(ws) {
     const inputOptions = {
       input,
       external: [...(external || externals.get(ws))],
-      define: {
-        __VERSION__: JSON.stringify(pkg.version),
+      transform: {
+        define: {
+          __VERSION__: JSON.stringify(pkg.version),
+        },
       },
       resolve: {
-        preserveSymlinks: false,
-        conditions: ['import', 'module', 'default'],
+        conditionNames: ['import', 'module', 'default'],
         extensions: ['.ts', '.mjs', '.js', '.json'],
       },
       plugins: [_dye, swc],
@@ -170,7 +171,7 @@ async function rolldownPackages(ws) {
     const created = []
     for (const f of formats) {
       const { ext, format } = FORMATS[f]
-      const { output } = await bundle.generate({ format, comments: 'preserve-legal' })
+      const { output } = await bundle.generate({ format })
       for (const chunk of output) {
         if (chunk.type !== 'chunk') {
           continue
