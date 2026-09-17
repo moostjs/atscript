@@ -1,3 +1,15 @@
+## [0.1.90](https://github.com/moostjs/atscript/compare/v0.1.89...v0.1.90) (2026-09-17)
+
+
+### Bug Fixes
+
+* **core:** comparison operators inside parenthesized query expressions; query diagnostics get real ranges ([023c8c0](https://github.com/moostjs/atscript/commit/023c8c056cbb41e3d94e8881ac7352556a0ff333))
+
+
+### Features
+
+* **cli:** never emit on errors, atomic writes; db sync keeps the source tree, aborts on partial inventory, config.models hook ([d0643df](https://github.com/moostjs/atscript/commit/d0643df55ed84b26e83a03bf1f32a58ccc19342b))
+* **unplugin:** root option + Vite root pickup via configResolved; prebundle @atscript/typescript/utils ([c8ae1b7](https://github.com/moostjs/atscript/commit/c8ae1b7087a737165e06f70e46a7b55654d77602))
 ## [0.1.89](https://github.com/moostjs/atscript/compare/v0.1.88...v0.1.89) (2026-07-29)
 ## [0.1.88](https://github.com/moostjs/atscript/compare/v0.1.87...v0.1.88) (2026-07-29)
 
