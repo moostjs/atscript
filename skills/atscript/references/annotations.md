@@ -35,6 +35,7 @@ export interface User {
 
 - Arguments are **space-separated** (and comma-separated when more than one). NOT `@meta.label('User')`.
 - Args are parsed literal tokens: `string` (quoted), `number`, `boolean` (`true` / `false`), `ref` (identifier), `query` (backticked). No regex literals, no expressions.
+- Inside a `query` arg the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` work at any nesting level, including inside parentheses (since 0.1.90): `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
 - Omit args entirely for no-arg annotations: `@meta.id`, `@meta.sensitive`.
 
 ## Built-in namespaces

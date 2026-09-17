@@ -8,6 +8,7 @@ import { commentNodes } from './comment.token'
 import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
+import { QueryBlockToken } from './query-block.token'
 import { QueryOperatorToken } from './query-operator.token'
 import { QueryToken } from './query.token'
 import { RegExpToken } from './regexp.token'
@@ -25,6 +26,7 @@ export const tokens = {
   text: TextToken,
   regexp: RegExpToken,
   query: QueryToken,
+  queryBlock: QueryBlockToken,
   root: undefined as unknown as Node<TLexicalToken>,
 }
 
@@ -58,10 +60,25 @@ BlockToken.recognize(
   PunctuationToken
 )
 
+// QueryBlockToken goes before BlockToken so that "(" is claimed by the
+// query-aware block, while "[" and "{" still fall through to the generic one.
 QueryToken.recognize(
   RegExpToken,
   QueryOperatorToken,
+  QueryBlockToken,
   BlockToken,
+  IdentifierToken,
+  TextToken,
+  NumberToken,
+  PunctuationToken
+)
+
+// Nested parentheses recurse through QueryBlockToken itself.
+// Comments are not recognized inside queries (mirrors QueryToken).
+QueryBlockToken.recognize(
+  RegExpToken,
+  QueryOperatorToken,
+  QueryBlockToken,
   IdentifierToken,
   TextToken,
   NumberToken,
@@ -77,11 +94,24 @@ QueryToken.recognize(
  * VSCode expects 0-based line, 0-based character.
  */
 export function extractTokens(node: ParsedNode): TLexicalToken[] {
-  return node.content.map(item => {
+  const content = node.content
+  return content.map((item, index) => {
     if (typeof item === 'string') {
+      // Unrecognized text is stored by the parser as a plain string with no
+      // position of its own. Derive a range from the surrounding siblings
+      // (falling back to the parent's own boundaries) so that diagnostics
+      // can point at it instead of at line 0.
+      const prev = content[index - 1]
+      const next = content[index + 1]
+      const start = typeof prev === 'object' ? prev.end : node.start
+      const end = typeof next === 'object' ? next.start : node.end
       return {
         type: 'unknown',
         text: item,
+        getRange: () => ({
+          start: { line: start.line - 1, character: start.column - 1 },
+          end: { line: end.line - 1, character: end.column - 1 },
+        }),
       } as TLexicalToken
     }
     const data = item.data as TLexicalToken

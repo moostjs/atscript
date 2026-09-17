@@ -196,4 +196,4 @@ Database annotations (tables, columns, indexes, relations, views, schema sync) a
 Some annotations accept special argument types beyond strings and numbers:
 
 - **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Custom annotations can declare `type: 'ref'` arguments.
-- **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Custom annotations can declare `type: 'query'` arguments.
+- **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Custom annotations can declare `type: 'query'` arguments. Comparison operators (`=`, `!=`, `>`, `>=`, `<`, `<=`) work at any nesting level, including inside parentheses — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` `` (since 0.1.90).

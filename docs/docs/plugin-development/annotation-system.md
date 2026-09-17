@@ -117,6 +117,8 @@ The argument types correspond to the tokens accepted in `.as` source:
 | `'ref'`     | Bare identifier referencing another type (e.g. `User`)                               |
 | `'query'`   | Backtick-delimited query expression — used by DB plugins for SQL-like filter syntax |
 
+Query expressions accept the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` at any nesting level, including inside parentheses (since 0.1.90) — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
+
 ### No Arguments (Flag Annotation)
 
 Omit `argument` entirely:
