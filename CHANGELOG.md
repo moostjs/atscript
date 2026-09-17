@@ -1,3 +1,14 @@
+## [0.1.92](https://github.com/moostjs/atscript/compare/v0.1.91...v0.1.92) (2026-09-17)
+
+
+### Bug Fixes
+
+* **vscode:** re-check dependants when a closed .as file changes on disk ([af07b91](https://github.com/moostjs/atscript/commit/af07b916ba34fc7d50b43250780cea5da9817312))
+
+
+### Features
+
+* **unplugin:** evict changed .as docs on watchChange and watch transitive imports (repo.closeDocument) ([9cced8e](https://github.com/moostjs/atscript/commit/9cced8e97e9ea01e6ce3caf64e0aeaeca3394f27))
 ## [0.1.91](https://github.com/moostjs/atscript/compare/v0.1.90...v0.1.91) (2026-09-17)
 
 
