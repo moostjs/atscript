@@ -49,11 +49,20 @@ module.exports = {
 
 ## Options
 
-| Option   | Type      | Default | Effect                                                                                |
-| -------- | --------- | ------- | ------------------------------------------------------------------------------------- |
-| `strict` | `boolean` | `true`  | Fail build on parse/diagnostic errors. `false` = warn-only (useful during refactors). |
+| Option   | Type      | Default             | Effect                                                                                |
+| -------- | --------- | ------------------- | ------------------------------------------------------------------------------------- |
+| `strict` | `boolean` | `true`              | Fail build on parse/diagnostic errors. `false` = warn-only (useful during refactors). |
+| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.   |
 
-That is the entire surface. Atscript config (primitives, annotations, plugins) lives in `atscript.config.*`, auto-discovered by walking up from `process.cwd()`. The unplugin is a thin bridge between the bundler and the atscript pipeline; per-file `include`/`exclude` is delegated to the bundler's own resolution (only `*.as` is intercepted).
+That is the entire surface. Atscript config (primitives, annotations, plugins) lives in `atscript.config.*`, auto-discovered by walking up from the root. The unplugin is a thin bridge between the bundler and the atscript pipeline; per-file `include`/`exclude` is delegated to the bundler's own resolution (only `*.as` is intercepted).
+
+**Root:** Vite sets it itself (`configResolved` → `config.root`); an explicit `root` option always wins. Other bundlers fall back to `process.cwd()` — pass `root` when the working directory is not the project root (monorepo `pnpm -C`, editor-launched builds, a root that sits next to rather than above the config).
+
+## Vite: automatic `optimizeDeps` prebundling
+
+Since `0.1.90` the Vite entry adds `@atscript/typescript/utils` to `optimizeDeps.include` (client only; skipped when already listed or not resolvable from the root).
+
+Why it is needed: every rendered `.as` module imports that runtime helper, but the module body only exists after `load` runs, so Vite's static dep scanner never sees it. Without the include, the first `.as`-backed route in dev logs `new dependencies optimized: @atscript/typescript/utils` and then `optimized dependencies changed. reloading` — a full document reload in the middle of a client-side navigation. Manual `optimizeDeps.include` workarounds can be removed.
 
 ## Behavior
 
@@ -127,7 +136,8 @@ The same applies if you subpath-import from any other `@atscript/*` package (`@a
 
 ## Troubleshooting
 
-- **"Cannot find atscript.config"** — ensure the config lives at/above `process.cwd()`.
+- **"Cannot find atscript.config" / valid `@db.*` / `@ui.*` reported as "Unknown annotation"** — the config was discovered from the wrong directory. Ensure it lives at/above the root, and pass `root` on non-Vite bundlers when the working directory is not the project root.
+- **Dev server full-reloads on the first `.as`-backed route** (`optimized dependencies changed. reloading`) — expected before `0.1.90`; upgrade, or add `@atscript/typescript/utils` to `optimizeDeps.include` manually.
 - **Type errors on `.as` imports** — runtime is fine, `.d.ts` is stale. Run `asc -f dts`.
 - **`.as` changes not picked up** — HMR depends on the bundler's watcher. Verify the bundler sees the file at all.
 - **Re-exported `.as` symbol untyped in a consumer / dist `.d.mts` imports it from a `.mjs` chunk** — see [Library builds that re-export `.as` symbols](#library-builds-that-re-export-as-symbols).

@@ -48,6 +48,11 @@ export default defineConfig({
 
 This lets you import `.as` types directly in your components — for example, to drive form rendering from metadata or validate user input against your type definitions.
 
+Two things happen automatically on Vite:
+
+- **Project root** — the plugin adopts Vite's own `root`, so `atscript.config.*` is discovered from the directory Vite builds, not from the directory the process happened to start in (`pnpm -C`, editor-launched dev servers). On other bundlers pass [`root`](#options) yourself when the two differ.
+- **Dependency prebundling** (since `0.1.90`) — the generated `.as` module imports `@atscript/typescript/utils`, which Vite's static scanner cannot see because the module body only exists after the plugin compiles it. The plugin adds the entry to `optimizeDeps.include` so Vite prebundles it up front, instead of discovering it on the first `.as`-backed route and interrupting a client-side navigation with `optimized dependencies changed. reloading`. Adding that entry manually is no longer needed.
+
 ## Other Bundlers
 
 `unplugin-atscript` supports all major bundlers. Import from the bundler-specific entry point:
@@ -116,15 +121,19 @@ export default {
 
 ## Options
 
-The plugin takes the same options on every bundler entry. There is just one:
+The plugin takes the same options on every bundler entry:
 
-| Option   | Type      | Default | Effect                                                                                     |
-| -------- | --------- | ------- | ------------------------------------------------------------------------------------------ |
-| `strict` | `boolean` | `true`  | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building.     |
+| Option   | Type      | Default             | Effect                                                                                 |
+| -------- | --------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
+| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
 
 ```javascript
 atscript({ strict: false }) // warn-only — useful mid-refactor or in CI pre-flight
+atscript({ root: __dirname }) // non-Vite bundler started from another directory
 ```
+
+Vite fills `root` in itself (from `configResolved`), so you only need it on the other bundlers — and only when the working directory is not the project root. A wrong root means the config is never found: plugin-provided annotations (`@db.*`, `@ui.*`, …) then show up as "Unknown annotation" errors.
 
 With `strict: false`, a `.as` file that fails to compile yields an empty module (`module.exports = {}`), so anything importing it will likely break at runtime — keep `strict: true` for normal builds.
 
@@ -132,7 +141,7 @@ Everything else (primitives, annotations, plugins, `include`/`exclude`) lives in
 
 ## How It Works
 
-1. **Config Discovery** — the plugin finds your `atscript.config.*` by searching upward from each `.as` file
+1. **Config Discovery** — the plugin finds your `atscript.config.*` by searching upward from the project root (Vite's `root`, the `root` option, or the working directory)
 2. **Plugin Execution** — runs the plugins defined in your configuration
 3. **Runtime JS** — for each imported `.as` it emits the runtime metadata module (the same output as `asc -f js`)
 4. **Import Resolution** — lets you import `.as` files directly in TypeScript/JavaScript

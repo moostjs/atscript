@@ -34,7 +34,7 @@ Main entry (`unplugin-atscript`) exports:
 - `unpluginFactory` -- Raw factory function for creating bundler-specific plugins
 - `unplugin` (default export) -- `UnpluginInstance` with all bundler adapters
 - `asPlugin` -- Deprecated alias for `unplugin`
-- `atscriptPluginOptions` -- Config interface: `{ strict?: boolean }` (default: `true`, throws on validation errors)
+- `atscriptPluginOptions` -- Config interface: `{ strict?: boolean; root?: string }` (default: `true`, throws on validation errors)
 
 ## Supported Build Tools
 

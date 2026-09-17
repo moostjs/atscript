@@ -40,12 +40,24 @@ module.exports = { plugins: [atscript()] }
 
 Also available: `unplugin-atscript/esbuild`, `unplugin-atscript/rolldown`, `unplugin-atscript/rspack`, `unplugin-atscript/farm`.
 
+## Options
+
+Same options on every bundler entry:
+
+| Option   | Type      | Default             | Effect                                                                                 |
+| -------- | --------- | ------------------- | -------------------------------------------------------------------------------------- |
+| `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
+| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
+
+Vite picks the root up automatically (from `configResolved`); other bundlers need `root` when the working directory is not the project root.
+
 ## Features
 
 - Universal bundler support via dedicated entry points
 - Automatic `atscript.config.*` loading
 - Strict validation — build fails on `.as` errors by default (`strict: false` to disable)
 - Tree-shaking aware — marks non-mutating modules as side-effect-free
+- On Vite, prebundles `@atscript/typescript/utils` so the first `.as`-backed route does not trigger a dep re-optimization reload
 
 ## Documentation
 

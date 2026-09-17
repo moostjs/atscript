@@ -1,4 +1,5 @@
 import { readFile } from 'fs/promises'
+import { createRequire } from 'module'
 import path from 'path'
 
 import type { TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
@@ -13,6 +14,21 @@ export interface atscriptPluginOptions {
    * @default true
    */
   strict?: boolean
+
+  /**
+   * The directory `atscript.config.*` is discovered from and `.as` files are
+   * resolved against. Absolute, or relative to `process.cwd()`.
+   *
+   * Defaults to the bundler's root (Vite: `config.root`, picked up automatically
+   * in `configResolved`) or `process.cwd()`.
+   *
+   * Vite picks the root up automatically; other bundlers need `root` when the
+   * working directory is not the project root (monorepo `pnpm -C`, editor-launched
+   * builds, a root that sits next to — not above — the config). Without it the
+   * config is discovered from the wrong directory and valid annotations from
+   * config-provided plugins (`@db.*`, `@ui.*`, …) are reported as unknown.
+   */
+  root?: string
 }
 
 // Matches declaration-module ids (.d.ts / .d.mts / .d.cts). Declaration bundlers
@@ -22,8 +38,35 @@ export interface atscriptPluginOptions {
 // asking for the module.
 const RE_DTS = /\.d\.[cm]?ts$/
 
+// Every rendered `.as` module imports its runtime helpers from here.
+const RUNTIME_ENTRY = '@atscript/typescript/utils'
+
+/** Minimal structural view of the Vite config objects this plugin touches. */
+interface TViteUserConfig {
+  root?: string
+  optimizeDeps?: { include?: string[] }
+}
+
+interface TViteResolvedConfig {
+  root: string
+}
+
+function isResolvableFrom(specifier: string, from: string): boolean {
+  try {
+    createRequire(path.join(from, 'package.json')).resolve(specifier)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
-  const root = process.cwd()
+  // An explicit option always wins over whatever the bundler reports.
+  const explicitRoot = opts?.root ? path.resolve(opts.root) : undefined
+  // Mutable and read lazily (never at factory time): a bundler hook — Vite's
+  // `configResolved` — may fill it in before the first `load`.
+  let detectedRoot: string | undefined
+  const getRoot = () => explicitRoot ?? detectedRoot ?? process.cwd()
   const strict = opts?.strict ?? true
   let repo: AtscriptRepo
   let configPromise: Promise<TAtscriptConfig> | undefined
@@ -34,12 +77,49 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
   // rejection. Errors now surface inside `load()`, where the bundler can report them.
   const getConfig = () =>
     (configPromise ??= (async () => {
-      const p = await resolveConfigFile(root)
+      const p = await resolveConfigFile(getRoot())
       return p ? loadConfig(p) : {}
     })())
 
   return {
     name: 'unplugin-atscript',
+
+    vite: {
+      /**
+       * Prebundle the runtime helper module.
+       *
+       * The JS this plugin renders for every `.as` module imports
+       * `@atscript/typescript/utils`, but that module body only exists after
+       * `load` has run — Vite's static dependency scanner never sees the import.
+       * In dev the first `.as`-backed route therefore triggers
+       * "new dependencies optimized: @atscript/typescript/utils" followed by a
+       * full page reload in the middle of a client-side navigation. Declaring the
+       * entry up front makes Vite prebundle it with everything else.
+       *
+       * Only client-side `optimizeDeps` is touched; SSR does not prebundle and
+       * shows no such reload.
+       */
+      config(userConfig: TViteUserConfig) {
+        // `config` runs before `configResolved`, so the root has to be derived
+        // from the user config here.
+        const root = path.resolve(explicitRoot ?? userConfig.root ?? process.cwd())
+        const listed = userConfig.optimizeDeps?.include?.includes(RUNTIME_ENTRY) ?? false
+        // An include entry that cannot be resolved makes Vite warn
+        // "Failed to resolve dependency" on every start.
+        return listed || !isResolvableFrom(RUNTIME_ENTRY, root)
+          ? undefined
+          : { optimizeDeps: { include: [RUNTIME_ENTRY] } }
+      },
+
+      /**
+       * Adopt Vite's own project root so `atscript.config.*` is discovered from
+       * the directory Vite actually builds, not from the working directory the
+       * process happened to start in. An explicit `root` option still wins.
+       */
+      configResolved(config: TViteResolvedConfig) {
+        detectedRoot = config.root
+      },
+    },
 
     resolveId(id, importer) {
       if (importer && id.endsWith('.as')) {
@@ -71,7 +151,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
           if (!config.plugins) {
             config.plugins = [ts()]
           }
-          repo = new AtscriptRepo(root, config as TAtscriptConfigInput)
+          repo = new AtscriptRepo(getRoot(), config as TAtscriptConfigInput)
         }
         const code = (await readFile(sourceId, 'utf8')).toString()
         const doc = await repo.openDocument(`file://${sourceId}`, code)
