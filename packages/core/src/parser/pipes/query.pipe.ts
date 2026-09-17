@@ -1,5 +1,4 @@
-import type { TLexicalToken } from '../../tokenizer/types'
-import { NodeIterator } from '../iterator'
+import type { NodeIterator } from '../iterator'
 import {
   SemanticQueryComparisonNode,
   SemanticQueryFieldRefNode,
@@ -11,51 +10,41 @@ import {
   type TQueryOperator,
 } from '../nodes/query-nodes'
 import { Token } from '../token'
-import type { TMessages } from '../types'
+import type { TVsCodeRange } from '../utils'
 
 const SYMBOLIC_OPS = new Set<string>(['=', '!=', '>', '>=', '<', '<='])
 
 const VALUE_KEYWORDS = new Set<string>(['true', 'false', 'null', 'undefined'])
 
-type TRange = TMessages[number]['range']
-
-/**
- * Query parsing context.
- * Carries the diagnostics sink plus the range to blame when the offending
- * token has no range of its own — the enclosing query token, or the enclosing
- * "(...)" block when parsing a parenthesized sub-expression.
- */
-interface TQueryCtx {
-  messages: TMessages
-  fallback: TRange
+const ZERO_RANGE: TVsCodeRange = {
+  start: { line: 0, character: 0 },
+  end: { line: 0, character: 0 },
 }
 
 /**
- * Parse a backtick-delimited query expression from its child tokens.
+ * Parse a backtick-delimited query expression.
+ *
+ * `ni` iterates the query token's children and carries that token as its
+ * `parent` — the range to blame when a diagnostic has no token of its own —
+ * so fork it from the annotation iterator while the query token is current.
  * Returns a SemanticQueryNode or undefined if the content is empty.
  */
 export function parseQueryExpression(
-  children: TLexicalToken[],
-  messages: TMessages,
+  ni: NodeIterator,
   sourceToken: Token
 ): SemanticQueryNode | undefined {
-  if (children.length === 0) {
+  if (!ni.$) {
     return undefined
   }
 
-  const ctx: TQueryCtx = { messages, fallback: sourceToken.range }
-
-  const ni = new NodeIterator(children, messages)
-  ni.move() // position at first token
-
-  const expr = parseOrExpr(ni, ctx)
+  const expr = parseOrExpr(ni)
   if (!expr) {
     return undefined
   }
 
   // Check for unconsumed tokens
   if (ni.$) {
-    pushError(ni, ctx, `Unexpected token in query expression: "${ni.$.text}"`)
+    pushError(ni, `Unexpected token in query expression: "${ni.$.text}"`)
   }
 
   const node = new SemanticQueryNode()
@@ -64,8 +53,8 @@ export function parseQueryExpression(
   return node
 }
 
-function parseOrExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | undefined {
-  const left = parseAndExpr(ni, ctx)
+function parseOrExpr(ni: NodeIterator): SemanticQueryExprNode | undefined {
+  const left = parseAndExpr(ni)
   if (!left) {
     return undefined
   }
@@ -73,9 +62,9 @@ function parseOrExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | 
   const operands: SemanticQueryExprNode[] = [left]
   while (ni.$?.type === 'identifier' && ni.$.text === 'or') {
     ni.move() // consume 'or'
-    const right = parseAndExpr(ni, ctx)
+    const right = parseAndExpr(ni)
     if (!right) {
-      pushError(ni, ctx, 'Expected expression after "or"')
+      pushError(ni, 'Expected expression after "or"')
       break
     }
     operands.push(right)
@@ -91,8 +80,8 @@ function parseOrExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | 
   return node
 }
 
-function parseAndExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | undefined {
-  const left = parseUnaryExpr(ni, ctx)
+function parseAndExpr(ni: NodeIterator): SemanticQueryExprNode | undefined {
+  const left = parseUnaryExpr(ni)
   if (!left) {
     return undefined
   }
@@ -100,9 +89,9 @@ function parseAndExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode |
   const operands: SemanticQueryExprNode[] = [left]
   while (ni.$?.type === 'identifier' && ni.$.text === 'and') {
     ni.move() // consume 'and'
-    const right = parseUnaryExpr(ni, ctx)
+    const right = parseUnaryExpr(ni)
     if (!right) {
-      pushError(ni, ctx, 'Expected expression after "and"')
+      pushError(ni, 'Expected expression after "and"')
       break
     }
     operands.push(right)
@@ -118,13 +107,13 @@ function parseAndExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode |
   return node
 }
 
-function parseUnaryExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | undefined {
+function parseUnaryExpr(ni: NodeIterator): SemanticQueryExprNode | undefined {
   // NOT
   if (ni.$?.type === 'identifier' && ni.$.text === 'not') {
     ni.move() // consume 'not'
-    const operand = parseUnaryExpr(ni, ctx)
+    const operand = parseUnaryExpr(ni)
     if (!operand) {
-      pushError(ni, ctx, 'Expected expression after "not"')
+      pushError(ni, 'Expected expression after "not"')
       return undefined
     }
     const node = new SemanticQueryLogicalNode()
@@ -133,31 +122,27 @@ function parseUnaryExpr(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode
     return node
   }
 
-  // Parenthesized subexpression
+  // Parenthesized subexpression — fork before moving on so the "(" block is
+  // the sub-iterator's parent, the fallback range for diagnostics inside it
   if (ni.$?.type === 'block' && ni.$.text === '(') {
-    const blockToken = ni.$
-    const blockChildren = blockToken.children || []
+    const subNi = ni.fork(ni.$.children || [])
     ni.move() // consume the block token
-    // Inside the parens the block itself is the best fallback for diagnostics
-    const subCtx: TQueryCtx = { messages: ctx.messages, fallback: rangeOf(blockToken, ctx) }
-    if (blockChildren.length === 0) {
-      pushErrorAt(subCtx.fallback, ctx, 'Empty parenthesized expression')
+    if (!subNi.$) {
+      pushError(subNi, 'Empty parenthesized expression')
       return undefined
     }
-    const subNi = new NodeIterator(blockChildren, ctx.messages)
-    subNi.move()
-    const expr = parseOrExpr(subNi, subCtx)
+    const expr = parseOrExpr(subNi)
     if (subNi.$) {
-      pushError(subNi, subCtx, `Unexpected token in parenthesized expression: "${subNi.$.text}"`)
+      pushError(subNi, `Unexpected token in parenthesized expression: "${subNi.$.text}"`)
     }
     return expr
   }
 
-  return parseComparison(ni, ctx)
+  return parseComparison(ni)
 }
 
-function parseComparison(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNode | undefined {
-  const left = parseFieldRef(ni, ctx)
+function parseComparison(ni: NodeIterator): SemanticQueryExprNode | undefined {
+  const left = parseFieldRef(ni)
   if (!left) {
     return undefined
   }
@@ -166,9 +151,9 @@ function parseComparison(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNod
   if (ni.$?.type === 'punctuation' && SYMBOLIC_OPS.has(ni.$.text)) {
     const opText = ni.$.text as TQueryOperator
     ni.move()
-    const right = parseValueOrFieldRef(ni, ctx)
+    const right = parseValueOrFieldRef(ni)
     if (!right) {
-      pushError(ni, ctx, `Expected value or field reference after "${opText}"`)
+      pushError(ni, `Expected value or field reference after "${opText}"`)
       return undefined
     }
     const node = new SemanticQueryComparisonNode()
@@ -185,7 +170,7 @@ function parseComparison(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNod
     // 'in' with value list
     if (opText === 'in') {
       ni.move()
-      const right = parseValueList(ni, ctx)
+      const right = parseValueList(ni)
       if (!right) {
         return undefined
       }
@@ -199,9 +184,9 @@ function parseComparison(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNod
     // 'matches' with value (regex literal)
     if (opText === 'matches') {
       ni.move()
-      const right = parseValueOrFieldRef(ni, ctx)
+      const right = parseValueOrFieldRef(ni)
       if (!right) {
-        pushError(ni, ctx, 'Expected value after "matches"')
+        pushError(ni, 'Expected value after "matches"')
         return undefined
       }
       const node = new SemanticQueryComparisonNode()
@@ -222,26 +207,25 @@ function parseComparison(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryExprNod
 
     // 'not in' / 'not exists' (two-keyword operators after field ref)
     if (opText === 'not') {
-      return parseNotComparison(ni, ctx, left)
+      return parseNotComparison(ni, left)
     }
 
-    pushError(ni, ctx, `Unknown operator "${opText}"`)
+    pushError(ni, `Unknown operator "${opText}"`)
     return undefined
   }
 
-  pushError(ni, ctx, 'Expected operator after field reference')
+  pushError(ni, 'Expected operator after field reference')
   return undefined
 }
 
 function parseNotComparison(
   ni: NodeIterator,
-  ctx: TQueryCtx,
   left: SemanticQueryFieldRefNode
 ): SemanticQueryComparisonNode | undefined {
   ni.move() // consume 'not'
   if (ni.$?.type === 'identifier' && ni.$.text === 'in') {
     ni.move()
-    const right = parseValueList(ni, ctx)
+    const right = parseValueList(ni)
     if (!right) {
       return undefined
     }
@@ -258,13 +242,13 @@ function parseNotComparison(
     node.operator = 'not exists'
     return node
   }
-  pushError(ni, ctx, 'Expected "in" or "exists" after "not"')
+  pushError(ni, 'Expected "in" or "exists" after "not"')
   return undefined
 }
 
-function parseFieldRef(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryFieldRefNode | undefined {
+function parseFieldRef(ni: NodeIterator): SemanticQueryFieldRefNode | undefined {
   if (ni.$?.type !== 'identifier') {
-    pushError(ni, ctx, 'Expected field reference')
+    pushError(ni, 'Expected field reference')
     return undefined
   }
 
@@ -286,7 +270,7 @@ function parseFieldRef(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryFieldRefN
           fieldText += `.${ni.$.text}`
           ni.move()
         } else {
-          pushError(ni, ctx, 'Expected identifier after "."')
+          pushError(ni, 'Expected identifier after "."')
           break
         }
       }
@@ -300,7 +284,7 @@ function parseFieldRef(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryFieldRefN
     }
 
     // Dot without following identifier — unexpected
-    pushError(ni, ctx, 'Expected identifier after "."')
+    pushError(ni, 'Expected identifier after "."')
     // Recover: treat as unqualified ref
     const node = new SemanticQueryFieldRefNode()
     node.fieldRef = firstToken
@@ -314,8 +298,7 @@ function parseFieldRef(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryFieldRefN
 }
 
 function parseValueOrFieldRef(
-  ni: NodeIterator,
-  ctx: TQueryCtx
+  ni: NodeIterator
 ): SemanticQueryFieldRefNode | SemanticQueryValueNode | undefined {
   if (!ni.$) {
     return undefined
@@ -323,25 +306,25 @@ function parseValueOrFieldRef(
 
   // Literal values: text, number, regexp
   if (ni.$.type === 'text' || ni.$.type === 'number' || ni.$.type === 'regexp') {
-    return parseValue(ni, ctx)
+    return parseValue(ni)
   }
 
   // Identifier: could be keyword value (true/false/null) or field ref
   if (ni.$.type === 'identifier') {
     if (VALUE_KEYWORDS.has(ni.$.text)) {
-      return parseValue(ni, ctx)
+      return parseValue(ni)
     }
     // It's a field ref
-    return parseFieldRef(ni, ctx)
+    return parseFieldRef(ni)
   }
 
-  pushError(ni, ctx, 'Expected value or field reference')
+  pushError(ni, 'Expected value or field reference')
   return undefined
 }
 
-function parseValue(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryValueNode | undefined {
+function parseValue(ni: NodeIterator): SemanticQueryValueNode | undefined {
   if (!ni.$) {
-    pushError(ni, ctx, 'Expected value')
+    pushError(ni, 'Expected value')
     return undefined
   }
 
@@ -358,42 +341,37 @@ function parseValue(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryValueNode | 
     return node
   }
 
-  pushError(ni, ctx, `Unexpected token "${token.text}" where value expected`)
+  pushError(ni, `Unexpected token "${token.text}" where value expected`)
   return undefined
 }
 
-function parseValueList(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryValueListNode | undefined {
-  // Expect a block token '(' containing comma-separated values
+function parseValueList(ni: NodeIterator): SemanticQueryValueListNode | undefined {
+  // Expect a block token '(' containing comma-separated values — fork before
+  // moving on so the "(" block is the sub-iterator's parent (see parseUnaryExpr)
   if (ni.$?.type === 'block' && ni.$.text === '(') {
-    const blockToken = ni.$
-    const blockChildren = blockToken.children || []
+    const subNi = ni.fork(ni.$.children || [])
     ni.move() // consume the block token
-    const subCtx: TQueryCtx = { messages: ctx.messages, fallback: rangeOf(blockToken, ctx) }
-
-    const values: SemanticQueryValueNode[] = []
-    if (blockChildren.length === 0) {
-      pushErrorAt(subCtx.fallback, ctx, 'Empty value list in "in" expression')
+    if (!subNi.$) {
+      pushError(subNi, 'Empty value list in "in" expression')
       return undefined
     }
 
-    const subNi = new NodeIterator(blockChildren, ctx.messages)
-    subNi.move()
-
-    const first = parseValue(subNi, subCtx)
+    const values: SemanticQueryValueNode[] = []
+    const first = parseValue(subNi)
     if (first) {
       values.push(first)
     }
 
     while (subNi.$?.type === 'punctuation' && subNi.$.text === ',') {
       subNi.move() // consume ','
-      const v = parseValue(subNi, subCtx)
+      const v = parseValue(subNi)
       if (v) {
         values.push(v)
       }
     }
 
     if (subNi.$) {
-      pushError(subNi, subCtx, `Unexpected token in value list: "${subNi.$.text}"`)
+      pushError(subNi, `Unexpected token in value list: "${subNi.$.text}"`)
     }
 
     const node = new SemanticQueryValueListNode()
@@ -401,27 +379,18 @@ function parseValueList(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryValueLis
     return node
   }
 
-  pushError(ni, ctx, 'Expected parenthesized value list after "in"')
+  pushError(ni, 'Expected parenthesized value list after "in"')
   return undefined
 }
 
 /**
- * Range of a token, falling back to the enclosing query/paren range when the
- * token carries no position of its own.
+ * Range to blame for a diagnostic: the current token, else the enclosing
+ * query token / "(...)" block the iterator was forked from.
  */
-function rangeOf(token: TLexicalToken | undefined, ctx: TQueryCtx): TRange {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  return token?.getRange?.() ?? ctx.fallback
+function rangeOf(ni: NodeIterator): TVsCodeRange {
+  return ni.$?.getRange?.() ?? ni.parent?.getRange?.() ?? ZERO_RANGE
 }
 
-function pushError(ni: NodeIterator, ctx: TQueryCtx, message: string): void {
-  pushErrorAt(rangeOf(ni.$, ctx), ctx, message)
-}
-
-function pushErrorAt(range: TRange, ctx: TQueryCtx, message: string): void {
-  ctx.messages.push({
-    severity: 1,
-    message,
-    range,
-  })
+function pushError(ni: NodeIterator, message: string): void {
+  ni.messages.push({ severity: 1, message, range: rangeOf(ni) })
 }

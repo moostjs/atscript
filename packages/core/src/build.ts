@@ -1,4 +1,4 @@
-import { mkdir, rename, rm, writeFile } from 'fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'fs/promises'
 import path from 'path'
 
 import { glob } from 'glob' // or any other glob library
@@ -12,6 +12,9 @@ import { AtscriptRepo } from './repo'
 export interface TOutput extends TOutputWithSource {
   target: string
 }
+
+/** Upper bound on concurrent file operations — macOS defaults `ulimit -n` to 256. */
+const WRITE_CONCURRENCY = 32
 
 export async function build(config: Partial<TAtscriptConfigInput>) {
   const rootDir = config.rootDir
@@ -117,17 +120,31 @@ export class BuildRepo {
    * Each write is awaited and atomic (temp file + rename), because a consumer
    * watching the output — a dev server, a type checker, another build — must
    * never observe a half-written file, and an un-awaited write can be
-   * truncated when the process exits.
+   * truncated when the process exits. Outputs whose content did not change
+   * are not rewritten, so those watchers see no event for them.
    */
   async write(config: TAtscriptConfigOutput, docs = this.docs) {
     const outFiles = await this.generate(config, docs)
-    for (const o of outFiles) {
-      if (o.target) {
-        await mkdir(path.dirname(o.target), { recursive: true })
-        await writeFileAtomic(o.target, o.content)
-      }
+    const targeted = outFiles.filter(o => o.target)
+    const dirs = new Set(targeted.map(o => path.dirname(o.target)))
+    await Promise.all(Array.from(dirs, dir => mkdir(dir, { recursive: true })))
+    for (let i = 0; i < targeted.length; i += WRITE_CONCURRENCY) {
+      await Promise.all(
+        targeted.slice(i, i + WRITE_CONCURRENCY).map(o => writeIfChanged(o.target, o.content))
+      )
     }
     return outFiles
+  }
+}
+
+/**
+ * Writes `content` to `target` unless the file already holds exactly that
+ * content, so an unchanged output produces no filesystem event.
+ */
+async function writeIfChanged(target: string, content: string) {
+  const existing = await readFile(target, 'utf8').catch(() => undefined)
+  if (existing !== content) {
+    await writeFileAtomic(target, content)
   }
 }
 

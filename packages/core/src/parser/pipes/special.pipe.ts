@@ -140,6 +140,15 @@ export function annotations() {
         }
         while (ni.satisfies(...opts.argument)) {
           let argToken = new Token(ni.$)
+          // Parse query expression from backtick token children. Fork before
+          // moving on so the query token is the sub-iterator's parent — the
+          // fallback range for diagnostics on positionless tokens.
+          if (argToken.type === 'query') {
+            const queryNode = parseQueryExpression(ni.fork(argToken.children), argToken)
+            if (queryNode) {
+              argToken.queryNode = queryNode
+            }
+          }
           ni.accepted()
           ni.move()
           // Chain ref continuation: consume .identifier segments for ref args
@@ -157,13 +166,6 @@ export function annotations() {
             }
             if (chainText !== argToken.text) {
               argToken = argToken.clone({ text: chainText })
-            }
-          }
-          // Parse query expression from backtick token children
-          if (argToken.type === 'query') {
-            const queryNode = parseQueryExpression(argToken.children, ni.messages, argToken)
-            if (queryNode) {
-              argToken.queryNode = queryNode
             }
           }
           addArgument(argToken)

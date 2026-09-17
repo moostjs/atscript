@@ -1,4 +1,4 @@
-import type { ParsedNode } from '@prostojs/parser'
+import type { ParsedNode, Position } from '@prostojs/parser'
 import { Node } from '@prostojs/parser'
 
 import type { TLexicalToken } from '../types'
@@ -85,6 +85,11 @@ QueryBlockToken.recognize(
   PunctuationToken
 )
 
+/** 1-based parser position → 0-based VSCode position, shifted by `offset` characters. */
+function toPos(p: Position, offset = 0) {
+  return { line: p.line - 1, character: p.column - 1 + offset }
+}
+
 /**
  * Recursively extract TLexicalToken[] from a ParsedNode tree.
  * Replaces the v0.5 mapContent('children', callback) + global loop.
@@ -108,22 +113,13 @@ export function extractTokens(node: ParsedNode): TLexicalToken[] {
       return {
         type: 'unknown',
         text: item,
-        getRange: () => ({
-          start: { line: start.line - 1, character: start.column - 1 },
-          end: { line: end.line - 1, character: end.column - 1 },
-        }),
+        getRange: () => ({ start: toPos(start), end: toPos(end) }),
       } as TLexicalToken
     }
     const data = item.data as TLexicalToken
     data.getRange = () => ({
-      start: {
-        line: item.start.line - 1,
-        character: item.start.column - 1 + (data.startOffset ?? 0),
-      },
-      end: {
-        line: item.end.line - 1,
-        character: item.end.column - 1 + (data.endOffset ?? 0),
-      },
+      start: toPos(item.start, data.startOffset),
+      end: toPos(item.end, data.endOffset),
     })
     data.children = extractTokens(item)
     return data

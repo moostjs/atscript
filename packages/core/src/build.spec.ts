@@ -5,6 +5,8 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  statSync,
+  utimesSync,
   writeFileSync,
 } from 'fs'
 import { tmpdir } from 'os'
@@ -122,5 +124,51 @@ describe('BuildRepo.write', () => {
     await expect(builder.write({ format: 'js' } as TAtscriptConfigOutput)).rejects.toThrow()
     expect(existsSync(path.join(root, 'a.as.out'))).toBe(true)
     expect(tmpSiblings(root)).toEqual([])
+  })
+
+  it('does not rewrite an output whose content is unchanged', async () => {
+    const root = makeProject({ 'a.as': 'export interface A { id: string }\n' })
+    const target = path.join(root, 'a.as.out')
+    writeFileSync(target, 'same content')
+    const old = new Date('2000-01-01T00:00:00Z')
+    utimesSync(target, old, old)
+
+    const builder = await build({
+      rootDir: root,
+      include: ['**/*.as'],
+      plugins: [emitPlugin(name => ({ fileName: `${name}.out`, content: 'same content' }))],
+    })
+    const out = await builder.write({ format: 'js' } as TAtscriptConfigOutput)
+
+    expect(out).toHaveLength(1)
+    expect(statSync(target).mtime.getTime()).toBe(old.getTime())
+    expect(readFileSync(target, 'utf8')).toBe('same content')
+    expect(tmpSiblings(root)).toEqual([])
+  })
+
+  it('lands outputs sharing a directory and in a nested directory', async () => {
+    const root = makeProject({
+      'a.as': 'export interface A { id: string }\n',
+      'b.as': 'export interface B { id: string }\n',
+      'nested/c.as': 'export interface C { id: string }\n',
+    })
+
+    const builder = await build({
+      rootDir: root,
+      include: ['**/*.as'],
+      plugins: [emitPlugin(name => ({ fileName: `${name}.out`, content: `content of ${name}` }))],
+    })
+    const out = await builder.write({ format: 'js', outDir: 'out' } as TAtscriptConfigOutput)
+
+    expect(out.map(o => o.target).sort()).toEqual([
+      path.join(root, 'out', 'a.as.out'),
+      path.join(root, 'out', 'b.as.out'),
+      path.join(root, 'out', 'nested', 'c.as.out'),
+    ])
+    for (const o of out) {
+      expect(readFileSync(o.target, 'utf8')).toBe(o.content)
+    }
+    expect(tmpSiblings(path.join(root, 'out'))).toEqual([])
+    expect(tmpSiblings(path.join(root, 'out', 'nested'))).toEqual([])
   })
 })
