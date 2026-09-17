@@ -114,6 +114,7 @@ interface CapturedHandlers {
   onSignatureHelp?: (...args: any[]) => any
   semanticTokensOnRange?: (...args: any[]) => any
   onDidSaveTextDocument?: (...args: any[]) => any
+  onDidChangeWatchedFiles?: (...args: any[]) => any
   workspaceFiles?: (...args: any[]) => any
 }
 
@@ -142,7 +143,9 @@ function createMockConnection() {
     onDidSaveTextDocument: vi.fn((h: (...args: any[]) => any) => {
       handlers.onDidSaveTextDocument = h
     }),
-    onDidChangeWatchedFiles: vi.fn(),
+    onDidChangeWatchedFiles: vi.fn((h: (...args: any[]) => any) => {
+      handlers.onDidChangeWatchedFiles = h
+    }),
     onNotification: vi.fn((method: string, h: (...args: any[]) => any) => {
       if (method === 'workspace/files') {
         handlers.workspaceFiles = h
@@ -931,5 +934,83 @@ describe('queue and debounce', () => {
     repo.addToChangeQueue(uri)
     await repo.currentCheck
     expect(connection.sendDiagnostics).toHaveBeenCalled()
+  })
+})
+
+describe('watched .as file changes', () => {
+  const aUri = 'file:///a.as'
+  const bUri = 'file:///b.as'
+  const sources: Record<string, string> = {
+    [aUri]: 'import { B } from "./b"\n\nexport interface A {\n  b: B\n}',
+    [bUri]: 'export interface B {\n  id: string\n}',
+  }
+
+  /** `a.as` imports `b.as`; `openInEditor` lists the uris backed by a text document. */
+  function importerRepo(openInEditor: string[]) {
+    const a = createDoc(aUri, sources[aUri])
+    const b = createDoc(bUri, sources[bUri])
+    a.updateDependencies([b])
+    const textDocs = new Map(openInEditor.map(uri => [uri, td(uri, sources[uri])] as const))
+    const atscriptDocs = new Map([
+      [aUri, a],
+      [bUri, b],
+    ])
+    return { ...createTestableRepo(textDocs, atscriptDocs), a, b }
+  }
+
+  it('closes a changed file that is not open in the editor and re-checks its dependants', async () => {
+    const { repo, connection, a, b } = importerRepo([aUri])
+    repo.checksDelay = 0
+
+    await repo.onAsFileChanged(bUri)
+
+    expect((repo as any).atscripts.has(bUri)).toBe(false)
+    expect((repo as any).atscripts.has(aUri)).toBe(true)
+    expect((repo as any).revalidateQueue).toEqual([aUri])
+    // The dependant keeps its wiring until its own check re-opens the import.
+    expect(a.dependencies.has(b)).toBe(true)
+
+    await repo.currentCheck
+    expect(connection.sendDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ uri: aUri }))
+    // The changed file itself is not re-opened: it may no longer exist.
+    expect(connection.sendDiagnostics).not.toHaveBeenCalledWith(
+      expect.objectContaining({ uri: bUri })
+    )
+  })
+
+  it('leaves a file that is open in the editor alone', async () => {
+    const { repo } = importerRepo([aUri, bUri])
+    await repo.onAsFileChanged(bUri)
+    expect((repo as any).atscripts.has(bUri)).toBe(true)
+    expect((repo as any).revalidateQueue).toEqual([])
+  })
+
+  it('ignores a file the repo never opened', async () => {
+    const { repo } = importerRepo([aUri])
+    await repo.onAsFileChanged('file:///c.as')
+    expect((repo as any).atscripts.size).toBe(2)
+    expect((repo as any).revalidateQueue).toEqual([])
+  })
+
+  it('drops a cached open that failed without queueing anything', async () => {
+    const { repo } = importerRepo([aUri])
+    const cUri = 'file:///c.as'
+    ;(repo as any).atscripts.set(cUri, Promise.reject(new Error('Document not found')))
+    await repo.onAsFileChanged(cUri)
+    expect((repo as any).atscripts.has(cUri)).toBe(false)
+    expect((repo as any).revalidateQueue).toEqual([])
+  })
+
+  it('is driven by onDidChangeWatchedFiles for .as uris only', async () => {
+    const { repo, handlers } = importerRepo([aUri])
+    const spy = vi.spyOn(repo, 'onAsFileChanged').mockResolvedValue(undefined)
+    await handlers.onDidChangeWatchedFiles!({
+      changes: [
+        { uri: bUri, type: 2 },
+        { uri: 'file:///notes.txt', type: 2 },
+      ],
+    })
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith(bUri)
   })
 })

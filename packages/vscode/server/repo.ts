@@ -91,6 +91,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       for (const change of params.changes) {
         if (/atscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
           this.onConfigChanged(change.uri)
+        } else if (change.uri.endsWith('.as')) {
+          await this.onAsFileChanged(change.uri)
         }
       }
     })
@@ -641,9 +643,41 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const { file } = await cache
       if (file === configFile) {
         this.configs.delete(id)
-        this.atscripts.delete(id)
+        this.closeDocument(id)
         this.addToRevalidateQueue(id)
       }
+    }
+  }
+
+  /**
+   * A `.as` file changed on disk while it is not open in the editor (a `git`
+   * checkout, a generator, an external tool). An open document is fed by the
+   * editor through `onDidChangeContent` and is left alone here.
+   *
+   * The base repo reads an imported document from disk once and caches it
+   * until it is closed, so without this every importer kept resolving against
+   * the stale parse until the server restarted. Closing the document makes
+   * the next check of each dependant re-read it from disk; the dependants are
+   * queued for that check. The file itself is not queued: it may have been
+   * deleted (opening it would reject and stall `runChecks`), and its own
+   * diagnostics refresh the next time it is opened in the editor.
+   */
+  async onAsFileChanged(uri: string): Promise<void> {
+    if (this.documents.get(uri)) {
+      return
+    }
+    const cached = this.atscripts.get(uri)
+    if (!cached) {
+      return
+    }
+    const dependants: string[] = await cached.then(
+      doc => Array.from(doc.dependants, d => d.id),
+      // A document that failed to open has no dependants wired to it.
+      () => []
+    )
+    this.closeDocument(uri)
+    for (const id of dependants) {
+      this.addToRevalidateQueue(id)
     }
   }
 
