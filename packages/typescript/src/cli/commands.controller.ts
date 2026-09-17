@@ -5,6 +5,7 @@ import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
 import { getConfig } from './config'
+import { NOTHING_EMITTED_MESSAGE, shouldEmit } from './emit-policy'
 
 @Controller()
 export class Commands {
@@ -62,7 +63,8 @@ export class Commands {
       }
     }
 
-    if (!noEmit) {
+    const emit = shouldEmit({ noEmit, skipDiag, errorCount })
+    if (emit) {
       const out = await builder.write(config as TAtscriptConfigOutput)
       for (const { target } of out) {
         this.logger.log(`✅ created ${__DYE_GREEN__}${target}${__DYE_COLOR_OFF__}`)
@@ -85,6 +87,9 @@ export class Commands {
     }
 
     if (errorCount > 0) {
+      if (!emit && !noEmit) {
+        this.logger.log(`${__DYE_YELLOW__}${NOTHING_EMITTED_MESSAGE}${__DYE_COLOR_OFF__}`)
+      }
       process.exit(1)
     }
   }

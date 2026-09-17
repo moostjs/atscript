@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'fs/promises'
+import { mkdir, rename, rm, writeFile } from 'fs/promises'
 import path from 'path'
 
 import { glob } from 'glob' // or any other glob library
@@ -111,14 +111,42 @@ export class BuildRepo {
     return outFiles
   }
 
+  /**
+   * Renders every document and writes the outputs to disk.
+   *
+   * Each write is awaited and atomic (temp file + rename), because a consumer
+   * watching the output — a dev server, a type checker, another build — must
+   * never observe a half-written file, and an un-awaited write can be
+   * truncated when the process exits.
+   */
   async write(config: TAtscriptConfigOutput, docs = this.docs) {
     const outFiles = await this.generate(config, docs)
     for (const o of outFiles) {
       if (o.target) {
         await mkdir(path.dirname(o.target), { recursive: true })
-        writeFile(o.target, o.content)
+        await writeFileAtomic(o.target, o.content)
       }
     }
     return outFiles
+  }
+}
+
+let tmpSeq = 0
+
+/**
+ * Writes `content` to a sibling temp file and renames it over `target`, so the
+ * target is either the old file or the new one — never a partial write.
+ * The temp file is removed if anything goes wrong.
+ */
+async function writeFileAtomic(target: string, content: string) {
+  const tmp = `${target}.${process.pid}.${tmpSeq++}.tmp`
+  try {
+    await writeFile(tmp, content)
+    await rename(tmp, target)
+  } catch (error) {
+    try {
+      await rm(tmp, { force: true })
+    } catch {}
+    throw error
   }
 }

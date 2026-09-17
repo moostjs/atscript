@@ -30,13 +30,15 @@ In `package.json`:
 
 ## Flags
 
-| Flag           | Shape                         | Effect                                                                                  |
-| -------------- | ----------------------------- | --------------------------------------------------------------------------------------- |
-| `-c <path>`    | path                          | Use a specific config. Default: walk up from CWD.                                       |
+| Flag           | Shape                         | Effect                                                                                                                                  |
+| -------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `-c <path>`    | path                          | Use a specific config. Default: walk up from CWD.                                                                                       |
 | `-f <format>`  | `dts` / `js` / plugin-defined | Output format. Omit → `DEFAULT_FORMAT` (each plugin emits its primary output; TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js`. |
-| `--noEmit`     | flag                          | Parse + diagnose, write nothing. Exit code mirrors diagnostic severity. Use in CI.      |
-| `--skipDiag`   | flag                          | Skip diagnostics, always emit.                                                          |
-| `--help`, `-h` | flag                          | Usage.                                                                                  |
+| `--noEmit`     | flag                          | Parse + diagnose, write nothing. Exit code mirrors diagnostic severity. Use in CI.                                                      |
+| `--skipDiag`   | flag                          | Skip diagnostics, always emit.                                                                                                          |
+| `--help`, `-h` | flag                          | Usage.                                                                                                                                  |
+
+**Errors ⇒ nothing is emitted** (since 0.1.90). Any error-severity diagnostic blocks the whole write — previous outputs stay untouched — and `asc` prints `Nothing emitted — previous outputs were left untouched. Fix the errors above, or pass --skipDiag to emit anyway.` before exiting `1`. `--skipDiag` forces the emit; warnings never block. Writes are atomic (temp file + rename), so a watcher never sees a half-written output.
 
 ## `db sync` subcommand
 
@@ -44,12 +46,19 @@ In `package.json`:
 
 CI-grade plan output (all plan-only — never apply):
 
-| Flag                       | Effect                                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `--check`                  | Exit `0` up-to-date, `1` changes needed, `2` destructive changes present. Gate builds / require approval on `2`. (`--dry-run` also never applies but always exits `0` — human preview vs CI gate.) |
-| `-f, --format json`        | Structured plan (`status`, `schemaHash`, `destructive`, per-entry column/type/FK diffs) on stdout; decorative logs muted. |
-| `-f, --format markdown`    | Same plan rendered for PR comments.                                                                     |
-| `--out <file>`             | Write `--format` output to a file (console output stays intact). Composable: `--check --format json --out plan.json`. |
+| Flag                    | Effect                                                                                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--check`               | Exit `0` up-to-date, `1` changes needed, `2` destructive changes present. Gate builds / require approval on `2`. (`--dry-run` also never applies but always exits `0` — human preview vs CI gate.) |
+| `-f, --format json`     | Structured plan (`status`, `schemaHash`, `destructive`, per-entry column/type/FK diffs) on stdout; decorative logs muted.                                                                          |
+| `-f, --format markdown` | Same plan rendered for PR comments.                                                                                                                                                                |
+| `--out <file>`          | Write `--format` output to a file (console output stays intact). Composable: `--check --format json --out plan.json`.                                                                              |
+
+**Complete inventory or abort** (since 0.1.90). A model that fails to load looks like a deleted table, so the CLI never plans from a partial set:
+
+- Diagnostics run before compiling; any error prints the messages then `Fix the errors above before syncing.` → exit `1`.
+- Each compiled module is imported on its own; failures print as `✖ <file>: <message>` then `Could not load N compiled model module(s); aborting before planning — a partial inventory would propose dropping tables.` → exit `1`, before any adapter connects.
+- Compiled models keep their source directory layout, so cross-directory `.as` imports resolve and same-basename files in different folders no longer collide.
+- `config.models` (see [config.md](config.md)) adds package-shipped models to the inventory; `Loaded N packaged model(s) from config.models`. A throwing callback exits `1`.
 
 Full sync semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
 
@@ -77,7 +86,8 @@ Project root (or config-specified location):
 ## Exit codes
 
 - `0` — success or warnings only.
-- `1` — errors (unless `--skipDiag`, where errors are reported but exit code is unchanged).
+- `1` — errors (unless `--skipDiag`, where errors are reported but exit code is unchanged). Nothing is written on `1`.
+- `db sync`: `1` also covers error diagnostics, unloadable model modules, and a throwing `config.models`; `--check` adds `2` for destructive changes.
 
 ## Troubleshooting
 

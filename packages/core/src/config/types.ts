@@ -22,6 +22,20 @@ export interface TAtscriptConfigInput {
   include?: string[]
   exclude?: string[]
   db?: TDbConfig
+  /**
+   * Extra Atscript models to include in `asc db sync` on top of the compiled
+   * `.as` files — typically models shipped by packages.
+   *
+   * The callback may return an array of annotated types, a module namespace
+   * object (`models: () => import('some-package/models')`), or a nested
+   * combination of both. Every export that `isAnnotatedType()` accepts and
+   * that carries `@db.table` or `@db.view` metadata is included, deduplicated
+   * by identity.
+   *
+   * Declared at the top level so it works with both the declarative and the
+   * function form of `db`.
+   */
+  models?: () => unknown | Promise<unknown>
 }
 
 export interface TAtscriptConfigOutput {

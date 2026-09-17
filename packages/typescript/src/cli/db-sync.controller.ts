@@ -1,19 +1,18 @@
-import { existsSync, writeFileSync, mkdirSync, rmSync } from 'fs'
+import { existsSync, writeFileSync } from 'fs'
 // oxlint-disable max-params
 import { createRequire } from 'node:module'
 import { createInterface } from 'node:readline'
 import { pathToFileURL } from 'node:url'
 import path from 'path'
 
-import type { TAtscriptConfig, TAtscriptConfigOutput, TDbConfigDeclarative } from '@atscript/core'
-import { build } from '@atscript/core'
+import type { TAtscriptConfig, TDbConfigDeclarative } from '@atscript/core'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
-import { isAnnotatedType } from '../runtime/annotated-type'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { getConfig } from './config'
+import { errorMessage, loadDbModels, partialInventoryMessage } from './db-sync-models'
 import { DbSyncPrinter, planFlags } from './db-sync-printer'
 
 @Controller()
@@ -109,10 +108,9 @@ export class DbSyncController {
       process.exit(1)
     }
 
-    const [dbSpace, dbTypes] = await Promise.all([
-      this.resolveDbSpace(config.db),
-      this.compileAndLoadTypes(config),
-    ])
+    // The inventory must be complete before anything touches the database —
+    // planning from a partial one would propose dropping the tables we missed.
+    const dbTypes = await this.loadTypes(config)
 
     if (dbTypes.length === 0) {
       this.info(`No types with @db.table or @db.view found. Nothing to sync.`)
@@ -121,6 +119,8 @@ export class DbSyncController {
 
     this.printer.typeCount(dbTypes.length)
     this.printer.banner()
+
+    const dbSpace = await this.resolveDbSpace(config.db)
 
     const { SchemaSync } = (await this.importFromCwd(
       '@atscript/db/sync',
@@ -201,56 +201,54 @@ export class DbSyncController {
 
   // ── Private helpers ────────────────────────────────────────────────
 
-  private async compileAndLoadTypes(config: TAtscriptConfig): Promise<TAtscriptAnnotatedType[]> {
-    const buildConfig: TAtscriptConfig = { ...config }
-    if (typeof config.db === 'object' && 'adapter' in config.db) {
-      const dbConfig = config.db as TDbConfigDeclarative
-      if (dbConfig.include) {
-        buildConfig.include = dbConfig.include
+  /**
+   * Loads the full model inventory or aborts. Diagnostics run first, every
+   * generated module is imported individually, and any failure exits 1 before
+   * a plan is computed.
+   */
+  private async loadTypes(config: TAtscriptConfig): Promise<TAtscriptAnnotatedType[]> {
+    const result = await loadDbModels({
+      config,
+      cwd: process.cwd(),
+      logger: { log: message => this.info(message) },
+    })
+
+    if (result.diagnostics.errors > 0) {
+      for (const message of result.diagnostics.messages) {
+        this.logger.error(message)
       }
-      if (dbConfig.exclude) {
-        buildConfig.exclude = dbConfig.exclude
-      }
+      this.logger.error(`Fix the errors above before syncing.`)
+      process.exit(1)
     }
-    buildConfig.format = 'js'
-
-    this.info(`Compiling .as files...`)
-    const builder = await build(buildConfig)
-    const outputs = await builder.generate(buildConfig as TAtscriptConfigOutput)
-
-    const jsOutputs = outputs.filter(o => o.fileName.endsWith('.js'))
-    const tmpDir = path.join(process.cwd(), `.atscript-db-sync-${Date.now()}`)
-
-    const writtenFiles: string[] = []
-    for (const o of jsOutputs) {
-      const target = path.join(tmpDir, o.fileName.replace(/\.js$/, '.mjs'))
-      mkdirSync(path.dirname(target), { recursive: true })
-      writeFileSync(target, patchAsImports(o.content))
-      writtenFiles.push(target)
+    // warnings only — keep them off stdout so --format output stays parseable
+    for (const message of result.diagnostics.messages) {
+      this.info(message)
     }
 
-    const dbTypes: TAtscriptAnnotatedType[] = []
-    try {
-      for (const file of writtenFiles) {
-        const mod = await import(/* @vite-ignore */ pathToFileURL(file).href)
-        for (const exp of Object.values(mod)) {
-          if (
-            isAnnotatedType(exp) &&
-            (exp.metadata?.has('db.table') || exp.metadata?.has('db.view'))
-          ) {
-            dbTypes.push(exp)
-          }
-        }
+    if (result.failures.length > 0) {
+      for (const failure of result.failures) {
+        this.logger.error(
+          `${__DYE_RED__}✖ ${failure.file}: ${errorMessage(failure.error)}${__DYE_COLOR_OFF__}`
+        )
       }
-    } catch (error) {
-      this.logger.warn?.(`Could not import compiled types: ${error}`)
-    } finally {
-      try {
-        rmSync(tmpDir, { recursive: true, force: true })
-      } catch {}
+      this.logger.error(
+        `${__DYE_RED__}${partialInventoryMessage(result.failures.length)}${__DYE_COLOR_OFF__}`
+      )
+      process.exit(1)
     }
 
-    return dbTypes
+    if (result.modelsError) {
+      this.logger.error(
+        `${__DYE_RED__}config.models failed: ${errorMessage(result.modelsError)}${__DYE_COLOR_OFF__}`
+      )
+      process.exit(1)
+    }
+
+    if (result.packaged > 0) {
+      this.info(`Loaded ${result.packaged} packaged model(s) from config.models`)
+    }
+
+    return result.types
   }
 
   private async resolveDbSpace(dbConfig: NonNullable<TAtscriptConfig['db']>): Promise<any> {
@@ -304,8 +302,4 @@ export class DbSyncController {
       })
     })
   }
-}
-
-function patchAsImports(content: string): string {
-  return content.replace(/(from\s+["'][^"']+)\.as(["'])/g, '$1.as.mjs$2')
 }

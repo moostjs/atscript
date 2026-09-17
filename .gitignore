@@ -25,3 +25,5 @@ cache
 *.as.js
 *.as.d.ts
 openspec
+# transient test projects (asc db sync model loading)
+.tmp-tests

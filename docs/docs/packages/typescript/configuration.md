@@ -17,15 +17,33 @@ export default defineConfig({
 
 ### Options
 
-| Option              | Type                           | Default                 | Description                                                                                                                                                                                                                                 |
-| ------------------- | ------------------------------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `rootDir`           | `string`                       | Config file's directory | Directory containing your `.as` files                                                                                                                                                                                                       |
-| `include`           | `string[]`                     | `['**/*.as']`           | Glob patterns for `.as` files to compile. Exclude test-fixture directories (`**/test/**`, `**/__test__/**`, `**/__tests__/**`) — see [Testing Fixtures](/packages/typescript/testing-fixtures) for the dedicated fixture-compilation helper |
-| `exclude`           | `string[]`                     | `['node_modules']`      | Glob patterns to ignore                                                                                                                                                                                                                     |
-| `format`            | `string`                       | Plugin-dependent        | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted                                                             |
-| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'` | `'error'`               | How to handle annotations not defined in config                                                                                                                                                                                             |
-| `plugins`           | `TAtscriptPlugin[]`            | `[]`                    | Active plugins                                                                                                                                                                                                                              |
-| `annotations`       | `object`                       | —                       | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))                                                                                                                                           |
+| Option              | Type                                | Default                 | Description                                                                                                                                                                                                                                 |
+| ------------------- | ----------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rootDir`           | `string`                            | Config file's directory | Directory containing your `.as` files                                                                                                                                                                                                       |
+| `include`           | `string[]`                          | `['**/*.as']`           | Glob patterns for `.as` files to compile. Exclude test-fixture directories (`**/test/**`, `**/__test__/**`, `**/__tests__/**`) — see [Testing Fixtures](/packages/typescript/testing-fixtures) for the dedicated fixture-compilation helper |
+| `exclude`           | `string[]`                          | `['node_modules']`      | Glob patterns to ignore                                                                                                                                                                                                                     |
+| `format`            | `string`                            | Plugin-dependent        | Default output format for [CLI](/packages/typescript/cli). The TypeScript plugin supports `'dts'` (type declarations) and `'js'` (runtime code); defaults to `dts` when omitted                                                             |
+| `unknownAnnotation` | `'error' \| 'warn' \| 'allow'`      | `'error'`               | How to handle annotations not defined in config                                                                                                                                                                                             |
+| `plugins`           | `TAtscriptPlugin[]`                 | `[]`                    | Active plugins                                                                                                                                                                                                                              |
+| `annotations`       | `object`                            | —                       | Custom annotation definitions (see [Custom Annotations](/packages/typescript/custom-annotations))                                                                                                                                           |
+| `models`            | `() => unknown \| Promise<unknown>` | —                       | Extra Atscript models for [`asc db sync`](/packages/typescript/cli#models-that-ship-inside-packages), on top of the compiled `.as` files (since 0.1.90)                                                                                     |
+
+### `models`
+
+`asc db sync` builds its table inventory from your compiled `.as` files. Models that ship inside a package are not on disk in your project, so declare them here — otherwise the CLI plans against a smaller set than your runtime uses and proposes dropping the tables it cannot see.
+
+```typescript
+export default defineConfig({
+  plugins: [ts()],
+  db: { adapter: '@atscript/db-sqlite', connection: './myapp.db' },
+  // a module namespace…
+  models: () => import('some-package/models'),
+  // …an array, or any nesting of the two
+  // models: () => [PackagedOrder, PackagedInvoice],
+})
+```
+
+Every export the callback exposes that is an annotated type carrying `@db.table` or `@db.view` is added to the inventory, deduplicated by identity. It is declared at the top level, so it works with both the declarative and the function form of `db`. Used only by `asc db sync` — it has no effect on codegen.
 
 ## Plugin Options
 

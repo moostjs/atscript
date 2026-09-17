@@ -22,17 +22,31 @@ TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before load — i
 
 ## Fields
 
-| Field         | Type                | Notes                                                                                                |
-| ------------- | ------------------- | ---------------------------------------------------------------------------------------------------- |
-| `rootDir`     | `string`            | Base dir; `include`/`exclude` resolve against it. Default: CWD.                                      |
-| `include`     | `string[]`          | Globs of `.as` to parse. Default: `['**/*.as']`.                                                     |
-| `exclude`     | `string[]`          | Globs to skip. Default: `['node_modules']`.                                                          |
-| `entries`     | `string[]`          | Explicit entry files (relative to `rootDir`) — replaces glob discovery. Used by `prepareFixtures()`. |
-| `outDir`      | `string`            | Where generated outputs go. Default: next to sources.                                                |
-| `format`      | `string`            | Default format (`'dts'`, `'js'`, …). CLI `-f` overrides.                                             |
-| `plugins`     | `TAtscriptPlugin[]` | Ordered. Empty array parses but generates nothing.                                                   |
-| `primitives`  | nested object       | Extend built-in primitives. See [primitives.md](primitives.md).                                      |
-| `annotations` | nested object       | Register custom annotations. See [annotations.md](annotations.md).                                   |
+| Field         | Type                                | Notes                                                                                                |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `rootDir`     | `string`                            | Base dir; `include`/`exclude` resolve against it. Default: CWD.                                      |
+| `include`     | `string[]`                          | Globs of `.as` to parse. Default: `['**/*.as']`.                                                     |
+| `exclude`     | `string[]`                          | Globs to skip. Default: `['node_modules']`.                                                          |
+| `entries`     | `string[]`                          | Explicit entry files (relative to `rootDir`) — replaces glob discovery. Used by `prepareFixtures()`. |
+| `outDir`      | `string`                            | Where generated outputs go. Default: next to sources.                                                |
+| `format`      | `string`                            | Default format (`'dts'`, `'js'`, …). CLI `-f` overrides.                                             |
+| `plugins`     | `TAtscriptPlugin[]`                 | Ordered. Empty array parses but generates nothing.                                                   |
+| `primitives`  | nested object                       | Extend built-in primitives. See [primitives.md](primitives.md).                                      |
+| `annotations` | nested object                       | Register custom annotations. See [annotations.md](annotations.md).                                   |
+| `models`      | `() => unknown \| Promise<unknown>` | Extra models for `asc db sync` only (since 0.1.90). See below.                                       |
+
+## `models` (packaged models for `db sync`)
+
+`asc db sync` compiles the project's `.as` files; models shipped inside packages are invisible to it and would be proposed for dropping. Declare them top-level (works with both the declarative and the function form of `db`):
+
+```js
+export default defineConfig({
+  plugins: [ts()],
+  models: () => import('some-package/models'), // or [Model, ...], or any nesting
+})
+```
+
+Returns an array, a module namespace object, or a nested combination. Every export that is an annotated type with `@db.table` / `@db.view` is added, deduped by identity. A throwing callback aborts the sync with exit `1`. No effect on codegen.
 
 ## Plugins
 
@@ -65,8 +79,12 @@ Small extensions live in the config without a dedicated plugin.
 ```js
 export default defineConfig({
   plugins: [ts()],
-  primitives: { /* … */ },
-  annotations: { /* … */ },
+  primitives: {
+    /* … */
+  },
+  annotations: {
+    /* … */
+  },
 })
 ```
 
