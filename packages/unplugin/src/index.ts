@@ -100,9 +100,10 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
        * shows no such reload.
        */
       config(userConfig: TViteUserConfig) {
-        // `config` runs before `configResolved`, so the root has to be derived
-        // from the user config here.
-        const root = path.resolve(explicitRoot ?? userConfig.root ?? process.cwd())
+        // `config` runs before `configResolved`, so apply Vite's own root rule
+        // here; `configResolved` overwrites it with the resolved root.
+        detectedRoot = path.resolve(userConfig.root ?? process.cwd())
+        const root = getRoot()
         const listed = userConfig.optimizeDeps?.include?.includes(RUNTIME_ENTRY) ?? false
         // An include entry that cannot be resolved makes Vite warn
         // "Failed to resolve dependency" on every start.
