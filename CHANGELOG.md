@@ -1,3 +1,9 @@
+## [0.1.91](https://github.com/moostjs/atscript/compare/v0.1.90...v0.1.91) (2026-09-17)
+
+
+### Features
+
+* **typescript:** ts({ moduleExtension }) replaces db-sync import patching; shared diagnostics collector ([720ce94](https://github.com/moostjs/atscript/commit/720ce9481aaa622567fdf0dcb0632b7a47e75651))
 ## [0.1.90](https://github.com/moostjs/atscript/compare/v0.1.89...v0.1.90) (2026-09-17)
 
 
