@@ -31,7 +31,9 @@ function makePlugin(opts?: atscriptPluginOptions): TPlugin {
   return unpluginFactory(opts, {} as never) as unknown as TPlugin
 }
 
-const runLoad = (plugin: TPlugin, id: string) => plugin.load(id)
+// `load` registers its `.as` dependencies as watch files — give it the
+// `addWatchFile` a real bundler would provide.
+const runLoad = (plugin: TPlugin, id: string) => plugin.load.call({ addWatchFile: () => {} }, id)
 
 // Vitest exposes its own node_modules through NODE_PATH, which makes every bare
 // specifier resolvable from any directory and hides the "unresolvable root"

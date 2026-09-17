@@ -2,10 +2,16 @@ import { readFile } from 'fs/promises'
 import { createRequire } from 'module'
 import path from 'path'
 
-import type { TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
-import { AtscriptRepo, isAnnotate, loadConfig, resolveConfigFile } from '@atscript/core'
+import type { AtscriptDoc, TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
+import {
+  AtscriptRepo,
+  fileUriToPath,
+  isAnnotate,
+  loadConfig,
+  resolveConfigFile,
+} from '@atscript/core'
 import { tsPlugin as ts } from '@atscript/typescript'
-import type { UnpluginFactory } from 'unplugin'
+import type { UnpluginBuildContext, UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 
 export interface atscriptPluginOptions {
@@ -49,6 +55,34 @@ interface TViteUserConfig {
 
 interface TViteResolvedConfig {
   root: string
+}
+
+/**
+ * Registers every transitive `.as` dependency of `doc` as a watch file.
+ *
+ * The bundler's module graph only knows the imports the rendered output keeps:
+ * the JS renderer drops imports it does not use, and the dts graph and
+ * non-Vite watchers never see the JS import list at all. Watching the whole
+ * `.as` closure explicitly makes the bundler re-run `load` for the importer
+ * whenever any of them changes.
+ *
+ * Re-registering on every `load` is required: Vite replaces a module's watch
+ * edges on each transform, so a repeat registration is deduped while skipping
+ * it would prune the edge.
+ */
+function addTransitiveWatchFiles(
+  ctx: UnpluginBuildContext,
+  doc: AtscriptDoc,
+  visited = new Set<AtscriptDoc>([doc])
+) {
+  for (const dep of doc.dependencies) {
+    if (visited.has(dep)) {
+      continue
+    }
+    visited.add(dep)
+    ctx.addWatchFile(fileUriToPath(dep.id))
+    addTransitiveWatchFiles(ctx, dep, visited)
+  }
 }
 
 function isResolvableFrom(specifier: string, from: string): boolean {
@@ -157,6 +191,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
         const code = (await readFile(sourceId, 'utf8')).toString()
         const doc = await repo.openDocument(`file://${sourceId}`, code)
         await repo.checkDoc(doc)
+        addTransitiveWatchFiles(this, doc)
         const messages = doc.getDiagMessages().reverse()
         let error = ''
         for (const m of messages) {
@@ -199,6 +234,29 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
           moduleSideEffects: hasMutatingAnnotates ? undefined : false,
         }
       }
+    },
+
+    /**
+     * Drop a changed `.as` file from the repo's document cache.
+     *
+     * The repo reads an imported document from disk once and then caches it
+     * forever, and the bundler re-transforms the *importer* first (its
+     * transform is what pulls the import in). Without this hook the importer
+     * would be re-checked against the stale import — failing the reload in
+     * strict mode before the changed file's own `load` ever ran, and failing
+     * the same way on every reload after that until the process restarts.
+     * `watchChange` runs before anything is re-transformed, so closing the
+     * document here guarantees the next check re-reads it from disk.
+     *
+     * Every event kind is handled the same way: `create` is a no-op unless
+     * something was already cached under that id, `update` and `delete` drop
+     * the stale document (a deleted import then reports `"..." not found`).
+     */
+    watchChange(id) {
+      if (!repo || !id.endsWith('.as')) {
+        return
+      }
+      repo.closeDocument(`file://${id}`)
     },
   }
 }

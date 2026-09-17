@@ -51,7 +51,7 @@ describe('dts bundling of .as re-exports', () => {
   it('serves a fresh dts render for .as.d.ts ids, without the .as reference directive', async () => {
     const plugin = unpluginFactory(undefined, {} as never)
     const load = plugin.load as (id: string) => Promise<{ code: string; moduleType?: string }>
-    const result = await load.call(plugin, path.join(dir, 'user.as.d.ts'))
+    const result = await load.call({ addWatchFile: () => {} }, path.join(dir, 'user.as.d.ts'))
     expect(result.code).toContain('export declare class User')
     expect(result.code).not.toContain('<reference path=')
     expect(result.moduleType).toBeUndefined()

@@ -58,6 +58,7 @@ Vite picks the root up automatically (from `configResolved`); other bundlers nee
 - Strict validation — build fails on `.as` errors by default (`strict: false` to disable)
 - Tree-shaking aware — marks non-mutating modules as side-effect-free
 - On Vite, prebundles `@atscript/typescript/utils` so the first `.as`-backed route does not trigger a dep re-optimization reload
+- Watch-safe in dev — a changed `.as` file is dropped from the document cache and every transitive `.as` import is registered as a watch file, so dependants are re-checked against the new definition on the next reload (esbuild excepted: unplugin has no `watchChange` for it, so under esbuild watch a changed `.as` import still needs a restart)
 
 ## Documentation
 

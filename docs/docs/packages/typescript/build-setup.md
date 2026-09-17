@@ -48,10 +48,11 @@ export default defineConfig({
 
 This lets you import `.as` types directly in your components — for example, to drive form rendering from metadata or validate user input against your type definitions.
 
-Two things happen automatically on Vite:
+Three things happen automatically on Vite:
 
 - **Project root** — the plugin adopts Vite's own `root`, so `atscript.config.*` is discovered from the directory Vite builds, not from the directory the process happened to start in (`pnpm -C`, editor-launched dev servers). On other bundlers pass [`root`](#options) yourself when the two differ.
 - **Dependency prebundling** (since `0.1.90`) — the generated `.as` module imports `@atscript/typescript/utils`, which Vite's static scanner cannot see because the module body only exists after the plugin compiles it. The plugin adds the entry to `optimizeDeps.include` so Vite prebundles it up front, instead of discovering it on the first `.as`-backed route and interrupting a client-side navigation with `optimized dependencies changed. reloading`. Adding that entry manually is no longer needed.
+- **Watch invalidation** (since `0.1.92`) — on a file change the plugin drops the changed `.as` file from its document cache and, on every compile, registers each transitive `.as` import as a watch file. A dependant is therefore re-checked against the new definition on the next reload, and it is invalidated even when the import leaves no JS import behind (an unused symbol, or a type only read through `extends`/annotation chains). Before `0.1.92`, a referenced model that changed type or moved to another file could stay stale in a long-running dev server — the dependant kept failing to reload until the server was restarted.
 
 ## Other Bundlers
 

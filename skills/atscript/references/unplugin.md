@@ -92,6 +92,10 @@ Per matching `.as`:
 
 HMR respects `@atscript/core`'s `AtscriptRepo` dependency graph — editing a type propagates to all referrers.
 
+**Gotcha (fixed in `0.1.92`)** — `AtscriptRepo` caches every document it opens and reads an imported one from disk only once, so before `0.1.92` a changed import stayed stale for the whole dev-server session: the dependant was re-checked against the old definition, threw in strict mode before the changed file's own `load` ran, and every reload after that failed the same way (`asc`/`tsc`/a fresh dev server accepted the same sources) until the process was restarted. Since `0.1.92` a `watchChange` hook closes the changed document (`repo.closeDocument()`), and each compile registers every transitive `.as` import via `addWatchFile` — so a dependant is invalidated even when the import leaves no JS import behind (an unused symbol, or a type only read through `extends`/annotation chains).
+
+**esbuild caveat** — unplugin has no `watchChange` for esbuild, so under esbuild watch a changed `.as` import still needs a restart.
+
 ## Strict vs non-strict
 
 - `strict: true` (default) — parse/diagnostic **errors** fail the build; warnings still log.
@@ -139,7 +143,7 @@ The same applies if you subpath-import from any other `@atscript/*` package (`@a
 - **"Cannot find atscript.config" / valid `@db.*` / `@ui.*` reported as "Unknown annotation"** — the config was discovered from the wrong directory. Ensure it lives at/above the root, and pass `root` on non-Vite bundlers when the working directory is not the project root.
 - **Dev server full-reloads on the first `.as`-backed route** (`optimized dependencies changed. reloading`) — expected before `0.1.90`; upgrade, or add `@atscript/typescript/utils` to `optimizeDeps.include` manually.
 - **Type errors on `.as` imports** — runtime is fine, `.d.ts` is stale. Run `asc -f dts`.
-- **`.as` changes not picked up** — HMR depends on the bundler's watcher. Verify the bundler sees the file at all.
+- **`.as` changes not picked up** — HMR depends on the bundler's watcher. Verify the bundler sees the file at all. A *dependant* stuck on a stale definition of an imported model is the pre-`0.1.92` cache bug — see [HMR](#hmr).
 - **Re-exported `.as` symbol untyped in a consumer / dist `.d.mts` imports it from a `.mjs` chunk** — see [Library builds that re-export `.as` symbols](#library-builds-that-re-export-as-symbols).
 
 ## See also

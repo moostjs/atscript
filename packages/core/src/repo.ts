@@ -246,6 +246,37 @@ export class AtscriptRepo {
     return atscript
   }
 
+  /**
+   * Drops the cached document for `id` and detaches it from its dependencies
+   * (which also removes it from each dependency's `dependants`).
+   *
+   * Documents are cached forever and an imported document is read from disk
+   * only once, so a file that changed outside the repo (a watcher, a dev
+   * server, an editor) keeps resolving to its stale parse until it is closed.
+   * After closing, the next `openDocument(id)` without text re-reads the file.
+   *
+   * Dependants are left untouched on purpose: their next `checkDoc` re-runs
+   * `checkImport` -> `openDocument(id)`, which re-reads the file and rewires
+   * their `dependenciesMap` to the fresh document.
+   *
+   * @returns `true` when a cached document was dropped, `false` when nothing
+   * was cached under `id`.
+   */
+  closeDocument(id: string): boolean {
+    const cached = this.atscripts.get(id)
+    if (!cached) {
+      return false
+    }
+    this.atscripts.delete(id)
+    cached.then(
+      d => d.updateDependencies([]),
+      // A document that failed to open has nothing to detach; swallowing the
+      // rejection here keeps the dropped entry from becoming an unhandled one.
+      () => {}
+    )
+    return true
+  }
+
   protected async _openDocument(id: string, text?: string): Promise<AtscriptDoc> {
     const { manager } = await this.resolveConfig(id)
     const newId = await manager.resolve(id)

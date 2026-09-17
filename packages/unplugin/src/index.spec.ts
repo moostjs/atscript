@@ -7,9 +7,11 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { unpluginFactory } from './index'
 
 // Helper: run the unplugin `load` hook regardless of how the object types it.
+// `load` registers its `.as` dependencies as watch files, so the context needs
+// the `addWatchFile` a real bundler would provide.
 async function runLoad(plugin: ReturnType<typeof unpluginFactory>, id: string) {
   const load = plugin.load as (id: string) => Promise<unknown>
-  return load.call(plugin, id)
+  return load.call({ addWatchFile: () => {} }, id)
 }
 
 describe('unpluginFactory', () => {
