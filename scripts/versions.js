@@ -110,10 +110,16 @@ async function main() {
     await $`git tag v${newVersion} -m "Release version ${newVersion}"`
     done('Git tag created.')
 
-    // Step 10: Push commits and tags to the remote repository
-    step('Pushing to remote repository...')
-    await $`git push --follow-tags`
-    done('Pushed to git successfully!')
+    // Step 10: Push commits and tags to the remote repository (skipped with
+    // --no-push so the release script can rebuild + publish first)
+    if (process.argv.includes('--no-push')) {
+      step('Skipping push (--no-push)...')
+      done('Remember to `git push --follow-tags` after publishing.')
+    } else {
+      step('Pushing to remote repository...')
+      await $`git push --follow-tags`
+      done('Pushed to git successfully!')
+    }
   } catch (error) {
     info('\n❌ Failed version update:', error)
     process.exit(1)
