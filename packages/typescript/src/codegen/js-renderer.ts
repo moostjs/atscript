@@ -27,6 +27,7 @@ import {
   getRelPath,
   isArray,
   isBareId,
+  isBareSpecifier,
   isGroup,
   isInterface,
   isPrimitive,
@@ -83,6 +84,14 @@ export class JsRenderer extends BaseRenderer {
     private opts?: TTsPluginOptions
   ) {
     super(doc)
+  }
+
+  /**
+   * Relative imports get the configured `moduleExtension`; bare specifiers
+   * always keep `.as` — they resolve through the package's `exports` map.
+   */
+  override transformFromPath(path: string): string {
+    return isBareSpecifier(path) ? `${path}.as` : `${path}${this.opts?.moduleExtension ?? '.as'}`
   }
 
   /**

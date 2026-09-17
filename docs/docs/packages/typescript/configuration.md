@@ -107,6 +107,26 @@ const example = createDataFromAnnotatedType(Product, { mode: 'example' })
 
 :::
 
+### `moduleExtension`
+
+Controls the extension the generated `.js` uses for **relative** `.as` imports (since 0.1.91). Bare specifiers (packages, e.g. `some-pkg/models/user.as`) always keep `.as` — they resolve through the package's `exports` map. The `.d.ts` output is not affected.
+
+| Value               | `import { B } from "./b"` renders as |
+| ------------------- | ------------------------------------ |
+| `'.as'` _(default)_ | `from "./b.as"`                      |
+| `'.as.js'`          | `from "./b.as.js"`                   |
+| `'.as.mjs'`         | `from "./b.as.mjs"`                  |
+
+```javascript
+// Default — bundler / asc-emitted `.as.js` next to the source
+plugins: [ts()]
+
+// Load the generated modules straight from Node without a bundler
+plugins: [ts({ moduleExtension: '.as.mjs' })]
+```
+
+`asc db sync` compiles with `'.as.mjs'` so the models it loads resolve directly in Node.
+
 ## The `atscript.d.ts` File
 
 When you run `asc -f dts`, an `atscript.d.ts` file is generated alongside your output. It declares the global `AtscriptMetadata` interface and `AtscriptPrimitiveTags` type — these provide TypeScript IntelliSense for all annotations and semantic type tags used in your project.

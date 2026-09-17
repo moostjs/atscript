@@ -75,6 +75,7 @@ export class User {
 - Every interface/type/annotate-alias gets a stable `static id` string (collision-safe within the document).
 - Ref-typed props (`foo: OtherType`) → `.refTo(OtherType)`, walked lazily.
 - Structures, unions/intersections, tuples, arrays each use their dedicated `defineAnnotatedType` constructor.
+- Relative `.as` imports render as `from "./b.as"`; `ts({ moduleExtension: '.as.js' | '.as.mjs' })` (since 0.1.91) changes that extension for relative imports only — bare specifiers (`some-pkg/x.as`) always keep `.as` and resolve through the package `exports` map. `asc db sync` compiles with `'.as.mjs'` to load models straight from Node. `.d.ts` output is unaffected.
 
 Consumer APIs: [runtime.md](runtime.md). Validation: [validation.md](validation.md).
 

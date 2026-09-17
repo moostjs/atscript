@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { tsPlugin } from '../plugin'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
-import { flattenModels, loadDbModels, partialInventoryMessage } from './db-sync-models'
+import { flattenModels, loadDbModels } from './db-sync-models'
 
 // __DYE_* are compile-time defines — diagnostics rendering reads them at runtime
 for (const key of [
@@ -128,10 +128,6 @@ describe('loadDbModels — fail fast', () => {
     expect(result.failures[0].file).toBe(path.join('models', 'a.as.mjs'))
     // the partial inventory (only C) must never be treated as complete
     expect(ids(result.types)).toEqual(['C'])
-    expect(partialInventoryMessage(1)).toBe(
-      'Could not load 1 compiled model module(s); aborting before planning — ' +
-        'a partial inventory would propose dropping tables.'
-    )
   })
 
   it('reports error diagnostics and skips compilation', async () => {

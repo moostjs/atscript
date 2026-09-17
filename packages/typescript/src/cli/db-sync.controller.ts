@@ -12,7 +12,7 @@ import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { getConfig } from './config'
-import { errorMessage, loadDbModels, partialInventoryMessage } from './db-sync-models'
+import { errorMessage, loadDbModels } from './db-sync-models'
 import { DbSyncPrinter, planFlags } from './db-sync-printer'
 
 @Controller()
@@ -30,6 +30,14 @@ export class DbSyncController {
     if (!this.quiet) {
       this.logger.log(message)
     }
+  }
+
+  /** Prints each line in red and exits 1. */
+  private fail(...lines: string[]): never {
+    for (const line of lines) {
+      this.logger.error(`${__DYE_RED__}${line}${__DYE_COLOR_OFF__}`)
+    }
+    process.exit(1)
   }
 
   @Cli('db sync')
@@ -86,10 +94,7 @@ export class DbSyncController {
     out?: string
   ) {
     if (format && format !== 'json' && format !== 'markdown') {
-      this.logger.error(
-        `${__DYE_RED__}Unknown --format "${format}". Use "json" or "markdown".${__DYE_COLOR_OFF__}`
-      )
-      process.exit(1)
+      this.fail(`Unknown --format "${format}". Use "json" or "markdown".`)
     }
     // Structured output on stdout must stay parseable — mute decorative logs
     this.quiet = Boolean(format) && !out
@@ -101,11 +106,7 @@ export class DbSyncController {
     const config = await getConfig(configFile, cfgLogger)
 
     if (!config.db) {
-      this.logger.error(
-        `${__DYE_RED__}No "db" field in atscript config. ` +
-          `Add a db configuration to use schema sync.${__DYE_COLOR_OFF__}`
-      )
-      process.exit(1)
+      this.fail('No "db" field in atscript config. Add a db configuration to use schema sync.')
     }
 
     // The inventory must be complete before anything touches the database —
@@ -147,8 +148,7 @@ export class DbSyncController {
     } else {
       this.printer.plan(plan)
       if (hasErrors) {
-        this.logger.error(`Schema has errors. Fix the issues above before syncing.`)
-        process.exit(1)
+        this.fail('Schema has errors. Fix the issues above before syncing.')
       }
     }
 
@@ -207,18 +207,15 @@ export class DbSyncController {
    * a plan is computed.
    */
   private async loadTypes(config: TAtscriptConfig): Promise<TAtscriptAnnotatedType[]> {
-    const result = await loadDbModels({
-      config,
-      cwd: process.cwd(),
-      logger: { log: message => this.info(message) },
-    })
+    this.info(`Compiling .as files...`)
+    const result = await loadDbModels({ config })
 
     if (result.diagnostics.errors > 0) {
+      // rendered diagnostics carry their own colours
       for (const message of result.diagnostics.messages) {
         this.logger.error(message)
       }
-      this.logger.error(`Fix the errors above before syncing.`)
-      process.exit(1)
+      this.fail('Fix the errors above before syncing.')
     }
     // warnings only — keep them off stdout so --format output stays parseable
     for (const message of result.diagnostics.messages) {
@@ -226,22 +223,15 @@ export class DbSyncController {
     }
 
     if (result.failures.length > 0) {
-      for (const failure of result.failures) {
-        this.logger.error(
-          `${__DYE_RED__}✖ ${failure.file}: ${errorMessage(failure.error)}${__DYE_COLOR_OFF__}`
-        )
-      }
-      this.logger.error(
-        `${__DYE_RED__}${partialInventoryMessage(result.failures.length)}${__DYE_COLOR_OFF__}`
+      this.fail(
+        ...result.failures.map(f => `✖ ${f.file}: ${errorMessage(f.error)}`),
+        `Could not load ${result.failures.length} compiled model module(s); aborting before planning — ` +
+          `a partial inventory would propose dropping tables.`
       )
-      process.exit(1)
     }
 
     if (result.modelsError) {
-      this.logger.error(
-        `${__DYE_RED__}config.models failed: ${errorMessage(result.modelsError)}${__DYE_COLOR_OFF__}`
-      )
-      process.exit(1)
+      this.fail(`config.models failed: ${errorMessage(result.modelsError)}`)
     }
 
     if (result.packaged > 0) {
@@ -264,17 +254,11 @@ export class DbSyncController {
     try {
       mod = await this.importFromCwd(adapter)
     } catch {
-      this.logger.error(
-        `${__DYE_RED__}Could not import adapter package "${adapter}". Is it installed?${__DYE_COLOR_OFF__}`
-      )
-      process.exit(1)
+      this.fail(`Could not import adapter package "${adapter}". Is it installed?`)
     }
 
     if (typeof mod.createAdapter !== 'function') {
-      this.logger.error(
-        `${__DYE_RED__}Adapter package "${adapter}" does not export a createAdapter function.${__DYE_COLOR_OFF__}`
-      )
-      process.exit(1)
+      this.fail(`Adapter package "${adapter}" does not export a createAdapter function.`)
     }
 
     const resolvedConnection = typeof connection === 'function' ? await connection() : connection

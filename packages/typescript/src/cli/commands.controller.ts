@@ -5,7 +5,8 @@ import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
 import { getConfig } from './config'
-import { NOTHING_EMITTED_MESSAGE, shouldEmit } from './emit-policy'
+import { collectDiagnostics } from './diagnostics'
+import { NOTHING_EMITTED_MESSAGE, emitDecision } from './emit-policy'
 
 @Controller()
 export class Commands {
@@ -47,24 +48,16 @@ export class Commands {
     let warningCount = 0
 
     if (!skipDiag) {
-      const diagMap = await builder.diagnostics()
-      for (const [docId, messages] of diagMap) {
-        const doc = builder.getDoc(docId)
-        for (const m of messages) {
-          if (m.severity === 1) {
-            errorCount++
-          } else if (m.severity === 2) {
-            warningCount++
-          }
-          if (doc) {
-            this.logger.log(doc.renderDiagMessage(m, true, true))
-          }
-        }
+      const diagnostics = await collectDiagnostics(builder)
+      for (const message of diagnostics.messages) {
+        this.logger.log(message)
       }
+      errorCount = diagnostics.errors
+      warningCount = diagnostics.warnings
     }
 
-    const emit = shouldEmit({ noEmit, skipDiag, errorCount })
-    if (emit) {
+    const decision = emitDecision({ noEmit, skipDiag, errorCount })
+    if (decision === 'emit') {
       const out = await builder.write(config as TAtscriptConfigOutput)
       for (const { target } of out) {
         this.logger.log(`✅ created ${__DYE_GREEN__}${target}${__DYE_COLOR_OFF__}`)
@@ -86,10 +79,10 @@ export class Commands {
       this.logger.log(`\nFound ${parts.join(' and ')}`)
     }
 
+    if (decision === 'blocked') {
+      this.logger.log(`${__DYE_YELLOW__}${NOTHING_EMITTED_MESSAGE}${__DYE_COLOR_OFF__}`)
+    }
     if (errorCount > 0) {
-      if (!emit && !noEmit) {
-        this.logger.log(`${__DYE_YELLOW__}${NOTHING_EMITTED_MESSAGE}${__DYE_COLOR_OFF__}`)
-      }
       process.exit(1)
     }
   }

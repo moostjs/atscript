@@ -25,6 +25,17 @@ export interface TTsPluginOptions {
    * - `true` — Import `createDataFromAnnotatedType`, create example data on each call.
    */
   exampleData?: boolean
+
+  /**
+   * Extension the emitted JS uses for **relative** `.as` imports
+   * (`./user` → `./user.as` by default). Bare specifiers (packages, e.g.
+   * `some-pkg/models/user.as`) always keep `.as` because they resolve through
+   * the package's `exports` map.
+   *
+   * `.as.mjs` is what `asc db sync` uses to load the compiled models straight
+   * from Node. *(default: `'.as'`)*
+   */
+  moduleExtension?: '.as' | '.as.js' | '.as.mjs'
 }
 
 /**
