@@ -1,3 +1,4 @@
+// oxlint-disable unicorn/prefer-export-from -- theme icon map re-exports raw SVG imports on purpose
 import asLogo from '../../public/logo.svg?raw'
 import asUiLogo from '../../public/atscript-ui-logo.svg?raw'
 import asDbLogo from '../../public/atscript-db-logo.svg?raw'

@@ -18,7 +18,9 @@ export function resolveAtscriptFromPath(from: string, id: string) {
 // LSP clients (VSCode) percent-encode `@`/`+` etc. in URIs, but on-disk paths
 // are unencoded — decode before any fs access. Non-`file://` ids pass through.
 export function fileUriToPath(id: string): string {
-  if (!id.startsWith('file://')) return id
+  if (!id.startsWith('file://')) {
+    return id
+  }
   const raw = id.slice(7)
   try {
     return decodeURIComponent(raw)

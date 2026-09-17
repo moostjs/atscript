@@ -294,11 +294,8 @@ function parseFieldRef(ni: NodeIterator, ctx: TQueryCtx): SemanticQueryFieldRefN
       const node = new SemanticQueryFieldRefNode()
       node.typeRef = firstToken
       // Create a fieldRef token with potentially joined text for multi-hop
-      if (fieldText !== secondToken.text) {
-        node.fieldRef = secondToken.clone({ text: fieldText })
-      } else {
-        node.fieldRef = secondToken
-      }
+      node.fieldRef =
+        fieldText === secondToken.text ? secondToken : secondToken.clone({ text: fieldText })
       return node
     }
 

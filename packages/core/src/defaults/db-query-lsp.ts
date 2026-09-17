@@ -161,11 +161,7 @@ export function getFieldsForType(doc: AtscriptDoc, typeName: string): SemanticPr
   let def: SemanticNode = doc.mergeIntersection(unwound.def)
   if (isInterface(def)) {
     const resolved = doc.resolveInterfaceExtends(def as SemanticInterfaceNode)
-    if (resolved) {
-      def = resolved
-    } else {
-      def = def.getDefinition() || def
-    }
+    def = resolved || def.getDefinition() || def
   }
   if (isStructure(def) || isInterface(def)) {
     return Array.from(def.props.values())

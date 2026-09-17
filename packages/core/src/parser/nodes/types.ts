@@ -39,7 +39,7 @@ export type TPrimitiveAnnotationValue =
   | string // single string arg (e.g., 'db.column.collate': 'nocase')
   | number // single number arg (e.g., 'expect.min': 0)
   | TPrimitiveAnnotationArgs // multi named args (e.g., { pattern: '...', flags: 'i', message: '...' })
-  | (TPrimitiveAnnotationArg | TPrimitiveAnnotationArgs)[] // multiple instances
+  | Array<TPrimitiveAnnotationArg | TPrimitiveAnnotationArgs> // multiple instances
 
 export interface TPrimitiveBaseConfig {
   type?: TPrimitiveTypeDef

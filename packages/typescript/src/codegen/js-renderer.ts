@@ -393,11 +393,7 @@ export class JsRenderer extends BaseRenderer {
             if (isInterface(def)) {
               if ((def as SemanticInterfaceNode).hasExtends) {
                 const resolved = unwound.doc.resolveInterfaceExtends(def as SemanticInterfaceNode)
-                if (resolved) {
-                  def = resolved
-                } else {
-                  def = def.getDefinition() || def
-                }
+                def = resolved || def.getDefinition() || def
               } else {
                 def = def.getDefinition() || def
               }
@@ -1190,11 +1186,7 @@ export class JsRenderer extends BaseRenderer {
           targetValue += '}'
         } else {
           const aSpec = spec.arguments[0]
-          if (an.args[0]) {
-            targetValue = this.emitArgValue(aSpec, an.args[0])
-          } else {
-            targetValue = 'true'
-          }
+          targetValue = an.args[0] ? this.emitArgValue(aSpec, an.args[0]) : 'true'
         }
       }
     } else {
