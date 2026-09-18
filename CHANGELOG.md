@@ -1,3 +1,9 @@
+## [0.1.93](https://github.com/moostjs/atscript/compare/v0.1.92...v0.1.93) (2026-09-18)
+
+
+### Features
+
+* **core,typescript:** db-sync refused runs, JSON entry fields, shared DB-entity rule, flat | null ([45d15e1](https://github.com/moostjs/atscript/commit/45d15e1a048317b2e2416c4b1ea4883212a6b342))
 ## [0.1.92](https://github.com/moostjs/atscript/compare/v0.1.91...v0.1.92) (2026-09-17)
 
 
