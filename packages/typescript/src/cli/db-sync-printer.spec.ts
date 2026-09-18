@@ -1,30 +1,8 @@
 import { SyncEntry } from '@atscript/db/sync'
-import type { TSyncPlan } from '@atscript/db/sync'
-import { beforeAll, describe, expect, it } from 'vitest'
+import type { TSyncPlan, TSyncResult } from '@atscript/db/sync'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { DbSyncPrinter as TDbSyncPrinter } from './db-sync-printer'
-
-// __DYE_* are compile-time defines injected by the dye bundler plugin —
-// stub them before the printer module is evaluated
-let DbSyncPrinter: typeof TDbSyncPrinter
-beforeAll(async () => {
-  for (const key of [
-    '__DYE_GREEN__',
-    '__DYE_RED__',
-    '__DYE_CYAN__',
-    '__DYE_YELLOW__',
-    '__DYE_BOLD__',
-    '__DYE_BOLD_OFF__',
-    '__DYE_DIM__',
-    '__DYE_DIM_OFF__',
-    '__DYE_UNDERSCORE__',
-    '__DYE_UNDERSCORE_OFF__',
-    '__DYE_COLOR_OFF__',
-  ]) {
-    ;(globalThis as Record<string, unknown>)[key] = ''
-  }
-  ;({ DbSyncPrinter } = await import('./db-sync-printer'))
-})
+import { DbSyncPrinter, planFlags } from './db-sync-printer'
 
 function makePlan(): TSyncPlan {
   return {
@@ -62,6 +40,72 @@ function makePlan(): TSyncPlan {
   }
 }
 
+/** A refused run: the plan comes back untouched, the offending entry as a refusal. */
+function makeRefused(): TSyncResult {
+  return {
+    status: 'refused',
+    schemaHash: 'abc123',
+    entries: [
+      new SyncEntry({ name: 'orders', status: 'in-sync' }),
+      new SyncEntry({
+        name: 'users',
+        status: 'error',
+        refused: true,
+        errors: ['primary key changes on a populated table: (id) → (code)'],
+      }),
+      new SyncEntry({ name: 'user_stats', viewType: 'M', status: 'create' }),
+    ],
+  }
+}
+
+/** Collects everything the printer logs to the console. */
+function capture(): string[] {
+  const lines: string[] = []
+  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+    lines.push(args.join(' '))
+  })
+  return lines
+}
+
+describe('DbSyncPrinter refused run', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('prints the refusal heading and only the refused entries, never the success line', () => {
+    const lines = capture()
+    new DbSyncPrinter().refused(makeRefused())
+    const out = lines.join('\n')
+    expect(out).toContain('Schema sync refused — nothing was applied.')
+    expect(out).toContain('✖ refused: users')
+    expect(out).toContain('primary key changes on a populated table: (id) → (code)')
+    expect(out).not.toContain('Schema synced successfully')
+    // untouched entries are the plan, not an outcome — not reported as applied
+    expect(out).not.toContain('orders')
+    expect(out).not.toContain('user_stats')
+    expect(out).not.toContain('created')
+  })
+
+  it('exposes the refusal on the plan flags and the JSON document', () => {
+    const plan: TSyncPlan = { ...makeRefused(), status: 'changes-needed' }
+    expect(planFlags(plan)).toMatchObject({ refused: true, hasErrors: true, hasChanges: true })
+    const doc = JSON.parse(new DbSyncPrinter().renderJson(plan))
+    expect(doc.refused).toBe(true)
+    expect(doc.entries[1]).toMatchObject({ name: 'users', status: 'error', refused: true })
+    expect(doc.entries[0].refused).toBe(false)
+  })
+
+  it('renders the refusal in the plan exactly as the run would refuse with', () => {
+    const plan: TSyncPlan = { ...makeRefused(), status: 'changes-needed' }
+    const lines = capture()
+    new DbSyncPrinter().plan(plan)
+    expect(lines.join('\n')).toContain('✖ refused: users')
+    const md = new DbSyncPrinter().renderMarkdown(plan)
+    expect(md).toContain('- **Status:** changes-needed (refused)')
+    expect(md).toContain('✖ refused: users')
+  })
+})
+
 describe('DbSyncPrinter structured output', () => {
   it('renders a JSON plan document', () => {
     const doc = JSON.parse(new DbSyncPrinter().renderJson(makePlan()))
@@ -94,6 +138,35 @@ describe('DbSyncPrinter structured output', () => {
 
     const view = doc.entries[2]
     expect(view).toMatchObject({ name: 'user_stats', kind: 'view', viewType: 'M' })
+  })
+
+  it('carries the 0.1.128 entry fields and the derived flags', () => {
+    const plan: TSyncPlan = {
+      status: 'changes-needed',
+      schemaHash: 'abc123',
+      entries: [
+        new SyncEntry({
+          name: 'users',
+          status: 'alter',
+          pkChange: { from: ['id'], to: ['code'], rebuild: false },
+          skipped: ['pk-rebuild'],
+          dependsOn: ['orgs'],
+        }),
+      ],
+    }
+    const doc = JSON.parse(new DbSyncPrinter().renderJson(plan))
+    expect(doc.entries[0]).toMatchObject({
+      name: 'users',
+      kind: 'table',
+      pkChange: { from: ['id'], to: ['code'], rebuild: false },
+      skipped: ['pk-rebuild'],
+      dependsOn: ['orgs'],
+      refused: false,
+      pending: true,
+      destructive: false,
+      hasChanges: true,
+      hasErrors: false,
+    })
   })
 
   it('renders a Markdown plan document without color codes', () => {

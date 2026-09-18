@@ -52,6 +52,8 @@ export declare class User {
 
 For `export type X = …` aliases: `export type X = …` plus a `declare namespace X` carrying `const type`, `const metadata`, `const validator`, etc.
 
+DB entities (`@db.table` / `@db.view` / `@db.view.for`) also get `static __flat` / `__ownProps` — dot-path → type maps the DB layer uses for filters, `$select`, `$sort` (`FlatOf<T>` / `OwnPropsOf<T>` in `@atscript/typescript/utils` read them): intermediate paths `never`, `@db.json` fields `string`, and since 0.1.93 optional entries `<type> | null` (`"address.zip"?: string | null` — the DB layer treats optional as nullable in filters; instance props stay `zip?: string`).
+
 The JSDoc blocks in generated `.d.ts` are produced by codegen (entity name + `@see` source link, deprecation notices); source `.as` comments are **not** preserved in output.
 
 ## `.js` shape
@@ -65,8 +67,10 @@ export class User {
   static __is_atscript_annotated_type = true
   static type = {}
   static metadata = new Map()
-  static id = "User"
-  static toJsonSchema() { /* … */ }
+  static id = 'User'
+  static toJsonSchema() {
+    /* … */
+  }
 }
 
 // Type & metadata populated post-class via $(...).prop(...).annotate(...) chains.

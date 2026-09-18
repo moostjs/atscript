@@ -100,7 +100,7 @@ npx asc db sync --format json
 
 ### The inventory must be complete
 
-A sync plan is a diff between your `.as` models and the live schema — so a model the CLI failed to load looks exactly like a table you deleted, and the plan proposes dropping it. Since 0.1.90 `asc db sync` refuses to plan from a partial inventory:
+A sync plan is a diff between your `.as` models and the live schema — so a model the CLI failed to load looks exactly like a table you deleted, and the plan proposes dropping it. The inventory is every exported type carrying `@db.table`, `@db.view` or `@db.view.for` — a view declared with only `@db.view.for` is a managed view, exactly as `DbSpace.get()` treats it (included since 0.1.93; earlier versions missed it and planned it as a drop). Since 0.1.90 `asc db sync` refuses to plan from a partial inventory:
 
 1. **Diagnostics run first.** Any error-severity message is printed and the command exits `1` with `Fix the errors above before syncing.` Warnings are printed and do not block.
 2. **Every compiled model module is imported individually.** Failures are collected rather than ending the loop, then printed one per line as `✖ <file>: <message>`, followed by:
@@ -126,14 +126,14 @@ export default defineConfig({
 })
 ```
 
-The callback may return an array of annotated types, a module namespace object, or any nesting of the two; every export carrying `@db.table` or `@db.view` is added to the inventory and deduplicated by identity. The CLI reports `Loaded N packaged model(s) from config.models`. If the callback throws, the error is printed and the command exits `1` — same rule: never plan from a partial inventory.
+The callback may return an array of annotated types, a module namespace object, or any nesting of the two; every export carrying `@db.table`, `@db.view` or `@db.view.for` is added to the inventory and deduplicated by identity. The CLI reports `Loaded N packaged model(s) from config.models`. If the callback throws, the error is printed and the command exits `1` — same rule: never plan from a partial inventory.
 
 ### CI usage
 
 `--check` and `--format` never apply changes — both are plan-only modes:
 
 - `--check` exits `0` when the schema is up to date, `1` when changes are needed, and `2` when the pending changes include destructive operations (column/table drops, type changes). Use the distinct codes to require manual approval for destructive migrations only. It differs from `--dry-run`, which also never applies but always exits `0` — `--dry-run` is the human preview, `--check` is the CI gate.
-- `--format json` emits a structured plan document (`status`, `schemaHash`, `destructive`, per-entry column/type/FK changes) on stdout; `--format markdown` renders the same plan for PR comments. Combine with `--out <file>` to keep the console output intact and write the document to a file.
+- `--format json` emits a structured plan document on stdout: `status`, `schemaHash`, the `destructive` / `hasChanges` / `hasErrors` / `refused` flags, and one object per entry carrying every `SyncEntry` field (column/type/FK changes, `pkChange`, `skipped`, `dependsOn`, `dropGroup`, `refused`) plus its derived `kind`, `destructive`, `hasChanges`, `hasErrors` and `pending`; `--format markdown` renders the same plan for PR comments. Combine with `--out <file>` to keep the console output intact and write the document to a file.
 - The two compose: `asc db sync --check --format json --out plan.json` gates the build _and_ saves the plan artifact.
 
 This requires a `db` section in your config:
@@ -147,6 +147,15 @@ export default defineConfig({
   },
 })
 ```
+
+### Refused runs
+
+Since 0.1.93 (with `@atscript/db` 0.1.128 or later) a sync can come back **refused**: pre-flight found a change that no order of DDL can apply safely — a populated table's primary key changing, a removed table still referenced by a model, and so on. Nothing is applied: no DDL runs and the tracking table and schema hash stay untouched. The CLI then:
+
+- prints the refusal entries (`✖ refused: <name>`, reasons below) under the heading `Schema sync refused — nothing was applied.` — the `Schema synced successfully.` line is never printed for a refused run;
+- exits `1` with `Schema sync refused — nothing was applied. Fix the issues above and re-run.`
+
+The plan already shows the same refusals before anything runs: `--dry-run`, `--check` and `--format` list them as `✖ refused: <name>` entries (`"refused": true` on the entry and on the document in `--format json`) and exit `1` with `Schema sync would be refused — nothing would be applied. Fix the issues above.` See [Pre-flight refusals](https://db.atscript.dev/sync/#pre-flight-refusals) for every message.
 
 See the [Schema Sync guide](https://db.atscript.dev/sync/) for full documentation.
 

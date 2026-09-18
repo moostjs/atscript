@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs'
+import { pathToFileURL } from 'node:url'
 import path from 'path'
 
 import type { TAtscriptConfig } from '@atscript/core'
@@ -7,20 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { tsPlugin } from '../plugin'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
-import { flattenModels, loadDbModels } from './db-sync-models'
-
-// __DYE_* are compile-time defines — diagnostics rendering reads them at runtime
-for (const key of [
-  '__DYE_RED__',
-  '__DYE_BLUE__',
-  '__DYE_CYAN__',
-  '__DYE_YELLOW__',
-  '__DYE_DIM__',
-  '__DYE_RESET__',
-  '__DYE_COLOR_OFF__',
-]) {
-  ;(globalThis as Record<string, unknown>)[key] ??= ''
-}
+import { prepareFixtures } from '../test-utils'
+import { flattenModels, isDbEntityType, loadDbModels } from './db-sync-models'
 
 // kept inside the package so generated modules resolve `@atscript/typescript/utils`
 const tmpRoot = path.resolve(__dirname, '../../.tmp-tests')
@@ -203,6 +192,25 @@ describe('loadDbModels — config.models', () => {
     expect(ids(result.types)).toEqual(['A'])
   })
 
+  it('includes a view declared with only @db.view.for, as DbSpace.get() does', async () => {
+    // a managed view needs @db.view.for; @db.view (the name) is optional
+    const viewRoot = makeProject({
+      'v.as': `${table('vees', 'V')}\n@db.view.for V\nexport interface ForOnly {\n  id: V.id\n}\n`,
+    })
+    const fromSource = await loadDbModels({ config: makeConfig(viewRoot), cwd: viewRoot })
+    expect(fromSource.diagnostics.errors).toBe(0)
+    expect(ids(fromSource.types)).toEqual(['ForOnly', 'V'])
+
+    const forOnly = fromSource.types.find(t => t.id === 'ForOnly')!
+    expect(forOnly.metadata.has('db.view')).toBe(false)
+    const result = await loadDbModels({
+      config: makeConfig(root, { models: () => [forOnly] }),
+      cwd: root,
+    })
+    expect(result.packaged).toBe(1)
+    expect(ids(result.types)).toEqual(['A', 'ForOnly'])
+  })
+
   it('surfaces a throwing callback instead of planning', async () => {
     const result = await loadDbModels({
       config: makeConfig(root, {
@@ -241,5 +249,20 @@ describe('flattenModels', () => {
   it('ignores values that are not db models', () => {
     expect(flattenModels(undefined)).toEqual([])
     expect(flattenModels([null, 'x', 42, () => {}, { a: { b: 'c' } }])).toEqual([])
+  })
+})
+
+describe('isDbEntityType', () => {
+  it('accepts an annotated type carrying any DB-entity annotation, nothing else', async () => {
+    const root = makeProject({
+      'm.as': `${table('tees', 'T')}\n@db.view.for T\nexport interface ForOnly {\n  id: T.id\n}\n\nexport interface Plain {\n  id: string\n}\n`,
+    })
+    await prepareFixtures({ rootDir: root, plugins: [dbPlugin()] })
+    const mod = await import(pathToFileURL(path.join(root, 'm.as.js')).href)
+
+    expect(isDbEntityType(mod.T)).toBe(true)
+    expect(isDbEntityType(mod.ForOnly)).toBe(true)
+    expect(isDbEntityType(mod.Plain)).toBe(false)
+    expect(isDbEntityType({})).toBe(false)
   })
 })

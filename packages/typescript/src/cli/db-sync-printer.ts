@@ -47,11 +47,14 @@ export function planFlags(plan: TSyncPlan): {
   destructive: boolean
   hasChanges: boolean
   hasErrors: boolean
+  /** A pre-flight refusal is present — `run()` would apply nothing. */
+  refused: boolean
 } {
   return {
     destructive: plan.entries.some(e => e.destructive),
     hasChanges: plan.entries.some(e => e.hasChanges),
     hasErrors: plan.entries.some(e => e.hasErrors),
+    refused: plan.entries.some(e => e.refused),
   }
 }
 
@@ -99,22 +102,41 @@ export class DbSyncPrinter {
     this.log('')
   }
 
+  /**
+   * A refused run issued no DDL and left tracking untouched, so its `entries`
+   * are the plan, not an outcome — only the entries that carry the refusal
+   * (or another error) are printed, in plan mode.
+   */
+  refused(result: TSyncResult) {
+    this.log('')
+    this.log(this.colors.red(this.colors.bold('Schema sync refused — nothing was applied.')))
+    this.log('')
+    this.printGrouped(
+      result.entries.filter(e => e.hasErrors),
+      'plan'
+    )
+    this.log('')
+  }
+
   // ── Structured output (--format json|markdown) ───────────────────
 
-  /** Renders the plan as a JSON document for CI consumption. */
+  /**
+   * Renders the plan as a JSON document for CI consumption. Every `SyncEntry`
+   * field (`toInit()`) is emitted, plus its derived flags; `columnsToAdd` is
+   * narrowed to the serializable column facts.
+   */
   renderJson(plan: TSyncPlan): string {
     const doc = {
       status: plan.status,
       schemaHash: plan.schemaHash,
       ...planFlags(plan),
       entries: plan.entries.map(e => ({
-        name: e.name,
+        ...e.toInit(),
         kind: e.viewType ? 'view' : 'table',
-        viewType: e.viewType,
-        status: e.status,
         destructive: e.destructive,
-        syncMethod: e.syncMethod,
-        renamedFrom: e.renamedFrom,
+        hasChanges: e.hasChanges,
+        hasErrors: e.hasErrors,
+        pending: e.pending,
         columnsToAdd: e.columnsToAdd.map(c => ({
           path: c.path,
           physicalName: c.physicalName,
@@ -123,16 +145,6 @@ export class DbSyncPrinter {
           isPrimaryKey: c.isPrimaryKey,
           storage: c.storage,
         })),
-        columnsToRename: e.columnsToRename,
-        typeChanges: e.typeChanges,
-        nullableChanges: e.nullableChanges,
-        defaultChanges: e.defaultChanges,
-        columnsToDrop: e.columnsToDrop,
-        optionChanges: e.optionChanges,
-        fkAdded: e.fkAdded,
-        fkRemoved: e.fkRemoved,
-        fkChanged: e.fkChanged,
-        errors: e.errors,
       })),
     }
     return `${JSON.stringify(doc, undefined, 2)}\n`
@@ -140,11 +152,11 @@ export class DbSyncPrinter {
 
   /** Renders the plan as a Markdown document (e.g. for PR comments). */
   renderMarkdown(plan: TSyncPlan): string {
-    const { destructive } = planFlags(plan)
+    const { destructive, refused } = planFlags(plan)
     const lines: string[] = [
       '# Schema Sync Plan',
       '',
-      `- **Status:** ${plan.status}${destructive ? ' (destructive)' : ''}`,
+      `- **Status:** ${plan.status}${destructive ? ' (destructive)' : ''}${refused ? ' (refused)' : ''}`,
       `- **Schema hash:** \`${plan.schemaHash}\``,
       '',
     ]

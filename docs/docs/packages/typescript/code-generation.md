@@ -48,6 +48,10 @@ Key points:
 - `toExampleData` is always optional — when `exampleData: true` is set in plugin options, it's rendered without deprecation; otherwise it's marked `@deprecated`
 - `Product.DataType` is a type alias for the data shape — useful for generic utilities
 
+### DB entity statics
+
+Interfaces annotated with `@db.table`, `@db.view` or `@db.view.for` additionally get `static __flat` and `static __ownProps` — maps from every dot-notation path (`"address.zip"`) to its value type, which the [DB layer](https://db.atscript.dev) uses to type filters, `$select` and `$sort`. Intermediate paths are `never` and `@db.json` fields are `string`; since 0.1.93 optional entries are typed `<type> | null` (`"address.zip"?: string | null`) because the DB layer treats optional as nullable in filters — the instance properties keep their plain `zip?: string` shape.
+
 ### Interface Extends
 
 When an interface uses `extends`, the first parent becomes the TypeScript `extends` target; properties from additional parents and own properties are merged into the class body. Inherited annotations are merged into the runtime metadata tree, so `metadata.get(...)` works on every inherited prop without you needing to think about how it was assembled.

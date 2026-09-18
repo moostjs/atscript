@@ -16,6 +16,7 @@ import {
   hasNavPropAnnotation,
   isArray,
   isConst,
+  isDbEntityNode,
   isGroup,
   isInterface,
   isPrimitive,
@@ -198,7 +199,9 @@ export class TypeRenderer extends BaseRenderer {
       )
     }
     this.writeln('static toExampleData?: () => any')
-    if (interfaceNode && this.hasDbEntity(interfaceNode)) {
+    // Only DB entities get the `__flat`, `__pk`, `__ownProps` and `__navProps` statics —
+    // they exist solely to type filters, `$select`/`$sort` and `$with` in the DB layer.
+    if (interfaceNode && isDbEntityNode(interfaceNode)) {
       this.renderFlat(interfaceNode)
       this.renderOwnProps(interfaceNode)
       this.renderNavProps(interfaceNode)
@@ -340,19 +343,6 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   /**
-   * Checks whether an interface is a DB entity (`@db.table` or `@db.view`).
-   *
-   * Only DB entities get `__flat`, `__pk`, `__ownProps`, and `__navProps` static properties.
-   * These exist solely to improve type-safety for filter expressions, `$select`/`$sort`,
-   * and `$with` operations in the DB layer.
-   */
-  private hasDbEntity(node: SemanticInterfaceNode): boolean {
-    return !!node.annotations?.some(
-      a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for'
-    )
-  }
-
-  /**
    * Renders the `static __flat` property — a map of all dot-notation paths
    * to their TypeScript value types.
    *
@@ -388,6 +378,8 @@ export class TypeRenderer extends BaseRenderer {
    * - **Intermediate paths** (structures, arrays of structures) → `never`
    * - **`@db.json` fields** → `string` (stored as serialized JSON in DB)
    * - **Leaf fields** → their original TypeScript type
+   * - **Optional leaf / `@db.json` fields** → `<type> | null` — the DB layer treats
+   *   optional as nullable in filters, so `null` must be assignable to the path's type
    */
   private renderFlatMap(
     propName: string,
@@ -408,10 +400,11 @@ export class TypeRenderer extends BaseRenderer {
         this.write('?')
       }
       this.write(': ')
+      const nullable = descriptor.optional ? ' | null' : ''
       if (descriptor.intermediate) {
         this.writeln('never')
       } else if (descriptor.dbJson) {
-        this.writeln('string')
+        this.writeln(`string${nullable}`)
       } else {
         // Use the original prop definition for rendering (preserves named refs like Address,
         // and gives the renderer ref nodes it knows how to resolve to TS types).
@@ -421,8 +414,9 @@ export class TypeRenderer extends BaseRenderer {
           originalDef && !(isGroup(descriptor.def) && descriptor.def !== originalDef)
             ? originalDef
             : descriptor.def
-        const renderedDef = this.renderTypeDefString(defToRender)
-        renderedDef.split('\n').forEach(l => this.writeln(l))
+        const lines = this.renderTypeDefString(defToRender).split('\n')
+        lines[lines.length - 1] += nullable
+        lines.forEach(l => this.writeln(l))
       }
     }
     if (opts?.trailingNewline) {

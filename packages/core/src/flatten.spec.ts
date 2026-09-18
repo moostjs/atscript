@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import type { TAtscriptDocConfig } from './document'
 import { AtscriptDoc } from './document'
-import { flattenInterfaceNode } from './flatten'
+import { flattenInterfaceNode, isDbEntityNode } from './flatten'
 import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import { PluginManager } from './plugin/plugin-manager'
 
@@ -248,5 +248,31 @@ describe('flattenInterfaceNode', () => {
     const flat = flattenInterfaceNode(doc, node)
 
     expect(flat.size).toBe(0)
+  })
+})
+
+describe('isDbEntityNode', () => {
+  it('accepts @db.table, @db.view and a @db.view.for-only view, nothing else', () => {
+    const doc = createDoc(`
+      @db.table "users"
+      interface Table {
+        id: string
+      }
+      @db.view "stats"
+      interface Named {
+        id: string
+      }
+      @db.view.for Table
+      interface ForOnly {
+        id: string
+      }
+      interface Plain {
+        id: string
+      }
+    `)
+    expect(isDbEntityNode(getInterface(doc, 'Table'))).toBe(true)
+    expect(isDbEntityNode(getInterface(doc, 'Named'))).toBe(true)
+    expect(isDbEntityNode(getInterface(doc, 'ForOnly'))).toBe(true)
+    expect(isDbEntityNode(getInterface(doc, 'Plain'))).toBe(false)
   })
 })

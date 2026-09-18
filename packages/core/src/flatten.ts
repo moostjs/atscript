@@ -106,6 +106,19 @@ export function hasNavPropAnnotation(prop: SemanticPropNode): boolean {
   )
 }
 
+/**
+ * Annotations that make an interface a DB entity — a table, or a managed view.
+ * `@db.view.for` alone declares a managed view (`@db.view`, the name, is
+ * optional), so codegen (`__flat` / `__ownProps`), the `asc db sync` inventory
+ * and `DbSpace.get()` in `@atscript/db` all share this one rule.
+ */
+export const DB_ENTITY_ANNOTATIONS = ['db.table', 'db.view', 'db.view.for'] as const
+
+/** AST side of {@link DB_ENTITY_ANNOTATIONS}: whether a node carries a DB-entity annotation. */
+export function isDbEntityNode(node: SemanticNode): boolean {
+  return !!node.annotations?.some(a => DB_ENTITY_ANNOTATIONS.some(name => name === a.name))
+}
+
 export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
   if (!def) {
     return false

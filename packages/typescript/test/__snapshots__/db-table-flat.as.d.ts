@@ -53,6 +53,12 @@ export declare class MyEntity {
   items: {
     label: string
   }[]
+  extra?: {
+    note: string
+  }
+  addr?: {
+    a: string
+  }
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof MyEntity, MyEntity>
   static metadata: TMetadataMap<AtscriptMetadata>
@@ -67,7 +73,7 @@ export declare class MyEntity {
     "address": never
     "address.street": string
     "address.city": string
-    "address.zip"?: string
+    "address.zip"?: string | null
     "tags": string[]
     "contacts": never
     "contacts.name": string
@@ -75,10 +81,13 @@ export declare class MyEntity {
     "home": never
     "home.street": string
     "home.city": string
-    "home.zip"?: string
-    "optional"?: number
+    "home.zip"?: string | null
+    "optional"?: number | null
     "metadata": string
     "items": string
+    "extra"?: string | null
+    "addr"?: never
+    "addr.a"?: string | null
   }
   static __ownProps: {
     "id": string
@@ -86,7 +95,7 @@ export declare class MyEntity {
     "address": never
     "address.street": string
     "address.city": string
-    "address.zip"?: string
+    "address.zip"?: string | null
     "tags": string[]
     "contacts": never
     "contacts.name": string
@@ -94,16 +103,19 @@ export declare class MyEntity {
     "home": never
     "home.street": string
     "home.city": string
-    "home.zip"?: string
-    "optional"?: number
+    "home.zip"?: string | null
+    "optional"?: number | null
     "metadata": string
     "items": string
+    "extra"?: string | null
+    "addr"?: never
+    "addr.a"?: string | null
   }
 }
 
 /**
  * Atscript interface **NonDbInterface**
- * @see {@link ./db-table-flat.as:34:18}
+ * @see {@link ./db-table-flat.as:41:18}
  */
 export declare class NonDbInterface {
   field: string

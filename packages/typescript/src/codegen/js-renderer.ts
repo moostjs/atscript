@@ -28,6 +28,7 @@ import {
   isArray,
   isBareId,
   isBareSpecifier,
+  isDbEntityNode,
   isGroup,
   isInterface,
   isPrimitive,
@@ -511,11 +512,7 @@ export class JsRenderer extends BaseRenderer {
       return
     }
     const interfaceNode = node as SemanticInterfaceNode
-    if (
-      !interfaceNode.annotations?.some(
-        a => a.name === 'db.table' || a.name === 'db.view' || a.name === 'db.view.for'
-      )
-    ) {
+    if (!isDbEntityNode(interfaceNode)) {
       return
     }
 

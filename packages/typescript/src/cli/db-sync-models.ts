@@ -8,7 +8,7 @@ import type {
   TDbConfigDeclarative,
   TOutput,
 } from '@atscript/core'
-import { build, fileUriToPath } from '@atscript/core'
+import { DB_ENTITY_ANNOTATIONS, build, fileUriToPath } from '@atscript/core'
 
 import { tsPlugin } from '../plugin'
 import { isAnnotatedType } from '../runtime/annotated-type'
@@ -199,11 +199,20 @@ function commonAncestor(dirs: string[]): string {
   return first.slice(0, i).join(path.sep) || path.sep
 }
 
-function isDbModel(value: unknown): value is TAtscriptAnnotatedType {
-  return (
-    isAnnotatedType(value) &&
-    Boolean(value.metadata?.has('db.table') || value.metadata?.has('db.view'))
-  )
+/**
+ * Runtime side of `DB_ENTITY_ANNOTATIONS` — the same rule as `DbSpace.get()`
+ * in `@atscript/db`: a type carrying only `@db.view.for` is a managed view, so
+ * it belongs in the inventory too (leaving it out would plan the view as a drop).
+ *
+ * Lives here rather than in `@atscript/typescript/utils`: `utils` is the
+ * runtime entry every generated `.as.js` module imports (browsers included)
+ * and carries no `@atscript/core` import, which is externalized in the build.
+ */
+export function isDbEntityType(value: unknown): value is TAtscriptAnnotatedType {
+  if (!isAnnotatedType(value)) {
+    return false
+  }
+  return DB_ENTITY_ANNOTATIONS.some(name => value.metadata?.has(name))
 }
 
 /** `seen` deduplicates by identity and guarantees termination on cyclic graphs. */
@@ -216,7 +225,7 @@ function walkModels(value: unknown, out: TAtscriptAnnotatedType[], seen: Set<unk
   }
   seen.add(value)
   if (isAnnotatedType(value)) {
-    if (isDbModel(value)) {
+    if (isDbEntityType(value)) {
       out.push(value)
     }
     return

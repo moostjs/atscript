@@ -49,7 +49,7 @@ CI-grade plan output (all plan-only — never apply):
 | Flag                    | Effect                                                                                                                                                                                             |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--check`               | Exit `0` up-to-date, `1` changes needed, `2` destructive changes present. Gate builds / require approval on `2`. (`--dry-run` also never applies but always exits `0` — human preview vs CI gate.) |
-| `-f, --format json`     | Structured plan (`status`, `schemaHash`, `destructive`, per-entry column/type/FK diffs) on stdout; decorative logs muted.                                                                          |
+| `-f, --format json`     | Structured plan (`status`, `schemaHash`, `destructive`/`hasChanges`/`hasErrors`/`refused`, every `SyncEntry` field per entry + `kind`/`pending`) on stdout; decorative logs muted.                 |
 | `-f, --format markdown` | Same plan rendered for PR comments.                                                                                                                                                                |
 | `--out <file>`          | Write `--format` output to a file (console output stays intact). Composable: `--check --format json --out plan.json`.                                                                              |
 
@@ -59,6 +59,9 @@ CI-grade plan output (all plan-only — never apply):
 - Each compiled module is imported on its own; failures print as `✖ <file>: <message>` then `Could not load N compiled model module(s); aborting before planning — a partial inventory would propose dropping tables.` → exit `1`, before any adapter connects.
 - Compiled models keep their source directory layout, so cross-directory `.as` imports resolve and same-basename files in different folders no longer collide.
 - `config.models` (see [config.md](config.md)) adds package-shipped models to the inventory; `Loaded N packaged model(s) from config.models`. A throwing callback exits `1`.
+- The inventory is every export carrying `@db.table`, `@db.view` or `@db.view.for` — a `@db.view.for`-only view is a managed view (same rule as `DbSpace.get()`), included since 0.1.93; earlier versions missed it and planned it as a drop. Nothing found → `No types with @db.table, @db.view or @db.view.for found. Nothing to sync.`
+
+**Refused runs** (since 0.1.93, `@atscript/db` ≥ 0.1.128). `SchemaSync.run()` may return `status: "refused"`: pre-flight found a change that cannot be applied safely, so nothing ran (no DDL, tracking/hash untouched). The CLI prints `Schema sync refused — nothing was applied.` followed by the refused entries (`✖ refused: <name>` + reasons — the same lines `--dry-run`/`--check`/`--format` show; `"refused": true` in `--format json`), never `Schema synced successfully.`, then `Schema sync refused — nothing was applied. Fix the issues above and re-run.` → exit `1`. A plan that contains a refusal exits `1` with `Schema sync would be refused — nothing would be applied. Fix the issues above.`
 
 Full sync semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
 
@@ -87,7 +90,7 @@ Project root (or config-specified location):
 
 - `0` — success or warnings only.
 - `1` — errors (unless `--skipDiag`, where errors are reported but exit code is unchanged). Nothing is written on `1`.
-- `db sync`: `1` also covers error diagnostics, unloadable model modules, and a throwing `config.models`; `--check` adds `2` for destructive changes.
+- `db sync`: `1` also covers error diagnostics, unloadable model modules, a throwing `config.models`, and a refused run or plan (since 0.1.93); `--check` adds `2` for destructive changes.
 
 ## Troubleshooting
 

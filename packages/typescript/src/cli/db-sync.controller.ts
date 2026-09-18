@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url'
 import path from 'path'
 
 import type { TAtscriptConfig, TDbConfigDeclarative } from '@atscript/core'
+import type { SchemaSync } from '@atscript/db/sync'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
@@ -114,7 +115,7 @@ export class DbSyncController {
     const dbTypes = await this.loadTypes(config)
 
     if (dbTypes.length === 0) {
-      this.info(`No types with @db.table or @db.view found. Nothing to sync.`)
+      this.info(`No types with @db.table, @db.view or @db.view.for found. Nothing to sync.`)
       return
     }
 
@@ -130,7 +131,7 @@ export class DbSyncController {
     const sync = new SchemaSync(dbSpace)
     const plan = await sync.plan(dbTypes, { force, safe })
 
-    const { destructive: hasDestructive, hasChanges, hasErrors } = planFlags(plan)
+    const { destructive: hasDestructive, hasChanges, hasErrors, refused } = planFlags(plan)
 
     if (format) {
       const doc =
@@ -148,7 +149,11 @@ export class DbSyncController {
     } else {
       this.printer.plan(plan)
       if (hasErrors) {
-        this.fail('Schema has errors. Fix the issues above before syncing.')
+        this.fail(
+          refused
+            ? 'Schema sync would be refused — nothing would be applied. Fix the issues above.'
+            : 'Schema has errors. Fix the issues above before syncing.'
+        )
       }
     }
 
@@ -171,7 +176,7 @@ export class DbSyncController {
 
     if (!hasChanges) {
       if (!dryRun) {
-        await sync.run(dbTypes, { force: true, safe })
+        await this.runSync(sync, dbTypes, safe)
       }
       return
     }
@@ -195,11 +200,25 @@ export class DbSyncController {
       this.logger.log(`No destructive changes, proceeding to sync...`)
     }
 
-    const result = await sync.run(dbTypes, { force: true, safe })
+    const result = await this.runSync(sync, dbTypes, safe)
     this.printer.result(result)
   }
 
   // ── Private helpers ────────────────────────────────────────────────
+
+  /**
+   * Applies the sync. A refused run (`status: 'refused'`) issued no DDL and
+   * left tracking untouched — its refusal entries are printed and the command
+   * exits 1 instead of reporting a successful sync.
+   */
+  private async runSync(sync: SchemaSync, dbTypes: TAtscriptAnnotatedType[], safe?: boolean) {
+    const result = await sync.run(dbTypes, { force: true, safe })
+    if (result.status === 'refused') {
+      this.printer.refused(result)
+      this.fail('Schema sync refused — nothing was applied. Fix the issues above and re-run.')
+    }
+    return result
+  }
 
   /**
    * Loads the full model inventory or aborts. Diagnostics run first, every

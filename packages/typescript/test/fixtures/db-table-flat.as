@@ -29,6 +29,13 @@ export interface MyEntity {
     items: {
         label: string
     }[]
+    @db.json
+    extra?: {
+        note: string
+    }
+    addr?: {
+        a: string
+    }
 }
 
 export interface NonDbInterface {
