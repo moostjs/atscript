@@ -1,6 +1,6 @@
 {
   "name": "@atscript/core",
-  "version": "0.1.93",
+  "version": "0.1.94",
   "description": "Core library for Atscript parsing and file generation.",
   "keywords": [
     "annotations",
