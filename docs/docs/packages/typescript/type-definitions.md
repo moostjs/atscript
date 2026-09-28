@@ -16,9 +16,11 @@ interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<
   validator: (opts?) => Validator // creates a validator instance
   optional?: boolean
   id?: string // stable type name (e.g. "Cat") — used for $defs/$ref in JSON Schema
-  ref?: { type: () => TAtscriptAnnotatedType; field: string } // FK reference to another type/field (set on @db.rel.FK)
+  ref?: { type: () => TAtscriptAnnotatedType; field: string } // set on every reference to another named type
 }
 ```
+
+`ref` is present on every node authored as a reference to another named type — nav props (`customer: Customer`), chain refs (`customerId: Customer.id`), array elements (`Line[]` → on `type.of`) and aliases (`export type X = Y`). `ref.type()` returns the referenced type; `ref.field` is the dot-joined chain, or `''` for a plain reference. Since 0.1.95 this holds for same-file and imported targets alike — earlier versions set `ref` on same-file targets only for chain refs.
 
 Generated interfaces expose this as static members:
 

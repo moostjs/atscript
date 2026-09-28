@@ -27,7 +27,7 @@ export interface TSerializedAnnotatedTypeInner {
   metadata: Record<string, unknown>
   optional?: boolean
   id?: string
-  /** FK reference; shallow `{ id, metadata }` target when `refDepth` has a `.5` fractional part. */
+  /** Reference to another named type (chain/FK or plain); shallow `{ id, metadata }` target when `refDepth` has a `.5` fractional part. */
   ref?: { type: TSerializedAnnotatedTypeInner | TSerializedShallowRefTarget; field: string }
 }
 
@@ -109,7 +109,7 @@ export interface TSerializeOptions {
   ) => { key: string; value: unknown } | undefined | void
 
   /**
-   * How many levels of `.ref` (FK references) to expand. `0` (default) strips refs; integer
+   * How many levels of `.ref` (references to other named types) to expand. `0` (default) strips refs; integer
    * `N` expands N levels with full target bodies. A `.5` fractional part (e.g. `0.5`, `1.5`)
    * emits a shallow `{ id, metadata }` at the tail level instead of the full body.
    */

@@ -220,6 +220,7 @@ export function cloneRefProp(parentType: TAtscriptTypeDef, propName: string): vo
       {
         id: existing.id,
         optional: existing.optional,
+        ref: existing.ref,
       }
     )
   )
@@ -235,6 +236,7 @@ function cloneTypeDef(type: TAtscriptTypeDef): TAtscriptTypeDef {
         createAnnotatedTypeNode(v.type, new Map(v.metadata) as TMetadataMap<AtscriptMetadata>, {
           id: v.id,
           optional: v.optional,
+          ref: v.ref,
         })
       )
     }
@@ -369,6 +371,9 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       // as a bare `$("", X).refTo(...)` statement whose return value is unused, so
       // reassigning this.$type would silently lose the patch and leave X with type = {}.
       const node = this.$type
+      // Every reference records `ref` (eager and lazy alike): `field` is the chain path, or
+      // '' for a plain ref (nav props, `export type X = Y` aliases).
+      const field = chain ? chain.join('.') : ''
       // Check isAnnotatedType first — ES classes are typeof 'function' but should be treated as eager refs
       if (isAnnotatedType(type)) {
         let newBase = type
@@ -401,16 +406,14 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
         // anonymous refs that have none. Overwriting it would collapse distinct object
         // aliases into a single json-schema $def.
         node.id = node.id ?? newBase.id
-        if (chain && chain.length > 0) {
-          node.ref = { type: () => type, field: chain.join('.') }
-        }
+        node.ref = { type: () => type, field }
       } else if (typeof type === 'function') {
         // Lazy ref — type resolved on first access (avoids circular import/bundle TDZ issues).
         // The resolving getter is installed on this.$type (the base) so the named class is
         // patched in place; resolution stays deferred (no forced access at install time).
         const lazyType = type as () => TAtscriptAnnotatedType & { name?: string }
         const ownId = node.id
-        node.ref = { type: lazyType, field: chain ? chain.join('.') : '' }
+        node.ref = { type: lazyType, field }
         const placeholder = node.type
         Object.defineProperty(node, 'type', {
           get() {

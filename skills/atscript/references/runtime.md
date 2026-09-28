@@ -27,7 +27,7 @@ Every generated `.as` export conforms to this shape (type importable from `@atsc
 | `metadata`                            | Typed `Map` — `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md))                     |
 | `id?`                                 | Stable type name; used by `buildJsonSchema()` for `$defs`/`$ref`                                                                                     |
 | `optional?`                           | Set when the node is an optional object prop                                                                                                         |
-| `ref?`                                | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it |
+| `ref?`                                | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it, or `''` for a plain ref (`customer: Customer`, `type X = Y`). Set for same-file and imported targets alike (since 0.1.95) |
 | `validator(opts?)`                    | Constructs `new Validator(this, opts)`. **Not cached.**                                                                                              |
 
 - `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the *serialized* form.
