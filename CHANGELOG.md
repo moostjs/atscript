@@ -1,3 +1,9 @@
+## [0.1.94](https://github.com/moostjs/atscript/compare/v0.1.93...v0.1.94) (2026-09-28)
+
+
+### Features
+
+* **core,vscode:** plugin-owned LSP field scopes (fieldScope, refFilter) for annotation args ([8a22c06](https://github.com/moostjs/atscript/commit/8a22c0623d017e6a9a69605e3113dd89b794c967))
 ## [0.1.93](https://github.com/moostjs/atscript/compare/v0.1.92...v0.1.93) (2026-09-18)
 
 
