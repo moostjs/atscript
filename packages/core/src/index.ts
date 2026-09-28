@@ -19,9 +19,10 @@ export * from './flatten'
 export {
   getQueryScope,
   resolveQueryFieldRef,
+  resolveFieldRefAt,
   getQueryCompletionScope,
+  getFieldPathCompletionScope,
   getFieldsForType,
   analyzeQueryCursorContext,
-  type TQueryScope,
   type TQueryCursorContext,
-} from './defaults/db-query-lsp'
+} from './lsp/field-refs'

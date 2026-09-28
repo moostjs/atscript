@@ -29,8 +29,9 @@ import {
   resolveAtscriptFromPath,
   resolveConfigFile,
   getQueryScope,
-  resolveQueryFieldRef,
+  resolveFieldRefAt,
   getQueryCompletionScope,
+  getFieldPathCompletionScope,
   analyzeQueryCursorContext,
 } from '@atscript/core'
 import { TextDocument } from 'vscode-languageserver-textdocument'
@@ -138,26 +139,14 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         this.openDocument(params.textDocument.uri),
         this.currentCheck,
       ])
-      const refs = atscript.getUsageListAt(params.position.line, params.position.character)
-      if (!refs) {
+      const token = atscript.tokensIndex.at(params.position.line, params.position.character)
+      const refs = token && this.referencesOf(atscript, token, params.position)
+      if (!refs?.usages) {
         return undefined
       }
-      const results = refs.map(r => ({ uri: r.uri, range: r.range }))
+      const results = refs.usages.map(r => ({ uri: r.uri, range: r.range }))
       if (params.context.includeDeclaration) {
-        const defLocations = atscript.getToDefinitionAt(
-          params.position.line,
-          params.position.character
-        )
-        if (defLocations) {
-          for (const loc of defLocations) {
-            results.push({ uri: loc.targetUri, range: loc.targetSelectionRange })
-          }
-        } else {
-          const token = atscript.tokensIndex.at(params.position.line, params.position.character)
-          if (token && (token.isDefinition || isProp(token.parentNode))) {
-            results.push({ uri: atscript.id, range: token.range })
-          }
-        }
+        results.push(...refs.definitions)
       }
       return results
     })
@@ -174,26 +163,12 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!token) {
         return null // No token found at the cursor
       }
-      const references: Array<{ uri: string; range: Token['range']; token: Token }> =
-        atscript.usageListFor(token) ?? []
-
-      // Add the definition token to the rename set
-      const defLocations = atscript.getToDefinitionAt(position.line, position.character)
-      if (defLocations) {
-        for (const loc of defLocations) {
-          references.push({
-            uri: loc.targetUri,
-            range: loc.targetSelectionRange,
-            token,
-          })
-        }
-      } else if (token.isDefinition || isProp(token.parentNode)) {
-        references.push({
-          uri: atscript.id,
-          range: token.range,
-          token,
-        })
-      }
+      // Usages plus the definition itself
+      const refs = this.referencesOf(atscript, token, position)
+      const references: Array<{ uri: string; range: Token['range'] }> = [
+        ...(refs.usages ?? []),
+        ...refs.definitions,
+      ]
 
       if (references.length === 0) {
         return null
@@ -348,6 +323,13 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         }
         if (arg?.type === 'query') {
           return this.getQueryCompletions(document, position, atscript, aContext!)
+        }
+        if (arg?.type === 'string' && arg.fieldScope) {
+          return this.getFieldPathCompletions(atscript, position, aContext!)
+        }
+        // type names for a `ref` argument (not after a dot: `User.` names a field)
+        if (arg?.type === 'ref' && charBefore(text, offset, [/\w/u]) !== '.') {
+          return this.getDeclarationsCompletions(atscript, text, false, arg.refFilter)
         }
       }
 
@@ -528,35 +510,31 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!token) {
         return
       }
-      // Query field ref hover (inside backtick expressions)
-      if (isQueryFieldRef(token.parentNode)) {
-        const fieldRefNode = token.parentNode
-        const queryArgToken = fieldRefNode.queryArgToken
-        if (queryArgToken) {
-          const scope = getQueryScope(queryArgToken, atscript)
-          if (scope) {
-            if (token === fieldRefNode.typeRef) {
-              const unwound = atscript.unwindType(token.text)
-              const docs = unwound?.def?.documentation || unwound?.node?.documentation
-              if (docs) {
-                return {
-                  contents: { kind: 'markdown', value: docs },
-                  range: token.range,
-                } as Hover
-              }
-            }
-            if (token === fieldRefNode.fieldRef) {
-              const resolved = resolveQueryFieldRef(fieldRefNode, atscript, scope)
-              if (resolved?.prop) {
-                const typeName = fieldRefNode.typeRef?.text || scope.unqualifiedTarget || ''
-                const doc = resolved.prop.documentation || `Property of \`${typeName}\``
-                return {
-                  contents: { kind: 'markdown', value: doc },
-                  range: token.range,
-                } as Hover
-              }
-            }
-          }
+      // Field ref hover (query field refs, field-path string args)
+      const fieldRef = resolveFieldRefAt(token, atscript, position.character)
+      if (fieldRef) {
+        return {
+          contents: {
+            kind: 'markdown',
+            value: fieldRef.prop.documentation || `Property of \`${fieldRef.typeName}\``,
+          },
+          range: fieldRef.range,
+        } as Hover
+      }
+      // Query type ref hover (`Customer` in `Customer.name`)
+      if (
+        isQueryFieldRef(token.parentNode) &&
+        token === token.parentNode.typeRef &&
+        token.parentNode.queryArgToken &&
+        getQueryScope(token.parentNode.queryArgToken, atscript)
+      ) {
+        const unwound = atscript.unwindType(token.text)
+        const docs = unwound?.def?.documentation || unwound?.node?.documentation
+        if (docs) {
+          return {
+            contents: { kind: 'markdown', value: docs },
+            range: token.range,
+          } as Hover
         }
       }
       if (isRef(token.parentNode)) {
@@ -827,7 +805,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   async getDeclarationsCompletions(
     atscript: AtscriptDoc,
     text: string,
-    includePrimitives = true
+    includePrimitives = true,
+    filter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean
   ): Promise<CompletionItem[] | undefined> {
     const defs = Array.from(atscript.registry.definitions.entries())
     const items = [] as CompletionItem[]
@@ -835,6 +814,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     const importSet = new Set<string>()
     for (const [key, token] of defs) {
       let t = token
+      let owner = atscript
       if (token.fromPath) {
         let exporter = exporters.get(token.fromPath)
         if (!exporter) {
@@ -844,7 +824,11 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           exporters.set(token.fromPath, exporter)
         }
         t = exporter.registry.definitions.get(token.text)!
+        owner = exporter
         importSet.add(token.text)
+      }
+      if (filter && !(t?.parentNode && filter(t.parentNode, owner))) {
+        continue
       }
       items.push({
         label: key,
@@ -860,7 +844,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (doc !== atscript) {
         for (const node of doc.exports.values()) {
           const token = node.token('identifier')
-          if (token && !importSet.has(token.text)) {
+          if (token && !importSet.has(token.text) && (!filter || filter(node, doc))) {
             const fromPath = this.resolvedToBare.get(doc.id) ?? getRelPath(atscript.id, doc.id)
             const importEdit = addImport(text, token.text, fromPath)
             items.push({
@@ -965,6 +949,68 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     })) as CompletionItem[]
   }
 
+  /**
+   * Usages of the symbol under the cursor and the location(s) of its definition.
+   * A field ref (query field ref, field-path string arg) is resolved once for both.
+   */
+  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
+  referencesOf(
+    atscript: AtscriptDoc,
+    token: Token,
+    position: Position
+  ): {
+    usages: Array<{ uri: string; range: Token['range'] }> | undefined
+    definitions: Array<{ uri: string; range: Token['range'] }>
+  } {
+    const fieldRef = resolveFieldRefAt(token, atscript, position.character)
+    const propToken = fieldRef?.prop.token('identifier')
+    if (fieldRef && propToken) {
+      return {
+        usages: fieldRef.doc.usageListFor(propToken),
+        definitions: [{ uri: fieldRef.doc.id, range: propToken.range }],
+      }
+    }
+    const usages = atscript.usageListFor(token)
+    const defLocations = atscript.getToDefinitionAt(position.line, position.character)
+    if (defLocations) {
+      return {
+        usages,
+        definitions: defLocations.map(loc => ({
+          uri: loc.targetUri,
+          range: loc.targetSelectionRange,
+        })),
+      }
+    }
+    return {
+      usages,
+      definitions:
+        token.isDefinition || isProp(token.parentNode)
+          ? [{ uri: atscript.id, range: token.range }]
+          : [],
+    }
+  }
+
+  /**
+   * Field completions inside a field-path `string` annotation argument (spec declares
+   * `fieldScope`). A dotted path offers the fields of the level typed so far.
+   */
+  getFieldPathCompletions(
+    atscript: AtscriptDoc,
+    position: Position,
+    aContext: { annotationToken: Token; argToken?: Token }
+  ): CompletionItem[] | undefined {
+    const argToken = aContext.argToken
+    if (!argToken || argToken.annotationRef !== aContext.annotationToken) {
+      return undefined
+    }
+    const scope = getFieldPathCompletionScope(argToken, atscript, position.character)
+    if (!scope) {
+      return undefined
+    }
+    const owner = [scope.typeName, ...scope.chain].join('.')
+    return this.propsToCompletionItems(scope.fields, `field of ${owner}`)
+  }
+
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this, max-params
   getQueryCompletions(
     document: TextDocument,
@@ -1015,30 +1061,19 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             })
           }
           if (scope.unqualifiedTarget) {
-            for (const prop of scope.getFields(scope.unqualifiedTarget)) {
-              items.push({
-                label: prop.id!,
-                kind: CompletionItemKind.Property,
-                detail: `field of ${scope.unqualifiedTarget}`,
-                documentation: prop.documentation
-                  ? ({ kind: 'markdown', value: prop.documentation } as MarkupContent)
-                  : undefined,
-              })
-            }
+            items.push(
+              ...this.propsToCompletionItems(
+                scope.getFields(scope.unqualifiedTarget),
+                `field of ${scope.unqualifiedTarget}`
+              )!
+            )
           }
           return items
         }
         case 'after-dot': {
           const typeName = context.typeName
           if (typeName && scope.typeNames.includes(typeName)) {
-            return scope.getFields(typeName).map(prop => ({
-              label: prop.id!,
-              kind: CompletionItemKind.Property,
-              detail: `field of ${typeName}`,
-              documentation: prop.documentation
-                ? ({ kind: 'markdown', value: prop.documentation } as MarkupContent)
-                : undefined,
-            }))
+            return this.propsToCompletionItems(scope.getFields(typeName), `field of ${typeName}`)
           }
           return undefined
         }
@@ -1171,11 +1206,17 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  propsToCompletionItems(props: SemanticNode[] | undefined): CompletionItem[] | undefined {
+  propsToCompletionItems(
+    props: SemanticNode[] | undefined,
+    detail?: string
+  ): CompletionItem[] | undefined {
     return props?.map(t => ({
       label: t.id!,
       kind: CompletionItemKind.Property,
-      documentation: { kind: 'markdown', value: t.documentation } as MarkupContent,
+      detail,
+      documentation: t.documentation
+        ? ({ kind: 'markdown', value: t.documentation } as MarkupContent)
+        : undefined,
     }))
   }
 

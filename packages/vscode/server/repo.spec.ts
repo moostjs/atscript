@@ -4,7 +4,7 @@ import {
   SemanticInterfaceNode,
   SemanticPrimitiveNode,
 } from '@atscript/core'
-import type { TAtscriptDocConfig } from '@atscript/core'
+import type { SemanticNode, TAtscriptDocConfig } from '@atscript/core'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest'
@@ -226,10 +226,14 @@ function createTestableRepo(
   return { repo, handlers, connection }
 }
 
-function singleDocRepo(uri: string, source: string) {
+function singleDocRepo(uri: string, source: string, config?: TAtscriptDocConfig) {
   const textDoc = td(uri, source)
-  const asDoc = createDoc(uri, source)
-  return createTestableRepo(new Map([[uri, textDoc]]), new Map([[uri, asDoc]]))
+  const doc = createDoc(uri, source, config)
+  return {
+    ...createTestableRepo(new Map([[uri, textDoc]]), new Map([[uri, doc]])),
+    textDoc,
+    doc,
+  }
 }
 
 // ===========================================================================
@@ -1012,5 +1016,192 @@ describe('watched .as file changes', () => {
     })
     expect(spy).toHaveBeenCalledTimes(1)
     expect(spy).toHaveBeenCalledWith(bUri)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Plugin-owned LSP hooks (fieldScope / refFilter)
+// ---------------------------------------------------------------------------
+
+describe('plugin LSP hooks', () => {
+  const refFilter = vi.fn(
+    (decl: SemanticNode, _doc: AtscriptDoc) =>
+      decl.annotations?.some(a => a.name === 'test.table') ?? false
+  )
+  const hookConfig: TAtscriptDocConfig = {
+    primitives,
+    annotations: {
+      test: {
+        table: new AnnotationSpec({ nodeType: ['interface'] }),
+        target: new AnnotationSpec({
+          argument: { name: 'target', type: 'ref', refFilter },
+        }),
+        anyref: new AnnotationSpec({ argument: { name: 'target', type: 'ref' } }),
+        field: new AnnotationSpec({
+          argument: {
+            name: 'field',
+            type: 'string',
+            fieldScope: () => ({ allowedTypes: [], unqualifiedTarget: 'Order' }),
+          },
+        }),
+        where: new AnnotationSpec({
+          argument: {
+            name: 'filter',
+            type: 'query',
+            fieldScope: () => ({ allowedTypes: ['Order', 'Customer'], unqualifiedTarget: 'Order' }),
+          },
+        }),
+      },
+    } as any,
+  }
+  const types = `@test.table
+interface Order {
+  id: number
+  amount: number
+  address: {
+    city: string
+  }
+}
+
+interface Customer {
+  name: string
+}
+`
+
+  const uri = 'file:///hooks.as'
+
+  function hookRepo(body: string) {
+    const repo = singleDocRepo(uri, `${types}${body}`, hookConfig)
+    const text = repo.textDoc.getText()
+    /** Position right after `needle` (or `shift` chars into it) */
+    const at = (needle: string, shift = needle.length) =>
+      repo.textDoc.positionAt(text.indexOf(needle) + shift)
+    return { ...repo, at }
+  }
+
+  it('completes the fields of a field-path string argument', async () => {
+    const { handlers, at } = hookRepo(`interface Report {\n  @test.field 'am'\n  total: number\n}`)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at(`'am`),
+    })
+    expect(result.map((i: any) => i.label)).toEqual(['id', 'amount', 'address'])
+    expect(result[0]).toEqual(
+      expect.objectContaining({ kind: CompletionItemKind.Property, detail: 'field of Order' })
+    )
+  })
+
+  it('completes the next level of a dotted field path', async () => {
+    const { handlers, at } = hookRepo(
+      `interface Report {\n  @test.field 'address.ci'\n  city: string\n}`
+    )
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at(`'address.ci`),
+    })
+    expect(result.map((i: any) => i.label)).toEqual(['city'])
+    expect(result[0].detail).toBe('field of Order.address')
+  })
+
+  it('filters ref argument completions with refFilter', async () => {
+    const { handlers, doc, at } = hookRepo(`@test.target \ninterface Report {\n  total: number\n}`)
+    refFilter.mockClear()
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at('@test.target '),
+    })
+    expect(result.map((i: any) => i.label)).toEqual(['Order'])
+    expect(refFilter).toHaveBeenCalledWith(expect.anything(), doc)
+  })
+
+  it('offers all declarations (no primitives) for a ref argument without refFilter', async () => {
+    const { handlers, at } = hookRepo(`@test.anyref Cu\ninterface Report {\n  total: number\n}`)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at('@test.anyref Cu'),
+    })
+    const labels = result.map((i: any) => i.label)
+    expect(labels).toEqual(expect.arrayContaining(['Order', 'Customer', 'Report']))
+    expect(labels).not.toContain('string')
+  })
+
+  it('offers no type names after a dot in a ref argument', async () => {
+    const { handlers, at } = hookRepo(`@test.anyref Order.\ninterface Report {\n  total: number\n}`)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at('@test.anyref Order.'),
+    })
+    expect(result?.map((i: any) => i.label) ?? []).not.toContain('Customer')
+  })
+
+  it('completes query fields through the fieldScope hook', async () => {
+    const { handlers, at } = hookRepo(
+      'interface Report {\n  @test.where `Customer.`\n  total: number\n}'
+    )
+    const typeStart = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at('@test.where `'),
+    })
+    expect(typeStart.map((i: any) => i.label)).toEqual(
+      expect.arrayContaining(['Order', 'Customer', 'id', 'amount'])
+    )
+    const afterDot = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: at('`Customer.'),
+    })
+    expect(afterDot.map((i: any) => i.label)).toEqual(['name'])
+  })
+
+  it('hovers a field-path string argument like the field it names', async () => {
+    const { handlers, at } = hookRepo(
+      `interface Report {\n  @test.field 'amount'\n  total: number\n}`
+    )
+    const result = await handlers.onHover!({
+      textDocument: { uri },
+      position: at(`'amount'`, 3),
+    })
+    expect(result.contents.value).toBe('Property of `Order`')
+    expect(result.range).toEqual({
+      start: at(`'amount'`, 1),
+      end: at(`'amount'`, 7),
+    })
+  })
+
+  it('renames a field together with its field-path string arguments', async () => {
+    const { handlers, at } = hookRepo(
+      `interface Report {\n  @test.field 'amount'\n  total: number\n}`
+    )
+    const result = await handlers.onRenameRequest!({
+      textDocument: { uri },
+      position: at(`'amount'`, 2),
+      newName: 'sum',
+    })
+    const ranges = result.changes[uri].map((c: any) => c.range)
+    expect(ranges).toEqual(
+      expect.arrayContaining([
+        { start: at(`'amount'`, 1), end: at(`'amount'`, 7) },
+        { start: at('amount: number', 0), end: at('amount: number', 6) },
+      ])
+    )
+    expect(ranges).toHaveLength(2)
+  })
+
+  it('renames from an intermediate segment of a dotted field path', async () => {
+    const { handlers, at } = hookRepo(
+      `interface Report {\n  @test.field 'address.city'\n  city: string\n}`
+    )
+    const result = await handlers.onRenameRequest!({
+      textDocument: { uri },
+      position: at(`'address.city'`, 3),
+      newName: 'location',
+    })
+    const ranges = result.changes[uri].map((c: any) => c.range)
+    expect(ranges).toEqual(
+      expect.arrayContaining([
+        { start: at(`'address.city'`, 1), end: at(`'address.city'`, 8) },
+        { start: at('address: {', 0), end: at('address: {', 7) },
+      ])
+    )
+    expect(ranges).toHaveLength(2)
   })
 })

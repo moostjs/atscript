@@ -148,7 +148,7 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 
 `AnnotationSpec` fields:
 
-- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query'`. Omit for no-arg annotations.
+- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values?, fieldScope?, refFilter? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query'`. Omit for no-arg annotations.
 - `nodeType` — `TNodeEntity[]` (e.g. `['prop', 'interface', 'type', 'primitive']`). Validated at parse time.
 - `defType` — restrict to specific primitive bases / kinds (e.g. `['string']`, `['number']`, `['array', 'string']`).
 - `multiple` — repeatable on same node.
@@ -156,6 +156,22 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 - `passedWhenReferred` — default `true`; set `false` for declaring-scope annotations (indexes, storage, keys) that must not be inherited by fields referencing the annotated node (see [Merge](#merge)).
 - `description` — VSCode hover text.
 - `validate(mainToken, args, doc)` / `modify(mainToken, args, doc)` — post-parse hooks.
+
+Editor (LSP) hooks on a `TAnnotationArgument` — drive VSCode completion/hover/go-to-definition/references inside the argument; no validation (keep that in `validate`):
+
+| Hook                        | For `type` | Return                                               | Effect                                                                                                                                     |
+| --------------------------- | ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fieldScope(argToken, doc)` | `'query'`  | `{ allowedTypes, unqualifiedTarget }` or `undefined` | Types a `Type.field` may name + the type a bare `field` resolves against                                                                   |
+| `fieldScope(argToken, doc)` | `'string'` | `{ allowedTypes, unqualifiedTarget }` or `undefined` | String is a (dotted, unqualified) field path of `unqualifiedTarget` → field completion per level, hover, F12, find-refs/rename per segment |
+| `refFilter(decl, doc)`      | `'ref'`    | `boolean`                                            | Filters type-name completion candidates                                                                                                    |
+
+1. `argToken.parentNode` = annotated node; read sibling annotations from `argToken.parentNode.annotations` to derive the scope.
+2. `refFilter`'s `doc` is the document that **declares** `decl` (not the one being edited).
+3. A `fieldScope` answer is final — `undefined` means "no scope", no fallback. For `string` args `allowedTypes` is ignored (pass `[]`).
+4. Built-in `@db.view.filter` / `@db.view.joins` / `@db.rel.filter` scopes in core are a deprecated fallback used only when `fieldScope` is absent (removal: next minor).
+5. Types: `import type { TAnnotationArgument, TQueryScope } from '@atscript/core'`.
+
+Full example → [atscript.dev plugin-development/annotation-system](https://atscript.dev/plugin-development/annotation-system#editor-support-for-arguments).
 
 Inline registration in `atscript.config.js`:
 

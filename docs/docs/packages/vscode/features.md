@@ -46,7 +46,7 @@ At the top level of an `.as` file, the extension suggests:
 
 When typing `@`, all available annotations are suggested based on the current context (interface-level vs. property-level). For namespaced annotations like `@meta.label`, typing the dot triggers a follow-up suggestion for the second part.
 
-Annotation arguments are also completed — predefined allowed values appear for each argument position, and boolean arguments suggest `true`/`false`.
+Annotation arguments are also completed — predefined allowed values appear for each argument position, and boolean arguments suggest `true`/`false`. Type-reference arguments suggest type names, and query expressions or field-name strings suggest fields — plugins decide which types and fields apply (see [Editor Support for Arguments](/plugin-development/annotation-system#editor-support-for-arguments)).
 
 ### Type Completions
 

@@ -16,12 +16,41 @@ import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
 import type { TLexicalToken } from '../tokenizer/types'
 
+/**
+ * Field scope of an annotation argument (returned by the `fieldScope` hook): which types
+ * its field refs may name (`Type.field`) and which type an unqualified field belongs to.
+ */
+export interface TQueryScope {
+  /** Type names a qualified field ref (`Type.field`) may use. Not used by `string` arguments. */
+  allowedTypes: string[]
+  /**
+   * Type an unqualified field ref resolves against — for a `string` argument, the type
+   * whose (dotted) field path the string names. `null` when unqualified refs are not allowed.
+   */
+  unqualifiedTarget: string | null
+}
+
 export interface TAnnotationArgument {
   optional?: boolean
   name: string
   type: 'string' | 'number' | 'boolean' | 'ref' | 'query'
   description?: string
   values?: string[]
+  /**
+   * Editor field scope of a `query` or `string` argument. Called with the argument token
+   * and the document that holds it; return `undefined` when the scope cannot be determined.
+   * - `query`: the types the backtick expression may reference (drives completion, hover,
+   *   go-to-definition, find-references and rename of its field refs).
+   * - `string`: the argument is a (dotted) field path of `unqualifiedTarget` (`'amount'`,
+   *   `'address.city'`) — same editor features on the string; `allowedTypes` is unused.
+   */
+  fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined
+  /**
+   * For a `ref` argument: filters the type names offered by completion.
+   * Called with each candidate declaration and the document that declares it;
+   * return `false` to hide the candidate. All declarations are offered when absent.
+   */
+  refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean
 }
 
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
@@ -238,8 +267,7 @@ export class AnnotationSpec {
       const parentNode = mainToken.parentNode
       const idToken = isRef(parentNode) ? parentNode.token('identifier') : undefined
       const isAnnotateEntry =
-        !!idToken &&
-        !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
+        !!idToken && !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
       if (!isAnnotateEntry) {
         let def = parentNode.getDefinition()
         if (isRef(def)) {

@@ -104,17 +104,20 @@ interface TAnnotationArgument {
   optional?: boolean
   description?: string
   values?: string[] // Enum — restrict to specific values
+  // Editor (LSP) hooks — see "Editor Support for Arguments" below
+  fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // 'query' / 'string' args
+  refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean // 'ref' args
 }
 ```
 
 The argument types correspond to the tokens accepted in `.as` source:
 
-| `type`      | Accepts                                                                              |
-| ----------- | ------------------------------------------------------------------------------------ |
-| `'string'`  | Quoted string literal (`"text"`)                                                     |
-| `'number'`  | Numeric literal (`42`, `-1.5`)                                                       |
-| `'boolean'` | Identifier `true` / `false`                                                          |
-| `'ref'`     | Bare identifier referencing another type (e.g. `User`)                               |
+| `type`      | Accepts                                                                             |
+| ----------- | ----------------------------------------------------------------------------------- |
+| `'string'`  | Quoted string literal (`"text"`)                                                    |
+| `'number'`  | Numeric literal (`42`, `-1.5`)                                                      |
+| `'boolean'` | Identifier `true` / `false`                                                         |
+| `'ref'`     | Bare identifier referencing another type (e.g. `User`)                              |
 | `'query'`   | Backtick-delimited query expression — used by DB plugins for SQL-like filter syntax |
 
 Query expressions accept the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` at any nesting level, including inside parentheses (since 0.1.90) — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
@@ -182,6 +185,83 @@ new AnnotationSpec({
 ```
 
 Usage: `@patch.strategy "replace"` (accepted) vs `@patch.strategy "upsert"` (error)
+
+### Editor Support for Arguments
+
+Arguments that point at types or fields can tell the VSCode extension what they point at. The editor then offers completion, hover, go-to-definition, find-references and rename inside the argument. The hooks only drive editor features — they don't validate anything, so keep checks in [`validate`](#custom-validation).
+
+| Hook         | Argument `type` | Returns                                               | Enables                                                                                                                                                                                                          |
+| ------------ | --------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fieldScope` | `'query'`       | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | Field/type completion, hover, go-to-definition, find-references and rename inside the backticks                                                                                                                  |
+| `fieldScope` | `'string'`      | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | The string is a field path of `unqualifiedTarget` (`'amount'`, `'address.city'`): field completion level by level, hover, go-to-definition, and every segment shows up in its field's find-references and rename |
+| `refFilter`  | `'ref'`         | `boolean`                                             | Narrows the type names offered by completion                                                                                                                                                                     |
+
+`fieldScope` receives the argument token and the document holding it. The annotated node is `argToken.parentNode`; its sibling annotations are on `argToken.parentNode.annotations`. Return `undefined` when the scope can't be determined — the editor then offers nothing rather than guessing.
+
+`refFilter` receives each candidate declaration (interface or type node) and the document that **declares** it, so `doc.unwindType(...)` resolves names from the declaration's own imports.
+
+```typescript
+import { AnnotationSpec, isInterface } from '@atscript/core'
+import type { SemanticNode, Token } from '@atscript/core'
+
+/** Type named by `@report.source` on the annotated interface */
+function sourceOf(argToken: Token): string | undefined {
+  const owner = argToken.parentNode
+  return owner?.annotations?.find(a => a.name === 'report.source')?.args[0]?.text
+}
+
+const isStored = (decl: SemanticNode) =>
+  isInterface(decl) && !!decl.annotations?.some(a => a.name === 'report.stored')
+
+export const reportAnnotations = {
+  source: new AnnotationSpec({
+    nodeType: ['interface'],
+    argument: { name: 'type', type: 'ref', refFilter: isStored },
+  }),
+  where: new AnnotationSpec({
+    nodeType: ['interface'],
+    argument: {
+      name: 'condition',
+      type: 'query',
+      fieldScope: argToken => {
+        const source = sourceOf(argToken)
+        return source ? { allowedTypes: [source], unqualifiedTarget: source } : undefined
+      },
+    },
+  }),
+  total: new AnnotationSpec({
+    nodeType: ['interface'],
+    argument: {
+      name: 'field',
+      type: 'string',
+      fieldScope: argToken => {
+        const source = sourceOf(argToken)
+        return source ? { allowedTypes: [], unqualifiedTarget: source } : undefined
+      },
+    },
+  }),
+}
+```
+
+```atscript
+// completion after `@report.source` offers only @report.stored interfaces
+@report.source Order
+// `status` completes, hovers and jumps to Order.status
+@report.where `status = 'paid'`
+// `amount` completes, hovers and jumps to Order.amount
+@report.total 'amount'
+interface PaidOrders {}
+```
+
+- `unqualifiedTarget` is the type a bare `field` resolves against; `allowedTypes` lists the types a qualified `Type.field` may name. Set `unqualifiedTarget: null` to require qualified refs.
+- A `string` argument's path is never qualified: it always resolves against `unqualifiedTarget`, and `allowedTypes` is ignored.
+- Hooks run on every editor request — keep them to cheap lookups on the syntax tree (sibling annotations, `doc.unwindType`).
+- A hook's answer is final: for an argument with `fieldScope`, the editor never falls back to anything else.
+- Without hooks: `string` arguments complete only their `values`, `ref` arguments complete every declared type (no primitives), and `query` arguments get no field scope apart from the deprecated built-ins below.
+
+::: info Built-in `@db.*` rules (deprecated)
+`@atscript/core` still carries built-in query scopes for `@db.view.filter`, `@db.view.joins` and `@db.rel.filter`, used only when the argument declares no `fieldScope`. They will be removed in the next minor — plugins should declare `fieldScope` themselves.
+:::
 
 ## Merge Strategies
 
