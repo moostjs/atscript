@@ -1,3 +1,4 @@
+## [0.1.97](https://github.com/moostjs/atscript/compare/v0.1.96...v0.1.97) (2026-09-29)
 ## [0.1.96](https://github.com/moostjs/atscript/compare/v0.1.95...v0.1.96) (2026-09-29)
 
 
