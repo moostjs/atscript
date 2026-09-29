@@ -1,3 +1,9 @@
+## [0.1.95](https://github.com/moostjs/atscript/compare/v0.1.94...v0.1.95) (2026-09-29)
+
+
+### Bug Fixes
+
+* **typescript:** same-file plain refs record ref like imported ones; clones keep ref ([bf286b0](https://github.com/moostjs/atscript/commit/bf286b055c351d22014ba4d6cc288286e2cb945d))
 ## [0.1.94](https://github.com/moostjs/atscript/compare/v0.1.93...v0.1.94) (2026-09-28)
 
 
