@@ -1,3 +1,10 @@
+## [0.1.96](https://github.com/moostjs/atscript/compare/v0.1.95...v0.1.96) (2026-09-29)
+
+
+### Bug Fixes
+
+* **vscode:** drop stale vsce>minimatch@3 override; vsce 3.9 needs minimatch 10 ([e56032d](https://github.com/moostjs/atscript/commit/e56032d453f4c426793467fc9450b4e01400b0dc))
+* **vscode:** pin @types/vscode to engines floor (~1.80) so vsce publish passes ([5f6aaee](https://github.com/moostjs/atscript/commit/5f6aaeef5b17e79cf387e051c186305fe0364527))
 ## [0.1.95](https://github.com/moostjs/atscript/compare/v0.1.94...v0.1.95) (2026-09-29)
 
 
