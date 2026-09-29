@@ -161,7 +161,7 @@ importers:
     devDependencies:
       '@atscript/db':
         specifier: ^0.1.128
-        version: 0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.92)(@uniqu/core@0.1.7)
+        version: 0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.95)(@uniqu/core@0.1.7)
       '@uniqu/core':
         specifier: ^0.1.7
         version: 0.1.7
@@ -201,8 +201,8 @@ importers:
         specifier: ^22.20.1
         version: 22.20.1
       '@types/vscode':
-        specifier: ^1.125.0
-        version: 1.125.0
+        specifier: ~1.80.0
+        version: 1.80.0
       vitest:
         specifier: 3.2.7
         version: 3.2.7(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
@@ -225,11 +225,11 @@ packages:
       '@atscript/typescript': ^0.1.92
       '@uniqu/core': ^0.1.8
 
-  '@atscript/typescript@0.1.92':
-    resolution: {integrity: sha512-x4kQ1C6D/tiwfWAlr/rm5KEddho2ZBe71UwsxH7PW/yptAbdl8bOzJdO8b1wmwDE2llMJpSXDypbRynbBcJB2g==}
+  '@atscript/typescript@0.1.95':
+    resolution: {integrity: sha512-/m5qZElz62sGZuUjjf61yLWxFLuny4W5tPujxEq7Z/zfjJ0ncZyoHQ6/ZuElrsDlkbUAkN7bHDjhOOPX8OwXwg==}
     hasBin: true
     peerDependencies:
-      '@atscript/core': ^0.1.92
+      '@atscript/core': ^0.1.95
       '@atscript/db': ^0.1.97
     peerDependenciesMeta:
       '@atscript/db':
@@ -1820,8 +1820,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.125.0':
-    resolution: {integrity: sha512-0icm/ZQAaism87P0ekHqi4/Ju9du+Tm0RUW+y7vqRsxY2cY0FNRX1nAnaW7nT6npPt2tfHiheZ55Zm9UhqonFA==}
+  '@types/vscode@1.80.0':
+    resolution: {integrity: sha512-qK/CmOdS2o7ry3k6YqU4zD3R2AYlJfbwBoSbKpBoP+GpXNE+0NEgJOli4n0bm0diK5kfBnchgCEj4igQz/44Hg==}
 
   '@types/web-bluetooth@0.0.21':
     resolution: {integrity: sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==}
@@ -4006,19 +4006,19 @@ packages:
 
 snapshots:
 
-  '@atscript/db@0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.92)(@uniqu/core@0.1.7)':
+  '@atscript/db@0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.95)(@uniqu/core@0.1.7)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@atscript/typescript': 0.1.92(@atscript/core@packages+core)(@atscript/db@0.1.128)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.23)(wooks@0.7.23)
+      '@atscript/typescript': 0.1.95(@atscript/core@packages+core)(@atscript/db@0.1.128)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.23)(wooks@0.7.23)
       '@uniqu/core': 0.1.7
 
-  '@atscript/typescript@0.1.92(@atscript/core@packages+core)(@atscript/db@0.1.128)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.23)(wooks@0.7.23)':
+  '@atscript/typescript@0.1.95(@atscript/core@packages+core)(@atscript/db@0.1.128)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.23)(wooks@0.7.23)':
     dependencies:
       '@atscript/core': link:packages/core
       '@moostjs/event-cli': 0.6.37(@prostojs/logger@0.4.3)(@prostojs/router@0.3.4)(@wooksjs/event-core@0.7.23)(moost@0.6.37)(wooks@0.7.23)
       moost: 0.6.37
     optionalDependencies:
-      '@atscript/db': 0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.92)(@uniqu/core@0.1.7)
+      '@atscript/db': 0.1.128(@atscript/core@packages+core)(@atscript/typescript@0.1.95)(@uniqu/core@0.1.7)
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
@@ -5291,7 +5291,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.125.0': {}
+  '@types/vscode@1.80.0': {}
 
   '@types/web-bluetooth@0.0.21': {}
 
