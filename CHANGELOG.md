@@ -1,3 +1,9 @@
+## [0.1.99](https://github.com/moostjs/atscript/compare/v0.1.98...v0.1.99) (2026-10-03)
+
+
+### Features
+
+* **core:** expr and order backtick argument kinds with arithmetic and LSP support ([edd9d03](https://github.com/moostjs/atscript/commit/edd9d0303ceb3ee1b7f696c35e271844ea332d8b))
 ## [0.1.98](https://github.com/moostjs/atscript/compare/v0.1.97...v0.1.98) (2026-09-30)
 ## [0.1.97](https://github.com/moostjs/atscript/compare/v0.1.96...v0.1.97) (2026-09-29)
 ## [0.1.96](https://github.com/moostjs/atscript/compare/v0.1.95...v0.1.96) (2026-09-29)
