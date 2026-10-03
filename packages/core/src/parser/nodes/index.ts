@@ -97,8 +97,21 @@ export {
   SemanticQueryFieldRefNode,
   SemanticQueryValueNode,
   SemanticQueryValueListNode,
+  SemanticExprNode,
+  SemanticExprBinaryNode,
+  SemanticExprUnaryNode,
+  SemanticExprCallNode,
+  SemanticExprNumberNode,
+  SemanticOrderNode,
 } from './query-nodes'
-export type { SemanticQueryExprNode, TQueryOperator, TQueryLogicalOperator } from './query-nodes'
+export type {
+  SemanticQueryExprNode,
+  TQueryOperator,
+  TQueryLogicalOperator,
+  SemanticExprItemNode,
+  TExprBinaryOperator,
+  TOrderItem,
+} from './query-nodes'
 
 export function isQueryLogical(
   node?: SemanticNode

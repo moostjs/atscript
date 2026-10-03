@@ -90,6 +90,8 @@ export type {
   AtscriptQueryNode,
   AtscriptQueryFieldRef,
   AtscriptQueryComparison,
+  AtscriptExprNode,
+  AtscriptOrderItem,
 } from './runtime/query-types'
 
 export {

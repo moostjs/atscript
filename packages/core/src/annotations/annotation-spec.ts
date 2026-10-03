@@ -30,17 +30,38 @@ export interface TQueryScope {
   unqualifiedTarget: string | null
 }
 
+/** Annotation argument types written in backticks, each parsed by its own grammar. */
+export type TBacktickArgKind = 'query' | 'expr' | 'order'
+
+/** Whether an annotation argument type is written in backticks (`query`, `expr`, `order`). */
+export function isBacktickArgType(type: string | undefined): type is TBacktickArgKind {
+  return type === 'query' || type === 'expr' || type === 'order'
+}
+
+const BACKTICK_TYPE_MESSAGES: Record<TBacktickArgKind, string> = {
+  query: 'query expression expected (use backticks).',
+  expr: 'expression expected (use backticks).',
+  order: 'order list expected (use backticks).',
+}
+
 export interface TAnnotationArgument {
   optional?: boolean
   name: string
-  type: 'string' | 'number' | 'boolean' | 'ref' | 'query'
+  /**
+   * - `query`: backtick predicate (`status = 'open' and Issue.overdue = true`)
+   * - `expr`: backtick arithmetic over field refs (`openCount * 10 + coalesce(overdue, 0)`):
+   *   `+ - * /`, unary `-`, parentheses, numeric literals, `coalesce(a, b, …)`
+   * - `order`: backtick ordering (`raisedAt desc, id`): field refs with optional `asc` / `desc`
+   */
+  type: 'string' | 'number' | 'boolean' | 'ref' | TBacktickArgKind
   description?: string
   values?: string[]
   /**
-   * Editor field scope of a `query` or `string` argument. Called with the argument token
-   * and the document that holds it; return `undefined` when the scope cannot be determined.
-   * - `query`: the types the backtick expression may reference (drives completion, hover,
-   *   go-to-definition, find-references and rename of its field refs).
+   * Editor field scope of a `query`, `expr`, `order` or `string` argument. Called with the
+   * argument token and the document that holds it; return `undefined` when the scope cannot
+   * be determined.
+   * - `query` / `expr` / `order`: the types the backtick expression may reference (drives
+   *   completion, hover, go-to-definition, find-references and rename of its field refs).
    * - `string`: the argument is a (dotted) field path of `unqualifiedTarget` (`'amount'`,
    *   `'address.city'`) — same editor features on the string; `allowedTypes` is unused.
    */
@@ -96,7 +117,7 @@ export class AnnotationSpec {
       .map((arg, index) => {
         const placeholderIndex = index + 1 // Snippet placeholders are 1-based
         const defaultValue = this.getDefaultValueForType(arg.name, arg.type)
-        const quote = arg.type === 'string' ? `'` : arg.type === 'query' ? '`' : ''
+        const quote = arg.type === 'string' ? `'` : isBacktickArgType(arg.type) ? '`' : ''
         return `${quote}\${${placeholderIndex}:${defaultValue}}${quote}`
       })
       .join(', ')
@@ -124,8 +145,10 @@ export class AnnotationSpec {
       case 'ref': {
         return tokenType === 'identifier' ? undefined : 'type reference expected.'
       }
-      case 'query': {
-        return tokenType === 'query' ? undefined : 'query expression expected (use backticks).'
+      case 'query':
+      case 'expr':
+      case 'order': {
+        return tokenType === 'query' ? undefined : BACKTICK_TYPE_MESSAGES[type]
       }
       default: {
         // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
@@ -351,6 +374,12 @@ export class AnnotationSpec {
       }
       case 'query': {
         return 'field = value'
+      }
+      case 'expr': {
+        return 'field + 1'
+      }
+      case 'order': {
+        return 'field asc'
       }
       default: {
         return ''

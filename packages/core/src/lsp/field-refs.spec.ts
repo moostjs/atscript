@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { AnnotationSpec } from '../annotations'
 import { AtscriptDoc } from '../document'
 import { SemanticPrimitiveNode } from '../parser/nodes/primitive-node'
-import { getFieldsForType, getQueryScope, resolveFieldRefAt } from './field-refs'
+import {
+  analyzeQueryCursorContext,
+  getFieldsForType,
+  getQueryScope,
+  resolveFieldRefAt,
+} from './field-refs'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
 primitives.set('string', new SemanticPrimitiveNode('string', { type: 'string' }))
@@ -171,6 +176,89 @@ interface Report {
 
       const usages = doc.getUsageListAt(amountDef.line, amountDef.character)
       expect(usages?.map(u => u.range.start)).toEqual([posOf(doc, 'amount > 5')])
+    })
+  })
+
+  describe('fieldScope on expr and order arguments', () => {
+    const exprOrderAnnotations = {
+      test: {
+        calc: new AnnotationSpec({
+          argument: { name: 'expression', type: 'expr', fieldScope: () => orderScope },
+        }),
+        sort: new AnnotationSpec({
+          argument: { name: 'order', type: 'order', fieldScope: () => orderScope },
+        }),
+      },
+    }
+    const body = `
+interface Report {
+  @test.calc \`coalesce(amount, 0) * 2 + id\`
+  @test.sort \`id desc, Order.amount\`
+  total: number
+}
+`
+
+    it('resolves an expr leaf and an order key to the property', () => {
+      const doc = createDoc(body, exprOrderAnnotations)
+      const amountDef = posOf(doc, 'amount: number')
+      const inExpr = posOf(doc, 'amount, 0', 1)
+      expect(
+        doc.getToDefinitionAt(inExpr.line, inExpr.character)?.[0].targetSelectionRange.start
+      ).toEqual(amountDef)
+      const inOrder = posOf(doc, 'Order.amount', 'Order.'.length + 1)
+      expect(
+        doc.getToDefinitionAt(inOrder.line, inOrder.character)?.[0].targetSelectionRange.start
+      ).toEqual(amountDef)
+      const token = doc.tokensIndex.at(inExpr.line, inExpr.character)!
+      expect(resolveFieldRefAt(token, doc)?.prop.id).toBe('amount')
+    })
+
+    it('lists expr leaves and order keys among the references of the property', () => {
+      const doc = createDoc(body, exprOrderAnnotations)
+      const idDef = posOf(doc, 'id: number')
+      const usages = doc.getUsageListAt(idDef.line, idDef.character)
+      expect(usages?.map(u => u.range.start)).toEqual([posOf(doc, 'id`'), posOf(doc, 'id desc')])
+    })
+  })
+
+  describe('cursor context by argument mode', () => {
+    it.each([
+      ['', 'field-start'],
+      ['a + ', 'field-start'],
+      ['coalesce(', 'field-start'],
+      ['coalesce(a, ', 'field-start'],
+      ['a * (', 'field-start'],
+      ['amo', 'field-start'],
+      ['a ', 'after-operand'],
+      ['a + 10 ', 'after-operand'],
+      ['(a + b) ', 'after-operand'],
+      ['10', 'after-operand'],
+    ])('expr: %j → %s', (text, type) => {
+      expect(analyzeQueryCursorContext(text, 'expr').type).toBe(type)
+    })
+
+    it('expr: after a dot', () => {
+      expect(analyzeQueryCursorContext('a + Order.', 'expr')).toEqual({
+        type: 'after-dot',
+        typeName: 'Order',
+      })
+    })
+
+    it.each([
+      ['', 'field-start'],
+      ['a, ', 'field-start'],
+      ['ra', 'field-start'],
+      ['raisedAt ', 'after-order-key'],
+      ['raisedAt de', 'after-order-key'],
+      ['raisedAt desc ', 'after-order-direction'],
+      ['raisedAt desc, i', 'field-start'],
+    ])('order: %j → %s', (text, type) => {
+      expect(analyzeQueryCursorContext(text, 'order').type).toBe(type)
+    })
+
+    it('query mode is unchanged by arithmetic characters', () => {
+      expect(analyzeQueryCursorContext('amount > -5 ')).toEqual({ type: 'after-comparison' })
+      expect(analyzeQueryCursorContext('amount ')).toEqual({ type: 'after-field' })
     })
   })
 

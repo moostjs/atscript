@@ -1,4 +1,8 @@
-import type { TAnnotationArgument, TQueryScope } from '../annotations/annotation-spec'
+import type {
+  TAnnotationArgument,
+  TBacktickArgKind,
+  TQueryScope,
+} from '../annotations/annotation-spec'
 import type { AtscriptDoc } from '../document'
 import {
   isInterface,
@@ -9,6 +13,8 @@ import {
   type SemanticPropNode,
   type SemanticQueryFieldRefNode,
 } from '../parser/nodes'
+import { BACKTICK_ARG_VOCABULARY, ORDER_DIRECTIONS } from '../parser/pipes/expr.pipe'
+import { SYMBOLIC_OPS, VALUE_KEYWORDS } from '../parser/pipes/query.pipe'
 import type { Token } from '../parser/token'
 import { getLegacyDbQueryScope } from './legacy-db-query-scope'
 
@@ -258,10 +264,8 @@ export function getQueryCompletionScope(
 }
 
 // Operators and keywords used for cursor context analysis
-const SYMBOLIC_OPS = new Set(['=', '!=', '>', '>=', '<', '<='])
 const KEYWORD_OPS = new Set(['in', 'matches', 'exists'])
 const LOGICAL_KEYWORDS = new Set(['and', 'or', 'not'])
-const VALUE_KEYWORDS = new Set(['true', 'false', 'null', 'undefined'])
 
 export type TQueryCursorContext =
   | { type: 'field-start' }
@@ -269,14 +273,25 @@ export type TQueryCursorContext =
   | { type: 'after-field' }
   | { type: 'after-operator' }
   | { type: 'after-comparison' }
+  /** `expr`: after a field, a number or `)` — an arithmetic operator follows. */
+  | { type: 'after-operand' }
+  /** `order`: after an order key — `asc`, `desc` or `,` follows. */
+  | { type: 'after-order-key' }
+  /** `order`: after `asc` / `desc` — `,` follows. */
+  | { type: 'after-order-direction' }
 
 /**
  * Analyze text inside backticks up to cursor position
  * to determine what kind of completions to offer.
  * Uses lightweight text scanning, not full AST parsing,
  * so it works on incomplete/mid-typing input.
+ *
+ * `mode` selects the grammar of the argument (default `query`).
  */
-export function analyzeQueryCursorContext(textBeforeCursor: string): TQueryCursorContext {
+export function analyzeQueryCursorContext(
+  textBeforeCursor: string,
+  mode: TBacktickArgKind = 'query'
+): TQueryCursorContext {
   const trimmed = textBeforeCursor.trimEnd()
   // If the user is mid-typing (no trailing whitespace), analyze what they're typing in context
   const hasTrailingSpace = textBeforeCursor.length > trimmed.length
@@ -294,6 +309,10 @@ export function analyzeQueryCursorContext(textBeforeCursor: string): TQueryCurso
       return { type: 'after-dot', typeName: match[1] }
     }
     return { type: 'field-start' }
+  }
+
+  if (mode !== 'query') {
+    return analyzeArgCursorContext(trimmed, hasTrailingSpace, mode)
   }
 
   // Tokenize: extract the last meaningful token
@@ -354,11 +373,52 @@ export function analyzeQueryCursorContext(textBeforeCursor: string): TQueryCurso
   return { type: 'field-start' }
 }
 
+const ARITHMETIC_OPS = new Set<string>(BACKTICK_ARG_VOCABULARY.arithmeticOps)
+
+/** An order key (an identifier other than `asc` / `desc`). */
+function isOrderKey(token: string | undefined): boolean {
+  return token !== undefined && /^\w+$/u.test(token) && !ORDER_DIRECTIONS.has(token)
+}
+
+/**
+ * Cursor context inside an `expr` or `order` argument — `trimmed` is the
+ * non-empty text before the cursor that does not end with `.`.
+ */
+function analyzeArgCursorContext(
+  trimmed: string,
+  hasTrailingSpace: boolean,
+  mode: 'expr' | 'order'
+): TQueryCursorContext {
+  const tokens = tokenizeQueryText(trimmed, true)
+  const last = tokens[tokens.length - 1]
+  if (last === undefined || last === ',' || last === '(' || ARITHMETIC_OPS.has(last)) {
+    return { type: 'field-start' }
+  }
+  if (mode === 'order') {
+    if (!/^\w+$/u.test(last)) {
+      return { type: 'after-order-direction' }
+    }
+    if (!hasTrailingSpace) {
+      // An identifier typed right after a key is a direction being typed
+      return isOrderKey(tokens[tokens.length - 2])
+        ? { type: 'after-order-key' }
+        : { type: 'field-start' }
+    }
+    return isOrderKey(last) ? { type: 'after-order-key' } : { type: 'after-order-direction' }
+  }
+  // expr: an identifier being typed still offers fields (the editor filters them)
+  if (/^[a-z_$]\w*$/iu.test(last) && !hasTrailingSpace) {
+    return { type: 'field-start' }
+  }
+  return { type: 'after-operand' }
+}
+
 /**
  * Simple tokenizer for query text — splits into identifiers, operators, and punctuation.
  * Does NOT need to handle all edge cases; just enough for cursor context analysis.
+ * With `arithmetic`, `+ - * /` are tokens too (otherwise they are skipped).
  */
-function tokenizeQueryText(text: string): string[] {
+function tokenizeQueryText(text: string, arithmetic = false): string[] {
   const tokens: string[] = []
   let i = 0
   while (i < text.length) {
@@ -394,7 +454,7 @@ function tokenizeQueryText(text: string): string[] {
     }
 
     // Single-char operators/punctuation
-    if ('=><(),'.includes(text[i])) {
+    if ('=><(),'.includes(text[i]) || (arithmetic && ARITHMETIC_OPS.has(text[i]))) {
       tokens.push(text[i])
       i++
       continue

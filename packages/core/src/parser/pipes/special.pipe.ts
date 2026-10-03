@@ -16,7 +16,6 @@ import { Token } from '../token'
 import type { TExpect, TTarget } from '../types'
 import type { TPipe } from './core.pipe'
 import { runPipes, runPipesOnce } from './core.pipe'
-import { parseQueryExpression } from './query.pipe'
 
 export function refWithChain() {
   const s = {
@@ -140,15 +139,8 @@ export function annotations() {
         }
         while (ni.satisfies(...opts.argument)) {
           let argToken = new Token(ni.$)
-          // Parse query expression from backtick token children. Fork before
-          // moving on so the query token is the sub-iterator's parent — the
-          // fallback range for diagnostics on positionless tokens.
-          if (argToken.type === 'query') {
-            const queryNode = parseQueryExpression(ni.fork(argToken.children), argToken)
-            if (queryNode) {
-              argToken.queryNode = queryNode
-            }
-          }
+          // Backtick arguments are parsed later, in `AtscriptDoc.registerAnnotation`,
+          // once the argument spec (query / expr / order) is known.
           ni.accepted()
           ni.move()
           // Chain ref continuation: consume .identifier segments for ref args

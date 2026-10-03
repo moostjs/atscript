@@ -14,6 +14,11 @@ export class Token {
     return new Token(t)
   }
 
+  /** The underlying lexical token (for re-iterating its children). */
+  get lexicalToken(): TLexicalToken {
+    return this._data
+  }
+
   get text() {
     return this._data.text || '' // equals "text" for identifiers and operator for "punctuation"
   }
@@ -98,4 +103,23 @@ export class Token {
    * Parsed query expression tree (for query-type annotation arguments)
    */
   public queryNode?: import('./nodes/query-nodes').SemanticQueryNode
+
+  /** The parsed tree of a backtick argument — whichever of the three it was parsed as. */
+  get backtickNode():
+    | import('./nodes/query-nodes').SemanticQueryNode
+    | import('./nodes/query-nodes').SemanticExprNode
+    | import('./nodes/query-nodes').SemanticOrderNode
+    | undefined {
+    return this.queryNode ?? this.exprNode ?? this.orderNode
+  }
+
+  /**
+   * Parsed arithmetic expression (for expr-type annotation arguments)
+   */
+  public exprNode?: import('./nodes/query-nodes').SemanticExprNode
+
+  /**
+   * Parsed ordering (for order-type annotation arguments)
+   */
+  public orderNode?: import('./nodes/query-nodes').SemanticOrderNode
 }

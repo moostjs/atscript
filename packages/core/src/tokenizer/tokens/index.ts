@@ -8,10 +8,11 @@ import { commentNodes } from './comment.token'
 import { IdentifierToken } from './identifier.token'
 import { NumberToken } from './number.token'
 import { PunctuationToken } from './punctuation.token'
+import { QueryArithmeticToken } from './query-arith.token'
 import { QueryBlockToken } from './query-block.token'
 import { QueryOperatorToken } from './query-operator.token'
 import { QueryToken } from './query.token'
-import { RegExpToken } from './regexp.token'
+import { QueryRegExpToken, RegExpToken } from './regexp.token'
 import { TextToken } from './text.node'
 
 export const tokens = {
@@ -62,26 +63,32 @@ BlockToken.recognize(
 
 // QueryBlockToken goes before BlockToken so that "(" is claimed by the
 // query-aware block, while "[" and "{" still fall through to the generic one.
+//
+// Inside queries a regexp literal is only recognized after `matches`, and the
+// arithmetic operators (`*`, `-`) come after `NumberToken` so an adjacent sign
+// still lexes as a signed number (`-5`).
 QueryToken.recognize(
-  RegExpToken,
+  QueryRegExpToken,
   QueryOperatorToken,
   QueryBlockToken,
   BlockToken,
   IdentifierToken,
   TextToken,
   NumberToken,
+  QueryArithmeticToken,
   PunctuationToken
 )
 
 // Nested parentheses recurse through QueryBlockToken itself.
 // Comments are not recognized inside queries (mirrors QueryToken).
 QueryBlockToken.recognize(
-  RegExpToken,
+  QueryRegExpToken,
   QueryOperatorToken,
   QueryBlockToken,
   IdentifierToken,
   TextToken,
   NumberToken,
+  QueryArithmeticToken,
   PunctuationToken
 )
 

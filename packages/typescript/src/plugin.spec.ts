@@ -1402,4 +1402,43 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/query-annotation.js')
     )
   })
+  it('must render expr and order annotation arguments as runtime trees', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/expr-annotation.as'],
+      plugins: [tsPlugin()],
+      annotations: {
+        ...annotations,
+        some: {
+          compute: new AnnotationSpec({ argument: { name: 'expression', type: 'expr' } }),
+          joins: new AnnotationSpec({
+            argument: [
+              { name: 'target', type: 'ref' },
+              { name: 'order', type: 'order' },
+            ],
+          }),
+        },
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    expect(out).toHaveLength(1)
+    const js = out[0].content
+    expect(js).toContain(
+      '.annotate("some.compute", { op: "+", args: [{ op: "*", args: [{ field: "openCount" }, 10] }, { field: "overdueCount" }] })'
+    )
+    expect(js).toContain(
+      '.annotate("some.compute", { op: "-", args: [{ op: "/", args: [{ op: "*", args: [{ op: "neg", args: [{ op: "-", args: [{ field: "a" }, { field: "b" }] }] }, 2] }, { op: "coalesce", args: [{ field: "c" }, 1.5] }] }, -1] })'
+    )
+    expect(js).toContain(
+      'order: [{ ref: { field: "raisedAt" }, desc: true }, { ref: { type: () => Issue, field: "id" } }]'
+    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/expr-annotation.js'))
+
+    const dts = await repo.generate({ format: 'dts' })
+    const globalDts = dts.find(f => f.fileName === 'atscript.d.ts')!.content
+    expect(globalDts).toContain(
+      '"some.compute": import("@atscript/typescript/utils").AtscriptExprNode'
+    )
+    expect(globalDts).toContain('order: import("@atscript/typescript/utils").AtscriptOrderItem[]')
+  })
 })

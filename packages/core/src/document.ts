@@ -5,7 +5,7 @@
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { resolveAnnotation } from './annotations'
+import { isBacktickArgType, resolveAnnotation } from './annotations'
 import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { getQueryScope, resolveFieldPathArgSegments, resolveFieldRefAt } from './lsp/field-refs'
@@ -34,6 +34,7 @@ import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
 import { runPipes } from './parser/pipes/core.pipe'
+import { parseBacktickArg } from './parser/pipes/expr.pipe'
 import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
@@ -44,6 +45,7 @@ import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
+import type { TLexicalToken } from './tokenizer/types'
 
 export interface TAtscriptDocConfig {
   primitives?: Map<string, SemanticPrimitiveNode>
@@ -211,6 +213,65 @@ export class AtscriptDoc {
     }
     this.semanticMessages = ni.getErrors()
     this.registerNodes(this.nodes)
+    this.parseUnregisteredBacktickArgs(rawTokens)
+  }
+
+  /** Lexical backtick tokens already parsed by `registerAnnotation`. */
+  private parsedBacktickArgs = new WeakSet<TLexicalToken>()
+
+  /**
+   * Backtick arguments of annotations that never get registered (dangling at
+   * EOF, or followed by a syntax error) are still parsed for diagnostics — by
+   * the argument spec of the preceding annotation when it resolves, else as a
+   * query predicate.
+   */
+  private parseUnregisteredBacktickArgs(tokens: TLexicalToken[]) {
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i]
+      if (t.type === 'block' && t.children) {
+        this.parseUnregisteredBacktickArgs(t.children)
+        continue
+      }
+      if (t.type !== 'query' || this.parsedBacktickArgs.has(t)) {
+        continue
+      }
+      // Walk back to the owning annotation on the same statement.
+      let argIndex = 0
+      let annotation: TLexicalToken | undefined
+      for (let j = i - 1; j >= 0; j--) {
+        const p = tokens[j]
+        if (p.type === 'annotation') {
+          annotation = p
+          break
+        }
+        if (
+          p.type === 'block' ||
+          (p.type === 'punctuation' && (p.text === '\n' || p.text === ';'))
+        ) {
+          break
+        }
+        if (p.type === 'punctuation' && p.text === ',') {
+          argIndex++
+        }
+      }
+      if (!annotation) {
+        continue
+      }
+      this.parseBacktickArgAs(
+        new Token(t),
+        this.resolveAnnotation(annotation.text.slice(1))?.arguments[argIndex]?.type
+      )
+    }
+  }
+
+  /**
+   * Parse a backtick argument by its spec type: `expr` / `order` get their own
+   * grammar; anything else (unknown annotation, position beyond the spec) parses
+   * as a query predicate.
+   */
+  private parseBacktickArgAs(arg: Token, specType: string | undefined) {
+    this.parsedBacktickArgs.add(arg.lexicalToken)
+    this.registerMessages(parseBacktickArg(arg, isBacktickArgType(specType) ? specType : 'query'))
   }
 
   cleanup() {
@@ -229,6 +290,7 @@ export class AtscriptDoc {
     this.blocksIndex = new BlocksIndex()
     this.resolvedAnnotations = []
     this.annotations = []
+    this.parsedBacktickArgs = new WeakSet()
   }
 
   private registerNodes(nodes: SemanticNode[]) {
@@ -252,12 +314,17 @@ export class AtscriptDoc {
     this.tokensIndex.add(mainToken)
     args?.forEach(a => this.tokensIndex.add(a))
     const annotationSpec = this.resolveAnnotation(mainToken.text.slice(1))
+    const specArgs = annotationSpec?.arguments ?? []
+    args?.forEach((a, i) => {
+      if (a.type === 'query') {
+        this.parseBacktickArgAs(a, specArgs[i]?.type)
+      }
+    })
     if (annotationSpec) {
       this.registerMessages(annotationSpec.validate(mainToken, args || [], this))
       annotationSpec.modify(mainToken, args || [], this)
       this.resolvedAnnotations.push(mainToken)
       // Track ref-typed arguments for import resolution
-      const specArgs = annotationSpec.arguments
       for (let i = 0; i < (args?.length ?? 0); i++) {
         const argSpec = specArgs[i]
         if (argSpec?.type === 'ref' && args?.[i]) {
@@ -273,9 +340,9 @@ export class AtscriptDoc {
             this.referred.push(refToken)
           }
         }
-        // Track query expression type refs for import resolution and LSP
-        if (argSpec?.type === 'query' && args?.[i]?.queryNode) {
-          args[i].queryNode!.registerAtDocument(this)
+        // Track query / expr / order field refs for import resolution and LSP
+        if (isBacktickArgType(argSpec?.type)) {
+          args?.[i]?.backtickNode?.registerAtDocument(this)
         }
         if (argSpec?.type === 'string' && argSpec.fieldScope && args?.[i]) {
           this.fieldPathArgs.push(args[i])

@@ -34,7 +34,7 @@ export interface User {
 ```
 
 - Arguments are **space-separated** (and comma-separated when more than one). NOT `@meta.label('User')`.
-- Args are parsed literal tokens: `string` (quoted), `number`, `boolean` (`true` / `false`), `ref` (identifier), `query` (backticked). No regex literals, no expressions.
+- Args are parsed literal tokens: `string` (quoted), `number`, `boolean` (`true` / `false`), `ref` (identifier), backticked `query` / `expr` / `order` (grammar picked by the spec's arg `type`). No regex literals outside backticks.
 - Inside a `query` arg the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` work at any nesting level, including inside parentheses (since 0.1.90): `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
 - Omit args entirely for no-arg annotations: `@meta.id`, `@meta.sensitive`.
 
@@ -148,7 +148,7 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 
 `AnnotationSpec` fields:
 
-- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values?, fieldScope?, refFilter? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query'`. Omit for no-arg annotations.
+- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values?, fieldScope?, refFilter? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'`. Omit for no-arg annotations. Backtick arg types → [table below](#backtick-argument-types).
 - `nodeType` — `TNodeEntity[]` (e.g. `['prop', 'interface', 'type', 'primitive']`). Validated at parse time.
 - `defType` — restrict to specific primitive bases / kinds (e.g. `['string']`, `['number']`, `['array', 'string']`).
 - `multiple` — repeatable on same node.
@@ -159,11 +159,11 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 
 Editor (LSP) hooks on a `TAnnotationArgument` — drive VSCode completion/hover/go-to-definition/references inside the argument; no validation (keep that in `validate`):
 
-| Hook                        | For `type` | Return                                               | Effect                                                                                                                                     |
-| --------------------------- | ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `fieldScope(argToken, doc)` | `'query'`  | `{ allowedTypes, unqualifiedTarget }` or `undefined` | Types a `Type.field` may name + the type a bare `field` resolves against                                                                   |
-| `fieldScope(argToken, doc)` | `'string'` | `{ allowedTypes, unqualifiedTarget }` or `undefined` | String is a (dotted, unqualified) field path of `unqualifiedTarget` → field completion per level, hover, F12, find-refs/rename per segment |
-| `refFilter(decl, doc)`      | `'ref'`    | `boolean`                                            | Filters type-name completion candidates                                                                                                    |
+| Hook                        | For `type`                     | Return                                               | Effect                                                                                                                                     |
+| --------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `fieldScope(argToken, doc)` | `'query'`, `'expr'`, `'order'` | `{ allowedTypes, unqualifiedTarget }` or `undefined` | Types a `Type.field` may name + the type a bare `field` resolves against                                                                   |
+| `fieldScope(argToken, doc)` | `'string'`                     | `{ allowedTypes, unqualifiedTarget }` or `undefined` | String is a (dotted, unqualified) field path of `unqualifiedTarget` → field completion per level, hover, F12, find-refs/rename per segment |
+| `refFilter(decl, doc)`      | `'ref'`                        | `boolean`                                            | Filters type-name completion candidates                                                                                                    |
 
 1. `argToken.parentNode` = annotated node; read sibling annotations from `argToken.parentNode.annotations` to derive the scope.
 2. `refFilter`'s `doc` is the document that **declares** `decl` (not the one being edited).
@@ -172,6 +172,22 @@ Editor (LSP) hooks on a `TAnnotationArgument` — drive VSCode completion/hover/
 5. Types: `import type { TAnnotationArgument, TQueryScope } from '@atscript/core'`.
 
 Full example → [atscript.dev plugin-development/annotation-system](https://atscript.dev/plugin-development/annotation-system#editor-support-for-arguments).
+
+### Backtick argument types
+
+Since 0.1.99. A backtick arg parses by its spec `type`; spec-less positions (unknown annotation, extra arg) keep the `query` grammar.
+
+| `type`    | Grammar                                                                                         | Example                                    | Runtime value (type from `@atscript/typescript/utils`)                                             |
+| --------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `'query'` | predicate: comparisons, `and` / `or` / `not`, `in`, `matches`, `exists`                         | `` `status = 'open'` ``                    | `AtscriptQueryNode`                                                                                |
+| `'expr'`  | `+ - * /`, unary `-`, `( )`, numbers, `coalesce(a, b, …)` (≥ 2 args), field refs — nothing else | `` `openCount * 10 + coalesce(rank, 0)` `` | `AtscriptExprNode`: number \| `{ field, type? }` \| `{ op, args }` (`op` ∈ `+ - * / neg coalesce`) |
+| `'order'` | `key (asc \| desc)?, …`                                                                         | `` `raisedAt desc, id` ``                  | `AtscriptOrderItem[]`: `[{ ref: { field, type? }, desc?: true }]`                                  |
+
+1. Core reports syntax errors only; field existence/types are the plugin's `validate` job (walk `argToken.exprNode.fieldRefs()` / `argToken.orderNode.fieldRefs()`).
+2. `a -5` / `a+1` parse as binary `a - 5` / `a + 1`; a standalone `-5` is a negative literal.
+3. `/` is division inside backticks; a regexp literal lexes only after `matches` (space optional: `matches/re/` ok) — `field = /x/` is no longer a regexp (0.1.99 change).
+4. `expr` number literals: finite, no underflow to `0` (`1e-400`), `|n| <= 2^53 - 1` — else a core error.
+5. `fieldScope` gives expr leaves and order keys the same completion / hover / F12 / references / rename as query refs.
 
 Inline registration in `atscript.config.js`:
 

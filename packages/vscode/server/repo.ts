@@ -8,7 +8,13 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, SemanticPropNode, Token, SemanticAnnotateNode } from '@atscript/core'
+import type {
+  SemanticNode,
+  SemanticPropNode,
+  Token,
+  SemanticAnnotateNode,
+  TBacktickArgKind,
+} from '@atscript/core'
 import {
   AtscriptDoc,
   AtscriptRepo,
@@ -33,6 +39,8 @@ import {
   getQueryCompletionScope,
   getFieldPathCompletionScope,
   analyzeQueryCursorContext,
+  isBacktickArgType,
+  BACKTICK_ARG_VOCABULARY,
 } from '@atscript/core'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type {
@@ -48,6 +56,7 @@ import {
   CompletionItemKind,
   DiagnosticSeverity,
   DiagnosticTag,
+  InsertTextFormat,
   ParameterInformation,
   SemanticTokensBuilder,
   SignatureInformation,
@@ -321,8 +330,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             },
           ]
         }
-        if (arg?.type === 'query') {
-          return this.getQueryCompletions(document, position, atscript, aContext!)
+        if (arg && isBacktickArgType(arg.type)) {
+          return this.getQueryCompletions(document, position, atscript, aContext!, arg.type)
         }
         if (arg?.type === 'string' && arg.fieldScope) {
           return this.getFieldPathCompletions(atscript, position, aContext!)
@@ -779,7 +788,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     if (currentAnnotation) {
       for (const arg of currentAnnotation.args) {
         if (
-          arg.queryNode &&
+          arg.backtickNode &&
           arg.range.start.line <= position.line &&
           arg.range.end.line >= position.line &&
           (arg.range.start.line < position.line ||
@@ -1021,7 +1030,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       argToken?: Token
       currentIndex: number
       annotationSpec?: { arguments: Array<{ type: string }> }
-    }
+    },
+    mode: TBacktickArgKind
   ): CompletionItem[] | undefined {
     try {
       const text = document.getText()
@@ -1046,11 +1056,22 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       }
       const textInQuery = textBefore.slice(backtickPos + 1)
 
-      const context = analyzeQueryCursorContext(textInQuery)
+      const context = analyzeQueryCursorContext(textInQuery, mode)
 
       switch (context.type) {
         case 'field-start': {
           const items: CompletionItem[] = []
+          if (mode === 'expr') {
+            for (const fn of BACKTICK_ARG_VOCABULARY.functions) {
+              items.push({
+                label: fn,
+                kind: CompletionItemKind.Function,
+                detail: 'First non-null argument',
+                insertText: `${fn}(\${1:field}, \${2:0})`,
+                insertTextFormat: InsertTextFormat.Snippet,
+              })
+            }
+          }
           for (const typeName of scope.typeNames) {
             items.push({
               label: typeName,
@@ -1113,6 +1134,24 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             { label: 'and', kind: CompletionItemKind.Keyword },
             { label: 'or', kind: CompletionItemKind.Keyword },
           ]
+        }
+        case 'after-operand': {
+          return BACKTICK_ARG_VOCABULARY.arithmeticOps.map(label => ({
+            label,
+            kind: CompletionItemKind.Operator,
+          }))
+        }
+        case 'after-order-key': {
+          return [
+            ...BACKTICK_ARG_VOCABULARY.orderDirections.map(label => ({
+              label,
+              kind: CompletionItemKind.Keyword,
+            })),
+            { label: ',', kind: CompletionItemKind.Operator },
+          ]
+        }
+        case 'after-order-direction': {
+          return [{ label: ',', kind: CompletionItemKind.Operator }]
         }
       }
     } catch (error) {

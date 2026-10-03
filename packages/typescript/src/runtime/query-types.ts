@@ -27,3 +27,20 @@ export type AtscriptQueryNode =
   | { $and: AtscriptQueryNode[] }
   | { $or: AtscriptQueryNode[] }
   | { $not: AtscriptQueryNode }
+
+/**
+ * Arithmetic expression tree (runtime shape of an `expr` annotation argument).
+ * Leaves are numeric literals or field references.
+ */
+export type AtscriptExprNode =
+  | number
+  | AtscriptQueryFieldRef
+  | { op: '+' | '-' | '*' | '/'; args: [AtscriptExprNode, AtscriptExprNode] }
+  | { op: 'neg'; args: [AtscriptExprNode] }
+  | { op: 'coalesce'; args: AtscriptExprNode[] }
+
+/** One key of an ordering (runtime shape of an `order` annotation argument is an array of these). */
+export interface AtscriptOrderItem {
+  ref: AtscriptQueryFieldRef
+  desc?: true
+}

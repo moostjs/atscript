@@ -12,9 +12,9 @@ import {
 import { Token } from '../token'
 import type { TVsCodeRange } from '../utils'
 
-const SYMBOLIC_OPS = new Set<string>(['=', '!=', '>', '>=', '<', '<='])
+export const SYMBOLIC_OPS = new Set<string>(['=', '!=', '>', '>=', '<', '<='])
 
-const VALUE_KEYWORDS = new Set<string>(['true', 'false', 'null', 'undefined'])
+export const VALUE_KEYWORDS = new Set<string>(['true', 'false', 'null', 'undefined'])
 
 const ZERO_RANGE: TVsCodeRange = {
   start: { line: 0, character: 0 },
@@ -246,7 +246,7 @@ function parseNotComparison(
   return undefined
 }
 
-function parseFieldRef(ni: NodeIterator): SemanticQueryFieldRefNode | undefined {
+export function parseFieldRef(ni: NodeIterator): SemanticQueryFieldRefNode | undefined {
   if (ni.$?.type !== 'identifier') {
     pushError(ni, 'Expected field reference')
     return undefined
@@ -391,6 +391,6 @@ function rangeOf(ni: NodeIterator): TVsCodeRange {
   return ni.$?.getRange?.() ?? ni.parent?.getRange?.() ?? ZERO_RANGE
 }
 
-function pushError(ni: NodeIterator, message: string): void {
+export function pushError(ni: NodeIterator, message: string): void {
   ni.messages.push({ severity: 1, message, range: rangeOf(ni) })
 }

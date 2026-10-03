@@ -796,6 +796,70 @@ describe('completions', () => {
   })
 })
 
+describe('expr and order arguments', () => {
+  const scope = { allowedTypes: ['Issue'], unqualifiedTarget: 'Issue' }
+  const exprConfig: TAtscriptDocConfig = {
+    primitives,
+    annotations: {
+      ...annotations,
+      x: {
+        calc: new AnnotationSpec({
+          argument: { name: 'expression', type: 'expr', fieldScope: () => scope },
+        }),
+        sort: new AnnotationSpec({
+          argument: { name: 'order', type: 'order', fieldScope: () => scope },
+        }),
+      },
+    },
+  }
+  const prefix = 'interface Issue {\n  severity: number\n  raisedAt: number\n}\ninterface Q {\n'
+
+  async function complete(line: string) {
+    const uri = 'file:///expr.as'
+    const source = `${prefix}${line}\n  v: number\n}`
+    const { handlers } = singleDocRepo(uri, source, exprConfig)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 5, character: line.length - 1 },
+    })
+    return (result ?? []).map((i: any) => i.label)
+  }
+
+  it('offers fields and coalesce at an expr operand position', async () => {
+    const labels = await complete('  @x.calc `severity * `')
+    expect(labels).toContain('severity')
+    expect(labels).toContain('raisedAt')
+    expect(labels).toContain('coalesce')
+    expect(labels).toContain('Issue')
+  })
+
+  it('offers arithmetic operators after an expr operand', async () => {
+    const labels = await complete('  @x.calc `severity `')
+    expect(labels).toEqual(['+', '-', '*', '/'])
+  })
+
+  it('offers fields at an order key position and directions after a key', async () => {
+    expect(await complete('  @x.sort `raisedAt desc, `')).toContain('severity')
+    expect(await complete('  @x.sort `raisedAt `')).toEqual(['asc', 'desc', ','])
+    expect(await complete('  @x.sort `raisedAt desc `')).toEqual([','])
+  })
+
+  it('renames a field across expr leaves and order keys', async () => {
+    const uri = 'file:///expr.as'
+    const source = `${prefix}  @x.calc \`severity * 2\`\n  @x.sort \`severity desc\`\n  v: number\n}`
+    const { handlers } = singleDocRepo(uri, source, exprConfig)
+    const result = await handlers.onRenameRequest!({
+      textDocument: { uri },
+      position: { line: 1, character: 3 },
+      newName: 'level',
+    })
+    const edits = result.changes[uri].map(
+      (e: any) => `${e.range.start.line}:${e.range.start.character}`
+    )
+    expect(edits.sort()).toEqual(['1:2', '5:11', '6:11'])
+  })
+})
+
 describe('hover', () => {
   it('shows phantom label on phantom type reference', async () => {
     const uri = 'file:///test.as'

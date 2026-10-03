@@ -21,7 +21,7 @@ No configuration needed — walks up from the open `.as` to find `atscript.confi
   - `.` in type position → primitive extensions (e.g. `string.` → `email`, `uuid`, `required`, …).
   - Inside `import { … } from ''` → file paths + exported identifiers (auto-import on type references).
   - Annotate-block property completions + context-aware keywords.
-  - Annotation arguments: `values` enums, `true`/`false`, type names for `ref` args, fields inside `query` backticks and field-path strings — scoped by the spec's `fieldScope` / `refFilter` hooks ([annotations.md](annotations.md#custom-annotations)).
+  - Annotation arguments: `values` enums, `true`/`false`, type names for `ref` args, fields inside `query` / `expr` / `order` backticks (plus `coalesce(`, `+ - * /`, `asc` / `desc` by position) and field-path strings — scoped by the spec's `fieldScope` / `refFilter` hooks ([annotations.md](annotations.md#custom-annotations)).
 - **Hover** — annotation → `AnnotationSpec.description`; type/interface → one-line summary.
 - **Go-to-definition** — cross-file.
 - **Find-references** — all usages of a type/primitive.

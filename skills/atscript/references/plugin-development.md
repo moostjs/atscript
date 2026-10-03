@@ -160,7 +160,7 @@ A language extension = plugin whose `render()` emits another language. Pattern:
 
 ## `AnnotationSpec` and primitive annotations
 
-`AnnotationSpec` shape, arg types (`'string' | 'number' | 'boolean' | 'ref' | 'query'`), full example → [annotations.md](annotations.md#custom-annotations).
+`AnnotationSpec` shape, arg types (`'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'`), full example → [annotations.md](annotations.md#custom-annotations).
 
 Primitives use generic `annotations: Record<string, TPrimitiveAnnotationValue>` — no hardcoded `expect` property. See [primitives.md](primitives.md#extending-via-config). Annotation values on primitives are resolved against the registered `AnnotationSpec` (spec arg names → object keys, `multiple: true` → array).
 

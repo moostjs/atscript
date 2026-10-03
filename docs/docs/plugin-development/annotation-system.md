@@ -100,12 +100,12 @@ Each argument is defined with `TAnnotationArgument`:
 ```typescript
 interface TAnnotationArgument {
   name: string
-  type: 'string' | 'number' | 'boolean' | 'ref' | 'query'
+  type: 'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'
   optional?: boolean
   description?: string
   values?: string[] // Enum — restrict to specific values
   // Editor (LSP) hooks — see "Editor Support for Arguments" below
-  fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // 'query' / 'string' args
+  fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // backtick / 'string' args
   refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean // 'ref' args
 }
 ```
@@ -119,8 +119,46 @@ The argument types correspond to the tokens accepted in `.as` source:
 | `'boolean'` | Identifier `true` / `false`                                                         |
 | `'ref'`     | Bare identifier referencing another type (e.g. `User`)                              |
 | `'query'`   | Backtick-delimited query expression — used by DB plugins for SQL-like filter syntax |
+| `'expr'`    | Backtick-delimited arithmetic expression (since 0.1.99)                             |
+| `'order'`   | Backtick-delimited ordering — field refs with `asc` / `desc` (since 0.1.99)         |
 
 Query expressions accept the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` at any nesting level, including inside parentheses (since 0.1.90) — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
+
+### Expression and Order Arguments
+
+Since 0.1.99 a backtick argument is parsed by the grammar of its spec `type`; a backtick in a position without a spec (unknown annotation, extra argument) keeps the query grammar.
+
+| `type`    | Grammar                                                                                                                                                                             | Example                                    | Runtime value (`metadata.get(...)`)                                                                                |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `'expr'`  | `+ - * /`, unary `-`, parentheses, numeric literals, `coalesce(a, b, …)` (2+ args), field refs (`field`, `Type.field`). No comparisons, strings, booleans, `null`, other functions. | `` `openCount * 10 + coalesce(rank, 0)` `` | `AtscriptExprNode`: a number, a field ref `{ field, type? }`, or `{ op, args }` with `op` ∈ `+ - * / neg coalesce` |
+| `'order'` | `key (asc \| desc)?, …` — each key a field ref, `asc` by default                                                                                                                    | `` `raisedAt desc, id` ``                  | `AtscriptOrderItem[]`: `[{ ref: { field, type? }, desc?: true }]`                                                  |
+
+```typescript
+import { AnnotationSpec } from '@atscript/core'
+import type { AtscriptExprNode, AtscriptOrderItem } from '@atscript/typescript/utils'
+
+export const reportAnnotations = {
+  score: new AnnotationSpec({
+    nodeType: ['prop'],
+    argument: { name: 'expression', type: 'expr' },
+  }),
+  sort: new AnnotationSpec({
+    nodeType: ['interface'],
+    argument: { name: 'order', type: 'order' },
+  }),
+}
+
+// at runtime
+const expr = Report.type.props.get('score')?.metadata.get('report.score') as AtscriptExprNode
+const order = Report.metadata.get('report.sort') as AtscriptOrderItem[]
+```
+
+- Syntax errors are reported by core at the offending token; checking that the referenced fields exist and have the right types is the plugin's job (`validate`).
+- `a -5` and `a+1` parse as `a - 5` / `a + 1`; `-5` alone is a negative literal.
+- `/` is division inside backticks. A regexp literal is recognized only after `matches`, with or without a space (`name matches /^a/i`, `name matches/^a/i`); since 0.1.99 `field = /x/` no longer lexes as a regexp.
+- Number literals in `expr` must be finite, must not underflow to `0` (`1e-400`), and must stay within ±`Number.MAX_SAFE_INTEGER` (`2^53 - 1`); otherwise core reports an error at the literal.
+- `fieldScope` works for both types exactly as for `query` (completion, hover, go-to-definition, references, rename); the editor completes `coalesce(`, operators, and `asc` / `desc` by position.
+- The generated `atscript.d.ts` types these arguments as `AtscriptExprNode` / `AtscriptOrderItem[]`.
 
 ### No Arguments (Flag Annotation)
 
@@ -190,11 +228,11 @@ Usage: `@patch.strategy "replace"` (accepted) vs `@patch.strategy "upsert"` (err
 
 Arguments that point at types or fields can tell the VSCode extension what they point at. The editor then offers completion, hover, go-to-definition, find-references and rename inside the argument. The hooks only drive editor features — they don't validate anything, so keep checks in [`validate`](#custom-validation).
 
-| Hook         | Argument `type` | Returns                                               | Enables                                                                                                                                                                                                          |
-| ------------ | --------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fieldScope` | `'query'`       | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | Field/type completion, hover, go-to-definition, find-references and rename inside the backticks                                                                                                                  |
-| `fieldScope` | `'string'`      | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | The string is a field path of `unqualifiedTarget` (`'amount'`, `'address.city'`): field completion level by level, hover, go-to-definition, and every segment shows up in its field's find-references and rename |
-| `refFilter`  | `'ref'`         | `boolean`                                             | Narrows the type names offered by completion                                                                                                                                                                     |
+| Hook         | Argument `type`                | Returns                                               | Enables                                                                                                                                                                                                          |
+| ------------ | ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fieldScope` | `'query'`, `'expr'`, `'order'` | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | Field/type completion, hover, go-to-definition, find-references and rename inside the backticks                                                                                                                  |
+| `fieldScope` | `'string'`                     | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | The string is a field path of `unqualifiedTarget` (`'amount'`, `'address.city'`): field completion level by level, hover, go-to-definition, and every segment shows up in its field's find-references and rename |
+| `refFilter`  | `'ref'`                        | `boolean`                                             | Narrows the type names offered by completion                                                                                                                                                                     |
 
 `fieldScope` receives the argument token and the document holding it. The annotated node is `argToken.parentNode`; its sibling annotations are on `argToken.parentNode.annotations`. Return `undefined` when the scope can't be determined — the editor then offers nothing rather than guessing.
 

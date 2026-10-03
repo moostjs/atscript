@@ -75,6 +75,8 @@ export class AtscriptRepo {
     const ANNOTATION_TYPE_MAP: Record<string, string> = {
       ref: 'import("@atscript/typescript/utils").AtscriptRef',
       query: 'import("@atscript/typescript/utils").AtscriptQueryNode',
+      expr: 'import("@atscript/typescript/utils").AtscriptExprNode',
+      order: 'import("@atscript/typescript/utils").AtscriptOrderItem[]',
     }
     const mapArgType = (t: string) => ANNOTATION_TYPE_MAP[t] || t
     type TAnnotationValue = {

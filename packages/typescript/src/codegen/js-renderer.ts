@@ -5,6 +5,11 @@ import type {
   SemanticAnnotateNode,
   SemanticArrayNode,
   SemanticConstNode,
+  SemanticExprBinaryNode,
+  SemanticExprCallNode,
+  SemanticExprItemNode,
+  SemanticExprNumberNode,
+  SemanticExprUnaryNode,
   SemanticGroup,
   SemanticInterfaceNode,
   SemanticNode,
@@ -1085,7 +1090,41 @@ export class JsRenderer extends BaseRenderer {
     if (aSpec.type === 'query' && argToken.queryNode) {
       return this.emitQueryTree(argToken.queryNode)
     }
+    if (aSpec.type === 'expr' && argToken.exprNode) {
+      return this.emitExprNode(argToken.exprNode.expression)
+    }
+    if (aSpec.type === 'order' && argToken.orderNode) {
+      const items = argToken.orderNode.items.map(
+        item => `{ ref: ${this.emitQueryFieldRef(item.ref)}${item.desc ? ', desc: true' : ''} }`
+      )
+      return `[${items.join(', ')}]`
+    }
     return aSpec.type === 'string' ? `"${escapeQuotes(argToken.text)}"` : argToken.text
+  }
+
+  private emitExprNode(node: SemanticExprItemNode): string {
+    // Discriminate by `entity` (not `instanceof`): the nodes may come from another copy of core
+    switch (node.entity as string) {
+      case 'query-expr-number': {
+        // the parser rejects non-finite literals
+        return String((node as SemanticExprNumberNode).value)
+      }
+      case 'query-expr-binary': {
+        const { op, left, right } = node as SemanticExprBinaryNode
+        return `{ op: "${op}", args: [${this.emitExprNode(left)}, ${this.emitExprNode(right)}] }`
+      }
+      case 'query-expr-unary': {
+        const { op, operand } = node as SemanticExprUnaryNode
+        return `{ op: "${op}", args: [${this.emitExprNode(operand)}] }`
+      }
+      case 'query-expr-call': {
+        const { fn, args } = node as SemanticExprCallNode
+        return `{ op: "${fn}", args: [${args.map(a => this.emitExprNode(a)).join(', ')}] }`
+      }
+      default: {
+        return this.emitQueryFieldRef(node as SemanticQueryFieldRefNode)
+      }
+    }
   }
 
   private emitQueryTree(queryNode: SemanticQueryNode): string {

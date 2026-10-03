@@ -226,6 +226,14 @@
       "endCaptures": { "0": { "name": "punctuation.definition.query.end.atscript" } },
       "patterns": [
         {
+          "comment": "Regexp literal after matches (with or without a space): its content is not arithmetic",
+          "match": "\\b(matches)\\s*(/(?![/*])(?:\\\\.|\\[[^\\]`]*\\]|[^/\\\\\\n\\r\\[`])*/[dgimsuy]*)",
+          "captures": {
+            "1": { "name": "keyword.operator.query.atscript" },
+            "2": { "name": "string.regexp.atscript" }
+          }
+        },
+        {
           "comment": "Logical keywords: and, or, not",
           "name": "keyword.operator.logical.atscript",
           "match": "\\b(?:and|or|not)\\b"
@@ -236,9 +244,24 @@
           "match": "\\b(?:in|matches|exists)\\b"
         },
         {
+          "comment": "Ordering keywords (order arguments): asc, desc",
+          "name": "keyword.other.order.atscript",
+          "match": "\\b(?:asc|desc)\\b"
+        },
+        {
+          "comment": "Expression functions (expr arguments): coalesce",
+          "name": "support.function.atscript",
+          "match": "\\bcoalesce(?=\\s*\\()"
+        },
+        {
           "comment": "Symbolic operators: =, !=, >=, <=, >, <",
           "name": "keyword.operator.comparison.atscript",
           "match": "!=|>=|<=|[=><]"
+        },
+        {
+          "comment": "Arithmetic operators (expr arguments): + - * /",
+          "name": "keyword.operator.arithmetic.atscript",
+          "match": "[-+*/]"
         },
         {
           "comment": "Boolean and null constants",

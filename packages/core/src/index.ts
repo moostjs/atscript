@@ -26,3 +26,4 @@ export {
   analyzeQueryCursorContext,
   type TQueryCursorContext,
 } from './lsp/field-refs'
+export { BACKTICK_ARG_VOCABULARY } from './parser/pipes/expr.pipe'
