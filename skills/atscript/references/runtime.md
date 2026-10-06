@@ -20,17 +20,17 @@ All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescr
 
 Every generated `.as` export conforms to this shape (type importable from `@atscript/typescript/utils`):
 
-| Field                                 | Use                                                                                                                                                 |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `__is_atscript_annotated_type: true` | Brand — what `isAnnotatedType()` checks                                                                                                              |
-| `type`                                | Type tree node — dispatch on `type.kind` (see below)                                                                                                 |
-| `metadata`                            | Typed `Map` — `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md))                     |
-| `id?`                                 | Stable type name; used by `buildJsonSchema()` for `$defs`/`$ref`                                                                                     |
-| `optional?`                           | Set when the node is an optional object prop                                                                                                         |
-| `ref?`                                | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it, or `''` for a plain ref (`customer: Customer`, `type X = Y`). Set for same-file and imported targets alike (since 0.1.95) |
-| `validator(opts?)`                    | Constructs `new Validator(this, opts)`. **Not cached.**                                                                                              |
+| Field                                | Use                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__is_atscript_annotated_type: true` | Brand — what `isAnnotatedType()` checks                                                                                                                                                                                                                                                             |
+| `type`                               | Type tree node — dispatch on `type.kind` (see below)                                                                                                                                                                                                                                                |
+| `metadata`                           | Typed `Map` — `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md))                                                                                                                                                                    |
+| `id?`                                | Stable type name; used by `buildJsonSchema()` for `$defs`/`$ref`                                                                                                                                                                                                                                    |
+| `optional?`                          | Set when the node is an optional object prop                                                                                                                                                                                                                                                        |
+| `ref?`                               | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it, or `''` for a plain ref (`customer: Customer`, `type X = Y`). Set for same-file and imported targets alike (since 0.1.95) |
+| `validator(opts?)`                   | Constructs `new Validator(this, opts)`. **Not cached.**                                                                                                                                                                                                                                             |
 
-- `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the *serialized* form.
+- `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the _serialized_ form.
 - `'' (final)` — primitive/literal node. Has `designType`, optional `value`, `tags`.
 - `'object'` — has `props: Map<string, TAtscriptAnnotatedType>`, `propsPatterns`, `tags`.
 - `'array'` — has `of: TAtscriptAnnotatedType`, `tags`.
@@ -38,11 +38,11 @@ Every generated `.as` export conforms to this shape (type importable from `@atsc
 
 ## Runtime vs serialized form
 
-| Concept            | Runtime                                                   | Serialized                                                     |
-| ------------------ | --------------------------------------------------------- | -------------------------------------------------------------- |
-| Ref to another type | `ref: { type: () => Target; field: '…' }`                 | `type: { kind: '$ref', id: 'Target' }` (also `ref` shallow target form when `refDepth` ends in `.5`) |
-| Primitive node     | `type.kind = ''`                                          | `type.kind = ''`                                               |
-| Object node        | `type.kind = 'object'`, `props: Map`                      | `type.kind = 'object'`, `props: Record`                        |
+| Concept             | Runtime                                   | Serialized                                                                                           |
+| ------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Ref to another type | `ref: { type: () => Target; field: '…' }` | `type: { kind: '$ref', id: 'Target' }` (also `ref` shallow target form when `refDepth` ends in `.5`) |
+| Primitive node      | `type.kind = ''`                          | `type.kind = ''`                                                                                     |
+| Object node         | `type.kind = 'object'`, `props: Map`      | `type.kind = 'object'`, `props: Record`                                                              |
 
 ## `defineAnnotatedType`
 
@@ -87,13 +87,29 @@ Kind-dispatched walker. Each handler receives the full `TAtscriptAnnotatedType` 
 import { forAnnotatedType } from '@atscript/typescript/utils'
 
 forAnnotatedType(User, {
-  object(node) { for (const [name, child] of node.type.props) { /* … */ } },
-  array(node)  { /* node.type.of */ },
-  union(node)  { /* node.type.items */ },
-  intersection(node) { /* node.type.items */ },
-  tuple(node)  { /* node.type.items */ },
-  final(node)  { /* primitive — node.type.designType, node.type.value, node.type.tags */ },
-  phantom(node) { /* optional — diverts phantoms away from final */ },
+  object(node) {
+    for (const [name, child] of node.type.props) {
+      /* … */
+    }
+  },
+  array(node) {
+    /* node.type.of */
+  },
+  union(node) {
+    /* node.type.items */
+  },
+  intersection(node) {
+    /* node.type.items */
+  },
+  tuple(node) {
+    /* node.type.items */
+  },
+  final(node) {
+    /* primitive — node.type.designType, node.type.value, node.type.tags */
+  },
+  phantom(node) {
+    /* optional — diverts phantoms away from final */
+  },
 })
 ```
 
@@ -135,6 +151,10 @@ serializeAnnotatedType(Order, { refDepth: 0.5 })
 
 Self-referential FKs handled via the serialized `kind: '$ref'` node.
 
+**Refs inside annotation values (since 0.1.100).** A type reference in an annotation value (`ref` argument getter, class, or `{ type, field }` query field ref) serializes as a shallow target: `{ id }` at `refDepth` 0, `{ id, metadata }` when `refDepth > 0`; refs inside that `metadata` are `{ id }` only (no cycles). Plain objects/arrays recurse, other values pass through. Before 0.1.100 these values were silently dropped from JSON. `SERIALIZE_VERSION` unchanged.
+
+**Repeated named types and `own`.** A named type serializes in full once; later uses are `type: { kind: '$ref', id }`. A later use that carries something of its own — different prop-level `metadata`, `optional`, or FK `ref` (another target type/field, e.g. `customerCode: Customer.code` vs `supplierCode: Supplier.code` sharing alias `Code`) — gets `type: { kind: '$ref', id, own: true }` plus its own `metadata`, `optional` and, when `refDepth > 0`, its use-site `ref`; `deserializeAnnotatedType` builds a separate node over the shared type with that `.ref`. Annotation values compare structurally, type-reference values (`@x Country`) by the type they resolve to (different targets => `own`, same target => collapse), other functions/instances by reference. Uses adding nothing stay `{ kind: '$ref', id }` with empty `metadata` and restore to the same node. `processAnnotation` runs only for the first use and `own` entries. Cyclic plain objects in annotation values serialize the repeat as `'[Circular]'`; BigInt is tolerated.
+
 ### Annotation filtering
 
 ```ts
@@ -162,7 +182,7 @@ Callback args: `key`, `value`, `path: string[]`, `kind` (type kind at node).
 import { User } from './user.as'
 
 const label = User.metadata.get('meta.label') // string | undefined (via AtscriptMetadata)
-const idFlag = User.metadata.get('meta.id')   // boolean — true if this node is a @meta.id member
+const idFlag = User.metadata.get('meta.id') // boolean — true if this node is a @meta.id member
 
 forAnnotatedType(User, {
   object(node) {
@@ -184,7 +204,7 @@ import { User } from './models/user.as'
 
 User.metadata.get('meta.label')
 User.validator().validate(data)
-User.type.kind          // 'object' | 'array' | 'union' | …
+User.type.kind // 'object' | 'array' | 'union' | …
 ```
 
 `.as` resolution: `unplugin-atscript` in bundlers, VSCode extension in editors, or pre-generated `.as.js` on disk (Node ESM with loader).
@@ -201,7 +221,7 @@ Builds a plain data object matching a type's shape. `opts.mode` (default `'empty
 
 ```ts
 import { createDataFromAnnotatedType } from '@atscript/typescript/utils'
-const blank = createDataFromAnnotatedType(Product)                       // empty
+const blank = createDataFromAnnotatedType(Product) // empty
 const sample = createDataFromAnnotatedType(Product, { mode: 'example' })
 ```
 

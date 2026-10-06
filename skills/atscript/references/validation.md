@@ -27,14 +27,18 @@ if (!ok) {
 
 All optional — pass any subset to `.validator(opts)`:
 
-| Option         | Values (default first)                                                                            | Effect                                                                                            |
-| -------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `partial`      | `false` · `true` (top-level only) · `'deep'` (every level) · `(type, path) => boolean`             | Allow missing required fields                                                                       |
-| `unknownProps` | `'error'` · `'strip'` (removes — **mutates the object**) · `'ignore'`                               | How unknown properties are treated                                                                  |
-| `errorLimit`   | `10`                                                                                                | Stop accumulating errors after N                                                                    |
-| `replace`      | `(type, path) => TAtscriptAnnotatedType`                                                            | Substitute the type validated against at a path; results cached per-type via `WeakMap`              |
-| `skipList`     | `Set<string>` of property paths                                                                     | Skip those paths entirely                                                                           |
-| `plugins`      | `TValidatorPlugin[]`                                                                                | Custom checks (see below)                                                                           |
+| Option         | Values (default first)                                                                 | Effect                                                                                 |
+| -------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `partial`      | `false` · `true` (top-level only) · `'deep'` (every level) · `(type, path) => boolean` | Allow missing required fields                                                          |
+| `unknownProps` | `'error'` · `'strip'` (removes — **mutates the object**) · `'ignore'`                  | How unknown properties are treated                                                     |
+| `errorLimit`   | `10`                                                                                   | Stop accumulating errors after N                                                       |
+| `replace`      | `(type, path) => TAtscriptAnnotatedType`                                               | Substitute the type validated against at a path; results cached per-type via `WeakMap` |
+| `skipList`     | `Set<string>` of property paths                                                        | Skip those paths entirely                                                              |
+| `plugins`      | `TValidatorPlugin[]`                                                                   | Custom checks (see below)                                                              |
+
+## Non-finite numbers (since 0.1.100)
+
+Every `number` (plain, optional, `number.int`, `number.timestamp`, union branch, array/tuple item) must be finite: `NaN` / `Infinity` / `-Infinity` fail with `Expected finite number, got NaN` before `@expect.min`/`max`/`int` run. `0`, `-0`, fractions stay valid. Not overridable by annotation. Escape hatch: a `TValidatorPlugin` returning `true` (plugins run before the type check). Upgrade: stored `Infinity` sentinels now fail write validation — use `null`, a bound, or a plugin.
 
 ## `ValidatorError`
 
@@ -45,15 +49,15 @@ try {
   validator.validate(data)
 } catch (e) {
   if (e instanceof ValidatorError) {
-    e.errors  // TError[]
+    e.errors // TError[]
     e.message // summary
   }
 }
 
 interface TError {
-  path: string        // 'user.email', 'cart.items[3].sku'
+  path: string // 'user.email', 'cart.items[3].sku'
   message: string
-  details?: TError[]  // nested errors for structured constraints
+  details?: TError[] // nested errors for structured constraints
 }
 ```
 
@@ -80,12 +84,12 @@ coerceForType(KafkaOffset, 'abc') // → 'abc' — validate afterwards for the p
 
 Converts string input (route params, query strings) toward the annotated type's scalar shapes. Pure, never throws, never validates — always pair with `validate()` after.
 
-| #   | Rule                                                                                                                              |
-| --- | --------------------------------------------------------------------------------------------------------------------------------- |
+| #   | Rule                                                                                                                                                            |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Only strings are converted: number ← `Number()` on trimmed non-empty (finite only); boolean ← `"true"/"1"/"false"/"0"`. `string`/`decimal` input never changed. |
-| 2   | Unions: branches in declared order, first successful parse wins; literal branches must equal the literal after parse.             |
-| 3   | Objects: recurses into props for plain-object input (`@Query()` DTO case). Returns a new object — input never mutated. Arrays/tuples: per item. |
-| 4   | Constraints (`@expect.*`) are NOT checked — coercion is representation-only; unparsable input returns unchanged for `Validator` to report. |
+| 2   | Unions: branches in declared order, first successful parse wins; literal branches must equal the literal after parse.                                           |
+| 3   | Objects: recurses into props for plain-object input (`@Query()` DTO case). Returns a new object — input never mutated. Arrays/tuples: per item.                 |
+| 4   | Constraints (`@expect.*`) are NOT checked — coercion is representation-only; unparsable input returns unchanged for `Validator` to report.                      |
 
 In Moost apps use `coercionPipe` from `@atscript/moost-validator` instead of calling this directly — see [moost-validator.md](moost-validator.md#coercion-rules-coercionpipe).
 
@@ -151,7 +155,7 @@ Custom rules via `plugins: TValidatorPlugin[]`. A plugin is a **function** — n
 type TValidatorPlugin = (
   ctx: TValidatorPluginContext,
   def: TAtscriptAnnotatedType,
-  value: any,
+  value: any
 ) => boolean | undefined
 ```
 

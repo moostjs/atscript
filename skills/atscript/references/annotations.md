@@ -44,17 +44,17 @@ Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints ch
 
 ## `@meta.*`
 
-| Annotation                | Args            | Effect                                                                                              |
-| ------------------------- | --------------- | --------------------------------------------------------------------------------------------------- |
-| `@meta.id`                | _none_          | Primary-key member. Multiple `@meta.id` on different props = composite key. Never `@meta.id(...)`.  |
-| `@meta.label 'text'`      | `string`        | Human label.                                                                                        |
-| `@meta.description 'text'` | `string`       | Description.                                                                                        |
-| `@meta.documentation 'text'` | `string`     | Multi-line docs. `multiple: true` — repeat to accumulate.                                           |
-| `@meta.sensitive`         | _none_          | Sensitive value (plugins mask/redact). Applies to `prop` / `type`.                                  |
-| `@meta.readonly`          | _none_          | Read-only at API/DB layer (plugins decide). Applies to `prop` / `type`.                             |
-| `@meta.required 'msg?'`   | `string?`       | For `string`: rejects empty/whitespace-only. For `boolean`: requires `true`. Optional error message. `defType: ['string', 'boolean']`. |
-| `@meta.default 'value'`   | `string`        | Default. Strings as-is; other types parsed as JSON. Applies to `prop` / `type`.                     |
-| `@meta.example 'value'`   | `string`        | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON. Applies to `prop` / `type`.      |
+| Annotation                   | Args      | Effect                                                                                                                                 |
+| ---------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `@meta.id`                   | _none_    | Primary-key member. Multiple `@meta.id` on different props = composite key. Never `@meta.id(...)`.                                     |
+| `@meta.label 'text'`         | `string`  | Human label.                                                                                                                           |
+| `@meta.description 'text'`   | `string`  | Description.                                                                                                                           |
+| `@meta.documentation 'text'` | `string`  | Multi-line docs. `multiple: true` — repeat to accumulate.                                                                              |
+| `@meta.sensitive`            | _none_    | Sensitive value (plugins mask/redact). Applies to `prop` / `type`.                                                                     |
+| `@meta.readonly`             | _none_    | Read-only at API/DB layer (plugins decide). Applies to `prop` / `type`.                                                                |
+| `@meta.required 'msg?'`      | `string?` | For `string`: rejects empty/whitespace-only. For `boolean`: requires `true`. Optional error message. `defType: ['string', 'boolean']`. |
+| `@meta.default 'value'`      | `string`  | Default. Strings as-is; other types parsed as JSON. Applies to `prop` / `type`.                                                        |
+| `@meta.example 'value'`      | `string`  | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON. Applies to `prop` / `type`.                                         |
 
 Composite key:
 
@@ -74,16 +74,16 @@ export interface MembershipRow {
 
 Validation, translated to JSON Schema. Every `@expect.*` takes an **optional error message** as its last argument.
 
-| Annotation                          | Args                              | Target                                                                   |
-| ----------------------------------- | --------------------------------- | ------------------------------------------------------------------------ |
-| `@expect.min n, 'msg?'`             | `number`, `string?`               | `number` only (`defType: ['number']`)                                    |
-| `@expect.max n, 'msg?'`             | `number`, `string?`               | `number` only                                                            |
-| `@expect.int`                       | _none_                            | `number` (prefer `number.int`)                                           |
+| Annotation                                | Args                           | Target                                                                                                                                                               |
+| ----------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@expect.min n, 'msg?'`                   | `number`, `string?`            | `number` only (`defType: ['number']`)                                                                                                                                |
+| `@expect.max n, 'msg?'`                   | `number`, `string?`            | `number` only                                                                                                                                                        |
+| `@expect.int`                             | _none_                         | `number` (prefer `number.int`)                                                                                                                                       |
 | `@expect.pattern 'pat', 'flags?', 'msg?'` | `string`, `string?`, `string?` | `string`. Pattern is a **string** (not a regex literal). `flags` from a fixed allow-list (`'g'`, `'i'`, `'u'`, combos). `multiple: true`, `mergeStrategy: 'append'`. |
-| `@expect.minLength n, 'msg?'`       | `number`, `string?`               | `string`, arrays (`defType: ['array', 'string']`)                        |
-| `@expect.maxLength n, 'msg?'`       | `number`, `string?`               | `string`, arrays                                                         |
-| `@expect.array.uniqueItems 'msg?'`  | `string?`                         | array props — distinct items (or, with `@expect.array.key`, key-based)   |
-| `@expect.array.key 'msg?'`          | `string?`                         | Identity key inside array element type. Target: `string`/`number`, non-optional. Pair with `uniqueItems` for key-based uniqueness. |
+| `@expect.minLength n, 'msg?'`             | `number`, `string?`            | `string`, arrays (`defType: ['array', 'string']`)                                                                                                                    |
+| `@expect.maxLength n, 'msg?'`             | `number`, `string?`            | `string`, arrays                                                                                                                                                     |
+| `@expect.array.uniqueItems 'msg?'`        | `string?`                      | array props — distinct items (or, with `@expect.array.key`, key-based)                                                                                               |
+| `@expect.array.key 'msg?'`                | `string?`                      | Identity key inside array element type. Target: `string`/`number`, non-optional. Pair with `uniqueItems` for key-based uniqueness.                                   |
 
 `@expect.min` / `@expect.max` apply to `number` only — NOT `decimal`.
 
@@ -105,8 +105,8 @@ export interface Cart {
 
 ## `@emit.*`
 
-| Annotation         | Args   | Effect                                                                              |
-| ------------------ | ------ | ----------------------------------------------------------------------------------- |
+| Annotation         | Args   | Effect                                                                                                                                 |
+| ------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `@emit.jsonSchema` | _none_ | Pre-compute and embed JSON Schema at build time for this interface/type/annotate, regardless of the global `jsonSchema` plugin option. |
 
 ## Merge
@@ -118,6 +118,7 @@ Ref-boundary rules (field referencing another declaration's field, e.g. `ownerId
 1. Precedence is nearest-first: local declaration > nearest ref > deeper refs > resolved type.
 2. Specs with `passedWhenReferred: false` never cross a ref — the referring field does not inherit them. Built-ins flagged: `@meta.id`, `@meta.required`, `@meta.default`, `@meta.readonly` (a field referencing a PK is not a PK; requiredness/defaults/mutability belong to the referring declaration).
 3. `extends`/intersection always inherit the full set — the flag applies only to refs.
+4. Since 0.1.100, `ref` arguments (and `Type.field` query refs) inside an inherited annotation are bound in the inheriting file's generated JS: the missing import is synthesized (aliased `Name_1` on clash), so `target: () => Dict` never throws `ReferenceError`.
 
 ```atscript
 type Email = string.email
@@ -163,13 +164,17 @@ Editor (LSP) hooks on a `TAnnotationArgument` — drive VSCode completion/hover/
 | --------------------------- | ------------------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `fieldScope(argToken, doc)` | `'query'`, `'expr'`, `'order'` | `{ allowedTypes, unqualifiedTarget }` or `undefined` | Types a `Type.field` may name + the type a bare `field` resolves against                                                                   |
 | `fieldScope(argToken, doc)` | `'string'`                     | `{ allowedTypes, unqualifiedTarget }` or `undefined` | String is a (dotted, unqualified) field path of `unqualifiedTarget` → field completion per level, hover, F12, find-refs/rename per segment |
+| `valueScope(annTok, doc)`   | `'string'`, `'number'`         | `TValueCandidate[]`                                  |
 | `refFilter(decl, doc)`      | `'ref'`                        | `boolean`                                            | Filters type-name completion candidates                                                                                                    |
 
 1. `argToken.parentNode` = annotated node; read sibling annotations from `argToken.parentNode.annotations` to derive the scope.
 2. `refFilter`'s `doc` is the document that **declares** `decl` (not the one being edited).
 3. A `fieldScope` answer is final — `undefined` means "no scope", no fallback. For `string` args `allowedTypes` is ignored (pass `[]`).
-4. Built-in `@db.view.filter` / `@db.view.joins` / `@db.rel.filter` scopes in core are a deprecated fallback used only when `fieldScope` is absent (removal: next minor).
-5. Types: `import type { TAnnotationArgument, TQueryScope } from '@atscript/core'`.
+4. Sibling scoping (since 0.1.100): derive the scope from an earlier argument with `argToken.parentNode.annotations.find(a => a.args.includes(argToken))` → `args[0].text`; return `undefined` if missing/not an identifier. Works in `annotate` block entries too. F12 on a `ref` argument jumps to the type (also across imports).
+5. Other spec hooks: `valueScope(annotationToken, doc)` (`'string'`/`'number'` args) returns `TValueCandidate[]` (`{ value, definition?, documentation? }`) — the closed set of values declared elsewhere (e.g. the literals of the annotated union); drives completion and F12 on the argument, advisory only (no validation). `definition` is `{ doc, token }` in the declaring document.
+6. Inside `validate` hooks use `doc.annotatedDefinition(node)` (from `AtscriptDoc`) — not `node.getDefinition()` — to get `{ def, doc }` of the annotated field: it resolves annotate-block entries (incl. nested `addr.status`) to the target property's type and returns the declaring doc, which may be another file. `undefined` if unresolved.
+7. Built-in `@db.view.filter` / `@db.view.joins` / `@db.rel.filter` scopes in core are a deprecated fallback used only when `fieldScope` is absent (removal: next minor).
+8. Types: `import type { TAnnotationArgument, TQueryScope } from '@atscript/core'`.
 
 Full example → [atscript.dev plugin-development/annotation-system](https://atscript.dev/plugin-development/annotation-system#editor-support-for-arguments).
 
@@ -229,8 +234,8 @@ role: 'admin' | 'editor'
 After `asc -f dts`, global `AtscriptMetadata` in `atscript.d.ts` declares precise return types:
 
 ```ts
-const label = User.metadata.get('meta.label')  // string | undefined
-const ids = User.metadata.get('meta.id')       // correct shape
+const label = User.metadata.get('meta.label') // string | undefined
+const ids = User.metadata.get('meta.id') // correct shape
 ```
 
 Never cast to `any`. Stale `atscript.d.ts` → `npx asc -f dts`. See [codegen.md](codegen.md#atscriptdts).

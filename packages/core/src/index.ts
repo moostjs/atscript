@@ -18,6 +18,9 @@ export * from './build'
 export * from './flatten'
 export {
   getQueryScope,
+  getSiblingAnnotation,
+  getValueCandidates,
+  getDeclaredValue,
   resolveQueryFieldRef,
   resolveFieldRefAt,
   getQueryCompletionScope,

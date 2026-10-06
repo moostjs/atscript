@@ -35,6 +35,7 @@ import {
   resolveAtscriptFromPath,
   resolveConfigFile,
   getQueryScope,
+  getDeclaredValue,
   resolveFieldRefAt,
   getQueryCompletionScope,
   getFieldPathCompletionScope,
@@ -318,6 +319,33 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             kind: CompletionItemKind.Value,
           }))
         }
+        // values declared elsewhere in the document (`valueScope`): the literals of a union, say
+        if (arg?.valueScope && (arg.type === 'string' || arg.type === 'number')) {
+          const candidates = arg.valueScope(aContext!.annotationToken, atscript)
+          if (candidates) {
+            // Replace the argument written so far (quotes included — an editor auto-closes
+            // `'` to `''`), so accepting a candidate never doubles the quotes.
+            const typed = aContext!.argToken
+            const range =
+              typed && typed.type === (arg.type === 'string' ? 'text' : 'number')
+                ? typed.range
+                : undefined
+            // Keep the quote character the user typed (`"op` stays double-quoted); `filterText`
+            // matches the typed prefix including its quote, which the editor filters on.
+            const quote = range && text[document.offsetAt(range.start)] === '"' ? '"' : "'"
+            return candidates.map(c => {
+              const newText = arg.type === 'string' ? `${quote}${c.value}${quote}` : c.value
+              return {
+                label: newText,
+                kind: CompletionItemKind.Value,
+                ...(range && { textEdit: { range, newText }, filterText: newText }),
+                ...(c.documentation && {
+                  documentation: { kind: 'markdown', value: c.documentation } as MarkupContent,
+                }),
+              }
+            })
+          }
+        }
         if (arg?.type === 'boolean') {
           return [
             {
@@ -546,7 +574,32 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           } as Hover
         }
       }
-      if (isRef(token.parentNode)) {
+      // Value argument naming a declared value (`valueScope`): hover shows that value
+      const declared = getDeclaredValue(token, atscript)
+      if (declared) {
+        const spec = atscript.resolveAnnotation(token.annotationRef!.text.slice(1))
+        const argType = spec?.arguments[token.index!]?.type
+        const shown = argType === 'string' ? `'${declared.value}'` : declared.value
+        const parts = [`\`${shown}\``]
+        if (declared.documentation) {
+          parts.push(declared.documentation)
+        }
+        if (declared.definition) {
+          const { doc: declaring, token: declToken } = declared.definition
+          const where =
+            declaring === atscript ? '' : ` in \`${getRelPath(atscript.id, declaring.id)}\``
+          parts.push(`Declared${where} at line ${declToken.range.start.line + 1}`)
+        }
+        const argDescription = spec?.renderDocs(token.index!)
+        if (argDescription) {
+          parts.push('---', argDescription)
+        }
+        return {
+          contents: { kind: 'markdown', value: parts.join('\n\n') },
+          range: token.range,
+        } as Hover
+      }
+      if (!token.annotationRef && isRef(token.parentNode)) {
         const unwound = atscript.unwindType(token.parentNode.id!, token.parentNode.chain)
         const def = unwound?.def
         const node = unwound?.node

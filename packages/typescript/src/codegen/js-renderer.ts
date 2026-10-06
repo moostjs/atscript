@@ -67,6 +67,11 @@ const QUERY_OP_MAP: Record<string, string> = {
   'not exists': '$exists',
 }
 
+// Placeholder line in the header; `render()` replaces it with the synthesized imports, which are
+// only complete after the body is rendered. Kept in the header (not emitted by `post()`) because
+// the import position is part of the generated-file snapshots.
+const SYNTH_IMPORTS_MARKER = '/*@@atscript-synth-imports@@*/'
+
 interface TSynthRefInfo {
   alias: string
   ownerDoc: AtscriptDoc
@@ -83,6 +88,9 @@ export class JsRenderer extends BaseRenderer {
   private _refSynthInfo = new Map<SemanticRefNode, TSynthRefInfo>()
   private _synthImports = new Map<string, Array<{ name: string; alias: string }>>()
   private _synthComputed = false
+  private _synthTaken?: Set<string>
+  private _synthAllocated = new Map<string, TSynthRefInfo>()
+  private _synthPathCache = new Map<AtscriptDoc, string | undefined>()
   private _ownerCache = new Map<string, ReturnType<AtscriptDoc['getDeclarationOwnerNode']>>()
 
   constructor(
@@ -201,10 +209,6 @@ export class JsRenderer extends BaseRenderer {
       return
     }
 
-    const taken = new Set<string>(this.doc.registry.definitions.keys())
-    const allocated = new Map<string, TSynthRefInfo>()
-    const synthPathCache = new Map<AtscriptDoc, string | undefined>()
-
     for (const [refNode, originDoc] of refToOriginDoc) {
       const refId = refNode.id
       if (!refId) {
@@ -217,26 +221,71 @@ export class JsRenderer extends BaseRenderer {
       if (ownerInfo.node && isPrimitive(ownerInfo.node)) {
         continue
       }
-      const ownerDoc = ownerInfo.doc
-      let synthPath: string | undefined
-      if (synthPathCache.has(ownerDoc)) {
-        synthPath = synthPathCache.get(ownerDoc)
-      } else {
-        synthPath = this.computeSynthPath(ownerDoc)
-        synthPathCache.set(ownerDoc, synthPath)
-      }
-      if (!synthPath) {
-        continue
-      }
-
-      const allocKey = `${synthPath}::${refId}`
-      let info = allocated.get(allocKey)
+      const info = this.synthBinding(refId, ownerInfo)
       if (!info) {
-        info = this.allocateSynthInfo(refId, synthPath, ownerInfo, taken)
-        allocated.set(allocKey, info)
+        continue
       }
       this._refSynthInfo.set(refNode, info)
     }
+  }
+
+  // Names already bound in this file (locals, user imports, earlier synth aliases).
+  private getSynthTaken(): Set<string> {
+    if (!this._synthTaken) {
+      this._synthTaken = new Set<string>(this.doc.registry.definitions.keys())
+      for (const name of this.doc.importedDefs.keys()) {
+        this._synthTaken.add(name)
+      }
+    }
+    return this._synthTaken
+  }
+
+  // Cached `computeSynthPath` (the value may be `undefined`, so `has` guards the lookup).
+  private getSynthPath(ownerDoc: AtscriptDoc): string | undefined {
+    if (!this._synthPathCache.has(ownerDoc)) {
+      this._synthPathCache.set(ownerDoc, this.computeSynthPath(ownerDoc))
+    }
+    return this._synthPathCache.get(ownerDoc)
+  }
+
+  // Allocates (once per path + name) the binding for a symbol declared in another document.
+  private synthBinding(
+    name: string,
+    ownerInfo: { doc: AtscriptDoc; node?: SemanticNode }
+  ): TSynthRefInfo | undefined {
+    const synthPath = this.getSynthPath(ownerInfo.doc)
+    if (!synthPath) {
+      return undefined
+    }
+    const allocKey = `${synthPath}::${name}`
+    let info = this._synthAllocated.get(allocKey)
+    if (!info) {
+      info = this.allocateSynthInfo(name, synthPath, ownerInfo, this.getSynthTaken())
+      this._synthAllocated.set(allocKey, info)
+    }
+    return info
+  }
+
+  /**
+   * Binding for a type name used by an annotation argument (`ref` / qualified
+   * query field refs). An annotation inherited from another document (chain ref
+   * or `extends`) carries names that only that document imports, so when the
+   * name does not resolve here to the same declaration, a synthesized import is
+   * allocated (lazily, spliced into the header by `render()`).
+   */
+  private annotationTypeName(typeName: string, origin: AtscriptDoc | undefined): string {
+    if (!origin || origin === this.doc) {
+      return typeName
+    }
+    const theirs = this.resolveOwner(origin, typeName)
+    if (!theirs?.doc || !theirs.node || theirs.doc === this.doc || isPrimitive(theirs.node)) {
+      return typeName
+    }
+    const mine = this.resolveOwner(this.doc, typeName)
+    if (mine?.doc === theirs.doc && mine.node === theirs.node) {
+      return typeName
+    }
+    return this.synthBinding(typeName, { doc: theirs.doc, node: theirs.node })?.alias ?? typeName
   }
 
   // Memoize `getDeclarationOwnerNode` across the synth pre-pass and the
@@ -349,12 +398,20 @@ export class JsRenderer extends BaseRenderer {
 
     // Synthesized imports for symbols only reachable through `extends` parent prop trees.
     this.computeSynthesizedImports()
+    this.writeln(SYNTH_IMPORTS_MARKER)
+  }
+
+  override render(): string {
+    const out = super.render()
+    const lines: string[] = []
     for (const [synthPath, names] of this._synthImports) {
       const list = names
         .map(n => (n.alias === n.name ? n.name : `${n.name} as ${n.alias}`))
         .join(', ')
-      this.writeln(`import { ${list} } from "${this.transformFromPath(synthPath)}"`)
+      lines.push(`import { ${list} } from "${this.transformFromPath(synthPath)}"`)
     }
+    const marker = `${SYNTH_IMPORTS_MARKER}\n`
+    return out.replace(marker, () => (lines.length > 0 ? `${lines.join('\n')}\n` : ''))
   }
 
   private buildAdHocMap(annotateNodes: SemanticAnnotateNode[]) {
@@ -1073,36 +1130,41 @@ export class JsRenderer extends BaseRenderer {
     }
   }
 
-  private emitRefValue(text: string): string {
+  private emitRefValue(text: string, origin: AtscriptDoc | undefined): string {
     const dotIdx = text.indexOf('.')
     if (dotIdx === -1) {
-      return `() => ${text}`
+      return `() => ${this.annotationTypeName(text, origin)}`
     }
-    const typeName = text.slice(0, dotIdx)
+    const typeName = this.annotationTypeName(text.slice(0, dotIdx), origin)
     const field = text.slice(dotIdx + 1)
     return `{ type: () => ${typeName}, field: "${escapeQuotes(field)}" }`
   }
 
-  private emitArgValue(aSpec: { type: string }, argToken: Token): string {
+  private emitArgValue(
+    aSpec: { type: string },
+    argToken: Token,
+    origin: AtscriptDoc | undefined
+  ): string {
     if (aSpec.type === 'ref') {
-      return this.emitRefValue(argToken.text)
+      return this.emitRefValue(argToken.text, origin)
     }
     if (aSpec.type === 'query' && argToken.queryNode) {
-      return this.emitQueryTree(argToken.queryNode)
+      return this.emitQueryTree(argToken.queryNode, origin)
     }
     if (aSpec.type === 'expr' && argToken.exprNode) {
-      return this.emitExprNode(argToken.exprNode.expression)
+      return this.emitExprNode(argToken.exprNode.expression, origin)
     }
     if (aSpec.type === 'order' && argToken.orderNode) {
       const items = argToken.orderNode.items.map(
-        item => `{ ref: ${this.emitQueryFieldRef(item.ref)}${item.desc ? ', desc: true' : ''} }`
+        item =>
+          `{ ref: ${this.emitQueryFieldRef(item.ref, origin)}${item.desc ? ', desc: true' : ''} }`
       )
       return `[${items.join(', ')}]`
     }
     return aSpec.type === 'string' ? `"${escapeQuotes(argToken.text)}"` : argToken.text
   }
 
-  private emitExprNode(node: SemanticExprItemNode): string {
+  private emitExprNode(node: SemanticExprItemNode, origin: AtscriptDoc | undefined): string {
     // Discriminate by `entity` (not `instanceof`): the nodes may come from another copy of core
     switch (node.entity as string) {
       case 'query-expr-number': {
@@ -1111,49 +1173,57 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'query-expr-binary': {
         const { op, left, right } = node as SemanticExprBinaryNode
-        return `{ op: "${op}", args: [${this.emitExprNode(left)}, ${this.emitExprNode(right)}] }`
+        return `{ op: "${op}", args: [${this.emitExprNode(left, origin)}, ${this.emitExprNode(right, origin)}] }`
       }
       case 'query-expr-unary': {
         const { op, operand } = node as SemanticExprUnaryNode
-        return `{ op: "${op}", args: [${this.emitExprNode(operand)}] }`
+        return `{ op: "${op}", args: [${this.emitExprNode(operand, origin)}] }`
       }
       case 'query-expr-call': {
         const { fn, args } = node as SemanticExprCallNode
-        return `{ op: "${fn}", args: [${args.map(a => this.emitExprNode(a)).join(', ')}] }`
+        return `{ op: "${fn}", args: [${args.map(a => this.emitExprNode(a, origin)).join(', ')}] }`
       }
       default: {
-        return this.emitQueryFieldRef(node as SemanticQueryFieldRefNode)
+        return this.emitQueryFieldRef(node as SemanticQueryFieldRefNode, origin)
       }
     }
   }
 
-  private emitQueryTree(queryNode: SemanticQueryNode): string {
-    return this.emitQueryExpr(queryNode.expression)
+  private emitQueryTree(queryNode: SemanticQueryNode, origin: AtscriptDoc | undefined): string {
+    return this.emitQueryExpr(queryNode.expression, origin)
   }
 
-  private emitQueryExpr(node: SemanticQueryExprNode): string {
+  private emitQueryExpr(node: SemanticQueryExprNode, origin: AtscriptDoc | undefined): string {
     if (isQueryLogical(node)) {
-      return this.emitQueryLogical(node)
+      return this.emitQueryLogical(node, origin)
     }
-    return this.emitQueryComparison(node as SemanticQueryComparisonNode)
+    return this.emitQueryComparison(node as SemanticQueryComparisonNode, origin)
   }
 
-  private emitQueryLogical(node: import('@atscript/core').SemanticQueryLogicalNode): string {
+  private emitQueryLogical(
+    node: import('@atscript/core').SemanticQueryLogicalNode,
+    origin: AtscriptDoc | undefined
+  ): string {
     if (node.operator === 'not') {
-      return `{ "$not": ${this.emitQueryExpr(node.operands[0])} }`
+      return `{ "$not": ${this.emitQueryExpr(node.operands[0], origin)} }`
     }
     const key = node.operator === 'and' ? '$and' : '$or'
-    const items = node.operands.map(op => this.emitQueryExpr(op)).join(', ')
+    const items = node.operands.map(op => this.emitQueryExpr(op, origin)).join(', ')
     return `{ "${key}": [${items}] }`
   }
 
-  private emitQueryComparison(node: SemanticQueryComparisonNode): string {
-    const left = this.emitQueryFieldRef(node.left)
+  private emitQueryComparison(
+    node: SemanticQueryComparisonNode,
+    origin: AtscriptDoc | undefined
+  ): string {
+    const left = this.emitQueryFieldRef(node.left, origin)
     const mappedOp = QUERY_OP_MAP[node.operator] || node.operator
     const parts = [`left: ${left}`, `op: "${mappedOp}"`]
     if (node.right) {
       if ('fieldRef' in node.right && (node.right as SemanticQueryFieldRefNode).fieldRef) {
-        parts.push(`right: ${this.emitQueryFieldRef(node.right as SemanticQueryFieldRefNode)}`)
+        parts.push(
+          `right: ${this.emitQueryFieldRef(node.right as SemanticQueryFieldRefNode, origin)}`
+        )
       } else if ('values' in node.right && (node.right as SemanticQueryValueListNode).values) {
         const values = (node.right as SemanticQueryValueListNode).values
           .map(v => this.emitQueryLiteral(v))
@@ -1170,10 +1240,13 @@ export class JsRenderer extends BaseRenderer {
     return `{ ${parts.join(', ')} }`
   }
 
-  private emitQueryFieldRef(node: SemanticQueryFieldRefNode): string {
+  private emitQueryFieldRef(
+    node: SemanticQueryFieldRefNode,
+    origin: AtscriptDoc | undefined
+  ): string {
     const parts: string[] = []
     if (node.typeRef) {
-      parts.push(`type: () => ${node.typeRef.text}`)
+      parts.push(`type: () => ${this.annotationTypeName(node.typeRef.text, origin)}`)
     }
     parts.push(`field: "${escapeQuotes(node.fieldRef.text)}"`)
     return `{ ${parts.join(', ')} }`
@@ -1212,6 +1285,7 @@ export class JsRenderer extends BaseRenderer {
     node: SemanticNode,
     an: TAnnotationTokens
   ): { value: string; multiple: boolean } {
+    const origin = this.doc.annotationOrigin(an)
     const spec = this.doc.resolveAnnotation(an.name)
     let targetValue = 'true'
     let multiple: boolean | undefined = false
@@ -1224,14 +1298,14 @@ export class JsRenderer extends BaseRenderer {
           let i = 0
           for (const aSpec of spec.arguments) {
             if (an.args[i]) {
-              targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i])}${i === length - 1 ? '' : ', '} `
+              targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i], origin)}${i === length - 1 ? '' : ', '} `
             }
             i++
           }
           targetValue += '}'
         } else {
           const aSpec = spec.arguments[0]
-          targetValue = an.args[0] ? this.emitArgValue(aSpec, an.args[0]) : 'true'
+          targetValue = an.args[0] ? this.emitArgValue(aSpec, an.args[0], origin) : 'true'
         }
       }
     } else {

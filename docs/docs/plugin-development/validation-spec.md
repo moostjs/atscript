@@ -81,16 +81,16 @@ Every validation call follows this sequence:
 
 Check that the runtime type of the value matches the declared primitive type:
 
-| Declared type | Check                                                                   |
-| ------------- | ----------------------------------------------------------------------- |
-| `string`      | `typeof value === 'string'`                                             |
-| `number`      | `typeof value === 'number'`                                             |
-| `boolean`     | `typeof value === 'boolean'`                                            |
-| `decimal`     | `typeof value === 'string'` AND value matches `^[+-]?\d+(\.\d+)?$`      |
-| `null`        | `value === null`                                                        |
-| `undefined`   | `value === undefined`                                                   |
-| `any`         | Always pass                                                             |
-| `never`       | Always fail                                                             |
+| Declared type | Check                                                                 |
+| ------------- | --------------------------------------------------------------------- |
+| `string`      | `typeof value === 'string'`                                           |
+| `number`      | `typeof value === 'number' && Number.isFinite(value)` (since 0.1.100) |
+| `boolean`     | `typeof value === 'boolean'`                                          |
+| `decimal`     | `typeof value === 'string'` AND value matches `^[+-]?\d+(\.\d+)?$`    |
+| `null`        | `value === null`                                                      |
+| `undefined`   | `value === undefined`                                                 |
+| `any`         | Always pass                                                           |
+| `never`       | Always fail                                                           |
 
 ::: warning Array disambiguation
 In languages where arrays are a subtype of objects (like JavaScript), check for arrays first: `Array.isArray(value) ? 'array' : typeof value`. An array should not match `'object'`.
@@ -114,22 +114,22 @@ The format `^[+-]?\d+(\.\d+)?$` is intentionally strict:
 - **No whitespace, thousands separators, or locale formatting**: those are presentation concerns, not on-wire form.
 - **No `NaN` / `Infinity`**: no DECIMAL column on any supported engine can store these.
 
-| Sample        | Result    |
-| ------------- | --------- |
-| `"0"`         | Pass      |
-| `"0.000"`     | Pass      |
-| `"-12.34"`    | Pass      |
-| `"+5"`        | Pass      |
-| `""`          | Fail      |
-| `".5"`        | Fail      |
-| `"5."`        | Fail      |
-| `"1.2.3"`     | Fail      |
-| `" 1.5 "`     | Fail      |
-| `"1,000"`     | Fail      |
-| `"1e3"`       | Fail      |
-| `"NaN"`       | Fail      |
-| `"-Infinity"` | Fail      |
-| `123` (num)   | Fail      |
+| Sample        | Result |
+| ------------- | ------ |
+| `"0"`         | Pass   |
+| `"0.000"`     | Pass   |
+| `"-12.34"`    | Pass   |
+| `"+5"`        | Pass   |
+| `""`          | Fail   |
+| `".5"`        | Fail   |
+| `"5."`        | Fail   |
+| `"1.2.3"`     | Fail   |
+| `" 1.5 "`     | Fail   |
+| `"1,000"`     | Fail   |
+| `"1e3"`       | Fail   |
+| `"NaN"`       | Fail   |
+| `"-Infinity"` | Fail   |
+| `123` (num)   | Fail   |
 
 Emit `"Expected string (decimal), got <kind>"` when the runtime type is wrong, and `"Invalid decimal format: <value>"` when the type is `string` but the format check fails. The two failures are reported separately so callers can tell "wrong type" from "malformed digit string" apart.
 
@@ -225,7 +225,7 @@ Applied when the value is a valid string:
 
 ### Number Constraints
 
-Applied when the value is a valid number:
+Applied when the value is a valid **finite** number (`NaN` and `±Infinity` are rejected earlier, with `"Expected finite number, got N"`):
 
 | Annotation      | Condition         | Default error                 |
 | --------------- | ----------------- | ----------------------------- |

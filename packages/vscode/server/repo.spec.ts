@@ -1,10 +1,11 @@
 import {
   AnnotationSpec,
   AtscriptDoc,
+  getSiblingAnnotation,
   SemanticInterfaceNode,
   SemanticPrimitiveNode,
 } from '@atscript/core'
-import type { SemanticNode, TAtscriptDocConfig } from '@atscript/core'
+import type { SemanticNode, TAtscriptDocConfig, TValueCandidate, Token } from '@atscript/core'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from 'vitest'
@@ -1087,11 +1088,82 @@ describe('watched .as file changes', () => {
 // Plugin-owned LSP hooks (fieldScope / refFilter)
 // ---------------------------------------------------------------------------
 
+const labels = (r: any) => (r ?? []).map((i: any) => i.label)
+
+/**
+ * Sibling-scoped `fieldScope` hook: resolves the target type from the annotation's first
+ * argument (a plain identifier), the way a plugin pairs `target` with `field` / `filter`.
+ */
+function siblingScope(allowed: (target: string) => string[]) {
+  return (arg: Token) => {
+    const target = getSiblingAnnotation(arg)?.args[0]?.text
+    if (!target || !/^[A-Za-z_]\w*$/.test(target)) {
+      return undefined
+    }
+    return { allowedTypes: allowed(target), unqualifiedTarget: target }
+  }
+}
+
+/**
+ * `valueScope` hook mirroring `@ui.literalLabel`: the candidates are the literals of the
+ * union the annotated node declares (directly or through a type alias), each linked to
+ * the const that declares it.
+ */
+function literalValues(annotationToken: Token, doc: AtscriptDoc): TValueCandidate[] | undefined {
+  const host = doc.annotatedDefinition(annotationToken.parentNode as SemanticNode | undefined)
+  let def = host?.def
+  let declaring = host?.doc ?? doc
+  if (def?.entity === 'ref') {
+    const unwound = declaring.unwindType((def as any).id, (def as any).chain)
+    if (!unwound) {
+      return undefined
+    }
+    def = unwound.def
+    declaring = unwound.doc
+  }
+  if (def?.entity !== 'group') {
+    return undefined
+  }
+  return (def as any).unwrap().flatMap((item: SemanticNode) => {
+    const token = item.entity === 'const' ? item.token('identifier') : undefined
+    return token ? [{ value: token.text, definition: { doc: declaring, token } }] : []
+  })
+}
+
 describe('plugin LSP hooks', () => {
   const refFilter = vi.fn(
     (decl: SemanticNode, _doc: AtscriptDoc) =>
       decl.annotations?.some(a => a.name === 'test.table') ?? false
   )
+  /** `refFilter` of the binding target: an interface that is not an alias. */
+  const isVhTarget = (decl: SemanticNode) =>
+    decl.entity === 'interface' && !decl.annotations?.some(a => a.name === 'test.alias')
+  /** Diagnostics hook: the target must pass the filter, the field must exist on it. */
+  const validateVh = (token: Token, args: Token[], doc: AtscriptDoc) => {
+    const messages: Array<{ message: string; severity: 1; range: Token['range'] }> = []
+    const [targetArg, fieldArg] = args
+    if (!targetArg) {
+      return messages
+    }
+    const owner = doc.getDeclarationOwnerNode(targetArg.text)
+    if (!owner?.node || !isVhTarget(owner.node)) {
+      messages.push({
+        message: `'${targetArg.text}' must be an interface — a value-help dictionary.`,
+        severity: 1,
+        range: targetArg.range,
+      })
+      return messages
+    }
+    const props = (owner.node as SemanticInterfaceNode).props
+    if (fieldArg && !props.has(fieldArg.text)) {
+      messages.push({
+        message: `Field '${fieldArg.text}' does not exist on '${targetArg.text}'`,
+        severity: 1,
+        range: fieldArg.range,
+      })
+    }
+    return messages
+  }
   const hookConfig: TAtscriptDocConfig = {
     primitives,
     annotations: {
@@ -1114,6 +1186,54 @@ describe('plugin LSP hooks', () => {
             type: 'query',
             fieldScope: () => ({ allowedTypes: ['Order', 'Customer'], unqualifiedTarget: 'Order' }),
           },
+        }),
+        alias: new AnnotationSpec({ nodeType: ['interface'] }),
+        // Mirrors `@ui.literalLabel`: `value` is one of the literals of the annotated union
+        lit: new AnnotationSpec({
+          nodeType: ['prop', 'type'],
+          multiple: true,
+          argument: [
+            { name: 'value', type: 'string', valueScope: literalValues },
+            { name: 'label', type: 'string' },
+          ],
+        }),
+        // Value-help style binding (mirrors `@ui.valueHelp`): a `ref` argument with a `refFilter`,
+        // then a `string` field and a `query` filter both scoped by the sibling ref
+        litNum: new AnnotationSpec({
+          nodeType: ['prop', 'type'],
+          argument: [
+            {
+              name: 'value',
+              type: 'number',
+              valueScope: () => [{ value: '10' }, { value: '25' }],
+            },
+          ],
+        }),
+        vh: new AnnotationSpec({
+          description: 'Binds a field to a dictionary target.',
+          nodeType: ['prop', 'type'],
+          argument: [
+            {
+              name: 'target',
+              type: 'ref',
+              description: 'The dictionary interface. Not an alias.',
+              refFilter: isVhTarget,
+            },
+            {
+              name: 'field',
+              type: 'string',
+              description: 'Top-level scalar field of the target.',
+              fieldScope: siblingScope(() => []),
+            },
+            {
+              optional: true,
+              name: 'filter',
+              type: 'query',
+              description: 'Static scope on the target.',
+              fieldScope: siblingScope(target => [target]),
+            },
+          ],
+          validate: validateVh,
         }),
       },
     } as any,
@@ -1267,5 +1387,473 @@ interface Customer {
       ])
     )
     expect(ranges).toHaveLength(2)
+  })
+  describe('sibling-scoped annotation (ref + string field + query filter)', () => {
+    it('completes the string field from the sibling ref target', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh Order, 'am'\n  total: number\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`'am`),
+      })
+      expect(labels(result)).toEqual(['id', 'amount', 'address'])
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          kind: CompletionItemKind.Property,
+          detail: 'field of Order',
+        })
+      )
+    })
+
+    it('completes query fields of the sibling target; other types are out of scope', async () => {
+      const { handlers, at } = hookRepo(
+        "interface Report {\n  @test.vh Order, 'id', `Customer.`\n  total: number\n}"
+      )
+      const afterDot = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at('`Customer.'),
+      })
+      expect(labels(afterDot)).not.toContain('name')
+
+      const bare = hookRepo("interface Report {\n  @test.vh Order, 'id', `am`\n  total: number\n}")
+      const unqualified = await bare.handlers.onCompletion!({
+        textDocument: { uri },
+        position: bare.at('`am'),
+      })
+      expect(labels(unqualified)).toEqual(expect.arrayContaining(['id', 'amount']))
+      expect(labels(unqualified)).not.toContain('name')
+    })
+
+    it('jumps from the ref argument to the interface, and from the field string to the prop', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh Order, 'amount'\n  total: number\n}`
+      )
+      const toRef = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at('@test.vh Order', 10),
+      })
+      expect(toRef[0].targetUri).toBe(uri)
+      expect(toRef[0].targetSelectionRange.start).toEqual(at('interface Order', 10))
+
+      const toField = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at(`'amount'`, 3),
+      })
+      expect(toField[0].targetUri).toBe(uri)
+      expect(toField[0].targetSelectionRange.start).toEqual(at('amount: number', 0))
+    })
+
+    it('hovers the field string as a property of the sibling target', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh Order, 'amount'\n  total: number\n}`
+      )
+      const result = await handlers.onHover!({
+        textDocument: { uri },
+        position: at(`'amount'`, 3),
+      })
+      expect(result.contents.value).toBe('Property of `Order`')
+    })
+
+    it('renames a field in the string argument and in the unqualified query reference', async () => {
+      const { handlers, at } = hookRepo(
+        "interface Report {\n  @test.vh Order, 'amount', `amount > 5`\n  total: number\n}"
+      )
+      const result = await handlers.onRenameRequest!({
+        textDocument: { uri },
+        position: at(`'amount'`, 2),
+        newName: 'sum',
+      })
+      const ranges = result.changes[uri].map((c: any) => c.range)
+      expect(ranges).toEqual(
+        expect.arrayContaining([
+          { start: at(`'amount'`, 1), end: at(`'amount'`, 7) },
+          { start: at('`amount', 1), end: at('`amount', 7) },
+          { start: at('amount: number', 0), end: at('amount: number', 6) },
+        ])
+      )
+      expect(ranges).toHaveLength(3)
+    })
+
+    it('gives no completion and does not throw when the sibling ref is missing', async () => {
+      const { handlers, at } = hookRepo(`interface Report {\n  @test.vh\n  total: number\n}`)
+      await expect(
+        handlers.onCompletion!({
+          textDocument: { uri },
+          position: at('@test.vh'),
+        })
+      ).resolves.not.toThrow()
+    })
+
+    it('gives no field completion when the sibling ref is not an identifier', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh 42, 'am'\n  total: number\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`'am`),
+      })
+      expect(labels(result)).not.toContain('amount')
+    })
+
+    it('gives no field completion when the sibling ref is an unknown type', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh Nope, 'am'\n  total: number\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`'am`),
+      })
+      expect(labels(result)).not.toContain('amount')
+    })
+
+    it('works the same inside an annotate block entry', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  total: number\n}\nannotate Report {\n  @test.vh Order, 'am'\n  total\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.vh Order, 'am`),
+      })
+      expect(labels(result)).toEqual(['id', 'amount', 'address'])
+
+      const hover = await handlers.onHover!({
+        textDocument: { uri },
+        position: at(`@test.vh Order, 'am`, `@test.vh Order, 'am`.length - 1),
+      })
+      expect(hover).toBeDefined()
+
+      const toRef = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at('@test.vh Order', 10),
+      })
+      expect(toRef[0].targetSelectionRange.start).toEqual(at('interface Order', 10))
+    })
+
+    const decls = `@test.alias\ninterface OrderView {\n  id: number\n}\n\ntype Plain = string\n\n`
+
+    it('completes only the targets the refFilter accepts (no alias, no type alias)', async () => {
+      const { handlers, at } = hookRepo(
+        `${decls}interface Report {\n  @test.vh \n  total: number\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at('@test.vh '),
+      })
+      expect(labels(result)).toEqual(expect.arrayContaining(['Order', 'Customer', 'Report']))
+      expect(labels(result)).not.toContain('OrderView')
+      expect(labels(result)).not.toContain('Plain')
+    })
+
+    it('hovers the annotation and the ref argument with their descriptions, and a filter field as a property', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Report {\n  @test.vh Order, 'amount', \`amount > 5\`\n  total: number\n}`
+      )
+      const annotation = await handlers.onHover!({
+        textDocument: { uri },
+        position: at('@test.vh', 4),
+      })
+      expect(annotation.contents.value).toContain('Binds a field to a dictionary target.')
+
+      const target = await handlers.onHover!({
+        textDocument: { uri },
+        position: at('@test.vh Order', 11),
+      })
+      expect(target.contents.value).toContain('The dictionary interface.')
+
+      const filter = await handlers.onHover!({
+        textDocument: { uri },
+        position: at('amount > 5', 2),
+      })
+      // a query argument hovers like the target field it references
+      expect(filter.contents.value).toBe('Property of `Order`')
+    })
+
+    it('reports a bad target and a bad field through the server diagnostics pipeline', async () => {
+      const { repo, connection, doc } = hookRepo(
+        `${decls}interface Report {\n  @test.vh OrderView, 'id'\n  a: number\n  @test.vh Order, 'nope'\n  b: number\n  @test.vh Order, 'amount'\n  c: number\n}`
+      )
+      await repo.checkDoc(doc)
+      const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+      const messages = diagnostics.map((d: any) => d.message)
+      expect(messages).toContain("'OrderView' must be an interface — a value-help dictionary.")
+      expect(messages).toContain("Field 'nope' does not exist on 'Order'")
+      expect(messages.filter((m: string) => m.includes("'amount'"))).toEqual([])
+    })
+
+    it('reports hook diagnostics inside an annotate block without an unknown-property error', async () => {
+      const { repo, connection, doc } = hookRepo(
+        `${decls}interface Report {\n  a: number\n  b: number\n}\nannotate Report {\n  @test.vh OrderView, 'id'\n  a\n  @test.vh Order, 'amount'\n  b\n}`
+      )
+      await repo.checkDoc(doc)
+      const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+      const messages = diagnostics.map((d: any) => d.message)
+      expect(messages).toContain("'OrderView' must be an interface — a value-help dictionary.")
+      expect(messages.filter((m: string) => m.includes('Unknown property'))).toEqual([])
+      expect(messages.filter((m: string) => m.includes("'amount'"))).toEqual([])
+    })
+  })
+  describe('valueScope argument (values declared elsewhere in the document)', () => {
+    const union = `type Status = 'open' | 'in_progress' | 'closed'\n`
+
+    it('completes the literals of the annotated union, quoted', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit 'op', 'Open'\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`'op`),
+      })
+      expect(labels(result)).toEqual([`'open'`, `'closed'`])
+      expect(result[0].kind).toBe(CompletionItemKind.Value)
+    })
+
+    it('completes through a type alias (declared in the same document)', async () => {
+      const { handlers, at } = hookRepo(
+        `${union}interface Ticket {\n  @test.lit 'x'\n  status: Status\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit 'x`),
+      })
+      expect(labels(result)).toEqual([`'open'`, `'in_progress'`, `'closed'`])
+    })
+
+    it('completes in an empty argument position, and not for the second (label) argument', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit ''\n  status: 'a' | 'b'\n}`
+      )
+      const value = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit '`),
+      })
+      expect(labels(value)).toEqual([`'a'`, `'b'`])
+
+      const second = hookRepo(`interface Ticket {\n  @test.lit 'a', 'La'\n  status: 'a' | 'b'\n}`)
+      const label = await second.handlers.onCompletion!({
+        textDocument: { uri },
+        position: second.at(`'La`),
+      })
+      expect(labels(label)).not.toContain(`'a'`)
+    })
+
+    it('offers nothing when the annotated type is not a union', async () => {
+      const { handlers, at } = hookRepo(`interface Ticket {\n  @test.lit 'x'\n  note: string\n}`)
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit 'x`),
+      })
+      expect(labels(result)).toEqual([])
+    })
+
+    it('jumps from the value argument to the literal it names', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit 'closed', 'Done'\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at(`@test.lit 'closed`, 12),
+      })
+      expect(result).toHaveLength(1)
+      expect(result[0].targetUri).toBe(uri)
+      // lands on the `'closed'` literal of the union (the second occurrence), not on the prop
+      expect(result[0].targetSelectionRange.start.line).toBe(at(`status: 'open' | 'closed'`).line)
+      expect(result[0].targetSelectionRange.start.character).toBe(
+        at(`status: 'open' | 'closed'`, `status: 'open' | `.length).character
+      )
+    })
+
+    it('jumps through a type alias to the literal in its declaration', async () => {
+      const { handlers, at } = hookRepo(
+        `${union}interface Ticket {\n  @test.lit 'in_progress', 'WIP'\n  status: Status\n}`
+      )
+      const result = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at(`@test.lit 'in_progress`, 14),
+      })
+      expect(result[0].targetSelectionRange.start.line).toBe(at(`type Status`).line)
+    })
+
+    it('completes inside an annotate block entry, replacing the typed quotes (no doubling)', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  status: 'open' | 'closed'\n}\nannotate Ticket {\n  @test.lit 'op'\n  status\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit 'op`),
+      })
+      expect(labels(result)).toEqual([`'open'`, `'closed'`])
+      // the edit replaces the whole `'op'` (both quotes), so accepting yields `'open'`
+      expect(result[0].textEdit.newText).toBe(`'open'`)
+      expect(result[0].textEdit.range.start).toEqual(at(`@test.lit '`, `@test.lit `.length))
+      expect(result[0].textEdit.range.end).toEqual(at(`@test.lit 'op'`))
+    })
+
+    it('replaces the auto-closed quotes of an empty argument', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit ''\n  status: 'a' | 'b'\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit '`),
+      })
+      expect(result[0].textEdit.newText).toBe(`'a'`)
+      expect(result[0].textEdit.range.start).toEqual(at(`@test.lit `))
+      expect(result[0].textEdit.range.end).toEqual(at(`@test.lit ''`))
+    })
+
+    it('keeps double quotes and sets filterText so the editor still matches the typed prefix', async () => {
+      const typedPrefix = hookRepo(
+        `interface Ticket {\n  @test.lit "op"\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await typedPrefix.handlers.onCompletion!({
+        textDocument: { uri },
+        position: typedPrefix.at(`@test.lit "op`),
+      })
+      expect(labels(result)).toEqual([`"open"`, `"closed"`])
+      expect(result[0].textEdit.newText).toBe(`"open"`)
+      expect(result[0].filterText).toBe(`"open"`)
+      expect(result[0].textEdit.range.start).toEqual(typedPrefix.at(`@test.lit `))
+      expect(result[0].textEdit.range.end).toEqual(typedPrefix.at(`@test.lit "op"`))
+
+      const empty = hookRepo(`interface Ticket {\n  @test.lit ""\n  status: 'a' | 'b'\n}`)
+      const emptyResult = await empty.handlers.onCompletion!({
+        textDocument: { uri },
+        position: empty.at(`@test.lit "`),
+      })
+      expect(emptyResult[0].textEdit.newText).toBe(`"a"`)
+      expect(emptyResult[0].filterText).toBe(`"a"`)
+    })
+
+    it('keeps single quotes with a matching filterText', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit 'op'\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.lit 'op`),
+      })
+      expect(result[0].textEdit.newText).toBe(`'open'`)
+      expect(result[0].filterText).toBe(`'open'`)
+    })
+
+    it('completes number values unquoted, replacing the typed number', async () => {
+      const { handlers, at } = hookRepo(`interface Ticket {\n  @test.litNum 2\n  size: number\n}`)
+      const result = await handlers.onCompletion!({
+        textDocument: { uri },
+        position: at(`@test.litNum 2`),
+      })
+      expect(labels(result)).toEqual(['10', '25'])
+      expect(result[0].textEdit.newText).toBe('10')
+      expect(result[0].filterText).toBe('10')
+      expect(result[0].textEdit.range.start).toEqual(at(`@test.litNum `))
+    })
+
+    describe('annotate block in another file than the union', () => {
+      const aUri = 'file:///proj/a.as'
+      const bUri = 'file:///proj/b.as'
+      const aSrc = `export interface Ticket {\n  status: 'open' | 'closed'\n}`
+      const bSrc = (arg: string) =>
+        `import { Ticket } from './a'\nannotate Ticket {\n  @test.lit ${arg}\n  status\n}`
+      // the union lives in a.as; b.as only imports `Ticket`
+      function twoFiles(arg: string) {
+        const a = createDoc(aUri, aSrc, hookConfig)
+        const b = createDoc(bUri, bSrc(arg), hookConfig)
+        b.updateDependencies([a])
+        const textB = td(bUri, bSrc(arg))
+        const { handlers } = createTestableRepo(
+          new Map([
+            [aUri, td(aUri, aSrc)],
+            [bUri, textB],
+          ]),
+          new Map([
+            [aUri, a],
+            [bUri, b],
+          ])
+        )
+        const text = textB.getText()
+        const at = (needle: string, shift = needle.length) =>
+          textB.positionAt(text.indexOf(needle) + shift)
+        return { handlers, at }
+      }
+
+      it('offers the literals although the union type is not imported', async () => {
+        const { handlers, at } = twoFiles(`'op'`)
+        const result = await handlers.onCompletion!({
+          textDocument: { uri: bUri },
+          position: at(`@test.lit 'op`),
+        })
+        expect(labels(result)).toEqual([`'open'`, `'closed'`])
+      })
+
+      it('jumps to the literal in the other file', async () => {
+        const { handlers, at } = twoFiles(`'closed', 'Done'`)
+        const result = await handlers.onDefinition!({
+          textDocument: { uri: bUri },
+          position: at(`@test.lit 'closed`, 12),
+        })
+        expect(result).toHaveLength(1)
+        expect(result[0].targetUri).toBe(aUri)
+        expect(result[0].targetSelectionRange.start).toEqual({
+          line: 1,
+          character: `  status: 'open' | `.length,
+        })
+      })
+
+      it('hovers with the declaration line of the other file', async () => {
+        const { handlers, at } = twoFiles(`'closed', 'Done'`)
+        const result = await handlers.onHover!({
+          textDocument: { uri: bUri },
+          position: at(`@test.lit 'closed`, 12),
+        })
+        expect(result.contents.value).toMatch(/Declared in `\.\/a` at line 2/)
+      })
+    })
+
+    it('jumps to the literal from inside an annotate block', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  status: 'open' | 'closed'\n}\nannotate Ticket {\n  @test.lit 'closed', 'Done'\n  status\n}`
+      )
+      const result = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at(`@test.lit 'closed`, 12),
+      })
+      expect(result[0].targetSelectionRange.start.line).toBe(at(`status: 'open'`).line)
+    })
+
+    it('hovers a value argument with the literal it names', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit 'closed', 'Done'\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await handlers.onHover!({
+        textDocument: { uri },
+        position: at(`@test.lit 'closed`, 12),
+      })
+      expect(result.contents.value).toContain(`'closed'`)
+      expect(result.contents.value).toContain('Declared at line')
+    })
+
+    it('hovers a value argument inside an annotate block', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  status: 'open' | 'closed'\n}\nannotate Ticket {\n  @test.lit 'open', 'Open'\n  status\n}`
+      )
+      const result = await handlers.onHover!({
+        textDocument: { uri },
+        position: at(`@test.lit 'open`, 12),
+      })
+      expect(result.contents.value).toContain(`'open'`)
+    })
+
+    it('does not jump anywhere new for a value that is not one of the literals', async () => {
+      const { handlers, at } = hookRepo(
+        `interface Ticket {\n  @test.lit 'nope', 'X'\n  status: 'open' | 'closed'\n}`
+      )
+      const result = await handlers.onDefinition!({
+        textDocument: { uri },
+        position: at(`@test.lit 'nope`, 13),
+      })
+      // stays on the argument itself — never on the union's literals
+      expect(result[0].targetSelectionRange.start.line).toBe(at(`@test.lit 'nope`).line)
+    })
   })
 })

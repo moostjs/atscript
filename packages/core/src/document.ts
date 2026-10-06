@@ -8,7 +8,12 @@
 import { isBacktickArgType, resolveAnnotation } from './annotations'
 import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
-import { getQueryScope, resolveFieldPathArgSegments, resolveFieldRefAt } from './lsp/field-refs'
+import {
+  getQueryScope,
+  getDeclaredValue,
+  resolveFieldPathArgSegments,
+  resolveFieldRefAt,
+} from './lsp/field-refs'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
 import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
@@ -307,7 +312,24 @@ export class AtscriptDoc {
   public resolvedAnnotations: Token[] = []
   public annotations: TAnnotationTokens[] = []
 
+  /**
+   * Annotation tokens survive merges across refs, chain refs and `extends`
+   * unchanged, so they are keyed by identity to the document that declared them.
+   */
+  private static readonly annotationOrigins = new WeakMap<TAnnotationTokens, AtscriptDoc>()
+
+  /**
+   * The document in which the given annotation was written (and whose imports
+   * its type-reference arguments resolve against). Annotations inherited into
+   * another document through a chain ref, `extends` or `annotate` keep the
+   * declaring document. `undefined` for annotations never registered on a doc.
+   */
+  annotationOrigin(annotation: TAnnotationTokens): AtscriptDoc | undefined {
+    return AtscriptDoc.annotationOrigins.get(annotation)
+  }
+
   registerAnnotation(annotationTokens: TAnnotationTokens) {
+    AtscriptDoc.annotationOrigins.set(annotationTokens, this)
     this.annotations.push(annotationTokens)
     const mainToken = annotationTokens.token
     const args = annotationTokens.args
@@ -333,6 +355,7 @@ export class AtscriptDoc {
           if (dotIdx > 0) {
             // For chain refs like "User.status", only the type name needs import tracking
             const typeToken = refToken.clone({ text: refToken.text.slice(0, dotIdx) })
+            typeToken.annotationRef = refToken.annotationRef
             typeToken.isReference = true
             this.referred.push(typeToken)
           } else {
@@ -570,6 +593,43 @@ export class AtscriptDoc {
     return block?.blockType === 'annotate' && isAnnotate(block.parentNode)
       ? block.parentNode
       : undefined
+  }
+
+  /**
+   * The definition an annotated node stands for, with the document that declares it:
+   * a prop / type declaration's own definition, or — for an `annotate` block entry —
+   * the type of the target property the entry names (`annotate Host { name @x.y }`
+   * → the type of `Host.name`). Plugin hooks use it to introspect the field an
+   * annotation sits on, whether it is written inline or in an annotate block.
+   * `undefined` when the node has no definition or the entry does not resolve.
+   */
+  annotatedDefinition(
+    node: SemanticNode | undefined
+  ): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+    if (!node) {
+      return undefined
+    }
+    if (!isRef(node)) {
+      const def = node.getDefinition()
+      return def ? { def, doc: this } : undefined
+    }
+    const idToken = node.token('identifier')
+    const block = idToken
+      ? this.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
+      : undefined
+    if (!block) {
+      return { def: node, doc: this }
+    }
+    const chain = [node.id!, ...node.chain.map(c => c.text)]
+    const unwound = this.unwindType(block.targetName, chain)
+    // A leaf union/intersection: unwindType hands back the group itself. When it
+    // actually resolved the full chain (its node id is the last chain member) keep its
+    // own doc — it may live in another file than the one holding the annotate block.
+    if (unwound?.def && (!isGroup(unwound.def) || unwound.node?.id === chain.at(-1))) {
+      return { def: unwound.def, doc: unwound.doc }
+    }
+    const merged = this.resolveChainWithMerge(block.targetName, chain)
+    return merged ? { def: merged, doc: this } : undefined
   }
 
   /**
@@ -996,9 +1056,55 @@ export class AtscriptDoc {
     }
   }
 
+  /** Pushes an "Unknown identifier" error when `t` is not defined; returns whether it was. */
+  private reportUnknownIdentifier(t: Token): boolean {
+    if (this.registry.isDefined(t)) {
+      return false
+    }
+    this._allMessages!.push({
+      severity: 1,
+      message: `Unknown identifier "${t.text}"`,
+      range: t.range,
+    })
+    return true
+  }
+
+  /** Definition link from `token` to `target`, or to what the token resolves to when omitted. */
+  private definitionLink(token: Token, target?: { uri: string; range?: Token['range'] }) {
+    const resolved = target ?? this.toRangeTarget(this.getDefinitionFor(token))
+    if (!resolved) {
+      return undefined
+    }
+    const range = resolved.range ?? zeroRange
+    return [
+      {
+        targetUri: resolved.uri,
+        targetRange: range,
+        targetSelectionRange: range,
+        originSelectionRange: token.range,
+      },
+    ]
+  }
+
+  private toRangeTarget(def?: { uri: string; token?: Token }) {
+    return def && { uri: def.uri, range: def.token?.range }
+  }
+
   getToDefinitionAt(line: number, character: number) {
     const token = this.tokensIndex.at(line, character)
     if (token) {
+      // Type-reference annotation argument (`@x.y Order`): resolve like any type reference.
+      // Checked first — the argument's parent node is the annotated prop (or annotate entry),
+      // which the branches below would mistake for the token's own declaration.
+      if (token.annotationRef && token.isReference) {
+        return this.definitionLink(token)
+      }
+      // Value argument naming a declared value (`valueScope`): jump to where it is declared.
+      // Also first, for the same reason.
+      const declared = getDeclaredValue(token, this)?.definition
+      if (declared) {
+        return this.definitionLink(token, { uri: declared.doc.id, range: declared.token.range })
+      }
       // Annotate entry refs resolve through the target interface
       const annotateBlock = this.annotateBlockAt(line, character)
       if (annotateBlock && isRef(token.parentNode)) {
@@ -1010,17 +1116,12 @@ export class AtscriptDoc {
             ? [entryRef.id!, ...entryRef.chain.slice(0, token.index).map(c => c.text)]
             : [token.text]
         const unwound = this.unwindType(targetName, chain)
-        if (unwound?.node) {
-          return [
-            {
-              targetUri: unwound.doc.id,
-              targetRange: unwound.node.token('identifier')?.range ?? zeroRange,
-              targetSelectionRange: unwound.node.token('identifier')?.range ?? zeroRange,
-              originSelectionRange: token.range,
-            },
-          ]
-        }
-        return undefined
+        return unwound?.node
+          ? this.definitionLink(token, {
+              uri: unwound.doc.id,
+              range: unwound.node.token('identifier')?.range,
+            })
+          : undefined
       }
       // Field refs (query field refs, field-path string args up to the segment under the cursor)
       const fieldRef = resolveFieldRefAt(token, this, character)
@@ -1039,55 +1140,24 @@ export class AtscriptDoc {
       if (isQueryFieldRef(token.parentNode)) {
         const { typeRef, queryArgToken } = token.parentNode
         if (token === typeRef && queryArgToken && getQueryScope(queryArgToken, this)) {
-          const result = this.getDefinitionFor(token)
-          return result
-            ? [
-                {
-                  targetUri: result.uri,
-                  targetRange: result.token?.range ?? zeroRange,
-                  targetSelectionRange: result.token?.range ?? zeroRange,
-                  originSelectionRange: token.range,
-                },
-              ]
-            : undefined
+          return this.definitionLink(token)
         }
         return undefined
       }
       if (isProp(token.parentNode)) {
-        return [
-          {
-            targetUri: this.id,
-            targetRange: token.range,
-            targetSelectionRange: token.range,
-            originSelectionRange: token.range,
-          },
-        ]
+        return this.definitionLink(token, { uri: this.id, range: token.range })
       }
       if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
         const id = token.parentNode.id!
         const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
         if (unwound?.node) {
-          return [
-            {
-              targetUri: unwound.doc.id,
-              targetRange: unwound.node.token('identifier')?.range ?? zeroRange,
-              targetSelectionRange: unwound.node.token('identifier')?.range ?? zeroRange,
-              originSelectionRange: token.range,
-            },
-          ]
+          return this.definitionLink(token, {
+            uri: unwound.doc.id,
+            range: unwound.node.token('identifier')?.range,
+          })
         }
       } else {
-        const result = this.getDefinitionFor(token)
-        return result
-          ? [
-              {
-                targetUri: result.uri,
-                targetRange: result.token?.range ?? zeroRange,
-                targetSelectionRange: result.token?.range ?? zeroRange,
-                originSelectionRange: token.range,
-              },
-            ]
-          : undefined
+        return this.definitionLink(token)
       }
     }
   }
@@ -1347,6 +1417,15 @@ export class AtscriptDoc {
         }
       }
       for (const t of this.referred) {
+        // A type-reference annotation argument (`@x.y Dict`) resolves like any type
+        // reference, wherever it is written — also inside an `annotate` block, where the
+        // enclosing block must not turn it into an entry of the annotate target.
+        // A query field ref's type qualifier (`Country.active`) is likewise a plain type
+        // reference, not an entry of the enclosing annotate target.
+        if (t.annotationRef || isQueryFieldRef(t.parentNode)) {
+          this.reportUnknownIdentifier(t)
+          continue
+        }
         // Annotate entry refs resolve through the target interface
         // e.g. `annotate User { firstName }` → validates firstName as User.firstName
         const annotateBlock = this.annotateBlockAt(t.range.start.line, t.range.start.character)
@@ -1410,12 +1489,7 @@ export class AtscriptDoc {
           }
           continue
         }
-        if (!this.registry.isDefined(t)) {
-          this._allMessages.push({
-            severity: 1,
-            message: `Unknown identifier "${t.text}"`,
-            range: t.range,
-          })
+        if (this.reportUnknownIdentifier(t)) {
           continue
         }
         if (isRef(t.parentNode)) {
@@ -1486,6 +1560,13 @@ export class AtscriptDoc {
       return undefined
     }
     for (const prop of chain) {
+      // A nested prop typed by a named type (`addr: Addr`) holds a ref: walk through it.
+      if (isRef(def)) {
+        def = this.unwindType(def.id!, def.chain)?.def
+        if (!def) {
+          return undefined
+        }
+      }
       def = this.mergeIntersection(def)
       if (isProp(def)) {
         const inner = def.getDefinition()

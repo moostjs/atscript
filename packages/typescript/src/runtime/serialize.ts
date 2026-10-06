@@ -4,6 +4,7 @@ import {
   type TAtscriptTypeFinal,
   type TMetadataMap,
   createAnnotatedTypeNode,
+  isAnnotatedType,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
 import type { Validator } from './validator'
@@ -69,6 +70,13 @@ export interface TSerializedTypeComplex {
 export interface TSerializedTypeRef {
   kind: '$ref'
   id: string
+  /**
+   * The entry's `metadata` / `optional` belong to the referencing node (a prop's own
+   * annotations merged over the type's), not to the first node serialized under `id`.
+   * The deserializer then builds a node of its own over the shared type. The entry then also
+   * carries the use-site `ref` (FK target) when `refDepth` > 0 and the node has one.
+   */
+  own?: true
 }
 
 export type TSerializedTypeDef =
@@ -142,33 +150,177 @@ export function serializeAnnotatedType(
   type: TAtscriptAnnotatedType,
   options?: TSerializeOptions
 ): TSerializedAnnotatedType {
-  const visited = new Set<string>()
+  const visited = new Visited()
   const result = serializeNode(type, [], options, visited) as TSerializedAnnotatedType
   result.$v = SERIALIZE_VERSION
   return result
+}
+
+/**
+ * Named types serialized so far. `own` keeps, per id, the first node serialized under it (and
+ * the `refDepth` it was serialized at); a later reference is compared against it, by a
+ * fingerprint of what it carries (metadata, `optional` and `ref`), to tell a reference that adds
+ * nothing from one whose prop annotations or FK target differ. The first node's key is computed
+ * only when a revisit needs it, and memoized.
+ */
+class Visited extends Set<string> {
+  readonly own = new Map<string, { def: TAtscriptAnnotatedType; refDepth: number }>()
+  private readonly firstKeys = new Map<string, string>()
+  private readonly identities = new WeakMap<object, number>()
+  private nextId = 0
+
+  /** Whether `def` (revisiting its id at `refDepth`) carries something other than the first node. */
+  differsFromFirst(def: TAtscriptAnnotatedType, refDepth: number): boolean {
+    const id = def.id!
+    let first = this.firstKeys.get(id)
+    if (first === undefined) {
+      const { def: firstDef, refDepth: firstDepth } = this.own.get(id)!
+      first = ownKey(firstDef, this, firstDepth)
+      this.firstKeys.set(id, first)
+    }
+    return first !== ownKey(def, this, refDepth)
+  }
+
+  /** Stable per-run identity of a function / class instance (compared by reference). */
+  identity(value: object): number {
+    let id = this.identities.get(value)
+    if (id === undefined) {
+      id = ++this.nextId
+      this.identities.set(value, id)
+    }
+    return id
+  }
+}
+
+/**
+ * A stable, cycle-safe, BigInt-tolerant comparison key of raw annotation values. Plain objects
+ * and arrays compare structurally; a type reference (a getter or an annotated type) by the type it
+ * resolves to, so equal targets collapse and different ones do not; other functions and objects by
+ * identity.
+ */
+function fingerprint(value: unknown, visited: Visited, ancestors = new Set<object>()): string {
+  switch (typeof value) {
+    case 'bigint': {
+      return `${value}n`
+    }
+    case 'string': {
+      return JSON.stringify(value)
+    }
+    case 'function': {
+      const target = resolveAnnotationTarget(value)
+      if (target) {
+        return targetKey(target, visited)
+      }
+      return `fn#${visited.identity(value)}`
+    }
+    case 'object': {
+      if (value === null) {
+        return 'null'
+      }
+      const target = resolveAnnotationTarget(value)
+      if (target) {
+        return targetKey(target, visited)
+      }
+      if (!isPlainOrArray(value)) {
+        return `obj#${visited.identity(value)}`
+      }
+      if (ancestors.has(value)) {
+        return '[circular]'
+      }
+      ancestors.add(value)
+      const body = Array.isArray(value)
+        ? value.map(v => fingerprint(v, visited, ancestors)).join(',')
+        : Object.entries(value)
+            .map(([k, v]) => `${JSON.stringify(k)}:${fingerprint(v, visited, ancestors)}`)
+            .join(',')
+      ancestors.delete(value)
+      return `[${body}]`
+    }
+    default: {
+      return String(value)
+    }
+  }
+}
+
+/** A plain object or an array (as opposed to a class instance), the shapes compared structurally. */
+function isPlainOrArray(value: object): boolean {
+  const proto = Object.getPrototypeOf(value)
+  return Array.isArray(value) || proto === Object.prototype || proto === null
+}
+
+/** Comparison key of a resolved annotation target: its id, else its identity. */
+function targetKey(target: TAtscriptAnnotatedType, visited: Visited): string {
+  return target.id ? `ref#${target.id}` : `ref@${visited.identity(target)}`
+}
+
+/** What a node carries of its own (metadata, optionality, FK target), as a comparison key. */
+function ownKey(def: TAtscriptAnnotatedType, visited: Visited, refDepth: number): string {
+  const entries = [...def.metadata.entries()].map(
+    ([k, v]) => `${JSON.stringify(k)}:${fingerprint(v, visited)}`
+  )
+  const refTarget = refDepth > 0 ? def.ref?.type() : undefined
+  const ref = def.ref && refTarget ? `${refTarget.id ?? ''}.${def.ref.field}` : ''
+  return `${entries.join(',')}|${def.optional ? 1 : 0}|${ref}`
+}
+
+function serializeRef(
+  def: TAtscriptAnnotatedType,
+  options: TSerializeOptions | undefined,
+  visited: Visited
+): TSerializedAnnotatedTypeInner['ref'] {
+  const refDepth = options?.refDepth ?? 0
+  if (refDepth > 0 && def.ref) {
+    const refTarget = def.ref.type()
+    if (refTarget) {
+      return {
+        field: def.ref.field,
+        type:
+          refDepth < 1 && isHalfStep(refDepth)
+            ? (shallowTarget(
+                refTarget,
+                options,
+                { visited, depth: 1 },
+                true
+              ) as TSerializedShallowRefTarget)
+            : serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
+      }
+    }
+  }
+  return undefined
 }
 
 function serializeNode(
   def: TAtscriptAnnotatedType,
   path: string[],
   options: TSerializeOptions | undefined,
-  visited: Set<string>
+  visited: Visited
 ): TSerializedAnnotatedTypeInner {
-  // Cycle detection: if this named type was already serialized, emit a $ref
+  const refDepth = options?.refDepth ?? 0
+  const metadata = () =>
+    serializeMetadata(def.metadata, { path, kind: def.type.kind }, options, { visited, depth: 0 })
+  // Cycle detection: if this named type was already serialized, emit a $ref. A reference
+  // whose own metadata / optionality / ref differ from the first node's (a prop annotation
+  // merged over the type's, another FK target) says so (`own`), so it does not collapse onto
+  // the first node on the way back. A collapsed reference carries no metadata, so
+  // `processAnnotation` is not consulted for it.
   if (def.id && visited.has(def.id)) {
+    const differs = visited.differsFromFirst(def, refDepth)
+    const ref = differs ? serializeRef(def, options, visited) : undefined
     return {
-      type: { kind: '$ref' as const, id: def.id },
-      metadata: {},
+      type: { kind: '$ref' as const, id: def.id, ...(differs ? { own: true as const } : {}) },
+      metadata: differs ? metadata() : {},
       ...(def.optional ? { optional: true } : {}),
       id: def.id,
+      ...(ref ? { ref } : {}),
     }
   }
   if (def.id) {
     visited.add(def.id)
+    visited.own.set(def.id, { def, refDepth })
   }
   const result: TSerializedAnnotatedTypeInner = {
     type: serializeTypeDef(def, path, options, visited),
-    metadata: serializeMetadata(def.metadata, path, def.type.kind, options),
+    metadata: metadata(),
   }
   if (def.optional) {
     result.optional = true
@@ -176,24 +328,10 @@ function serializeNode(
   if (def.id) {
     result.id = def.id
   }
-
-  const refDepth = options?.refDepth ?? 0
-  if (refDepth > 0 && def.ref) {
-    const refTarget = def.ref.type()
-    if (refTarget) {
-      result.ref = {
-        field: def.ref.field,
-        type:
-          refDepth < 1 && isHalfStep(refDepth)
-            ? {
-                id: refTarget.id ?? '',
-                metadata: serializeMetadata(refTarget.metadata, [], refTarget.type.kind, options),
-              }
-            : serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
-      }
-    }
+  const ref = serializeRef(def, options, visited)
+  if (ref) {
+    result.ref = ref
   }
-
   return result
 }
 
@@ -205,7 +343,7 @@ function serializeTypeDef(
   def: TAtscriptAnnotatedType,
   path: string[],
   options: TSerializeOptions | undefined,
-  visited: Set<string>
+  visited: Visited
 ): TSerializedTypeDef {
   return forAnnotatedType<TSerializedTypeDef>(def, {
     phantom(d) {
@@ -273,12 +411,111 @@ function serializeTypeDef(
   })
 }
 
+/**
+ * Resolves a type reference held in an annotation value: an annotated type itself (same-file
+ * refs) or the getter generated for a cross-file ref. Generated getters are zero-arity, plain
+ * synchronous arrow functions (no `prototype`, `Function` constructor); that is the only shape
+ * invoked. Classes, `function` expressions, async/generator functions and any other function
+ * are never called, so serializing never runs user code.
+ */
+function resolveAnnotationTarget(value: unknown): TAtscriptAnnotatedType | undefined {
+  if (isAnnotatedType(value)) {
+    return value
+  }
+  if (
+    typeof value === 'function' &&
+    value.length === 0 &&
+    !Object.prototype.hasOwnProperty.call(value, 'prototype') &&
+    value.constructor === Function
+  ) {
+    const fn = value as () => unknown
+    try {
+      const target = fn()
+      return isAnnotatedType(target) ? target : undefined
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+/**
+ * `{ id }` for a referenced type, plus its metadata (serialized at the next depth, so every
+ * nested reference collapses to `{ id }`) when `withMetadata`.
+ */
+function shallowTarget(
+  target: TAtscriptAnnotatedType,
+  options: TSerializeOptions | undefined,
+  state: { visited: Visited; depth: number },
+  withMetadata: boolean
+): { id: string; metadata?: Record<string, unknown> } {
+  return {
+    id: target.id ?? '',
+    ...(withMetadata
+      ? {
+          metadata: serializeMetadata(
+            target.metadata,
+            { path: [], kind: target.type.kind },
+            options,
+            state
+          ),
+        }
+      : {}),
+  }
+}
+
+/**
+ * Makes an annotation value JSON-safe: type references (a getter or a class, as emitted for `ref`
+ * arguments and qualified query field refs) become shallow targets `{ id, metadata }`
+ * (`refDepth > 0`) or `{ id }` (`refDepth` 0). Inside a shallow target's own metadata (`depth` >= 1)
+ * every reference is `{ id }`, so the output is bounded and cycle-free. Plain objects and arrays
+ * recurse; other values pass unchanged.
+ */
+function serializeAnnotationValue(
+  value: unknown,
+  options: TSerializeOptions | undefined,
+  state: { visited: Visited; depth: number; ancestors?: Set<object> }
+): unknown {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
+    return value
+  }
+  const target = resolveAnnotationTarget(value)
+  if (target) {
+    return shallowTarget(
+      target,
+      options,
+      { visited: state.visited, depth: state.depth + 1 },
+      state.depth === 0 && (options?.refDepth ?? 0) > 0
+    )
+  }
+  if (typeof value === 'function') {
+    return value
+  }
+  if (!isPlainOrArray(value)) {
+    return value
+  }
+  // A cyclic plain object / array cannot be expressed as JSON: cut the cycle.
+  const ancestors = (state.ancestors ??= new Set())
+  if (ancestors.has(value)) {
+    return '[Circular]'
+  }
+  ancestors.add(value)
+  const out = Array.isArray(value)
+    ? value.map(item => serializeAnnotationValue(item, options, state))
+    : Object.fromEntries(
+        Object.entries(value).map(([k, v]) => [k, serializeAnnotationValue(v, options, state)])
+      )
+  ancestors.delete(value)
+  return out
+}
+
 function serializeMetadata(
   metadata: TMetadataMap<AtscriptMetadata>,
-  path: string[],
-  kind: string,
-  options: TSerializeOptions | undefined
+  site: { path: string[]; kind: string },
+  options: TSerializeOptions | undefined,
+  state: { visited: Visited; depth: number }
 ): Record<string, unknown> {
+  const { path, kind } = site
   const result: Record<string, unknown> = {}
   const ignoreSet = options?.ignoreAnnotations ? new Set(options.ignoreAnnotations) : undefined
 
@@ -297,11 +534,11 @@ function serializeMetadata(
       if (processed === undefined || processed === null) {
         continue
       }
-      result[processed.key] = processed.value
+      result[processed.key] = serializeAnnotationValue(processed.value, options, state)
       continue
     }
 
-    result[key as string] = value
+    result[key as string] = serializeAnnotationValue(value, options, state)
   }
 
   return result
@@ -352,18 +589,61 @@ function toMetadataMap(record: Record<string, unknown>): TMetadataMap<AtscriptMe
   return new Map(Object.entries(record)) as TMetadataMap<AtscriptMetadata>
 }
 
+function deserializeRef(
+  data: TSerializedAnnotatedTypeInner,
+  resolved: Map<string, TAtscriptAnnotatedType>
+): { type: () => TAtscriptAnnotatedType; field: string } | undefined {
+  if (!data.ref) {
+    return undefined
+  }
+  const refTargetData = data.ref.type
+  if ('type' in refTargetData) {
+    const deserializedRefTarget = deserializeNode(refTargetData, resolved)
+    return { type: () => deserializedRefTarget, field: data.ref.field }
+  }
+  // Shallow ref: empty props is the "body unavailable" signal; consumers must fetch
+  // the body from the target's own meta endpoint using refTarget.id.
+  const sentinel = createAnnotatedTypeNode(
+    emptyObjectTypeDef(),
+    toMetadataMap(refTargetData.metadata),
+    { id: refTargetData.id || undefined }
+  )
+  return { type: () => sentinel, field: data.ref.field }
+}
+
 function deserializeNode(
   data: TSerializedAnnotatedTypeInner,
   resolved: Map<string, TAtscriptAnnotatedType>
 ): TAtscriptAnnotatedType {
   if (data.type.kind === '$ref') {
-    const refId = (data.type as TSerializedTypeRef).id
-    return (
-      resolved.get(refId) ||
-      createAnnotatedTypeNode(emptyObjectTypeDef(), new Map() as TMetadataMap<AtscriptMetadata>, {
-        id: refId,
-      })
+    const { id: refId, own } = data.type as TSerializedTypeRef
+    const target = resolved.get(refId)
+    if (!own) {
+      return (
+        target ||
+        createAnnotatedTypeNode(emptyObjectTypeDef(), new Map() as TMetadataMap<AtscriptMetadata>, {
+          id: refId,
+        })
+      )
+    }
+    // A node of its own (the referencing prop's annotations) over the shared type. The type is
+    // read through the target, which may still be under construction (a cyclic reference).
+    const node = createAnnotatedTypeNode(
+      target?.type ?? emptyObjectTypeDef(),
+      toMetadataMap(data.metadata),
+      { id: refId, optional: data.optional || undefined, ref: deserializeRef(data, resolved) }
     )
+    if (target) {
+      Object.defineProperty(node, 'type', {
+        get: () => target.type,
+        set: v => {
+          target.type = v
+        },
+        enumerable: true,
+        configurable: true,
+      })
+    }
+    return node
   }
 
   const metadata = toMetadataMap(data.metadata)
@@ -384,23 +664,7 @@ function deserializeNode(
 
   const type = deserializeTypeDef(data.type, resolved)
 
-  let ref: { type: () => TAtscriptAnnotatedType; field: string } | undefined
-  if (data.ref) {
-    const refTargetData = data.ref.type
-    if ('type' in refTargetData) {
-      const deserializedRefTarget = deserializeNode(refTargetData, resolved)
-      ref = { type: () => deserializedRefTarget, field: data.ref.field }
-    } else {
-      // Shallow ref: empty props is the "body unavailable" signal; consumers must fetch
-      // the body from the target's own meta endpoint using refTarget.id.
-      const sentinel = createAnnotatedTypeNode(
-        emptyObjectTypeDef(),
-        toMetadataMap(refTargetData.metadata),
-        { id: refTargetData.id || undefined }
-      )
-      ref = { type: () => sentinel, field: data.ref.field }
-    }
-  }
+  const ref = deserializeRef(data, resolved)
 
   if (result) {
     result.type = type

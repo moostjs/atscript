@@ -803,6 +803,31 @@ describe('document', () => {
     expect(merged[1].args[0]!.text).toBe('[a-z]+')
   })
 
+  it('keeps both the referenced type and the prop entries of an append annotation across a ref', () => {
+    const mulAppend = new AnnotationSpec({
+      multiple: true,
+      mergeStrategy: 'append',
+      argument: { name: 'value', type: 'string' },
+    })
+    const doc = new AtscriptDoc('file-1.as', { primitives, annotations: { mulAppend } })
+    doc.update(`
+    @mulAppend 'type-1'
+    @mulAppend 'type-2'
+    export type Shared = string
+
+    export interface Holder {
+      @mulAppend 'own-1'
+      field: Shared
+    }
+`)
+    const holder = doc.nodes.find(n => n.id === 'Holder')!.getDefinition() as SemanticInterfaceNode
+    const merged = doc.evalAnnotationsForNode(holder.props.get('field')!)
+    const values = merged!.filter(a => a.name === 'mulAppend').map(a => a.args[0]!.text)
+    // Both sets survive; the order consumers see is pinned on the emitted metadata
+    // (typescript plugin.spec.ts): the referenced type's entries first, then the prop's own.
+    expect([...values].sort()).toEqual(['own-1', 'type-1', 'type-2'])
+  })
+
   it('should respect append strategy when merging mutating annotate annotations', () => {
     const mulAppend = new AnnotationSpec({
       multiple: true,
@@ -1191,5 +1216,85 @@ describe('document/merging intersections', () => {
         message: expect.stringContaining('container type'),
       })
     )
+  })
+})
+
+describe('document/annotate blocks with query args and leaf unions', () => {
+  const queryAnn = new AnnotationSpec({
+    argument: [
+      { name: 'target', type: 'ref' },
+      {
+        name: 'filter',
+        type: 'query',
+        optional: true,
+        fieldScope: () => ({ allowedTypes: ['Dict'], unqualifiedTarget: 'Dict' }),
+      },
+    ],
+  })
+  const cfg = { primitives, annotations: { some: { q: queryAnn } } } as never
+  const DICT = 'export interface Dict {\n  code: string\n  active: string\n}\n'
+
+  it('does not validate a qualified query field ref as an annotate entry', () => {
+    const doc = new AtscriptDoc('file:///p/q.as', cfg)
+    doc.update(
+      `${DICT}interface Host {\n  name: string\n}\nannotate Host {\n  @some.q Dict, \`Dict.active = 'x'\`\n  name\n}`
+    )
+    expect(doc.getDiagMessages().map(m => m.message)).toEqual([])
+  })
+
+  it('still reports an unknown qualifier type in a query inside an annotate block', () => {
+    const doc = new AtscriptDoc('file:///p/q2.as', cfg)
+    doc.update(
+      `${DICT}interface Host {\n  name: string\n}\nannotate Host {\n  @some.q Dict, \`Nope.active = 'x'\`\n  name\n}`
+    )
+    expect(doc.getDiagMessages().some(m => m.message.includes('Nope'))).toBe(true)
+    expect(doc.getDiagMessages().some(m => m.message.includes('Unknown property "Nope"'))).toBe(
+      false
+    )
+  })
+
+  it('annotatedDefinition keeps the declaring doc of a leaf union across files', () => {
+    const model = new AtscriptDoc('file:///p/model.as', cfg)
+    model.update(`export interface Host {\n  name: string\n  st: 'aa' | 'bb'\n}`)
+    const main = new AtscriptDoc('file:///p/main.as', cfg)
+    main.update(`import { Host } from './model'\nannotate Host {\n  @some.q Host\n  st\n}`)
+    main.updateDependencies([model])
+    const host = main.annotatedDefinition(main.annotations[0].token.parentNode)
+    expect(host?.doc.id).toBe('file:///p/model.as')
+    expect(isGroup(host!.def)).toBe(true)
+  })
+
+  const NESTED = `type Status = 'open' | 'closed'
+interface Addr {
+  status: Status
+  city: string
+}
+interface Host {
+  addr: Addr
+  inline: { st: Status }
+}
+`
+
+  it('resolves an annotate entry on a nested union leaf', () => {
+    const doc = new AtscriptDoc('file:///p/n1.as', cfg)
+    doc.update(
+      `${NESTED}annotate Host {\n  @some.q Host\n  addr.status\n  @some.q Host\n  inline.st\n}`
+    )
+    expect(doc.getDiagMessages().map(m => m.message)).toEqual([])
+  })
+
+  it('still reports an unknown nested property behind a ref', () => {
+    const doc = new AtscriptDoc('file:///p/n2.as', cfg)
+    doc.update(`${NESTED}annotate Host {\n  addr.nope\n}`)
+    expect(
+      doc.getDiagMessages().some(m => m.message.includes('Unknown property "addr.nope"'))
+    ).toBe(true)
+  })
+
+  it('annotatedDefinition resolves a nested union leaf entry', () => {
+    const doc = new AtscriptDoc('file:///p/n3.as', cfg)
+    doc.update(`${NESTED}annotate Host {\n  @some.q Host\n  addr.status\n}`)
+    const host = doc.annotatedDefinition(doc.annotations[0].token.parentNode)
+    expect(isGroup(host!.def)).toBe(true)
   })
 })

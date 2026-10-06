@@ -372,3 +372,90 @@ describe('Validator external context', () => {
     expect(seen).toBeUndefined()
   })
 })
+
+describe('Validator non-finite numbers', () => {
+  const bad = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]
+  const expectRejected = (validator: Validator<any>, value: unknown, msg: string) => {
+    expect(validator.validate(value, true)).toBe(false)
+    expect(validator.errors[0]?.message).toBe(msg)
+  }
+  const num = () => defineAnnotatedType().designType('number')
+
+  it.each(bad)('rejects %s for plain number with exact message', n => {
+    expectRejected(new Validator(num().$type), n, `Expected finite number, got ${n}`)
+  })
+
+  it('rejects non-finite for optional number (non-null value)', () => {
+    const t = defineAnnotatedType('object').prop('n', num().optional().$type)
+    const v = new Validator(t.$type)
+    for (const n of bad) {
+      expect(v.validate({ n }, true)).toBe(false)
+      expect(v.errors[0]).toMatchObject({
+        path: 'n',
+        message: `Expected finite number, got ${n}`,
+      })
+    }
+    expect(v.validate({}, true)).toBe(true)
+    expect(v.validate({ n: undefined }, true)).toBe(true)
+  })
+
+  it('rejects non-finite with min, max and int', () => {
+    const min = new Validator(num().annotate('expect.min', { minValue: 0 } as any).$type)
+    const max = new Validator(num().annotate('expect.max', { maxValue: 10 } as any).$type)
+    const int = new Validator(num().annotate('expect.int', true).$type)
+    for (const n of bad) {
+      for (const v of [min, max, int]) {
+        expectRejected(v, n, `Expected finite number, got ${n}`)
+      }
+    }
+  })
+
+  it('rejects non-finite for number.timestamp-style number primitives', () => {
+    const t = num().tags('number', 'timestamp', 'number.timestamp').$type
+    const v = new Validator(t)
+    for (const n of bad) {
+      expectRejected(v, n, `Expected finite number, got ${n}`)
+    }
+    expect(v.validate(1_700_000_000_000, true)).toBe(true)
+  })
+
+  it('rejects non-finite in union, array and tuple items', () => {
+    const union = new Validator(
+      defineAnnotatedType('union')
+        .item(num().$type)
+        .item(defineAnnotatedType().designType('string').$type).$type
+    )
+    const arr = new Validator(defineAnnotatedType('array').of(num().$type).$type)
+    const tuple = new Validator(
+      defineAnnotatedType('tuple')
+        .item(defineAnnotatedType().designType('string').$type)
+        .item(num().$type).$type
+    )
+    for (const n of bad) {
+      expect(union.validate(n, true)).toBe(false)
+      expect(arr.validate([1, n], true)).toBe(false)
+      expect(arr.errors[0]).toMatchObject({
+        path: '1',
+        message: `Expected finite number, got ${n}`,
+      })
+      expect(tuple.validate(['a', n], true)).toBe(false)
+      expect(tuple.errors[0]?.message).toBe(`Expected finite number, got ${n}`)
+    }
+    expect(union.validate('x', true)).toBe(true)
+  })
+
+  it('keeps 0, -0, fractions and extremes valid', () => {
+    const v = new Validator(num().$type)
+    for (const n of [0, -0, 1.5, -2.25, Number.MAX_VALUE, Number.MIN_VALUE]) {
+      expect(v.validate(n, true)).toBe(true)
+    }
+  })
+
+  it('lets a plugin opt in to non-finite values', () => {
+    const allow: TValidatorPlugin = (_ctx, _def, value) =>
+      typeof value === 'number' && !Number.isFinite(value) ? true : undefined
+    const v = new Validator(num().$type, { plugins: [allow] })
+    expect(v.validate(Number.NaN, true)).toBe(true)
+    expect(v.validate(Number.POSITIVE_INFINITY, true)).toBe(true)
+  })
+})

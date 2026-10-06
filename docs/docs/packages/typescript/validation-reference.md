@@ -89,6 +89,12 @@ Semantic types like `string.email`, `string.required`, and `number.positive` add
 Values typed as `decimal` are stored as strings to preserve precision. The validator enforces the regex `/^[+-]?\d+(\.\d+)?$/` — anything else (NaN, scientific notation, leading/trailing whitespace) is rejected with `Invalid decimal format`.
 :::
 
+::: warning Non-finite numbers are rejected (since 0.1.100)
+Every `number` (including `number.int`, `number.timestamp`, optional fields, union branches, array and tuple items) must be finite. `NaN`, `Infinity` and `-Infinity` fail with `Expected finite number, got NaN` (or `Infinity` / `-Infinity`), before `@expect.min` / `@expect.max` / `@expect.int` run. `0`, `-0` and fractions stay valid. The message is not overridable by annotation.
+
+**Upgrading:** data that intentionally stored `Infinity` (for example an "unlimited" sentinel) now fails write validation — use `null`, an explicit bound, or a validator plugin that returns `true` for the value (plugins run before the type check). Validation of already-stored data is unaffected unless you validate it.
+:::
+
 ## Array Uniqueness
 
 `@expect.array.uniqueItems` and `@expect.array.key` work together:
@@ -174,18 +180,16 @@ The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, and
 
 Plugins may push their own structured errors into the active validator via `ctx.error(message, path?, details?)`:
 
-| Argument  | Type      | Notes                                                                                  |
-| --------- | --------- | -------------------------------------------------------------------------------------- |
-| `message` | `string`  | Required. Becomes the `message` of a `TError` entry.                                   |
-| `path`    | `string?` | Optional. Defaults to the current dot-separated path being validated.                  |
+| Argument  | Type        | Notes                                                                              |
+| --------- | ----------- | ---------------------------------------------------------------------------------- |
+| `message` | `string`    | Required. Becomes the `message` of a `TError` entry.                               |
+| `path`    | `string?`   | Optional. Defaults to the current dot-separated path being validated.              |
 | `details` | `TError[]?` | Optional. Nested error breakdown — useful when an alternative-tested branch fails. |
 
 ```typescript
 const requirePositiveAmount: TValidatorPlugin = (ctx, def, value) => {
   if (def.metadata.get('meta.label') === 'Amount' && typeof value === 'number' && value <= 0) {
-    ctx.error('Amount must be positive', ctx.path, [
-      { path: ctx.path, message: `Got ${value}` },
-    ])
+    ctx.error('Amount must be positive', ctx.path, [{ path: ctx.path, message: `Got ${value}` }])
     return false
   }
   return undefined

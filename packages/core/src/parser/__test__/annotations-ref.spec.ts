@@ -18,6 +18,9 @@ const stringAnnotation = new AnnotationSpec({
   argument: { name: 'value', type: 'string' },
 })
 
+const unknownTypeErrors = (doc: AtscriptDoc, name: string) =>
+  doc.getDiagMessages().filter(m => m.message.includes(name))
+
 describe('ref annotation arguments', () => {
   describe('parser', () => {
     it('parses simple identifier as annotation argument', () => {
@@ -219,6 +222,107 @@ interface PostTag {
       const refTokens = doc.referred.filter(t => t.text === 'PostTag')
       expect(refTokens.length).toBeGreaterThan(0)
       expect(refTokens[0].isReference).toBe(true)
+    })
+  })
+  describe('imported and unknown targets', () => {
+    const config = { primitives, annotations: { some: { ref: refAnnotation } } }
+    const importing = (main: string, model = 'export interface Dict {\n  code: string\n}') => {
+      const modelDoc = new AtscriptDoc('file:///proj/dict.as', config)
+      modelDoc.update(model)
+      const mainDoc = new AtscriptDoc('file:///proj/main.as', config)
+      mainDoc.update(main)
+      mainDoc.updateDependencies([modelDoc])
+      return { mainDoc, modelDoc }
+    }
+
+    it('a ref arg resolving to an imported type produces no unknown-type diagnostic', () => {
+      const { mainDoc } = importing(
+        `import { Dict } from './dict'\ninterface Host {\n  @some.ref Dict\n  name: string\n}`
+      )
+      expect(unknownTypeErrors(mainDoc, 'Dict')).toHaveLength(0)
+    })
+
+    it('a ref arg with an unknown name produces a diagnostic', () => {
+      const { mainDoc } = importing(`interface Host {\n  @some.ref Missing\n  name: string\n}`)
+      expect(unknownTypeErrors(mainDoc, 'Missing').length).toBeGreaterThan(0)
+    })
+
+    it('go-to-definition on an imported ref arg lands on the declaring document', () => {
+      const { mainDoc, modelDoc } = importing(
+        `import { Dict } from './dict'\ninterface Host {\n  @some.ref Dict\n  name: string\n}`
+      )
+      const result = mainDoc.getToDefinitionAt(2, '  @some.ref Di'.length)
+      expect(result).toHaveLength(1)
+      expect(result![0].targetUri).toBe(modelDoc.id)
+      expect(result![0].targetSelectionRange.start.line).toBe(0)
+    })
+
+    it('go-to-definition on a local ref arg lands on the declaration (not on itself)', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(
+        `interface Host {\n  @some.ref Tag\n  name: string\n}\ninterface Tag {\n  id: number\n}`
+      )
+      const result = doc.getToDefinitionAt(1, '  @some.ref Ta'.length)
+      expect(result![0].targetSelectionRange.start.line).toBe(4)
+    })
+
+    it('records the declaring document of an annotation (annotationOrigin)', () => {
+      const { mainDoc, modelDoc } = importing(
+        `import { Dict } from './dict'\ninterface Host {\n  @some.ref Dict\n  name: string\n}`,
+        `export interface Dict {\n  @some.ref Dict\n  code: string\n}`
+      )
+      const own = mainDoc.annotations[0]
+      expect(mainDoc.annotationOrigin(own)).toBe(mainDoc)
+      expect(modelDoc.annotationOrigin(modelDoc.annotations[0])).toBe(modelDoc)
+      // lookup works from any document (annotations keep their declaring doc across refs)
+      expect(mainDoc.annotationOrigin(modelDoc.annotations[0])).toBe(modelDoc)
+    })
+  })
+  describe('inside annotate blocks', () => {
+    const config = { primitives, annotations: { some: { ref: refAnnotation } } }
+
+    it('a ref arg in an annotate entry resolves as a type, not as a property of the target', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(
+        `interface Dict {\n  code: string\n}\ninterface Host {\n  name: string\n}\nannotate Host {\n  @some.ref Dict\n  name\n}`
+      )
+      expect(doc.getDiagMessages().filter(m => m.severity === 1)).toEqual([])
+    })
+
+    it('an unknown ref arg in an annotate entry reports an unknown identifier', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(
+        `interface Host {\n  name: string\n}\nannotate Host {\n  @some.ref Missing\n  name\n}`
+      )
+      const messages = doc.getDiagMessages().map(m => m.message)
+      expect(messages).toContain('Unknown identifier "Missing"')
+      expect(messages.some(m => m.includes('Unknown property'))).toBe(false)
+    })
+
+    it('a chain ref arg in an annotate entry is not read as an entry chain', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(
+        `interface Dict {\n  code: string\n}\ninterface Host {\n  name: string\n}\nannotate Host {\n  @some.ref Dict.code\n  name\n}`
+      )
+      expect(doc.getDiagMessages().filter(m => m.severity === 1)).toEqual([])
+    })
+
+    it('annotatedDefinition resolves an annotate entry to the target property type', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(
+        `interface Host {\n  status: 'a' | 'b'\n  name: string\n}\nannotate Host {\n  @some.ref Host\n  status\n}`
+      )
+      const entry = doc.annotations.find(a => a.name === 'some.ref')!.token.parentNode
+      const host = doc.annotatedDefinition(entry)
+      expect(host?.def.entity).toBe('group')
+      expect(host?.doc).toBe(doc)
+    })
+
+    it('annotatedDefinition returns the own definition for an inline prop', () => {
+      const doc = new AtscriptDoc('test', config)
+      doc.update(`interface Host {\n  @some.ref Host\n  name: string\n}`)
+      const prop = doc.annotations[0].token.parentNode
+      expect(doc.annotatedDefinition(prop)?.def.entity).toBe('ref')
     })
   })
 })

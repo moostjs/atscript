@@ -2,6 +2,7 @@ import type {
   TAnnotationArgument,
   TBacktickArgKind,
   TQueryScope,
+  TValueCandidate,
 } from '../annotations/annotation-spec'
 import type { AtscriptDoc } from '../document'
 import {
@@ -12,6 +13,7 @@ import {
   type SemanticNode,
   type SemanticPropNode,
   type SemanticQueryFieldRefNode,
+  type TAnnotationTokens,
 } from '../parser/nodes'
 import { BACKTICK_ARG_VOCABULARY, ORDER_DIRECTIONS } from '../parser/pipes/expr.pipe'
 import { SYMBOLIC_OPS, VALUE_KEYWORDS } from '../parser/pipes/query.pipe'
@@ -35,12 +37,56 @@ interface TFieldPathSegment {
   range: Token['range']
 }
 
+function getArgSpecAt(
+  annotationToken: Token,
+  index: number,
+  doc: AtscriptDoc
+): TAnnotationArgument | undefined {
+  return doc.resolveAnnotation(annotationToken.text.slice(1))?.arguments[index]
+}
+
 function getArgSpec(argToken: Token, doc: AtscriptDoc): TAnnotationArgument | undefined {
   const annotationRef = argToken.annotationRef
   if (!annotationRef || typeof argToken.index !== 'number') {
     return undefined
   }
-  return doc.resolveAnnotation(annotationRef.text.slice(1))?.arguments[argToken.index]
+  return getArgSpecAt(annotationRef, argToken.index, doc)
+}
+
+/**
+ * The annotation an argument token belongs to, found among the annotations of the annotated
+ * node (`argToken.parentNode`, a prop or an annotate entry). For `fieldScope` hooks that scope
+ * an argument by its siblings (`getSiblingAnnotation(arg)?.args[0]?.text`).
+ */
+export function getSiblingAnnotation(argToken: Token): TAnnotationTokens | undefined {
+  return (argToken.parentNode as SemanticNode | undefined)?.annotations?.find(a =>
+    a.args.includes(argToken)
+  )
+}
+
+/**
+ * The values an annotation argument may take, from the `valueScope` hook of its spec
+ * (`undefined` when the argument declares none or the set cannot be determined).
+ */
+export function getValueCandidates(
+  annotationToken: Token,
+  argIndex: number,
+  doc: AtscriptDoc
+): TValueCandidate[] | undefined {
+  return getArgSpecAt(annotationToken, argIndex, doc)?.valueScope?.(annotationToken, doc)
+}
+
+/**
+ * The declared value a value-argument token names (`valueScope`), or `undefined` when the token
+ * is not a value argument or names no candidate.
+ */
+export function getDeclaredValue(token: Token, doc: AtscriptDoc): TValueCandidate | undefined {
+  if (!token.annotationRef || typeof token.index !== 'number' || token.isReference) {
+    return undefined
+  }
+  return getValueCandidates(token.annotationRef, token.index, doc)?.find(
+    c => c.value === token.text
+  )
 }
 
 /**

@@ -56,6 +56,21 @@ import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
 
 FK references (`.ref`) are stripped from serialized output by default. Pass `refDepth: 1` to include immediate refs when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields). Integer values expand `N` full levels; a fractional `.5` part (e.g. `refDepth: 0.5` or `refDepth: 1.5`) emits a shallow `{ id, metadata }` target at the tail level instead of the full body — handy for keeping payloads small when the client only needs the target's identity. Plain references (nav props such as `customer: Customer`) carry `ref` too, not only chain refs — see [The Annotated Type](/packages/typescript/type-definitions#the-annotated-type). For the full ref-control semantics, see the [`@atscript/db` docs](https://db.atscript.dev).
 
+### Type references inside annotation values (since 0.1.100)
+
+Annotation values that hold a type reference — a `ref` argument (`target: () => Dict`) or the `{ type, field }` of a qualified query field — are serialized as shallow targets instead of disappearing from the JSON:
+
+| `refDepth`              | Serialized reference                                                         |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `0` (default)           | `{ id: 'Dict' }`                                                             |
+| `> 0` (e.g. `0.5`, `1`) | `{ id: 'Dict', metadata: { … } }` — the target's interface-level annotations |
+
+References inside that `metadata` are always `{ id }`, so the output is bounded and cycle-free. A chain ref such as `AttributeValue.value` serializes as `{ type: { id, metadata }, field: 'value' }`, the same shape as a prop's shallow `ref`. Plain objects and arrays are walked; every other value is left as is. A function is treated as a type-reference getter only when it is a zero-arity, plain synchronous arrow function (the shape the generated code emits); classes, `function` expressions, async functions and other functions are never invoked. `SERIALIZE_VERSION` is unchanged: these values used to serialize to nothing, and `deserializeAnnotatedType` keeps them as plain records.
+
+### A named type used more than once
+
+A named type (a node with an `id`) is serialized in full once; every further use is a `{ kind: '$ref', id }` entry, which also keeps cyclic types finite. When a later use carries something of its own — prop-level annotations merged over the type's, its own `optional`, or its own FK `ref` (another target field, or another target type that shares the alias type, as `customerCode: Customer.code` and `supplierCode: Supplier.code` do) — the entry is marked `own: true` and carries that use's `metadata`, `optional` and, when `refDepth` > 0, its `ref`. `deserializeAnnotatedType` then builds a separate node over the shared type, so each prop keeps its own annotations and `.ref`. Annotation values are compared structurally; a type reference in them (an argument such as `@ui.valueHelp Country`) is compared by the type it resolves to (by id), so two uses that bind different targets are `own` and two that bind the same target still collapse, while any other function or class instance is compared by reference. A use that adds nothing carries no `own` flag, an empty `metadata`, and restores to the very same node as the first use. `processAnnotation` is only consulted for entries that carry metadata (the first use and `own` entries), not for collapsed ones. Cyclic plain objects inside an annotation value are cut at the repeat (`'[Circular]'`), and BigInt values are tolerated.
+
 ## Filtering Annotations
 
 Use `TSerializeOptions` to control which annotations are included in the output. This is useful for stripping sensitive or server-only metadata before sending types to the client.

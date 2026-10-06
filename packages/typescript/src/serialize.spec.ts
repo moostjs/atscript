@@ -736,6 +736,206 @@ describe('$ref resolution', () => {
   })
 })
 
+describe('named type referenced with its own annotations', () => {
+  const status = () =>
+    defineAnnotatedType('union')
+      .id('Status')
+      .item(defineAnnotatedType().designType('string').value('a').$type)
+      .item(defineAnnotatedType().designType('string').value('b').$type)
+      .annotate('meta.label' as never, 'type label').$type
+
+  /** A node over the same type def and id, carrying its own merged metadata (what `refTo` builds). */
+  const refNode = (target: TAtscriptAnnotatedType, label: string, optional = false) => {
+    const node = defineAnnotatedType().refTo(target).$type
+    node.metadata = new Map(target.metadata)
+    node.metadata.set('meta.label' as never, label as never)
+    if (optional) {
+      node.optional = true
+    }
+    return node
+  }
+
+  it("a later reference with other annotations keeps its own, not the first one's", () => {
+    const target = status()
+    const root = defineAnnotatedType('object')
+      .prop('first', refNode(target, 'first label'))
+      .prop('second', target).$type
+    const restored = asObject(roundTrip(root))
+    expect(restored.props.get('first')!.metadata.get('meta.label' as never)).toBe('first label')
+    // the plain use must not inherit the first prop's annotations
+    expect(restored.props.get('second')!.metadata.get('meta.label' as never)).toBe('type label')
+  })
+
+  it('inside arrays and unions, and with its own optionality', () => {
+    const target = status()
+    const root = defineAnnotatedType('object')
+      .prop('one', refNode(target, 'one'))
+      .prop('many', defineAnnotatedType('array').of(target).$type)
+      .prop('maybe', refNode(target, 'maybe', true)).$type
+    const restored = asObject(roundTrip(root))
+    expect(asArray(restored.props.get('many')!).of.metadata.get('meta.label' as never)).toBe(
+      'type label'
+    )
+    expect(restored.props.get('maybe')!.optional).toBe(true)
+    expect(restored.props.get('maybe')!.metadata.get('meta.label' as never)).toBe('maybe')
+    // the type def is shared, so the union still resolves
+    expect(asComplex(restored.props.get('maybe')!).items).toHaveLength(2)
+    expect(restored.props.get('maybe')!.id).toBe('Status')
+  })
+
+  it('references that add nothing still collapse onto one node', () => {
+    const target = status()
+    const root = defineAnnotatedType('object').prop('x', target).prop('y', target).$type
+    const serialized = serializeAnnotatedType(root)
+    const y = (serialized.type as TSerializedTypeObject).props.y
+    expect(y.type).toEqual({ kind: '$ref', id: 'Status' })
+    const restored = asObject(deserializeAnnotatedType(serialized))
+    expect(restored.props.get('y')).toBe(restored.props.get('x'))
+  })
+})
+
+describe('named type with annotation bindings that are type getters', () => {
+  const code = () => defineAnnotatedType().designType('string').id('Code').$type
+  const dict = (id: string) => defineAnnotatedType('object').id(id).$type
+  const bound = (target: () => TAtscriptAnnotatedType) => {
+    const node = code()
+    node.metadata = new Map()
+    node.metadata.set('ui.valueHelp' as never, { target } as never)
+    return node
+  }
+  const targetId = (t: TAtscriptAnnotatedType) =>
+    ((t.metadata.get('ui.valueHelp' as never) as { target: { id: string } }) || { target: {} })
+      .target.id
+
+  for (const refDepth of [0, 0.5]) {
+    it(`bindings differing only by target keep their own (refDepth ${refDepth})`, () => {
+      const Country = dict('Country')
+      const Region = dict('Region')
+      const root = defineAnnotatedType('object')
+        .prop(
+          'country',
+          bound(() => Country)
+        )
+        .prop(
+          'region',
+          bound(() => Region)
+        ).$type
+      const json = serializeAnnotatedType(root, { refDepth })
+      const region = (json.type as TSerializedTypeObject).props.region
+      expect(region.type).toMatchObject({ kind: '$ref', id: 'Code', own: true })
+      const restored = asObject(deserializeAnnotatedType(JSON.parse(JSON.stringify(json))))
+      expect(targetId(restored.props.get('country')!)).toBe('Country')
+      expect(targetId(restored.props.get('region')!)).toBe('Region')
+    })
+  }
+
+  it('equal targets behind different getters still collapse', () => {
+    const Country = dict('Country')
+    const root = defineAnnotatedType('object')
+      .prop(
+        'a',
+        bound(() => Country)
+      )
+      .prop(
+        'b',
+        bound(() => Country)
+      ).$type
+    const json = serializeAnnotatedType(root, { refDepth: 0.5 })
+    expect((json.type as TSerializedTypeObject).props.b.type).toEqual({ kind: '$ref', id: 'Code' })
+  })
+})
+
+describe('use-site ref on a named type referenced more than once', () => {
+  const Code = () => defineAnnotatedType().designType('string').id('Code').$type
+  const entity = (name: string) =>
+    defineAnnotatedType('object').id(name).prop('code', defineAnnotatedType().refTo(Code()).$type)
+      .$type
+  const fk = (target: TAtscriptAnnotatedType, label?: string) => {
+    const node = defineAnnotatedType().refTo(target, ['code']).$type
+    if (label) {
+      node.metadata.set('meta.label' as never, label as never)
+    }
+    return node
+  }
+  const refOf = (t: TAtscriptAnnotatedType) =>
+    t.ref ? `${t.ref.type().id}.${t.ref.field}` : 'NONE'
+
+  for (const refDepth of [0.5, 1]) {
+    it(`a later nav prop with other annotations keeps its ref (refDepth ${refDepth})`, () => {
+      const Customer = entity('Customer')
+      const root = defineAnnotatedType('object')
+        .id('Order')
+        .prop('first', fk(Customer, 'First'))
+        .prop('second', fk(Customer, 'Second')).$type
+      const restored = asObject(roundTrip(root, { refDepth }))
+      expect(refOf(restored.props.get('first')!)).toBe('Customer.code')
+      expect(refOf(restored.props.get('second')!)).toBe('Customer.code')
+      expect(restored.props.get('second')!.metadata.get('meta.label' as never)).toBe('Second')
+    })
+
+    it(`FKs to different targets sharing an alias type keep their own ref (refDepth ${refDepth})`, () => {
+      const Customer = entity('Customer')
+      const Supplier = entity('Supplier')
+      const root = defineAnnotatedType('object')
+        .id('Order')
+        .prop('customerCode', fk(Customer))
+        .prop('supplierCode', fk(Supplier)).$type
+      const restored = asObject(roundTrip(root, { refDepth }))
+      expect(refOf(restored.props.get('customerCode')!)).toBe('Customer.code')
+      expect(refOf(restored.props.get('supplierCode')!)).toBe('Supplier.code')
+    })
+  }
+
+  it('without refDepth the ref is stripped and equal-looking props still collapse', () => {
+    const Customer = entity('Customer')
+    const Supplier = entity('Supplier')
+    const root = defineAnnotatedType('object')
+      .id('Order')
+      .prop('a', fk(Customer))
+      .prop('b', fk(Supplier)).$type
+    const json = serializeAnnotatedType(root)
+    expect((json.type as TSerializedTypeObject).props.b.type).toEqual({ kind: '$ref', id: 'Code' })
+  })
+
+  it('does not call processAnnotation for a collapsed reference', () => {
+    const target = defineAnnotatedType('object')
+      .id('T')
+      .annotate('meta.label' as never, 'x' as never).$type
+    const root = defineAnnotatedType('object').prop('a', target).prop('b', target).$type
+    const paths: string[] = []
+    serializeAnnotatedType(root, {
+      processAnnotation: ({ key, value, path }) => {
+        paths.push(path.join('.'))
+        return { key, value }
+      },
+    })
+    expect(paths).toEqual(['a'])
+  })
+})
+
+describe('serializer robustness with unusual annotation values', () => {
+  it('tolerates BigInt metadata values on a repeated named type', () => {
+    const target = defineAnnotatedType('object')
+      .id('Big')
+      .annotate('meta.big' as never, 10n as never).$type
+    const root = defineAnnotatedType('object').prop('a', target).prop('b', target).$type
+    expect(() => serializeAnnotatedType(root)).not.toThrow()
+  })
+
+  it('cuts a cyclic plain-object annotation value instead of overflowing', () => {
+    const cyclic: Record<string, unknown> = { name: 'x' }
+    cyclic.self = cyclic
+    const t = defineAnnotatedType('object')
+      .id('Cyc')
+      .annotate('meta.cyclic' as never, cyclic as never).$type
+    const root = defineAnnotatedType('object').prop('a', t).prop('b', t).$type
+    const json = serializeAnnotatedType(root)
+    expect(() => JSON.stringify(json)).not.toThrow()
+    const a = (json.type as TSerializedTypeObject).props.a
+    expect(a.metadata['meta.cyclic']).toEqual({ name: 'x', self: '[Circular]' })
+  })
+})
+
 // ---------------------------------------------------------------------------
 // ref (FK reference) serialization
 // ---------------------------------------------------------------------------

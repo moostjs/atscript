@@ -555,6 +555,10 @@ export class Validator<
           this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
           return false
         }
+        if (!Number.isFinite(value)) {
+          this.error(`Expected finite number, got ${value}`)
+          return false
+        }
         return this.validateNumber(def, value)
       }
       case 'boolean': {

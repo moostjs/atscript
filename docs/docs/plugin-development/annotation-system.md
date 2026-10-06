@@ -28,17 +28,21 @@ new AnnotationSpec({
 
 ### TAnnotationSpecConfig Options
 
-| Option                | Type                    | Default     | Description                                                                                              |
-| --------------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------- |
-| `description`         | `string`                | —           | Documentation shown in IntelliSense hover                                                                |
-| `nodeType`             | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                           |
-| `argument`             | `object \| object[]`    | —           | Argument definition(s)                                                                                   |
-| `multiple`             | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                           |
-| `mergeStrategy`        | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                        |
-| `passedWhenReferred`   | `boolean`               | `true`      | Whether fields referencing the annotated node inherit this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred). |
-| `defType`              | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).         |
-| `validate`             | `function`              | —           | Custom validation at parse time                                                                          |
-| `modify`               | `function`              | —           | AST mutation after validation                                                                            |
+| Option               | Type                    | Default     | Description                                                                                                                      |
+| -------------------- | ----------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `description`        | `string`                | —           | Documentation shown in IntelliSense hover                                                                                        |
+| `nodeType`           | `TNodeEntity[]`         | —           | Where annotation can appear: `'interface'`, `'type'`, `'prop'`                                                                   |
+| `argument`           | `object \| object[]`    | —           | Argument definition(s)                                                                                                           |
+| `multiple`           | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                                                   |
+| `mergeStrategy`      | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                                                 |
+| `passedWhenReferred` | `boolean`               | `true`      | Whether fields referencing the annotated node inherit this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred). |
+| `defType`            | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).                                 |
+| `validate`           | `function`              | —           | Custom validation at parse time                                                                                                  |
+| `modify`             | `function`              | —           | AST mutation after validation                                                                                                    |
+
+### Type references inside inherited annotations (since 0.1.100)
+
+A `ref` argument, and the type part of a qualified `Type.field` in a `query` / `expr` / `order` argument, names a type that is imported in the file **declaring** the annotation. When the annotation is inherited into another file — through a chain ref (`color: Ticket.color`) or `extends` — the generated JavaScript for that file adds the missing import itself (aliased `Name_1` if the name clashes with a local declaration), so the argument's getter (`target: () => Dict`) never throws `ReferenceError`. Plugins do not need to do anything; this applies to every annotation whose spec has `passedWhenReferred: true` (the default).
 
 ## Registering Annotations via config()
 
@@ -107,6 +111,7 @@ interface TAnnotationArgument {
   // Editor (LSP) hooks — see "Editor Support for Arguments" below
   fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // backtick / 'string' args
   refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean // 'ref' args
+  valueScope?: (annotationToken: Token, doc: AtscriptDoc) => TValueCandidate[] | undefined // 'string' / 'number' args
 }
 ```
 
@@ -228,15 +233,22 @@ Usage: `@patch.strategy "replace"` (accepted) vs `@patch.strategy "upsert"` (err
 
 Arguments that point at types or fields can tell the VSCode extension what they point at. The editor then offers completion, hover, go-to-definition, find-references and rename inside the argument. The hooks only drive editor features — they don't validate anything, so keep checks in [`validate`](#custom-validation).
 
-| Hook         | Argument `type`                | Returns                                               | Enables                                                                                                                                                                                                          |
-| ------------ | ------------------------------ | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `fieldScope` | `'query'`, `'expr'`, `'order'` | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | Field/type completion, hover, go-to-definition, find-references and rename inside the backticks                                                                                                                  |
-| `fieldScope` | `'string'`                     | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`) | The string is a field path of `unqualifiedTarget` (`'amount'`, `'address.city'`): field completion level by level, hover, go-to-definition, and every segment shows up in its field's find-references and rename |
-| `refFilter`  | `'ref'`                        | `boolean`                                             | Narrows the type names offered by completion                                                                                                                                                                     |
+| Hook         | Argument `type`                | Returns                                                        | Enables                                                                                                                                                                                                          |
+| ------------ | ------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fieldScope` | `'query'`, `'expr'`, `'order'` | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`)          | Field/type completion, hover, go-to-definition, find-references and rename inside the backticks                                                                                                                  |
+| `fieldScope` | `'string'`                     | `{ allowedTypes, unqualifiedTarget }` (`TQueryScope`)          | The string is a field path of `unqualifiedTarget` (`'amount'`, `'address.city'`): field completion level by level, hover, go-to-definition, and every segment shows up in its field's find-references and rename |
+| `valueScope` | `'string'`, `'number'`         | `TValueCandidate[]` (`{ value, definition?, documentation? }`) | The argument names one of a closed set of values declared elsewhere in the document (the literals of the annotated union, say): completion offers them, go-to-definition on the argument jumps to `definition`   |
+| `refFilter`  | `'ref'`                        | `boolean`                                                      | Narrows the type names offered by completion                                                                                                                                                                     |
 
-`fieldScope` receives the argument token and the document holding it. The annotated node is `argToken.parentNode`; its sibling annotations are on `argToken.parentNode.annotations`. Return `undefined` when the scope can't be determined — the editor then offers nothing rather than guessing.
+`fieldScope` receives the argument token and the document holding it. The annotated node is `argToken.parentNode`; its sibling annotations are on `argToken.parentNode.annotations`. `getSiblingAnnotation(argToken)` (from `@atscript/core`) returns the annotation the argument belongs to, so `getSiblingAnnotation(argToken)?.args[0]?.text` reads the sibling argument that scopes the others. Return `undefined` when the scope can't be determined — the editor then offers nothing rather than guessing.
+
+`valueScope` receives the annotation's main token (`annotationToken.parentNode` is the annotated node) and the document holding it. It is advisory: it drives the editor, it does not validate. `TValueCandidate.definition` is `{ doc, token }` of the declaring token, in the document that declares it.
 
 `refFilter` receives each candidate declaration (interface or type node) and the document that **declares** it, so `doc.unwindType(...)` resolves names from the declaration's own imports.
+
+**Sibling-scoped arguments (since 0.1.100).** An annotation with several arguments can scope a later one by an earlier one. For example, in `` @binding Order, 'amount', `amount > 5` `` the first argument (a `ref`) is the type that the `'amount'` string and the backtick filter refer to. In the hook, find the annotation with `argToken.parentNode.annotations.find(a => a.args.includes(argToken))` and read `args[0].text`; return `undefined` when that argument is missing or not an identifier. The same hooks work for annotations written in an `annotate` block entry. Go-to-definition on a `ref` argument (`Order`) jumps to the type's declaration, including across imports.
+
+**Introspecting the annotated field: `annotatedDefinition()`.** A `validate` hook that needs the type of the field an annotation sits on must not read `node.getDefinition()` directly, because inside an `annotate` block the annotated node is an entry that only names a property. `doc.annotatedDefinition(node)` returns `{ def, doc }` for both forms: the node's own definition for an inline prop or type declaration, or the type of the target property an annotate-block entry names (`annotate Host { @x.y name }` gives the type of `Host.name`, including nested entries such as `addr.status`). `doc` is the document that declares `def`, which may be another file, so resolve names from `def` through that document. It returns `undefined` when the node has no definition or the entry does not resolve.
 
 ```typescript
 import { AnnotationSpec, isInterface } from '@atscript/core'
@@ -355,6 +367,8 @@ annotate Base as Tagged {
 ::: tip
 `mergeStrategy: 'append'` almost always pairs with `multiple: true` — otherwise the base annotation would error on duplicates.
 :::
+
+Across a ref (`status: Status`, `ownerId: User.id`) the emitted runtime metadata lists the referenced type's entries first, then the referring prop's own, in source order within each group. A consumer that folds the entries into a map (last entry wins) therefore lets the prop's own entry override the type's entry for the same key. Since 0.1.100.
 
 ## Ref Boundaries (`passedWhenReferred`)
 

@@ -44,6 +44,19 @@ const BACKTICK_TYPE_MESSAGES: Record<TBacktickArgKind, string> = {
   order: 'order list expected (use backticks).',
 }
 
+/**
+ * One value a `string` / `number` annotation argument may take (returned by the `valueScope`
+ * hook), for editor completion and go-to-definition.
+ */
+export interface TValueCandidate {
+  /** The argument value as written without quotes (`open` for `'open'`). */
+  value: string
+  /** Where the value is declared; go-to-definition on the argument jumps there. */
+  definition?: { doc: AtscriptDoc; token: Token }
+  /** Shown beside the value in the completion list. */
+  documentation?: string
+}
+
 export interface TAnnotationArgument {
   optional?: boolean
   name: string
@@ -66,6 +79,15 @@ export interface TAnnotationArgument {
    *   `'address.city'`) — same editor features on the string; `allowedTypes` is unused.
    */
   fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined
+  /**
+   * Editor value scope of a `string` or `number` argument that names one of a closed set of
+   * values declared elsewhere in the document (the literals of the annotated field's union,
+   * say). Called with the annotation's main token (its `parentNode` is the annotated node)
+   * and the document that holds it; return `undefined` when the set cannot be determined.
+   * Completion offers the candidates, go-to-definition on the argument follows
+   * `TValueCandidate.definition`. Candidates are advisory — it does not validate.
+   */
+  valueScope?: (annotationToken: Token, doc: AtscriptDoc) => TValueCandidate[] | undefined
   /**
    * For a `ref` argument: filters the type names offered by completion.
    * Called with each candidate declaration and the document that declares it;

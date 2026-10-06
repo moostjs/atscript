@@ -277,6 +277,22 @@ describe('ts-plugin', () => {
     expect(block('Extended')).toContain('.annotate("structural", "by_code", true)')
     expect(block('Extended')).toContain('.annotate("label", "Code")')
   })
+  it('emits append-merged annotations across a ref: the referenced type first, then the prop', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/append-order.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const out = await repo.generate({ format: 'js' })
+    const code = out[0].content
+    const holder = code.slice(code.indexOf('$("object", Holder)'))
+    const values = [...holder.matchAll(/\.annotate\("mulAppend", "([^"]+)", true\)/g)].map(
+      m => m[1]
+    )
+    // A consumer keying entries into a Map (last wins) lets the prop's own entry override the type's.
+    expect(values).toEqual(['type-1', 'type-2', 'own-1', 'own-2'])
+  })
   it('must render real-world example (entity with address)', async () => {
     const repo = await build({
       rootDir: wd,
@@ -1055,9 +1071,7 @@ describe('ts-plugin', () => {
     expect(js).toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-synth-base\.as"/)
     // refTo uses Helper (no clash, no alias needed)
     expect(js).toContain('() => Helper')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-synth-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-synth-child.js'))
   })
 
   it('must alias synthesized import when local def shadows parent helper name', async () => {
@@ -1099,9 +1113,7 @@ describe('ts-plugin', () => {
     // First parent's Helper imported under original name
     expect(js).toMatch(/import \{ Helper \} from "\.\/extends-synth-multi-base1\.as"/)
     // Second parent's Helper aliased to Helper_1
-    expect(js).toMatch(
-      /import \{ Helper as Helper_1 \} from "\.\/extends-synth-multi-base2\.as"/
-    )
+    expect(js).toMatch(/import \{ Helper as Helper_1 \} from "\.\/extends-synth-multi-base2\.as"/)
     const propASection = js.slice(js.indexOf('"propA"'), js.indexOf('"propB"'))
     const propBSection = js.slice(js.indexOf('"propB"'))
     expect(propASection).toContain('() => Helper')
@@ -1124,9 +1136,7 @@ describe('ts-plugin', () => {
     // User's own Helper import preserved unchanged (no alias on user's side)
     expect(js).toMatch(/import \{ Helper \} from "\.\/extends-xpath-a\.as"/)
     // Parent's Helper synthesized under Helper_1 from the OTHER path
-    expect(js).toMatch(
-      /import \{ Helper as Helper_1 \} from "\.\/extends-xpath-b\.as"/
-    )
+    expect(js).toMatch(/import \{ Helper as Helper_1 \} from "\.\/extends-xpath-b\.as"/)
     // Parent-origin payload uses aliased name
     const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"fromUser"'))
     expect(payloadSection).toContain('() => Helper_1')
@@ -1134,9 +1144,7 @@ describe('ts-plugin', () => {
     const fromUserSection = js.slice(js.indexOf('"fromUser"'))
     expect(fromUserSection).toContain('() => Helper')
     expect(fromUserSection).not.toContain('Helper_1')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-xpath-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-xpath-child.js'))
   })
 
   it('must synthesize imports for helpers nested deep in parent prop tree (object/array/union)', async () => {
@@ -1181,9 +1189,7 @@ describe('ts-plugin', () => {
     expect(js).toMatch(/"g"[\s\S]*?refTo\(\(\) => Helper\)/)
     // Mid is imported by the user (line for it stays); Helper must NOT be sourced from mid
     expect(js).not.toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-grand-mid\.as"/)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-grand-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-grand-child.js'))
   })
 
   it('must re-emit type-level annotations on synthesized helper using parent doc context', async () => {
@@ -1200,9 +1206,7 @@ describe('ts-plugin', () => {
     const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"id"'))
     expect(payloadSection).toContain('refTo(() => Helper)')
     expect(payloadSection).toContain('.annotate("label", "Helper Label")')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-annot-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-annot-child.js'))
   })
 
   it('must bake annotate-block contributions into inherited props of an extending child', async () => {
@@ -1217,10 +1221,7 @@ describe('ts-plugin', () => {
     // The annotate-block targets the imported parent, but the child must carry the
     // annotation on its own inherited `username` prop — otherwise consumers reading
     // the child's flat prop view at runtime won't see it.
-    const usernameSection = js.slice(
-      js.indexOf('"username"'),
-      js.indexOf('"extra"')
-    )
+    const usernameSection = js.slice(js.indexOf('"username"'), js.indexOf('"extra"'))
     expect(usernameSection).toContain('"username"')
     expect(usernameSection).toMatch(/\.annotate\("meta\.id"/)
     // The annotate block in the same file still emits its mutating $a() call against
@@ -1249,9 +1250,7 @@ describe('ts-plugin', () => {
     expect(js).not.toContain('Helper as ')
     // payload (parent-origin) and own (child-origin) both refer to same Helper
     expect(js).toContain('() => Helper')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-dedup-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-dedup-child.js'))
   })
 
   it('must skip past taken `_1` and use `_2` when both base name and `_1` are reserved', async () => {
@@ -1264,9 +1263,7 @@ describe('ts-plugin', () => {
     const out = await repo.generate({ format: 'js' })
     const js = out[0].content
     // Both Helper and Helper_1 are local in child; synth must fall through to Helper_2
-    expect(js).toMatch(
-      /import \{ Helper as Helper_2 \} from "\.\/extends-fallback-base\.as"/
-    )
+    expect(js).toMatch(/import \{ Helper as Helper_2 \} from "\.\/extends-fallback-base\.as"/)
     // Local Helper and Helper_1 still rendered as classes
     expect(js).toContain('export class Helper {')
     expect(js).toContain('export class Helper_1 {')
@@ -1314,9 +1311,7 @@ describe('ts-plugin', () => {
     expect(js).toMatch(/import \{ User \} from "\.\/extends-chain-base\.as"/)
     // Chain ref preserved — refTo with chain array
     expect(js).toMatch(/refTo\(\(\) => User, \["name"\]\)/)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-chain-child.js')
-    )
+    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-chain-child.js'))
   })
 
   it('must synthesize a recursive type alias used through `extends` (matches atscript-ui JsonValue pattern)', async () => {
