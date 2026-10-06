@@ -1,3 +1,9 @@
+## [0.1.100](https://github.com/moostjs/atscript/compare/v0.1.99...v0.1.100) (2026-10-06)
+
+
+### Features
+
+* bound annotation type refs, own $ref serialization, annotate-block args, valueScope; reject non-finite numbers ([512a06d](https://github.com/moostjs/atscript/commit/512a06dd54ba682d0b2e9314026f657ef0da4c0c))
 ## [0.1.99](https://github.com/moostjs/atscript/compare/v0.1.98...v0.1.99) (2026-10-03)
 
 
