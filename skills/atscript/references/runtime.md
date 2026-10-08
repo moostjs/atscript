@@ -176,6 +176,19 @@ serializeAnnotatedType(Product, {
 
 Callback args: `key`, `value`, `path: string[]`, `kind` (type kind at node).
 
+Per-node overrides (add / replace / remove, without mutating runtime metadata):
+
+```ts
+serializeAnnotatedType(Product, {
+  annotationOverrides: type =>
+    type === Product
+      ? { 'db.http.path': '/api/products', 'meta.description': undefined }
+      : undefined,
+})
+```
+
+Called with the owning node for every serialized metadata block (root, props, items, full ref bodies, shallow ref targets, annotation-value targets; not collapsed `$ref` uses). `undefined` value removes the key. Applied before `ignoreAnnotations` / `processAnnotation`, which still filter the result. Keep it a pure function of the node.
+
 ## Metadata access
 
 ```ts

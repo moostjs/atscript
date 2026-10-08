@@ -104,6 +104,25 @@ The `processAnnotation` callback receives:
 - `path` — property path as a `string[]` array (e.g. `['address', 'city']`)
 - `kind` — type kind at this node (`''`, `'object'`, `'array'`, etc.)
 
+### Annotation overrides
+
+`annotationOverrides(type)` lets the caller add, replace or remove annotations per node without touching the runtime metadata. It receives the annotated type node that owns each serialized metadata block (the root, props, items, union/tuple members, full ref bodies, shallow ref targets, and types referenced from annotation values) and returns a record of overrides, or `undefined` for none:
+
+```typescript
+const serialized = serializeAnnotatedType(Product, {
+  annotationOverrides(type) {
+    if (type === Product) {
+      return { 'db.http.path': '/api/products', 'meta.description': undefined }
+    }
+  },
+})
+```
+
+- A key absent from the node is added, an existing key is replaced, and a key whose value is `undefined` is removed.
+- Overrides are applied first. `ignoreAnnotations` and `processAnnotation` then filter the merged result, so an override can still be ignored, and `processAnnotation` sees the overridden value.
+- Keep the function pure in the node. A repeated named type serializes its metadata once; later uses that add nothing collapse to a `$ref` and restore to the first node, which carries its overrides.
+- Runtime metadata is never modified. Without the option, the output is unchanged.
+
 ## Example: Server-Driven Field Tools
 
 A practical use case: the server serializes a type definition and the client uses it to build a field list with labels and placeholders.

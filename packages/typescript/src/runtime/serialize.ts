@@ -122,6 +122,20 @@ export interface TSerializeOptions {
    * emits a shallow `{ id, metadata }` at the tail level instead of the full body.
    */
   refDepth?: number
+
+  /**
+   * Per-node annotation overrides, applied over the node's own metadata BEFORE
+   * `ignoreAnnotations` / `processAnnotation` (which still filter them). Called with the owning
+   * annotated type node for every serialized metadata block (type nodes and shallow ref /
+   * annotation-value targets; never for collapsed `$ref` uses). Keys absent from the node are
+   * added, existing keys are replaced, and a key whose value is `undefined` is removed. Must be a
+   * pure function of the node: the repeated-type detector compares the nodes' own metadata, and a
+   * collapsed use restores to the first node's (overridden) metadata. Runtime metadata is never
+   * mutated.
+   */
+  annotationOverrides?: (
+    type: TAtscriptAnnotatedType
+  ) => Readonly<Record<string, unknown>> | undefined
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +311,7 @@ function serializeNode(
 ): TSerializedAnnotatedTypeInner {
   const refDepth = options?.refDepth ?? 0
   const metadata = () =>
-    serializeMetadata(def.metadata, { path, kind: def.type.kind }, options, { visited, depth: 0 })
+    serializeMetadata(def, { path, kind: def.type.kind }, options, { visited, depth: 0 })
   // Cycle detection: if this named type was already serialized, emit a $ref. A reference
   // whose own metadata / optionality / ref differ from the first node's (a prop annotation
   // merged over the type's, another FK target) says so (`own`), so it does not collapse onto
@@ -453,12 +467,7 @@ function shallowTarget(
     id: target.id ?? '',
     ...(withMetadata
       ? {
-          metadata: serializeMetadata(
-            target.metadata,
-            { path: [], kind: target.type.kind },
-            options,
-            state
-          ),
+          metadata: serializeMetadata(target, { path: [], kind: target.type.kind }, options, state),
         }
       : {}),
   }
@@ -510,7 +519,7 @@ function serializeAnnotationValue(
 }
 
 function serializeMetadata(
-  metadata: TMetadataMap<AtscriptMetadata>,
+  owner: TAtscriptAnnotatedType,
   site: { path: string[]; kind: string },
   options: TSerializeOptions | undefined,
   state: { visited: Visited; depth: number }
@@ -519,7 +528,21 @@ function serializeMetadata(
   const result: Record<string, unknown> = {}
   const ignoreSet = options?.ignoreAnnotations ? new Set(options.ignoreAnnotations) : undefined
 
-  for (const [key, value] of metadata.entries()) {
+  const overrides = options?.annotationOverrides?.(owner)
+  let entries: Iterable<[string, unknown]> = owner.metadata.entries() as Iterable<[string, unknown]>
+  if (overrides) {
+    const merged = new Map<string, unknown>(entries)
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === undefined) {
+        merged.delete(key)
+      } else {
+        merged.set(key, value)
+      }
+    }
+    entries = merged
+  }
+
+  for (const [key, value] of entries) {
     if (ignoreSet?.has(key as string)) {
       continue
     }

@@ -1294,3 +1294,137 @@ describe('fractional refDepth', () => {
     expect(refTarget.metadata.get('meta.label')).toBe('Full')
   })
 })
+
+describe('annotationOverrides', () => {
+  const withMeta = (node: TAtscriptAnnotatedType, entries: Record<string, unknown>) => {
+    for (const [k, v] of Object.entries(entries)) {
+      node.metadata.set(k as never, v as never)
+    }
+    return node
+  }
+  const entity = (id: string, entries: Record<string, unknown> = {}) =>
+    withMeta(
+      defineAnnotatedType('object')
+        .id(id)
+        .prop('id', defineAnnotatedType().designType('string').$type).$type,
+      entries
+    )
+
+  it('adds, replaces and removes keys; other keys keep their order', () => {
+    const User = entity('User', { 'meta.label': 'User', 'meta.description': 'x', 'ui.a': 1 })
+    const json = serializeAnnotatedType(User, {
+      annotationOverrides: () => ({
+        'meta.label': 'Overridden',
+        'meta.description': undefined,
+        'db.http.path': '/api/users',
+      }),
+    })
+    expect(json.metadata).toEqual({
+      'meta.label': 'Overridden',
+      'ui.a': 1,
+      'db.http.path': '/api/users',
+    })
+  })
+
+  it('is keyed by node identity and reaches every metadata site', () => {
+    const Target = entity('Target', { 'meta.label': 'T' })
+    const Other = entity('Other')
+    const fk = defineAnnotatedType().refTo(Target, ['id']).$type
+    const root = defineAnnotatedType('object')
+      .id('Root')
+      .prop('fk', fk)
+      .prop('nested', defineAnnotatedType('object').prop('x', Other).$type).$type
+    const seen: TAtscriptAnnotatedType[] = []
+    const overrides = (t: TAtscriptAnnotatedType) => {
+      seen.push(t)
+      return t === Target
+        ? { 'db.http.path': '/t' }
+        : t === root
+          ? { 'db.http.path': '/r' }
+          : undefined
+    }
+    const json = serializeAnnotatedType(root, { refDepth: 0.5, annotationOverrides: overrides })
+    const obj = json.type as TSerializedTypeObject
+    expect(json.metadata['db.http.path']).toBe('/r')
+    expect((obj.props.fk.ref!.type as { metadata: Record<string, unknown> }).metadata).toEqual({
+      'meta.label': 'T',
+      'db.http.path': '/t',
+    })
+    const nested = (obj.props.nested.type as TSerializedTypeObject).props.x
+    expect(nested.metadata['db.http.path']).toBeUndefined()
+    expect(seen).toContain(Other)
+    expect(seen).toContain(Target)
+  })
+
+  it('applies to full ref bodies and annotation-value targets', () => {
+    const Dict = entity('Dict', { 'meta.label': 'D' })
+    const Holder = defineAnnotatedType().designType('string').$type
+    Holder.metadata.set('ui.valueHelp' as never, { target: () => Dict } as never)
+    const Target = entity('Target2')
+    const root = defineAnnotatedType('object')
+      .prop('h', Holder)
+      .prop('fk', defineAnnotatedType().refTo(Target, ['id']).$type).$type
+    const json = serializeAnnotatedType(root, {
+      refDepth: 1,
+      annotationOverrides: t => ({ 'x.mark': t.id ?? 'none' }),
+    })
+    const props = (json.type as TSerializedTypeObject).props
+    expect(props.h.metadata['ui.valueHelp']).toMatchObject({
+      target: { id: 'Dict', metadata: { 'x.mark': 'Dict' } },
+    })
+    expect((props.fk.ref!.type as TSerializedAnnotatedTypeInner).metadata['x.mark']).toBe('Target2')
+  })
+
+  it('is filtered by ignoreAnnotations and seen by processAnnotation', () => {
+    const User = entity('User2', { 'meta.label': 'U' })
+    const seen: unknown[] = []
+    const json = serializeAnnotatedType(User, {
+      ignoreAnnotations: ['ignored.key'],
+      annotationOverrides: () => ({ 'ignored.key': 1, 'db.http.path': '/u' }),
+      processAnnotation({ key, value }) {
+        seen.push([key, value])
+        return key === 'db.http.path' ? { key, value: `${value}!` } : { key, value }
+      },
+    })
+    expect(json.metadata['ignored.key']).toBeUndefined()
+    expect(json.metadata['db.http.path']).toBe('/u!')
+    expect(seen).toContainEqual(['db.http.path', '/u'])
+    expect(seen.some(([k]) => (k as string) === 'ignored.key')).toBe(false)
+  })
+
+  it('leaves runtime metadata untouched and survives a round trip', () => {
+    const User = entity('User3', { 'meta.label': 'U' })
+    const json = serializeAnnotatedType(User, {
+      annotationOverrides: () => ({ 'meta.label': 'Changed', 'db.http.path': '/u' }),
+    })
+    expect(User.metadata.get('meta.label' as never)).toBe('U')
+    expect(User.metadata.has('db.http.path' as never)).toBe(false)
+    const restored = deserializeAnnotatedType(JSON.parse(JSON.stringify(json)))
+    expect(restored.metadata.get('meta.label' as never)).toBe('Changed')
+    expect(restored.metadata.get('db.http.path' as never)).toBe('/u')
+  })
+
+  it('output is unchanged when the option is absent or returns undefined', () => {
+    const User = entity('User4', { 'meta.label': 'U' })
+    expect(serializeAnnotatedType(User, { annotationOverrides: () => undefined })).toEqual(
+      serializeAnnotatedType(User)
+    )
+  })
+
+  it('a collapsed repeated-type use restores to the first node, which carries the override', () => {
+    const Code = () => defineAnnotatedType().designType('string').id('Code').$type
+    const a = Code()
+    const b = Code()
+    const root = defineAnnotatedType('object').prop('a', a).prop('b', b).$type
+    const json = serializeAnnotatedType(root, {
+      annotationOverrides: t => (t.id === 'Code' ? { 'db.http.path': '/c' } : undefined),
+    })
+    const props = (json.type as TSerializedTypeObject).props
+    expect(props.a.metadata['db.http.path']).toBe('/c')
+    expect(props.b.type).toEqual({ kind: '$ref', id: 'Code' })
+    expect(props.b.metadata).toEqual({})
+    const restored = asObject(deserializeAnnotatedType(JSON.parse(JSON.stringify(json))))
+    expect(restored.props.get('b')).toBe(restored.props.get('a'))
+    expect(restored.props.get('b')!.metadata.get('db.http.path' as never)).toBe('/c')
+  })
+})
