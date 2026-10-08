@@ -1,3 +1,9 @@
+## [0.1.101](https://github.com/moostjs/atscript/compare/v0.1.100...v0.1.101) (2026-10-08)
+
+
+### Features
+
+* **typescript:** serialize annotationOverrides — per-node annotation add/replace/remove ([0bc2607](https://github.com/moostjs/atscript/commit/0bc2607ae0fc0a4e4477c1a5c23ad2884d1d0256))
 ## [0.1.100](https://github.com/moostjs/atscript/compare/v0.1.99...v0.1.100) (2026-10-06)
 
 
