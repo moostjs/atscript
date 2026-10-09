@@ -1,3 +1,9 @@
+## [0.1.102](https://github.com/moostjs/atscript/compare/v0.1.101...v0.1.102) (2026-10-09)
+
+
+### Performance Improvements
+
+* validator fast pre-check, cached pipe validators, faster coerce/unions; fix: enforce 0 bounds ([d87abda](https://github.com/moostjs/atscript/commit/d87abda4ea79c2e115d7cd8e44bbe64717255f66))
 ## [0.1.101](https://github.com/moostjs/atscript/compare/v0.1.100...v0.1.101) (2026-10-08)
 
 
