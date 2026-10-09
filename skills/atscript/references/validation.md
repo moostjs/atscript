@@ -40,6 +40,8 @@ All optional — pass any subset to `.validator(opts)`:
 
 Every `number` (plain, optional, `number.int`, `number.timestamp`, union branch, array/tuple item) must be finite: `NaN` / `Infinity` / `-Infinity` fail with `Expected finite number, got NaN` before `@expect.min`/`max`/`int` run. `0`, `-0`, fractions stay valid. Not overridable by annotation. Escape hatch: a `TValidatorPlugin` returning `true` (plugins run before the type check). Upgrade: stored `Infinity` sentinels now fail write validation — use `null`, a bound, or a plugin.
 
+A `0` bound is enforced (since 0.1.102): `@expect.min 0` rejects `-1`, `@expect.max 0` rejects `1`, `@expect.maxLength 0` rejects `'a'` / `['a']`. Earlier versions skipped a bare-number `0` set at runtime (`annotate('expect.min', 0)`) in both `validate()` and `buildJsonSchema()`; `.as`-declared bounds were already enforced.
+
 ## `ValidatorError`
 
 ```ts

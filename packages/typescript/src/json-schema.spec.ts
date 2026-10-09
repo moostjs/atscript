@@ -834,3 +834,38 @@ describe('mergeJsonSchemas', () => {
     expect(() => mergeJsonSchemas([noId.$type])).toThrow(/all types must have an id/)
   })
 })
+
+describe('json-schema zero bounds', () => {
+  it('emits 0 bounds given in the bare-number form', () => {
+    const n = $()
+      .designType('number')
+      .annotate('expect.min', 0 as any)
+      .annotate('expect.max', 0 as any)
+    expect($$(n.$type)).toEqual({ type: 'number', minimum: 0, maximum: 0 })
+    const s = $()
+      .designType('string')
+      .annotate('expect.minLength', 0 as any)
+      .annotate('expect.maxLength', 0 as any)
+    expect($$(s.$type)).toEqual({ type: 'string', minLength: 0, maxLength: 0 })
+    const a = $('array')
+      .of($().designType('string').$type)
+      .annotate('expect.minLength', 0 as any)
+      .annotate('expect.maxLength', 0 as any)
+    expect($$(a.$type)).toEqual({
+      type: 'array',
+      items: { type: 'string' },
+      minItems: 0,
+      maxItems: 0,
+    })
+  })
+
+  it('round-trips 0 bounds', () => {
+    for (const schema of [
+      { type: 'number', minimum: 0, maximum: 0 },
+      { type: 'string', minLength: 0, maxLength: 0 },
+      { type: 'array', items: { type: 'number' }, minItems: 0, maxItems: 0 },
+    ]) {
+      expect($$(fromJsonSchema(schema))).toEqual(schema)
+    }
+  })
+})

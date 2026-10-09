@@ -9,6 +9,7 @@ import type {
   TAtscriptTypeObject,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
+import { DECIMAL_RE, fastCheckPasses, getRegex } from './validator-fast-check'
 
 interface TError {
   path: string
@@ -40,8 +41,6 @@ export interface TValidatorOptions {
   errorLimit: number
   skipList?: Set<string>
 }
-
-const regexCache = new Map<string, RegExp>()
 
 /** Context exposed to {@link TValidatorPlugin} functions. */
 export interface TValidatorPluginContext {
@@ -186,6 +185,16 @@ export class Validator<
     this.stackErrors.length = 0
     this.depth = 0
     this.limitExceeded = false
+    // Allocation-free pre-check; only when a passing walk has no observable side effects
+    // (`skipList` and a `partial` callback see paths, so they always take the walk).
+    if (
+      this.shortcuts &&
+      !this.opts.skipList &&
+      typeof this.opts.partial !== 'function' &&
+      fastCheckPasses(this.def, value, this.opts)
+    ) {
+      return true
+    }
     this.context = context
     const passed = this.validateSafe(this.def, value)
     this.context = undefined
@@ -196,6 +205,16 @@ export class Validator<
       this.throw()
     }
     return true
+  }
+
+  /**
+   * Plain `Validator` without plugins / `replace`: eligible for the allocation-free
+   * shortcuts. Subclasses may override the protected `validate*` hooks, so they
+   * always take the full walk. (A getter, not a constructor-set field: validators are
+   * often built per call, so construction stays as cheap as before.)
+   */
+  private get shortcuts(): boolean {
+    return this.constructor === Validator && !this.hasPlugins && !this.hasReplace
   }
 
   protected validateSafe(def: TAtscriptAnnotatedType, value: any): boolean {
@@ -259,6 +278,26 @@ export class Validator<
 
   protected validateUnion(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
     const items = def.type.items
+    if (this.shortcuts) {
+      // Literal-branch (enum) shortcut: when the value equals a literal and every earlier
+      // branch is a plain literal, the walk would only record and then discard
+      // literal-mismatch errors before accepting it. Anything else falls through to the
+      // loop below, so errors are produced exactly as before.
+      for (const item of items) {
+        const type = item.type as TAtscriptTypeFinal
+        if (
+          item.optional ||
+          type.kind !== '' ||
+          type.value === undefined ||
+          type.designType === 'phantom'
+        ) {
+          break
+        }
+        if (type.value === value) {
+          return true
+        }
+      }
+    }
     let details: TError[] | undefined
 
     for (const item of items) {
@@ -332,7 +371,7 @@ export class Validator<
       return false
     }
     const minLength = def.metadata.get('expect.minLength')
-    if (minLength) {
+    if (minLength !== undefined) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
         const message =
@@ -344,7 +383,7 @@ export class Validator<
       }
     }
     const maxLength = def.metadata.get('expect.maxLength')
-    if (maxLength) {
+    if (maxLength !== undefined) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
         const message =
@@ -587,7 +626,7 @@ export class Validator<
           this.error(`Expected string (decimal), got ${typeOfValue}`)
           return false
         }
-        if (!/^[+-]?\d+(\.\d+)?$/.test(value as string)) {
+        if (!DECIMAL_RE.test(value as string)) {
           this.error(`Invalid decimal format: ${JSON.stringify(value)}`)
           return false
         }
@@ -616,7 +655,7 @@ export class Validator<
       }
     }
     const minLength = def.metadata.get('expect.minLength')
-    if (minLength) {
+    if (minLength !== undefined) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
         const message =
@@ -628,7 +667,7 @@ export class Validator<
       }
     }
     const maxLength = def.metadata.get('expect.maxLength')
-    if (maxLength) {
+    if (maxLength !== undefined) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
         const message =
@@ -644,15 +683,7 @@ export class Validator<
       if (!pattern) {
         continue
       }
-
-      const cacheKey = `${pattern}//${flags || ''}`
-
-      let regex = regexCache.get(cacheKey)
-      if (!regex) {
-        regex = new RegExp(pattern, flags)
-        regexCache.set(cacheKey, regex)
-      }
-      if (!regex.test(value)) {
+      if (!getRegex(pattern, flags).test(value)) {
         this.error(message || `Value is expected to match pattern "${pattern}"`)
         return false
       }
@@ -676,7 +707,7 @@ export class Validator<
       return false
     }
     const min = def.metadata.get('expect.min')
-    if (min) {
+    if (min !== undefined) {
       const minValue = typeof min === 'number' ? min : min.minValue
       if (value < minValue) {
         const message =
@@ -688,7 +719,7 @@ export class Validator<
       }
     }
     const max = def.metadata.get('expect.max')
-    if (max) {
+    if (max !== undefined) {
       const maxValue = typeof max === 'number' ? max : max.maxValue
       if (value > maxValue) {
         const message =

@@ -32,9 +32,7 @@ export type TUnionDiscriminator = {
  * it is returned as the discriminator. Returns `null` when no qualifying
  * property exists, or when more than one does (ambiguous).
  */
-export function detectDiscriminator(
-  items: TAtscriptAnnotatedType[]
-): TUnionDiscriminator | null {
+export function detectDiscriminator(items: TAtscriptAnnotatedType[]): TUnionDiscriminator | null {
   if (items.length < 2) {
     return null
   }
@@ -154,11 +152,11 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       array(d) {
         const schema: TJsonSchema = { type: 'array', items: build(d.type.of) }
         const minLength = meta.get('expect.minLength')
-        if (minLength) {
+        if (minLength !== undefined) {
           schema.minItems = typeof minLength === 'number' ? minLength : minLength.length
         }
         const maxLength = meta.get('expect.maxLength')
-        if (maxLength) {
+        if (maxLength !== undefined) {
           schema.maxItems = typeof maxLength === 'number' ? maxLength : maxLength.length
         }
         return schema
@@ -205,11 +203,11 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
             schema.minLength = 1
           }
           const minLength = meta.get('expect.minLength')
-          if (minLength) {
+          if (minLength !== undefined) {
             schema.minLength = typeof minLength === 'number' ? minLength : minLength.length
           }
           const maxLength = meta.get('expect.maxLength')
-          if (maxLength) {
+          if (maxLength !== undefined) {
             schema.maxLength = typeof maxLength === 'number' ? maxLength : maxLength.length
           }
           const patterns = meta.get('expect.pattern') as Array<{ pattern: string }> | undefined
@@ -225,11 +223,11 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         }
         if (schema.type === 'number' || schema.type === 'integer') {
           const min = meta.get('expect.min')
-          if (min) {
+          if (min !== undefined) {
             schema.minimum = typeof min === 'number' ? min : min.minValue
           }
           const max = meta.get('expect.max')
-          if (max) {
+          if (max !== undefined) {
             schema.maximum = typeof max === 'number' ? max : max.maxValue
           }
         }

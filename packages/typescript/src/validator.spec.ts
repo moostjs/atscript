@@ -459,3 +459,76 @@ describe('Validator non-finite numbers', () => {
     expect(v.validate(Number.POSITIVE_INFINITY, true)).toBe(true)
   })
 })
+
+describe('Validator zero bounds', () => {
+  const num = (key: string, bound: unknown) =>
+    defineAnnotatedType()
+      .designType('number')
+      .annotate(key as any, bound as any).$type
+  const str = (key: string, bound: unknown) =>
+    defineAnnotatedType()
+      .designType('string')
+      .annotate(key as any, bound as any).$type
+  const arr = (key: string, bound: unknown) =>
+    defineAnnotatedType('array')
+      .of(defineAnnotatedType().designType('string').$type)
+      .annotate(key as any, bound as any).$type
+
+  // Both the bare-number and the object form; each type is checked at the top level and
+  // nested in an object so the pre-check and the error-collecting walk are both covered.
+  const cases: Array<[string, (b: unknown) => any, unknown, unknown, string]> = [
+    ['expect.min 0', b => num('expect.min', b), 0, -1, 'Expected minimum 0, got -1'],
+    ['expect.max 0', b => num('expect.max', b), 0, 1, 'Expected maximum 0, got 1'],
+    [
+      'string expect.maxLength 0',
+      b => str('expect.maxLength', b),
+      '',
+      'a',
+      'Expected maximum length of 0 characters, got 1 characters',
+    ],
+    [
+      'array expect.maxLength 0',
+      b => arr('expect.maxLength', b),
+      [],
+      ['a'],
+      'Expected maximum length of 0 items, got 1 items',
+    ],
+  ]
+  const forms = (name: string, bound: number) =>
+    name.startsWith('expect.min')
+      ? [bound, { minValue: bound }]
+      : name.startsWith('expect.max ')
+        ? [bound, { maxValue: bound }]
+        : [bound, { length: bound }]
+
+  for (const [name, make, ok, bad, message] of cases) {
+    for (const bound of forms(name, 0)) {
+      it(`${name} (${typeof bound === 'number' ? 'number' : 'object'} form) is enforced`, () => {
+        const t = make(bound)
+        const top = new Validator(t)
+        expect(top.validate(ok, true)).toBe(true)
+        expect(top.validate(bad, true)).toBe(false)
+        expect(top.errors).toEqual([{ path: '', message }])
+
+        const nested = new Validator(defineAnnotatedType('object').prop('v', t).$type)
+        expect(nested.validate({ v: ok }, true)).toBe(true)
+        expect(nested.validate({ v: bad }, true)).toBe(false)
+        expect(nested.errors).toEqual([{ path: 'v', message }])
+      })
+    }
+  }
+
+  it('expect.minLength 0 accepts empty strings and arrays', () => {
+    expect(new Validator(str('expect.minLength', 0)).validate('', true)).toBe(true)
+    expect(new Validator(arr('expect.minLength', 0)).validate([], true)).toBe(true)
+  })
+
+  it('a zero bound inside a union branch steers branch selection', () => {
+    const t = defineAnnotatedType('union')
+      .item(num('expect.max', 0))
+      .item(defineAnnotatedType().designType('string').$type).$type
+    const v = new Validator(t)
+    expect(v.validate(-5, true)).toBe(true)
+    expect(v.validate(5, true)).toBe(false)
+  })
+})

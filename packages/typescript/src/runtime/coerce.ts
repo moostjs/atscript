@@ -1,9 +1,10 @@
 import type {
   TAtscriptAnnotatedType,
+  TAtscriptTypeArray,
+  TAtscriptTypeComplex,
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
-import { forAnnotatedType } from './traverse'
 
 /**
  * Internal sentinel returned when a value cannot be coerced to a type node.
@@ -59,40 +60,50 @@ function coerce(def: TAtscriptAnnotatedType, value: unknown): unknown {
   if (value === undefined || value === null) {
     return def.optional === true ? value : NO_MATCH
   }
-  return forAnnotatedType<unknown>(def, {
-    final: d => {
-      const result = scalar(d.type.designType, value)
+  // Direct switch (not `forAnnotatedType`) — avoids allocating a handler-closure
+  // object on every node visit of this per-request path.
+  const type = def.type
+  switch (type.kind) {
+    case '': {
+      const final = type as TAtscriptTypeFinal
+      if (final.designType === 'phantom') {
+        return value
+      }
+      const result = scalar(final.designType, value)
       // Literal types: the parsed value must equal the literal for a union
       // branch to claim it (e.g. `'a' | 7` with input "7" must pick the 7 branch).
-      if (result !== NO_MATCH && d.type.value !== undefined && result !== d.type.value) {
+      if (result !== NO_MATCH && final.value !== undefined && result !== final.value) {
         return NO_MATCH
       }
       return result
-    },
-    phantom: () => value,
-    object: d => {
+    }
+    case 'object': {
       if (!isPlainObject(value)) {
         return NO_MATCH
       }
-      return coerceProps(d, value)
-    },
-    array: d => (Array.isArray(value) ? coerceItems(value, d.type.of) : NO_MATCH),
-    tuple: d =>
-      Array.isArray(value) && value.length === d.type.items.length
-        ? coerceItems(value, undefined, d.type.items)
-        : NO_MATCH,
-    union: d => {
-      for (const item of d.type.items) {
+      return coerceProps(def as TAtscriptAnnotatedType<TAtscriptTypeObject<string>>, value)
+    }
+    case 'array': {
+      return Array.isArray(value) ? coerceItems(value, (type as TAtscriptTypeArray).of) : NO_MATCH
+    }
+    case 'tuple': {
+      const items = (type as TAtscriptTypeComplex).items
+      return Array.isArray(value) && value.length === items.length
+        ? coerceItems(value, undefined, items)
+        : NO_MATCH
+    }
+    case 'union': {
+      for (const item of (type as TAtscriptTypeComplex).items) {
         const result = coerce(item, value)
         if (result !== NO_MATCH) {
           return result
         }
       }
       return NO_MATCH
-    },
-    intersection: d => {
-      let current = value
-      for (const item of d.type.items) {
+    }
+    case 'intersection': {
+      let current: unknown = value
+      for (const item of (type as TAtscriptTypeComplex).items) {
         const result = coerce(item, current)
         if (result === NO_MATCH) {
           return NO_MATCH
@@ -100,8 +111,11 @@ function coerce(def: TAtscriptAnnotatedType, value: unknown): unknown {
         current = result
       }
       return current
-    },
-  })
+    }
+    default: {
+      throw new Error(`Unknown type kind "${(type as { kind: string }).kind}"`)
+    }
+  }
 }
 
 function scalar(designType: TAtscriptTypeFinal['designType'], value: unknown): unknown {

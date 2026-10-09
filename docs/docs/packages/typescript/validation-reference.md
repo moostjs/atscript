@@ -95,6 +95,12 @@ Every `number` (including `number.int`, `number.timestamp`, optional fields, uni
 **Upgrading:** data that intentionally stored `Infinity` (for example an "unlimited" sentinel) now fails write validation — use `null`, an explicit bound, or a validator plugin that returns `true` for the value (plugins run before the type check). Validation of already-stored data is unaffected unless you validate it.
 :::
 
+::: warning Zero bounds are always enforced (since 0.1.102)
+A bound of `0` is a real bound: `@expect.min 0` rejects `-1`, `@expect.max 0` rejects `1`, and `@expect.maxLength 0` rejects `'a'` and `['a']`. Earlier versions ignored a `0` bound when it was set as a bare number at runtime — `annotate('expect.min', 0)` and other `expect.minLength` / `maxLength` / `min` / `max` values — and `buildJsonSchema()` dropped it (no `minimum: 0`, `maxLength: 0`, …). Bounds written in `.as` files were already enforced.
+
+**Upgrading:** types that set a bare-number `0` bound through `annotate()` now reject values outside it, and their JSON Schema now includes the bound.
+:::
+
 ## Array Uniqueness
 
 `@expect.array.uniqueItems` and `@expect.array.key` work together:
