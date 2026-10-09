@@ -85,6 +85,8 @@ Annotations from `.as` files are enforced automatically:
 
 Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions.
 
+Every rule above also applies to a **nullable** field — the target type in a union with `null` / `undefined` (`number | null`, `string[] | null`, or an alias of such a union): `null` passes and any other value is checked. Constraints on a literal member of a union (`'a' | 'b'`) are not checked — its value is fixed.
+
 ::: tip Decimal format
 Values typed as `decimal` are stored as strings to preserve precision. The validator enforces the regex `/^[+-]?\d+(\.\d+)?$/` — anything else (NaN, scientific notation, leading/trailing whitespace) is rejected with `Invalid decimal format`.
 :::
@@ -99,6 +101,15 @@ Every `number` (including `number.int`, `number.timestamp`, optional fields, uni
 A bound of `0` is a real bound: `@expect.min 0` rejects `-1`, `@expect.max 0` rejects `1`, and `@expect.maxLength 0` rejects `'a'` and `['a']`. Earlier versions ignored a `0` bound when it was set as a bare number at runtime — `annotate('expect.min', 0)` and other `expect.minLength` / `maxLength` / `min` / `max` values — and `buildJsonSchema()` dropped it (no `minimum: 0`, `maxLength: 0`, …). Bounds written in `.as` files were already enforced.
 
 **Upgrading:** types that set a bare-number `0` bound through `annotate()` now reject values outside it, and their JSON Schema now includes the bound.
+:::
+
+::: warning Nullable constraints and optional `@meta.required` (since 0.1.103)
+
+- **Constraints on nullable fields are enforced.** `@expect.*` and `@meta.required` on `T | null` now compile, and `validate()` checks them on non-null values. Before, such a field failed to compile (`got "group"`), and a type built without that check — at runtime, via `fromJsonSchema()`, or with diagnostics ignored — silently skipped the constraint. `buildJsonSchema()` puts the constraint on the matching `anyOf` member.
+- **`null` on an optional `@meta.required` field is rejected.** `@meta.required name?: string` accepts an omitted (or `undefined`) value but rejects `null` with the `@meta.required` message (`Must not be empty` / `Must be checked` by default). Partial validation keeps accepting an omitted field. Declare `name?: string | null` when `null` is a legal value.
+- **Built-in primitive extensions keep their checks inside unions, arrays and tuples.** `number.int | null`, `string.email[]` and `[number.int, string]` now validate `expect.int` / the email pattern on the member, as a plain `number.int` field always did.
+
+**Upgrading:** clients that send `null` for a cleared optional `@meta.required` field (for example a form that maps an empty input to `null`) must omit the field or send `undefined` — or declare the field `T | null`. Values on nullable fields, union members and array elements that broke a constraint and used to pass now fail.
 :::
 
 ## Array Uniqueness

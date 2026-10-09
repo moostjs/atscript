@@ -56,6 +56,8 @@ Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints ch
 | `@meta.default 'value'`      | `string`  | Default. Strings as-is; other types parsed as JSON. Applies to `prop` / `type`.                                                        |
 | `@meta.example 'value'`      | `string`  | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON. Applies to `prop` / `type`.                                         |
 
+`@meta.required` and `null` (since 0.1.103): optional field (`name?: string`) → omission OK, `null` rejected with the `@meta.required` message; nullable field (`name: string | null`) → `null` OK, a string must be non-empty.
+
 Composite key:
 
 ```atscript
@@ -86,6 +88,8 @@ Validation, translated to JSON Schema. Every `@expect.*` takes an **optional err
 | `@expect.array.key 'msg?'`                | `string?`                      | Identity key inside array element type. Target: `string`/`number`, non-optional. Pair with `uniqueItems` for key-based uniqueness.                                   |
 
 `@expect.min` / `@expect.max` apply to `number` only — NOT `decimal`.
+
+Nullable targets (since 0.1.103): every `defType`-guarded annotation (all `@expect.*` above + `@meta.required`) and `uniqueItems` also accept a union of the target with `null` / `undefined` — `number | null`, `string[] | null`, `number.int | null`, alias `type N = number | null`. `null` passes; other values are checked. Mixed unions (`number | string`) still error: `Expected type is (number), got union (number | string)`. Custom plugin hooks: `nonNullishMembers(def, doc)` from `@atscript/core` (see [plugin-development.md](plugin-development.md#type-guards)).
 
 Key + uniqueItems:
 

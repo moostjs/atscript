@@ -4,6 +4,7 @@ import type {
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
+  TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
 import type { TValidatorOptions } from './validator'
@@ -72,6 +73,30 @@ export function getRegex(pattern: string, flags?: string): RegExp {
   return regex
 }
 
+/**
+ * `true` when `def` (an optional field holding `null`) carries `@meta.required` and its
+ * type does not itself accept `null`. Shared by the walk and the fast pre-check.
+ */
+export function rejectsNullAsRequired(def: TAtscriptAnnotatedType): boolean {
+  return def.metadata.size > 0 && !!def.metadata.get('meta.required') && !acceptsNull(def)
+}
+
+function acceptsNull(def: TAtscriptAnnotatedType): boolean {
+  const type = def.type
+  if (type.kind === '') {
+    const designType = (type as TAtscriptTypeFinal).designType
+    return designType === 'null' || designType === 'any'
+  }
+  if (type.kind === 'union') {
+    for (const item of (type as TAtscriptTypeComplex).items) {
+      if (item.optional || acceptsNull(item)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
 function fastCheck(
   def: TAtscriptAnnotatedType,
   value: any,
@@ -79,7 +104,8 @@ function fastCheck(
   opts: TValidatorOptions
 ): number {
   if (def.optional && (value === undefined || value === null)) {
-    return PASS
+    // Mirrors Validator.validateSafe: `null` on an optional `@meta.required` field fails.
+    return value === null && rejectsNullAsRequired(def) ? FAIL : PASS
   }
   const type = def.type
   switch (type.kind) {
@@ -97,7 +123,9 @@ function fastCheck(
       for (const item of (type as TAtscriptTypeComplex).items) {
         const result = fastCheck(item, value, branchFlags, opts)
         if (result !== FAIL) {
-          return result
+          return result === PASS && (item.type as TAtscriptTypeFinal).value === undefined
+            ? fastCheckUnionConstraints(def.metadata, value)
+            : result
         }
       }
       return FAIL
@@ -145,21 +173,15 @@ function fastCheckFinal(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value: 
   }
   switch (designType) {
     case 'string': {
-      return typeof value === 'string' ? fastCheckString(def, value) : FAIL
+      return typeof value === 'string' ? fastCheckString(def.metadata, value) : FAIL
     }
     case 'number': {
       return typeof value === 'number' && Number.isFinite(value)
-        ? fastCheckNumber(def, value)
+        ? fastCheckNumber(def.metadata, value)
         : FAIL
     }
     case 'boolean': {
-      if (typeof value !== 'boolean') {
-        return FAIL
-      }
-      if (def.metadata.size === 0) {
-        return PASS
-      }
-      return def.metadata.get('meta.required') && value !== true ? FAIL : PASS
+      return typeof value === 'boolean' ? fastCheckBoolean(def.metadata, value) : FAIL
     }
     case 'any': {
       return PASS
@@ -183,11 +205,46 @@ function fastCheckFinal(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value: 
   }
 }
 
-// Constraint checks below mirror Validator.validateString / validateNumber / validateArray
+// Constraint checks below mirror Validator.validate{String,Number,Boolean,Array}Constraints
 // exactly (same order, same presence tests) so a failure stops at the same check.
 
-function fastCheckString(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value: string): number {
-  const metadata = def.metadata
+type TMetadata = TMetadataMap<AtscriptMetadata>
+
+/**
+ * Mirrors Validator.validateUnionConstraints: union-level constraints on the matched value
+ * (`null` / objects pass; the caller skips literal branches).
+ */
+function fastCheckUnionConstraints(metadata: TMetadata, value: any): number {
+  if (metadata.size === 0) {
+    return PASS
+  }
+  switch (typeof value) {
+    case 'string': {
+      return fastCheckString(metadata, value)
+    }
+    case 'number': {
+      return fastCheckNumber(metadata, value)
+    }
+    case 'boolean': {
+      return fastCheckBoolean(metadata, value)
+    }
+    case 'object': {
+      return Array.isArray(value) ? fastCheckArrayConstraints(metadata, value) : PASS
+    }
+    default: {
+      return PASS
+    }
+  }
+}
+
+function fastCheckBoolean(metadata: TMetadata, value: boolean): number {
+  if (metadata.size === 0) {
+    return PASS
+  }
+  return metadata.get('meta.required') && value !== true ? FAIL : PASS
+}
+
+function fastCheckString(metadata: TMetadata, value: string): number {
   if (metadata.size === 0) {
     return PASS
   }
@@ -228,8 +285,7 @@ function fastCheckString(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value:
   return PASS
 }
 
-function fastCheckNumber(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value: number): number {
-  const metadata = def.metadata
+function fastCheckNumber(metadata: TMetadata, value: number): number {
   if (metadata.size === 0) {
     return PASS
   }
@@ -314,22 +370,9 @@ function fastCheckArray(
   }
   const metadata = def.metadata
   if (metadata.size > 0) {
-    const minLength = metadata.get('expect.minLength')
-    if (
-      minLength !== undefined &&
-      value.length < (typeof minLength === 'number' ? minLength : minLength.length)
-    ) {
-      return FAIL
-    }
-    const maxLength = metadata.get('expect.maxLength')
-    if (
-      maxLength !== undefined &&
-      value.length > (typeof maxLength === 'number' ? maxLength : maxLength.length)
-    ) {
-      return FAIL
-    }
-    if (metadata.get('expect.array.uniqueItems')) {
-      return BAIL
+    const result = fastCheckArrayConstraints(metadata, value)
+    if (result !== PASS) {
+      return result
     }
   }
   const of = def.type.of
@@ -347,4 +390,23 @@ function fastCheckArray(
     }
   }
   return result
+}
+
+function fastCheckArrayConstraints(metadata: TMetadata, value: unknown[]): number {
+  const minLength = metadata.get('expect.minLength')
+  if (
+    minLength !== undefined &&
+    value.length < (typeof minLength === 'number' ? minLength : minLength.length)
+  ) {
+    return FAIL
+  }
+  const maxLength = metadata.get('expect.maxLength')
+  if (
+    maxLength !== undefined &&
+    value.length > (typeof maxLength === 'number' ? maxLength : maxLength.length)
+  ) {
+    return FAIL
+  }
+  // Duplicate detection is left to the walk.
+  return metadata.get('expect.array.uniqueItems') ? BAIL : PASS
 }

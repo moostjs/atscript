@@ -151,14 +151,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       },
       array(d) {
         const schema: TJsonSchema = { type: 'array', items: build(d.type.of) }
-        const minLength = meta.get('expect.minLength')
-        if (minLength !== undefined) {
-          schema.minItems = typeof minLength === 'number' ? minLength : minLength.length
-        }
-        const maxLength = meta.get('expect.maxLength')
-        if (maxLength !== undefined) {
-          schema.maxItems = typeof maxLength === 'number' ? maxLength : maxLength.length
-        }
+        applyArrayConstraints(schema, meta)
         return schema
       },
       union(d) {
@@ -178,7 +171,13 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
             },
           }
         }
-        return { anyOf: d.type.items.map(build) }
+        const anyOf = d.type.items.map(build)
+        if (meta.size > 0) {
+          // Constraints annotated on the union itself (`@expect.min 0` on `number | null`)
+          // go onto the members they apply to.
+          applyUnionConstraints(anyOf, meta)
+        }
+        return { anyOf }
       },
       intersection(d) {
         return { allOf: d.type.items.map(build) }
@@ -194,43 +193,8 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         if (d.type.designType && d.type.designType !== 'any') {
           const dt = d.type.designType
           schema.type = dt === 'undefined' ? 'null' : dt === 'decimal' ? 'string' : dt
-          if (schema.type === 'number' && meta.get('expect.int')) {
-            schema.type = 'integer'
-          }
         }
-        if (schema.type === 'string') {
-          if (meta.get('meta.required')) {
-            schema.minLength = 1
-          }
-          const minLength = meta.get('expect.minLength')
-          if (minLength !== undefined) {
-            schema.minLength = typeof minLength === 'number' ? minLength : minLength.length
-          }
-          const maxLength = meta.get('expect.maxLength')
-          if (maxLength !== undefined) {
-            schema.maxLength = typeof maxLength === 'number' ? maxLength : maxLength.length
-          }
-          const patterns = meta.get('expect.pattern') as Array<{ pattern: string }> | undefined
-          if (patterns?.length) {
-            if (patterns.length === 1) {
-              schema.pattern = patterns[0].pattern
-            } else {
-              schema.allOf = (schema.allOf || []).concat(
-                patterns.map(p => ({ pattern: p.pattern }))
-              )
-            }
-          }
-        }
-        if (schema.type === 'number' || schema.type === 'integer') {
-          const min = meta.get('expect.min')
-          if (min !== undefined) {
-            schema.minimum = typeof min === 'number' ? min : min.minValue
-          }
-          const max = meta.get('expect.max')
-          if (max !== undefined) {
-            schema.maximum = typeof max === 'number' ? max : max.maxValue
-          }
-        }
+        applyScalarConstraints(schema, meta)
         return schema
       },
     })
@@ -241,6 +205,110 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     return { ...schema, $defs: defs }
   }
   return schema
+}
+
+type TMetadata = TAtscriptAnnotatedType['metadata']
+
+/** `@expect.minLength` / `maxLength` → `minItems` / `maxItems` on an array schema. */
+function applyArrayConstraints(schema: TJsonSchema, meta: TMetadata): void {
+  const minLength = meta.get('expect.minLength')
+  if (minLength !== undefined) {
+    schema.minItems = typeof minLength === 'number' ? minLength : minLength.length
+  }
+  const maxLength = meta.get('expect.maxLength')
+  if (maxLength !== undefined) {
+    schema.maxItems = typeof maxLength === 'number' ? maxLength : maxLength.length
+  }
+}
+
+/** String / number constraints on a scalar schema whose `type` is already set. */
+function applyScalarConstraints(schema: TJsonSchema, meta: TMetadata): void {
+  if (schema.type === 'number' && meta.get('expect.int')) {
+    schema.type = 'integer'
+  }
+  if (schema.type === 'string') {
+    if (meta.get('meta.required')) {
+      schema.minLength = 1
+    }
+    const minLength = meta.get('expect.minLength')
+    if (minLength !== undefined) {
+      schema.minLength = typeof minLength === 'number' ? minLength : minLength.length
+    }
+    const maxLength = meta.get('expect.maxLength')
+    if (maxLength !== undefined) {
+      schema.maxLength = typeof maxLength === 'number' ? maxLength : maxLength.length
+    }
+    const patterns = meta.get('expect.pattern') as Array<{ pattern: string }> | undefined
+    if (patterns?.length) {
+      if (patterns.length === 1) {
+        schema.pattern = patterns[0].pattern
+      } else {
+        schema.allOf = (schema.allOf || []).concat(patterns.map(p => ({ pattern: p.pattern })))
+      }
+    }
+  }
+  if (schema.type === 'number' || schema.type === 'integer') {
+    const min = meta.get('expect.min')
+    if (min !== undefined) {
+      schema.minimum = typeof min === 'number' ? min : min.minValue
+    }
+    const max = meta.get('expect.max')
+    if (max !== undefined) {
+      schema.maximum = typeof max === 'number' ? max : max.maxValue
+    }
+  }
+}
+
+const LOWER_BOUNDS = new Set(['minimum', 'minLength', 'minItems'])
+const UPPER_BOUNDS = new Set(['maximum', 'maxLength', 'maxItems'])
+
+/**
+ * Puts union-level constraints onto the matching `anyOf` members (numbers, strings,
+ * arrays; nested `anyOf` members recursively). When a member already has the same
+ * bound, the stricter one wins; patterns accumulate.
+ */
+function applyUnionConstraints(members: TJsonSchema[], meta: TMetadata): void {
+  for (const member of members) {
+    if (Array.isArray(member.anyOf)) {
+      applyUnionConstraints(member.anyOf, meta)
+      continue
+    }
+    // A literal member is exempt, as in the validator: its value is fixed.
+    if (member.const !== undefined) {
+      continue
+    }
+    const type = member.type
+    const extra: TJsonSchema = { type }
+    if (type === 'array') {
+      applyArrayConstraints(extra, meta)
+    } else if (type === 'string' || type === 'number' || type === 'integer') {
+      applyScalarConstraints(extra, meta)
+    } else {
+      continue
+    }
+    if (extra.type === 'integer') {
+      member.type = 'integer'
+    }
+    for (const [key, value] of Object.entries(extra)) {
+      if (key === 'type') {
+        continue
+      }
+      if (key === 'pattern' || key === 'allOf') {
+        const patterns = key === 'pattern' ? [{ pattern: value }] : (value as TJsonSchema[])
+        if (member.pattern === undefined && key === 'pattern' && !member.allOf) {
+          member.pattern = value
+        } else {
+          member.allOf = (member.allOf || []).concat(patterns)
+        }
+      } else if (member[key] === undefined) {
+        member[key] = value
+      } else if (LOWER_BOUNDS.has(key)) {
+        member[key] = Math.max(member[key], value)
+      } else if (UPPER_BOUNDS.has(key)) {
+        member[key] = Math.min(member[key], value)
+      }
+    }
+  }
 }
 
 /**

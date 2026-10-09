@@ -1481,7 +1481,11 @@ export class AtscriptDoc {
           if (resolvedType && isRef(t.parentNode) && t.parentNode.annotations) {
             for (const a of t.parentNode.annotations) {
               const spec = this.resolveAnnotation(a.token.text.slice(1))
-              const msgs = spec?.validateTargetType(resolvedType, a.token.range)
+              const msgs = spec?.validateTargetType(
+                resolvedType,
+                a.token.range,
+                unwound?.doc || this
+              )
               if (msgs) {
                 this._allMessages.push(...msgs)
               }

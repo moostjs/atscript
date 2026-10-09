@@ -532,3 +532,74 @@ describe('Validator zero bounds', () => {
     expect(v.validate(5, true)).toBe(false)
   })
 })
+
+describe('Validator union-level constraints', () => {
+  const $ = defineAnnotatedType
+  const nul = () => $().designType('null').$type
+  const lit = (v: number) => $().designType('number').value(v).$type
+
+  it('applies constraints annotated on a nullable union to non-null values', () => {
+    const t = $('object').prop(
+      'a',
+      $('union')
+        .item($().designType('number').$type)
+        .item(nul())
+        .annotate('expect.min', { minValue: 0 })
+        .annotate('expect.max', { maxValue: 10, message: 'too big' }).$type
+    ).$type
+    const v = new Validator(t)
+    expect(v.validate({ a: null }, true)).toBe(true)
+    expect(v.validate({ a: 5 }, true)).toBe(true)
+    expect(v.validate({ a: -5 }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'a', message: 'Expected minimum 0, got -5' }])
+    expect(v.validate({ a: 50 }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'a', message: 'too big' }])
+  })
+
+  it('does not apply them to literal (enum) members', () => {
+    const t = $('union').item(lit(1)).item(lit(5)).item(lit(9)).annotate('expect.max', {
+      maxValue: 5,
+    }).$type
+    expect(new Validator(t).validate(9, true)).toBe(true)
+  })
+})
+
+describe('Validator @meta.required on optional fields', () => {
+  const $ = defineAnnotatedType
+  const make = (required: unknown) =>
+    $('object').prop(
+      'name',
+      $().designType('string').annotate('meta.required', required).optional().$type
+    ).$type
+
+  it('rejects null but allows omission', () => {
+    const v = new Validator(make(true))
+    expect(v.validate({}, true)).toBe(true)
+    expect(v.validate({ name: undefined }, true)).toBe(true)
+    expect(v.validate({ name: null }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'name', message: 'Must not be empty' }])
+  })
+
+  it('uses the custom message', () => {
+    const v = new Validator(make({ message: 'Name please' }))
+    expect(v.validate({ name: null }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'name', message: 'Name please' }])
+  })
+
+  it('accepts null when the optional type is nullable', () => {
+    const t = $('object').prop(
+      'name',
+      $('union')
+        .item($().designType('string').$type)
+        .item($().designType('null').$type)
+        .annotate('meta.required', true)
+        .optional().$type
+    ).$type
+    expect(new Validator(t).validate({ name: null }, true)).toBe(true)
+  })
+
+  it('accepts null on optional fields without @meta.required', () => {
+    const t = $('object').prop('name', $().designType('string').optional().$type).$type
+    expect(new Validator(t).validate({ name: null }, true)).toBe(true)
+  })
+})

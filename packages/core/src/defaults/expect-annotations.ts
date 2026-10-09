@@ -1,13 +1,16 @@
-import { AnnotationSpec } from '../annotations'
+import { AnnotationSpec, nonNullishMembers } from '../annotations'
 import type { TAnnotationsTree } from '../config'
-import { isArray, isPrimitive, isRef } from '../parser/nodes'
+import { isArray, isPrimitive, isRef, type SemanticNode } from '../parser/nodes'
 import type { TMessages } from '../parser/types'
+
+const NULLABLE_NOTE =
+  'Also allowed on a nullable field (`T | null`, `T | undefined`): `null` passes, ' +
+  'any other value must satisfy the constraint.'
 
 export const expectAnnotations: TAnnotationsTree = {
   minLength: new AnnotationSpec({
     description:
-      'Validates that a string or array has a minimum length.' +
-      '\n\n**Example:**' +
+      `Validates that a string or array has a minimum length. ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.minLength 5' +
       'name: string' +
@@ -30,8 +33,7 @@ export const expectAnnotations: TAnnotationsTree = {
 
   maxLength: new AnnotationSpec({
     description:
-      'Validates that a string or array has a maximum length.' +
-      '\n\n**Example:**' +
+      `Validates that a string or array has a maximum length. ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.maxLength 5' +
       'name: string' +
@@ -54,8 +56,7 @@ export const expectAnnotations: TAnnotationsTree = {
 
   min: new AnnotationSpec({
     description:
-      'Validates that a number is greater than or equal to a minimum value.' +
-      '\n\n**Example:**' +
+      `Validates that a number is greater than or equal to a minimum value. ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.min 18' +
       'age: number' +
@@ -78,8 +79,7 @@ export const expectAnnotations: TAnnotationsTree = {
 
   max: new AnnotationSpec({
     description:
-      'Validates that a number is less than or equal to a maximum value.' +
-      '\n\n**Example:**' +
+      `Validates that a number is less than or equal to a maximum value. ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.max 10' +
       'count: number' +
@@ -102,8 +102,7 @@ export const expectAnnotations: TAnnotationsTree = {
 
   int: new AnnotationSpec({
     description:
-      'Validates that a number is an integer (no decimal places).' +
-      '\n\n**Example:**' +
+      `Validates that a number is an integer (no decimal places). ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.int' +
       'age: number' +
@@ -113,8 +112,7 @@ export const expectAnnotations: TAnnotationsTree = {
 
   pattern: new AnnotationSpec({
     description:
-      'Validates that a string matches a specific pattern.' +
-      '\n\n**Example:**' +
+      `Validates that a string matches a specific pattern. ${NULLABLE_NOTE}\n\n**Example:**` +
       '```atscript' +
       '@expect.pattern "[a-z]+", "u"' +
       'name: string' +
@@ -235,6 +233,7 @@ export const expectAnnotations: TAnnotationsTree = {
         'uniqueness is checked by those keys only; otherwise by deep equality of the whole object.\n\n' +
         'Unlike `@expect.array.key` (which only *identifies* key fields for lookup/patch operations), ' +
         '`@expect.array.uniqueItems` actively *enforces* uniqueness during validation.\n\n' +
+        'Also allowed on a nullable array (`T[] | null`); `null` passes.\n\n' +
         '**Examples:**\n' +
         '```atscript\n' +
         '// Primitive array — no duplicates allowed\n' +
@@ -266,16 +265,19 @@ export const expectAnnotations: TAnnotationsTree = {
         if (!definition) {
           return errors
         }
-        let wrongType = false
+        let def: SemanticNode | undefined = definition
+        let defDoc = doc
         if (isRef(definition)) {
-          const def = doc.unwindType(definition.id!, definition.chain)?.def
-          if (!isArray(def)) {
-            wrongType = true
-          }
-        } else if (!isArray(definition)) {
-          wrongType = true
+          const unwound = doc.unwindType(definition.id!, definition.chain)
+          def = unwound?.def
+          defDoc = unwound?.doc || doc
         }
-        if (wrongType) {
+        // A nullable array (`T[] | null`) is accepted like `T[]`.
+        const members = nonNullishMembers(def, defDoc)
+        const isArrayField = members
+          ? members.length > 0 && members.every(m => isArray(m))
+          : isArray(def)
+        if (!isArrayField) {
           errors.push({
             message: `@expect.array.uniqueItems requires an array field`,
             severity: 1,

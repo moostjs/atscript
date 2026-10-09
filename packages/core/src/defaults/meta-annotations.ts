@@ -93,7 +93,9 @@ export const metaAnnotations: TAnnotationsTree = {
     description:
       'Marks a field as required for form validation. ' +
       'For strings: must contain at least one non-whitespace character. ' +
-      'For booleans: must be true.' +
+      'For booleans: must be true. ' +
+      'On an optional field (`name?: string`) the field may be omitted, but `null` is rejected. ' +
+      'On a nullable field (`string | null`) `null` is accepted and a string must not be empty.' +
       '\n\n**Example:**' +
       '```atscript' +
       '@meta.required' +

@@ -64,6 +64,8 @@ Annotations from `.as` files are translated into JSON Schema constraints:
 | `@expect.int`       | `type: 'integer'`        | Changes `number` to `integer`                                  |
 | `@expect.pattern`   | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
 
+On a nullable field (`@expect.max 10` on `number | null`), the constraint goes onto the matching non-null `anyOf` member: `{ anyOf: [{ type: 'number', maximum: 10 }, { type: 'null' }] }` (since 0.1.103). When the member has its own bound, the stricter one is kept.
+
 ::: warning Pattern properties are dropped
 Atscript's wildcard-key syntax (`[/regex/]: Type`) has no equivalent in `buildJsonSchema` output — those entries are silently omitted from the generated schema. If you need pattern-keyed maps in JSON Schema, model them as `additionalProperties` with an external post-process step.
 :::

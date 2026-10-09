@@ -523,6 +523,31 @@ Available `defType` values:
 
 `'object'` matches both interfaces and inline structures; `'union'` / `'intersection'` match group nodes.
 
+A nullable union also passes the `defType` check when every member other than `null` / `undefined` matches (since 0.1.103): `defType: ['number']` accepts `number | null`, `number.int | undefined` and an alias `type N = number | null`. Mixed unions (`number | string`) are still rejected.
+
+To give a custom `validate` hook the same behavior, use `nonNullishMembers(def, doc)` from `@atscript/core`. It returns the resolved non-null members of a union (nested unions and aliases flattened), or `undefined` when `def` is not a union:
+
+```typescript
+import { AnnotationSpec, isArray, isRef, nonNullishMembers } from '@atscript/core'
+
+new AnnotationSpec({
+  validate(token, args, doc) {
+    let def = token.parentNode!.getDefinition()
+    let defDoc = doc
+    if (isRef(def)) {
+      const unwound = doc.unwindType(def.id!, def.chain)
+      def = unwound?.def
+      defDoc = unwound?.doc || doc
+    }
+    const members = nonNullishMembers(def, defDoc)
+    const ok = members ? members.length > 0 && members.every(isArray) : isArray(def)
+    return ok ? [] : [{ severity: 1, message: 'Requires an array field', range: token.range }]
+  },
+})
+```
+
+Pass the document the union is declared in (the `doc` returned by `unwindType`), so member refs resolve.
+
 ## AST Modification with modify()
 
 The `modify` hook runs after successful validation and can mutate the AST. This is a powerful feature for plugins that need to inject computed properties or restructure the parsed document.

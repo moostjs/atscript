@@ -7,9 +7,15 @@ import type {
   TAtscriptTypeComplex,
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
+  TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
-import { DECIMAL_RE, fastCheckPasses, getRegex } from './validator-fast-check'
+import {
+  DECIMAL_RE,
+  fastCheckPasses,
+  getRegex,
+  rejectsNullAsRequired,
+} from './validator-fast-check'
 
 interface TError {
   path: string
@@ -230,6 +236,12 @@ export class Validator<
       def = replaced
     }
     if (def.optional && (value === undefined || value === null)) {
+      // `@meta.required` on an optional field: omitting it is fine, `null` is not
+      // (unless the type itself accepts null, e.g. `string | null`).
+      if (value === null && rejectsNullAsRequired(def)) {
+        this.error(requiredMessage(def))
+        return false
+      }
       return true
     }
     if (this.hasPlugins) {
@@ -309,7 +321,7 @@ export class Validator<
 
       if (this.validateSafe(item, value)) {
         this.stackErrors.pop()
-        return true
+        return this.validateUnionConstraints(def, item, value)
       }
 
       const branchErrors = this.stackErrors.pop()
@@ -333,6 +345,42 @@ export class Validator<
       .join(', ')
     this.error(`Value does not match any of the allowed types: ${expected}`, undefined, details)
     return false
+  }
+
+  /**
+   * Constraints annotated on the union itself (`@expect.min 0` on `number | null`)
+   * apply to the non-null value that matched `branch`, on top of the branch's own.
+   * A literal branch (an enum value) is exempt: its value is fixed.
+   */
+  protected validateUnionConstraints(
+    def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+    branch: TAtscriptAnnotatedType,
+    value: any
+  ): boolean {
+    const metadata = def.metadata
+    if (metadata.size === 0 || (branch.type as TAtscriptTypeFinal).value !== undefined) {
+      return true
+    }
+    switch (typeof value) {
+      case 'string': {
+        return this.validateStringConstraints(metadata, value)
+      }
+      case 'number': {
+        return this.validateNumberConstraints(metadata, value)
+      }
+      case 'boolean': {
+        return this.validateBooleanConstraints(metadata, value)
+      }
+      case 'object': {
+        if (Array.isArray(value)) {
+          return this.validateArrayConstraints(metadata, value, arrayElementType(branch))
+        }
+        return true
+      }
+      default: {
+        return true
+      }
+    }
   }
 
   protected validateIntersection(
@@ -370,7 +418,34 @@ export class Validator<
       this.error('Expected array')
       return false
     }
-    const minLength = def.metadata.get('expect.minLength')
+    if (def.metadata.size > 0 && !this.validateArrayConstraints(def.metadata, value, def.type.of)) {
+      return false
+    }
+    let i = 0
+    let passed = true
+    for (const item of value) {
+      this.push(String(i))
+      if (!this.validateSafe(def.type.of, item)) {
+        passed = false
+        this.pop(true)
+        if (this.limitExceeded) {
+          return false
+        }
+      } else {
+        this.pop(false)
+      }
+      i++
+    }
+    return passed
+  }
+
+  /** `@expect.minLength` / `maxLength` / `array.uniqueItems` checks for an array value. */
+  protected validateArrayConstraints(
+    metadata: TMetadataMap<AtscriptMetadata>,
+    value: any[],
+    of?: TAtscriptAnnotatedType
+  ): boolean {
+    const minLength = metadata.get('expect.minLength')
     if (minLength !== undefined) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
@@ -382,7 +457,7 @@ export class Validator<
         return false
       }
     }
-    const maxLength = def.metadata.get('expect.maxLength')
+    const maxLength = metadata.get('expect.maxLength')
     if (maxLength !== undefined) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
@@ -394,15 +469,13 @@ export class Validator<
         return false
       }
     }
-    const uniqueItems = def.metadata.get('expect.array.uniqueItems') as
-      | { message?: string }
-      | undefined
+    const uniqueItems = metadata.get('expect.array.uniqueItems') as { message?: string } | undefined
     if (uniqueItems) {
       const separator = '▼↩'
       const seen = new Set<string>()
       const keyProps = new Set<string>()
-      if (def.type.of.type.kind === 'object') {
-        for (const [key, val] of def.type.of.type.props.entries()) {
+      if (of?.type.kind === 'object') {
+        for (const [key, val] of of.type.props.entries()) {
           if (val.metadata.get('expect.array.key')) {
             keyProps.add(key)
           }
@@ -428,22 +501,7 @@ export class Validator<
         seen.add(key)
       }
     }
-    let i = 0
-    let passed = true
-    for (const item of value) {
-      this.push(String(i))
-      if (!this.validateSafe(def.type.of, item)) {
-        passed = false
-        this.pop(true)
-        if (this.limitExceeded) {
-          return false
-        }
-      } else {
-        this.pop(false)
-      }
-      i++
-    }
-    return passed
+    return true
   }
 
   protected validateObject(def: TAtscriptAnnotatedType<TAtscriptTypeObject>, value: any): boolean {
@@ -642,10 +700,18 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: string
   ): boolean {
-    if (def.metadata.size === 0) {
+    return this.validateStringConstraints(def.metadata, value)
+  }
+
+  /** `@meta.required` / `@expect.minLength` / `maxLength` / `pattern` checks for a string value. */
+  protected validateStringConstraints(
+    metadata: TMetadataMap<AtscriptMetadata>,
+    value: string
+  ): boolean {
+    if (metadata.size === 0) {
       return true
     }
-    const filled = def.metadata.get('meta.required')
+    const filled = metadata.get('meta.required')
     if (filled) {
       if (value.trim().length === 0) {
         const message =
@@ -654,7 +720,7 @@ export class Validator<
         return false
       }
     }
-    const minLength = def.metadata.get('expect.minLength')
+    const minLength = metadata.get('expect.minLength')
     if (minLength !== undefined) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
       if (value.length < length) {
@@ -666,7 +732,7 @@ export class Validator<
         return false
       }
     }
-    const maxLength = def.metadata.get('expect.maxLength')
+    const maxLength = metadata.get('expect.maxLength')
     if (maxLength !== undefined) {
       const length = typeof maxLength === 'number' ? maxLength : maxLength.length
       if (value.length > length) {
@@ -678,7 +744,7 @@ export class Validator<
         return false
       }
     }
-    const patterns = def.metadata.get('expect.pattern')
+    const patterns = metadata.get('expect.pattern')
     for (const { pattern, flags, message } of patterns || []) {
       if (!pattern) {
         continue
@@ -696,17 +762,25 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: number
   ): boolean {
-    if (def.metadata.size === 0) {
+    return this.validateNumberConstraints(def.metadata, value)
+  }
+
+  /** `@expect.int` / `min` / `max` checks for a number value. */
+  protected validateNumberConstraints(
+    metadata: TMetadataMap<AtscriptMetadata>,
+    value: number
+  ): boolean {
+    if (metadata.size === 0) {
       return true
     }
-    const int = def.metadata.get('expect.int') as boolean | { message?: string }
+    const int = metadata.get('expect.int') as boolean | { message?: string }
     if (int && value % 1 !== 0) {
       const message =
         typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`
       this.error(message)
       return false
     }
-    const min = def.metadata.get('expect.min')
+    const min = metadata.get('expect.min')
     if (min !== undefined) {
       const minValue = typeof min === 'number' ? min : min.minValue
       if (value < minValue) {
@@ -718,7 +792,7 @@ export class Validator<
         return false
       }
     }
-    const max = def.metadata.get('expect.max')
+    const max = metadata.get('expect.max')
     if (max !== undefined) {
       const maxValue = typeof max === 'number' ? max : max.maxValue
       if (value > maxValue) {
@@ -737,10 +811,18 @@ export class Validator<
     def: TAtscriptAnnotatedType<TAtscriptTypeFinal>,
     value: boolean
   ): boolean {
-    if (def.metadata.size === 0) {
+    return this.validateBooleanConstraints(def.metadata, value)
+  }
+
+  /** `@meta.required` check for a boolean value (must be `true`). */
+  protected validateBooleanConstraints(
+    metadata: TMetadataMap<AtscriptMetadata>,
+    value: boolean
+  ): boolean {
+    if (metadata.size === 0) {
       return true
     }
-    const filled = def.metadata.get('meta.required')
+    const filled = metadata.get('meta.required')
     if (filled) {
       if (value !== true) {
         const message =
@@ -751,6 +833,38 @@ export class Validator<
     }
     return true
   }
+}
+
+/** The `@meta.required` error message for `def` (custom message or the type's default). */
+function requiredMessage(def: TAtscriptAnnotatedType): string {
+  const filled = def.metadata.get('meta.required')
+  if (typeof filled === 'object' && filled.message) {
+    return filled.message
+  }
+  return def.type.kind === '' && (def.type as TAtscriptTypeFinal).designType === 'boolean'
+    ? 'Must be checked'
+    : 'Must not be empty'
+}
+
+/**
+ * Element type of the array a union branch holds — through nested unions too
+ * (`Items | undefined` with `type Items = Item[] | null`), so `@expect.array.key`
+ * fields of the elements are found.
+ */
+function arrayElementType(branch: TAtscriptAnnotatedType): TAtscriptAnnotatedType | undefined {
+  const type = branch.type
+  if (type.kind === 'array') {
+    return (type as TAtscriptTypeArray).of
+  }
+  if (type.kind === 'union') {
+    for (const item of (type as TAtscriptTypeComplex).items) {
+      const of = arrayElementType(item)
+      if (of) {
+        return of
+      }
+    }
+  }
+  return undefined
 }
 
 /** Error thrown by {@link Validator.validate} when validation fails. Contains structured error details. */

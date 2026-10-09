@@ -8,6 +8,7 @@ import {
   isPrimitive,
   isRef,
   isStructure,
+  type SemanticGroup,
   type SemanticNode,
   type SemanticPrimitiveNode,
   type TNodeEntity,
@@ -315,10 +316,13 @@ export class AnnotationSpec {
         !!idToken && !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
       if (!isAnnotateEntry) {
         let def = parentNode.getDefinition()
+        let defDoc = doc
         if (isRef(def)) {
-          def = doc.unwindType(def.id!, def.chain)?.def || def
+          const unwound = doc.unwindType(def.id!, def.chain)
+          def = unwound?.def || def
+          defDoc = unwound?.doc || doc
         }
-        messages.push(...(this.validateTargetType(def, mainToken.range) || []))
+        messages.push(...(this.validateTargetType(def, mainToken.range, defDoc) || []))
       }
     }
 
@@ -336,32 +340,41 @@ export class AnnotationSpec {
    * guard is configured. Shared by the parse-time check (for inline props) and
    * the deferred annotate-entry check in `AtscriptDoc.getDiagMessages`, where
    * imported target types finally resolve.
+   *
+   * A union also matches when every member other than `null` / `undefined`
+   * matches (`number | null`, `string[] | null`, an alias of such a union).
+   * Union members are refs, so `doc` (the document the union is declared in) is
+   * needed to resolve them; without it a union never matches.
    */
-  validateTargetType(def: SemanticNode | undefined, range: Token['range']): TMessages | undefined {
-    if (!this.config.defType?.length) {
+  validateTargetType(
+    def: SemanticNode | undefined,
+    range: Token['range'],
+    doc?: AtscriptDoc
+  ): TMessages | undefined {
+    const defType = this.config.defType
+    if (!defType?.length) {
       return undefined
     }
-    let defEntity = def?.entity || 'unknown'
-    if (isInterface(def) || isStructure(def)) {
-      defEntity = 'object'
-    } else if (isGroup(def) && def.entity !== 'tuple') {
-      defEntity = def.op === '&' ? 'intersection' : 'union'
+    if (matchesDefType(def, defType)) {
+      return undefined
     }
-    if (
-      (!isPrimitive(def) && !this.config.defType.includes(defEntity as 'array')) ||
-      (isPrimitive(def) && !this.config.defType.includes(def.type))
-    ) {
-      return [
-        {
-          message: `Expected type is (${this.config.defType.join(' | ')}), got "${
-            isPrimitive(def) ? def.type : def?.entity || 'unknown'
-          }"`,
-          severity: 1,
-          range,
-        },
-      ]
+    let got: string
+    if (isGroup(def) && def.entity !== 'tuple' && def.op !== '&') {
+      const members = doc ? nonNullishMembers(def, doc) : undefined
+      if (members?.length && members.every(m => matchesDefType(m, defType))) {
+        return undefined
+      }
+      got = `union (${describeUnionMembers(def, doc)})`
+    } else {
+      got = `"${describeNode(def)}"`
     }
-    return undefined
+    return [
+      {
+        message: `Expected type is (${defType.join(' | ')}), got ${got}`,
+        severity: 1,
+        range,
+      },
+    ]
   }
 
   renderDocs(index: number | string) {
@@ -436,4 +449,100 @@ export function resolveAnnotation(
     return current.$self
   }
   return undefined
+}
+
+/** `null` / `undefined` / `void` primitive. */
+function isNullishPrimitive(node: SemanticNode | undefined): boolean {
+  return isPrimitive(node) && (node.type === 'null' || node.type === 'void')
+}
+
+/** Whether a resolved node satisfies a `defType` guard (a union as a whole, not its members). */
+function matchesDefType(
+  def: SemanticNode | undefined,
+  defType: Array<SemanticPrimitiveNode['type']>
+): boolean {
+  return defType.includes(describeNode(def) as SemanticPrimitiveNode['type'])
+}
+
+/** The `defType` vocabulary name of a resolved node (`string`, `object`, `union`, `array`, …). */
+function describeNode(def: SemanticNode | undefined): string {
+  if (isPrimitive(def)) {
+    return def.type || 'unknown'
+  }
+  if (isInterface(def) || isStructure(def)) {
+    return 'object'
+  }
+  if (isGroup(def) && def.entity !== 'tuple') {
+    return def.op === '&' ? 'intersection' : 'union'
+  }
+  return def?.entity || 'unknown'
+}
+
+/** Walks a `|` union (flattening nested unions and union aliases), resolving member refs. */
+function walkUnionMembers(
+  def: SemanticNode,
+  doc: AtscriptDoc | undefined,
+  cb: (member: SemanticNode | undefined) => void,
+  seen = new Set<SemanticNode>()
+): void {
+  if (seen.has(def)) {
+    return
+  }
+  seen.add(def)
+  for (const item of (def as SemanticGroup).unwrap()) {
+    let member: SemanticNode | undefined = item
+    let memberDoc = doc
+    if (isRef(member)) {
+      const unwound = doc?.unwindType(member.id!, member.chain)
+      member = unwound?.def
+      memberDoc = unwound?.doc || doc
+    }
+    if (isGroup(member) && member.entity !== 'tuple' && member.op !== '&') {
+      walkUnionMembers(member, memberDoc, cb, seen)
+    } else {
+      cb(member)
+    }
+  }
+}
+
+function describeUnionMembers(def: SemanticNode, doc: AtscriptDoc | undefined): string {
+  const names: string[] = []
+  walkUnionMembers(def, doc, m => {
+    const name = describeNode(m)
+    if (!names.includes(name)) {
+      names.push(name)
+    }
+  })
+  return names.join(' | ')
+}
+
+/**
+ * Resolved members of a union other than `null` / `undefined`, or `undefined`
+ * when `def` is not a union. Nested unions and union aliases are flattened and
+ * member refs are resolved through `doc` (the document `def` is declared in);
+ * members that can't be resolved are left out (they are reported as unknown
+ * identifiers elsewhere).
+ *
+ * Use it in an annotation's `validate` hook to accept nullable targets, e.g.
+ * treat `string | null` like `string`:
+ *
+ * ```ts
+ * const members = nonNullishMembers(def, doc)
+ * const ok = members ? members.length > 0 && members.every(isWanted) : isWanted(def)
+ * ```
+ */
+export function nonNullishMembers(
+  def: SemanticNode | undefined,
+  doc: AtscriptDoc
+): SemanticNode[] | undefined {
+  if (!isGroup(def) || def.entity === 'tuple' || def.op === '&') {
+    return undefined
+  }
+  const members: SemanticNode[] = []
+  walkUnionMembers(def, doc, m => {
+    if (m && !isNullishPrimitive(m)) {
+      members.push(m)
+    }
+  })
+  return members
 }

@@ -160,6 +160,105 @@ function makeUnions() {
     ).$type,
   }).$type
 }
+/** Constraints annotated on the union itself (`@expect.min 0` on `number | null`). */
+function makeUnionConstraints() {
+  const nul = () => prim('null').$type
+  const item = obj({
+    label: union(str().$type, nul())
+      .annotate('expect.maxLength', { length: 3 })
+      .annotate('meta.required', true).$type,
+  }).$type
+  return obj({
+    score: union(num().$type, nul())
+      .annotate('expect.min', { minValue: 0 })
+      .annotate('expect.max', { maxValue: 10 })
+      .annotate('expect.int', true).$type,
+    code: union(str().$type, nul())
+      .annotate('expect.minLength', { length: 2 })
+      .annotate('expect.pattern', { pattern: '^[a-z]+$' }, true).$type,
+    tags: union(arr(str().$type).$type, nul())
+      .annotate('expect.maxLength', { length: 2 })
+      .annotate('expect.array.uniqueItems', {}).$type,
+    level: union(lit(1).$type, lit(5).$type, lit(9).$type).annotate('expect.max', { maxValue: 5 })
+      .$type,
+    agree: union(bool().$type, nul()).annotate('meta.required', true).$type,
+    opt: union(num().$type, nul()).annotate('expect.max', { maxValue: 3 }).optional().$type,
+    reqOpt: str({ 'meta.required': true }).optional().$type,
+    reqOptNullable: union(str().$type, nul()).annotate('meta.required', true).optional().$type,
+    reqBool: bool({ 'meta.required': { message: 'tick it' } }).optional().$type,
+    items: arr(item).$type,
+  }).$type
+}
+const validUnionConstraints = (): any => ({
+  score: 3,
+  code: 'ab',
+  tags: ['a'],
+  level: 5,
+  agree: true,
+  opt: 2,
+  reqOpt: 'x',
+  reqOptNullable: null,
+  reqBool: true,
+  items: [{ label: 'abc' }, { label: null }],
+})
+/** Union-level constraints in nested unions, intersections, tuples, arrays and mixed unions. */
+function makeUnionConstraintsNested() {
+  const nul = () => prim('null').$type
+  const keyed = obj({
+    id: str({ 'expect.array.key': true }).$type,
+    v: num().$type,
+  }).$type
+  return obj({
+    // metadata at both union levels
+    nested: union(
+      union(num().$type, str().$type).annotate('expect.max', { maxValue: 10 }).$type,
+      nul()
+    )
+      .annotate('expect.min', { minValue: 1 })
+      .annotate('expect.minLength', { length: 2 }).$type,
+    anyOrNull: union(prim('any').$type, nul()).annotate('expect.minLength', { length: 2 }).$type,
+    litOrNum: union(lit(100).$type, num().$type, nul()).annotate('expect.max', { maxValue: 5 })
+      .$type,
+    both: $('intersection')
+      .item(union(num().$type, nul()).annotate('expect.min', { minValue: 0 }).$type)
+      .item(union(num().$type, nul()).annotate('expect.max', { maxValue: 5 }).$type).$type,
+    pair: $('tuple')
+      .item(union(num().$type, nul()).annotate('expect.int', true).$type)
+      .item(union(str().$type, nul()).annotate('expect.maxLength', { length: 2 }).$type).$type,
+    list: arr(union(str().$type, nul()).annotate('expect.minLength', { length: 1 }).$type, {
+      'expect.maxLength': { length: 3 },
+    }).$type,
+    keyedList: union(arr(keyed).$type, nul()).annotate('expect.array.uniqueItems', {}).$type,
+    keyedNested: union(union(arr(keyed).$type, nul()).$type, prim('undefined').$type).annotate(
+      'expect.array.uniqueItems',
+      {}
+    ).$type,
+    mixed: union(num().$type, str().$type, bool().$type)
+      .annotate('meta.required', true)
+      .annotate('expect.min', { minValue: 1 }).$type,
+    reqUndef: union(bool().$type, prim('undefined').$type)
+      .annotate('meta.required', true)
+      .optional().$type,
+  }).$type
+}
+const validUnionConstraintsNested = (): any => ({
+  nested: 5,
+  anyOrNull: 'ab',
+  litOrNum: 100,
+  both: 3,
+  pair: [1, 'ab'],
+  list: ['a', null],
+  keyedList: [
+    { id: 'a', v: 1 },
+    { id: 'b', v: 1 },
+  ],
+  keyedNested: [
+    { id: 'a', v: 1 },
+    { id: 'b', v: 2 },
+  ],
+  mixed: 'x',
+  reqUndef: true,
+})
 const validUnions = (): any => ({
   pay: { kind: 'bank', iban: 'DE0012345678' },
   nullable: null,
@@ -543,6 +642,10 @@ describe('Validator fast path — equivalence with the full walk', () => {
   it('unions, tuples, intersections, nullable: randomized', () =>
     fuzz(makeUnions(), validUnions, 2))
   it('misc primitives, patterns, arrays, phantom: randomized', () => fuzz(makeMisc(), validMisc, 3))
+  it('union-level constraints and optional @meta.required: randomized', () =>
+    fuzz(makeUnionConstraints(), validUnionConstraints, 8))
+  it('union-level constraints in nested / intersected / tupled / mixed unions: randomized', () =>
+    fuzz(makeUnionConstraintsNested(), validUnionConstraintsNested, 9))
   it('props patterns: randomized', () =>
     fuzz(makeRecord(), () => ({ 'fixed': 1, 'x-a': 'ab', 'x-n': 2 }), 4))
   it('recursive type: randomized', () =>

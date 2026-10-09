@@ -2,13 +2,14 @@ import {
   AnnotationSpec,
   AtscriptDoc,
   getSiblingAnnotation,
+  PluginManager,
   SemanticInterfaceNode,
   SemanticPrimitiveNode,
 } from '@atscript/core'
 import type { SemanticNode, TAtscriptDocConfig, TValueCandidate, Token } from '@atscript/core'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { CompletionItemKind } from 'vscode-languageserver/node'
 
@@ -912,6 +913,37 @@ describe('hover', () => {
     })
     expect(result).toBeDefined()
     expect(result.contents.kind).toBe('markdown')
+  })
+})
+
+describe('type-guarded annotations on nullable fields', () => {
+  // The built-in annotation specs and primitives (incl. `null`), as a real project sees them.
+  let builtIns: TAtscriptDocConfig
+  beforeAll(async () => {
+    builtIns = await new PluginManager({ unknownAnnotation: 'allow' }).getDocConfig()
+  })
+
+  it('reports no target-type error for number | null and a readable one for mixed unions', async () => {
+    const uri = 'file:///test.as'
+    const source =
+      'export interface User {\n  @expect.min 0\n  age: number | null\n  @expect.min 0\n  bad: number | string\n}'
+    const { repo, connection, doc } = singleDocRepo(uri, source, builtIns)
+    await repo.checkDoc(doc)
+    const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+    expect(diagnostics.map((d: any) => [d.range.start.line, d.message])).toEqual([
+      [3, 'Expected type is (number), got union (number | string)'],
+    ])
+  })
+
+  it('mentions nullable fields in the annotation hover', async () => {
+    const uri = 'file:///test.as'
+    const source = 'interface User {\n  @expect.min 0\n  age: number | null\n}'
+    const { handlers } = singleDocRepo(uri, source, builtIns)
+    const result = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 1, character: 4 },
+    })
+    expect(result.contents.value).toContain('nullable field')
   })
 })
 

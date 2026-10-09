@@ -660,9 +660,18 @@ export class JsRenderer extends BaseRenderer {
         const ref = node as SemanticRefNode
         const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
         const handle = this.toAnnotatedHandle(decl!, true)
-        return skipAnnotations
-          ? handle
-          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+        if (skipAnnotations) {
+          return handle
+        }
+        // Same as the emitted type (annotateType + defineInlinePrimitiveMetadata): a member /
+        // element ref carries the annotations of what it references — a built-in
+        // primitive's own, or a named alias's.
+        const own = this.doc.evalAnnotationsForNode(node)
+        const referred = this.refTargetAnnotations(ref, decl)
+        return this.applyExpectAnnotations(
+          handle,
+          referred ? this.doc.mergeNodesAnnotations(referred, own) : own
+        )
       }
       case 'primitive': {
         const prim = node as SemanticPrimitiveNode
@@ -783,7 +792,8 @@ export class JsRenderer extends BaseRenderer {
           )
           break
         }
-        case 'expect.int': {
+        case 'expect.int':
+        case 'meta.required': {
           handle.annotate(a.name as any, true)
           break
         }
@@ -809,17 +819,10 @@ export class JsRenderer extends BaseRenderer {
       case 'ref': {
         const ref = node as SemanticRefNode
         const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
-        if (isPrimitive(decl)) {
-          // Only inline as primitive if the ref directly targets a built-in primitive,
-          // not a named type alias that resolves to a primitive (e.g. `type MyString = string`).
-          const ownerDecl = this.resolveOwner(this.doc, ref.id!)
-          if (
-            !ownerDecl?.node ||
-            (ownerDecl.node.entity !== 'type' && ownerDecl.node.entity !== 'interface')
-          ) {
-            this.annotateType(decl, name)
-            return this
-          }
+        const primitive = this.inlinedPrimitive(ref, decl)
+        if (primitive) {
+          this.annotateType(primitive, name)
+          return this
         }
         // When ad-hoc annotations target paths through this ref,
         // inline the referenced type so _propPath can traverse it
@@ -1044,18 +1047,83 @@ export class JsRenderer extends BaseRenderer {
   defineGroup(node: SemanticGroup) {
     const items = node.unwrap()
     for (const item of items) {
-      this.write('.item(').indent().annotateType(item).write('  .$type').writeln(`)`).unindent()
+      this.write('.item(')
+        .indent()
+        .annotateType(item)
+        .defineInlinePrimitiveMetadata(item)
+        .write('  .$type')
+        .writeln(`)`)
+        .unindent()
     }
     return this
   }
   defineArray(node: SemanticArrayNode) {
+    const of = node.getDefinition()
     this.write('.of(')
       .indent()
-      .annotateType(node.getDefinition())
+      .annotateType(of)
+      .defineInlinePrimitiveMetadata(of)
       .write('  .$type')
       .writeln(`)`)
       .unindent()
     return this
+  }
+
+  /**
+   * A built-in primitive extension used directly as a union / tuple member or array
+   * element (`number.int | null`, `string.email[]`) is inlined by `annotateType` without
+   * its built-in annotations (`expect.int`, the email pattern, …) — a prop gets them
+   * through `defineMetadata`, a member has no prop to carry them, so emit them here.
+   */
+  private defineInlinePrimitiveMetadata(node?: SemanticNode) {
+    const primitive = node && this.inlinedPrimitive(node)
+    if (primitive?.annotations?.length) {
+      this.indent()
+      for (const an of primitive.annotations) {
+        this.resolveAnnotationValue(primitive, an)
+      }
+      this.unindent()
+    }
+    return this
+  }
+
+  /**
+   * The built-in primitive a ref is inlined as by `annotateType` — not a named alias that
+   * resolves to one (`type MyString = string`), which is emitted as a `refTo`.
+   */
+  private inlinedPrimitive(
+    node: SemanticNode,
+    decl = isRef(node) ? this.doc.unwindType(node.id!, node.chain)?.def : undefined
+  ): SemanticPrimitiveNode | undefined {
+    if (!isRef(node) || !isPrimitive(decl)) {
+      return undefined
+    }
+    const ownerDecl = this.resolveOwner(this.doc, node.id!)
+    if (
+      ownerDecl?.node &&
+      (ownerDecl.node.entity === 'type' || ownerDecl.node.entity === 'interface')
+    ) {
+      return undefined
+    }
+    return decl
+  }
+
+  /** Annotations a ref inherits from its target (see `annotateType`'s ref case). */
+  private refTargetAnnotations(
+    ref: SemanticRefNode,
+    decl: SemanticNode | undefined
+  ): TAnnotationTokens[] | undefined {
+    const primitive = this.inlinedPrimitive(ref, decl)
+    if (primitive) {
+      return primitive.annotations
+    }
+    if (ref.hasChain) {
+      return undefined
+    }
+    const ownerDecl = this.resolveOwner(this.doc, ref.id!)
+    return ownerDecl?.node
+      ? ownerDecl.doc.filterPassedWhenReferred(ownerDecl.doc.evalAnnotationsForNode(ownerDecl.node))
+      : undefined
   }
 
   defineMetadata(node: SemanticNode) {

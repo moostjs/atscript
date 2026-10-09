@@ -183,6 +183,8 @@ for (const node of doc.nodes) {
 
 Guards check the `entity` string field — stable across serialization boundaries.
 
+Nullable targets in a `validate` hook: `nonNullishMembers(def, doc)` (since 0.1.103) → resolved non-`null`/`undefined` members of a union (aliases + nested unions flattened), `undefined` when `def` is not a union. Pass the doc returned by `doc.unwindType(...)` so member refs resolve. `defType` guards already apply this rule.
+
 ## Testing a plugin
 
 - **Unit** — exercise `render()` with fabricated `AtscriptDoc` instances.

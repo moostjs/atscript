@@ -144,6 +144,33 @@ Atscript provides common-purpose annotations:
 
 All validation annotations accept an optional custom error message as the last argument. When validation fails, the custom message is used instead of the default error message.
 
+#### Nullable Fields
+
+Validation annotations also work on a nullable field — a union of the target type with `null` / `undefined`, written inline or through a type alias. `null` passes; any other value must satisfy the constraint:
+
+```atscript
+type Percent = number | null
+
+interface Settings {
+    @expect.min 0
+    @expect.max 100
+    discount: number | null      // null, 0..100
+
+    @expect.maxLength 64
+    @expect.pattern "^[a-z-]+$"
+    slug?: string | null         // omitted, null, or a matching string ≤ 64 chars
+
+    @expect.maxLength 5
+    @expect.array.uniqueItems
+    tags: string[] | null
+
+    @expect.int
+    share: Percent
+}
+```
+
+A union of different non-null types (`number | string`) is still rejected with `Expected type is (number), got union (number | string)`.
+
 #### Array Annotations Example
 
 `@expect.array.uniqueItems` and `@expect.array.key` work together to enforce unique array elements by identity fields:
@@ -178,6 +205,8 @@ interface Product {
 ### Form Validation (@meta.required)
 
 - `@meta.required` or `@meta.required "Custom error message"` - For strings: must contain at least one non-whitespace character. For booleans: must be `true` (optional message)
+- On an **optional** field (`name?: string`) the field may be omitted, but `null` is rejected with the `@meta.required` message.
+- On a **nullable** field (`name: string | null`) `null` is accepted, and a string must still not be empty.
 
 ::: tip Form Validation
 Use `string.required` or `@meta.required` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@meta.required` catches this common form validation gap. For checkboxes, `@meta.required` on a `boolean` field ensures the value is `true` (e.g., "accept terms").
