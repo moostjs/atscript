@@ -122,13 +122,13 @@ function toAnnotationTokens(
   spec?: AnnotationSpec
 ): TAnnotationTokens {
   if (typeof value === 'boolean') {
-    return { name, token: dummyToken, args: [] }
+    return { name, token: dummyToken, args: [], intrinsic: true }
   }
   if (typeof value === 'string') {
-    return { name, token: dummyToken, args: [text(value)] }
+    return { name, token: dummyToken, args: [text(value)], intrinsic: true }
   }
   if (typeof value === 'number') {
-    return { name, token: dummyToken, args: [num(value)] }
+    return { name, token: dummyToken, args: [num(value)], intrinsic: true }
   }
   // Object with named args → map by spec argument names (ordered, positional)
   const argNames = spec?.arguments.map(a => a.name) ?? Object.keys(value)
@@ -144,7 +144,7 @@ function toAnnotationTokens(
     raw.pop()
   }
   const args: Token[] = raw.map(t => t ?? text(''))
-  return { name, token: dummyToken, args }
+  return { name, token: dummyToken, args, intrinsic: true }
 }
 
 const dummyToken = new Token({

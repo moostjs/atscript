@@ -61,6 +61,8 @@ type TPrimitiveAnnotationValue =
 
 Annotations declared in a primitive's `annotations` map are **identical** to writing the same annotation in `.as` source on every field that uses the primitive. They participate in normal validation and inheritance.
 
+That includes annotations whose spec sets `passedWhenReferred: false`: they reach every field typed with the primitive, directly or through a type alias. A field that references another field (`createdAt: Order.createdAt`) does not get them. See [Ref boundaries](/plugin-development/annotation-system#ref-boundaries-passedwhenreferred).
+
 ## The Final Scalar Types
 
 `TPrimitiveTypeFinal` is the set of underlying scalar kinds a primitive can resolve to:

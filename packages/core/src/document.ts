@@ -514,11 +514,14 @@ export class AtscriptDoc {
     }
   }
 
-  evalAnnotationsForNode(givenNode: SemanticNode) {
-    let right = givenNode.annotations
+  evalAnnotationsForNode(givenNode: SemanticNode, own = givenNode.annotations) {
+    let right = own
     let def = givenNode.getDefinition()
     if (def) {
       const refDef = isRef(def) ? def : undefined
+      // A primitive's intrinsic annotations follow type refs and aliases, but
+      // stop at a reference to a prop (`Order.createdAt`), like the prop's own.
+      let viaProp = false
       if (refDef) {
         // Collect the nodes of the ref chain and merge them nearest-first, so
         // that annotations declared closer to the referring field win over
@@ -530,22 +533,28 @@ export class AtscriptDoc {
           refDef.token('identifier')!.text,
           refDef.chain,
           intermediate => {
+            if (isProp(intermediate) && intermediate !== givenNode) {
+              viaProp = true
+            }
             if (intermediate?.annotations?.length) {
               chainNodes.push(intermediate)
             }
           }
         )
-        if (
-          unwound?.node &&
-          unwound.node !== givenNode &&
-          unwound.node.annotations?.length &&
-          !chainNodes.includes(unwound.node)
-        ) {
-          chainNodes.unshift(unwound.node)
+        if (unwound?.node && unwound.node !== givenNode) {
+          viaProp ||= isProp(unwound.node)
+          if (unwound.node.annotations?.length && !chainNodes.includes(unwound.node)) {
+            chainNodes.unshift(unwound.node)
+          }
         }
         for (const chainNode of chainNodes) {
+          // the resolved type itself is merged below — once, or append-merged
+          // multiples (`expect.pattern` of `string.email`) would be doubled
+          if (chainNode === unwound?.def) {
+            continue
+          }
           right = this.mergeNodesAnnotations(
-            this.filterPassedWhenReferred(chainNode.annotations),
+            this.filterPassedWhenReferred(chainNode.annotations, viaProp),
             right
           )
         }
@@ -554,7 +563,7 @@ export class AtscriptDoc {
       if (def) {
         const merged = this.mergeIntersection(def)
         right = this.mergeNodesAnnotations(
-          refDef ? this.filterPassedWhenReferred(merged.annotations) : merged.annotations,
+          refDef ? this.filterPassedWhenReferred(merged.annotations, viaProp) : merged.annotations,
           right
         )
       }
@@ -563,21 +572,39 @@ export class AtscriptDoc {
   }
 
   /**
+   * The annotations a reference to `node` (`field: Alias`) inherits: its evaluated
+   * set without the `passedWhenReferred: false` ones. The node's own are filtered
+   * before the merge, so a dropped one cannot shadow a primitive's intrinsic
+   * annotation of the same name (`@meta.required 'msg'` on `type N = string.required`).
+   */
+  evalReferredAnnotations(node: SemanticNode) {
+    return this.filterPassedWhenReferred(
+      this.evalAnnotationsForNode(node, this.filterPassedWhenReferred(node.annotations))
+    )
+  }
+
+  /**
    * Drops annotations whose spec declares `passedWhenReferred: false` — used
    * when folding annotations across a ref boundary. Annotations without a
-   * resolvable spec pass through (default is to inherit). Returns the input
+   * resolvable spec pass through (default is to inherit), and so do a
+   * primitive's intrinsic ones (`number.timestamp.created` → `@db.default.now`)
+   * unless the boundary is a reference to a prop (`viaProp`). Returns the input
    * array unchanged when nothing is dropped.
    */
-  filterPassedWhenReferred(annotations?: TAnnotationTokens[]) {
+  filterPassedWhenReferred(annotations?: TAnnotationTokens[], viaProp = false) {
     if (!annotations?.length) {
       return annotations
     }
     let filtered: TAnnotationTokens[] | undefined
     for (let i = 0; i < annotations.length; i++) {
-      if (this.resolveAnnotation(annotations[i].name)?.config.passedWhenReferred === false) {
+      const a = annotations[i]
+      if (
+        (viaProp || !a.intrinsic) &&
+        this.resolveAnnotation(a.name)?.config.passedWhenReferred === false
+      ) {
         filtered ??= annotations.slice(0, i)
       } else {
-        filtered?.push(annotations[i])
+        filtered?.push(a)
       }
     }
     return filtered ?? annotations

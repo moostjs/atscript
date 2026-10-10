@@ -18,12 +18,12 @@ let NullableConstraints: any
 let RequiredOptional: any
 let InlinePrimitives: any
 let KeyedNullable: any
+let RequiredPrimitives: any
 
 beforeAll(async () => {
   await prepareFixtures({ rootDir, entries: ['nullable-constraints.as'] })
-  ;({ NullableConstraints, RequiredOptional, InlinePrimitives, KeyedNullable } = await import(
-    path.join(rootDir, 'nullable-constraints.as.js')
-  ))
+  ;({ NullableConstraints, RequiredOptional, InlinePrimitives, KeyedNullable, RequiredPrimitives } =
+    await import(path.join(rootDir, 'nullable-constraints.as.js')))
 })
 
 function validBase(): any {
@@ -213,6 +213,21 @@ describe('built-in primitive extensions as union members / array elements', () =
     expect(p.contact.anyOf[0].pattern).toBeDefined()
     expect(p.aliased.anyOf[0].pattern).toBe(p.contact.anyOf[0].pattern)
     expect(p.aliasedList.items.pattern).toBe(p.contact.anyOf[0].pattern)
+  })
+})
+
+describe('string.required / boolean.required fields', () => {
+  it('reject blank strings and false, directly and through an alias', () => {
+    const valid = { name: 'a', agreed: true, aliased: 'b' }
+    expect(check(RequiredPrimitives, valid)).toEqual([])
+    expect(check(RequiredPrimitives, { ...valid, optionalName: ' ' })).toEqual([
+      'optionalName: Must not be empty',
+    ])
+    expect(check(RequiredPrimitives, { name: ' ', agreed: false, aliased: '' })).toEqual([
+      'name: Must not be empty',
+      'agreed: Must be checked',
+      'aliased: Must not be empty',
+    ])
   })
 })
 

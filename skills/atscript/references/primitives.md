@@ -54,8 +54,8 @@ Chained via dots. Each narrows the parent with annotation-based constraints; TS 
 | `number.int.uint32`      | tag `uint32`, range 0…4 294 967 295.                                                  |
 | `number.int.uint64`      | tag `uint64`, clamped to JS safe-int range.                                           |
 | `number.timestamp`       | `expect.int true`.                                                                    |
-| `number.timestamp.created` | tag `created`. Auto-applies `@db.default.now` (DB layer reads this).                |
-| `number.timestamp.updated` | tag `updated`. DB adapters auto-update on every write.                              |
+| `number.timestamp.created` | tag `created` + `@db.default.now` (directly and through aliases; not through a field ref like `Order.createdAt`). |
+| `number.timestamp.updated` | tag `updated` only — a marker; no default, nothing sets it on write.                |
 
 ### `boolean.*`
 

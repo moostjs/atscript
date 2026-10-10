@@ -858,12 +858,11 @@ export class JsRenderer extends BaseRenderer {
         // metadata is available regardless of declaration order.
         if (!ref.hasChain) {
           if (ownerDecl?.node) {
-            const typeAnnotations = ownerDecl.doc.filterPassedWhenReferred(
-              ownerDecl.doc.evalAnnotationsForNode(ownerDecl.node)
-            )
-            typeAnnotations?.forEach((an: TAnnotationTokens) => {
-              this.resolveAnnotationValue(ownerDecl.node!, an)
-            })
+            ownerDecl.doc
+              .evalReferredAnnotations(ownerDecl.node)
+              ?.forEach((an: TAnnotationTokens) => {
+                this.resolveAnnotationValue(ownerDecl.node!, an)
+              })
           }
         }
         this.unindent()
@@ -1121,9 +1120,7 @@ export class JsRenderer extends BaseRenderer {
       return undefined
     }
     const ownerDecl = this.resolveOwner(this.doc, ref.id!)
-    return ownerDecl?.node
-      ? ownerDecl.doc.filterPassedWhenReferred(ownerDecl.doc.evalAnnotationsForNode(ownerDecl.node))
-      : undefined
+    return ownerDecl?.node ? ownerDecl.doc.evalReferredAnnotations(ownerDecl.node) : undefined
   }
 
   defineMetadata(node: SemanticNode) {

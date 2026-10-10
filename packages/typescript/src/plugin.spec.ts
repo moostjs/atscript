@@ -277,6 +277,63 @@ describe('ts-plugin', () => {
     expect(block('Extended')).toContain('.annotate("structural", "by_code", true)')
     expect(block('Extended')).toContain('.annotate("label", "Code")')
   })
+  it("keeps a primitive's intrinsic passedWhenReferred:false annotations across type refs, not prop refs", async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/primitive-ref-scope.as'],
+      plugins: [tsPlugin()],
+      annotations: {
+        ...annotations,
+        structural: new AnnotationSpec({
+          passedWhenReferred: false,
+          argument: { name: 'value', type: 'string' },
+        }),
+      },
+      primitives: {
+        stamp: {
+          type: 'number',
+          extensions: { auto: { annotations: { structural: 'intrinsic', mulAppend: 'm' } } },
+        },
+      },
+    })
+    const out = await repo.generate({ format: 'js' })
+    const code = out[0].content
+    const slice = (from: string, to: string) => {
+      const start = code.indexOf(from)
+      expect(start).toBeGreaterThanOrEqual(0)
+      const end = code.indexOf(to, start + from.length)
+      return end === -1 ? code.slice(start) : code.slice(start, end)
+    }
+    const prop = (name: string) => slice(`"${name}",`, '.$type')
+    const intrinsic = '.annotate("structural", "intrinsic")'
+    // the primitive used directly, optional, through an alias, as a union member
+    expect(prop('direct')).toContain(intrinsic)
+    expect(prop('optional')).toContain(intrinsic)
+    expect(prop('aliased')).toContain(intrinsic)
+    expect(slice('$("", Stamp)', '\n\n')).toContain(intrinsic)
+    expect(slice('"member",', '.item($().designType("null")')).toContain(intrinsic)
+    // an alias redeclaring it: the alias's own value stays on the alias, the intrinsic one reaches its users
+    expect(prop('relabeled')).toContain(intrinsic)
+    expect(prop('relabeled')).not.toContain('"alias"')
+    expect(prop('relabeled2')).toContain(intrinsic)
+    expect(slice('$("", StampRelabeled2)', '\n\n')).toContain(intrinsic)
+    // merged once, however long the ref chain
+    const appended = '.annotate("mulAppend", "m", true)'
+    for (const name of ['aliasedTwice', 'viaProp']) {
+      expect(prop(name).split(appended)).toHaveLength(2)
+    }
+    // a reference to a prop drops it, like the prop's own passedWhenReferred:false ones
+    expect(prop('viaProp')).not.toContain('"structural"')
+    expect(prop('viaProp')).toContain('.annotate("label", "At")')
+    expect(prop('viaPropAlias')).not.toContain('"structural"')
+    expect(slice('$("", SourceAt)', '\n\n')).not.toContain('"structural"')
+    // the prop's own declaration wins
+    expect(prop('overridden')).toContain('.annotate("structural", "own")')
+    expect(prop('overridden')).not.toContain(intrinsic)
+    // core's built-in passedWhenReferred:false primitive annotations
+    expect(prop('name')).toContain('.annotate("meta.required", {')
+    expect(prop('agreed')).toContain('.annotate("meta.required", {')
+  })
   it('emits append-merged annotations across a ref: the referenced type first, then the prop', async () => {
     const repo = await build({
       rootDir: wd,

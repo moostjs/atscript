@@ -30,6 +30,13 @@ export interface TAnnotationTokens {
   name: string
   token: Token
   args: Token[]
+  /**
+   * Built into a primitive extension (`number.timestamp.created` → `@db.default.now`,
+   * `string.required` → `@meta.required`). Part of the type itself, so it follows
+   * type references and aliases even when its spec sets `passedWhenReferred: false`;
+   * only a reference to a prop (`User.createdAt`) drops such an annotation.
+   */
+  intrinsic?: true
 }
 
 export type TPrimitiveAnnotationArg = string | number | boolean

@@ -112,6 +112,12 @@ A bound of `0` is a real bound: `@expect.min 0` rejects `-1`, `@expect.max 0` re
 **Upgrading:** clients that send `null` for a cleared optional `@meta.required` field (for example a form that maps an empty input to `null`) must omit the field or send `undefined` — or declare the field `T | null`. Values on nullable fields, union members and array elements that broke a constraint and used to pass now fail.
 :::
 
+::: warning `string.required` and `boolean.required` are enforced on every field (since 0.1.104)
+A field typed `string.required` or `boolean.required` — directly (`name: string.required`, `agreed?: boolean.required`) or through a type alias (`type Name = string.required`) — carries `@meta.required` again: `''` / whitespace-only strings fail with `Must not be empty`, `false` fails with `Must be checked`, and `buildJsonSchema()` emits `minLength: 1`. Versions 0.1.79–0.1.103 dropped the annotation from such fields, so they accepted any string or boolean; union members and array elements (`string.required | null`, `string.required[]`) were already checked. A field that references another field (`ownerName: User.name`) still does not inherit it.
+
+**Upgrading:** payloads with an empty string or `false` in these fields now fail validation — fill them, or type the field `string` / `boolean` if empty is legal.
+:::
+
 ## Array Uniqueness
 
 `@expect.array.uniqueItems` and `@expect.array.key` work together:

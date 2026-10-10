@@ -216,7 +216,7 @@ export const primitives: Record<string, TPrimitiveConfig> = {
           },
           updated: {
             documentation:
-              'Timestamp auto-updated on every write. DB adapters read the "updated" tag.',
+              'Last-modified timestamp (tag "updated"). A marker only: it carries no default and is not set on write.',
             tags: ['updated'],
           },
         },

@@ -48,6 +48,8 @@ Since 0.1.103 (tightenings — upgrade note in the docs' validation reference):
 | 2   | Optional `@meta.required` field: omitted / `undefined` passes, `null` fails with the `@meta.required` message. Partial modes still skip omitted fields. Declare `T \| null` to allow `null`.                                                                                               |
 | 3   | Built-in primitive extensions as union members / array elements / tuple items (`number.int \| null`, `string.email[]`) keep their `expect.*` checks in generated code.                                                                                                                     |
 
+Since 0.1.104: `string.required` / `boolean.required` fields (direct, optional, or via a type alias) carry `@meta.required` again — `''`/whitespace and `false` fail; JSON Schema gets `minLength: 1`. 0.1.79–0.1.103 dropped it there (only union members / array elements were checked). A field ref (`x: User.name`) still does not inherit it.
+
 A `0` bound is enforced (since 0.1.102): `@expect.min 0` rejects `-1`, `@expect.max 0` rejects `1`, `@expect.maxLength 0` rejects `'a'` / `['a']`. Earlier versions skipped a bare-number `0` set at runtime (`annotate('expect.min', 0)`) in both `validate()` and `buildJsonSchema()`; `.as`-declared bounds were already enforced.
 
 ## `ValidatorError`

@@ -67,6 +67,15 @@ export interface RequiredOptional {
   }
 }
 
+type RequiredName = string.required
+
+export interface RequiredPrimitives {
+  name: string.required
+  agreed: boolean.required
+  aliased: RequiredName
+  optionalName?: string.required
+}
+
 interface KeyedItem {
   @expect.array.key
   id: string
