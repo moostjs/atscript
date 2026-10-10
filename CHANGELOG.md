@@ -1,3 +1,9 @@
+## [0.1.104](https://github.com/moostjs/atscript/compare/v0.1.103...v0.1.104) (2026-10-10)
+
+
+### Bug Fixes
+
+* **core:** primitive-extension annotations apply to plain props and aliases (timestamp.created default, string.required) ([c25c531](https://github.com/moostjs/atscript/commit/c25c531eb8e8390feb4bb65eb1b1f82110f6d4e4))
 ## [0.1.103](https://github.com/moostjs/atscript/compare/v0.1.102...v0.1.103) (2026-10-09)
 ## [0.1.102](https://github.com/moostjs/atscript/compare/v0.1.101...v0.1.102) (2026-10-09)
 
