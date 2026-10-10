@@ -121,7 +121,7 @@ Ref-boundary rules (field referencing another declaration's field, e.g. `ownerId
 
 1. Precedence is nearest-first: local declaration > nearest ref > deeper refs > resolved type.
 2. Specs with `passedWhenReferred: false` never cross a ref — the referring field does not inherit them. Built-ins flagged: `@meta.id`, `@meta.required`, `@meta.default`, `@meta.readonly` (a field referencing a PK is not a PK; requiredness/defaults/mutability belong to the referring declaration).
-   Exception: a primitive's own annotations (`string.required` → `@meta.required`, `number.timestamp.created` → `@db.default.now`) apply to every field typed with the primitive, directly or via a type alias; only a field ref (`createdAt: Order.createdAt`) drops the `false` ones. Since 0.1.104 (0.1.79–0.1.103 dropped them except on union members / array elements).
+   Exception: a primitive's own annotations (`string.required` → `@meta.required`, `number.timestamp.created` → `@db.default.now`, `number.timestamp.updated` → `@db.default.now` + `@db.onUpdate.now` since 0.1.106) apply to every field typed with the primitive, directly or via a type alias; only a field ref (`createdAt: Order.createdAt`) drops the `false` ones. Since 0.1.104 (0.1.79–0.1.103 dropped them except on union members / array elements).
 3. `extends`/intersection always inherit the full set — the flag applies only to refs.
 4. Since 0.1.100, `ref` arguments (and `Type.field` query refs) inside an inherited annotation are bound in the inheriting file's generated JS: the missing import is synthesized (aliased `Name_1` on clash), so `target: () => Dict` never throws `ReferenceError`.
 

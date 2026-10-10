@@ -144,3 +144,18 @@ describe('number.timestamp.created', () => {
     expect(fnAnno).toBeUndefined()
   })
 })
+
+describe('number.timestamp.updated', () => {
+  it('should have @db.default.now and @db.onUpdate.now annotations', () => {
+    const numPrim = getPrimitive('number')
+    const updated = numPrim.props.get('timestamp')!.props?.get('updated') as
+      | SemanticPrimitiveNode
+      | undefined
+    expect(updated).toBeDefined()
+    expect(updated!.config.tags).toContain('updated')
+    expect(updated!.annotations).toContainEqual(expect.objectContaining({ name: 'db.default.now' }))
+    expect(updated!.annotations).toContainEqual(
+      expect.objectContaining({ name: 'db.onUpdate.now' })
+    )
+  })
+})

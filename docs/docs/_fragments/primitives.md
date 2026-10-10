@@ -148,7 +148,7 @@ In SQL databases, `decimal` maps to the native `DECIMAL` type (with precision/sc
 
 Atscript provides timestamp-oriented numeric tags: `number.timestamp`, `number.timestamp.created`, and `number.timestamp.updated`.
 
-`number.timestamp.created` also carries `@db.default.now`, so a database layer fills it with the insert time. It applies to fields typed with it directly or through a type alias, not to a field that references another one (`createdAt: Order.createdAt`). `number.timestamp.updated` is a marker tag only: nothing sets it on write.
+`number.timestamp.created` also carries `@db.default.now`, so a database layer fills it with the insert time. `number.timestamp.updated` carries `@db.default.now` and `@db.onUpdate.now`, so a database layer fills it with the insert time and sets it to the current time on every update. Both apply to fields typed with them directly or through a type alias, not to a field that references another one (`createdAt: Order.createdAt`). With `@atscript/db`, `number.timestamp.updated` is set on every write from atscript 0.1.106 / `@atscript/db` 0.1.156 — earlier releases left it unset.
 
 Timestamps are stored as `number` and constrained to integers — the unit (seconds, milliseconds, microseconds) is project-decided. The primitive itself does not enforce a unit. Storing timestamps as numbers is a deliberate choice — numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. Using `Date` objects would require walking every response to convert strings back to `Date` instances on both sides of the transport layer.
 

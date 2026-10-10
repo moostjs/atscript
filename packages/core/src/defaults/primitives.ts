@@ -216,8 +216,9 @@ export const primitives: Record<string, TPrimitiveConfig> = {
           },
           updated: {
             documentation:
-              'Last-modified timestamp (tag "updated"). A marker only: it carries no default and is not set on write.',
+              'Timestamp auto-set on creation and on every update. Auto-applies @db.default.now and @db.onUpdate.now.',
             tags: ['updated'],
+            annotations: { 'db.default.now': true, 'db.onUpdate.now': true },
           },
         },
       },

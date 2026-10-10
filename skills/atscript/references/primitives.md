@@ -55,7 +55,7 @@ Chained via dots. Each narrows the parent with annotation-based constraints; TS 
 | `number.int.uint64`      | tag `uint64`, clamped to JS safe-int range.                                           |
 | `number.timestamp`       | `expect.int true`.                                                                    |
 | `number.timestamp.created` | tag `created` + `@db.default.now` (directly and through aliases; not through a field ref like `Order.createdAt`). |
-| `number.timestamp.updated` | tag `updated` only — a marker; no default, nothing sets it on write.                |
+| `number.timestamp.updated` | tag `updated` + `@db.default.now` + `@db.onUpdate.now` — set on insert and on every update (same scoping as `created`). Since 0.1.106. |
 
 ### `boolean.*`
 
