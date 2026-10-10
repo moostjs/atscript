@@ -1,3 +1,9 @@
+## [0.1.106](https://github.com/moostjs/atscript/compare/v0.1.105...v0.1.106) (2026-10-10)
+
+
+### Bug Fixes
+
+* **core:** number.timestamp.updated applies db.default.now + db.onUpdate.now (auto-set on every write) ([4381647](https://github.com/moostjs/atscript/commit/438164738f585488db89fb7aeb55ca528e79cf66))
 ## [0.1.105](https://github.com/moostjs/atscript/compare/v0.1.104...v0.1.105) (2026-10-10)
 
 
