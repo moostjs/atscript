@@ -71,13 +71,13 @@
     "moost": "^0.6.52"
   },
   "devDependencies": {
-    "@atscript/db": "^0.1.158",
+    "@atscript/db": "^0.1.159",
     "@uniqu/core": "^0.1.15",
     "vitest": "3.2.7"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
-    "@atscript/db": "^0.1.158"
+    "@atscript/db": "^0.1.159"
   },
   "peerDependenciesMeta": {
     "@atscript/db": {
