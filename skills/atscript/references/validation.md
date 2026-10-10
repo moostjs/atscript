@@ -190,7 +190,7 @@ validator.validate(data, true)
 
 Plugin receives:
 
-- `ctx` — `TValidatorPluginContext` with `ctx.error(message, path?, details?)`, `ctx.path`, `ctx.opts`, `ctx.validateAnnotatedType`, `ctx.context` (user-supplied via `validate(value, safe, context)`).
+- `ctx` — `TValidatorPluginContext` with `ctx.error(message, path?, details?)`, `ctx.path`, `ctx.opts`, `ctx.validateAnnotatedType`, `ctx.root` (the type the validator was created for — same on every node, before `replace`; since 0.1.105), `ctx.context` (user-supplied via `validate(value, safe, context)`).
 - `def` — current `TAtscriptAnnotatedType`.
 - `value` — actual value at this location.
 

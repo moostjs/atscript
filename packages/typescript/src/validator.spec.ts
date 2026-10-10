@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 
-import { defineAnnotatedType } from './runtime/annotated-type'
+import { defineAnnotatedType, type TAtscriptAnnotatedType } from './runtime/annotated-type'
 import { Validator, type TValidatorPlugin, type TValidatorPluginContext } from './runtime/validator'
 
 describe('Validator at primitives', () => {
@@ -370,6 +370,28 @@ describe('Validator external context', () => {
 
     validator.validate('hello', true)
     expect(seen).toBeUndefined()
+  })
+})
+
+describe('Validator plugin root', () => {
+  it('exposes the type the validator was created for on every node, before replace', () => {
+    const street = defineAnnotatedType().designType('string').$type
+    const address = defineAnnotatedType('object').prop('street', street).$type
+    const root = defineAnnotatedType('object').prop('address', address).$type
+    const seen: Array<[string, unknown, unknown]> = []
+    const plugin: TValidatorPlugin = (ctx, def) => {
+      seen.push([ctx.path, ctx.root, def])
+      return undefined
+    }
+    const replace = (d: TAtscriptAnnotatedType) => (d === root ? { ...root } : d)
+    const validator = new Validator(root, { plugins: [plugin], replace })
+    expect(validator.validate({ address: { street: 'Main' } }, true)).toBe(true)
+    expect(seen.map(([path]) => path)).toEqual(['', 'address', 'address.street'])
+    for (const [, r] of seen) {
+      expect(r).toBe(root)
+    }
+    expect(seen[0][2]).not.toBe(root)
+    expect(seen[2][2]).toBe(street)
   })
 })
 

@@ -197,7 +197,24 @@ const roleAware: TValidatorPlugin = ctx => {
 Product.validator({ plugins: [roleAware] }).validate(data, true, { role: 'admin' })
 ```
 
-The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, and `context`.
+The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, `root`, and `context`.
+
+### The Root Type
+
+`ctx.root` (since 0.1.105) is the type the validator was created for — the same for every node of the walk, as passed to the constructor (before `replace`). Use it when a rule depends on where the visited node sits in the whole type, together with `ctx.path`:
+
+```typescript
+// A custom repeatable annotation (`multiple: true`, `mergeStrategy: 'append'`) on the interface —
+// `@app.serverFilled 'createdBy'` `@app.serverFilled 'audit.editor'` — lists the paths
+// that may be left out because the server fills them in
+const serverFilled: TValidatorPlugin = (ctx, def, value) => {
+  const paths = ctx.root.metadata.get('app.serverFilled')
+  if (value === undefined && paths?.includes(ctx.path)) {
+    return true
+  }
+  return undefined
+}
+```
 
 ### Reporting Custom Errors from a Plugin
 

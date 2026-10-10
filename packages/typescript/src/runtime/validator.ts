@@ -54,6 +54,11 @@ export interface TValidatorPluginContext {
   validateAnnotatedType: Validator<any>['validateAnnotatedType']
   error: Validator<any>['error']
   path: Validator<any>['path']
+  /**
+   * The type the validator was created for — the root of the walk, as passed to the
+   * constructor (before `replace`). The plugin's `def` argument is the node visited now.
+   */
+  readonly root: TAtscriptAnnotatedType
   context: unknown
 }
 
@@ -257,6 +262,11 @@ export class Validator<
 
   protected get path() {
     return this.buildPath()
+  }
+
+  /** The type this validator was created for (see {@link TValidatorPluginContext.root}). */
+  protected get root(): T {
+    return this.def
   }
 
   protected validateAnnotatedType(def: TAtscriptAnnotatedType, value: any) {
