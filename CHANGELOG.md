@@ -1,3 +1,9 @@
+## [0.1.105](https://github.com/moostjs/atscript/compare/v0.1.104...v0.1.105) (2026-10-10)
+
+
+### Features
+
+* **typescript:** expose the validated root type to validator plugins (ctx.root) ([73152ef](https://github.com/moostjs/atscript/commit/73152eff69c7a5ee725beb26f80e7a859cf25333))
 ## [0.1.104](https://github.com/moostjs/atscript/compare/v0.1.103...v0.1.104) (2026-10-10)
 
 
