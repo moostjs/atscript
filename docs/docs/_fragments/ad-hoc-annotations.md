@@ -142,12 +142,12 @@ For annotations configured with `mergeStrategy: 'append'`, ad-hoc values are **a
 
 ```atscript
 export interface User {
-    @expect.pattern '^[A-Z]', '', 'Must start uppercase'
+    @expect.pattern '^[A-Z]', 'u', 'Must start uppercase'
     name: string
 }
 
 annotate User {
-    @expect.pattern '.{3,}', '', 'Min 3 chars'   // Added, not replaced
+    @expect.pattern '.{3,}', 'u', 'Min 3 chars'   // Added, not replaced
     name
 }
 // Result: both patterns are validated

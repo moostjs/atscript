@@ -293,7 +293,7 @@ items: {
 All constraint annotations support an optional trailing `message` argument in `.as` files:
 
 ```atscript
-@expect.minLength 3 "Name is too short"
+@expect.minLength 3, "Name is too short"
 @meta.required "This field cannot be blank"
 ```
 

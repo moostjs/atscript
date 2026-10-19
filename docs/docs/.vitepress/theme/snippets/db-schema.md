@@ -16,10 +16,12 @@ export interface Task {
   @db.rel.onDelete 'cascade'
   projectId: Project.id
 
-  @db.rel.to Project 'projectId'
+  // resolved through the projectId FK above
+  @db.rel.to
   project: Project
 
-  @db.rel.from Comment.taskId
+  // resolved through the FK on Comment that points back to Task
+  @db.rel.from
   comments: Comment[]
 
   createdAt: number.timestamp.created
