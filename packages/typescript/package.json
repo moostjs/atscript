@@ -71,7 +71,7 @@
     "moost": "^0.6.52"
   },
   "devDependencies": {
-    "@atscript/db": "^0.1.159",
+    "@atscript/db": "^0.1.161",
     "@uniqu/core": "^0.1.15",
     "vitest": "3.2.7"
   },
