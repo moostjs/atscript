@@ -596,7 +596,9 @@ function fuzz(def: TAtscriptAnnotatedType, valid: () => any, seed: number, n = 4
 
 // ── tests ───────────────────────────────────────────────────────────────────
 
-describe('Validator fast path — equivalence with the full walk', () => {
+// The randomized suites are seeded (deterministic) and bounded; each runs ~0.5–2.5 s, so the
+// default 5 s timeout is too tight on a loaded machine.
+describe('Validator fast path — equivalence with the full walk', { timeout: 30_000 }, () => {
   it('order: hand-written mutations', () => {
     const Order = makeOrder()
     const mutations: Array<(v: any) => void> = [
@@ -891,6 +893,12 @@ describe('Validator fast path — generated types', () => {
       }
     }
   })
+
+  it('literal mismatch reports null-prototype objects instead of throwing', () => {
+    const validator = new Validator(union(lit('a').$type, lit('b').$type).$type)
+    expect(validator.validate(Object.create(null), true)).toBe(false)
+    expect(validator.errors[0].message).toContain('allowed types')
+  })
 })
 
 describe('Validator fast path — metadata / structure mutated after first validate', () => {
@@ -985,6 +993,141 @@ describe('Validator fast path — metadata / structure mutated after first valid
     const v = validOrder()
     v['x-a'] = 'too long'
     check(t => t.type.propsPatterns.push({ pattern: /^x-/, def: str().$type }), v, true)
+  })
+  // Compiled plans are cached per type node (shared by all validators): every kind of
+  // in-place change after a plan was built must still be picked up on the next call.
+  it('existing annotation replaced (same metadata size)', () => {
+    check(t => prop(t, 'name').metadata.set('expect.maxLength', 3), validOrder(), false)
+  })
+  it('existing annotation replaced on a number / array / boolean', () => {
+    const v = validOrder()
+    v.active = false
+    check(t => prop(t, 'age').metadata.set('expect.min', { minValue: 50 }), validOrder(), false)
+    check(t => prop(t, 'tags').metadata.set('expect.maxLength', 1), validOrder(), false)
+    check(t => prop(t, 'active').metadata.set('meta.required', true), v, false)
+  })
+  it('@expect.array.uniqueItems added to an array', () => {
+    const v = validOrder()
+    v.tags = ['a', 'a']
+    check(t => annotate(prop(t, 'tags').metadata, 'expect.array.uniqueItems', {} as any), v, false)
+  })
+  it('pattern entry mutated in place', () => {
+    check(
+      t => ((prop(t, 'email').metadata.get('expect.pattern') as any)[0].pattern = '^x'),
+      validOrder(),
+      false
+    )
+  })
+  it('prop node replaced under the same key', () => {
+    check(t => t.type.props.set('name', num().$type), validOrder(), false)
+  })
+  it('metadata map replaced', () => {
+    check(
+      t => (prop(t, 'name').metadata = new Map([['expect.maxLength', 3]]) as any),
+      validOrder(),
+      false
+    )
+  })
+  it('type replaced / literal value changed', () => {
+    const v = validOrder()
+    check(t => ((prop(t, 'score') as any).type = str().$type.type), v, false)
+    check(t => ((prop(t, 'status').type as any).items[2].type.value = 'gone'), v, false)
+  })
+  it('union item replaced in place (same length)', () => {
+    const v = validOrder()
+    check(t => ((prop(t, 'status').type as any).items[2] = lit('other').$type), v, false)
+  })
+  it('prop patterns added to a compiled object (plan falls back to the live check)', () => {
+    const t = makeOrder() as TObj
+    const v = new Validator(t, { unknownProps: 'ignore' })
+    const value = { ...validOrder(), address: { ...addr(), 'x-a': 1 } }
+    expect(v.validate(structuredClone(value), true)).toBe(true)
+    ;(prop(t, 'address').type as any).propsPatterns.push({ pattern: /^x-/, def: str().$type })
+    expect(v.validate(structuredClone(value), true)).toBe(false)
+    const walk = new WalkValidator(t, { unknownProps: 'ignore' })
+    expect(walk.validate(structuredClone(value), true)).toBe(false)
+    expect(v.errors).toEqual(walk.errors)
+  })
+  // Array items go through compiled plans: the same kinds of change inside `items[]`.
+  describe('inside array items (compiled plans)', () => {
+    const item = (t: TObj) => (prop(t, 'items').type as any).of as TObj
+    it('annotation added / replaced / removed', () => {
+      check(
+        t => annotate(prop(item(t), 'sku').metadata, 'expect.maxLength', 2),
+        validOrder(),
+        false
+      )
+      check(t => prop(item(t), 'sku').metadata.set('expect.minLength', 10), validOrder(), false)
+      const v = validOrder()
+      v.items[0].qty = 0
+      check(t => prop(item(t), 'qty').metadata.delete('expect.min'), v, true)
+    })
+    it('constraint object mutated in place', () => {
+      const t = arr(obj({ n: num({ 'expect.min': { minValue: 1 } }).$type }).$type).$type
+      const v = new Validator(t)
+      expect(v.validate([{ n: 5 }, { n: 6 }], true)).toBe(true)
+      const n = ((t.type as any).of as TObj).type.props.get('n')!
+      ;(n.metadata.get('expect.min') as any).minValue = 6
+      expect(v.validate([{ n: 5 }, { n: 6 }], true)).toBe(false)
+      expect(v.errors).toEqual([{ path: '0.n', message: 'Expected minimum 6, got 5' }])
+    })
+    it('prop added / replaced / removed / turned phantom / optional toggled', () => {
+      check(t => item(t).type.props.set('extra', str().$type), validOrder(), false)
+      check(t => item(t).type.props.set('sku', num().$type), validOrder(), false)
+      check(t => item(t).type.props.delete('note'), validOrder(), false)
+      check(t => ((prop(item(t), 'sku').type as any).designType = 'phantom'), validOrder(), false)
+      check(
+        t => (prop(item(t), 'note').optional = false),
+        { ...validOrder(), items: [{ sku: 'SKU-1', qty: 2, price: 9.99 }] },
+        false
+      )
+    })
+    it('metadata map / type replaced, array `of` replaced', () => {
+      check(
+        t => (prop(item(t), 'sku').metadata = new Map([['expect.maxLength', 2]]) as any),
+        validOrder(),
+        false
+      )
+      check(t => ((prop(item(t), 'price') as any).type = str().$type.type), validOrder(), false)
+      check(t => ((prop(t, 'tags').type as any).of = num().$type), validOrder(), false)
+      check(
+        t => (prop(t, 'tags').type as any).of.metadata.set('expect.maxLength', 0),
+        validOrder(),
+        false
+      )
+    })
+  })
+  it('a plan built by one validator is honoured by validators with other options', () => {
+    const t = makeOrder()
+    const value = { ...validOrder(), extra: 1, address: { ...addr(), extra: 2 } }
+    for (const opts of OPTION_SETS) {
+      compare(t, opts, value)
+    }
+    for (const opts of [...OPTION_SETS].reverse()) {
+      compare(t, opts, value)
+      compare(t, opts, validOrder())
+    }
+  })
+  it('recursive types reuse their plan through the cycle', () => {
+    const node = $('object')
+    node.prop('name', str({ 'expect.minLength': 1 }).$type)
+    node.prop('children', arr(node.$type).optional().$type)
+    const tree = (depth: number): any => ({
+      name: `n${depth}`,
+      children: depth > 0 ? [tree(depth - 1), tree(depth - 1)] : undefined,
+    })
+    const v = new Validator(node.$type)
+    expect(v.validate(tree(6), true)).toBe(true)
+    const bad = tree(6)
+    bad.children[1].children[0].children[1].name = ''
+    compare(node.$type, {}, bad)
+    annotate(
+      (node.$type.type as TAtscriptTypeObject).props.get('name')!.metadata,
+      'expect.minLength',
+      3
+    )
+    expect(v.validate(tree(6), true)).toBe(false)
+    compare(node.$type, {}, tree(6))
   })
   it('lazy ref resolved after the validator was created', () => {
     const box: { target?: TAtscriptAnnotatedType } = {}

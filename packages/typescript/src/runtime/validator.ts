@@ -636,7 +636,7 @@ export class Validator<
   ): boolean {
     if (def.type.value !== undefined) {
       if (value !== def.type.value) {
-        this.error(`Expected ${def.type.value}, got ${value}`)
+        this.error(`Expected ${def.type.value}, got ${printValue(value)}`)
         return false
       }
       return true
@@ -875,6 +875,15 @@ function arrayElementType(branch: TAtscriptAnnotatedType): TAtscriptAnnotatedTyp
     }
   }
   return undefined
+}
+
+/** `${value}` throws for symbols and null-prototype objects: `String()` handles symbols, the tag the rest. */
+function printValue(value: unknown): string {
+  try {
+    return String(value)
+  } catch {
+    return Object.prototype.toString.call(value)
+  }
 }
 
 /** Error thrown by {@link Validator.validate} when validation fails. Contains structured error details. */
