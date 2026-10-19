@@ -1,3 +1,14 @@
+## [0.1.108](https://github.com/moostjs/atscript/compare/v0.1.107...v0.1.108) (2026-10-19)
+
+
+### Bug Fixes
+
+* **core:** accept comments after annotations; LSP and grammar ignore comments ([8c672ec](https://github.com/moostjs/atscript/commit/8c672ec3b1f6ceab7ef78abc629c3b49d3e299af))
+
+
+### Performance Improvements
+
+* **typescript:** compiled plans for array items in validator pre-check; safe literal error printing ([8757ca4](https://github.com/moostjs/atscript/commit/8757ca4c332a35df907585d1f7349356d47be4b9))
 ## [0.1.107](https://github.com/moostjs/atscript/compare/v0.1.106...v0.1.107) (2026-10-10)
 ## [0.1.106](https://github.com/moostjs/atscript/compare/v0.1.105...v0.1.106) (2026-10-10)
 
