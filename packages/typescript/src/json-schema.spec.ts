@@ -7,6 +7,7 @@ import { tsPlugin } from './plugin'
 import type { TAtscriptAnnotatedType } from './runtime/annotated-type'
 import { defineAnnotatedType as $ } from './runtime/annotated-type'
 import { buildJsonSchema as $$, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
+import { prepareFixtures } from './test-utils'
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
 // export interface JsonDeep {
@@ -200,6 +201,66 @@ describe('json-schema', () => {
     const content = out[0].content.split('\n').filter(s => s.trim().startsWith('return {'))?.[0]
     const schema = content.trim().slice('return '.length)
     expect(JSON.parse(schema)).toEqual(expectedSchema)
+  })
+
+  // Regression: building the bundle schema of a recursive type overflowed the stack.
+  it('must pre-render json schema of recursive and shared types (same as built at runtime)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-recursive.as'],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+    })
+    const out = await repo.generate({ format: 'js' })
+    const bundled = out[0].content
+      .split('\n')
+      .filter(s => s.trim().startsWith('return {'))
+      .map(s => JSON.parse(s.trim().slice('return '.length)))
+    await prepareFixtures({
+      rootDir: path.join(wd, 'test/fixtures'),
+      entries: ['jsonschema-recursive.as'],
+      formats: ['js'],
+    })
+    const { TreeNode, Holder, Forest, Point, Shape, AliasOfPoint, Pair } = await import(
+      path.join(wd, 'test/fixtures/jsonschema-recursive.as.js')
+    )
+    expect(bundled).toEqual(
+      [TreeNode, Holder, Forest, Point, Shape, AliasOfPoint, Pair].map(t => $$(t))
+    )
+    expect(bundled[0].$defs.TreeNode.properties.children.items).toEqual({
+      $ref: '#/$defs/TreeNode',
+    })
+    // A reference to an alias points at the alias, not at what it unwinds to.
+    expect(bundled[6].properties.id.items).toEqual([
+      { $ref: '#/$defs/Point' },
+      { $ref: '#/$defs/AliasOfPoint' },
+    ])
+  })
+
+  it('must pre-render json schema of aliases of imported aliases (same as built at runtime)', async () => {
+    const dir = path.join(wd, 'test/fixtures/jsonschema-alias')
+    const repo = await build({
+      rootDir: dir,
+      entries: ['uses.as'],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+    })
+    const out = await repo.generate({ format: 'js' })
+    const bundled = out
+      .find(f => f.fileName.endsWith('uses.as.js'))!
+      .content.split('\n')
+      .filter(s => s.trim().startsWith('return {'))
+      .map(s => JSON.parse(s.trim().slice('return '.length)))
+    await prepareFixtures({ rootDir: dir, entries: ['target.as', 'uses.as'], formats: ['js'] })
+    const { ReAlias, UsesAlias } = await import(path.join(dir, 'uses.as.js'))
+    // A lazy (cross-module) reference adopts its target's id once resolved: resolve them all.
+    for (const item of UsesAlias.type.props.get('b').type.items) {
+      expect(item.type.kind).toBe('object')
+    }
+    expect(bundled).toEqual([$$(ReAlias), $$(UsesAlias)])
+    expect(bundled[0].properties).toEqual({ x: { type: 'number' } })
+    expect(bundled[1].properties.b.items).toEqual([
+      { $ref: '#/$defs/AliasOfPoint' },
+      { $ref: '#/$defs/ReAlias' },
+    ])
   })
 })
 

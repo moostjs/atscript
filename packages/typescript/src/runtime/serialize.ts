@@ -4,6 +4,8 @@ import {
   type TAtscriptTypeFinal,
   type TMetadataMap,
   createAnnotatedTypeNode,
+  createMetadataMap,
+  createObjectTypeDef,
   isAnnotatedType,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
@@ -600,16 +602,11 @@ export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscr
 }
 
 function emptyObjectTypeDef(): TAtscriptTypeDef {
-  return {
-    kind: 'object',
-    props: new Map(),
-    propsPatterns: [],
-    tags: new Set(),
-  } as TAtscriptTypeDef
+  return createObjectTypeDef() as TAtscriptTypeDef
 }
 
 function toMetadataMap(record: Record<string, unknown>): TMetadataMap<AtscriptMetadata> {
-  return new Map(Object.entries(record)) as TMetadataMap<AtscriptMetadata>
+  return createMetadataMap(Object.entries(record))
 }
 
 function deserializeRef(
@@ -644,7 +641,7 @@ function deserializeNode(
     if (!own) {
       return (
         target ||
-        createAnnotatedTypeNode(emptyObjectTypeDef(), new Map() as TMetadataMap<AtscriptMetadata>, {
+        createAnnotatedTypeNode(emptyObjectTypeDef(), createMetadataMap(), {
           id: refId,
         })
       )
@@ -723,15 +720,15 @@ function deserializeTypeDef(
       return result
     }
     case 'object': {
-      const props = new Map<string, TAtscriptAnnotatedType>()
+      const def = createObjectTypeDef(tags)
       for (const [key, val] of Object.entries(t.props)) {
-        props.set(key, deserializeNode(val, resolved))
+        def.props.set(key, deserializeNode(val, resolved))
       }
-      const propsPatterns = t.propsPatterns.map(pp => ({
+      def.propsPatterns = t.propsPatterns.map(pp => ({
         pattern: new RegExp(pp.pattern.source, pp.pattern.flags),
         def: deserializeNode(pp.def, resolved),
       }))
-      return { kind: 'object', props, propsPatterns, tags }
+      return def
     }
     case 'array': {
       return { kind: 'array', of: deserializeNode(t.of, resolved), tags }
@@ -751,7 +748,7 @@ function deserializeTypeDef(
       if (existing) {
         return existing.type
       }
-      return { kind: 'object', props: new Map(), propsPatterns: [], tags }
+      return createObjectTypeDef(tags)
     }
     default: {
       throw new Error(`Unknown serialized type kind "${(t as any).kind}"`)

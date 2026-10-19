@@ -1,4 +1,4 @@
-const validIdentifier = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+export const validIdentifier = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
 
 /**
  * Wraps a property name in double quotes if it's not a valid identifier (contains special chars, etc.).

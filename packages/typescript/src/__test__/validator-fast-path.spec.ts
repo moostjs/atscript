@@ -2,6 +2,7 @@ import path from 'path'
 
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 
+import { afterRawWrite } from '../../test/compiled-engine'
 import {
   annotate,
   cloneRefProp,
@@ -927,6 +928,16 @@ describe('Validator fast path — generated types', () => {
 describe('Validator fast path — metadata / structure mutated after first validate', () => {
   type TObj = TAtscriptAnnotatedType<TAtscriptTypeObject>
   const prop = (t: TAtscriptAnnotatedType, k: string) => (t as TObj).type.props.get(k)!
+  /**
+   * A raw (untracked) write: compiled checks need `invalidateCompiledValidators()` after it
+   * (`afterRawWrite` calls it under the compiled engine only).
+   */
+  const raw =
+    (write: (t: TObj) => unknown) =>
+    (t: TObj): void => {
+      write(t)
+      afterRawWrite()
+    }
 
   function check(mutateType: (t: TObj) => void, value: any, expectAfter: boolean) {
     const t = makeOrder() as TObj
@@ -974,6 +985,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
     const v = new Validator(t)
     expect(v.validate({ n: 5 }, true)).toBe(true)
     ;(prop(t, 'n').metadata.get('expect.min') as any).minValue = 10
+    afterRawWrite()
     expect(v.validate({ n: 5 }, true)).toBe(false)
   })
   it('exclusive bounds at the boundary match the walk (scalar, array item, union-level)', () => {
@@ -1013,6 +1025,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
     const v = new Validator(t)
     expect(v.validate({ n: 5 }, true)).toBe(true)
     ;(prop(t, 'n').metadata.get('expect.exclusiveMax') as any).exclusiveMaxValue = 5
+    afterRawWrite()
     expect(v.validate({ n: 5 }, true)).toBe(false)
     prop(t, 'n').metadata.set('expect.exclusiveMax', { exclusiveMaxValue: 6 })
     expect(v.validate({ n: 5 }, true)).toBe(true)
@@ -1026,20 +1039,36 @@ describe('Validator fast path — metadata / structure mutated after first valid
     check(t => t.type.props.delete('phone'), validOrder(), false)
   })
   it('optional flag toggled', () => {
-    check(t => (prop(t, 'phone').optional = false), { ...validOrder(), phone: undefined }, false)
+    check(
+      raw(t => (prop(t, 'phone').optional = false)),
+      { ...validOrder(), phone: undefined },
+      false
+    )
   })
   it('union items.push() widens an enum', () => {
     const v = validOrder()
     v.status = 'paused'
     expect(
-      check(t => (prop(t, 'status').type as any).items.push(lit('paused').$type), v, true)
+      check(
+        raw(t => (prop(t, 'status').type as any).items.push(lit('paused').$type)),
+        v,
+        true
+      )
     ).toBe(false)
   })
   it('array `of` replaced', () => {
-    check(t => ((prop(t, 'tags').type as any).of = num().$type), validOrder(), false)
+    check(
+      raw(t => ((prop(t, 'tags').type as any).of = num().$type)),
+      validOrder(),
+      false
+    )
   })
   it('prop turned phantom', () => {
-    check(t => ((prop(t, 'id').type as any).designType = 'phantom'), validOrder(), false)
+    check(
+      raw(t => ((prop(t, 'id').type as any).designType = 'phantom')),
+      validOrder(),
+      false
+    )
   })
   it('cloneRefProp() then annotate the clone', () => {
     check(
@@ -1058,7 +1087,11 @@ describe('Validator fast path — metadata / structure mutated after first valid
   it('propPattern added later', () => {
     const v = validOrder()
     v['x-a'] = 'too long'
-    check(t => t.type.propsPatterns.push({ pattern: /^x-/, def: str().$type }), v, true)
+    check(
+      raw(t => t.type.propsPatterns.push({ pattern: /^x-/, def: str().$type })),
+      v,
+      true
+    )
   })
   // Compiled plans are cached per type node (shared by all validators): every kind of
   // in-place change after a plan was built must still be picked up on the next call.
@@ -1079,7 +1112,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
   })
   it('pattern entry mutated in place', () => {
     check(
-      t => ((prop(t, 'email').metadata.get('expect.pattern') as any)[0].pattern = '^x'),
+      raw(t => ((prop(t, 'email').metadata.get('expect.pattern') as any)[0].pattern = '^x')),
       validOrder(),
       false
     )
@@ -1089,19 +1122,31 @@ describe('Validator fast path — metadata / structure mutated after first valid
   })
   it('metadata map replaced', () => {
     check(
-      t => (prop(t, 'name').metadata = new Map([['expect.maxLength', 3]]) as any),
+      raw(t => (prop(t, 'name').metadata = new Map([['expect.maxLength', 3]]) as any)),
       validOrder(),
       false
     )
   })
   it('type replaced / literal value changed', () => {
     const v = validOrder()
-    check(t => ((prop(t, 'score') as any).type = str().$type.type), v, false)
-    check(t => ((prop(t, 'status').type as any).items[2].type.value = 'gone'), v, false)
+    check(
+      raw(t => ((prop(t, 'score') as any).type = str().$type.type)),
+      v,
+      false
+    )
+    check(
+      raw(t => ((prop(t, 'status').type as any).items[2].type.value = 'gone')),
+      v,
+      false
+    )
   })
   it('union item replaced in place (same length)', () => {
     const v = validOrder()
-    check(t => ((prop(t, 'status').type as any).items[2] = lit('other').$type), v, false)
+    check(
+      raw(t => ((prop(t, 'status').type as any).items[2] = lit('other').$type)),
+      v,
+      false
+    )
   })
   it('prop patterns added to a compiled object (plan falls back to the live check)', () => {
     const t = makeOrder() as TObj
@@ -1109,6 +1154,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
     const value = { ...validOrder(), address: { ...addr(), 'x-a': 1 } }
     expect(v.validate(structuredClone(value), true)).toBe(true)
     ;(prop(t, 'address').type as any).propsPatterns.push({ pattern: /^x-/, def: str().$type })
+    afterRawWrite()
     expect(v.validate(structuredClone(value), true)).toBe(false)
     const walk = new WalkValidator(t, { unknownProps: 'ignore' })
     expect(walk.validate(structuredClone(value), true)).toBe(false)
@@ -1134,6 +1180,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
       expect(v.validate([{ n: 5 }, { n: 6 }], true)).toBe(true)
       const n = ((t.type as any).of as TObj).type.props.get('n')!
       ;(n.metadata.get('expect.min') as any).minValue = 6
+      afterRawWrite()
       expect(v.validate([{ n: 5 }, { n: 6 }], true)).toBe(false)
       expect(v.errors).toEqual([{ path: '0.n', message: 'Expected minimum 6, got 5' }])
     })
@@ -1141,21 +1188,33 @@ describe('Validator fast path — metadata / structure mutated after first valid
       check(t => item(t).type.props.set('extra', str().$type), validOrder(), false)
       check(t => item(t).type.props.set('sku', num().$type), validOrder(), false)
       check(t => item(t).type.props.delete('note'), validOrder(), false)
-      check(t => ((prop(item(t), 'sku').type as any).designType = 'phantom'), validOrder(), false)
       check(
-        t => (prop(item(t), 'note').optional = false),
+        raw(t => ((prop(item(t), 'sku').type as any).designType = 'phantom')),
+        validOrder(),
+        false
+      )
+      check(
+        raw(t => (prop(item(t), 'note').optional = false)),
         { ...validOrder(), items: [{ sku: 'SKU-1', qty: 2, price: 9.99 }] },
         false
       )
     })
     it('metadata map / type replaced, array `of` replaced', () => {
       check(
-        t => (prop(item(t), 'sku').metadata = new Map([['expect.maxLength', 2]]) as any),
+        raw(t => (prop(item(t), 'sku').metadata = new Map([['expect.maxLength', 2]]) as any)),
         validOrder(),
         false
       )
-      check(t => ((prop(item(t), 'price') as any).type = str().$type.type), validOrder(), false)
-      check(t => ((prop(t, 'tags').type as any).of = num().$type), validOrder(), false)
+      check(
+        raw(t => ((prop(item(t), 'price') as any).type = str().$type.type)),
+        validOrder(),
+        false
+      )
+      check(
+        raw(t => ((prop(t, 'tags').type as any).of = num().$type)),
+        validOrder(),
+        false
+      )
       check(
         t => (prop(t, 'tags').type as any).of.metadata.set('expect.maxLength', 0),
         validOrder(),
@@ -1682,7 +1741,10 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     const changes: Array<(t: TObj) => void> = [
       t => t.type.props.set('c', num().optional().$type),
       t => t.type.props.delete('b'),
-      t => ((t.type.props.get('b')!.type as any).designType = 'phantom'),
+      t => {
+        ;(t.type.props.get('b')!.type as any).designType = 'phantom'
+        afterRawWrite()
+      },
     ]
     for (const change of changes) {
       for (const wrap of [(i: TObj) => i, (i: TObj) => arr(i).$type]) {

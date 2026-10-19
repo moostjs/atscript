@@ -1,3 +1,4 @@
+import { AnnotationMap, isValidatorKey, PropsMap, touched } from './compiled-check/tracking'
 import { Validator, type TValidatorOptions } from './validator'
 
 // eslint-disable max-lines
@@ -13,10 +14,15 @@ function validatorMethod(this: TAtscriptAnnotatedType, opts?: Partial<TValidator
 /**
  * Creates a minimal annotated type node from a type def and metadata map.
  * Centralises the shape so callers never duplicate the boilerplate.
+ *
+ * `metadata` is used as-is (the node keeps the caller's map, so later writes through it
+ * apply). When omitted, the node gets a new, tracked metadata map. Compiled validator
+ * checks only bind to nodes whose metadata is tracked; nodes built over a caller-supplied
+ * `Map` are always validated by the interpreted validator.
  */
 export function createAnnotatedTypeNode(
   type: TAtscriptTypeDef,
-  metadata: TMetadataMap<AtscriptMetadata>,
+  metadata: Map<string, unknown> | TMetadataMap<AtscriptMetadata> = new AnnotationMap(),
   opts?: {
     id?: string
     optional?: boolean
@@ -26,11 +32,46 @@ export function createAnnotatedTypeNode(
   return {
     __is_atscript_annotated_type: true,
     type,
-    metadata,
+    metadata: metadata as TMetadataMap<AtscriptMetadata>,
     validator: validatorMethod,
     id: opts?.id,
     optional: opts?.optional,
     ref: opts?.ref,
+  }
+}
+
+/** A new tracked metadata map holding `entries` (see {@link createAnnotatedTypeNode}). */
+export function createMetadataMap(
+  entries?: Iterable<readonly [string, unknown]>
+): TMetadataMap<AtscriptMetadata> {
+  return new AnnotationMap(entries) as unknown as TMetadataMap<AtscriptMetadata>
+}
+
+/**
+ * The metadata map `defineAnnotatedType()` installs on `base`: `base.metadata` itself, except
+ * that an absent map or an empty plain `Map` (what a generated class starts with:
+ * `static metadata = new Map()`) is replaced by a new tracked map, so the node can bind to a
+ * compiled validator check. A non-empty map or a `Map` subclass is always kept as-is (its
+ * identity and overrides preserved; such a node stays interpreted).
+ */
+function baseMetadata(metadata: unknown): TMetadataMap<AtscriptMetadata> {
+  const replace =
+    !metadata ||
+    (Object.getPrototypeOf(metadata) === Map.prototype &&
+      (metadata as Map<unknown, unknown>).size === 0)
+  return replace ? createMetadataMap() : (metadata as TMetadataMap<AtscriptMetadata>)
+}
+
+/** A new object type def (its props map is tracked, see {@link createAnnotatedTypeNode}). */
+export function createObjectTypeDef(
+  tags = new Set<AtscriptPrimitiveTags>(),
+  propsPatterns: TAtscriptTypeObject['propsPatterns'] = []
+): TAtscriptTypeObject {
+  return {
+    kind: 'object',
+    props: new PropsMap<string, TAtscriptAnnotatedType>(),
+    propsPatterns,
+    tags,
   }
 }
 
@@ -186,6 +227,10 @@ export function annotate<K extends keyof AtscriptMetadata>(
       const a = metadata.get(key)
       if (Array.isArray(a)) {
         a.push(value as any)
+        // In place: the map itself sees no write.
+        if (isValidatorKey(key)) {
+          touched(metadata)
+        }
       } else {
         metadata.set(key, [a, value] as any)
       }
@@ -211,41 +256,26 @@ export function cloneRefProp(parentType: TAtscriptTypeDef, propName: string): vo
     return
   }
 
-  const clonedType = cloneTypeDef(existing.type)
-  objType.props.set(
-    propName as any,
-    createAnnotatedTypeNode(
-      clonedType,
-      new Map(existing.metadata) as TMetadataMap<AtscriptMetadata>,
-      {
-        id: existing.id,
-        optional: existing.optional,
-        ref: existing.ref,
-      }
-    )
-  )
+  objType.props.set(propName as any, cloneNode(existing, cloneTypeDef(existing.type)))
+}
+
+/** A copy of `node` (own metadata map) over `type`. */
+function cloneNode(node: TAtscriptAnnotatedType, type: TAtscriptTypeDef): TAtscriptAnnotatedType {
+  return createAnnotatedTypeNode(type, createMetadataMap(node.metadata), {
+    id: node.id,
+    optional: node.optional,
+    ref: node.ref,
+  })
 }
 
 function cloneTypeDef(type: TAtscriptTypeDef): TAtscriptTypeDef {
   if (type.kind === 'object') {
     const obj = type as TAtscriptTypeObject
-    const props = new Map<string, TAtscriptAnnotatedType>()
+    const clone = createObjectTypeDef(new Set(obj.tags), [...obj.propsPatterns])
     for (const [k, v] of obj.props) {
-      props.set(
-        k,
-        createAnnotatedTypeNode(v.type, new Map(v.metadata) as TMetadataMap<AtscriptMetadata>, {
-          id: v.id,
-          optional: v.optional,
-          ref: v.ref,
-        })
-      )
+      clone.props.set(k, cloneNode(v, v.type))
     }
-    return {
-      kind: 'object',
-      props,
-      propsPatterns: [...obj.propsPatterns],
-      tags: new Set(obj.tags),
-    } as TAtscriptTypeDef
+    return clone
   }
   if (type.kind === 'array') {
     const arr = type as TAtscriptTypeArray
@@ -295,16 +325,18 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     Omit<TAtscriptTypeFinal, 'kind'> &
     Omit<TAtscriptTypeArray, 'kind'> &
     Omit<TAtscriptTypeObject, 'kind'>
+  // Re-initialising a base's type def in place is a structural change (a no-op for new defs).
+  touched(type)
   type.kind = kind
   if (COMPLEX_KINDS.has(kind)) {
     type.items = []
   }
   if (kind === 'object') {
-    type.props = new Map()
+    type.props = new PropsMap()
     type.propsPatterns = []
   }
   type.tags = new Set()
-  const metadata = (base?.metadata || new Map<string, unknown>()) as TMetadataMap<AtscriptMetadata>
+  const metadata = baseMetadata(base?.metadata)
   const payload = {
     __is_atscript_annotated_type: true as const,
     metadata,
@@ -324,18 +356,22 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     },
     designType(value: TAtscriptTypeFinal['designType']) {
       this.$def.designType = value
+      touched(this.$def)
       return this
     },
     value(value: string | number | boolean) {
       this.$def.value = value
+      touched(this.$def)
       return this
     },
     of(value: TAtscriptAnnotatedType) {
       this.$def.of = value
+      touched(this.$def)
       return this
     },
     item(value: TAtscriptAnnotatedType) {
       this.$def.items.push(value)
+      touched(this.$def)
       return this
     },
     prop(name: string, value: TAtscriptAnnotatedType) {
@@ -344,10 +380,12 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     },
     propPattern(pattern: RegExp, def: TAtscriptAnnotatedType) {
       this.$def.propsPatterns.push({ pattern, def })
+      touched(this.$def)
       return this
     },
     optional(value = true) {
       this.$type.optional = value
+      touched(this.$type)
       return this
     },
     copyMetadata(fromMetadata: TMetadataMap<AtscriptMetadata>, ignore?: Set<string>) {
@@ -371,6 +409,8 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
       // as a bare `$("", X).refTo(...)` statement whose return value is unused, so
       // reassigning this.$type would silently lose the patch and leave X with type = {}.
       const node = this.$type
+      // Re-pointing a node is a structural change (lazy resolution below is not).
+      touched(node)
       // Every reference records `ref` (eager and lazy alike): `field` is the chain path, or
       // '' for a plain ref (nav props, `export type X = Y` aliases).
       const field = chain ? chain.join('.') : ''

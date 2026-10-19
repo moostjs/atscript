@@ -36,7 +36,37 @@ export interface TTsPluginOptions {
    * from Node. *(default: `'.as'`)*
    */
   moduleExtension?: '.as' | '.as.js' | '.as.mjs'
+
+  /**
+   * Emit a build-time compiled validator check per type into the `.as.js` output.
+   *
+   * `validate()` then runs the type's compiled check instead of the interpreted pre-check
+   * (results and errors are identical; only speed differs). The check binds to the live
+   * type on first use and re-binds after mutations made through `annotate()`, the
+   * metadata / props `Map` methods, the `defineAnnotatedType()` handle and `cloneRefProp()`.
+   * Raw writes need `invalidateCompiledValidators()`: property writes (`node.optional = …`,
+   * `type.items.push(…)`, …) and in-place edits of annotation values (mutating a constraint
+   * object, pushing onto an `@expect.pattern` array directly) — the check keeps the values
+   * it bound until then. Any runtime mutation of a type a check has bound to makes the
+   * checks re-bind once on next use: cheap at startup, but avoid it per request. Types it
+   * cannot bind to, and types not built from generated modules (deserialised,
+   * JSON-schema-built, flattened, hand-built), are validated by the interpreted path as
+   * before.
+   *
+   * Adds code to every `.as.js`: meant for backend builds — leave it off for bundles
+   * shipped to browsers (the code is CSP-safe: no `eval` / `new Function`). The
+   * `'js:compiled'` / `'js:interpreted'` render formats force it on / off per render.
+   * *(default: `false`)*
+   */
+  compileValidators?: boolean
 }
+
+/**
+ * Render formats of the JS output that override {@link TTsPluginOptions.compileValidators}
+ * (used by `unplugin-atscript`'s `compileValidators` option).
+ */
+export const JS_COMPILED_FORMAT = 'js:compiled'
+export const JS_INTERPRETED_FORMAT = 'js:interpreted'
 
 /**
  * Resolves the effective JSON schema mode from plugin options.
@@ -61,11 +91,13 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
           },
         ]
       }
-      if (format === 'js') {
+      if (format === 'js' || format === JS_COMPILED_FORMAT || format === JS_INTERPRETED_FORMAT) {
+        const jsOpts =
+          format === 'js' ? opts : { ...opts, compileValidators: format === JS_COMPILED_FORMAT }
         return [
           {
             fileName: `${doc.name}.js`,
-            content: new JsRenderer(doc, opts).render(),
+            content: new JsRenderer(doc, jsOpts).render(),
           },
         ]
       }

@@ -7,7 +7,9 @@ import type {
   TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
+import { compiledCheckFor, optionFlags, type TCompiledEnv } from './compiled-check/registry'
 import type { TValidatorOptions } from './validator'
+import { ARRAY_KEYS, BOOLEAN_KEYS, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
 
 /**
  * Allocation-free boolean pre-check used by {@link Validator.validate} before the
@@ -82,7 +84,7 @@ export function fastCheckPasses(
   // A new call: every plan re-verifies itself against the live type when first reached.
   stamp++
   try {
-    return fastCheck(def, value, TOP, opts) === PASS
+    return check(def, value, opts) === PASS
   } catch {
     // Let the walk reproduce (or not) the failure with its own semantics.
     return false
@@ -103,7 +105,7 @@ function fastCheckStripping(
   stripping = true
   let passed: boolean
   try {
-    passed = fastCheck(def, value, TOP, opts) === PASS
+    passed = check(def, value, opts) === PASS
   } catch {
     passed = false
   } finally {
@@ -121,6 +123,18 @@ function fastCheckStripping(
     pendingKeys.length = 0
   }
   return passed
+}
+
+/**
+ * The pre-check of the root: the type's build-time compiled check when it has one bound to
+ * the live tree (see compiled-check/registry.ts), else the interpreted one. Both share the
+ * contract above and the strip state.
+ */
+function check(def: TAtscriptAnnotatedType, value: unknown, opts: TValidatorOptions): number {
+  const compiled = compiledCheckFor(def, COMPILED_ENV)
+  return compiled === null
+    ? fastCheck(def, value, TOP, opts)
+    : compiled(value, TOP | optionFlags(opts), opts)
 }
 
 export const DECIMAL_RE = /^[+-]?\d+(\.\d+)?$/
@@ -165,6 +179,17 @@ function acceptsNull(def: TAtscriptAnnotatedType): boolean {
     }
   }
   return false
+}
+
+/** What compiled checks share with the interpreted pre-check. */
+export const COMPILED_ENV: TCompiledEnv = {
+  pk: pendingKeys,
+  // oxlint-disable-next-line @typescript-eslint/unbound-method
+  ho: Object.prototype.hasOwnProperty,
+  dec: DECIMAL_RE,
+  regex: getRegex,
+  interp: fastCheck,
+  rn: rejectsNullAsRequired,
 }
 
 function fastCheck(
@@ -847,21 +872,14 @@ function build(plan: Plan): void {
       } else if (type.value !== undefined) {
         plan.op = OP_FINAL
       } else if (type.designType === 'string') {
-        setMetaKeys(plan, 'meta.required', 'expect.minLength', 'expect.maxLength', 'expect.pattern')
+        setMetaKeys(plan, ...STRING_KEYS)
         plan.regexes = []
         plan.op = OP_STRING
       } else if (type.designType === 'number') {
-        setMetaKeys(
-          plan,
-          'expect.int',
-          'expect.min',
-          'expect.max',
-          'expect.exclusiveMin',
-          'expect.exclusiveMax'
-        )
+        setMetaKeys(plan, ...NUMBER_KEYS)
         plan.op = OP_NUMBER
       } else if (type.designType === 'boolean') {
-        setMetaKeys(plan, 'meta.required')
+        setMetaKeys(plan, ...BOOLEAN_KEYS)
         plan.op = OP_BOOLEAN
       } else {
         plan.op = OP_FINAL
@@ -892,7 +910,7 @@ function build(plan: Plan): void {
       break
     }
     case 'array': {
-      setMetaKeys(plan, 'expect.minLength', 'expect.maxLength', 'expect.array.uniqueItems')
+      setMetaKeys(plan, ...ARRAY_KEYS)
       plan.of = type.of
       plan.ofPlan = planFor(type.of)
       plan.op = OP_ARRAY

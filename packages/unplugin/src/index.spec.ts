@@ -64,3 +64,51 @@ describe('unpluginFactory', () => {
     expect(result.code.length).toBeGreaterThan(0)
   })
 })
+
+describe('compileValidators override', () => {
+  let dir: string
+  let asFile: string
+  const cwd = process.cwd()
+
+  beforeAll(() => {
+    dir = mkdtempSync(path.join(tmpdir(), 'unplugin-atscript-cv-'))
+    process.chdir(dir)
+    asFile = path.join(dir, 'model.as')
+    writeFileSync(asFile, 'export interface Model {\n  @expect.minLength 2\n  id: string\n}\n')
+  })
+
+  afterAll(() => {
+    process.chdir(cwd)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  async function code(
+    compileValidators: boolean | 'ssr' | undefined,
+    loadOptions?: { ssr?: boolean },
+    ctx: Record<string, unknown> = {}
+  ) {
+    const plugin = unpluginFactory({ compileValidators }, {} as never)
+    const load = plugin.load as (id: string, o?: { ssr?: boolean }) => Promise<{ code: string }>
+    return (await load.call({ addWatchFile: () => {}, ...ctx }, asFile, loadOptions)).code
+  }
+
+  it('leaves the atscript config in charge when unset', async () => {
+    expect(await code(undefined)).not.toContain('$cv(')
+  })
+
+  it('true / false force compiled checks on / off', async () => {
+    expect(await code(true)).toContain('$cv(Model')
+    expect(await code(false)).not.toContain('$cv(')
+  })
+
+  it("'ssr' compiles for Vite server loads only", async () => {
+    expect(await code('ssr', { ssr: true })).toContain('$cv(Model')
+    expect(await code('ssr', { ssr: false })).not.toContain('$cv(')
+    expect(await code('ssr')).not.toContain('$cv(')
+    // Vite environment API (`this.environment`)
+    const server = { environment: { config: { consumer: 'server' } } }
+    const client = { environment: { config: { consumer: 'client' } } }
+    expect(await code('ssr', undefined, server)).toContain('$cv(Model')
+    expect(await code('ssr', undefined, client)).not.toContain('$cv(')
+  })
+})

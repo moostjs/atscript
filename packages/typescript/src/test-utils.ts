@@ -4,7 +4,7 @@ import path from 'path'
 import { build } from '@atscript/core'
 import type { TAtscriptPlugin } from '@atscript/core'
 
-import { tsPlugin } from './plugin'
+import { tsPlugin, type TTsPluginOptions } from './plugin'
 
 export interface PrepareFixturesOptions {
   /** Absolute directory containing the `.as` fixture files. */
@@ -17,6 +17,8 @@ export interface PrepareFixturesOptions {
   entries?: string[]
   /** Output formats to generate; defaults to `['js', 'dts']`. */
   formats?: Array<'js' | 'dts'>
+  /** Options of the auto-injected `tsPlugin()` (e.g. `{ compileValidators: true }`). */
+  tsPluginOptions?: TTsPluginOptions
 }
 
 /**
@@ -28,11 +30,18 @@ export interface PrepareFixturesOptions {
  * don't touch mtimes of up-to-date artifacts.
  */
 export async function prepareFixtures(options: PrepareFixturesOptions): Promise<void> {
-  const { rootDir, plugins = [], entries, include, formats = ['js', 'dts'] } = options
+  const {
+    rootDir,
+    plugins = [],
+    entries,
+    include,
+    formats = ['js', 'dts'],
+    tsPluginOptions,
+  } = options
 
   const repo = await build({
     rootDir,
-    plugins: [tsPlugin(), ...plugins],
+    plugins: [tsPlugin(tsPluginOptions), ...plugins],
     ...(entries ? { entries } : { include: include ?? ['**/*.as'] }),
   })
 

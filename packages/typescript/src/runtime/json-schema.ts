@@ -7,6 +7,7 @@ import {
   type TAtscriptTypeObject,
 } from './annotated-type'
 import { forAnnotatedType } from './traverse'
+import { boundOf } from './validator-keys'
 
 /** A JSON Schema object (draft-compatible). */
 export type TJsonSchema = Record<string, any>
@@ -214,11 +215,11 @@ type TMetadata = TAtscriptAnnotatedType['metadata']
 function applyArrayConstraints(schema: TJsonSchema, meta: TMetadata): void {
   const minLength = meta.get('expect.minLength')
   if (minLength !== undefined) {
-    schema.minItems = typeof minLength === 'number' ? minLength : minLength.length
+    schema.minItems = boundOf(minLength, 'length')
   }
   const maxLength = meta.get('expect.maxLength')
   if (maxLength !== undefined) {
-    schema.maxItems = typeof maxLength === 'number' ? maxLength : maxLength.length
+    schema.maxItems = boundOf(maxLength, 'length')
   }
 }
 
@@ -233,11 +234,11 @@ function applyScalarConstraints(schema: TJsonSchema, meta: TMetadata): void {
     }
     const minLength = meta.get('expect.minLength')
     if (minLength !== undefined) {
-      schema.minLength = typeof minLength === 'number' ? minLength : minLength.length
+      schema.minLength = boundOf(minLength, 'length')
     }
     const maxLength = meta.get('expect.maxLength')
     if (maxLength !== undefined) {
-      schema.maxLength = typeof maxLength === 'number' ? maxLength : maxLength.length
+      schema.maxLength = boundOf(maxLength, 'length')
     }
     const patterns = meta.get('expect.pattern') as Array<{ pattern: string }> | undefined
     if (patterns?.length) {
@@ -266,11 +267,6 @@ function applyScalarConstraints(schema: TJsonSchema, meta: TMetadata): void {
       schema.exclusiveMaximum = boundOf(exMax, 'exclusiveMaxValue')
     }
   }
-}
-
-/** A number-bound annotation's value: the bare number, or its `field` in the object form. */
-function boundOf<T extends object, K extends keyof T>(m: number | T, field: K): number | T[K] {
-  return typeof m === 'number' ? m : m[field]
 }
 
 const LOWER_BOUNDS = new Set(['minimum', 'exclusiveMinimum', 'minLength', 'minItems'])

@@ -82,6 +82,9 @@ export type { TCreateDataOptions, TValueResolver } from './runtime/default-value
 
 export { throwFeatureDisabled } from './runtime/throw-disabled'
 
+export { registerCompiledCheck } from './runtime/compiled-check/registry'
+export { invalidateCompiledValidators } from './runtime/compiled-check/tracking'
+
 export { flattenAnnotatedType } from './runtime/flatten'
 export type { TFlattenOptions } from './runtime/flatten'
 

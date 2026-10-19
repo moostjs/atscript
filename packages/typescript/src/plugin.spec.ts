@@ -1496,3 +1496,46 @@ describe('ts-plugin', () => {
     expect(globalDts).toContain('order: import("@atscript/typescript/utils").AtscriptOrderItem[]')
   })
 })
+
+describe('ts-plugin — compileValidators', () => {
+  // Off by default: covered by every snapshot above (byte-identical output).
+  for (const [fixture, snapshot] of [
+    ['interface.as', 'interface.js'],
+    ['imports.as', 'imports.js'],
+    ['annotate-mutating.as', 'annotate-mutating.js'],
+    ['extends-recursive-base.as', 'extends-recursive-base.js'],
+    ['extends-recursive-child.as', 'extends-recursive-child.js'],
+  ]) {
+    it(`must emit compiled validator checks (${fixture})`, async () => {
+      const repo = await build({
+        rootDir: wd,
+        entries: [`test/fixtures/${fixture}`],
+        plugins: [tsPlugin({ compileValidators: true })],
+        annotations,
+      })
+      const out = await repo.generate({ format: 'js' })
+      const content = out.find(f => f.fileName === `${fixture}.js`)!.content
+      expect(content).toContain('registerCompiledCheck as $cv')
+      expect(content).not.toMatch(/\bnew Function\b|\bFunction\(|\beval\(/)
+      await expect(content).toMatchFileSnapshot(
+        path.join(wd, `test/__snapshots__/compiled/${snapshot}`)
+      )
+    })
+  }
+
+  it('the js:compiled / js:interpreted formats override the option', async () => {
+    const render = async (format: string, compileValidators?: boolean) => {
+      const repo = await build({
+        rootDir: wd,
+        entries: ['test/fixtures/interface.as'],
+        plugins: [tsPlugin({ compileValidators })],
+        annotations,
+      })
+      return (await repo.generate({ format }))[0].content
+    }
+    const plain = await render('js')
+    expect(plain).not.toContain('$cv')
+    expect(await render('js:interpreted', true)).toBe(plain)
+    expect(await render('js:compiled')).toBe(await render('js', true))
+  })
+})

@@ -10,7 +10,7 @@ import {
   loadConfig,
   resolveConfigFile,
 } from '@atscript/core'
-import { tsPlugin as ts } from '@atscript/typescript'
+import { JS_COMPILED_FORMAT, JS_INTERPRETED_FORMAT, tsPlugin as ts } from '@atscript/typescript'
 import type { UnpluginBuildContext, UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 
@@ -35,6 +35,33 @@ export interface atscriptPluginOptions {
    * config-provided plugins (`@db.*`, `@ui.*`, …) are reported as unknown.
    */
   root?: string
+
+  /**
+   * Overrides `tsPlugin({ compileValidators })` of the atscript config for the modules
+   * this plugin renders:
+   * - `true` / `false` — always / never emit build-time compiled validator checks.
+   * - `'ssr'` — only for server builds: Vite's SSR / server environments get compiled
+   *   checks, client bundles stay lean (one Vite config for both). Bundlers that do not
+   *   report a server build (everything but Vite) get none.
+   *
+   * Unset: the atscript config decides (default: off).
+   */
+  compileValidators?: boolean | 'ssr'
+}
+
+/** The `load` hook options Vite passes (absent for other bundlers). */
+interface TLoadOptions {
+  ssr?: boolean
+}
+
+/** `true` when Vite is loading the module for a server (SSR) build / environment. */
+function isServerLoad(ctx: unknown, options: TLoadOptions | undefined): boolean {
+  if (options?.ssr === true) {
+    return true
+  }
+  const consumer = (ctx as { environment?: { config?: { consumer?: string } } } | undefined)
+    ?.environment?.config?.consumer
+  return consumer === 'server'
 }
 
 // Matches declaration-module ids (.d.ts / .d.mts / .d.cts). Declaration bundlers
@@ -174,7 +201,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
       }
     },
 
-    async load(id) {
+    async load(id, options?: TLoadOptions) {
       // `<file>.as.d.ts` ids are produced by `resolveId` for the dts graph; the
       // declaration is rendered fresh from the `.as` source, so it never depends
       // on (possibly stale) asc-emitted artifacts on disk.
@@ -225,7 +252,19 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
             map: null,
           }
         }
-        const out = await doc.render('js')
+        const compile = opts?.compileValidators
+        // Render formats of @atscript/typescript overriding its `compileValidators` option.
+        const format =
+          compile === undefined
+            ? 'js'
+            : compile === true || (compile === 'ssr' && isServerLoad(this, options))
+              ? JS_COMPILED_FORMAT
+              : JS_INTERPRETED_FORMAT
+        let out = await doc.render(format)
+        if (!out?.[0]?.content && format !== 'js') {
+          // A config plugin that does not know the override formats.
+          out = await doc.render('js')
+        }
         const hasMutatingAnnotates = doc.nodes.some(n => isAnnotate(n) && n.isMutating)
         return {
           code: out?.[0]?.content || '',

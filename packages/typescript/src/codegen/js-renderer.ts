@@ -52,6 +52,7 @@ import {
 import { buildJsonSchema } from '../runtime/json-schema'
 import { BaseRenderer } from './base-renderer'
 import { escapeQuotes, wrapProp } from './utils'
+import { rawLiteralValue, type TAccessorStep, ValidationModel } from './validation-model'
 
 const QUERY_OP_MAP: Record<string, string> = {
   '=': '$eq',
@@ -80,6 +81,40 @@ const NUMBER_BOUND_FIELDS: Record<string, string> = {
 // the import position is part of the generated-file snapshots.
 const SYNTH_IMPORTS_MARKER = '/*@@atscript-synth-imports@@*/'
 
+interface TMutatingClone {
+  parentSteps: TAccessorStep[]
+  propName: string
+}
+
+interface TPropPath {
+  steps: TAccessorStep[]
+  propDef: SemanticNode | undefined
+}
+
+/** The runtime value of an annotation argument (see `JsRenderer.computeAnnotationValue`). */
+function runtimeArg(type: string | undefined, token: Token): unknown {
+  return type === 'string' || (type === undefined && token.type === 'text')
+    ? token.text
+    : rawLiteralValue(token.text)
+}
+
+/**
+ * The runtime accessor of a mutating-annotate path: `Name` followed by the steps
+ * (`.type`, `.props.get("a")?`, `.items[0]`).
+ */
+function accessorPath(targetName: string, steps: TAccessorStep[]): string {
+  let path = targetName
+  for (const step of steps) {
+    path +=
+      step === 'type'
+        ? '.type'
+        : step[0] === 'props'
+          ? `.props.get("${escapeQuotes(step[1])}")?`
+          : `.items[${step[1]}]`
+  }
+  return path
+}
+
 interface TSynthRefInfo {
   alias: string
   ownerDoc: AtscriptDoc
@@ -100,12 +135,17 @@ export class JsRenderer extends BaseRenderer {
   private _synthAllocated = new Map<string, TSynthRefInfo>()
   private _synthPathCache = new Map<AtscriptDoc, string | undefined>()
   private _ownerCache = new Map<string, ReturnType<AtscriptDoc['getDeclarationOwnerNode']>>()
+  /** Build-time model of the emitted type trees (`compileValidators` only). */
+  private readonly model?: ValidationModel
 
   constructor(
     doc: AtscriptDoc,
     private opts?: TTsPluginOptions
   ) {
     super(doc)
+    if (opts?.compileValidators) {
+      this.model = new ValidationModel()
+    }
   }
 
   /**
@@ -402,6 +442,9 @@ export class JsRenderer extends BaseRenderer {
     if (jsonSchemaMode === false) {
       imports.push('throwFeatureDisabled as $d')
     }
+    if (this.model) {
+      imports.push('registerCompiledCheck as $cv')
+    }
     this.writeln(`import { ${imports.join(', ')} } from "@atscript/typescript/utils"`)
 
     // Synthesized imports for symbols only reachable through `extends` parent prop trees.
@@ -479,7 +522,7 @@ export class JsRenderer extends BaseRenderer {
               }
             }
             this._adHocAnnotations = this.buildAdHocMap([annotateNode])
-            this.annotateType(def, node.id)
+            this.modelClass(node.id!, () => this.annotateType(def, node.id))
             this._adHocAnnotations = null
             this.indent()
             this.defineMetadataForAnnotateAlias(annotateNode)
@@ -496,13 +539,58 @@ export class JsRenderer extends BaseRenderer {
             def = resolved
           }
         }
-        this.annotateType(def, node.id)
+        this.modelClass(node.id!, () => this.annotateType(def, node.id))
         this.indent().defineMetadata(node).unindent()
         this.writeln()
       }
     }
+    this.renderCompiledChecks()
     this.writeln('// prettier-ignore-end')
     super.post()
+  }
+
+  /** Classes whose chain the validation model followed (in emission order). */
+  private modelClasses: string[] = []
+
+  /**
+   * Emits class `name`'s chain; the validation model follows it (its handle stays the current
+   * chain, the target of the class-level annotations emitted next).
+   */
+  private modelClass(name: string, emit: () => void) {
+    if (this.model) {
+      this.model.current = undefined
+    }
+    emit()
+    // A class whose chain wrote nothing keeps its `{}` type: nothing to compile.
+    if (this.model?.current) {
+      this.modelClasses.push(name)
+    }
+  }
+
+  /**
+   * `compileValidators`: one `$cv(Class, …)` registration per class, after every chain and
+   * mutating annotate of the module ran (the compiled check binds on first use).
+   */
+  private renderCompiledChecks() {
+    if (!this.model) {
+      return
+    }
+    const registrations: string[] = []
+    for (const name of this.modelClasses) {
+      const registration = this.model.registration(name)
+      if (registration) {
+        registrations.push(registration)
+      }
+    }
+    if (registrations.length > 0) {
+      this.writeln('// Compiled validator checks')
+      for (const registration of registrations) {
+        for (const line of registration.split('\n')) {
+          this.writeln(line)
+        }
+      }
+      this.writeln()
+    }
   }
 
   private renderClassStatics(node: SemanticNode) {
@@ -543,6 +631,7 @@ export class JsRenderer extends BaseRenderer {
     this.write(exported ? 'export ' : '')
     this.write(`class ${node.id!} `)
     this.blockln('{}')
+    this.model?.declare(node.id!)
     this.renderClassStatics(node)
     this.popln()
     this.postAnnotate.push(node)
@@ -622,35 +711,111 @@ export class JsRenderer extends BaseRenderer {
   }
 
   private toAnnotatedType(node?: SemanticNode): TAtscriptAnnotatedType {
-    return this.toAnnotatedHandle(node).$type
+    return node?.entity === 'interface' || node?.entity === 'type'
+      ? this.declType(node)
+      : this.toAnnotatedHandle(node).$type
   }
 
-  private toAnnotatedHandle(node?: SemanticNode, skipAnnotations = false): TAnnotatedTypeHandle {
+  /**
+   * Build-time runtime types of declarations (for the bundled JSON schema), by declaration
+   * and by definition (what a reference unwinds to). One type per declaration, shared by
+   * every reference — the same identities as the runtime module.
+   */
+  private _declTypes = new Map<SemanticNode, TAtscriptAnnotatedType>()
+
+  /**
+   * The build-time runtime type of an interface / type declaration (see `_declTypes`);
+   * `doc` is the document that declares it (where an alias's target name resolves).
+   */
+  private declType(node: SemanticNode, doc: AtscriptDoc = this.doc): TAtscriptAnnotatedType {
+    const known = this._declTypes.get(node)
+    if (known) {
+      return known
+    }
+    let def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
+    if (isInterface(node) && (node as SemanticInterfaceNode).hasExtends) {
+      const resolved = this.doc.resolveInterfaceExtends(node as SemanticInterfaceNode)
+      if (resolved) {
+        def = resolved
+      }
+    }
+    // Assign id for $defs/$ref support in buildJsonSchema (bundle mode)
+    const typeId =
+      this.typeIds.get(node) ??
+      (node.__typeId !== null && node.__typeId !== undefined ? node.id : undefined)
+    let handle: TAnnotatedTypeHandle
+    if (def && isRef(def)) {
+      // An alias: references unwind past it, so none reaches it while it is built. Its
+      // target name resolves in the declaring document (it may be another module's alias).
+      const ref = def as SemanticRefNode
+      const decl = doc.unwindType(ref.id!, ref.chain)?.def
+      const target = this.refTarget(ref, decl, doc)
+      handle = target ? defineAnnotatedType().refTo(target) : this.toAnnotatedHandle(decl, true)
+    } else {
+      // Like the generated class: the type exists before its tree is built and is filled
+      // in place, so references reached meanwhile (a recursive type) share it.
+      const base = {
+        __is_atscript_annotated_type: true,
+        type: {},
+        metadata: new Map(),
+        id: typeId,
+      }
+      this._declTypes.set(node, base as unknown as TAtscriptAnnotatedType)
+      if (def) {
+        this._declTypes.set(def, base as unknown as TAtscriptAnnotatedType)
+      }
+      handle = this.toAnnotatedHandle(def, true, base)
+    }
+    this._declTypes.set(node, handle.$type)
+    if (typeId) {
+      handle.id(typeId)
+    }
+    this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+    return handle.$type
+  }
+
+  /**
+   * The declaration type a reference points at (see `declType`), or `undefined` when it is
+   * not a declaration (a chained reference into a prop, an unresolved name). A plain
+   * reference to a type alias points at the alias itself (its own type and id, like the
+   * runtime `$().refTo(Alias)`), not at what the alias unwinds to.
+   */
+  private refTarget(
+    ref: SemanticRefNode,
+    decl: SemanticNode | undefined,
+    doc: AtscriptDoc = this.doc
+  ): TAtscriptAnnotatedType | undefined {
+    if (!decl) {
+      return undefined
+    }
+    const owner = ref.hasChain ? undefined : this.resolveOwner(doc, ref.id!)
+    if (owner?.node?.entity === 'type' || owner?.node?.entity === 'interface') {
+      return this.declType(owner.node, owner.doc)
+    }
+    const known = this._declTypes.get(decl)
+    if (known) {
+      return known
+    }
+    return isInterface(decl) ? this.declType(decl) : undefined
+  }
+
+  /**
+   * The build-time runtime type of an expression node; with `base`, built into that object
+   * (a declaration's type, see `declType`).
+   */
+  private toAnnotatedHandle(
+    node?: SemanticNode,
+    skipAnnotations = false,
+    base?: object
+  ): TAnnotatedTypeHandle {
     if (!node) {
-      return defineAnnotatedType()
+      return defineAnnotatedType(undefined, base)
     }
 
     switch (node.entity) {
       case 'interface':
       case 'type': {
-        let def = (node as SemanticInterfaceNode | SemanticTypeNode).getDefinition()
-        if (isInterface(node) && (node as SemanticInterfaceNode).hasExtends) {
-          const resolved = this.doc.resolveInterfaceExtends(node as SemanticInterfaceNode)
-          if (resolved) {
-            def = resolved
-          }
-        }
-        const handle = this.toAnnotatedHandle(def, true)
-        // Assign id for $defs/$ref support in buildJsonSchema (bundle mode)
-        const typeId =
-          this.typeIds.get(node) ??
-          (node.__typeId !== null && node.__typeId !== undefined ? node.id : undefined)
-        if (typeId) {
-          handle.id(typeId)
-        }
-        return skipAnnotations
-          ? handle
-          : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
+        return defineAnnotatedType().refTo(this.declType(node))
       }
       case 'prop': {
         const prop = node as SemanticPropNode
@@ -667,7 +832,10 @@ export class JsRenderer extends BaseRenderer {
       case 'ref': {
         const ref = node as SemanticRefNode
         const decl = this.doc.unwindType(ref.id!, ref.chain)?.def
-        const handle = this.toAnnotatedHandle(decl!, true)
+        const target = this.refTarget(ref, decl)
+        const handle = target
+          ? defineAnnotatedType().refTo(target)
+          : this.toAnnotatedHandle(decl, true)
         if (skipAnnotations) {
           return handle
         }
@@ -683,7 +851,7 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'primitive': {
         const prim = node as SemanticPrimitiveNode
-        const handle = defineAnnotatedType()
+        const handle = defineAnnotatedType(undefined, base)
         handle.designType(prim.id! === 'never' ? 'never' : (prim.config.type as 'string'))
         if (!skipAnnotations) {
           this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
@@ -692,7 +860,7 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'const': {
         const c = node as SemanticConstNode
-        const handle = defineAnnotatedType()
+        const handle = defineAnnotatedType(undefined, base)
         const t = c.token('identifier')?.type
         handle.designType(t === 'number' ? 'number' : 'string')
         handle.value(t === 'number' ? Number(c.id!) : c.id!)
@@ -702,7 +870,7 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'structure': {
         const struct = node as SemanticStructureNode
-        const handle = defineAnnotatedType('object')
+        const handle = defineAnnotatedType('object', base)
         for (const prop of Array.from(struct.props.values()) as SemanticPropNode[]) {
           const propHandle = this.toAnnotatedHandle(prop)
           const pattern = prop.token('identifier')?.pattern
@@ -719,7 +887,7 @@ export class JsRenderer extends BaseRenderer {
       case 'group': {
         const group = node as SemanticGroup
         const kind = group.op === '|' ? 'union' : 'intersection'
-        const handle = defineAnnotatedType(kind as any)
+        const handle = defineAnnotatedType(kind as any, base)
         for (const item of group.unwrap()) {
           handle.item(this.toAnnotatedHandle(item).$type)
         }
@@ -729,7 +897,7 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'tuple': {
         const group = node as SemanticGroup
-        const handle = defineAnnotatedType('tuple')
+        const handle = defineAnnotatedType('tuple', base)
         for (const item of group.unwrap()) {
           handle.item(this.toAnnotatedHandle(item).$type)
         }
@@ -739,14 +907,14 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'array': {
         const arr = node as SemanticArrayNode
-        const handle = defineAnnotatedType('array')
+        const handle = defineAnnotatedType('array', base)
         handle.of(this.toAnnotatedHandle(arr.getDefinition()).$type)
         return skipAnnotations
           ? handle
           : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
       }
       default: {
-        const handle = defineAnnotatedType()
+        const handle = defineAnnotatedType(undefined, base)
         return skipAnnotations
           ? handle
           : this.applyExpectAnnotations(handle, this.doc.evalAnnotationsForNode(node))
@@ -856,6 +1024,12 @@ export class JsRenderer extends BaseRenderer {
         this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
           .writeln(`.refTo(${refExpr}${chain})`)
+        this.model?.refTo(
+          this.modelHandle('', name),
+          refName,
+          isImported,
+          ref.hasChain ? ref.chain.map(c => c.text) : undefined
+        )
         // Emit the referenced type's annotations at build time so that
         // metadata is available regardless of declaration order.
         if (!ref.hasChain) {
@@ -875,6 +1049,7 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       case 'const': {
+        this.modelHandle('', name)
         this.writeln(`$(${name ? `"", ${name}` : ''})`)
           .indent()
           .defineConst(node as SemanticConstNode)
@@ -882,6 +1057,7 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       case 'structure': {
+        this.modelHandle('object', name)
         this.writeln(`$("object"${name ? `, ${name}` : ''})`)
           .indent()
           .defineObject(node as SemanticStructureNode)
@@ -890,6 +1066,7 @@ export class JsRenderer extends BaseRenderer {
       }
       case 'group': {
         kind = (node as SemanticGroup).op! === '|' ? 'union' : 'intersection'
+        this.modelHandle(kind, name)
         this.writeln(`$("${kind}"${name ? `, ${name}` : ''})`)
           .indent()
           .defineGroup(node as SemanticGroup)
@@ -897,6 +1074,7 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       case 'tuple': {
+        this.modelHandle('tuple', name)
         this.writeln(`$("tuple"${name ? `, ${name}` : ''})`)
           .indent()
           .defineGroup(node as SemanticGroup)
@@ -904,6 +1082,7 @@ export class JsRenderer extends BaseRenderer {
         return this
       }
       case 'array': {
+        this.modelHandle('array', name)
         this.writeln(`$("array"${name ? `, ${name}` : ''})`)
           .indent()
           .defineArray(node as SemanticArrayNode)
@@ -916,12 +1095,51 @@ export class JsRenderer extends BaseRenderer {
     }
   }
 
+  /** `$(kind, name?)` in the validation model; it becomes the current chain. */
+  private modelHandle(kind: string, name?: string) {
+    if (!this.model) {
+      return undefined
+    }
+    const h = this.model.handle(kind, name)
+    this.model.current = h
+    return h
+  }
+
+  /**
+   * The model handle of a nested chain (`emit` writes it and its annotations): `current`
+   * is cleared first so a chain that emits nothing breaks the model instead of leaving a
+   * stale handle, and restored to the parent chain afterwards.
+   */
+  private modelChild(emit: () => void): TAnnotatedTypeHandle | undefined {
+    if (!this.model) {
+      emit()
+      return undefined
+    }
+    const parent = this.model.current
+    this.model.current = undefined
+    emit()
+    const child = this.model.current
+    this.model.current = parent
+    if (!child) {
+      this.model.broken = true
+    }
+    return child
+  }
+
   defineConst(node: SemanticConstNode) {
     const t = node.token('identifier')?.type
     const designType = t === 'text' ? 'string' : t === 'number' ? 'number' : 'unknown'
     // const type = t === 'text' ? 'String' : t === 'number' ? 'Number' : 'undefined'
     this.writeln(`.designType("${escapeQuotes(designType)}")`)
     this.writeln(`.value(${t === 'text' ? `"${escapeQuotes(node.id!)}"` : node.id!})`)
+    if (this.model) {
+      const h = this.model.current
+      this.model.run(() => {
+        h!
+          .designType(designType as 'string')
+          .value((t === 'text' ? node.id! : rawLiteralValue(node.id!)) as string)
+      })
+    }
     return this
   }
   definePrimitive(node: SemanticPrimitiveNode, name?: string) {
@@ -934,85 +1152,96 @@ export class JsRenderer extends BaseRenderer {
     return this
   }
 
-  renderPrimitiveDef(def?: TPrimitiveTypeDef | 'never', name?: string) {
+  /** Emits a primitive's builder chain (and follows it in the validation model). */
+  renderPrimitiveDef(def?: TPrimitiveTypeDef | 'never', name?: string): void {
     const d = (t?: string) => [`"${t || ''}"`, name].filter(Boolean).join(', ').replace(/^""$/, '')
+    const final = (designType: string) => {
+      this.writeln(`$(${d()}).designType("${designType}")`)
+      const h = this.modelHandle('', name)
+      this.model?.run(() => h!.designType(designType as 'string'))
+    }
     if (!def) {
-      return this.writeln(`$(${d()}).designType("any")`)
+      return final('any')
     }
     // If it's a direct final type, return it
     if (typeof def === 'string') {
-      return this.writeln(`$(${d()}).designType("${def === 'void' ? 'undefined' : def}")`)
+      return final(def === 'void' ? 'undefined' : def)
     }
-
     switch (def.kind) {
       case 'final': {
-        return this.writeln(
-          `$(${d()}).designType("${def.value === 'void' ? 'undefined' : def.value}")`
-        )
+        return final(def.value === 'void' ? 'undefined' : def.value)
       }
       case 'union':
       case 'intersection':
       case 'tuple': {
         this.writeln(`$(${d(def.kind)})`)
+        this.modelHandle(def.kind, name)
         this.indent()
         for (const itemDef of def.items) {
           this.write(`.item(`)
           this.indent()
-          this.renderPrimitiveDef(itemDef)
+          const child = this.modelChild(() => this.renderPrimitiveDef(itemDef))
           this.writeln('.$type')
           this.unindent()
           this.write(`)`)
+          this.model?.run(() => this.model!.current!.item(child!.$type))
         }
         this.unindent()
         return
       }
       case 'array': {
         this.writeln(`$(${d('array')})`)
+        this.modelHandle('array', name)
         this.indent()
         this.write('.of(')
         this.indent()
-        this.renderPrimitiveDef(def.of)
+        const child = this.modelChild(() => this.renderPrimitiveDef(def.of))
         this.writeln(`.$type`)
         this.unindent()
         this.writeln(`)`)
         this.unindent()
+        this.model?.run(() => this.model!.current!.of(child!.$type))
         return
       }
       case 'object': {
         this.writeln(`$(${d('object')})`)
+        this.modelHandle('object', name)
         this.indent()
-        for (const [key, propDef] of Object.entries(def.props)) {
+        const props: Array<[string, TPrimitiveTypeDef, boolean]> = [
+          ...Object.entries(def.props).map(
+            ([k, p]) => [k, p, false] as [string, TPrimitiveTypeDef, boolean]
+          ),
+          ...Object.entries(def.propsPatterns).map(
+            ([k, p]) => [k, p, true] as [string, TPrimitiveTypeDef, boolean]
+          ),
+        ]
+        for (const [key, propDef, isPattern] of props) {
           const optional = typeof propDef === 'object' && propDef.optional
-          this.writeln(`.prop(`)
+          this.writeln(isPattern ? `.propPattern(` : `.prop(`)
           this.indent()
-          this.writeln(`"${escapeQuotes(key)}",`)
-          this.renderPrimitiveDef(propDef)
-          if (optional) {
-            this.writeln('.optional()')
-          }
+          this.writeln(isPattern ? `${key},` : `"${escapeQuotes(key)}",`)
+          const child = this.modelChild(() => {
+            this.renderPrimitiveDef(propDef)
+            if (optional) {
+              this.writeln('.optional()')
+              this.model?.run(() => this.model!.current!.optional())
+            }
+          })
           this.writeln('.$type')
           this.unindent()
           this.write(`)`)
-        }
-        for (const [key, propDef] of Object.entries(def.propsPatterns)) {
-          const optional = typeof propDef === 'object' && propDef.optional
-          this.writeln(`.propPattern(`)
-          this.indent()
-          this.writeln(`${key},`)
-          this.renderPrimitiveDef(propDef)
-          if (optional) {
-            this.writeln('.optional()')
-          }
-          this.writeln('.$type')
-          this.unindent()
-          this.write(`)`)
+          this.model?.run(() =>
+            isPattern
+              ? this.model!.current!.propPattern(/./, child!.$type)
+              : this.model!.current!.prop(key, child!.$type)
+          )
         }
         this.unindent()
         return
       }
       default: {
         // Fallback in case of unexpected input
-        return this.writeln(`$(${d()}).designType("any")`)
+        return final('any')
       }
     }
   }
@@ -1032,8 +1261,10 @@ export class JsRenderer extends BaseRenderer {
         this.indent()
         this.writeln(`"${escapeQuotes(prop.id!)}",`)
       }
-      this.annotateType(prop.getDefinition())
-      this.indent().defineMetadata(prop).unindent()
+      const child = this.modelChild(() => {
+        this.annotateType(prop.getDefinition())
+        this.indent().defineMetadata(prop).unindent()
+      })
       if (optional) {
         this.writeln('  .optional()')
       }
@@ -1041,32 +1272,37 @@ export class JsRenderer extends BaseRenderer {
       this.unindent()
       this.write(`)`)
       this._propPath.pop()
+      this.model?.run(() => {
+        if (optional) {
+          child!.optional()
+        }
+        if (pattern) {
+          this.model!.current!.propPattern(pattern, child!.$type)
+        } else {
+          this.model!.current!.prop(prop.id!, child!.$type)
+        }
+      })
     }
     this.writeln()
     return this
   }
   defineGroup(node: SemanticGroup) {
-    const items = node.unwrap()
-    for (const item of items) {
-      this.write('.item(')
-        .indent()
-        .annotateType(item)
-        .defineInlinePrimitiveMetadata(item)
-        .write('  .$type')
-        .writeln(`)`)
-        .unindent()
+    for (const item of node.unwrap()) {
+      this.write('.item(').indent()
+      const child = this.modelChild(() =>
+        this.annotateType(item).defineInlinePrimitiveMetadata(item)
+      )
+      this.write('  .$type').writeln(`)`).unindent()
+      this.model?.run(() => this.model!.current!.item(child!.$type))
     }
     return this
   }
   defineArray(node: SemanticArrayNode) {
     const of = node.getDefinition()
-    this.write('.of(')
-      .indent()
-      .annotateType(of)
-      .defineInlinePrimitiveMetadata(of)
-      .write('  .$type')
-      .writeln(`)`)
-      .unindent()
+    this.write('.of(').indent()
+    const child = this.modelChild(() => this.annotateType(of).defineInlinePrimitiveMetadata(of))
+    this.write('  .$type').writeln(`)`).unindent()
+    this.model?.run(() => this.model!.current!.of(child!.$type))
     return this
   }
 
@@ -1189,12 +1425,13 @@ export class JsRenderer extends BaseRenderer {
   }
 
   resolveAnnotationValue(node: SemanticNode, an: TAnnotationTokens) {
-    const { value, multiple } = this.computeAnnotationValue(node, an)
+    const { value, multiple, runtime } = this.computeAnnotationValue(node, an)
     if (multiple) {
       this.writeln(`.annotate("${escapeQuotes(an.name)}", ${value}, true)`)
     } else {
       this.writeln(`.annotate("${escapeQuotes(an.name)}", ${value})`)
     }
+    this.model?.annotate(an.name, runtime, multiple)
   }
 
   private emitRefValue(text: string, origin: AtscriptDoc | undefined): string {
@@ -1348,13 +1585,19 @@ export class JsRenderer extends BaseRenderer {
     }
   }
 
+  /**
+   * The JS source of an annotation's value, and (for the validation model, which only reads
+   * validator annotations: numbers, strings, flags) the runtime value it evaluates to;
+   * other argument kinds are opaque there.
+   */
   private computeAnnotationValue(
     node: SemanticNode,
     an: TAnnotationTokens
-  ): { value: string; multiple: boolean } {
+  ): { value: string; multiple: boolean; runtime: unknown } {
     const origin = this.doc.annotationOrigin(an)
     const spec = this.doc.resolveAnnotation(an.name)
     let targetValue = 'true'
+    let runtime: unknown = true
     let multiple: boolean | undefined = false
     if (spec) {
       multiple = spec.config.multiple
@@ -1362,17 +1605,21 @@ export class JsRenderer extends BaseRenderer {
       if (length !== 0) {
         if (Array.isArray(spec.config.argument)) {
           targetValue = '{ '
+          const fields: Record<string, unknown> = {}
           let i = 0
           for (const aSpec of spec.arguments) {
             if (an.args[i]) {
               targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i], origin)}${i === length - 1 ? '' : ', '} `
+              fields[aSpec.name] = runtimeArg(aSpec.type, an.args[i])
             }
             i++
           }
           targetValue += '}'
-        } else {
+          runtime = fields
+        } else if (an.args[0]) {
           const aSpec = spec.arguments[0]
-          targetValue = an.args[0] ? this.emitArgValue(aSpec, an.args[0], origin) : 'true'
+          targetValue = this.emitArgValue(aSpec, an.args[0], origin)
+          runtime = runtimeArg(aSpec.type, an.args[0])
         }
       }
     } else {
@@ -1380,9 +1627,10 @@ export class JsRenderer extends BaseRenderer {
       if (an.args.length > 0) {
         targetValue =
           an.args[0].type === 'text' ? `"${escapeQuotes(an.args[0].text)}"` : an.args[0].text
+        runtime = runtimeArg(undefined, an.args[0])
       }
     }
-    return { value: targetValue, multiple: !!multiple }
+    return { value: targetValue, multiple: !!multiple, runtime }
   }
 
   private renderMutatingAnnotateNode(node: SemanticAnnotateNode) {
@@ -1391,10 +1639,10 @@ export class JsRenderer extends BaseRenderer {
     this.writeln('// Ad-hoc annotations for ', targetName)
 
     // First pass: collect all accessor paths and clone operations
-    const allClones: Array<{ parentPath: string; propName: string }> = []
+    const allClones: TMutatingClone[] = []
     const entryAccessors: Array<{
       entry: SemanticAnnotateNode['entries'][number]
-      accessors: string[]
+      accessors: TAccessorStep[][]
     }> = []
 
     for (const entry of node.entries) {
@@ -1403,7 +1651,7 @@ export class JsRenderer extends BaseRenderer {
         continue
       }
       const parts = entry.hasChain ? [entry.id!, ...entry.chain.map(c => c.text)] : [entry.id!]
-      const { accessors, clones } = this.buildMutatingAccessors(targetName, targetDef, parts)
+      const { accessors, clones } = this.buildMutatingAccessors(targetDef, parts)
       allClones.push(...clones)
       entryAccessors.push({ entry, accessors })
     }
@@ -1411,23 +1659,25 @@ export class JsRenderer extends BaseRenderer {
     // Emit deduplicated clone operations (shallowest first, already in order)
     const cloneKeys = new Set<string>()
     for (const clone of allClones) {
-      const key = `${clone.parentPath}|${clone.propName}`
+      const parentPath = accessorPath(targetName, clone.parentSteps)
+      const key = `${parentPath}|${clone.propName}`
       if (!cloneKeys.has(key)) {
         cloneKeys.add(key)
-        this.writeln(`$c(${clone.parentPath}, "${escapeQuotes(clone.propName)}")`)
+        this.writeln(`$c(${parentPath}, "${escapeQuotes(clone.propName)}")`)
+        this.model?.cloneProp(targetName, clone.parentSteps, clone.propName)
       }
     }
 
     // Emit mutation statements
     for (const { entry, accessors } of entryAccessors) {
       for (const accessor of accessors) {
-        this.emitMutatingAnnotations(entry, entry.annotations!, accessor)
+        this.emitMutatingAnnotations(entry, entry.annotations!, accessor, targetName)
       }
     }
     // Top-level annotations on the annotate block mutate the target's metadata
     const topAnnotations = node.annotations
     if (topAnnotations && topAnnotations.length > 0) {
-      this.emitMutatingAnnotations(node, topAnnotations, targetName)
+      this.emitMutatingAnnotations(node, topAnnotations, [], targetName)
     }
 
     this.writeln()
@@ -1436,16 +1686,19 @@ export class JsRenderer extends BaseRenderer {
   private emitMutatingAnnotations(
     node: SemanticNode,
     annotations: TAnnotationTokens[],
-    accessor: string
+    steps: TAccessorStep[],
+    targetName: string
   ) {
+    const accessor = accessorPath(targetName, steps)
     const cleared = new Set<string>()
     for (const an of annotations) {
-      const { value, multiple } = this.computeAnnotationValue(node, an)
+      const { value, multiple, runtime } = this.computeAnnotationValue(node, an)
       if (multiple) {
         if (!cleared.has(an.name)) {
           const spec = this.doc.resolveAnnotation(an.name)
           if (!spec || spec.config.mergeStrategy !== 'append') {
             this.writeln(`${accessor}.metadata.delete("${escapeQuotes(an.name)}")`)
+            this.model?.deleteAnnotation(targetName, steps, an.name)
           }
           cleared.add(an.name)
         }
@@ -1453,6 +1706,7 @@ export class JsRenderer extends BaseRenderer {
       } else {
         this.writeln(`$a(${accessor}.metadata, "${escapeQuotes(an.name)}", ${value})`)
       }
+      this.model?.mutateAnnotation(targetName, steps, an.name, runtime, multiple)
     }
   }
 
@@ -1469,57 +1723,53 @@ export class JsRenderer extends BaseRenderer {
   }
 
   /**
-   * Builds the runtime accessor paths for mutating annotate entries.
+   * Builds the accessor paths (as steps, see `accessorPath`) for mutating annotate entries.
    * Computes exact paths at compile time by walking the AST,
    * so the generated JS accesses props directly without runtime search.
    * Returns multiple paths when a property appears in multiple union branches.
    */
   private buildMutatingAccessors(
-    targetName: string,
     targetDef: SemanticNode | undefined,
     parts: string[]
-  ): { accessors: string[]; clones: Array<{ parentPath: string; propName: string }> } {
-    let accessors = [{ prefix: `${targetName}.type`, def: targetDef }]
-    const clones: Array<{ parentPath: string; propName: string }> = []
+  ): { accessors: TAccessorStep[][]; clones: TMutatingClone[] } {
+    let accessors: Array<{ steps: TAccessorStep[]; def: SemanticNode | undefined }> = [
+      { steps: ['type'], def: targetDef },
+    ]
+    const clones: TMutatingClone[] = []
 
     for (let i = 0; i < parts.length; i++) {
-      const nextAccessors: Array<{ prefix: string; def: SemanticNode | undefined }> = []
-      for (const { prefix, def } of accessors) {
+      const last = i === parts.length - 1
+      const nextAccessors: typeof accessors = []
+      for (const { steps, def } of accessors) {
         const results = this.buildPropPaths(def, parts[i])
-        if (results.length > 0) {
-          for (const result of results) {
-            if (i < parts.length - 1) {
-              // If this prop's definition is a ref, its .type is shared via refTo().
-              // Clone this prop so mutations don't leak to the referenced type.
-              if (result.propDef && isRef(result.propDef)) {
-                clones.push({ parentPath: prefix, propName: parts[i] })
-              }
-              nextAccessors.push({ prefix: `${prefix}${result.path}?.type`, def: result.propDef })
-            } else {
-              nextAccessors.push({ prefix: `${prefix}${result.path}?`, def: result.propDef })
-            }
+        // Fallback for unresolvable paths
+        const found =
+          results.length > 0 ? results : [{ steps: [['props', parts[i]]], propDef: undefined }]
+        for (const result of found as TPropPath[]) {
+          // If this prop's definition is a ref, its .type is shared via refTo().
+          // Clone this prop so mutations don't leak to the referenced type.
+          if (!last && result.propDef && isRef(result.propDef)) {
+            clones.push({ parentSteps: steps, propName: parts[i] })
           }
-        } else {
-          // Fallback for unresolvable paths
-          const suffix = `.props.get("${escapeQuotes(parts[i])}")${i < parts.length - 1 ? '?.type' : '?'}`
-          nextAccessors.push({ prefix: `${prefix}${suffix}`, def: undefined })
+          const next: TAccessorStep[] = [...steps, ...result.steps]
+          if (!last) {
+            next.push('type')
+          }
+          nextAccessors.push({ steps: next, def: result.propDef })
         }
       }
       accessors = nextAccessors
     }
 
-    return { accessors: accessors.map(a => a.prefix), clones }
+    return { accessors: accessors.map(a => a.steps), clones }
   }
 
   /**
    * Finds a property in a type tree at compile time, returning all
-   * matching runtime path strings and prop definitions for further chaining.
+   * matching accessor steps and prop definitions for further chaining.
    * Returns multiple results when the same property appears in different union branches.
    */
-  private buildPropPaths(
-    def: SemanticNode | undefined,
-    propName: string
-  ): Array<{ path: string; propDef: SemanticNode | undefined }> {
+  private buildPropPaths(def: SemanticNode | undefined, propName: string): TPropPath[] {
     if (!def) {
       return []
     }
@@ -1543,12 +1793,7 @@ export class JsRenderer extends BaseRenderer {
     if (isStructure(def)) {
       const prop = def.props.get(propName) as SemanticPropNode | undefined
       if (prop) {
-        return [
-          {
-            path: `.props.get("${escapeQuotes(propName)}")`,
-            propDef: prop.getDefinition(),
-          },
-        ]
+        return [{ steps: [['props', propName]], propDef: prop.getDefinition() }]
       }
       return []
     }
@@ -1557,11 +1802,11 @@ export class JsRenderer extends BaseRenderer {
     if (isGroup(def)) {
       const group = def as SemanticGroup
       const items = group.unwrap()
-      const results: Array<{ path: string; propDef: SemanticNode | undefined }> = []
+      const results: TPropPath[] = []
       for (let i = 0; i < items.length; i++) {
         for (const result of this.buildPropPaths(items[i], propName)) {
           results.push({
-            path: `.items[${i}].type${result.path}`,
+            steps: [['items', i], 'type', ...result.steps],
             propDef: result.propDef,
           })
         }
