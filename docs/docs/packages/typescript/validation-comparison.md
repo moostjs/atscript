@@ -387,6 +387,31 @@ A plugin receives the type definition, the value, and a context object with `err
 
 Zod achieves custom validation through `.refine()` and `.superRefine()` — methods that attach to individual schema nodes. There's no way to inject cross-cutting validation logic across an entire schema from the outside. Class-validator supports custom decorator-based validators, but each one requires defining a class that implements `ValidatorConstraintInterface`.
 
+## Performance
+
+An [open benchmark](https://github.com/prostojs/router-benchmark/tree/main/packages/validator-benchmark) validates the same `Order` model (nested objects, arrays, string/number constraints, a two-branch payment union) with the Atscript validator and equivalent Zod 4 schemas. A pre-flight check makes sure both sides do the same work: they accept and reject the same inputs, and on invalid input they detect the same violations. A failed union is reported differently by design — Atscript returns one error with per-branch details, Zod returns the closest branch's issues.
+
+Throughput with unknown properties stripped (Zod `z.object()`, Atscript `unknownProps: 'strip'`), median ops/s, higher is better:
+
+| Scenario                         | Atscript `validate()` | Zod `safeParse()` | Zod `z.compile()` + `safeParse()` |
+| -------------------------------- | --------------------: | ----------------: | --------------------------------: |
+| Valid order                      |                  424k |              407k |                             3.57M |
+| Valid order, second union branch |                  440k |              441k |                             3.77M |
+| Valid order, 50 line items       |                   70k |               50k |                              644k |
+| Valid order with unknown props   |                  185k |              454k |                             2.99M |
+| Invalid order, all errors        |                  330k |              137k |                              127k |
+| Payment union, first branch      |                 4.09M |             8.86M |                             23.6M |
+| Payment union, no branch matches |                 1.68M |              603k |                              620k |
+
+- **Against Zod's default `safeParse()`**, Atscript is about level on a valid order, 1.4x faster on the 50-item order, and 2.4–2.8x faster on invalid input.
+- **Zod's ahead-of-time `z.compile()`** is 8–9x faster than Atscript on valid input. Atscript is still faster on invalid input.
+- **Atscript is slower** when it has to strip unknown properties (2.4x behind `safeParse()`), and on the standalone union when its first branch matches.
+- Atscript validates in place and returns a boolean; `safeParse()` builds a new output object.
+
+Atscript has no ahead-of-time compile mode yet; one is planned.
+
+These numbers are an indicative estimate from a single round on a laptop (Apple M4 MacBook Air, Node.js 24, Atscript 0.1.108, Zod 4.6.7). The benchmark repository has the passthrough and strict modes, the first-error scenario, and the full methodology.
+
 ## Summary
 
 |                            | Atscript                              | Zod                                        | class-validator                              |
