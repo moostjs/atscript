@@ -152,10 +152,25 @@ Atscript provides common-purpose annotations:
 - `@expect.maxLength 100, "Custom error message"` - Maximum string/array length (optional message)
 - `@expect.min 0, "Custom error message"` - Minimum number value (optional message)
 - `@expect.max 100, "Custom error message"` - Maximum number value (optional message)
+- `@expect.exclusiveMin 0, "Custom error message"` - Number must be strictly greater than the value (optional message, since 0.1.109)
+- `@expect.exclusiveMax 1, "Custom error message"` - Number must be strictly less than the value (optional message, since 0.1.109)
 - `@expect.int "Custom error message"` - Must be integer (optional message)
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
 - `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
 - `@expect.array.key "Custom error message"` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself; optional message)
+
+`@expect.min` / `@expect.max` include the bound itself; `@expect.exclusiveMin` / `@expect.exclusiveMax` reject it:
+
+```atscript
+interface Pricing {
+    @expect.exclusiveMin 0
+    price: number               // > 0
+
+    @expect.exclusiveMin 0
+    @expect.exclusiveMax 1, "Rate must be below 1"
+    rate: number | null         // null, or 0 < rate < 1
+}
+```
 
 `@expect.array.key` has compile-time constraints: the field must be `string` or `number`, cannot be optional, and multiple key fields form a **composite key**.
 

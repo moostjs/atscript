@@ -780,6 +780,24 @@ export class JsRenderer extends BaseRenderer {
           }
           break
         }
+        case 'expect.exclusiveMin': {
+          if (a.args[0]) {
+            handle.annotate(a.name as any, {
+              exclusiveMinValue: Number(a.args[0].text),
+              message: a.args[1]?.text,
+            })
+          }
+          break
+        }
+        case 'expect.exclusiveMax': {
+          if (a.args[0]) {
+            handle.annotate(a.name as any, {
+              exclusiveMaxValue: Number(a.args[0].text),
+              message: a.args[1]?.text,
+            })
+          }
+          break
+        }
         case 'expect.pattern': {
           handle.annotate(
             a.name as any,

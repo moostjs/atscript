@@ -1,6 +1,7 @@
 import {
   defineAnnotatedType,
   isPhantomType,
+  type TAnnotatedTypeHandle,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeFinal,
   type TAtscriptTypeObject,
@@ -256,11 +257,19 @@ function applyScalarConstraints(schema: TJsonSchema, meta: TMetadata): void {
     if (max !== undefined) {
       schema.maximum = typeof max === 'number' ? max : max.maxValue
     }
+    const exMin = meta.get('expect.exclusiveMin')
+    if (exMin !== undefined) {
+      schema.exclusiveMinimum = typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue
+    }
+    const exMax = meta.get('expect.exclusiveMax')
+    if (exMax !== undefined) {
+      schema.exclusiveMaximum = typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue
+    }
   }
 }
 
-const LOWER_BOUNDS = new Set(['minimum', 'minLength', 'minItems'])
-const UPPER_BOUNDS = new Set(['maximum', 'maxLength', 'maxItems'])
+const LOWER_BOUNDS = new Set(['minimum', 'exclusiveMinimum', 'minLength', 'minItems'])
+const UPPER_BOUNDS = new Set(['maximum', 'exclusiveMaximum', 'maxLength', 'maxItems'])
 
 /**
  * Puts union-level constraints onto the matching `anyOf` members (numbers, strings,
@@ -461,23 +470,13 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
     if (s.type === 'integer') {
       const handle = defineAnnotatedType().designType('number').tags('number')
       handle.annotate('expect.int', true)
-      if (typeof s.minimum === 'number') {
-        handle.annotate('expect.min', { minValue: s.minimum })
-      }
-      if (typeof s.maximum === 'number') {
-        handle.annotate('expect.max', { maxValue: s.maximum })
-      }
+      annotateNumberBounds(handle, s)
       return handle.$type
     }
 
     if (s.type === 'number') {
       const handle = defineAnnotatedType().designType('number').tags('number')
-      if (typeof s.minimum === 'number') {
-        handle.annotate('expect.min', { minValue: s.minimum })
-      }
-      if (typeof s.maximum === 'number') {
-        handle.annotate('expect.max', { maxValue: s.maximum })
-      }
+      annotateNumberBounds(handle, s)
       return handle.$type
     }
 
@@ -493,6 +492,34 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
   }
 
   return convert(schema)
+}
+
+/**
+ * Maps `minimum` / `maximum` / `exclusiveMinimum` / `exclusiveMaximum` onto
+ * `@expect.min` / `max` / `exclusiveMin` / `exclusiveMax`. Also reads the draft-4 form,
+ * where `exclusiveMinimum: true` makes `minimum` exclusive.
+ */
+function annotateNumberBounds(handle: TAnnotatedTypeHandle, s: TJsonSchema): void {
+  if (typeof s.minimum === 'number') {
+    if (s.exclusiveMinimum === true) {
+      handle.annotate('expect.exclusiveMin', { exclusiveMinValue: s.minimum })
+    } else {
+      handle.annotate('expect.min', { minValue: s.minimum })
+    }
+  }
+  if (typeof s.maximum === 'number') {
+    if (s.exclusiveMaximum === true) {
+      handle.annotate('expect.exclusiveMax', { exclusiveMaxValue: s.maximum })
+    } else {
+      handle.annotate('expect.max', { maxValue: s.maximum })
+    }
+  }
+  if (typeof s.exclusiveMinimum === 'number') {
+    handle.annotate('expect.exclusiveMin', { exclusiveMinValue: s.exclusiveMinimum })
+  }
+  if (typeof s.exclusiveMaximum === 'number') {
+    handle.annotate('expect.exclusiveMax', { exclusiveMaxValue: s.exclusiveMaximum })
+  }
 }
 
 /**

@@ -246,3 +246,54 @@ interface Foo {
     expect(nonNullishMembers(c.def, c.doc)).toBeUndefined()
   })
 })
+
+describe('@expect.exclusiveMin / @expect.exclusiveMax', () => {
+  it('accepts number, number | null, refs and number primitives', () => {
+    const doc = createDoc(`
+type NN = number | null
+type Pct = number
+interface Foo {
+  @expect.exclusiveMin 0
+  @expect.exclusiveMax 1, "Must be below one"
+  a: number
+  @expect.exclusiveMin 0
+  b: number | null
+  @expect.exclusiveMax 100
+  c: NN
+  @expect.exclusiveMin 0
+  d: Pct | undefined
+  @expect.exclusiveMin 0
+  e: number.int | null
+}
+`)
+    expect(targetErrors(doc)).toEqual([])
+    expect(doc.getDiagMessages()).toEqual([])
+  })
+
+  it('rejects non-number targets and mixed unions', () => {
+    const doc = createDoc(`
+interface Foo {
+  @expect.exclusiveMin 0
+  a: string
+  @expect.exclusiveMax 0
+  b: number | string
+}
+`)
+    expect(targetErrors(doc)).toEqual([
+      'Expected type is (number), got "string"',
+      'Expected type is (number), got union (number | string)',
+    ])
+  })
+
+  it('validates argument types', () => {
+    const doc = createDoc(`
+interface Foo {
+  @expect.exclusiveMin "zero"
+  a: number
+  @expect.exclusiveMax
+  b: number
+}
+`)
+    expect(doc.getDiagMessages().length).toBe(2)
+  })
+})

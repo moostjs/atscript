@@ -776,7 +776,7 @@ export class Validator<
     return this.validateNumberConstraints(def.metadata, value)
   }
 
-  /** `@expect.int` / `min` / `max` checks for a number value. */
+  /** `@expect.int` / `min` / `max` / `exclusiveMin` / `exclusiveMax` checks for a number value. */
   protected validateNumberConstraints(
     metadata: TMetadataMap<AtscriptMetadata>,
     value: number
@@ -811,6 +811,30 @@ export class Validator<
           typeof max === 'object' && max.message
             ? max.message
             : `Expected maximum ${maxValue}, got ${value}`
+        this.error(message)
+        return false
+      }
+    }
+    const exMin = metadata.get('expect.exclusiveMin')
+    if (exMin !== undefined) {
+      const bound = typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue
+      if (value <= bound) {
+        const message =
+          typeof exMin === 'object' && exMin.message
+            ? exMin.message
+            : `Expected greater than ${bound}, got ${value}`
+        this.error(message)
+        return false
+      }
+    }
+    const exMax = metadata.get('expect.exclusiveMax')
+    if (exMax !== undefined) {
+      const bound = typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue
+      if (value >= bound) {
+        const message =
+          typeof exMax === 'object' && exMax.message
+            ? exMax.message
+            : `Expected less than ${bound}, got ${value}`
         this.error(message)
         return false
       }

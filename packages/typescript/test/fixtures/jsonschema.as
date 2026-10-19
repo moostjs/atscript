@@ -8,6 +8,10 @@ export interface User {
   @expect.max 99
   age?: number
 
+  @expect.exclusiveMin 0
+  @expect.exclusiveMax 1
+  ratio?: number
+
   @expect.minLength 1
   @expect.maxLength 5
   tags: string[]

@@ -54,17 +54,21 @@ export interface ApiResponse {
 
 Annotations from `.as` files are translated into JSON Schema constraints:
 
-| Annotation          | JSON Schema              | Notes                                                          |
-| ------------------- | ------------------------ | -------------------------------------------------------------- |
-| `@meta.required`    | `minLength: 1`           | For string fields. Ensures at least one non-whitespace char    |
-| `@expect.minLength` | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays                 |
-| `@expect.maxLength` | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays                 |
-| `@expect.min`       | `minimum`                |                                                                |
-| `@expect.max`       | `maximum`                |                                                                |
-| `@expect.int`       | `type: 'integer'`        | Changes `number` to `integer`                                  |
-| `@expect.pattern`   | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
+| Annotation             | JSON Schema              | Notes                                                          |
+| ---------------------- | ------------------------ | -------------------------------------------------------------- |
+| `@meta.required`       | `minLength: 1`           | For string fields. Ensures at least one non-whitespace char    |
+| `@expect.minLength`    | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays                 |
+| `@expect.maxLength`    | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays                 |
+| `@expect.min`          | `minimum`                |                                                                |
+| `@expect.max`          | `maximum`                |                                                                |
+| `@expect.exclusiveMin` | `exclusiveMinimum`       | Since 0.1.109                                                  |
+| `@expect.exclusiveMax` | `exclusiveMaximum`       | Since 0.1.109                                                  |
+| `@expect.int`          | `type: 'integer'`        | Changes `number` to `integer`                                  |
+| `@expect.pattern`      | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
 
 On a nullable field (`@expect.max 10` on `number | null`), the constraint goes onto the matching non-null `anyOf` member: `{ anyOf: [{ type: 'number', maximum: 10 }, { type: 'null' }] }` (since 0.1.103). When the member has its own bound, the stricter one is kept.
+
+`fromJsonSchema()` maps `exclusiveMinimum` / `exclusiveMaximum` back to `@expect.exclusiveMin` / `@expect.exclusiveMax`. It also reads the draft-4 boolean form (`minimum: 0, exclusiveMinimum: true`) as `@expect.exclusiveMin 0`.
 
 ::: warning Pattern properties are dropped
 Atscript's wildcard-key syntax (`[/regex/]: Type`) has no equivalent in `buildJsonSchema` output — those entries are silently omitted from the generated schema. If you need pattern-keyed maps in JSON Schema, model them as `additionalProperties` with an external post-process step.

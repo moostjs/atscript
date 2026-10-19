@@ -227,13 +227,15 @@ Applied when the value is a valid string:
 
 Applied when the value is a valid **finite** number (`NaN` and `±Infinity` are rejected earlier, with `"Expected finite number, got N"`):
 
-| Annotation      | Condition         | Default error                 |
-| --------------- | ----------------- | ----------------------------- |
-| `@expect.int`   | `value % 1 !== 0` | `"Expected integer, got N"`   |
-| `@expect.min N` | `value < N`       | `"Expected minimum N, got M"` |
-| `@expect.max N` | `value > N`       | `"Expected maximum N, got M"` |
+| Annotation               | Condition         | Default error                      |
+| ------------------------ | ----------------- | ---------------------------------- |
+| `@expect.int`            | `value % 1 !== 0` | `"Expected integer, got N"`        |
+| `@expect.min N`          | `value < N`       | `"Expected minimum N, got M"`      |
+| `@expect.max N`          | `value > N`       | `"Expected maximum N, got M"`      |
+| `@expect.exclusiveMin N` | `value <= N`      | `"Expected greater than N, got M"` |
+| `@expect.exclusiveMax N` | `value >= N`      | `"Expected less than N, got M"`    |
 
-**Evaluation order**: `@expect.int` first, then `@expect.min`, then `@expect.max`.
+**Evaluation order**: `@expect.int` first, then `@expect.min`, `@expect.max`, `@expect.exclusiveMin`, `@expect.exclusiveMax`.
 
 ### Boolean Constraints
 

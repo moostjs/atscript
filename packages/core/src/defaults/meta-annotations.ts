@@ -5,10 +5,10 @@ export const metaAnnotations: TAnnotationsTree = {
   label: new AnnotationSpec({
     description:
       'Defines a **human-readable label** for a property or entity. Useful for UI, logs, and documentation.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.label "User Name"' +
-      'name: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.label "User Name"\n' +
+      'name: string\n' +
       '```',
     argument: {
       name: 'text',
@@ -21,10 +21,10 @@ export const metaAnnotations: TAnnotationsTree = {
     description:
       'Marks a field as a unique identifier across multiple domains (DB, API, UI, logs). ' +
       'Multiple fields can be annotated with `@meta.id` to form a composite primary key.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.id' +
-      'id: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.id\n' +
+      'id: string\n' +
       '```',
     nodeType: ['prop'],
     passedWhenReferred: false, // an FK referencing a PK must not become an id itself
@@ -33,10 +33,10 @@ export const metaAnnotations: TAnnotationsTree = {
   description: new AnnotationSpec({
     description:
       'Provides a **detailed description** of a field or entity, often used in documentation.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.description "Stores the user email address"' +
-      'email: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.description "Stores the user email address"\n' +
+      'email: string\n' +
       '```',
     argument: {
       name: 'text',
@@ -48,12 +48,12 @@ export const metaAnnotations: TAnnotationsTree = {
   documentation: new AnnotationSpec({
     description:
       'Provides **multi-line documentation** for a field or entity.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.documentation "# bio"' +
-      '@meta.documentation "## documentation of bio"' +
-      '@meta.documentation "your documentation"' +
-      'bio: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.documentation "# bio"\n' +
+      '@meta.documentation "## documentation of bio"\n' +
+      '@meta.documentation "your documentation"\n' +
+      'bio: string\n' +
       '```',
     multiple: true,
     argument: {
@@ -67,10 +67,10 @@ export const metaAnnotations: TAnnotationsTree = {
   sensitive: new AnnotationSpec({
     description:
       'Marks a field as **sensitive** (e.g., passwords, API keys), ensuring it is hidden in logs and UI.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.sensitive' +
-      'password: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.sensitive\n' +
+      'password: string\n' +
       '```',
     nodeType: ['prop', 'type'],
     multiple: false,
@@ -79,10 +79,10 @@ export const metaAnnotations: TAnnotationsTree = {
   readonly: new AnnotationSpec({
     description:
       'Marks a field as **read-only**.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.readonly' +
-      'createdAt: string.date' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.readonly\n' +
+      'createdAt: string.date\n' +
       '```',
     nodeType: ['prop', 'type'],
     multiple: false,
@@ -96,13 +96,13 @@ export const metaAnnotations: TAnnotationsTree = {
       'For booleans: must be true. ' +
       'On an optional field (`name?: string`) the field may be omitted, but `null` is rejected. ' +
       'On a nullable field (`string | null`) `null` is accepted and a string must not be empty.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.required' +
-      'name: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.required\n' +
+      'name: string\n' +
       '\n' +
-      '@meta.required "You must accept the terms"' +
-      'agreed: boolean' +
+      '@meta.required "You must accept the terms"\n' +
+      'agreed: boolean\n' +
       '```',
     defType: ['string', 'boolean'],
     argument: [
@@ -120,16 +120,16 @@ export const metaAnnotations: TAnnotationsTree = {
     description:
       'Defines a **default value** for a property or type. ' +
       'For string fields the value is used as-is; for other types it is parsed as JSON.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.default "unknown"' +
-      'name: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.default "unknown"\n' +
+      'name: string\n' +
       '\n' +
-      '@meta.default "0"' +
-      'count: number' +
+      '@meta.default "0"\n' +
+      'count: number\n' +
       '\n' +
-      '@meta.default \'{"street":"","city":""}\'' +
-      'address: Address' +
+      '@meta.default \'{"street":"","city":""}\'\n' +
+      'address: Address\n' +
       '```',
     nodeType: ['prop', 'type'],
     argument: {
@@ -144,16 +144,16 @@ export const metaAnnotations: TAnnotationsTree = {
     description:
       'Defines an **example value** for a property or type, useful for documentation and data generation. ' +
       'For string fields the value is used as-is; for other types it is parsed as JSON.' +
-      '\n\n**Example:**' +
-      '```atscript' +
-      '@meta.example "John Doe"' +
-      'name: string' +
+      '\n\n**Example:**\n' +
+      '```atscript\n' +
+      '@meta.example "John Doe"\n' +
+      'name: string\n' +
       '\n' +
-      '@meta.example "42"' +
-      'age: number' +
+      '@meta.example "42"\n' +
+      'age: number\n' +
       '\n' +
-      '@meta.example \'["admin","user"]\'' +
-      'roles: string[]' +
+      '@meta.example \'["admin","user"]\'\n' +
+      'roles: string[]\n' +
       '```',
     nodeType: ['prop', 'type'],
     argument: {

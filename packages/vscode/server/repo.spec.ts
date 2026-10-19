@@ -945,6 +945,30 @@ describe('type-guarded annotations on nullable fields', () => {
     })
     expect(result.contents.value).toContain('nullable field')
   })
+
+  it('offers, hovers and signs @expect.exclusiveMin / exclusiveMax from the built-in specs', async () => {
+    const uri = 'file:///test.as'
+    const source =
+      'interface User {\n  @expect.exclusiveMin 0\n  @expect.\n  ratio: number | null\n}'
+    const { handlers } = singleDocRepo(uri, source, builtIns)
+    const completion = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 2, character: 10 },
+    })
+    const labels = completion.map((i: any) => i.label)
+    expect(labels).toContain('exclusiveMin')
+    expect(labels).toContain('exclusiveMax')
+    const hover = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 1, character: 12 },
+    })
+    expect(hover.contents.value).toContain('strictly greater than')
+    const sig = await handlers.onSignatureHelp!({
+      textDocument: { uri },
+      position: { line: 1, character: 23 },
+    })
+    expect(sig.signatures[0].label).toContain('exclusiveMinValue')
+  })
 })
 
 describe('signature help', () => {

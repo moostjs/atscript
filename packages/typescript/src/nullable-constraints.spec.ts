@@ -69,6 +69,20 @@ describe('union-level constraints on nullable fields', () => {
     expect(check(NullableConstraints, { ...validBase(), score: 10, nested: { n: 3 } })).toEqual([])
   })
 
+  it('enforces exclusive bounds on a nullable ref', () => {
+    expect(check(NullableConstraints, { ...validBase(), ratio: null })).toEqual([])
+    expect(check(NullableConstraints, { ...validBase(), ratio: 0.5 })).toEqual([])
+    expect(check(NullableConstraints, { ...validBase(), ratio: 0 })).toEqual([
+      'ratio: Expected greater than 0, got 0',
+    ])
+    expect(check(NullableConstraints, { ...validBase(), ratio: 1 })).toEqual([
+      'ratio: Ratio must be below 1',
+    ])
+    expect(buildJsonSchema(NullableConstraints).properties.ratio).toEqual({
+      anyOf: [{ type: 'number', exclusiveMinimum: 0, exclusiveMaximum: 1 }, { type: 'null' }],
+    })
+  })
+
   it('enforces number bounds and int on number | null', () => {
     expect(check(NullableConstraints, { ...validBase(), score: -1 })).toEqual([
       'score: Expected minimum 0, got -1',

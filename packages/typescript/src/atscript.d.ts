@@ -13,6 +13,8 @@ declare global {
     'expect.maxLength': { length: number; message?: string }
     'expect.min': { minValue: number; message?: string }
     'expect.max': { maxValue: number; message?: string }
+    'expect.exclusiveMin': { exclusiveMinValue: number; message?: string }
+    'expect.exclusiveMax': { exclusiveMaxValue: number; message?: string }
     'meta.required': { message?: string } | true
     'expect.int': { message?: string } | true
     'expect.array.uniqueItems': { message?: string }

@@ -383,7 +383,9 @@ function fastCheckNumber(metadata: TMetadata, value: number): number {
     value,
     metadata.get('expect.int'),
     metadata.get('expect.min'),
-    metadata.get('expect.max')
+    metadata.get('expect.max'),
+    metadata.get('expect.exclusiveMin'),
+    metadata.get('expect.exclusiveMax')
   )
 }
 
@@ -398,7 +400,9 @@ function numberConstraints(
   value: number,
   int: unknown,
   min: AtscriptMetadata['expect.min'] | undefined,
-  max: AtscriptMetadata['expect.max'] | undefined
+  max: AtscriptMetadata['expect.max'] | undefined,
+  exMin: AtscriptMetadata['expect.exclusiveMin'] | undefined,
+  exMax: AtscriptMetadata['expect.exclusiveMax'] | undefined
 ): number {
   if (int && value % 1 !== 0) {
     return FAIL
@@ -407,6 +411,18 @@ function numberConstraints(
     return FAIL
   }
   if (max !== undefined && value > (typeof max === 'number' ? max : max.maxValue)) {
+    return FAIL
+  }
+  if (
+    exMin !== undefined &&
+    value <= (typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue)
+  ) {
+    return FAIL
+  }
+  if (
+    exMax !== undefined &&
+    value >= (typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue)
+  ) {
     return FAIL
   }
   return PASS
@@ -640,16 +656,18 @@ class Plan {
   /**
    * Annotation keys the node's check reads, and their values (`undefined` when absent):
    * string `meta.required, expect.minLength, maxLength, pattern`; number `expect.int, min,
-   * max`; boolean `meta.required`; array `expect.minLength, maxLength, array.uniqueItems`.
+   * max, exclusiveMin, exclusiveMax`; boolean `meta.required`; array `expect.minLength, maxLength, array.uniqueItems`.
    */
   k0: string | undefined = undefined
   k1: string | undefined = undefined
   k2: string | undefined = undefined
   k3: string | undefined = undefined
+  k4: string | undefined = undefined
   m0: any = undefined
   m1: any = undefined
   m2: any = undefined
   m3: any = undefined
+  m4: any = undefined
   // object
   props: Map<string, TAtscriptAnnotatedType> | undefined = undefined
   propsPatterns: unknown[] | undefined = undefined
@@ -762,11 +780,13 @@ function refreshMeta(plan: Plan): void {
       ? plan.m0 === undefined &&
         plan.m1 === undefined &&
         plan.m2 === undefined &&
-        plan.m3 === undefined
+        plan.m3 === undefined &&
+        plan.m4 === undefined
       : metadata.get(plan.k0) === plan.m0 &&
         (plan.k1 === undefined || metadata.get(plan.k1) === plan.m1) &&
         (plan.k2 === undefined || metadata.get(plan.k2) === plan.m2) &&
-        (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3)
+        (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3) &&
+        (plan.k4 === undefined || metadata.get(plan.k4) === plan.m4)
   if (!same) {
     snapshotMeta(plan)
   }
@@ -779,6 +799,7 @@ function snapshotMeta(plan: Plan): void {
   plan.m1 = metadata.get(plan.k1)
   plan.m2 = metadata.get(plan.k2)
   plan.m3 = metadata.get(plan.k3)
+  plan.m4 = metadata.get(plan.k4)
 }
 
 function setMetaKeys(
@@ -786,12 +807,14 @@ function setMetaKeys(
   k0: string | undefined,
   k1: string | undefined,
   k2: string | undefined,
-  k3: string | undefined
+  k3: string | undefined,
+  k4?: string
 ): void {
   plan.k0 = k0
   plan.k1 = k1
   plan.k2 = k2
   plan.k3 = k3
+  plan.k4 = k4
   snapshotMeta(plan)
   plan.metaStamp = stamp
 }
@@ -833,7 +856,14 @@ function build(plan: Plan): void {
         plan.regexes = []
         plan.op = OP_STRING
       } else if (type.designType === 'number') {
-        setMetaKeys(plan, 'expect.int', 'expect.min', 'expect.max', undefined)
+        setMetaKeys(
+          plan,
+          'expect.int',
+          'expect.min',
+          'expect.max',
+          'expect.exclusiveMin',
+          'expect.exclusiveMax'
+        )
         plan.op = OP_NUMBER
       } else if (type.designType === 'boolean') {
         setMetaKeys(plan, 'meta.required', undefined, undefined, undefined)
@@ -990,7 +1020,7 @@ function checkNumber(plan: Plan, value: number): number {
   if (plan.metaStamp !== stamp) {
     refreshMeta(plan)
   }
-  return numberConstraints(value, plan.m0, plan.m1, plan.m2)
+  return numberConstraints(value, plan.m0, plan.m1, plan.m2, plan.m3, plan.m4)
 }
 
 /** Plan counterpart of {@link fastCheckObject}. */
