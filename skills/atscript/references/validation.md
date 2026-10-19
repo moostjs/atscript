@@ -50,6 +50,8 @@ Since 0.1.103 (tightenings — upgrade note in the docs' validation reference):
 
 Since 0.1.104: `string.required` / `boolean.required` fields (direct, optional, or via a type alias) carry `@meta.required` again — `''`/whitespace and `false` fail; JSON Schema gets `minLength: 1`. 0.1.79–0.1.103 dropped it there (only union members / array elements were checked). A field ref (`x: User.name`) still does not inherit it.
 
+Since 0.1.109: `@expect.exclusiveMin n` / `@expect.exclusiveMax n` reject the bound itself (`Expected greater than n, got v` / `Expected less than n, got v`), map to JSON Schema `exclusiveMinimum` / `exclusiveMaximum`, and `fromJsonSchema()` reads both the numeric and the draft-4 boolean form.
+
 A `0` bound is enforced (since 0.1.102): `@expect.min 0` rejects `-1`, `@expect.max 0` rejects `1`, `@expect.maxLength 0` rejects `'a'` / `['a']`. Earlier versions skipped a bare-number `0` set at runtime (`annotate('expect.min', 0)`) in both `validate()` and `buildJsonSchema()`; `.as`-declared bounds were already enforced.
 
 ## `ValidatorError`

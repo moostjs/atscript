@@ -809,6 +809,8 @@ describe('ts-plugin', () => {
     expect(out[0].content).toContain('"pattern":"^[a-z]+$"')
     expect(out[0].content).toContain('"minimum":18')
     expect(out[0].content).toContain('"maximum":99')
+    expect(out[0].content).toContain('"exclusiveMinimum":0')
+    expect(out[0].content).toContain('"exclusiveMaximum":1')
     expect(out[0].content).toContain('"minItems":1')
     expect(out[0].content).toContain('"maxItems":5')
   })

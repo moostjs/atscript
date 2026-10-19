@@ -383,6 +383,50 @@ describe('fromJsonSchema', () => {
       expect(type.metadata.get('expect.max')).toEqual({ maxValue: 100 })
     })
 
+    it('should convert exclusiveMinimum/exclusiveMaximum (2020-12 numeric form)', () => {
+      const type = fromJsonSchema({ type: 'number', exclusiveMinimum: 0, exclusiveMaximum: 1 })
+      expect(type.metadata.get('expect.exclusiveMin')).toEqual({ exclusiveMinValue: 0 })
+      expect(type.metadata.get('expect.exclusiveMax')).toEqual({ exclusiveMaxValue: 1 })
+      expect(type.metadata.get('expect.min')).toBeUndefined()
+      const v = type.validator()
+      expect(v.validate(0.5, true)).toBe(true)
+      expect(v.validate(0, true)).toBe(false)
+      expect(v.validate(1, true)).toBe(false)
+    })
+
+    it('should keep both inclusive and exclusive numeric bounds', () => {
+      const type = fromJsonSchema({
+        type: 'number',
+        minimum: 3,
+        exclusiveMinimum: 5,
+        maximum: 10,
+        exclusiveMaximum: 8,
+      })
+      expect(type.metadata.get('expect.min')).toEqual({ minValue: 3 })
+      expect(type.metadata.get('expect.exclusiveMin')).toEqual({ exclusiveMinValue: 5 })
+      expect(type.metadata.get('expect.max')).toEqual({ maxValue: 10 })
+      expect(type.metadata.get('expect.exclusiveMax')).toEqual({ exclusiveMaxValue: 8 })
+      const v = type.validator()
+      expect([5, 5.1, 7.9, 8].map(x => v.validate(x, true))).toEqual([false, true, true, false])
+    })
+
+    it('should convert draft-4 boolean exclusiveMinimum/exclusiveMaximum', () => {
+      const type = fromJsonSchema({
+        type: 'integer',
+        minimum: 0,
+        exclusiveMinimum: true,
+        maximum: 10,
+        exclusiveMaximum: true,
+      })
+      expect(type.metadata.get('expect.exclusiveMin')).toEqual({ exclusiveMinValue: 0 })
+      expect(type.metadata.get('expect.exclusiveMax')).toEqual({ exclusiveMaxValue: 10 })
+      expect(type.metadata.get('expect.min')).toBeUndefined()
+      expect(type.metadata.get('expect.max')).toBeUndefined()
+      const inclusive = fromJsonSchema({ type: 'number', minimum: 0, exclusiveMinimum: false })
+      expect(inclusive.metadata.get('expect.min')).toEqual({ minValue: 0 })
+      expect(inclusive.metadata.get('expect.exclusiveMin')).toBeUndefined()
+    })
+
     it('should convert integer with constraints', () => {
       const type = fromJsonSchema({ type: 'integer', minimum: 1, maximum: 10 })
       expect(type.metadata.get('expect.int')).toBe(true)
@@ -859,8 +903,42 @@ describe('json-schema zero bounds', () => {
     })
   })
 
+  it('emits exclusive bounds (object and bare-number forms)', () => {
+    const n = $()
+      .designType('number')
+      .annotate('expect.exclusiveMin', { exclusiveMinValue: 0 })
+      .annotate('expect.exclusiveMax', 5 as any)
+    expect($$(n.$type)).toEqual({ type: 'number', exclusiveMinimum: 0, exclusiveMaximum: 5 })
+  })
+
+  it('merges exclusive union-level bounds onto members (stricter wins)', () => {
+    const t = $('union')
+      .item(
+        $().designType('number').annotate('expect.exclusiveMin', { exclusiveMinValue: 5 }).$type
+      )
+      .item($().designType('null').$type)
+      .annotate('expect.exclusiveMin', { exclusiveMinValue: 2 })
+      .annotate('expect.exclusiveMax', { exclusiveMaxValue: 9 }).$type
+    expect($$(t)).toEqual({
+      anyOf: [{ type: 'number', exclusiveMinimum: 5, exclusiveMaximum: 9 }, { type: 'null' }],
+    })
+  })
+
+  it('keeps both an inclusive and an exclusive bound when a union mixes them', () => {
+    const t = $('union')
+      .item($().designType('number').annotate('expect.min', { minValue: 5 }).$type)
+      .item($().designType('null').$type)
+      .annotate('expect.exclusiveMin', { exclusiveMinValue: 4 }).$type
+    expect($$(t)).toEqual({
+      anyOf: [{ type: 'number', minimum: 5, exclusiveMinimum: 4 }, { type: 'null' }],
+    })
+    const v = t.validator()
+    expect([4.5, 5, null].map(x => v.validate(x, true))).toEqual([false, true, true])
+  })
+
   it('round-trips 0 bounds', () => {
     for (const schema of [
+      { type: 'number', exclusiveMinimum: 0, exclusiveMaximum: 0 },
       { type: 'number', minimum: 0, maximum: 0 },
       { type: 'string', minLength: 0, maxLength: 0 },
       { type: 'array', items: { type: 'number' }, minItems: 0, maxItems: 0 },

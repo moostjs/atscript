@@ -29,6 +29,10 @@ export interface NullableConstraints {
   @expect.max 100
   opt?: number | null
 
+  @expect.exclusiveMin 0
+  @expect.exclusiveMax 1, "Ratio must be below 1"
+  ratio?: NullableCount
+
   nested: {
     @expect.max 3
     n?: number | null

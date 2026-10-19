@@ -38,8 +38,8 @@ Chained via dots. Each narrows the parent with annotation-based constraints; TS 
 
 | Extension                | Effect                                                                                |
 | ------------------------ | ------------------------------------------------------------------------------------- |
-| `number.positive`        | `expect.min 0`.                                                                       |
-| `number.negative`        | `expect.max 0`.                                                                       |
+| `number.positive`        | `expect.min 0` (inclusive, `0` passes; strict: add `@expect.exclusiveMin 0`).         |
+| `number.negative`        | `expect.max 0` (inclusive, `0` passes; strict: add `@expect.exclusiveMax 0`).         |
 | `number.single`          | Single-precision float. Has `.positive` / `.negative`.                                |
 | `number.double`          | Double-precision float. Has `.positive` / `.negative`.                                |
 | `number.int`             | `expect.int true`. Has `.positive` / `.negative`.                                     |

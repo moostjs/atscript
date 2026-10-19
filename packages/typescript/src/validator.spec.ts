@@ -555,6 +555,49 @@ describe('Validator zero bounds', () => {
   })
 })
 
+describe('Validator exclusive number bounds', () => {
+  const num = () => defineAnnotatedType().designType('number')
+  it('rejects the bound itself and reports min/max-style messages', () => {
+    const t = num()
+      .annotate('expect.exclusiveMin', { exclusiveMinValue: 0 })
+      .annotate('expect.exclusiveMax', { exclusiveMaxValue: 10 }).$type
+    const v = new Validator(t)
+    expect(v.validate(0.001, true)).toBe(true)
+    expect(v.validate(9.999, true)).toBe(true)
+    expect(v.validate(0, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: '', message: 'Expected greater than 0, got 0' }])
+    expect(v.validate(-1, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: '', message: 'Expected greater than 0, got -1' }])
+    expect(v.validate(10, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: '', message: 'Expected less than 10, got 10' }])
+  })
+
+  it('accepts the bare-number form and custom messages', () => {
+    const t = defineAnnotatedType('object').prop(
+      'p',
+      num()
+        .annotate('expect.exclusiveMin', 0 as any)
+        .annotate('expect.exclusiveMax', { exclusiveMaxValue: 1, message: 'below one' }).$type
+    ).$type
+    const v = new Validator(t)
+    expect(v.validate({ p: 0.5 }, true)).toBe(true)
+    expect(v.validate({ p: 0 }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'p', message: 'Expected greater than 0, got 0' }])
+    expect(v.validate({ p: 1 }, true)).toBe(false)
+    expect(v.errors).toEqual([{ path: 'p', message: 'below one' }])
+  })
+
+  it('combines with inclusive bounds (both enforced)', () => {
+    const v = new Validator(
+      num()
+        .annotate('expect.min', { minValue: 0 })
+        .annotate('expect.exclusiveMin', { exclusiveMinValue: 0 }).$type
+    )
+    expect(v.validate(0, true)).toBe(false)
+    expect(v.validate(1, true)).toBe(true)
+  })
+})
+
 describe('Validator union-level constraints', () => {
   const $ = defineAnnotatedType
   const nul = () => $().designType('null').$type

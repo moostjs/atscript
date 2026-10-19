@@ -78,8 +78,8 @@ export interface Product {
 Useful built-ins:
 
 - `number.int` — integer only
-- `number.positive` — minimum `0`
-- `number.negative` — maximum `0`
+- `number.positive` — minimum `0` (inclusive: `0` passes; add `@expect.exclusiveMin 0` to reject it)
+- `number.negative` — maximum `0` (inclusive: `0` passes; add `@expect.exclusiveMax 0` to reject it)
 - `number.single` / `number.double` — numeric intent tags
 
 #### Sized Integer Types

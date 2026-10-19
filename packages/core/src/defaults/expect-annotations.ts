@@ -10,10 +10,10 @@ const NULLABLE_NOTE =
 export const expectAnnotations: TAnnotationsTree = {
   minLength: new AnnotationSpec({
     description:
-      `Validates that a string or array has a minimum length. ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.minLength 5' +
-      'name: string' +
+      `Validates that a string or array has a minimum length. ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.minLength 5\n' +
+      'name: string\n' +
       '```',
     defType: ['array', 'string'],
     argument: [
@@ -33,10 +33,10 @@ export const expectAnnotations: TAnnotationsTree = {
 
   maxLength: new AnnotationSpec({
     description:
-      `Validates that a string or array has a maximum length. ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.maxLength 5' +
-      'name: string' +
+      `Validates that a string or array has a maximum length. ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.maxLength 5\n' +
+      'name: string\n' +
       '```',
     defType: ['array', 'string'],
     argument: [
@@ -56,10 +56,10 @@ export const expectAnnotations: TAnnotationsTree = {
 
   min: new AnnotationSpec({
     description:
-      `Validates that a number is greater than or equal to a minimum value. ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.min 18' +
-      'age: number' +
+      `Validates that a number is greater than or equal to a minimum value. ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.min 18\n' +
+      'age: number\n' +
       '```',
     defType: ['number'],
     argument: [
@@ -79,10 +79,10 @@ export const expectAnnotations: TAnnotationsTree = {
 
   max: new AnnotationSpec({
     description:
-      `Validates that a number is less than or equal to a maximum value. ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.max 10' +
-      'count: number' +
+      `Validates that a number is less than or equal to a maximum value. ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.max 10\n' +
+      'count: number\n' +
       '```',
     defType: ['number'],
     argument: [
@@ -100,22 +100,68 @@ export const expectAnnotations: TAnnotationsTree = {
     ],
   }),
 
+  exclusiveMin: new AnnotationSpec({
+    description:
+      `Validates that a number is strictly greater than a value (the value itself is rejected). ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.exclusiveMin 0\n' +
+      'price: number\n' +
+      '```',
+    defType: ['number'],
+    argument: [
+      {
+        name: 'exclusiveMinValue',
+        type: 'number',
+        description: 'The exclusive lower bound (the value must be greater than this).',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
+  }),
+
+  exclusiveMax: new AnnotationSpec({
+    description:
+      `Validates that a number is strictly less than a value (the value itself is rejected). ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.exclusiveMax 1\n' +
+      'ratio: number\n' +
+      '```',
+    defType: ['number'],
+    argument: [
+      {
+        name: 'exclusiveMaxValue',
+        type: 'number',
+        description: 'The exclusive upper bound (the value must be less than this).',
+      },
+      {
+        name: 'message',
+        optional: true,
+        type: 'string',
+        description: 'Optional error message to display if the validation fails.',
+      },
+    ],
+  }),
+
   int: new AnnotationSpec({
     description:
-      `Validates that a number is an integer (no decimal places). ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.int' +
-      'age: number' +
+      `Validates that a number is an integer (no decimal places). ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.int\n' +
+      'age: number\n' +
       '```',
     defType: ['number'],
   }),
 
   pattern: new AnnotationSpec({
     description:
-      `Validates that a string matches a specific pattern. ${NULLABLE_NOTE}\n\n**Example:**` +
-      '```atscript' +
-      '@expect.pattern "[a-z]+", "u"' +
-      'name: string' +
+      `Validates that a string matches a specific pattern. ${NULLABLE_NOTE}\n\n**Example:**\n` +
+      '```atscript\n' +
+      '@expect.pattern "[a-z]+", "u"\n' +
+      'name: string\n' +
       '```',
     defType: ['string'],
     multiple: true,

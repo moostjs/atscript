@@ -183,6 +183,9 @@ function makeUnionConstraints() {
       .$type,
     agree: union(bool().$type, nul()).annotate('meta.required', true).$type,
     opt: union(num().$type, nul()).annotate('expect.max', { maxValue: 3 }).optional().$type,
+    ratio: union(num().$type, nul())
+      .annotate('expect.exclusiveMin', { exclusiveMinValue: 0 })
+      .annotate('expect.exclusiveMax', { exclusiveMaxValue: 1 }).$type,
     reqOpt: str({ 'meta.required': true }).optional().$type,
     reqOptNullable: union(str().$type, nul()).annotate('meta.required', true).optional().$type,
     reqBool: bool({ 'meta.required': { message: 'tick it' } }).optional().$type,
@@ -196,6 +199,7 @@ const validUnionConstraints = (): any => ({
   level: 5,
   agree: true,
   opt: 2,
+  ratio: 0.5,
   reqOpt: 'x',
   reqOptNullable: null,
   reqBool: true,
@@ -283,6 +287,9 @@ function makeMisc() {
     agree: bool({ 'meta.required': { message: 'must agree' } }).$type,
     minObj: num({ 'expect.min': { minValue: 3, message: 'too small' } }).$type,
     maxObj: num({ 'expect.max': { maxValue: 9 } }).$type,
+    exMinObj: num({ 'expect.exclusiveMin': { exclusiveMinValue: 0, message: 'positive' } }).$type,
+    exMaxObj: num({ 'expect.exclusiveMax': { exclusiveMaxValue: 1 } }).$type,
+    exBoth: num({ 'expect.exclusiveMin': 0, 'expect.exclusiveMax': 10, 'expect.int': true }).$type,
     lenObj: str({ 'expect.minLength': { length: 2 }, 'expect.maxLength': { length: 4 } }).$type,
     filled: str({ 'meta.required': { message: 'fill me' } }).$type,
     twoPatterns: (() => {
@@ -305,6 +312,9 @@ const validMisc = (): any => ({
   agree: true,
   minObj: 3,
   maxObj: 9,
+  exMinObj: 0.5,
+  exMaxObj: 0.5,
+  exBoth: 5,
   lenObj: 'abc',
   filled: 'x',
   twoPatterns: 'abz',
@@ -951,6 +961,49 @@ describe('Validator fast path — metadata / structure mutated after first valid
     const v = new Validator(t)
     expect(v.validate({ n: 5 }, true)).toBe(true)
     ;(prop(t, 'n').metadata.get('expect.min') as any).minValue = 10
+    expect(v.validate({ n: 5 }, true)).toBe(false)
+  })
+  it('exclusive bounds at the boundary match the walk (scalar, array item, union-level)', () => {
+    const bounded = () =>
+      num({ 'expect.exclusiveMin': { exclusiveMinValue: 0 }, 'expect.exclusiveMax': 5 })
+    const defs = [
+      bounded().$type,
+      arr(bounded().$type).$type,
+      obj({ a: bounded().$type }).$type,
+      union(num({ 'expect.min': { minValue: 5 } }).$type, prim('null').$type).annotate(
+        'expect.exclusiveMin',
+        { exclusiveMinValue: 5 }
+      ).$type,
+    ]
+    const values = [-1, -0, 0, 0.5, 4.9, 5, 5.1, Number.NaN, Number.POSITIVE_INFINITY, null]
+    for (const def of defs) {
+      for (const v of values) {
+        for (const value of [v, [v], { a: v }]) {
+          expect([value, new Validator(def).validate(value, true)]).toEqual([
+            value,
+            new WalkValidator(def).validate(value, true),
+          ])
+        }
+      }
+    }
+    expect(new Validator(defs[0]).validate(-0, true)).toBe(false)
+    expect(new Validator(defs[3]).validate(5, true)).toBe(false)
+  })
+
+  it('exclusive bound objects mutated in place', () => {
+    const t = obj({
+      n: num({
+        'expect.exclusiveMin': { exclusiveMinValue: 1 },
+        'expect.exclusiveMax': { exclusiveMaxValue: 10 },
+      }).$type,
+    }).$type
+    const v = new Validator(t)
+    expect(v.validate({ n: 5 }, true)).toBe(true)
+    ;(prop(t, 'n').metadata.get('expect.exclusiveMax') as any).exclusiveMaxValue = 5
+    expect(v.validate({ n: 5 }, true)).toBe(false)
+    prop(t, 'n').metadata.set('expect.exclusiveMax', { exclusiveMaxValue: 6 })
+    expect(v.validate({ n: 5 }, true)).toBe(true)
+    prop(t, 'n').metadata.set('expect.exclusiveMin', { exclusiveMinValue: 5 })
     expect(v.validate({ n: 5 }, true)).toBe(false)
   })
   it('props.set() adds a required prop', () => {

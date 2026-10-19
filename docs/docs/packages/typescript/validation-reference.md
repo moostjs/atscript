@@ -78,12 +78,16 @@ Annotations from `.as` files are enforced automatically:
 | `@expect.maxLength`         | string, array            | Maximum length                                                         |
 | `@expect.min`               | number                   | Minimum value                                                          |
 | `@expect.max`               | number                   | Maximum value                                                          |
+| `@expect.exclusiveMin`      | number                   | Strictly greater than the value (since 0.1.109)                        |
+| `@expect.exclusiveMax`      | number                   | Strictly less than the value (since 0.1.109)                           |
 | `@expect.int`               | number                   | Must be integer                                                        |
 | `@expect.pattern`           | string                   | Regex match                                                            |
 | `@expect.array.uniqueItems` | array                    | No duplicate items                                                     |
 | `@expect.array.key`         | array element properties | Marks identity fields for uniqueness and patch operations              |
 
-Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions.
+Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions. `number.positive` is `@expect.min 0`, so `0` passes; use `@expect.exclusiveMin 0` for a strictly positive number.
+
+Default messages for the number bounds: `Expected minimum N, got V`, `Expected maximum N, got V`, `Expected greater than N, got V` (`exclusiveMin`) and `Expected less than N, got V` (`exclusiveMax`). All four checks run when both an inclusive and an exclusive bound are declared.
 
 Every rule above also applies to a **nullable** field — the target type in a union with `null` / `undefined` (`number | null`, `string[] | null`, or an alias of such a union): `null` passes and any other value is checked. Constraints on a literal member of a union (`'a' | 'b'`) are not checked — its value is fixed.
 
