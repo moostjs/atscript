@@ -1,3 +1,19 @@
+## [0.1.109](https://github.com/moostjs/atscript/compare/v0.1.108...v0.1.109) (2026-10-19)
+
+
+### Bug Fixes
+
+* strings ending in an escaped backslash terminate; document raw string literals ([9975aa3](https://github.com/moostjs/atscript/commit/9975aa3f650ab4d22e53b093a7e1f005dfe0e026))
+
+
+### Features
+
+* add [@expect](https://github.com/expect).exclusiveMin/exclusiveMax, render hover examples on separate lines ([5cd99ce](https://github.com/moostjs/atscript/commit/5cd99ceba19c61ba65bfe2ea28d8b4957eb9b4f1))
+
+
+### Performance Improvements
+
+* validator fast path handles root-level strip and early unknown-key failure ([8536c7f](https://github.com/moostjs/atscript/commit/8536c7f0218323b2b1cd112beac8852a604b2a5c))
 ## [0.1.108](https://github.com/moostjs/atscript/compare/v0.1.107...v0.1.108) (2026-10-19)
 
 
