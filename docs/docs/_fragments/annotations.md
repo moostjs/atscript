@@ -110,6 +110,23 @@ When merged, how repeated annotations combine depends on the merge strategy:
 
 Arguments can be optional. Annotations without arguments are flag annotations.
 
+### String Literals
+
+String arguments (single or double quoted) are **raw**: Atscript does not decode escape sequences, so the text between the quotes reaches the metadata exactly as written, backslashes included. This is why regex patterns need no double escaping:
+
+```atscript
+@expect.pattern '^\S+$'           // pattern is ^\S+$ (one backslash)
+```
+
+- A backslash before the quote (`\"` or `\'`) lets the quote appear inside the string. The backslash is kept, so `"say \"hi\""` produces `say \"hi\"`.
+- A string may end with an escaped backslash: `"C:\\"` closes at its last quote and produces `C:\\`. An even run of backslashes before a quote ends the string; an odd run escapes the quote.
+- `\n`, `\t` and similar sequences are not turned into control characters; they stay as two characters.
+
+```atscript
+@meta.label "a\\"                 // value: a\\
+@expect.pattern "^[^\"]+$", "u"   // pattern: ^[^\"]+$
+```
+
 ## Core Annotations
 
 Atscript provides common-purpose annotations:

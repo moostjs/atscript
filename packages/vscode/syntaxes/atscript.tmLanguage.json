@@ -40,7 +40,7 @@
     "strings": {
       "patterns": [
         {
-          "match": "'([^']*)'|\"([^\"]*)\"",
+          "match": "'(?:[^'\\\\]|\\\\.)*'|\"(?:[^\"\\\\]|\\\\.)*\"",
           "name": "variable.other.constant.atscript"
         }
       ]
@@ -83,7 +83,7 @@
               ]
             },
             {
-              "match": "'([^']*)'|\"([^\"]*)\"",
+              "match": "'(?:[^'\\\\]|\\\\.)*'|\"(?:[^\"\\\\]|\\\\.)*\"",
               "name": "string.quoted.import.atscript"
             }
           ]
