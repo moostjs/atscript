@@ -67,6 +67,14 @@ const QUERY_OP_MAP: Record<string, string> = {
   'not exists': '$exists',
 }
 
+/** Value field of each number-bound annotation's object form. */
+const NUMBER_BOUND_FIELDS: Record<string, string> = {
+  'expect.min': 'minValue',
+  'expect.max': 'maxValue',
+  'expect.exclusiveMin': 'exclusiveMinValue',
+  'expect.exclusiveMax': 'exclusiveMaxValue',
+}
+
 // Placeholder line in the header; `render()` replaces it with the synthesized imports, which are
 // only complete after the body is rendered. Kept in the header (not emitted by `post()`) because
 // the import position is part of the generated-file snapshots.
@@ -762,37 +770,13 @@ export class JsRenderer extends BaseRenderer {
           }
           break
         }
-        case 'expect.min': {
-          if (a.args[0]) {
-            handle.annotate(a.name as any, {
-              minValue: Number(a.args[0].text),
-              message: a.args[1]?.text,
-            })
-          }
-          break
-        }
-        case 'expect.max': {
-          if (a.args[0]) {
-            handle.annotate(a.name as any, {
-              maxValue: Number(a.args[0].text),
-              message: a.args[1]?.text,
-            })
-          }
-          break
-        }
-        case 'expect.exclusiveMin': {
-          if (a.args[0]) {
-            handle.annotate(a.name as any, {
-              exclusiveMinValue: Number(a.args[0].text),
-              message: a.args[1]?.text,
-            })
-          }
-          break
-        }
+        case 'expect.min':
+        case 'expect.max':
+        case 'expect.exclusiveMin':
         case 'expect.exclusiveMax': {
           if (a.args[0]) {
             handle.annotate(a.name as any, {
-              exclusiveMaxValue: Number(a.args[0].text),
+              [NUMBER_BOUND_FIELDS[a.name]]: Number(a.args[0].text),
               message: a.args[1]?.text,
             })
           }

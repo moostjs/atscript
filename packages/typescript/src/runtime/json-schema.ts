@@ -251,21 +251,26 @@ function applyScalarConstraints(schema: TJsonSchema, meta: TMetadata): void {
   if (schema.type === 'number' || schema.type === 'integer') {
     const min = meta.get('expect.min')
     if (min !== undefined) {
-      schema.minimum = typeof min === 'number' ? min : min.minValue
+      schema.minimum = boundOf(min, 'minValue')
     }
     const max = meta.get('expect.max')
     if (max !== undefined) {
-      schema.maximum = typeof max === 'number' ? max : max.maxValue
+      schema.maximum = boundOf(max, 'maxValue')
     }
     const exMin = meta.get('expect.exclusiveMin')
     if (exMin !== undefined) {
-      schema.exclusiveMinimum = typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue
+      schema.exclusiveMinimum = boundOf(exMin, 'exclusiveMinValue')
     }
     const exMax = meta.get('expect.exclusiveMax')
     if (exMax !== undefined) {
-      schema.exclusiveMaximum = typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue
+      schema.exclusiveMaximum = boundOf(exMax, 'exclusiveMaxValue')
     }
   }
+}
+
+/** A number-bound annotation's value: the bare number, or its `field` in the object form. */
+function boundOf<T extends object, K extends keyof T>(m: number | T, field: K): number | T[K] {
+  return typeof m === 'number' ? m : m[field]
 }
 
 const LOWER_BOUNDS = new Set(['minimum', 'exclusiveMinimum', 'minLength', 'minItems'])

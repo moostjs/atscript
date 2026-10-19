@@ -795,51 +795,46 @@ export class Validator<
     if (min !== undefined) {
       const minValue = typeof min === 'number' ? min : min.minValue
       if (value < minValue) {
-        const message =
-          typeof min === 'object' && min.message
-            ? min.message
-            : `Expected minimum ${minValue}, got ${value}`
-        this.error(message)
-        return false
+        return this.numberBoundFailed(min, 'minimum', minValue, value)
       }
     }
     const max = metadata.get('expect.max')
     if (max !== undefined) {
       const maxValue = typeof max === 'number' ? max : max.maxValue
       if (value > maxValue) {
-        const message =
-          typeof max === 'object' && max.message
-            ? max.message
-            : `Expected maximum ${maxValue}, got ${value}`
-        this.error(message)
-        return false
+        return this.numberBoundFailed(max, 'maximum', maxValue, value)
       }
     }
     const exMin = metadata.get('expect.exclusiveMin')
     if (exMin !== undefined) {
       const bound = typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue
       if (value <= bound) {
-        const message =
-          typeof exMin === 'object' && exMin.message
-            ? exMin.message
-            : `Expected greater than ${bound}, got ${value}`
-        this.error(message)
-        return false
+        return this.numberBoundFailed(exMin, 'greater than', bound, value)
       }
     }
     const exMax = metadata.get('expect.exclusiveMax')
     if (exMax !== undefined) {
       const bound = typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue
       if (value >= bound) {
-        const message =
-          typeof exMax === 'object' && exMax.message
-            ? exMax.message
-            : `Expected less than ${bound}, got ${value}`
-        this.error(message)
-        return false
+        return this.numberBoundFailed(exMax, 'less than', bound, value)
       }
     }
     return true
+  }
+
+  /** Reports a failed number bound: its custom message, else `Expected <label> <bound>, got <value>`. */
+  private numberBoundFailed(
+    annotation: number | { message?: string },
+    label: string,
+    bound: number,
+    value: number
+  ): false {
+    const message =
+      typeof annotation === 'object' && annotation.message
+        ? annotation.message
+        : `Expected ${label} ${bound}, got ${value}`
+    this.error(message)
+    return false
   }
 
   protected validateBoolean(

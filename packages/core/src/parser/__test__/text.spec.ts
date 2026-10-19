@@ -30,8 +30,8 @@ describe('multiline text', () => {
 })
 
 /** Annotation args of prop `p` as `[type, text]`, asserting a clean parse. */
-function args(annotation: string) {
-  const src = `interface I {\n  ${annotation}\n  p: string\n}`
+function args(annotation: string, suffix = '') {
+  const src = `interface I {\n  ${annotation}${suffix}\n  p: string\n}`
   const result = parseAtscript(src)
   expect(result.messages).toEqual([])
   const node = result.nodes[0] as SemanticInterfaceNode
@@ -88,11 +88,6 @@ describe('string literal termination (raw content)', () => {
   })
 
   it('an escaped backslash does not swallow a following comment', () => {
-    const src = `interface I {\n  @a "a\\\\" // note "x"\n  p: string\n}`
-    const result = parseAtscript(src)
-    expect(result.messages).toEqual([])
-    const node = result.nodes[0] as SemanticInterfaceNode
-    node.registerAtDocument(new AtscriptDoc('1', {}))
-    expect(node.props.get('p')!.annotations![0].args.map(a => a.text)).toEqual(['a\\\\'])
+    expect(args('@a "a\\\\"', ' // note "x"')).toEqual([['text', 'a\\\\']])
   })
 })

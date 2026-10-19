@@ -85,9 +85,9 @@ Annotations from `.as` files are enforced automatically:
 | `@expect.array.uniqueItems` | array                    | No duplicate items                                                     |
 | `@expect.array.key`         | array element properties | Marks identity fields for uniqueness and patch operations              |
 
-Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions. `number.positive` is `@expect.min 0`, so `0` passes; use `@expect.exclusiveMin 0` for a strictly positive number.
+Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions.
 
-Default messages for the number bounds: `Expected minimum N, got V`, `Expected maximum N, got V`, `Expected greater than N, got V` (`exclusiveMin`) and `Expected less than N, got V` (`exclusiveMax`). All four checks run when both an inclusive and an exclusive bound are declared.
+Default error messages and the order in which constraints are checked are listed in the [Validation Specification](/plugin-development/validation-spec#constraint-annotations).
 
 Every rule above also applies to a **nullable** field — the target type in a union with `null` / `undefined` (`number | null`, `string[] | null`, or an alias of such a union): `null` passes and any other value is checked. Constraints on a literal member of a union (`'a' | 'b'`) are not checked — its value is fixed.
 

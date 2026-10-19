@@ -502,6 +502,20 @@ describe('Validator zero bounds', () => {
     ['expect.min 0', b => num('expect.min', b), 0, -1, 'Expected minimum 0, got -1'],
     ['expect.max 0', b => num('expect.max', b), 0, 1, 'Expected maximum 0, got 1'],
     [
+      'expect.exclusiveMin 0',
+      b => num('expect.exclusiveMin', b),
+      0.001,
+      0,
+      'Expected greater than 0, got 0',
+    ],
+    [
+      'expect.exclusiveMax 0',
+      b => num('expect.exclusiveMax', b),
+      -0.001,
+      0,
+      'Expected less than 0, got 0',
+    ],
+    [
       'string expect.maxLength 0',
       b => str('expect.maxLength', b),
       '',
@@ -516,12 +530,16 @@ describe('Validator zero bounds', () => {
       'Expected maximum length of 0 items, got 1 items',
     ],
   ]
-  const forms = (name: string, bound: number) =>
-    name.startsWith('expect.min')
-      ? [bound, { minValue: bound }]
-      : name.startsWith('expect.max ')
-        ? [bound, { maxValue: bound }]
-        : [bound, { length: bound }]
+  const fields: Record<string, string> = {
+    'expect.min': 'minValue',
+    'expect.max': 'maxValue',
+    'expect.exclusiveMin': 'exclusiveMinValue',
+    'expect.exclusiveMax': 'exclusiveMaxValue',
+  }
+  const forms = (name: string, bound: number) => [
+    bound,
+    { [fields[name.split(' ')[0]] ?? 'length']: bound },
+  ]
 
   for (const [name, make, ok, bad, message] of cases) {
     for (const bound of forms(name, 0)) {
@@ -555,34 +573,20 @@ describe('Validator zero bounds', () => {
   })
 })
 
+// Default messages and both annotation forms are covered by 'Validator zero bounds'.
 describe('Validator exclusive number bounds', () => {
   const num = () => defineAnnotatedType().designType('number')
-  it('rejects the bound itself and reports min/max-style messages', () => {
-    const t = num()
-      .annotate('expect.exclusiveMin', { exclusiveMinValue: 0 })
-      .annotate('expect.exclusiveMax', { exclusiveMaxValue: 10 }).$type
-    const v = new Validator(t)
-    expect(v.validate(0.001, true)).toBe(true)
-    expect(v.validate(9.999, true)).toBe(true)
-    expect(v.validate(0, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: '', message: 'Expected greater than 0, got 0' }])
-    expect(v.validate(-1, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: '', message: 'Expected greater than 0, got -1' }])
-    expect(v.validate(10, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: '', message: 'Expected less than 10, got 10' }])
-  })
-
-  it('accepts the bare-number form and custom messages', () => {
+  it('reports custom messages', () => {
     const t = defineAnnotatedType('object').prop(
       'p',
       num()
-        .annotate('expect.exclusiveMin', 0 as any)
+        .annotate('expect.exclusiveMin', { exclusiveMinValue: 0, message: 'above zero' })
         .annotate('expect.exclusiveMax', { exclusiveMaxValue: 1, message: 'below one' }).$type
     ).$type
     const v = new Validator(t)
     expect(v.validate({ p: 0.5 }, true)).toBe(true)
     expect(v.validate({ p: 0 }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'p', message: 'Expected greater than 0, got 0' }])
+    expect(v.errors).toEqual([{ path: 'p', message: 'above zero' }])
     expect(v.validate({ p: 1 }, true)).toBe(false)
     expect(v.errors).toEqual([{ path: 'p', message: 'below one' }])
   })

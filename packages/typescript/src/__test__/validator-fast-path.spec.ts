@@ -504,11 +504,21 @@ function run(v: Validator, x: unknown) {
   }
 }
 
-function compare(def: TAtscriptAnnotatedType, opts: Partial<TValidatorOptions>, value: unknown) {
+/**
+ * Validates clones of `value` with the fast and the reference validator and expects identical
+ * results, errors and mutations. `onFast` sees the fast validator and its input before it runs.
+ */
+function compare(
+  def: TAtscriptAnnotatedType,
+  opts: Partial<TValidatorOptions>,
+  value: unknown,
+  onFast?: (fast: Validator, input: unknown) => void
+) {
   const fast = new Validator(def, opts)
   const walk = new WalkValidator(def, opts)
   const a = structuredClone(value)
   const b = structuredClone(value)
+  onFast?.(fast, a)
   const r1 = run(fast, a)
   const r2 = run(walk, b)
   expect(r1).toBe(r2)
@@ -516,6 +526,15 @@ function compare(def: TAtscriptAnnotatedType, opts: Partial<TValidatorOptions>, 
   // strip mutates the input; the mutation must match too
   expect(a).toEqual(b)
   return r1
+}
+
+/** The node at `path` inside `value`. */
+function at(value: any, path: Array<string | number>): any {
+  let node = value
+  for (const k of path) {
+    node = node[k]
+  }
+  return node
 }
 
 /** Every path (object key / array index) inside a value, depth-first. */
@@ -538,10 +557,7 @@ function singleEdits(valid: () => any): unknown[] {
   for (const p of all) {
     const set = (x: unknown, del = false) => {
       const v = valid()
-      let node = v
-      for (let i = 0; i < p.length - 1; i++) {
-        node = node[p[i]]
-      }
+      const node = at(v, p.slice(0, -1))
       if (del) {
         delete node[p.at(-1)!]
       } else {
@@ -556,10 +572,7 @@ function singleEdits(valid: () => any): unknown[] {
   }
   for (const p of [[], ...all]) {
     const v = valid()
-    let node = v
-    for (const k of p) {
-      node = node[k]
-    }
+    const node = at(v, p)
     if (typeof node === 'object' && node !== null && !Array.isArray(node)) {
       node.extra = 1
       out.push(v)
@@ -1329,10 +1342,7 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
   /** Makes two places share one object (the walk then sees one visit's strips in the other). */
   function alias(value: any, r: () => number) {
     const all = paths(value).filter(p => {
-      let node = value
-      for (const k of p) {
-        node = node[k]
-      }
+      const node = at(value, p)
       return typeof node === 'object' && node !== null && !Array.isArray(node)
     })
     if (all.length < 2) {
@@ -1340,14 +1350,8 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     }
     const from = all[Math.floor(r() * all.length)]
     const to = all[Math.floor(r() * all.length)]
-    let src = value
-    for (const k of from) {
-      src = src[k]
-    }
-    let dst = value
-    for (const k of to.slice(0, -1)) {
-      dst = dst[k]
-    }
+    const src = at(value, from)
+    const dst = at(value, to.slice(0, -1))
     if (!objects(src).includes(dst)) {
       dst[to.at(-1)!] = src
     }
@@ -1362,22 +1366,18 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     opts: Partial<TValidatorOptions>,
     value: unknown
   ) {
-    const fast = new Validator(def, opts)
-    const walk = new WalkValidator(def, opts)
-    const spy = vi.spyOn(fast as any, 'validateSafe')
-    const a = structuredClone(value)
-    const b = structuredClone(value)
-    const r1 = run(fast, a)
-    const r2 = run(walk, b)
-    expect(r1).toBe(r2)
-    expect(fast.errors).toEqual(walk.errors)
-    expect(a).toEqual(b)
-    if (spy.mock.calls.length > 0) {
+    let spy: { mock: { calls: unknown[] } } | undefined
+    let input: unknown
+    const result = compare(def, opts, value, (fast, a) => {
+      spy = vi.spyOn(fast as any, 'validateSafe')
+      input = a
+    })
+    if (spy!.mock.calls.length > 0) {
       stats.walks++
-    } else if (opts.unknownProps === 'strip' && JSON.stringify(a) !== JSON.stringify(value)) {
+    } else if (opts.unknownProps === 'strip' && JSON.stringify(input) !== JSON.stringify(value)) {
       stats.fastStrips++
     }
-    return r1
+    return result
   }
 
   it('randomized: unknown keys at every depth, mixed with failures and aliasing', () => {
@@ -1628,39 +1628,40 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     expect(() => new Validator(t).validate(value, true)).toThrow()
   })
 
-  it('many pending strips (hashed lookup) still detect a revisited object', () => {
-    const t = obj({
-      list: arr(obj({ x: num().$type }).$type).$type,
-      last: obj({ x: num().$type, junk: num().$type }).$type,
-    }).$type
-    const list = Array.from({ length: 40 }, (_, i) => ({ x: i, junk: i }))
-    compare(t, { unknownProps: 'strip' }, { list, last: list[3] })
-    compare(t, { unknownProps: 'strip' }, { list, last: { x: 1, junk: 1 } })
-  })
-
   it('a validate() re-entered mid-check (getter) keeps the outer strips', () => {
-    const inner = obj({ x: num().$type }).$type
-    const t = obj({ a: inner, g: num().$type }).$type
-    const make = (V: typeof Validator) => {
-      const nested = new V(inner, { unknownProps: 'strip' })
-      const value: any = { a: { x: 1, junk: 1 } }
-      Object.defineProperty(value, 'g', {
-        enumerable: true,
+    // The root's first intersection member records its top-level strip; the second member's
+    // `type` getter then runs a nested 'strip' validate() before the outer call completes.
+    const nested = new Validator(obj({ x: num().$type }).$type, { unknownProps: 'strip' })
+    const reentering = prim('any').$type
+    const anyType = reentering.type
+    let reentered = 0
+    Object.defineProperty(reentering, 'type', {
+      get: () => {
+        reentered++
         // a failing nested call must not drop the outer call's pending strips
-        get: () => (nested.validate({ x: 'no' }, true) ? 0 : 1),
-      })
-      return value
-    }
-    const a = make(Validator)
-    const b = make(WalkValidator)
-    expect(new Validator(t, { unknownProps: 'strip' }).validate(a, true)).toBe(
+        nested.validate({ x: 'no', junk: 1 }, true)
+        return anyType
+      },
+    })
+    const t = $('intersection')
+      .item(obj({ a: num().$type }).$type)
+      .item(reentering).$type
+    const fast = new Validator(t, { unknownProps: 'strip' })
+    const spy = vi.spyOn(fast as any, 'validateSafe')
+    const a = { a: 1, junk: 1 }
+    const b = { a: 1, junk: 1 }
+    reentered = 0
+    expect(fast.validate(a, true)).toBe(
       new WalkValidator(t, { unknownProps: 'strip' }).validate(b, true)
     )
-    expect(a.a).toEqual(b.a)
-    expect(a.a).toEqual({ x: 1 })
+    expect(reentered).toBeGreaterThan(0)
+    expect(a).toEqual(b)
+    expect(a).toEqual({ a: 1 })
+    // the outer pass was decided (and stripped) by the pre-check
+    expect(spy).not.toHaveBeenCalled()
   })
 
-  it('a non-deletable unknown key throws like the walk, after the same deletions', () => {
+  it('a non-deletable nested unknown key throws like the walk', () => {
     const t = obj({ a: obj({ x: num().$type }).$type, b: obj({ y: num().$type }).$type }).$type
     const make = () => ({
       a: { x: 1, junk: 1 },

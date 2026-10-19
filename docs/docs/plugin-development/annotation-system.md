@@ -40,6 +40,27 @@ new AnnotationSpec({
 | `validate`           | `function`              | —           | Custom validation at parse time                                                                                                  |
 | `modify`             | `function`              | —           | AST mutation after validation                                                                                                    |
 
+### Hover examples (since 0.1.109)
+
+`annotationExample(description, ...lines)` from `@atscript/core` appends an **Example:** block to a `description`, formatted like the built-in annotations' hovers. Each extra argument is one line of the `atscript` code block; pass `''` for a blank line:
+
+```typescript
+import { AnnotationSpec, annotationExample } from '@atscript/core'
+
+new AnnotationSpec({
+  description: annotationExample(
+    'Mark field as searchable.',
+    '@api.searchable 2',
+    'title: string',
+    '',
+    '@api.searchable',
+    'body: string'
+  ),
+  nodeType: ['prop'],
+  argument: { name: 'weight', type: 'number', optional: true },
+})
+```
+
 ### Type references inside inherited annotations (since 0.1.100)
 
 A `ref` argument, and the type part of a qualified `Type.field` in a `query` / `expr` / `order` argument, names a type that is imported in the file **declaring** the annotation. When the annotation is inherited into another file — through a chain ref (`color: Ticket.color`) or `extends` — the generated JavaScript for that file adds the missing import itself (aliased `Name_1` if the name clashes with a local declaration), so the argument's getter (`target: () => Dict`) never throws `ReferenceError`. Plugins do not need to do anything; this applies to every annotation whose spec has `passedWhenReferred: true` (the default).

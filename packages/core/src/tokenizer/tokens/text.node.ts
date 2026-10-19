@@ -24,7 +24,7 @@ export const TextToken = new Node<TLexicalToken & { quote: string; end: string }
   name: 'text',
   start: { token: /(?<quote>["'])/u, omit: true },
   end: {
-    token: ctx => END_RE[ctx.node.data.quote] ?? END_RE['"'],
+    token: ctx => END_RE[ctx.node.data.quote],
     omit: true,
   },
   eofClose: true,

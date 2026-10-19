@@ -63,7 +63,6 @@ let stripping = false
  * Unknown keys of the top-level object the walk would delete (`unknownProps: 'strip'`), in
  * the walk's deletion order. Deleted when the call passes, dropped otherwise.
  */
-let pendingObject: Record<string, unknown> | undefined
 const pendingKeys: string[] = []
 
 /**
@@ -110,25 +109,18 @@ function fastCheckStripping(
   } finally {
     stripping = false
   }
-  if (pendingObject !== undefined) {
-    // Outside the try: a failing `delete` throws from the walk too, at the same key.
-    flushStrips(pendingObject, passed)
-  }
-  return passed
-}
-
-/** Performs (`apply`) or drops the pending strips of `target`. */
-function flushStrips(target: Record<string, unknown>, apply: boolean): void {
-  pendingObject = undefined
+  // Outside the try: a failing `delete` throws from the walk too, at the same key.
+  // Strips are only recorded for the top-level object, which is `value` itself.
   try {
-    if (apply) {
+    if (passed) {
       for (const key of pendingKeys) {
-        delete target[key]
+        delete (value as Record<string, unknown>)[key]
       }
     }
   } finally {
     pendingKeys.length = 0
   }
+  return passed
 }
 
 export const DECIMAL_RE = /^[+-]?\d+(\.\d+)?$/
@@ -523,27 +515,30 @@ function pendStrips(
   flags: number
 ): number {
   for (const key of Object.keys(value)) {
-    const known = props.get(key)
-    if (known === undefined || isPhantomType(known)) {
+    if (isUnknownKey(props, key)) {
       if ((flags & TOP) === 0) {
         return BAIL
       }
-      pendingObject = value
       pendingKeys.push(key)
     }
   }
   return PASS
 }
 
-/** `true` when `value` has a key the walk treats as unknown (no prop, or a phantom one). */
+/** `true` when `value` has a key the walk treats as unknown. */
 function hasUnknownKey(props: Map<string, TAtscriptAnnotatedType>, value: object): boolean {
   for (const key of Object.keys(value)) {
-    const known = props.get(key)
-    if (known === undefined || isPhantomType(known)) {
+    if (isUnknownKey(props, key)) {
       return true
     }
   }
   return false
+}
+
+/** `true` when the walk treats `key` as unknown (no prop, or a phantom one). */
+function isUnknownKey(props: Map<string, TAtscriptAnnotatedType>, key: string): boolean {
+  const known = props.get(key)
+  return known === undefined || isPhantomType(known)
 }
 
 function fastCheckArray(
@@ -641,7 +636,7 @@ const plans = new WeakMap<TAtscriptAnnotatedType, Plan>()
 class Plan {
   /** Call in which the node structure was last verified (`-1`: must rebuild). */
   stamp = -1
-  /** Call in which the annotation values (`m0`–`m3`) were last verified. */
+  /** Call in which the annotation values (`m0`–`m4`) were last verified. */
   metaStamp = -1
   op = OP_GENERIC
   // snapshot of the node
@@ -804,10 +799,10 @@ function snapshotMeta(plan: Plan): void {
 
 function setMetaKeys(
   plan: Plan,
-  k0: string | undefined,
-  k1: string | undefined,
-  k2: string | undefined,
-  k3: string | undefined,
+  k0?: string,
+  k1?: string,
+  k2?: string,
+  k3?: string,
   k4?: string
 ): void {
   plan.k0 = k0
@@ -843,7 +838,7 @@ function build(plan: Plan): void {
   plan.of = undefined
   plan.ofPlan = undefined
   plan.items = undefined
-  setMetaKeys(plan, undefined, undefined, undefined, undefined)
+  setMetaKeys(plan)
   switch (type.kind) {
     case '': {
       // Same order as fastCheckFinal.
@@ -866,7 +861,7 @@ function build(plan: Plan): void {
         )
         plan.op = OP_NUMBER
       } else if (type.designType === 'boolean') {
-        setMetaKeys(plan, 'meta.required', undefined, undefined, undefined)
+        setMetaKeys(plan, 'meta.required')
         plan.op = OP_BOOLEAN
       } else {
         plan.op = OP_FINAL
@@ -897,13 +892,7 @@ function build(plan: Plan): void {
       break
     }
     case 'array': {
-      setMetaKeys(
-        plan,
-        'expect.minLength',
-        'expect.maxLength',
-        'expect.array.uniqueItems',
-        undefined
-      )
+      setMetaKeys(plan, 'expect.minLength', 'expect.maxLength', 'expect.array.uniqueItems')
       plan.of = type.of
       plan.ofPlan = planFor(type.of)
       plan.op = OP_ARRAY
@@ -1094,6 +1083,8 @@ function checkObject(plan: Plan, value: any, flags: number, opts: TValidatorOpti
     // The walk never strips a failing object; the unknown-key scan can't change the outcome.
     return result
   }
+  // Unlike fastCheckObject, the unknown-key scan deliberately stays after the props even for
+  // 'error' outside unions: `byKey` and the child `op`s are only verified by the loop above.
   const unknownProps = opts.unknownProps
   if (unknownProps === 'error' || unknownProps === 'strip') {
     // Every prop and child plan was verified in the loop above, so `byKey` and `op` are current.
