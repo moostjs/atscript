@@ -1,3 +1,9 @@
+## [0.1.110](https://github.com/moostjs/atscript/compare/v0.1.109...v0.1.110) (2026-10-19)
+
+
+### Features
+
+* **typescript:** opt-in build-time compiled validators ([12f5715](https://github.com/moostjs/atscript/commit/12f571545fe01168880aea7ea9c95fccf924662c))
 ## [0.1.109](https://github.com/moostjs/atscript/compare/v0.1.108...v0.1.109) (2026-10-19)
 
 
