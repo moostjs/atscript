@@ -4,6 +4,7 @@ import { nextTick } from 'vue'
 
 import HomeLayout from './HomeLayout.vue'
 import RoadmapVisual from './RoadmapVisual.vue'
+import ValidatorBenchChart from './ValidatorBenchChart.vue'
 import './style.css'
 
 function colorizeAtscriptAnnotations() {
@@ -27,6 +28,7 @@ export default {
   Layout: HomeLayout,
   enhanceApp({ app }) {
     app.component('RoadmapVisual', RoadmapVisual)
+    app.component('ValidatorBenchChart', ValidatorBenchChart)
     app.mixin({
       mounted() {
         nextTick(colorizeAtscriptAnnotations)
