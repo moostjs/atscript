@@ -53,6 +53,7 @@ module.exports = {
 | -------- | --------- | ------------------- | ------------------------------------------------------------------------------------- |
 | `strict` | `boolean` | `true`              | Fail build on parse/diagnostic errors. `false` = warn-only (useful during refactors). |
 | `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.   |
+| `compileValidators` | `boolean \| 'ssr'` | unset = `atscript.config` decides | Overrides `ts({ compileValidators })` for modules this plugin renders. `true`/`false` = always/never. `'ssr'` = compiled only for Vite's server/SSR build or environment, client stays interpreted (one Vite config for SSR apps, e.g. Moost + Vite). Non-Vite bundlers never report a server build → `'ssr'` = interpreted there; use `true` for their server builds. Rules: [validation.md](validation.md#compiled-validators-opt-in). |
 
 That is the entire surface. Atscript config (primitives, annotations, plugins) lives in `atscript.config.*`, auto-discovered by walking up from the root. The unplugin is a thin bridge between the bundler and the atscript pipeline; per-file `include`/`exclude` is delegated to the bundler's own resolution (only `*.as` is intercepted).
 

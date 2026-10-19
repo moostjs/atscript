@@ -285,5 +285,6 @@ Coercion converts representation only — constraint checks (`@expect.int`, `@ex
 ## Next Steps
 
 - [Validation Guide](/packages/typescript/validation) — the practical application flow
+- [Compiled Validators](/packages/typescript/compiled-validators) — which options keep a validator on the interpreted path
 - [Type Definitions](/packages/typescript/type-definitions) — the runtime type system behind validation
 - [Serialization](/packages/typescript/serialization) — validate deserialized types

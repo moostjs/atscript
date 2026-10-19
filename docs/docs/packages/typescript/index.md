@@ -37,6 +37,7 @@ If you are evaluating Atscript for the first time, read these in order:
 ### 3. Use The Runtime Tools
 
 - [Validation Guide](/packages/typescript/validation) — validate unknown input with type narrowing
+- [Compiled Validators](/packages/typescript/compiled-validators) — opt-in build-time checks that speed up validation on servers
 - [Metadata](/packages/typescript/metadata-export) — read labels, placeholders, and other annotations at runtime
 - [JSON Schema](/packages/typescript/json-schema) — generate JSON Schema from types
 - [Serialization](/packages/typescript/serialization) — serialize types for backend-to-frontend transfer

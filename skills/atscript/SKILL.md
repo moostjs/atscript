@@ -6,6 +6,7 @@ description: >-
   syntax, `@meta.*` / `@expect.*` / custom annotations, primitives, the `asc`
   CLI + `atscript.config.*`, generated `.as.d.ts` / `.as.js` / `atscript.d.ts`,
   runtime helpers (`Validator`, `coerceForType`, JSON Schema, serialize),
+  compiled validators (`compileValidators`, `invalidateCompiledValidators`),
   `unplugin-atscript`, `@atscript/moost-validator` (validation + coercion
   pipes), VSCode LSP, and plugin authoring. Out of scope:
   `@db.*` annotations, schema sync, DB adapters → use the atscript-db skill;
@@ -63,6 +64,7 @@ import {
   buildJsonSchema, fromJsonSchema, mergeJsonSchemas, detectDiscriminator,
   serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION,
   isAnnotatedType, isAnnotatedTypeOfPrimitive,
+  invalidateCompiledValidators,    // after raw writes to a type tree (compileValidators on)
 } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescript/utils'
 
@@ -118,8 +120,8 @@ npx skills add moostjs/atscript-ui   # UI layer
 | `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, `--skipDiag`, scripts, "Nothing emitted" / errors block the emit, atomic writes, `db sync` flags (`--check`, `--format`), complete-inventory rule ("Could not load N compiled model module(s)", `ERR_MODULE_NOT_FOUND`, nested `.as` imports) + pointer |
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType`, `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth    |
-| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, `coerceForType`, JSON Schema helpers, plugins               |
-| Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, `root` (config discovered from the wrong cwd, `pnpm -C`, unknown `@db.*`/`@ui.*` annotations), `optimizeDeps` prebundling of `@atscript/typescript/utils` ("optimized dependencies changed. reloading"), stale `.as` import after moving/retyping a model (dev server keeps the old field type, "requires string" on reload while `asc`/`tsc` pass, `watchChange` cache invalidation), dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
+| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, `coerceForType`, JSON Schema helpers, plugins, compiled validators (`compileValidators`, which options/types stay interpreted, `invalidateCompiledValidators` after raw type mutations) |
+| Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, `root`, `compileValidators` override (`ssr` = compile the Vite server build only) (config discovered from the wrong cwd, `pnpm -C`, unknown `@db.*`/`@ui.*` annotations), `optimizeDeps` prebundling of `@atscript/typescript/utils` ("optimized dependencies changed. reloading"), stale `.as` import after moving/retyping a model (dev server keeps the old field type, "requires string" on reload while `asc`/`tsc` pass, `watchChange` cache invalidation), dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
 | Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform                            |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |
 | Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd                                        |

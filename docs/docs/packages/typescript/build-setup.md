@@ -128,10 +128,12 @@ The plugin takes the same options on every bundler entry:
 | -------- | --------- | ------------------- | -------------------------------------------------------------------------------------- |
 | `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
 | `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
+| `compileValidators` | `boolean \| 'ssr'` | from `atscript.config` | Overrides [`compileValidators`](/packages/typescript/configuration#compilevalidators) for the modules this plugin compiles. `'ssr'` compiles only Vite's server (SSR) build. See [Compiled Validators](/packages/typescript/compiled-validators#per-build-override-in-unplugin-atscript). |
 
 ```javascript
 atscript({ strict: false }) // warn-only — useful mid-refactor or in CI pre-flight
 atscript({ root: __dirname }) // non-Vite bundler started from another directory
+atscript({ compileValidators: 'ssr' }) // Vite SSR app: compiled checks on the server only
 ```
 
 Vite fills `root` in itself (from `configResolved`), so you only need it on the other bundlers — and only when the working directory is not the project root. A wrong root means the config is never found: plugin-provided annotations (`@db.*`, `@ui.*`, …) then show up as "Unknown annotation" errors.

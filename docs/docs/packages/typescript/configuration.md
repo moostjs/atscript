@@ -127,6 +127,22 @@ plugins: [ts({ moduleExtension: '.as.mjs' })]
 
 `asc db sync` compiles with `'.as.mjs'` so the models it loads resolve directly in Node.
 
+### `compileValidators`
+
+Emits a build-time compiled validator check for each type into the generated `.js`. `validate()` uses it automatically, and results stay the same as without it.
+
+| Value               | Generated `.js`                                         |
+| ------------------- | ------------------------------------------------------- |
+| `false` _(default)_ | Validation is interpreted at runtime                    |
+| `true`              | Adds a compiled check per type: faster validation of valid input, more code per module |
+
+```javascript
+// Backend build: faster request validation
+plugins: [ts({ compileValidators: true })]
+```
+
+Keep it off for frontend bundles. `unplugin-atscript` can override it per build, for example to compile only the SSR build of a Vite app. See [Compiled Validators](/packages/typescript/compiled-validators) for when checks stay interpreted and how to change types at runtime safely.
+
 ## The `atscript.d.ts` File
 
 When you run `asc -f dts`, an `atscript.d.ts` file is generated alongside your output. It declares the global `AtscriptMetadata` interface and `AtscriptPrimitiveTags` type — these provide TypeScript IntelliSense for all annotations and semantic type tags used in your project.

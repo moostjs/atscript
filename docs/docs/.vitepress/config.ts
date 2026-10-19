@@ -356,6 +356,7 @@ export default defineConfig({
             { text: 'Primitives', link: '/packages/typescript/primitives' },
             { text: 'Annotations Guide', link: '/packages/typescript/annotations' },
             { text: 'Validation Guide', link: '/packages/typescript/validation' },
+            { text: 'Compiled Validators', link: '/packages/typescript/compiled-validators' },
             { text: 'Metadata', link: '/packages/typescript/metadata-export' },
             { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
             { text: 'Serialization', link: '/packages/typescript/serialization' },

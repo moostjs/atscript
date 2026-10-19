@@ -154,6 +154,7 @@ For array uniqueness and other less common rules, see the [Validation Reference]
 - **DON'T forget that `'strip'` mutates your input.** It deletes the extra fields from the object you passed in — clone the payload first if you still need the original.
 - **DO create the validator once and reuse it in hot paths.** `.validator()` builds a fresh instance on every call. Reuse is safe: each `validate()` call resets `validator.errors` before running.
 - **DO raise `errorLimit` when a form needs every message.** Validation stops collecting after 10 errors by default, so long forms may show an incomplete error list.
+- **DO consider [compiled validators](/packages/typescript/compiled-validators) for server builds.** They are opt-in and make validating valid input faster without changing results.
 
 ## When To Read The Reference
 
@@ -169,5 +170,6 @@ Use the reference page when you need:
 ## Next Steps
 
 - [Validation Reference](/packages/typescript/validation-reference) — options, plugins, and lower-level API details
+- [Compiled Validators](/packages/typescript/compiled-validators) — opt-in build-time checks for faster validation
 - [Annotations Guide](/packages/typescript/annotations) — keep validation rules on the model
 - [Type Definitions](/packages/typescript/type-definitions) — understand the runtime type system behind the validator

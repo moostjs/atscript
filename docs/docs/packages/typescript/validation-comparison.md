@@ -433,7 +433,7 @@ Passthrough mode, the only mode where every engine runs, median ops/s (higher is
 - **Invalid input with a full error report**: Atscript is 2.2–2.8x faster than Zod (both `safeParse()` and `z.compile()`, which does not speed up the error path), about 6–11x faster than compiled TypeBox and ArkType, and far ahead of Joi, class-validator and Yup.
 - Atscript validates in place and returns a boolean plus an error list; `safeParse()`-style APIs build a new output object.
 
-Atscript has no ahead-of-time compile mode yet; one is planned, and the compiled rows show what that kind of validator can reach on valid input.
+These numbers are for the interpreted validator. Atscript now has opt-in [compiled validators](/packages/typescript/compiled-validators) (`ts({ compileValidators: true })`), which are roughly 8–10× faster on valid input on this benchmark and unchanged on invalid input. Refreshed numbers that include them are pending.
 
 These numbers are an indicative estimate from a single round on a laptop (Apple M4 MacBook Air, Node.js 24.22, Atscript 0.1.109, Zod 4.6.7, Valibot 1.5.0, Yup 1.7.1, Joi 18.3.0, Ajv 8.20.0, ArkType 2.2.8, class-validator 0.15.1, TypeBox 1.4.2). The full results, including the strip and strict tables and ns/op, are in [RESULTS.md](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/RESULTS.md).
 

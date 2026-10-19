@@ -36,6 +36,22 @@ All optional — pass any subset to `.validator(opts)`:
 | `skipList`     | `Set<string>` of property paths                                                        | Skip those paths entirely                                                              |
 | `plugins`      | `TValidatorPlugin[]`                                                                   | Custom checks (see below)                                                              |
 
+## Compiled validators (opt-in)
+
+`ts({ compileValidators: true })` in `atscript.config` → `asc -f js` / unplugin emit a compiled boolean check per type into `.as.js`; `validate()` uses it with no code changes.
+
+| #   | Rule                                                                                                                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Off by default. Turn on for backend/server builds; keep frontend bundles interpreted (each compiled type adds code). CSP-safe (no `eval` / `new Function`).                                                                                                 |
+| 2   | Results, error messages/paths, `errorLimit` and `'strip'` deletions are identical to interpreted. Compiled check = fast path for valid input only; invalid input runs the normal error-collecting walk (no error-path speed-up).                          |
+| 3   | Always interpreted (validator): `plugins`, `replace`, `skipList`, function `partial`, any `Validator` subclass. Supported: `partial: true` / `'deep'`, `unknownProps: 'error'` / `'ignore'` / `'strip'`.                                                  |
+| 4   | Always interpreted (type): deserialized (`deserializeAnnotatedType`, e.g. metadata shipped to a frontend), `fromJsonSchema()`, flattened, hand-built `defineAnnotatedType()` types. Two copies of `@atscript/typescript` in the app → interpreted.          |
+| 5   | Walked even when compiled (correct, not accelerated): pattern properties, `@expect.array.uniqueItems` arrays, `@expect.pattern` with `g`/`y` flag, nested unknown keys under `'strip'` (whole call falls back).                                           |
+| 6   | Tracked mutations (auto re-bind): `annotate()`, `metadata` / `props` Map `set`/`delete`/`clear`, `defineAnnotatedType()` handle methods, `cloneRefProp()`.                                                                                                |
+| 7   | Untracked → call `invalidateCompiledValidators()` (from `@atscript/typescript/utils` or `@atscript/typescript`): raw writes (`node.optional = …`, `node.type = …`, `node.metadata = …`, `type.items.push(…)`), in-place edits of a constraint object or `@expect.pattern` array. Skipping it = check keeps validating the old shape/values. |
+| 8   | Any mutation of a bound type makes every compiled check re-bind once on next use — mutate at startup, never per request.                                                                                                                                  |
+| 9   | Per-build override: unplugin `compileValidators: boolean \| 'ssr'` — see [unplugin.md](unplugin.md#options).                                                                                                                                             |
+
 ## Non-finite numbers (since 0.1.100)
 
 Every `number` (plain, optional, `number.int`, `number.timestamp`, union branch, array/tuple item) must be finite: `NaN` / `Infinity` / `-Infinity` fail with `Expected finite number, got NaN` before `@expect.min`/`max`/`int` run. `0`, `-0`, fractions stay valid. Not overridable by annotation. Escape hatch: a `TValidatorPlugin` returning `true` (plugins run before the type check). Upgrade: stored `Infinity` sentinels now fail write validation — use `null`, a bound, or a plugin.

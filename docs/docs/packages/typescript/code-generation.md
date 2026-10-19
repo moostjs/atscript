@@ -62,7 +62,7 @@ For types (not interfaces), a companion `namespace` carries the same `__is_atscr
 
 Generates JavaScript files with full runtime metadata. Use this when you need validation, metadata access, or serialization.
 
-The generated `.js` registers the type tree at module load via internal builder calls — you should not need to read or hand-write it. The `.d.ts` is the consumer-facing surface; the `.js` exists to make the static members on each generated class actually work at runtime. Set [`jsonSchema`](/packages/typescript/configuration#jsonschema) and [`exampleData`](/packages/typescript/configuration#exampledata) in plugin options to control what runtime helpers get pulled in.
+The generated `.js` registers the type tree at module load via internal builder calls — you should not need to read or hand-write it. The `.d.ts` is the consumer-facing surface; the `.js` exists to make the static members on each generated class actually work at runtime. Set [`jsonSchema`](/packages/typescript/configuration#jsonschema) and [`exampleData`](/packages/typescript/configuration#exampledata) in plugin options to control what runtime helpers get pulled in, and [`compileValidators`](/packages/typescript/configuration#compilevalidators) to add build-time validator checks.
 
 ## When to Use Which
 
