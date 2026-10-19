@@ -275,3 +275,8 @@ function buildImportStatement(fullImport: string, insideBraces: string, newIdent
 function escapeReg(str: string): string {
   return str.replace(/[$()*+.?[\\\]^{|}]/gu, '\\$&')
 }
+
+/** The text of the line holding `offset`, from the line start up to `offset`. */
+export function lineTextBefore(text: string, offset: number): string {
+  return text.slice(text.lastIndexOf('\n', offset - 1) + 1, offset)
+}

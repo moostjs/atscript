@@ -1,5 +1,4 @@
 import type { TLexicalToken } from '../../tokenizer/types'
-import type { NodeIterator } from '../iterator'
 import type { TNodeEntity } from '../nodes'
 import { $n } from '../nodes'
 import { SemanticArrayNode } from '../nodes/array-node'
@@ -141,17 +140,9 @@ const importPipe = $pipe('import', [
     .respectPriority(),
 ]).skip('\n', ';')
 
-const skipComments = {
-  handler(ni: NodeIterator) {
-    ni.skip()
-    return true
-  },
-}
-
 const annotateEntry = $pipe('ref', [
   annotations(),
   refWithChain(),
-  skipComments,
   pun(';', ',', '\n').orEob().lookBehind(),
 ]).skip('\n', ';', ',') as TPipe
 

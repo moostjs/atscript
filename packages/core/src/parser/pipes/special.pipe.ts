@@ -137,7 +137,8 @@ export function annotations() {
           ni.accepted()
           ni.move()
         }
-        while (ni.satisfies(...opts.argument)) {
+        // `ni.$` guard: an annotation at end of input must not read past the last token
+        while (ni.$ && ni.satisfies(...opts.argument)) {
           let argToken = new Token(ni.$)
           // Backtick arguments are parsed later, in `AtscriptDoc.registerAnnotation`,
           // once the argument spec (query / expr / order) is known.

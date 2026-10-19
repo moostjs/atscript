@@ -50,6 +50,7 @@ import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
 import { tokenize } from './tokenizer'
+import type { TCommentSpan } from './tokenizer'
 import type { TLexicalToken } from './tokenizer/types'
 
 export interface TAtscriptDocConfig {
@@ -204,10 +205,31 @@ export class AtscriptDoc {
     return this._text
   }
 
+  /** Comment spans of `text`, in source order. */
+  private commentSpans: TCommentSpan[] = []
+
+  /** Whether `offset` into `text` falls inside a comment (e.g. a cursor in `// …`). */
+  isInComment(offset: number): boolean {
+    // binary search for the last comment starting before `offset`
+    let lo = 0
+    let hi = this.commentSpans.length
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (this.commentSpans[mid].start < offset) {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    const span = this.commentSpans[lo - 1]
+    return span !== undefined && offset < span.end
+  }
+
   update(text: string, debug = false) {
     this._text = text
     this.cleanup()
-    const rawTokens = tokenize(text, debug)
+    this.commentSpans = []
+    const rawTokens = tokenize(text, debug, this.commentSpans)
     const ni = new NodeIterator(rawTokens, []).move()
     this.nodes = runPipes(
       [pipes.importPipe, pipes.type, pipes.interfaceType, pipes.annotatePipe],

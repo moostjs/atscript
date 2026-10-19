@@ -64,7 +64,13 @@ import {
 } from 'vscode-languageserver/node'
 import type { Range, SemanticTokens } from 'vscode-languageserver/node'
 
-import { addImport, charBefore, createInsertTextRule, getItnFileCompletions } from './utils'
+import {
+  addImport,
+  charBefore,
+  createInsertTextRule,
+  getItnFileCompletions,
+  lineTextBefore,
+} from './utils'
 
 const CHECKS_DELAY = 100
 
@@ -228,6 +234,10 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       const text = document.getText()
       const offset = document.offsetAt(position)
       const [atscript] = await Promise.all([this.openDocument(textDocument.uri), this.currentCheck])
+      // nothing to complete inside a comment (e.g. one trailing an annotation)
+      if (atscript.isInComment(offset)) {
+        return
+      }
 
       const block = atscript.blocksIndex.at(position.line, position.character)
 
@@ -407,8 +417,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (block?.blockType === 'structure' && before !== '.') {
         const owner = block.parentNode?.ownerNode
         if (owner && isInterface(owner) && owner.hasExtends) {
-          const lineStartOffset = document.offsetAt({ line: position.line, character: 0 })
-          const lineText = text.slice(lineStartOffset, offset)
+          const lineText = lineTextBefore(text, offset)
           if (/^\s*\w*$/u.test(lineText)) {
             const merged = atscript.resolveInterfaceExtends(owner)
             const allProps =
@@ -428,8 +437,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
       // top-level keyword completions (not in any block)
       if (block?.blockType === undefined) {
-        const lineStartOffset = document.offsetAt({ line: position.line, character: 0 })
-        const lineText = text.slice(lineStartOffset, offset)
+        const lineText = lineTextBefore(text, offset)
 
         // After "interface Name extends" or "interface Name extends A," → suggest type names
         if (
@@ -809,9 +817,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     const text = document.getText()
     const offset = document.offsetAt(position)
 
-    // Get the text from the start of the line up to the cursor
-    const lineStartOffset = text.lastIndexOf('\n', offset - 1) + 1
-    const lineText = text.slice(lineStartOffset, offset)
+    const lineText = lineTextBefore(text, offset)
 
     // Check if the line starts with an annotation (e.g., @label)
     const annotationMatch = /^\s*@([.0-9A-Za-z]*)/u.exec(lineText)
@@ -819,6 +825,10 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       return
     }
     const atscript = existingDoc ?? (await this.openDocument(document.uri))
+    // a cursor in a comment trailing the annotation is not in an argument
+    if (atscript.isInComment(offset)) {
+      return
+    }
     const annotationToken = atscript.tokensIndex.at(position.line, lineText.indexOf('@') + 1)
     if (!annotationToken?.parentNode) {
       return

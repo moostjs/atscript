@@ -181,6 +181,7 @@
           },
           "end": "(?=$|\\n|\\r|;)",
           "patterns": [
+            { "include": "#comments" },
             {
               "name": "constant.numeric.atscript",
               "match": "\\b\\d+(\\.\\d+)?\\b"

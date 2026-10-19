@@ -76,10 +76,7 @@ export class NodeIterator {
   }
 
   skip(pun?: string[]) {
-    while (
-      this.$?.type === 'comment' ||
-      (this.$?.type === 'punctuation' && pun?.length && pun.includes(this.$.text))
-    ) {
+    while (this.$?.type === 'punctuation' && pun?.includes(this.$.text)) {
       this.move()
     }
     return this

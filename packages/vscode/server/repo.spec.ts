@@ -1889,3 +1889,96 @@ interface Customer {
     })
   })
 })
+
+describe('trailing comments after annotations', () => {
+  const uri = 'file:///test.as'
+  const source = [
+    'interface User {',
+    '  @meta.label "Name" // shown in forms',
+    '  name: string',
+    '  @expect.pattern "^//", /* flags */ ',
+    '  url: string',
+    '  @expect.min 5 /* lower bound */',
+    '  age: number',
+    '}',
+  ].join('\n')
+
+  it('parses without diagnostics errors', async () => {
+    const { repo, connection, doc } = singleDocRepo(uri, source)
+    await repo.checkDoc(doc)
+    const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+    expect(diagnostics.filter((d: any) => d.severity === 1)).toEqual([])
+  })
+
+  it('hovers the annotation name and argument on a commented line', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    const onName = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 1, character: 3 },
+    })
+    expect(onName.contents.value).toContain('label')
+    const onArg = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 5, character: 14 },
+    })
+    expect(onArg.contents.kind).toBe('markdown')
+  })
+
+  it('completes argument values before a trailing comment', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    // after `"^//", ` (char 24) — the second (flags) argument
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 3, character: 24 },
+    })
+    expect(result.map((i: any) => i.label)).toEqual(["'g'", "'i'", "'gi'"])
+  })
+
+  it('gives signature help before the comment and none inside it', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    const before = await handlers.onSignatureHelp!({
+      textDocument: { uri },
+      position: { line: 5, character: 14 },
+    })
+    expect(before.signatures[0].label).toContain('minValue')
+    const inside = await handlers.onSignatureHelp!({
+      textDocument: { uri },
+      position: { line: 5, character: 24 },
+    })
+    expect(inside).toBeUndefined()
+    const insideLine = await handlers.onSignatureHelp!({
+      textDocument: { uri },
+      position: { line: 1, character: 30 },
+    })
+    expect(insideLine).toBeUndefined()
+  })
+
+  it('offers no completions inside a trailing comment', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    for (const position of [
+      { line: 1, character: 30 },
+      { line: 3, character: 30 },
+      { line: 5, character: 24 },
+    ]) {
+      const result = await handlers.onCompletion!({ textDocument: { uri }, position })
+      expect(result ?? []).toEqual([])
+    }
+  })
+
+  it('treats lines inside a block comment opened on an earlier line as comment', async () => {
+    const src = [
+      'interface User {',
+      '  /* disabled:',
+      '  @expect.pattern "^//", ',
+      '  */',
+      '  url: string',
+      '}',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, src)
+    const position = { line: 2, character: 24 }
+    const completion = await handlers.onCompletion!({ textDocument: { uri }, position })
+    expect(completion ?? []).toEqual([])
+    const signature = await handlers.onSignatureHelp!({ textDocument: { uri }, position })
+    expect(signature).toBeUndefined()
+  })
+})
