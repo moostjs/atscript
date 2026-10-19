@@ -1175,3 +1175,478 @@ describe('Validator literal-union shortcut', () => {
     expect(spy).toHaveBeenCalledTimes(1)
   })
 })
+
+// The pre-check handles unknown keys itself: 'strip' records the walk's deletions and
+// performs them on a pass, 'error' fails early outside unions.
+describe('Validator fast path — unknown props (strip / error)', { timeout: 30_000 }, () => {
+  const MODES: Array<Partial<TValidatorOptions>> = [
+    { unknownProps: 'strip' },
+    { unknownProps: 'error' },
+    { unknownProps: 'ignore' },
+    { unknownProps: 'strip', partial: 'deep' },
+    { unknownProps: 'strip', errorLimit: 1 },
+    { unknownProps: 'error', errorLimit: 2 },
+  ]
+
+  function makeModel() {
+    const nul = prim('null').$type
+    const geo = obj({ lat: num().$type, lng: num().$type }).$type
+    const field = obj({ key: str({ 'expect.minLength': 1 }).$type, value: str().$type }).$type
+    const address = obj({
+      street: str({ 'expect.minLength': 1 }).$type,
+      zip: str({ 'expect.pattern': { pattern: '^\\d{5}$' } }).$type,
+      geo: $().refTo(geo).optional().$type,
+      hidden: prim('phantom').$type,
+    }).$type
+    const item = obj({
+      sku: str({ 'expect.minLength': 2 }).$type,
+      qty: num({ 'expect.int': true, 'expect.min': 1 }).$type,
+      meta: obj({ color: str().optional().$type, fields: arr(field).$type }).optional().$type,
+    }).$type
+    const card = obj({
+      kind: lit('card').$type,
+      number: str({ 'expect.pattern': { pattern: '^\\d{16}$' } }).$type,
+      holder: obj({ name: str({ 'expect.minLength': 1 }).$type }).$type,
+    }).$type
+    const paypal = obj({
+      kind: lit('paypal').$type,
+      email: str().$type,
+      extra: obj({ note: str().optional().$type }).optional().$type,
+    }).$type
+    return obj({
+      id: str().$type,
+      address,
+      billing: $().refTo(address).optional().$type,
+      items: arr(item).$type,
+      pay: union(card, paypal).$type,
+      payments: arr(union(card, paypal, nul).$type).$type,
+      where: union(geo, nul).$type,
+      both: $('intersection')
+        .item(obj({ a: num().$type }).$type)
+        .item(obj({ b: str().optional().$type }).$type).$type,
+      pair: $('tuple').item(geo).item(field).$type,
+      grid: arr(arr(field).$type).$type,
+      tree: makeTree(),
+    }).$type
+  }
+  const valid = (): any => ({
+    id: 'x',
+    address: { street: 'Main', zip: '12345', geo: { lat: 1, lng: 2 } },
+    billing: { street: 'Oak', zip: '54321' },
+    items: [
+      { sku: 'ab', qty: 1, meta: { color: 'red', fields: [{ key: 'k', value: 'v' }] } },
+      { sku: 'cd', qty: 2 },
+    ],
+    pay: { kind: 'card', number: '1234567890123456', holder: { name: 'J' } },
+    payments: [{ kind: 'paypal', email: 'e', extra: { note: 'n' } }, null],
+    where: { lat: 3, lng: 4 },
+    both: { a: 1 },
+    pair: [
+      { lat: 5, lng: 6 },
+      { key: 'p', value: 'q' },
+    ],
+    grid: [[{ key: 'g', value: 'h' }], []],
+    tree: { name: 'r', children: [{ name: 'c' }] },
+  })
+
+  /** Every plain object inside `value` (depth-first, including `value`). */
+  function objects(value: unknown, out: Array<Record<string, unknown>> = []) {
+    if (typeof value === 'object' && value !== null) {
+      if (!Array.isArray(value)) {
+        out.push(value as Record<string, unknown>)
+      }
+      for (const v of Object.values(value)) {
+        objects(v, out)
+      }
+    }
+    return out
+  }
+
+  /** Adds unknown keys (incl. the phantom prop's name) to random objects at any depth. */
+  function sprinkle(value: unknown, r: () => number) {
+    for (const o of objects(value)) {
+      if (r() < 0.35) {
+        const key = r() < 0.15 ? 'hidden' : `x${Math.floor(r() * 3)}`
+        o[key] = r() < 0.7 ? 1 : { nested: true }
+      }
+    }
+    return value
+  }
+
+  /** Makes two places share one object (the walk then sees one visit's strips in the other). */
+  function alias(value: any, r: () => number) {
+    const all = paths(value).filter(p => {
+      let node = value
+      for (const k of p) {
+        node = node[k]
+      }
+      return typeof node === 'object' && node !== null && !Array.isArray(node)
+    })
+    if (all.length < 2) {
+      return value
+    }
+    const from = all[Math.floor(r() * all.length)]
+    const to = all[Math.floor(r() * all.length)]
+    let src = value
+    for (const k of from) {
+      src = src[k]
+    }
+    let dst = value
+    for (const k of to.slice(0, -1)) {
+      dst = dst[k]
+    }
+    if (!objects(src).includes(dst)) {
+      dst[to.at(-1)!] = src
+    }
+    return value
+  }
+
+  const stats = { fastStrips: 0, walks: 0 }
+
+  /** {@link compare}, also counting passes the pre-check alone decided with strips. */
+  function compareCounting(
+    def: TAtscriptAnnotatedType,
+    opts: Partial<TValidatorOptions>,
+    value: unknown
+  ) {
+    const fast = new Validator(def, opts)
+    const walk = new WalkValidator(def, opts)
+    const spy = vi.spyOn(fast as any, 'validateSafe')
+    const a = structuredClone(value)
+    const b = structuredClone(value)
+    const r1 = run(fast, a)
+    const r2 = run(walk, b)
+    expect(r1).toBe(r2)
+    expect(fast.errors).toEqual(walk.errors)
+    expect(a).toEqual(b)
+    if (spy.mock.calls.length > 0) {
+      stats.walks++
+    } else if (opts.unknownProps === 'strip' && JSON.stringify(a) !== JSON.stringify(value)) {
+      stats.fastStrips++
+    }
+    return r1
+  }
+
+  it('randomized: unknown keys at every depth, mixed with failures and aliasing', () => {
+    const Model = makeModel()
+    const r = rng(11)
+    let passed = 0
+    let failed = 0
+    for (let i = 0; i < 600; i++) {
+      const pick = r()
+      let value: any = pick < 0.25 ? genFromType(Model, r) : valid()
+      sprinkle(value, r)
+      if (pick >= 0.25 && pick < 0.55) {
+        value = mutate(value, r)
+      }
+      if (r() < 0.15) {
+        alias(value, r)
+      }
+      for (const opts of MODES) {
+        if (compareCounting(Model, opts, value) === true) {
+          passed++
+        } else {
+          failed++
+        }
+      }
+    }
+    expect(passed).toBeGreaterThan(300)
+    expect(failed).toBeGreaterThan(300)
+    // the pre-check really decides strip passes with (top-level) unknown keys (no walk)
+    expect(stats.fastStrips).toBeGreaterThan(0)
+  })
+
+  it('systematic: one unknown key on each object of a valid value', () => {
+    const Model = makeModel()
+    const base = valid()
+    const count = objects(base).length
+    for (let n = 0; n < count; n++) {
+      for (const extra of [1, { nested: 1 }]) {
+        const value = valid()
+        objects(value)[n].junk = extra
+        for (const opts of MODES) {
+          compare(Model, opts, value)
+        }
+        // plus a failure elsewhere: nothing may be stripped
+        const bad = structuredClone(value)
+        bad.id = 1
+        for (const opts of MODES) {
+          compare(Model, opts, bad)
+        }
+      }
+    }
+  })
+
+  it('strip passes without the walk when only the top-level object has unknown keys', () => {
+    const t = obj({
+      id: str().$type,
+      hidden: prim('phantom').$type,
+      items: arr(obj({ x: num().$type }).$type).$type,
+    }).$type
+    const v = new Validator(t, { unknownProps: 'strip' })
+    const spy = vi.spyOn(v as any, 'validateSafe')
+    const value: any = { extra: 1, id: 'a', hidden: { x: 1 }, items: [{ x: 1 }], more: 2 }
+    const reference = structuredClone(value)
+    expect(v.validate(value)).toBe(true)
+    expect(spy).not.toHaveBeenCalled()
+    expect(new WalkValidator(t, { unknownProps: 'strip' }).validate(reference)).toBe(true)
+    expect(value).toEqual(reference)
+    expect(Object.keys(value)).toEqual(['id', 'items'])
+  })
+
+  it('nested unknown keys are stripped by the walk', () => {
+    const v = new Validator(makeModel(), { unknownProps: 'strip' })
+    const spy = vi.spyOn(v as any, 'validateSafe')
+    const value = valid()
+    value.extra = 1
+    value.address.geo.alt = 3
+    value.items[0].meta.fields[0].note = 'n'
+    value.pay.holder.title = 'Dr'
+    value.tree.children[0].y = 1
+    const reference = structuredClone(value)
+    expect(v.validate(value)).toBe(true)
+    expect(spy).toHaveBeenCalled()
+    expect(new WalkValidator(makeModel(), { unknownProps: 'strip' }).validate(reference)).toBe(true)
+    expect(value).toEqual(reference)
+    // (the intersection's second member strips the first member's `a`, as the walk does)
+    expect(value).toEqual({ ...valid(), both: {} })
+  })
+
+  // A deferred nested strip would be observable by later reads that reach the stripped
+  // object without being it: a prototype, a proxy, an accessor.
+  it('later reads through a prototype / proxy / accessor see the walk’s nested strips', () => {
+    const named = obj({ name: str().$type }).$type
+    const cases: Array<[TAtscriptAnnotatedType, () => any]> = [
+      // `x` inherits `extra` from the stripped `a`
+      [
+        obj({ a: named, x: obj({ extra: str().$type }).$type }).$type,
+        () => {
+          const a = { name: 'a', extra: 'e' }
+          return { a, x: Object.create(a) }
+        },
+      ],
+      // the root inherits `b` from `a`, stripped while visiting the root's first prop
+      [
+        obj({ a: obj({ x: str().$type }).$type, b: str().$type }).$type,
+        () => {
+          const p: any = { x: '1', b: 'hi' }
+          const v = Object.create(p)
+          v.a = p
+          return v
+        },
+      ],
+      // a trap-free proxy of the stripped object
+      [
+        obj({ a: named, x: obj({ name: str().$type, extra: str().$type }).$type }).$type,
+        () => {
+          const a = { name: 'a', extra: 'e' }
+          return { a, x: new Proxy(a, {}) }
+        },
+      ],
+      // a pure accessor reading the stripped key
+      [
+        obj({ a: named, x: str().$type }).$type,
+        () => {
+          const v: any = { a: { name: 'a', extra: 'e' } }
+          Object.defineProperty(v, 'x', { enumerable: false, get: () => v.a.extra })
+          return v
+        },
+      ],
+      // the stripped object is the last array item, read again through a proxy later
+      [
+        obj({ list: arr(named).$type, x: obj({ name: str().$type, extra: str().$type }).$type })
+          .$type,
+        () => {
+          const a = { name: 'a', extra: 'e' }
+          return { list: [{ name: 'b' }, a], x: new Proxy(a, {}) }
+        },
+      ],
+    ]
+    for (const [t, make] of cases) {
+      const a = make()
+      const b = make()
+      const r1 = run(new Validator(t, { unknownProps: 'strip' }), a)
+      const r2 = run(new WalkValidator(t, { unknownProps: 'strip' }), b)
+      expect(r1).toBe(r2)
+      expect(r1).toBe(false)
+      expect({ ...a }).toEqual({ ...b })
+    }
+  })
+
+  it('a top-level intersection / union strips the root like the walk', () => {
+    const inter = $('intersection')
+      .item(obj({ a: num().$type }).$type)
+      .item(union(obj({ a: num().optional().$type }).$type, prim('any').$type).$type)
+      .item(prim('any').$type).$type
+    const un = union(
+      obj({ k: lit(1).$type, a: num().$type }).$type,
+      $('intersection')
+        .item(obj({ k: lit(2).$type }).$type)
+        .item(prim('string').$type).$type,
+      prim('any').$type
+    ).$type
+    for (const t of [inter, un]) {
+      for (const value of [
+        { a: 1 },
+        { a: 1, z: 2 },
+        { k: 1, a: 1, z: 1 },
+        { k: 2, a: 1 },
+        { k: 2, z: 1 },
+      ]) {
+        for (const opts of MODES) {
+          compare(t, opts, value)
+        }
+      }
+    }
+  })
+
+  it('a failing value is left untouched for the walk (which strips passing nested objects)', () => {
+    const t = obj({ a: obj({ x: num().$type }).$type, b: num().$type }).$type
+    const fast = new Validator(t, { unknownProps: 'strip' })
+    const value: any = { a: { x: 1, junk: 1 }, b: 'no', junk: 2 }
+    expect(fast.validate(value, true)).toBe(false)
+    // the walk strips `a` (it passed), not the failing root
+    expect(value).toEqual({ a: { x: 1 }, b: 'no', junk: 2 })
+  })
+
+  it('aliased objects, intersections and cycles see the walk’s earlier strips', () => {
+    const inner = obj({ x: num().$type }).$type
+    const wider = obj({ x: num().$type, y: num().$type }).$type
+    const shared: any = { x: 1, y: 2 }
+    // stripped as `inner` first, then read as `wider` (y is gone in the walk)
+    compare(obj({ a: inner, b: wider }).$type, { unknownProps: 'strip' }, { a: shared, b: shared })
+    compare(obj({ b: wider, a: inner }).$type, { unknownProps: 'strip' }, { b: shared, a: shared })
+    // same object twice in an array
+    compare(arr(inner).$type, { unknownProps: 'strip' }, [shared, shared])
+    // intersection members visit one object in turn
+    const inter = $('intersection')
+      .item(obj({ a: num().$type }).$type)
+      .item(obj({ b: str().optional().$type }).$type).$type
+    for (const value of [{ a: 1, b: 'x' }, { a: 1, b: 2 }, { a: 1 }, { a: 1, c: 1 }]) {
+      for (const opts of MODES) {
+        compare(inter, opts, value)
+      }
+    }
+    // a nested visit of the same object strips keys its outer visit still reads
+    const cyc = obj({ a: inner, b: str().$type }).$type
+    const loop: any = { b: 's', x: 1 }
+    loop.a = loop
+    for (const opts of MODES) {
+      compare(cyc, opts, loop)
+    }
+  })
+
+  it('a rejected union branch keeps its nested strips for the next branches', () => {
+    const t = union(
+      obj({ n: obj({ x: num().$type }).$type, k: lit(1).$type }).$type,
+      obj({ n: obj({ x: num().$type, y: num().$type }).$type, k: lit(2).$type }).$type,
+      obj({ n: obj({ x: num().$type, y: num().optional().$type }).$type, k: lit(2).$type }).$type
+    ).$type
+    for (const value of [
+      { n: { x: 1, y: 2 }, k: 2 },
+      { n: { x: 1, y: 2 }, k: 1 },
+      { n: { x: 1, y: 2, z: 3 }, k: 2, w: 1 },
+      { n: { x: 1 }, k: 2 },
+    ]) {
+      for (const opts of MODES) {
+        compare(t, opts, value)
+      }
+    }
+  })
+
+  it('with errorLimit, a rejected branch may stop before nested objects it would strip', () => {
+    // branch 1 fails on `k` first: with errorLimit 1 the walk never reaches (nor strips) `n`
+    const t = union(
+      obj({ k: lit(1).$type, n: obj({ x: num().$type }).$type }).$type,
+      obj({ k: lit(2).$type, n: prim('any').$type }).$type
+    ).$type
+    for (const errorLimit of [1, 10]) {
+      compare(t, { unknownProps: 'strip', errorLimit }, { k: 2, n: { x: 1, junk: 1 } })
+    }
+  })
+
+  it('an unknown key in a union branch does not skip a later throwing prop', () => {
+    const t = union(
+      obj({ a: str().$type, b: str({ 'expect.pattern': { pattern: '(' } }).$type }).$type,
+      obj({ a: str().$type, b: str().$type, junk: num().$type }).$type
+    ).$type
+    const value = { a: 'x', b: 'y', junk: 1 }
+    expect(() => new WalkValidator(t).validate(value, true)).toThrow()
+    expect(() => new Validator(t).validate(value, true)).toThrow()
+  })
+
+  it('many pending strips (hashed lookup) still detect a revisited object', () => {
+    const t = obj({
+      list: arr(obj({ x: num().$type }).$type).$type,
+      last: obj({ x: num().$type, junk: num().$type }).$type,
+    }).$type
+    const list = Array.from({ length: 40 }, (_, i) => ({ x: i, junk: i }))
+    compare(t, { unknownProps: 'strip' }, { list, last: list[3] })
+    compare(t, { unknownProps: 'strip' }, { list, last: { x: 1, junk: 1 } })
+  })
+
+  it('a validate() re-entered mid-check (getter) keeps the outer strips', () => {
+    const inner = obj({ x: num().$type }).$type
+    const t = obj({ a: inner, g: num().$type }).$type
+    const make = (V: typeof Validator) => {
+      const nested = new V(inner, { unknownProps: 'strip' })
+      const value: any = { a: { x: 1, junk: 1 } }
+      Object.defineProperty(value, 'g', {
+        enumerable: true,
+        // a failing nested call must not drop the outer call's pending strips
+        get: () => (nested.validate({ x: 'no' }, true) ? 0 : 1),
+      })
+      return value
+    }
+    const a = make(Validator)
+    const b = make(WalkValidator)
+    expect(new Validator(t, { unknownProps: 'strip' }).validate(a, true)).toBe(
+      new WalkValidator(t, { unknownProps: 'strip' }).validate(b, true)
+    )
+    expect(a.a).toEqual(b.a)
+    expect(a.a).toEqual({ x: 1 })
+  })
+
+  it('a non-deletable unknown key throws like the walk, after the same deletions', () => {
+    const t = obj({ a: obj({ x: num().$type }).$type, b: obj({ y: num().$type }).$type }).$type
+    const make = () => ({
+      a: { x: 1, junk: 1 },
+      b: Object.freeze({ y: 1, junk: 2 }),
+    })
+    const a = make()
+    const b = make()
+    expect(run(new Validator(t, { unknownProps: 'strip' }), a)).toBe(
+      run(new WalkValidator(t, { unknownProps: 'strip' }), b)
+    )
+    expect(a).toEqual(b)
+    expect(a.a).toEqual({ x: 1 })
+  })
+
+  it('props added / removed / turned phantom after the first validate are honoured', () => {
+    type TObj = TAtscriptAnnotatedType<TAtscriptTypeObject>
+    const item = () => obj({ a: num().$type, b: num().optional().$type }).$type as TObj
+    const changes: Array<(t: TObj) => void> = [
+      t => t.type.props.set('c', num().optional().$type),
+      t => t.type.props.delete('b'),
+      t => ((t.type.props.get('b')!.type as any).designType = 'phantom'),
+    ]
+    for (const change of changes) {
+      for (const wrap of [(i: TObj) => i, (i: TObj) => arr(i).$type]) {
+        const it = item()
+        const t = wrap(it)
+        const list = t !== it
+        const value = () => (list ? [{ a: 1, b: 2, c: 3 }] : { a: 1, b: 2, c: 3 })
+        const fast = new Validator(t, { unknownProps: 'strip' })
+        const first = value()
+        fast.validate(first, true)
+        change(it)
+        const a = value()
+        const b = value()
+        expect(fast.validate(a, true)).toBe(
+          new WalkValidator(t, { unknownProps: 'strip' }).validate(b, true)
+        )
+        expect(a).toEqual(b)
+      }
+    }
+  })
+})

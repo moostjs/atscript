@@ -196,7 +196,8 @@ export class Validator<
     this.stackErrors.length = 0
     this.depth = 0
     this.limitExceeded = false
-    // Allocation-free pre-check; only when a passing walk has no observable side effects
+    // Allocation-free pre-check (it performs the walk's 'strip' deletions itself); only when
+    // a passing walk has no other observable side effects
     // (`skipList` and a `partial` callback see paths, so they always take the walk).
     if (
       this.shortcuts &&

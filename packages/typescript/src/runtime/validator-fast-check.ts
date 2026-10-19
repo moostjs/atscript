@@ -23,14 +23,26 @@ import type { TValidatorOptions } from './validator'
  * after a validator was created are always honoured — the same as the full walk.
  *
  * Result contract (relative to the full walk over the same node and value):
- * - `PASS` — the walk returns `true`, collects no errors and has no side effects.
- * - `FAIL` — the walk returns `false`; every node the walk would visit was visited
- *   here too (so a walk that would throw makes this throw first) and the walk has
- *   no side effects for this node.
+ * - `PASS` — the walk returns `true`, collects no errors and has no side effects other
+ *   than the strips recorded here (see below).
+ * - `FAIL` — the walk returns `false`. Inside a union, every node the walk would visit
+ *   was visited here too (so a walk that would throw makes this throw first) and the
+ *   walk's only side effects for this node are the strips recorded here. Outside unions
+ *   a `FAIL` always ends in the walk, so it may be returned early.
  * - `BAIL` — not decidable here; the caller must run the full walk.
  *
  * Union branches are tried in declared order, continuing past `FAIL` and stopping
  * at `BAIL`, which keeps union results identical to the walk.
+ *
+ * `unknownProps: 'strip'`: the walk deletes an object's unknown keys right after the object
+ * passes (even when an ancestor fails later). This check records those deletions only for
+ * the top-level object (`pendingKeys`), whose strip is the walk's last read of the input:
+ * deferring an earlier strip past later reads could be observed by them (a prototype, a
+ * proxy or an accessor over the stripped object), so a nested object with unknown keys
+ * bails, as does any object visit once a strip is pending (a later intersection member).
+ * The recorded keys are deleted, in the walk's order, only when the whole value passes —
+ * so a `PASS` result still has exactly the walk's side effects, and `FAIL` / `BAIL` leave
+ * the value untouched for the walk.
  */
 const FAIL = 0
 const PASS = 1
@@ -44,15 +56,30 @@ const IN_UNION = 2
 /** Incremented per {@link fastCheckPasses} call; snapshots verified in older calls re-verify. */
 let stamp = 0
 
+/** A 'strip' {@link fastCheckPasses} call is in progress (the pending strips below are its own). */
+let stripping = false
+
 /**
- * `true` only when the full walk over `value` is guaranteed to pass with no errors
- * and no side effects. Any other outcome (including a throw) means "run the walk".
+ * Unknown keys of the top-level object the walk would delete (`unknownProps: 'strip'`), in
+ * the walk's deletion order. Deleted when the call passes, dropped otherwise.
+ */
+let pendingObject: Record<string, unknown> | undefined
+const pendingKeys: string[] = []
+
+/**
+ * `true` only when the full walk over `value` is guaranteed to pass with no errors and
+ * no side effects other than its 'strip' deletions, which are then performed here, as the
+ * walk would. Any other outcome (including a throw) leaves `value` untouched and means
+ * "run the walk".
  */
 export function fastCheckPasses(
   def: TAtscriptAnnotatedType,
   value: unknown,
   opts: TValidatorOptions
 ): boolean {
+  if (opts.unknownProps === 'strip') {
+    return fastCheckStripping(def, value, opts)
+  }
   // A new call: every plan re-verifies itself against the live type when first reached.
   stamp++
   try {
@@ -60,6 +87,47 @@ export function fastCheckPasses(
   } catch {
     // Let the walk reproduce (or not) the failure with its own semantics.
     return false
+  }
+}
+
+/** {@link fastCheckPasses} for `unknownProps: 'strip'`: performs the recorded strips on a pass. */
+function fastCheckStripping(
+  def: TAtscriptAnnotatedType,
+  value: unknown,
+  opts: TValidatorOptions
+): boolean {
+  if (stripping) {
+    // Re-entered mid-check (a getter / proxy validating): leave this one to the walk.
+    return false
+  }
+  stamp++
+  stripping = true
+  let passed: boolean
+  try {
+    passed = fastCheck(def, value, TOP, opts) === PASS
+  } catch {
+    passed = false
+  } finally {
+    stripping = false
+  }
+  if (pendingObject !== undefined) {
+    // Outside the try: a failing `delete` throws from the walk too, at the same key.
+    flushStrips(pendingObject, passed)
+  }
+  return passed
+}
+
+/** Performs (`apply`) or drops the pending strips of `target`. */
+function flushStrips(target: Record<string, unknown>, apply: boolean): void {
+  pendingObject = undefined
+  try {
+    if (apply) {
+      for (const key of pendingKeys) {
+        delete target[key]
+      }
+    }
+  } finally {
+    pendingKeys.length = 0
   }
 }
 
@@ -134,6 +202,10 @@ function fastCheck(
         const result = fastCheck(item, value, branchFlags, opts)
         if (result !== FAIL) {
           return unionMatchResult(result, item, def.metadata, value)
+        }
+        if (pendingKeys.length > 0) {
+          // The walk keeps the strips of a branch it rejects; the next branches would see them.
+          return BAIL
         }
       }
       return FAIL
@@ -380,9 +452,18 @@ function fastCheckObject(
   if (type.propsPatterns.length > 0) {
     return BAIL
   }
+  if (pendingKeys.length > 0) {
+    // The walk reads the top-level object again after stripping it (an intersection).
+    return BAIL
+  }
+  const unknownProps = opts.unknownProps
+  const inUnion = (flags & IN_UNION) !== 0
+  if (unknownProps === 'error' && !inUnion && hasUnknownKey(type.props, value)) {
+    // Outside unions a FAIL always ends in the walk: no need to check the props first.
+    return FAIL
+  }
   const partial = opts.partial
   const skipUndefined = partial === 'deep' || (partial === true && (flags & TOP) !== 0)
-  const inUnion = (flags & IN_UNION) !== 0
   const propFlags = flags & IN_UNION
   let result = PASS
   for (const [key, item] of type.props) {
@@ -408,18 +489,45 @@ function fastCheckObject(
     // The walk never strips a failing object; the unknown-key scan can't change the outcome.
     return result
   }
-  const unknownProps = opts.unknownProps
-  if (unknownProps === 'error' || unknownProps === 'strip') {
-    const props = type.props
-    for (const key of Object.keys(value)) {
-      const known = props.get(key)
-      if (known === undefined || isPhantomType(known)) {
-        // 'strip' deletes keys during the walk — leave that to the walk.
-        return unknownProps === 'error' ? FAIL : BAIL
+  if (unknownProps === 'strip') {
+    return pendStrips(type.props, value, flags)
+  }
+  // 'error' outside unions was scanned before the props.
+  return unknownProps === 'error' && inUnion && hasUnknownKey(type.props, value) ? FAIL : PASS
+}
+
+/**
+ * Records the unknown keys of a passing top-level object: the walk deletes them at this
+ * point, after its last read of the input. A nested object's strip would be followed by
+ * more reads, so it is left to the walk.
+ */
+function pendStrips(
+  props: Map<string, TAtscriptAnnotatedType>,
+  value: Record<string, unknown>,
+  flags: number
+): number {
+  for (const key of Object.keys(value)) {
+    const known = props.get(key)
+    if (known === undefined || isPhantomType(known)) {
+      if ((flags & TOP) === 0) {
+        return BAIL
       }
+      pendingObject = value
+      pendingKeys.push(key)
     }
   }
   return PASS
+}
+
+/** `true` when `value` has a key the walk treats as unknown (no prop, or a phantom one). */
+function hasUnknownKey(props: Map<string, TAtscriptAnnotatedType>, value: object): boolean {
+  for (const key of Object.keys(value)) {
+    const known = props.get(key)
+    if (known === undefined || isPhantomType(known)) {
+      return true
+    }
+  }
+  return false
 }
 
 function fastCheckArray(
@@ -963,7 +1071,7 @@ function checkObject(plan: Plan, value: any, flags: number, opts: TValidatorOpti
     for (const key of Object.keys(value)) {
       const known = byKey.get(key)
       if (known === undefined || known.op === OP_PHANTOM) {
-        // 'strip' deletes keys during the walk — leave that to the walk.
+        // Plans check nested nodes only: their strips are left to the walk (see pendStrips).
         return unknownProps === 'error' ? FAIL : BAIL
       }
     }
