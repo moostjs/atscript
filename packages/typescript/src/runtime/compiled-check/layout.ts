@@ -1,4 +1,4 @@
-import { metaEmpty } from '../layers'
+import { filledMeta } from '../layers'
 /**
  * Layout of a compiled validator check: the structure a check was compiled for, as plain
  * data. `buildLayout` (build-layout.ts) derives it from a type tree (the build-time model
@@ -279,7 +279,8 @@ export function readKeys(
   let mask = 0
   let shape = ''
   let k = at
-  if (metaEmpty(metadata)) {
+  const meta = filledMeta(metadata)
+  if (meta === undefined) {
     return { mask, shape }
   }
   for (let i = 0; i < VALIDATOR_KEYS.length; i++) {
@@ -287,7 +288,7 @@ export function readKeys(
     if ((relevant & b) === 0) {
       continue
     }
-    const raw = metadata.get(VALIDATOR_KEYS[i]) as any
+    const raw = meta.get(VALIDATOR_KEYS[i]) as any
     if ((b & FLAG_BITS) !== 0) {
       if (raw) {
         mask |= b

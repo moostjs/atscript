@@ -8,7 +8,7 @@ import type {
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
 import { compiledCheckFor, optionFlags, type TCompiledEnv } from './compiled-check/registry'
-import { filledMeta, metaEmpty, readable } from './layers'
+import { filledMeta, readable } from './layers'
 import { statelessRegExp } from './stateless-regex'
 import type { TValidatorOptions } from './validator'
 import { ARRAY_KEYS, BOOLEAN_KEYS, DECIMAL_RE, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
@@ -134,16 +134,40 @@ function fastCheckStripping(
     COMPILED_ENV.m = undefined
   }
   // Outside the try: a failing `delete` throws from the walk too, at the same key.
+  performStrips(pendingStrips, passed)
+  return passed
+}
+
+/**
+ * Deletes the recorded unknown keys (`unknownProps: 'strip'`; `object, key, …` in deletion order)
+ * when the call `passed`, and empties the list either way. Shared by the walk and the pre-check:
+ * the same deletes in the same order (a failing `delete`, e.g. of a frozen object's key, throws
+ * at the same key).
+ */
+export function performStrips(strips: unknown[], passed: boolean): void {
   try {
     if (passed) {
-      for (let i = 0; i < pendingStrips.length; i += 2) {
-        delete (pendingStrips[i] as Record<string, unknown>)[pendingStrips[i + 1] as string]
+      for (let i = 0; i < strips.length; i += 2) {
+        delete (strips[i] as Record<string, unknown>)[strips[i + 1] as string]
       }
     }
   } finally {
-    pendingStrips.length = 0
+    strips.length = 0
   }
-  return passed
+}
+
+/** The strips `list` recorded after its first `kept` entries (a union's own), or `undefined`. */
+export function stripsSince(list: unknown[], kept: number): unknown[] | undefined {
+  return list.length > kept ? list.slice(kept) : undefined
+}
+
+/** Records in `target` again the strips a memoized union recorded (see {@link stripsSince}). */
+export function stripAgain(target: unknown[], strips: unknown[] | undefined): void {
+  if (strips !== undefined) {
+    for (const entry of strips) {
+      target.push(entry)
+    }
+  }
 }
 
 /**
@@ -185,7 +209,8 @@ export function getRegex(pattern: string, flags?: string): RegExp {
  * type does not itself accept `null`. Shared by the walk and the fast pre-check.
  */
 export function rejectsNullAsRequired(def: TAtscriptAnnotatedType): boolean {
-  return !metaEmpty(def.metadata) && !!def.metadata.get('meta.required') && !acceptsNull(def)
+  const metadata = filledMeta(def.metadata)
+  return metadata !== undefined && !!metadata.get('meta.required') && !acceptsNull(def)
 }
 
 function acceptsNull(def: TAtscriptAnnotatedType): boolean {
@@ -246,21 +271,12 @@ function memoGet(key: object, value: object, flags: number, opts: TValidatorOpti
   if (entries !== undefined) {
     for (let i = 0; i < entries.length; i += 5) {
       if (entries[i] === key && entries[i + 1] === flags && entries[i + 2] === opts) {
-        stripAgain(entries[i + 4] as unknown[] | undefined)
+        stripAgain(pendingStrips, entries[i + 4] as unknown[] | undefined)
         return entries[i + 3] as number
       }
     }
   }
   return -1
-}
-
-/** Records again the strips a memoized union recorded (see {@link memoSet}). */
-function stripAgain(strips: unknown[] | undefined): void {
-  if (strips !== undefined) {
-    for (const entry of strips) {
-      pendingStrips.push(entry)
-    }
-  }
 }
 
 /**
@@ -276,7 +292,7 @@ function memoSet(
   kept: number
 ): void {
   const memo = COMPILED_ENV.m!
-  const strips = pendingStrips.length > kept ? pendingStrips.slice(kept) : undefined
+  const strips = stripsSince(pendingStrips, kept)
   const entries = memo.get(value)
   if (entries === undefined) {
     memo.set(value, [key, flags, opts, result, strips])

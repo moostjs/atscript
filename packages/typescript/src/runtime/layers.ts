@@ -4,9 +4,15 @@
  * A node's metadata is its own map plus an ordered list of base nodes (`b`, priority order:
  * `b[0]` first). A read returns the own value, else the first base that has the key; an append
  * key returns the bases' values (lowest priority first), then the own ones. Writes (`set`,
- * `delete`, `clear`) are the own map's: `delete` lets a base's value show again. Bases are read
- * live (`n.metadata` on every read), so a later write on a base shows through every layer over
- * it. There is no copy, sync or invalidation.
+ * `delete`, `clear`) are the own map's: `delete` lets a base's value show again, and a write on
+ * a base shows through every layer over it.
+ *
+ * Reads go through a flattened view of the effective entries, rebuilt on the first read after any
+ * metadata write (one global write counter: `metadataWriteCount`). The view is used only while
+ * every map below is tracked (an `AnnotationMap` or a `LayerMap`, whose writes the counter
+ * sees); otherwise the reads are live. A raw write the counter does not see (a node's map swapped,
+ * `node.metadata = X`, or edited in place) must be followed by `invalidateCompiledValidators()`,
+ * as compiled checks require (PERF-2).
  */
 import {
   AnnotationMap,
@@ -72,18 +78,20 @@ export function markIntrinsic(m: object, keys: unknown[]): void {
   metadataReplaced()
 }
 
-/** A map replacing `from` (layered over its bases now) keeps its intrinsic marks. */
+/**
+ * A map replacing `from` (layered over its bases now) keeps its intrinsic marks. (No write
+ * counted: the callers count the map replaced.)
+ */
 export function moveIntrinsic(from: object, to: object): void {
   const s = INTRINSIC.get(from)
   if (s) {
     INTRINSIC.set(to, s)
-    metadataReplaced()
   }
 }
 
 const MISS = Symbol('miss')
 
-/** The view of a layered map without effective entries (read only: never written). */
+/** The view of a layered map without effective entries (never written: views stay internal). */
 const NO_ENTRIES = new AnnotationMap<unknown, unknown>()
 const mapGet = Map.prototype.get
 const mapHas = Map.prototype.has
@@ -102,9 +110,9 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
    * built on the first read after a metadata write (`w` ≠ `metadataWrites`); `undefined` while a
    * map below is not tracked (a plain `Map` or a subclass: its writes are not counted, read live).
    */
-  f: Map<K, V> | undefined
+  private f: Map<K, V> | undefined
   /** `metadataWrites` when {@link f} was built (`-1`: not built). */
-  w: number
+  private w: number
 
   constructor(bases: TLayerNode[], reference = false, own?: Iterable<readonly [K, V]> | null) {
     super(own)
@@ -114,8 +122,11 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
     this.w = -1
   }
 
-  /** The flattened view (built again after a metadata write), `undefined`: read live. */
-  view(): Map<K, V> | undefined {
+  /**
+   * The flattened view (built again after a metadata write), `undefined`: read live. Internal:
+   * this module's readers and the validators read it (`readable`, `filledMeta`), never write.
+   */
+  private view(): Map<K, V> | undefined {
     return this.w === metadataWriteCount() ? this.f : this.flatten()
   }
 
@@ -201,9 +212,9 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
     if (this.r && notReferred(key)) {
       // (through a reference layer: only intrinsic entries)
       const parts: unknown[] = []
-      const seen = new Set<object>()
+      const acc = { out: parts, seen: new Map<object, boolean>() }
       for (let i = this.b.length - 1; i >= 0; i--) {
-        collect(this.b[i].metadata, key, { out: parts, seen }, true)
+        collect(this.b[i].metadata, key, acc, true)
       }
       if (parts.length === 0) {
         return own
@@ -230,7 +241,7 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
     }
     // (each map once: a diamond — two bases over one node — gives its values once)
     const parts: unknown[] = []
-    collect(this, key, { out: parts, seen: new Set() }, false)
+    collect(this, key, { out: parts, seen: new Map() }, false)
     if (parts.length === 1) {
       return parts[0]
     }
@@ -253,7 +264,7 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
 
   private liveKeys(): K[] {
     const out = new Set<K>()
-    keysOf(this, false, out, new Set())
+    keysOf(this, false, out, new Map())
     return [...out]
   }
 
@@ -284,10 +295,15 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   }
 }
 
+/** A layered map as this module's readers see it: its private flattened view readable. */
+interface TViewed {
+  view(): Map<unknown, unknown> | undefined
+}
+
 // (`size` is the effective count: an accessor, which a class body cannot declare over `Map`'s)
 Object.defineProperty(LayerMap.prototype, 'size', {
   get(this: LayerMap) {
-    const view = this.view()
+    const view = (this as unknown as TViewed).view()
     if (view !== undefined) {
       return view.size
     }
@@ -340,20 +356,36 @@ function intrinsicLookup(m: Map<unknown, unknown>, key: unknown): unknown {
 }
 
 /**
- * The values of `key` of `m` and its bases (lowest priority first), each map once. `filtered`:
- * reached through a reference layer with a `passedWhenReferred: false` key — only intrinsic
- * entries count (see {@link INTRINSIC}), down to the bottom.
+ * Whether a layer walk visits `m` (reached `filtered` or not): each map once, except that a map
+ * first reached `filtered` (through a reference layer) is visited again when reached unfiltered
+ * (a diamond: a direct base over the same node), as the layered `get` reads it. `seen`: the maps
+ * visited, `true` while only filtered.
+ */
+function visit(m: object, filtered: boolean, seen: Map<object, boolean>): boolean {
+  const was = seen.get(m)
+  if (was !== undefined && (filtered || !was)) {
+    return false
+  }
+  seen.set(m, filtered)
+  return true
+}
+
+/**
+ * The values of `key` of `m` and its bases (lowest priority first), each map once (see
+ * {@link visit}). `filtered`: reached through a reference layer with a `passedWhenReferred: false`
+ * key — only intrinsic entries count (see {@link INTRINSIC}), down to the bottom.
  */
 function collect(
   m: Map<unknown, unknown>,
   key: unknown,
-  acc: { out: unknown[]; seen: Set<object> },
+  acc: { out: unknown[]; seen: Map<object, boolean> },
   filtered: boolean
 ): void {
-  if (acc.seen.has(m)) {
+  // (`true`: visited filtered before, its intrinsic entry already collected)
+  const was = acc.seen.get(m)
+  if (!visit(m, filtered, acc.seen)) {
     return
   }
-  acc.seen.add(m)
   const layer = m instanceof LayerMap ? m : undefined
   if (layer) {
     const below = filtered || (layer.r && notReferred(key))
@@ -361,22 +393,28 @@ function collect(
       collect(layer.b[i].metadata, key, acc, below)
     }
   }
-  if ((!filtered || INTRINSIC.get(m)?.has(key)) && (layer ? mapHas.call(m, key) : m.has(key))) {
+  const intrinsic = INTRINSIC.get(m)?.has(key) === true
+  if (
+    (filtered ? intrinsic : !(was === true && intrinsic)) &&
+    (layer ? mapHas.call(m, key) : m.has(key))
+  ) {
     acc.out.push(layer ? mapGet.call(m, key) : m.get(key))
   }
 }
 
-/** The keys of `m` (own first, then its bases'), `filtered`: reached through a reference layer. */
+/**
+ * The keys of `m` (own first, then its bases'), each map once (see {@link visit}). `filtered`:
+ * reached through a reference layer.
+ */
 function keysOf(
   m: Map<unknown, unknown>,
   filtered: boolean,
   out: Set<unknown>,
-  seen: Set<object>
+  seen: Map<object, boolean>
 ): void {
-  if (seen.has(m)) {
+  if (!visit(m, filtered, seen)) {
     return
   }
-  seen.add(m)
   const layer = m instanceof LayerMap ? m : undefined
   const own = layer ? (Map.prototype.keys.call(m) as Iterable<unknown>) : m.keys()
   const intrinsic = INTRINSIC.get(m)
@@ -402,7 +440,7 @@ export function metaEmpty(m: Map<unknown, unknown>): boolean {
   if (b === undefined) {
     return m.size === 0
   }
-  const view = (m as LayerMap).view()
+  const view = (m as unknown as TViewed).view()
   if (view !== undefined) {
     return view.size === 0
   }
@@ -418,13 +456,13 @@ export function metaEmpty(m: Map<unknown, unknown>): boolean {
 }
 
 /**
- * `m` for reading: a layered map's flattened view (see {@link LayerMap.view}), else `m` itself.
- * The validators read builtin maps this way.
+ * `m` for reading: a layered map's flattened view (see `LayerMap.view`), else `m` itself.
+ * The validators read builtin maps this way (never write: a view is shared).
  */
 export function readable<M extends Map<unknown, unknown>>(m: M): M {
   return (m as unknown as LayerMap).b === undefined
     ? m
-    : (((m as unknown as LayerMap).view() as unknown as M | undefined) ?? m)
+    : (((m as unknown as TViewed).view() as M | undefined) ?? m)
 }
 
 /**
@@ -435,7 +473,7 @@ export function filledMeta<M extends Map<unknown, unknown>>(m: M): M | undefined
   if ((m as unknown as LayerMap).b === undefined) {
     return m.size === 0 ? undefined : m
   }
-  const view = (m as unknown as LayerMap).view() as unknown as M | undefined
+  const view = (m as unknown as TViewed).view() as M | undefined
   if (view !== undefined) {
     return view.size === 0 ? undefined : view
   }

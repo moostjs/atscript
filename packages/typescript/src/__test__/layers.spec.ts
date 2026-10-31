@@ -9,7 +9,7 @@ import {
 import { $alias } from '../runtime/blocks'
 import { lazyJsonSchema } from '../runtime/bundled-schema'
 import { AnnotationMap, invalidateCompiledValidators } from '../runtime/compiled-check/tracking'
-import { $ak, $nr, LayerMap, metaEmpty } from '../runtime/layers'
+import { $ak, $nr, LayerMap, markIntrinsic, metaEmpty } from '../runtime/layers'
 import { Validator } from '../runtime/validator'
 
 /*
@@ -344,5 +344,190 @@ describe('cached layered reads (a view rebuilt after a metadata write)', () => {
     same(s)
     expect(meta(s).get('expect.maxLength')).toBe(10)
     expect(v.validate({ s: 'abcd' }, true)).toBe(true)
+  })
+})
+
+/*
+ * Diamond layer graphs: one node reached through a reference layer and directly. The fuzz below
+ * builds random layer DAGs (node `i` layers over earlier nodes only, so diamonds are frequent).
+ */
+
+// plain, append, passedWhenReferred:false, both
+const KEYS = ['meta.label', 'test.list', 'test.ro', 'test.ra']
+const isAppend = (k: string) => k === 'test.list' || k === 'test.ra'
+const isNr = (k: string) => k === 'test.ro' || k === 'test.ra'
+const valueOf = (k: string, tag: string) => (isAppend(k) ? [tag] : tag)
+
+/** A seeded PRNG (Park–Miller), `[0, 1)`. */
+function rng(seed: number) {
+  let a = seed
+  return () => {
+    a = (a * 48_271) % 2_147_483_647
+    return (a - 1) / 2_147_483_646
+  }
+}
+
+interface TSpec {
+  bases: number[]
+  r: boolean
+  own: string[]
+  intrinsic: string[]
+}
+
+type TNodes = Array<{ metadata: Map<unknown, unknown> }>
+
+/** A random layer DAG of `n` nodes. */
+function graph(rand: () => number, n: number): TSpec[] {
+  const specs: TSpec[] = []
+  for (let i = 0; i < n; i++) {
+    const bases: number[] = []
+    if (i > 0 && rand() < 0.8) {
+      const count = 1 + Math.floor(rand() * Math.min(3, i))
+      while (bases.length < count) {
+        const b = Math.floor(rand() * i)
+        if (!bases.includes(b)) {
+          bases.push(b)
+        }
+      }
+    }
+    const own = KEYS.filter(() => rand() < 0.35)
+    specs.push({ bases, r: rand() < 0.5, own, intrinsic: own.filter(() => rand() < 0.25) })
+  }
+  return specs
+}
+
+/** The nodes of `specs`; `plain`: leaves are plain maps (untracked: every read is live). */
+function build(specs: TSpec[], plain: boolean): TNodes {
+  const nodes: TNodes = []
+  for (const [i, s] of specs.entries()) {
+    const own = s.own.map(k => [k, valueOf(k, `${i}`)] as const)
+    let m: Map<unknown, unknown>
+    if (s.bases.length > 0) {
+      m = new LayerMap(
+        s.bases.map(b => nodes[b]),
+        s.r,
+        own
+      )
+    } else {
+      m = plain ? new Map<unknown, unknown>(own) : new AnnotationMap<unknown, unknown>(own)
+    }
+    markIntrinsic(m, s.intrinsic)
+    nodes.push({ metadata: m })
+  }
+  return nodes
+}
+
+/**
+ * The path reference: the nodes whose own `k` a read of node `i` sees, in priority order (every
+ * path down; a `passedWhenReferred: false` key filtered below a reference layer unless intrinsic).
+ */
+function seen(specs: TSpec[], i: number, k: string): number[] {
+  const out: number[] = []
+  const walk = (j: number, filtered: boolean) => {
+    const s = specs[j]
+    if (s.own.includes(k) && (!filtered || s.intrinsic.includes(k)) && !out.includes(j)) {
+      out.push(j)
+    }
+    for (const b of s.bases) {
+      walk(b, filtered || (s.r && isNr(k)))
+    }
+  }
+  walk(i, false)
+  return out
+}
+
+const read = (m: Map<unknown, unknown>) => ({
+  entries: [...m.entries()],
+  size: m.size,
+  has: KEYS.map(k => m.has(k)),
+  get: KEYS.map(k => m.get(k)),
+})
+
+/** Every node of `cached` reads as its live twin and as the path reference (checks made). */
+function checkGraph(label: string, specs: TSpec[], cached: TNodes, live: TNodes): number {
+  let checked = 0
+  for (const [i, node] of cached.entries()) {
+    const m = node.metadata
+    expect(read(m), `${label} node ${i}`).toEqual(read(live[i].metadata))
+    // (exact with a view; a live read may answer `false` for filtered-out entries only)
+    expect(metaEmpty(m)).toBe(m.size === 0)
+    if (metaEmpty(live[i].metadata)) {
+      expect(m.size).toBe(0)
+    }
+    const keys = new Set(m.keys())
+    for (const k of KEYS) {
+      const at = seen(specs, i, k)
+      const value = m.get(k)
+      expect(m.has(k), `${label} node ${i} has ${k}`).toBe(at.length > 0)
+      expect(keys.has(k), `${label} node ${i} keys ${k}`).toBe(at.length > 0)
+      if (isAppend(k)) {
+        const all = value === undefined ? [] : (value as string[])
+        expect([...all].sort(), `${label} node ${i} ${k}`).toEqual(at.map(String).sort())
+      } else {
+        expect(value, `${label} node ${i} ${k}`).toBe(at.length > 0 ? `${at[0]}` : undefined)
+      }
+      checked++
+    }
+  }
+  return checked
+}
+
+describe('diamond layer graphs (one node reached through a reference layer and directly)', () => {
+  $ak('test.ra')
+  $nr('test.ra', 'meta.required')
+
+  it("X over [R, T], R a reference layer over T: X reads T's passedWhenReferred:false key", () => {
+    const T = $().designType('string').tags('string').annotate('meta.required', true).$type
+    meta(T).set('test.ro', 'T')
+    const R = $().designType('string').tags('string').over([T], true).$type
+    const X = $().designType('string').tags('string').over([R, T]).$type
+    const Y = $().designType('string').tags('string').over([T, R]).$type
+    for (const n of [X, Y]) {
+      expect(meta(n).get('meta.required')).toBe(true)
+      expect(meta(n).has('meta.required')).toBe(true)
+      expect(meta(n).get('test.ro')).toBe('T')
+      expect([...meta(n).keys()]).toEqual(['meta.required', 'test.ro'])
+      expect(meta(n).size).toBe(2)
+      expect(new Validator(n).validate('', true)).toBe(false)
+    }
+    // (through the reference layer alone: filtered)
+    expect(meta(R).has('meta.required')).toBe(false)
+    expect(meta(R).size).toBe(0)
+  })
+
+  it("an append key: a diamond's values once, the directly reached node's included", () => {
+    const T = { metadata: new AnnotationMap<unknown, unknown>([['test.ra', ['t']]]) }
+    const R = { metadata: new LayerMap([T], true, [['test.ra', ['r']]]) }
+    const X = new LayerMap([R, T])
+    const Y = new LayerMap([T, R])
+    expect(X.get('test.ra')).toEqual(['t', 'r'])
+    // (lowest priority first: R's values, then T's, reached directly)
+    expect(Y.get('test.ra')).toEqual(['r', 't'])
+    expect(R.metadata.get('test.ra')).toEqual(['r'])
+  })
+
+  it('fuzz: cached reads equal the live (uncached) reads and the path reference', () => {
+    let checked = 0
+    for (let seed = 1; seed <= 400; seed++) {
+      const rand = rng(seed)
+      const specs = graph(rand, 2 + Math.floor(rand() * 9))
+      const cached = build(specs, false)
+      const live = build(specs, true)
+      checked += checkGraph(`seed ${seed}`, specs, cached, live)
+      // (a write anywhere: the views are rebuilt)
+      const at = Math.floor(rand() * specs.length)
+      const k = KEYS[Math.floor(rand() * KEYS.length)]
+      if (specs[at].own.includes(k)) {
+        specs[at].own = specs[at].own.filter(x => x !== k)
+        cached[at].metadata.delete(k)
+        live[at].metadata.delete(k)
+      } else {
+        specs[at].own.push(k)
+        cached[at].metadata.set(k, valueOf(k, `${at}`))
+        live[at].metadata.set(k, valueOf(k, `${at}`))
+      }
+      checked += checkGraph(`seed ${seed} (after a write)`, specs, cached, live)
+    }
+    expect(checked).toBeGreaterThan(5000)
   })
 })

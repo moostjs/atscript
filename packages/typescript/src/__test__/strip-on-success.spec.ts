@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { boundCheck, COMPILED_ENGINE } from '../../test/compiled-engine'
 import { defineAnnotatedType as $, type TAtscriptAnnotatedType } from '../runtime/annotated-type'
-import { Validator, type TValidatorOptions } from '../runtime/validator'
+import { Validator, type TValidatorOptions, type TValidatorPlugin } from '../runtime/validator'
 import { WalkValidator } from '../test-utils'
 
 // `unknownProps: 'strip'` deletes on success only (0.2.0): the checks read the input untouched,
@@ -264,5 +264,49 @@ describe("unknownProps 'strip': deletes on success only", () => {
     const log = run(Validator)
     expect(log).toEqual(['a.q', 'a.p', 'l0.w', 'l1.w', 'root.z1', 'root.z0'])
     expect(run(WalkValidator)).toEqual(log)
+  })
+})
+
+/** `inner` passes `strict`'s `inner` with an unknown key; `must` is missing (`strict` fails). */
+const altValue = () => ({ a: { inner: { x: 1, junk: 1 } }, extra: 1 })
+
+describe("unknownProps 'strip': a failed plugin sub-validation strips nothing (STRIP-2)", () => {
+  const strict = obj({ inner: obj({ x: num() }), must: str() })
+  const loose = obj({ inner: any() })
+  const slot = any()
+  /** A plugin trying `strict`, else `loose`, on the `slot` node. */
+  const alternatives: TValidatorPlugin = (ctx, def, value) => {
+    if (def === slot) {
+      return ctx.validateAnnotatedType(strict, value) || ctx.validateAnnotatedType(loose, value)
+    }
+    return undefined
+  }
+
+  it('plugin alternatives `strict || loose` strip what the union `strict | loose` strips', () => {
+    const viaPlugin = altValue()
+    const v = new Validator(obj({ a: slot }), { unknownProps: 'strip', plugins: [alternatives] })
+    expect(v.validate(viaPlugin, true)).toBe(true)
+    const { passed, value } = both(obj({ a: union(strict, loose) }), altValue)
+    expect(passed).toBe(true)
+    // (`strict` failed at `must` after `inner` passed: its `junk` strip is dropped)
+    expect(value).toEqual({ a: { inner: { x: 1, junk: 1 } } })
+    expect(viaPlugin).toEqual(value)
+  })
+
+  it('a passing plugin sub-validation keeps its strips', () => {
+    const value = { a: { inner: { x: 1, junk: 1 }, must: 'm', more: 2 }, extra: 1 }
+    const v = new Validator(obj({ a: slot }), { unknownProps: 'strip', plugins: [alternatives] })
+    expect(v.validate(value, true)).toBe(true)
+    expect(value).toEqual({ a: { inner: { x: 1 }, must: 'm' } })
+  })
+
+  it('a passing sub-validation inside a failing call strips nothing', () => {
+    const value = { a: { inner: { x: 1, junk: 1 }, must: 'm' }, b: 'no' }
+    const v = new Validator(obj({ a: slot, b: num() }), {
+      unknownProps: 'strip',
+      plugins: [alternatives],
+    })
+    expect(v.validate(value, true)).toBe(false)
+    expect(value).toEqual({ a: { inner: { x: 1, junk: 1 }, must: 'm' }, b: 'no' })
   })
 })

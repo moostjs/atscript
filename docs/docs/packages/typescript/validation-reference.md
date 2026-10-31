@@ -39,7 +39,7 @@ How to handle properties not defined in the type:
 - `'ignore'`
 - `'strip'` — deletes the unknown keys from the value, only when `validate()` passes
 
-With `'strip'`, validation reads the value as you passed it. The keys are deleted after the whole value has passed, so a failed validation leaves the value unchanged. A rejected union branch strips nothing: only the keys unknown to the branch that matched are deleted.
+With `'strip'`, validation reads the value as you passed it. The keys are deleted after the whole value has passed, so a failed validation leaves the value unchanged. A rejected union branch strips nothing: only the keys unknown to the branch that matched are deleted. The same holds for a [plugin](#plugins) that validates a sub-value with `ctx.validateAnnotatedType(...)`: a call that returns `false` strips nothing, so a plugin trying alternatives (`a || b`) strips what the union `a | b` would.
 
 The compiler merges every intersection of object types in `.as` into one object type, which knows every member's keys. A node of kind `'intersection'` built at runtime (`defineAnnotatedType('intersection')`, `fromJsonSchema` with `allOf`) checks each member on its own, like JSON Schema `allOf`: a key only another member declares is unknown to a member (`'error'` reports it, `'strip'` removes it).
 
@@ -205,7 +205,7 @@ const roleAware: TValidatorPlugin = ctx => {
 Product.validator({ plugins: [roleAware] }).validate(data, true, { role: 'admin' })
 ```
 
-The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, `root`, and `context`.
+The plugin context exposes `opts`, `validateAnnotatedType`, `error`, `path`, `root`, and `context`. `ctx.validateAnnotatedType(def, value)` validates a sub-value at the current path. With `unknownProps: 'strip'`, a call that returns `false` drops the keys it recorded, as a rejected union branch does; a call that passes keeps them, and they are deleted once the whole value passes.
 
 ### The Root Type
 

@@ -375,7 +375,7 @@ When the data object contains keys that are not declared in the type definition:
 `'strip'` deletes on success only:
 
 - Validation reads the data as it was passed. Each object that passes records its unknown keys.
-- A rejected union branch (or a failed pattern property attempt) drops the keys it recorded.
+- A rejected union branch (or a failed pattern property attempt, or a plugin sub-validation that fails) drops the keys it recorded. A failed validation at any level strips nothing.
 - When the whole value passes, the recorded keys are deleted, object by object in the order the objects finished, each object's keys in key order. When validation fails, nothing is deleted, and `errorLimit` never changes what is deleted.
 
 ### Pattern Properties
@@ -396,7 +396,7 @@ Plugins receive access to a context that includes:
 
 - An error reporting function
 - The current path
-- A recursive validation function (for delegating to sub-validations)
+- A recursive validation function (for delegating to sub-validations). With `'strip'`, a sub-validation that fails drops the keys it recorded, as a rejected union branch does, so a plugin trying alternatives strips what the equivalent union would
 - An arbitrary user-supplied context value (e.g., user roles, request metadata)
 
 ## Implementation Checklist

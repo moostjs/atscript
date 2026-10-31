@@ -368,17 +368,16 @@ class CheckEmitter {
             return [...kept, ...branches, 'return 0']
           }
           const m = this.next('m')
-          // (with the strips count kept at its start, see `unionBranches`)
-          const s = this.keptName()
-          const record = (code: string) =>
-            `if (${m} && H.m !== undefined) H.ms(mk${d}, v, f, o, ${code}, ${s})`
-          const { kept, branches } = this.unionBranches(
+          // (with the strips count `s` kept at its start, see `unionBranches`)
+          const record = (code: string, count: string) =>
+            `if (${m} && H.m !== undefined) H.ms(mk${d}, v, f, o, ${code}, ${count})`
+          const { s, kept, branches } = this.unionBranches(
             items,
             'v',
             false,
-            item => {
+            (item, count) => {
               const code = choose(this.literalExpr(item), '3', '1')
-              return [record(code), `return ${code}`]
+              return [record(code, count), `return ${code}`]
             },
             m
           )
@@ -388,7 +387,7 @@ class CheckEmitter {
             ]),
             ...kept,
             ...branches,
-            record('0'),
+            record('0', s),
             'return 0',
           ]
         }
@@ -817,30 +816,23 @@ class CheckEmitter {
   }
 
   /**
-   * The name of the strips count kept by the union whose branches are emitted next (see
-   * {@link unionBranches}): numbered after its first branch label, so the other names stay.
-   */
-  private keptName(): string {
-    return `s${this.uid}`
-  }
-
-  /**
    * Mirrors the `fastCheck` union case: branches in declared order, each a labelled block a
    * FAIL breaks out of; `onMatch` ends a passing branch. A rejected branch drops the strips it
-   * recorded: `pk` goes back to its length at the union's start, kept by the `kept` statement
-   * (none when no branch calls a check). A memoized union (`m`) always keeps it: its outcome is
-   * memoized with the strips it recorded.
+   * recorded: `pk` goes back to its length at the union's start, kept in `s` by the `kept`
+   * statement (none when no branch calls a check). A memoized union (`m`) always keeps it: its
+   * outcome is memoized with the strips it recorded. `s` is numbered after the first branch label,
+   * so the other names stay.
    */
   private unionBranches(
     items: TSite[],
     x: string,
     clearTop: boolean,
-    onMatch: (item: TSite) => string[],
+    onMatch: (item: TSite, s: string) => string[],
     /** The memo local of a memoized union: its failed branches count (see `memoEntry`). */
     m?: string
-  ): { kept: string[]; branches: string[] } {
+  ): { s: string; kept: string[]; branches: string[] } {
     const lines: string[] = []
-    const s = this.keptName()
+    const s = `s${this.uid}`
     const unionCalls = this.calls
     for (const item of items) {
       if (this.isNever(item)) {
@@ -854,10 +846,10 @@ class CheckEmitter {
         // A failed branch that entered nested unions over objects wasted work (see the file
         // comment).
         const c = this.next('c')
-        lines.push(`const ${c} = H.n`, `${b}: {`, ...indent([...body, ...onMatch(item)]), '}')
+        lines.push(`const ${c} = H.n`, `${b}: {`, ...indent([...body, ...onMatch(item, s)]), '}')
         lines.push(`if (H.n !== ${c}) H.wa()`)
       } else {
-        lines.push(`${b}: {`, ...indent([...body, ...onMatch(item)]), '}')
+        lines.push(`${b}: {`, ...indent([...body, ...onMatch(item, s)]), '}')
       }
       if (m !== undefined) {
         lines.push(`if (${m}) H.n++`)
@@ -868,7 +860,7 @@ class CheckEmitter {
     }
     // (a union without calls records no strips)
     const kept = m !== undefined || this.calls !== unionCalls ? [`const ${s} = pk.length`] : []
-    return { kept, branches: lines }
+    return { s, kept, branches: lines }
   }
 
   /** An inline union: the first matching branch passes after the union-level constraints. */
@@ -883,9 +875,8 @@ class CheckEmitter {
     const u = this.next('U')
     const memo = d !== undefined && this.memo[d]
     const m = memo ? this.next('m') : undefined
-    // (with the strips count kept at its start, see `unionBranches`)
-    const s = this.keptName()
-    const { kept, branches } = this.unionBranches(
+    // (with the strips count `s` kept at its start, see `unionBranches`)
+    const { s, kept, branches } = this.unionBranches(
       items,
       x,
       ctx.clearTop,

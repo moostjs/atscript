@@ -16,7 +16,10 @@ import {
   fastCheckPasses,
   WASTE_BEFORE_MEMO,
   getRegex,
+  performStrips,
   rejectsNullAsRequired,
+  stripAgain,
+  stripsSince,
 } from './validator-fast-check'
 import { arrayKeyProps } from './validator-keys'
 
@@ -68,6 +71,12 @@ export interface TValidatorOptions {
 /** Context exposed to {@link TValidatorPlugin} functions. */
 export interface TValidatorPluginContext {
   opts: Validator<any>['opts']
+  /**
+   * Validates `value` against `def` at the current path (errors go to the current level). With
+   * `unknownProps: 'strip'`, a call that returns `false` strips nothing: the keys it recorded are
+   * dropped, as for a rejected union branch, so trying alternatives (`a || b`) strips what the
+   * union `a | b` would.
+   */
   validateAnnotatedType: Validator<any>['validateAnnotatedType']
   error: Validator<any>['error']
   path: Validator<any>['path']
@@ -152,9 +161,10 @@ export class Validator<
   /** Wasted union branches since the outermost union was entered (see `unionMemo`). */
   private wasted = 0
   /**
-   * `unknownProps: 'strip'`: the objects that passed with unknown keys, and those keys
-   * (`object, keys, …`), in the order the objects completed. A rejected union branch or pattern
-   * property attempt drops what it recorded; the keys are deleted once the whole call passes.
+   * `unknownProps: 'strip'`: the unknown keys of the objects that passed (`object, key, …`), in the
+   * order the objects completed, then in key order. A rejected union branch, pattern property
+   * attempt or plugin sub-validation drops what it recorded; the keys are deleted once the whole
+   * call passes (`performStrips`).
    */
   private strips: unknown[] = []
 
@@ -281,7 +291,7 @@ export class Validator<
     }
     if (this.strips.length > 0) {
       // 'strip' deletes only when the whole value passed
-      this.performStrips(passed)
+      performStrips(this.strips, passed)
     }
     if (!passed) {
       if (safe) {
@@ -290,23 +300,6 @@ export class Validator<
       this.throw()
     }
     return true
-  }
-
-  /** Deletes the recorded unknown keys when the call `passed` (see `strips`); drops them anyway. */
-  private performStrips(passed: boolean) {
-    const strips = this.strips
-    try {
-      if (passed) {
-        for (let i = 0; i < strips.length; i += 2) {
-          const value = strips[i] as Record<string, unknown>
-          for (const key of strips[i + 1] as string[]) {
-            delete value[key]
-          }
-        }
-      }
-    } finally {
-      strips.length = 0
-    }
   }
 
   /**
@@ -361,14 +354,49 @@ export class Validator<
       return true
     }
     if (this.hasPlugins) {
+      const ctx = (this.pluginCtx ??= this.pluginContext())
       for (const plugin of this.opts.plugins) {
-        const result = plugin(this as unknown as TValidatorPluginContext, def, value)
+        const result = plugin(ctx, def, value)
         if (result === false || result === true) {
           return result
         }
       }
     }
     return undefined
+  }
+
+  /** The context the plugins get (see {@link pluginContext}), made on the first plugin call. */
+  private pluginCtx?: TValidatorPluginContext
+
+  /**
+   * The plugins' view of this validator: its state read live; `validateAnnotatedType` drops the
+   * strips a failed call recorded (a failed validation at any level strips nothing).
+   */
+  private pluginContext(): TValidatorPluginContext {
+    const ctx = {
+      validateAnnotatedType: (def: TAtscriptAnnotatedType, value: unknown): boolean => {
+        const kept = this.strips.length
+        const passed = this.validateAnnotatedType(def, value)
+        if (!passed && this.strips.length !== kept) {
+          this.strips.length = kept
+        }
+        return passed
+      },
+      error: (message: string, path?: string, details?: TError[]) =>
+        this.error(message, path, details),
+    } as TValidatorPluginContext
+    return Object.defineProperties(ctx, {
+      opts: { get: () => this.opts, enumerable: true },
+      path: { get: () => this.path, enumerable: true },
+      root: { get: () => this.root, enumerable: true },
+      context: {
+        get: () => this.context,
+        set: (context: unknown) => {
+          this.context = context
+        },
+        enumerable: true,
+      },
+    })
   }
 
   /** `def` as the `replace` option replaces it at the current path (memoized per node). */
@@ -453,11 +481,7 @@ export class Validator<
           const known = this.decided(def, value, path)
           if (known !== undefined) {
             if (known.error === undefined) {
-              if (known.strips !== undefined) {
-                for (const entry of known.strips) {
-                  this.strips.push(entry)
-                }
-              }
+              stripAgain(this.strips, known.strips)
               return this.validateUnionConstraints(def, known.item!, value)
             }
             this.report(known.error)
@@ -577,7 +601,7 @@ export class Validator<
       unknownProps: this.opts.unknownProps,
       item,
       error,
-      strips: this.strips.length > kept ? this.strips.slice(kept) : undefined,
+      strips: stripsSince(this.strips, kept),
     }
     const outcomes = this.unionMemo!.get(value)
     if (outcomes === undefined) {
@@ -869,7 +893,10 @@ export class Validator<
       }
     }
     if (passed && keysToStrip !== undefined) {
-      this.strips.push(value, keysToStrip)
+      // (after the strips the pattern props' values recorded: this object completes last)
+      for (const key of keysToStrip) {
+        this.strips.push(value, key)
+      }
     }
     return passed
   }
