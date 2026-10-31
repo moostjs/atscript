@@ -8,7 +8,7 @@ import type {
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
 import { compiledCheckFor, optionFlags, type TCompiledEnv } from './compiled-check/registry'
-import { metaEmpty } from './layers'
+import { filledMeta, metaEmpty, readable } from './layers'
 import { statelessRegExp } from './stateless-regex'
 import type { TValidatorOptions } from './validator'
 import { ARRAY_KEYS, BOOLEAN_KEYS, DECIMAL_RE, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
@@ -540,8 +540,9 @@ function unionMatchResult(
  * Mirrors Validator.validateUnionConstraints: union-level constraints on the matched value
  * (`null` / objects pass; the caller skips literal branches).
  */
-function fastCheckUnionConstraints(metadata: TMetadata, value: any): number {
-  if (metaEmpty(metadata)) {
+function fastCheckUnionConstraints(meta: TMetadata, value: any): number {
+  const metadata = filledMeta(meta)
+  if (metadata === undefined) {
     return PASS
   }
   switch (typeof value) {
@@ -563,12 +564,14 @@ function fastCheckUnionConstraints(metadata: TMetadata, value: any): number {
   }
 }
 
-function fastCheckBoolean(metadata: TMetadata, value: boolean): number {
-  return metaEmpty(metadata) ? PASS : booleanConstraints(value, metadata.get('meta.required'))
+function fastCheckBoolean(meta: TMetadata, value: boolean): number {
+  const metadata = filledMeta(meta)
+  return metadata === undefined ? PASS : booleanConstraints(value, metadata.get('meta.required'))
 }
 
-function fastCheckString(metadata: TMetadata, value: string): number {
-  if (metaEmpty(metadata)) {
+function fastCheckString(meta: TMetadata, value: string): number {
+  const metadata = filledMeta(meta)
+  if (metadata === undefined) {
     return PASS
   }
   const filled = metadata.get('meta.required')
@@ -603,8 +606,9 @@ function fastCheckString(metadata: TMetadata, value: string): number {
   return PASS
 }
 
-function fastCheckNumber(metadata: TMetadata, value: number): number {
-  if (metaEmpty(metadata)) {
+function fastCheckNumber(meta: TMetadata, value: number): number {
+  const metadata = filledMeta(meta)
+  if (metadata === undefined) {
     return PASS
   }
   return numberConstraints(
@@ -806,8 +810,8 @@ function fastCheckArray(
   if (!Array.isArray(value)) {
     return FAIL
   }
-  const metadata = def.metadata
-  if (!metaEmpty(metadata)) {
+  const metadata = filledMeta(def.metadata)
+  if (metadata !== undefined) {
     const result = fastCheckArrayConstraints(metadata, value)
     if (result !== PASS) {
       return result
@@ -1022,19 +1026,20 @@ type TAnnotationReader = Map<string | undefined, unknown>
 
 /** Brings the annotation values up to date (once per call, when a constraint is read). */
 function refreshMeta(plan: Plan): void {
-  const metadata = plan.metadata as TAnnotationReader
+  const metadata = filledMeta(plan.metadata as TAnnotationReader)
   // Most nodes carry no annotations: one size check instead of four lookups.
-  const same = metaEmpty(metadata)
-    ? plan.m0 === undefined &&
-      plan.m1 === undefined &&
-      plan.m2 === undefined &&
-      plan.m3 === undefined &&
-      plan.m4 === undefined
-    : metadata.get(plan.k0) === plan.m0 &&
-      (plan.k1 === undefined || metadata.get(plan.k1) === plan.m1) &&
-      (plan.k2 === undefined || metadata.get(plan.k2) === plan.m2) &&
-      (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3) &&
-      (plan.k4 === undefined || metadata.get(plan.k4) === plan.m4)
+  const same =
+    metadata === undefined
+      ? plan.m0 === undefined &&
+        plan.m1 === undefined &&
+        plan.m2 === undefined &&
+        plan.m3 === undefined &&
+        plan.m4 === undefined
+      : metadata.get(plan.k0) === plan.m0 &&
+        (plan.k1 === undefined || metadata.get(plan.k1) === plan.m1) &&
+        (plan.k2 === undefined || metadata.get(plan.k2) === plan.m2) &&
+        (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3) &&
+        (plan.k4 === undefined || metadata.get(plan.k4) === plan.m4)
   if (!same) {
     snapshotMeta(plan)
   }
@@ -1042,7 +1047,7 @@ function refreshMeta(plan: Plan): void {
 }
 
 function snapshotMeta(plan: Plan): void {
-  const metadata = plan.metadata as TAnnotationReader
+  const metadata = readable(plan.metadata as TAnnotationReader)
   plan.m0 = metadata.get(plan.k0)
   plan.m1 = metadata.get(plan.k1)
   plan.m2 = metadata.get(plan.k2)

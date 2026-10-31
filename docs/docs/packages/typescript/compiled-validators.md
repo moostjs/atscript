@@ -122,7 +122,7 @@ skuProp.optional = true // direct write: not tracked
 invalidateCompiledValidators()
 ```
 
-`invalidateCompiledValidators` is exported from both `@atscript/typescript/utils` and `@atscript/typescript`. Types that have no compiled check always read the live tree and never need it.
+`invalidateCompiledValidators` is exported from both `@atscript/typescript/utils` and `@atscript/typescript`. The same rule holds without compiled checks: a node that reads metadata through other nodes (a reference, a merged field, a path override) caches what it reads and refreshes it after the tracked changes above. After a direct write such as `node.metadata = otherMap`, call `invalidateCompiledValidators()` whichever engine validates the type.
 
 A write changes only the node it is made on, and what reads through it; see [Runtime Metadata](/plugin-development/runtime-metadata) for which nodes are shared.
 

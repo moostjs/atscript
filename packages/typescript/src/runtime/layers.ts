@@ -8,7 +8,13 @@
  * live (`n.metadata` on every read), so a later write on a base shows through every layer over
  * it. There is no copy, sync or invalidation.
  */
-import { AnnotationMap, appendOwn, watch } from './compiled-check/tracking'
+import {
+  AnnotationMap,
+  appendOwn,
+  metadataReplaced,
+  metadataWriteCount,
+  watch,
+} from './compiled-check/tracking'
 
 /** A node as layers read it. */
 interface TLayerNode {
@@ -26,6 +32,8 @@ function flag(keys: string[], f: number): void {
   for (const key of keys) {
     FLAGS.set(key, (FLAGS.get(key) ?? 0) | f)
   }
+  // (how layers read a key changed: flattened views are rebuilt)
+  metadataReplaced()
 }
 
 /** Registers append keys (`mergeStrategy: 'append'`). */
@@ -61,6 +69,7 @@ export function markIntrinsic(m: object, keys: unknown[]): void {
   for (const k of keys) {
     s.add(k)
   }
+  metadataReplaced()
 }
 
 /** A map replacing `from` (layered over its bases now) keeps its intrinsic marks. */
@@ -68,10 +77,14 @@ export function moveIntrinsic(from: object, to: object): void {
   const s = INTRINSIC.get(from)
   if (s) {
     INTRINSIC.set(to, s)
+    metadataReplaced()
   }
 }
 
 const MISS = Symbol('miss')
+
+/** The view of a layered map without effective entries (read only: never written). */
+const NO_ENTRIES = new AnnotationMap<unknown, unknown>()
 const mapGet = Map.prototype.get
 const mapHas = Map.prototype.has
 const ownSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size')!.get!
@@ -84,11 +97,44 @@ const ownSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size')!.get!
 export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   b: TLayerNode[]
   r: boolean
+  /**
+   * The flattened view: every effective entry (as the layered reads give it, in their order),
+   * built on the first read after a metadata write (`w` ≠ `metadataWrites`); `undefined` while a
+   * map below is not tracked (a plain `Map` or a subclass: its writes are not counted, read live).
+   */
+  f: Map<K, V> | undefined
+  /** `metadataWrites` when {@link f} was built (`-1`: not built). */
+  w: number
 
   constructor(bases: TLayerNode[], reference = false, own?: Iterable<readonly [K, V]> | null) {
     super(own)
     this.b = bases
     this.r = reference
+    this.f = undefined
+    this.w = -1
+  }
+
+  /** The flattened view (built again after a metadata write), `undefined`: read live. */
+  view(): Map<K, V> | undefined {
+    return this.w === metadataWriteCount() ? this.f : this.flatten()
+  }
+
+  private flatten(): Map<K, V> | undefined {
+    this.w = -1
+    let f: Map<K, V> | undefined
+    if (tracked(this, new Set())) {
+      // (an `AnnotationMap`, as the plain nodes' maps: the readers' call sites see one map class;
+      // filled by its constructor: no write counted)
+      const keys = this.liveKeys()
+      // (no effective entry, often a reference layer: one shared empty view)
+      f =
+        keys.length === 0
+          ? (NO_ENTRIES as Map<K, V>)
+          : new AnnotationMap<K, V>(keys.map(k => [k, this.liveGet(k) as V] as const))
+    }
+    this.f = f
+    this.w = metadataWriteCount()
+    return f
   }
 
   /** The value of `key` (not concatenated), or `MISS`; `nr`: a `passedWhenReferred:false` key. */
@@ -130,6 +176,12 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   }
 
   override get(key: K): V | undefined {
+    const view = this.w === metadataWriteCount() ? this.f : this.flatten()
+    return view === undefined ? this.liveGet(key) : (mapGet.call(view, key) as V | undefined)
+  }
+
+  /** `get` read through the layers (see the file comment). */
+  private liveGet(key: K): V | undefined {
     const f = FLAGS.get(key)
     if (f !== undefined && (f & APPEND) !== 0) {
       return this.append(key) as V | undefined
@@ -139,7 +191,8 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   }
 
   override has(key: K): boolean {
-    return this.lookup(key, notReferred(key)) !== MISS
+    const view = this.view()
+    return view === undefined ? this.lookup(key, notReferred(key)) !== MISS : mapHas.call(view, key)
   }
 
   /** An append key: the bases' values (lowest priority first), then the own ones. */
@@ -194,6 +247,11 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
 
   /** The effective keys: own first, then the bases' in priority order. */
   private effectiveKeys(): K[] {
+    const view = this.view()
+    return view === undefined ? this.liveKeys() : [...view.keys()]
+  }
+
+  private liveKeys(): K[] {
     const out = new Set<K>()
     keysOf(this, false, out, new Set())
     return [...out]
@@ -229,12 +287,37 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
 // (`size` is the effective count: an accessor, which a class body cannot declare over `Map`'s)
 Object.defineProperty(LayerMap.prototype, 'size', {
   get(this: LayerMap) {
+    const view = this.view()
+    if (view !== undefined) {
+      return view.size
+    }
     return metaEmpty(this)
       ? 0
       : (this as unknown as { effectiveKeys(): unknown[] }).effectiveKeys().length
   },
   configurable: true,
 })
+
+/**
+ * Every map of `m`'s layers is tracked (an `AnnotationMap` or a `LayerMap`, whose writes count in
+ * `metadataWrites`), so a flattened view of `m` stays right until the next write.
+ */
+function tracked(m: Map<unknown, unknown>, seen: Set<object>): boolean {
+  const p = Object.getPrototypeOf(m)
+  if (p !== AnnotationMap.prototype && p !== LayerMap.prototype) {
+    return false
+  }
+  const b = (m as LayerMap).b
+  if (b !== undefined && !seen.has(m)) {
+    seen.add(m)
+    for (const n of b) {
+      if (!tracked(n.metadata, seen)) {
+        return false
+      }
+    }
+  }
+  return true
+}
 
 /** `key`'s intrinsic value in `m` or its bases (see {@link INTRINSIC}), or `MISS`. */
 function intrinsicLookup(m: Map<unknown, unknown>, key: unknown): unknown {
@@ -319,6 +402,10 @@ export function metaEmpty(m: Map<unknown, unknown>): boolean {
   if (b === undefined) {
     return m.size === 0
   }
+  const view = (m as LayerMap).view()
+  if (view !== undefined) {
+    return view.size === 0
+  }
   if (ownSize.call(m) !== 0) {
     return false
   }
@@ -328,6 +415,31 @@ export function metaEmpty(m: Map<unknown, unknown>): boolean {
     }
   }
   return true
+}
+
+/**
+ * `m` for reading: a layered map's flattened view (see {@link LayerMap.view}), else `m` itself.
+ * The validators read builtin maps this way.
+ */
+export function readable<M extends Map<unknown, unknown>>(m: M): M {
+  return (m as unknown as LayerMap).b === undefined
+    ? m
+    : (((m as unknown as LayerMap).view() as unknown as M | undefined) ?? m)
+}
+
+/**
+ * {@link readable}`(m)`, or `undefined` when `m` has no entry: the validators' "no constraint"
+ * fast path and their reads in one (a plain map costs what `metaEmpty` did).
+ */
+export function filledMeta<M extends Map<unknown, unknown>>(m: M): M | undefined {
+  if ((m as unknown as LayerMap).b === undefined) {
+    return m.size === 0 ? undefined : m
+  }
+  const view = (m as unknown as LayerMap).view() as unknown as M | undefined
+  if (view !== undefined) {
+    return view.size === 0 ? undefined : view
+  }
+  return metaEmpty(m) ? undefined : m
 }
 
 /**

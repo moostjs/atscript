@@ -222,7 +222,7 @@ A node's metadata = own values + bases it reads through (reference → target, p
 | L6 | `delete(key)` removes only the OWN value (a base's shows again). To hide, set another value. |
 | L7 | An array read from metadata is the STORED array (no copy) and may be a base node's, shared through layers — mutating it (`push`, `splice`, `sort`) changes every node reading it. Never mutate; write with `set()` or `annotate(map, key, value, true)`. |
 | L8 | `passedWhenReferred: false` keys (per spec, core + plugins) never pass a reference layer — raw writes of them included. |
-| L9 | Who sees a raw write: validator (interpreted + compiled — compiled checks re-bind; direct prop writes still need `invalidateCompiledValidators()`), `'lazy'` `toJsonSchema()`, readers. NOT a `'bundle'` `toJsonSchema()` literal → use `buildJsonSchema(type)`. |
+| L9 | Who sees a write through `set`/`delete`/`clear`/`annotate()`/handle methods: validator (interpreted + compiled), `'lazy'` `toJsonSchema()`, readers. NOT a `'bundle'` `toJsonSchema()` literal → use `buildJsonSchema(type)`. ONE rule, both engines: any other edit (`node.metadata = otherMap`, `node.optional = …`, a stored value changed in place) → call `invalidateCompiledValidators()` (layered reads are cached until a tracked write or that call). |
 | L10 | `deserializeAnnotatedType` → plain maps (effective entries), no layers. |
 
 ## What `.as.js` exports

@@ -66,7 +66,7 @@ import {
   buildJsonSchema, fromJsonSchema, mergeJsonSchemas, detectDiscriminator,
   serializeAnnotatedType, deserializeAnnotatedType, SERIALIZE_VERSION,
   isAnnotatedType, isAnnotatedTypeOfPrimitive,
-  invalidateCompiledValidators,    // after raw writes to a type tree (compileValidators on)
+  invalidateCompiledValidators,    // after raw writes to a type tree (either validator engine)
   annotate,                        // low-level runtime write to a metadata map (append: annotate(map, key, v, true))
 } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescript/utils'

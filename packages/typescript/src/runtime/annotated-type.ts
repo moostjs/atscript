@@ -306,6 +306,9 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     type.propsPatterns = []
   }
   const metadata = baseMetadata(base?.metadata)
+  if (base && base.metadata !== metadata) {
+    metadataReplaced()
+  }
   // (a node of its own: the shape of `createAnnotatedTypeNode`'s, every field present; a class
   // keeps its own `id`)
   base = base

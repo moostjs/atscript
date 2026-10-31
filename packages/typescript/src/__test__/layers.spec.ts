@@ -8,7 +8,7 @@ import {
 } from '../runtime/annotated-type'
 import { $alias } from '../runtime/blocks'
 import { lazyJsonSchema } from '../runtime/bundled-schema'
-import { AnnotationMap } from '../runtime/compiled-check/tracking'
+import { AnnotationMap, invalidateCompiledValidators } from '../runtime/compiled-check/tracking'
 import { $ak, $nr, LayerMap, metaEmpty } from '../runtime/layers'
 import { Validator } from '../runtime/validator'
 
@@ -224,5 +224,125 @@ describe('validators read layered metadata', () => {
     expect(v().validate({ s: 'abc' }, true)).toBe(true)
     expect(v().validate({ s: 'bc' }, true)).toBe(false)
     expect(v().validate({ s: 'ab' }, true)).toBe(false)
+  })
+})
+
+describe('cached layered reads (a view rebuilt after a metadata write)', () => {
+  /** The layered read without the cached view: the reference every cached read must equal. */
+  const live = (n: TAtscriptAnnotatedType) => {
+    const m = n.metadata as unknown as {
+      liveKeys(): string[]
+      liveGet(k: string): unknown
+    }
+    return m.liveKeys().map(k => [k, m.liveGet(k)])
+  }
+  const same = (n: TAtscriptAnnotatedType) => {
+    expect([...meta(n).entries()]).toEqual(live(n))
+    expect([...meta(n).keys()]).toEqual(live(n).map(e => e[0]))
+    expect(meta(n).size).toBe(live(n).length)
+  }
+
+  /** `interface P { s: S1 }`, `interface Q { s: S2 }`: `s` merged over S2's and S1's fields. */
+  function merged() {
+    const field = () =>
+      $().designType('string').tags('string').annotate('expect.maxLength', 3).$type
+    const s1 = field()
+    const s2 = field()
+    const s = $().designType('string').tags('string').over([s2, s1]).$type
+    const H = cls('H')
+    $('object', H).prop('s', s)
+    return { s1, s2, s, v: new Validator(H) }
+  }
+
+  it("a contributor's write shows on the merged field and in validation", () => {
+    const { s2, s, v } = merged()
+    expect(v.validate({ s: 'abcd' }, true)).toBe(false)
+    same(s)
+    meta(s2).set('expect.maxLength', 5)
+    same(s)
+    expect(v.validate({ s: 'abcd' }, true)).toBe(true)
+    meta(s2).delete('expect.maxLength')
+    // (the lower contributor's value shows again)
+    expect(meta(s).get('expect.maxLength')).toBe(3)
+    expect(v.validate({ s: 'abcd' }, true)).toBe(false)
+  })
+
+  it('own set and delete on the merged field: local, the contributors show again', () => {
+    const { s1, s2, s, v } = merged()
+    expect(v.validate({ s: 'ab' }, true)).toBe(true)
+    meta(s).set('expect.maxLength', 1)
+    same(s)
+    expect(v.validate({ s: 'ab' }, true)).toBe(false)
+    expect(meta(s1).get('expect.maxLength')).toBe(3)
+    expect(meta(s2).get('expect.maxLength')).toBe(3)
+    meta(s).delete('expect.maxLength')
+    same(s)
+    expect(v.validate({ s: 'ab' }, true)).toBe(true)
+  })
+
+  it("an in-place append on a contributor's own list shows in the concatenation", () => {
+    const { s1, s2, s, v } = merged()
+    annotate(s1.metadata, 'expect.pattern', { pattern: '^a' }, true)
+    expect(v.validate({ s: 'ab' }, true)).toBe(true)
+    // (the own list exists: appended in place)
+    annotate(s1.metadata, 'expect.pattern', { pattern: 'c$' }, true)
+    annotate(s2.metadata, 'expect.pattern', { pattern: 'b' }, true)
+    same(s)
+    expect(meta(s).get('expect.pattern')).toEqual([
+      { pattern: '^a' },
+      { pattern: 'c$' },
+      { pattern: 'b' },
+    ])
+    expect(v.validate({ s: 'ab' }, true)).toBe(false)
+    expect(v.validate({ s: 'abc' }, true)).toBe(true)
+  })
+
+  it('a key registered as an append key later concatenates from then on', () => {
+    const { s1, s } = merged()
+    meta(s1).set('test.late', 'base')
+    meta(s).set('test.late', 'own')
+    expect(meta(s).get('test.late')).toBe('own')
+    $ak('test.late')
+    same(s)
+    expect(meta(s).get('test.late')).toEqual(['base', 'own'])
+  })
+
+  it('size, keys, has and iteration order stay those of the layered read', () => {
+    const { s1, s2, s } = merged()
+    meta(s2).set('meta.label', 'L2')
+    meta(s1).set('meta.description', 'd1')
+    meta(s).set('meta.placeholder', 'p')
+    same(s)
+    expect([...meta(s).keys()]).toEqual([
+      'meta.placeholder',
+      'expect.maxLength',
+      'meta.label',
+      'meta.description',
+    ])
+    expect(meta(s).has('meta.description')).toBe(true)
+    expect(meta(s).has('meta.required')).toBe(false)
+    expect(metaEmpty(meta(s))).toBe(false)
+  })
+
+  it('the reference filter holds after a write below a reference layer', () => {
+    const T = typeT({ 'meta.label': 'T' })
+    const ref = $().ref(T).$type
+    same(ref)
+    meta(T).set('test.ro', true)
+    meta(T).set('meta.description', 'd')
+    same(ref)
+    expect(meta(ref).has('test.ro')).toBe(false)
+    expect([...meta(ref).keys()]).toEqual(['meta.label', 'meta.description'])
+  })
+
+  it("a raw swap of a node's metadata map, then invalidateCompiledValidators(): the new values are read", () => {
+    const { s1, s2, s, v } = merged()
+    expect(v.validate({ s: 'abcd' }, true)).toBe(false)
+    s2.metadata = new AnnotationMap([['expect.maxLength', 10]]) as any
+    s1.metadata = new Map([['expect.maxLength', 10]]) as any
+    invalidateCompiledValidators()
+    same(s)
+    expect(meta(s).get('expect.maxLength')).toBe(10)
+    expect(v.validate({ s: 'abcd' }, true)).toBe(true)
   })
 })

@@ -10,7 +10,7 @@ import type {
   TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
-import { metaEmpty } from './layers'
+import { filledMeta, metaEmpty, readable } from './layers'
 import {
   DECIMAL_RE,
   fastCheckPasses,
@@ -683,10 +683,11 @@ export class Validator<
 
   /** `@expect.minLength` / `maxLength` / `array.uniqueItems` checks for an array value. */
   protected validateArrayConstraints(
-    metadata: TMetadataMap<AtscriptMetadata>,
+    meta: TMetadataMap<AtscriptMetadata>,
     value: any[],
     of?: TAtscriptAnnotatedType
   ): boolean {
+    const metadata = readable(meta)
     const minLength = metadata.get('expect.minLength')
     if (minLength !== undefined) {
       const length = typeof minLength === 'number' ? minLength : minLength.length
@@ -921,10 +922,11 @@ export class Validator<
 
   /** `@meta.required` / `@expect.minLength` / `maxLength` / `pattern` checks for a string value. */
   protected validateStringConstraints(
-    metadata: TMetadataMap<AtscriptMetadata>,
+    meta: TMetadataMap<AtscriptMetadata>,
     value: string
   ): boolean {
-    if (metaEmpty(metadata)) {
+    const metadata = filledMeta(meta)
+    if (metadata === undefined) {
       return true
     }
     const filled = metadata.get('meta.required')
@@ -983,10 +985,11 @@ export class Validator<
 
   /** `@expect.int` / `min` / `max` / `exclusiveMin` / `exclusiveMax` checks for a number value. */
   protected validateNumberConstraints(
-    metadata: TMetadataMap<AtscriptMetadata>,
+    meta: TMetadataMap<AtscriptMetadata>,
     value: number
   ): boolean {
-    if (metaEmpty(metadata)) {
+    const metadata = filledMeta(meta)
+    if (metadata === undefined) {
       return true
     }
     const int = metadata.get('expect.int') as boolean | { message?: string }
@@ -1051,10 +1054,11 @@ export class Validator<
 
   /** `@meta.required` check for a boolean value (must be `true`). */
   protected validateBooleanConstraints(
-    metadata: TMetadataMap<AtscriptMetadata>,
+    meta: TMetadataMap<AtscriptMetadata>,
     value: boolean
   ): boolean {
-    if (metaEmpty(metadata)) {
+    const metadata = filledMeta(meta)
+    if (metadata === undefined) {
       return true
     }
     const filled = metadata.get('meta.required')

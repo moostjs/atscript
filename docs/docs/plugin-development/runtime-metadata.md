@@ -27,7 +27,7 @@ A node's metadata is its own values plus an ordered list of **base** nodes it re
 | `has`, `size`, `keys()`, `entries()`, loops | The effective entries: each key once, with the value `get` returns; own keys first                                                                                                                         |
 | `passedWhenReferred: false` keys            | Not read through a reference (a prop's type, a chain ref, a merge operand's type level, an annotated alias); see [Ref boundaries](/plugin-development/annotation-system#ref-boundaries-passedwhenreferred) |
 
-Bases are read live: a value written to `Address.city` later shows in `Client.home.city` unless the override sets that key itself.
+Bases are read through: a value written to `Address.city` later (with `set`, `delete` or `annotate()`) shows in `Client.home.city` unless the override sets that key itself. A node caches what it reads through its bases and refreshes it after any such write; see [Writing at runtime](#writing-at-runtime) for the one rule.
 
 Maps of a [deserialized](/packages/typescript/serialization) type are plain maps holding the effective entries; they read through nothing.
 
@@ -69,6 +69,7 @@ Consequences to plan for:
 - **Blocks run when their module loads, and write the type's own nodes.** A block loaded after your write that sets the same key overwrites it. Write after every module with `annotate` blocks has loaded.
 - **`delete(key)` removes only the node's own value.** A base's value shows through again. To hide a value, set a different one.
 - **An array read from metadata is the stored array.** It is not a copy, and through layers it can be a base node's array that other nodes read too: pushing onto it or changing it changes every node that shares it. Never mutate it. Write with `set()`, or add a value with `annotate(map, key, value, true)` from `@atscript/typescript/utils`, which appends to the node's own values.
+- **Write through the map, or call `invalidateCompiledValidators()`.** `set` / `delete` / `clear`, `annotate()` and the `defineAnnotatedType()` handle methods are seen everywhere. After any other edit (swapping a node's map, `node.metadata = otherMap`, or changing a stored value in place) call `invalidateCompiledValidators()` from `@atscript/typescript/utils`. This holds for both validator engines: compiled checks and the nodes that read through other nodes keep what they read until a tracked write or that call.
 - **Layers read a key as its spec says.** A plugin's raw write of a key whose spec says `passedWhenReferred: false` does not pass a reference, and one of a `mergeStrategy: 'append'` key comes after its bases' values, like the same annotation written in `.as` (also when no `.as` file writes that key).
 
 ```typescript
@@ -81,7 +82,7 @@ annotate(homeCity.metadata, 'expect.pattern', { pattern: '^[A-Z]' }, true)
 
 | Reader                                                                                | After `metadata.set` / `delete` / `clear` / `annotate()`                                                                              |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `Validator` (interpreted)                                                             | Reads the maps on every call: sees it                                                                                                 |
+| `Validator` (interpreted)                                                             | Sees it. A direct edit (`node.metadata = …`) needs `invalidateCompiledValidators()`, as for compiled checks                           |
 | [Compiled checks](/packages/typescript/compiled-validators#changing-types-at-runtime) | Re-bind on their next use: see it. Direct property writes (`node.optional = …`) need `invalidateCompiledValidators()`                 |
 | `toJsonSchema()` with `jsonSchema: 'lazy'`                                            | Rebuilt after a write: sees it                                                                                                        |
 | `toJsonSchema()` with `jsonSchema: 'bundle'`                                          | The schema embedded at build time does **not** see runtime writes. Call `buildJsonSchema(type)` for a schema of the type as it is now |
