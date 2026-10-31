@@ -13,7 +13,7 @@ All APIs live in `@atscript/typescript/utils`. The main entry `@atscript/typescr
 - [`forAnnotatedType`](#foranotatedtype) — kind-dispatched walker
 - [`serializeAnnotatedType` / `deserializeAnnotatedType`](#serializeannotatedtype--deserializeannotatedtype) — JSON round-trip, `SERIALIZE_VERSION`, `refDepth` shallow FK targets, annotation filtering
 - [`createDataFromAnnotatedType`](#createdatafromannotatedtype) — build empty/default/example data objects from a type
-- [Metadata access](#metadata-access) — typed `metadata.get(...)` via `AtscriptMetadata`
+- [Metadata access](#metadata-access) — typed `metadata.get(...)` via `AtscriptMetadata`; [layers + runtime writes](#metadata-layers--runtime-writes) (`metadata.set` is local, `delete` own-only, arrays read are stored arrays: never mutate)
 - [What `.as.js` exports](#what-asjs-exports)
 
 ## `TAtscriptAnnotatedType`
@@ -27,7 +27,7 @@ Every generated `.as` export conforms to this shape (type importable from `@atsc
 | `metadata`                           | Typed `Map` — `metadata.get('meta.label')` returns the type declared in global `AtscriptMetadata` (see [codegen.md](codegen.md))                                                                                                                                                                    |
 | `id?`                                | Stable type name; used by `buildJsonSchema()` for `$defs`/`$ref`                                                                                                                                                                                                                                    |
 | `optional?`                          | Set when the node is an optional object prop                                                                                                                                                                                                                                                        |
-| `ref?`                               | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it, or `''` for a plain ref (`customer: Customer`, `type X = Y`). Set for same-file and imported targets alike (since 0.1.95) |
+| `ref?`                               | Present only when authored as a reference to another type: `{ type, field }` — `type` is a **lazy function** resolving the target; `field` is a dot-joined chain into it, or `''` for a plain ref (`customer: Customer`, `@meta.x '…' type X = Y`, `annotate Y as X`). A bare `type X = Y` IS `Y` (same object). Set for same-file and imported targets alike (since 0.1.95) |
 | `validator(opts?)`                   | Constructs `new Validator(this, opts)`. **Not cached.**                                                                                                                                                                                                                                             |
 
 - `type.kind` is one of `'' | 'object' | 'array' | 'union' | 'intersection' | 'tuple'`. There is **no `'ref'` kind at runtime** — refs are carried via the sibling `ref?` field. `'$ref'` only appears in the _serialized_ form.
@@ -63,7 +63,7 @@ export const User = _User.$type
 Subtleties:
 
 - `$('object', Class)` **resets** the node. Never reuse a handle across declarations.
-- Metadata propagation is lazy; inspecting `metadata.get(...)` before the tree is fully built may miss later entries.
+- `.ref(Target)` / `.ref(Target, ['field'])` makes a reference node (structure from `Target`, metadata reading through it). `refTo` and `cloneRefProp` are REMOVED: `.as` packages built with 0.1.110 must be rebuilt (their generated code calls them).
 
 Prefer `.as` fixtures compiled via `prepareFixtures()` over hand-written `$()` chains in tests — hand-written builders are fragile. It recompiles `.as.js` + `.as.d.ts` next to the source on every run but **writes only files whose content changed** (up-to-date artifacts keep their mtime — no watch-mode churn, no cache busting). Gitignore `*.as.js` / `*.as.d.ts` and let it regenerate.
 
@@ -153,7 +153,7 @@ Self-referential FKs handled via the serialized `kind: '$ref'` node.
 
 **Refs inside annotation values (since 0.1.100).** A type reference in an annotation value (`ref` argument getter, class, or `{ type, field }` query field ref) serializes as a shallow target: `{ id }` at `refDepth` 0, `{ id, metadata }` when `refDepth > 0`; refs inside that `metadata` are `{ id }` only (no cycles). Plain objects/arrays recurse, other values pass through. Before 0.1.100 these values were silently dropped from JSON. `SERIALIZE_VERSION` unchanged.
 
-**Repeated named types and `own`.** A named type serializes in full once; later uses are `type: { kind: '$ref', id }`. A later use that carries something of its own — different prop-level `metadata`, `optional`, or FK `ref` (another target type/field, e.g. `customerCode: Customer.code` vs `supplierCode: Supplier.code` sharing alias `Code`) — gets `type: { kind: '$ref', id, own: true }` plus its own `metadata`, `optional` and, when `refDepth > 0`, its use-site `ref`; `deserializeAnnotatedType` builds a separate node over the shared type with that `.ref`. Annotation values compare structurally, type-reference values (`@x Country`) by the type they resolve to (different targets => `own`, same target => collapse), other functions/instances by reference. Uses adding nothing stay `{ kind: '$ref', id }` with empty `metadata` and restore to the same node. `processAnnotation` runs only for the first use and `own` entries. Cyclic plain objects in annotation values serialize the repeat as `'[Circular]'`; BigInt is tolerated.
+**Repeated named types and `own`.** A named type serializes in full once; later uses are `type: { kind: '$ref', id }`. A later use that carries something of its own — different prop-level `metadata`, `optional`, or FK `ref` (another target type/field, e.g. `customerCode: Customer.code` vs `supplierCode: Supplier.code` sharing alias `Code`) — gets `type: { kind: '$ref', id, own: true }` plus its own `metadata`, `optional` and, when `refDepth > 0`, its use-site `ref`; `deserializeAnnotatedType` builds a separate node over the shared type with that `.ref`. Annotation values compare structurally, type-reference values (`@x Country`) by the type they resolve to (different targets => `own`, same target => collapse), other functions/instances by reference. Uses adding nothing stay `{ kind: '$ref', id }` with empty `metadata` and restore to the same node. `processAnnotation` runs only for the first use and `own` entries. Cyclic plain objects in annotation values serialize the repeat as `'[Circular]'`; BigInt is tolerated. Distinct types sharing an `id` (same name, different modules) never collapse: each further one is serialized in full under a unique payload `id` (`Name@1`, `Name@2`, …) plus `origId: 'Name'`, and its `$ref` uses that payload id; `deserializeAnnotatedType` restores `origId` as the type's `id`. Code walking the serialized form by `id` sees distinct ids per distinct type. A self-reaching reference without an id (`interface T { d?: { x?: T.d } }`) gets a payload `id` (`Recursive`, `Recursive@1`, …) with `anon: true` (restored without an id), so its repeat is a `$ref`; so is any other id-less type the tree holds in several places (types refer to each other's nodes: a prop inherited through `extends` / an intersection, `T.a` used twice). A deserialized type is a snapshot: later changes to the source types (blocks loaded later, metadata edits) do not reach it. `buildJsonSchema()` likewise extracts such a repeated id-less type into `$defs` once (named after its prop, `Recursive` when it reaches itself).
 
 ### Annotation filtering
 
@@ -208,6 +208,23 @@ forAnnotatedType(User, {
 
 Never cast `metadata.get(...)` to `any`. If the type is wrong/missing, `atscript.d.ts` is stale — see [codegen.md](codegen.md#atscriptdts).
 
+### Metadata layers + runtime writes
+
+A node's metadata = own values + bases it reads through (reference → target, path override → overridden prop, merged prop → each member's prop, `as` copy → `T`). Docs: https://atscript.dev/plugin-development/runtime-metadata
+
+| # | Rule |
+|---|------|
+| L1 | `get` = own value, else first base having it (later merge member first). `append` keys (per spec, core + plugins — raw writes included) = bases' values first (lowest priority first), then own. |
+| L2 | Iteration / `size` / `has` = effective entries, each key once, own keys first. |
+| L3 | Shared nodes: bare alias IS its target; inherited prop IS the parent's (a write through `Child` changes `Parent` + siblings); prop one merge member has IS that member's; `p?: T` is its own thin node over `T`; named merge = own class; same unnamed merge in two modules = two objects. |
+| L4 | `metadata.set` is LOW-LEVEL and LOCAL: writes only the held node; shows where that node object is and through every node reading through it. Prefer `annotate` blocks. |
+| L5 | A block loaded later setting the same key overwrites a raw write → write only after all annotate modules have loaded. |
+| L6 | `delete(key)` removes only the OWN value (a base's shows again). To hide, set another value. |
+| L7 | An array read from metadata is the STORED array (no copy) and may be a base node's, shared through layers — mutating it (`push`, `splice`, `sort`) changes every node reading it. Never mutate; write with `set()` or `annotate(map, key, value, true)`. |
+| L8 | `passedWhenReferred: false` keys (per spec, core + plugins) never pass a reference layer — raw writes of them included. |
+| L9 | Who sees a raw write: validator (interpreted + compiled — compiled checks re-bind; direct prop writes still need `invalidateCompiledValidators()`), `'lazy'` `toJsonSchema()`, readers. NOT a `'bundle'` `toJsonSchema()` literal → use `buildJsonSchema(type)`. |
+| L10 | `deserializeAnnotatedType` → plain maps (effective entries), no layers. |
+
 ## What `.as.js` exports
 
 Each top-level `.as` export → a `class` of the same name with `static __is_atscript_annotated_type`, `static id`, `static type`, `static metadata`, `static validator`. The class itself **is** the `TAtscriptAnnotatedType`:
@@ -231,6 +248,8 @@ Builds a plain data object matching a type's shape. `opts.mode` (default `'empty
 - `'example'` — values from `@meta.example`; optional props always included; arrays get one sample item. This is what the generated `.toExampleData()` calls when `exampleData: true` is set in the TS plugin config.
 - `'db'` — `@db.default` / `@db.default.increment|uuid|now` (DB layer — see https://db.atscript.dev).
 - a `TValueResolver` — `(prop, path) => value` for full control.
+
+Recursive types stop where they would repeat (an optional prop leading back is omitted even in `'example'` mode, an array of it is `[]`, a union takes a branch that ends); an intersection of objects gets every member's props.
 
 ```ts
 import { createDataFromAnnotatedType } from '@atscript/typescript/utils'

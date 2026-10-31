@@ -50,6 +50,10 @@ When a property references another property, annotations merge in order:
 2. Referenced property annotations
 3. Current property annotations (highest priority)
 
+### Intersections and `extends`
+
+A property several intersection members (or several parents of `extends A, B`) declare reads the annotations of each, the later member winning; a member written in place wins over the others. See [How a merge is built](/packages/typescript/interfaces-types#how-a-merge-is-built).
+
 ### Merge Strategies
 
 When annotations are merged (from type inheritance, property references, or ad-hoc annotations), the **merge strategy** determines how same-named annotations combine:
@@ -155,7 +159,7 @@ Atscript provides common-purpose annotations:
 - `@expect.exclusiveMin 0, "Custom error message"` - Number must be strictly greater than the value (optional message, since 0.1.109)
 - `@expect.exclusiveMax 1, "Custom error message"` - Number must be strictly less than the value (optional message, since 0.1.109)
 - `@expect.int "Custom error message"` - Must be integer (optional message)
-- `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message)
+- `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message). Every check of a value gives the same result: the `g` flag has no effect, and `y` matches at the start of the value only (like `^`); the compiler warns about both
 - `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
 - `@expect.array.key "Custom error message"` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself; optional message)
 
@@ -247,6 +251,7 @@ Use `string.required` or `@meta.required` to ensure required string fields are n
 ### Emit Annotations (@emit.\*)
 
 - `@emit.jsonSchema` — Pre-compute and embed the JSON Schema for an interface at build time, regardless of the global `jsonSchema` plugin setting
+- `@emit.compiledValidator` — Emit a build-time compiled validator check for this type even when the global `compileValidators` option is off. See [Compiled Validators](/packages/typescript/compiled-validators#per-type-opt-in-emit-compiledvalidator)
 
 ### Database Annotations (@db.\*)
 

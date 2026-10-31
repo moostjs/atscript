@@ -1,8 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { User } from "./extends-chain-base.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base } from "./extends-chain-base.as"
 
 export class Child {
@@ -15,17 +14,11 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "userName",
-    $()
-      .refTo(() => User, ["name"])
-      .$type
-  ).prop(
-    "id",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("userName", $f(Base, "userName"))
+  .prop("id", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

@@ -35,7 +35,7 @@ new AnnotationSpec({
 | `argument`           | `object \| object[]`    | —           | Argument definition(s)                                                                                                           |
 | `multiple`           | `boolean`               | `false`     | Allow the annotation to appear more than once on the same node                                                                   |
 | `mergeStrategy`      | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                                                 |
-| `passedWhenReferred` | `boolean`               | `true`      | Whether fields referencing the annotated node inherit this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred). |
+| `passedWhenReferred` | `boolean`               | `true`      | Whether references to the annotated node read this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred).         |
 | `defType`            | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).                                 |
 | `validate`           | `function`              | —           | Custom validation at parse time                                                                                                  |
 | `modify`             | `function`              | —           | AST mutation after validation                                                                                                    |
@@ -389,13 +389,13 @@ annotate Base as Tagged {
 `mergeStrategy: 'append'` almost always pairs with `multiple: true` — otherwise the base annotation would error on duplicates.
 :::
 
-Across a ref (`status: Status`, `ownerId: User.id`) the emitted runtime metadata lists the referenced type's entries first, then the referring prop's own, in source order within each group. A consumer that folds the entries into a map (last entry wins) therefore lets the prop's own entry override the type's entry for the same key. Since 0.1.100.
+Across a ref (`status: Status`, `ownerId: User.id`) the referring prop's metadata reads through to the referenced type's: iterating it yields each key once with its effective value (the prop's own keys first, then those read from the referenced type), so a consumer folding the entries into a map gets the prop's own value where both set the same key. See [Runtime Metadata](/plugin-development/runtime-metadata) for how these layers read.
 
 ## Ref Boundaries (`passedWhenReferred`)
 
-When a field references another declaration's field (`ownerId: User.id`, directly or through intermediate refs), the referenced field's annotations fold into the referring field — merged nearest-first, so precedence is: local declaration → nearest ref → deeper refs → resolved type.
+When a field references another declaration or one of its fields (`owner: User`, `ownerId: User.id`, directly or through intermediate refs), it reads the referenced annotations — precedence: local declaration → nearest ref → deeper refs → resolved type.
 
-That inheritance is right for annotations that describe the **value or its presentation** (labels, validation constraints, UI hints) and wrong for annotations that describe the **declaring scope itself** — a database index, a storage option, a primary-key marker. `passedWhenReferred: false` opts an annotation out of crossing ref boundaries:
+That inheritance is right for annotations that describe the **value or its presentation** (labels, validation constraints, UI hints) and wrong for annotations that describe the **declaring scope itself** — a database table or index, a storage option, a primary-key marker. `passedWhenReferred: false` keeps an annotation from crossing a reference:
 
 ```typescript
 new AnnotationSpec({
@@ -407,10 +407,22 @@ new AnnotationSpec({
 })
 ```
 
+Where the flag applies:
+
+| Construct                                                         | `passedWhenReferred: false` keys of the referenced type          |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A prop typed by a reference (`owner: User`)                       | Left out of the prop's own level (`owner.metadata`)              |
+| A chain ref (`ownerId: User.id`)                                  | Left out (`ownerId` is not a primary key)                        |
+| An intersection operand (`type RW = RO & W`)                      | Left out of the merge's type-level metadata                      |
+| An alias with annotations of its own (`@db.alias 'x' type P = T`) | Left out of `P`'s type-level metadata (`P` is not a `@db.table`) |
+| A bare alias (`type P = T`, `type P = (T)`)                       | Kept: the alias **is** `T`                                       |
+| A copy (`annotate T as X { … }`)                                  | Kept: a copy keeps everything                                    |
+| Inherited props (`extends`) and props of a merge                  | Kept: they are (or read through) the members' own props          |
+
 Rules:
 
-- Applies **only** at ref boundaries. `extends` and intersection merging always inherit the full annotation set — the child owns the inherited props.
 - Default is `true`: value/presentation annotations travel with the field they describe.
+- The flag comes from the spec, so it holds for every write of the key: a block of another module and a plugin's runtime `metadata.set` of a `false` key do not pass a reference either.
 - Built-in specs that declare `false`: `@meta.id`, `@meta.required`, `@meta.default`, `@meta.readonly` — a field referencing a primary key is not itself a primary key, and requiredness/defaults/mutability are the referring declaration's own contract.
 - A primitive's own annotations (its config `annotations` map — `string.required` → `@meta.required`, `number.timestamp.created` → `@db.default.now`, `number.timestamp.updated` → `@db.default.now` + `@db.onUpdate.now` since 0.1.106) are part of the type: they apply to every field typed with the primitive, directly or through a type alias (`type Name = string.required`), whatever `passedWhenReferred` says. Only a reference to another field (`createdAt: Order.createdAt`) drops the `false` ones, like that field's own annotations. Since 0.1.104; versions 0.1.79–0.1.103 dropped them from such fields (union members and array elements kept them), so `name: string.required` did not reject `''`.
 
@@ -544,6 +556,8 @@ Available `defType` values:
 - Composite kinds: `'object'`, `'array'`, `'union'`, `'intersection'`
 
 `'object'` matches both interfaces and inline structures; `'union'` / `'intersection'` match group nodes.
+
+On a top-level annotation of an `annotate` block (written before the keyword), `defType` checks the type the block's target resolves to — through type aliases and `annotate … as` aliases — exactly like the annotation written on the target's declaration: with `type Name = string`, a `defType: ['string']` annotation is valid on `annotate Name {}` and `annotate Name as Short {}`.
 
 A nullable union also passes the `defType` check when every member other than `null` / `undefined` matches (since 0.1.103): `defType: ['number']` accepts `number | null`, `number.int | undefined` and an alias `type N = number | null`. Mixed unions (`number | string`) are still rejected.
 

@@ -5,7 +5,8 @@ import path from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { TAtscriptConfigInput } from './config'
-import { AtscriptRepo } from './repo'
+import type { AtscriptDoc } from './document'
+import { AtscriptRepo, blockDependencies, blockTargetDocuments } from './repo'
 
 const dirs: string[] = []
 
@@ -136,5 +137,86 @@ describe('AtscriptRepo.closeDocument', () => {
       process.off('unhandledRejection', onRejection)
     }
     expect(onRejection).not.toHaveBeenCalled()
+  })
+})
+
+describe('AtscriptRepo.openDocument with text', () => {
+  it('an empty text is the text: a document emptied is parsed as empty', async () => {
+    const root = makeProject({
+      't.as': 'export interface T {\n  a: string\n}\n',
+      'p.as': "import { T } from './t'\nexport interface P {\n  t: T\n}\n",
+    })
+    const repo = makeRepo(root)
+    const p = await repo.openDocument(uri(root, 'p.as'))
+    await repo.checkDoc(p)
+    expect(p.getDiagMessages().filter(m => m.severity === 1)).toEqual([])
+    const t = await repo.openDocument(uri(root, 't.as'), '')
+    expect(t.text).toBe('')
+    expect(t.exports.size).toBe(0)
+    p.clearMessages()
+    await repo.checkDoc(p)
+    expect(p.getDiagMessages().map(m => m.message)).toContain(`"./t" has no exported member "T"`)
+    // (and a document opened with an empty text is not read from disk)
+    const fresh = makeRepo(root)
+    const empty = await fresh.openDocument(uri(root, 't.as'), '')
+    expect(empty.text).toBe('')
+    expect(empty.exports.size).toBe(0)
+  })
+})
+
+describe('blockTargetDocuments / blockDependencies', () => {
+  it('resolve a block through plain aliases, in any file', async () => {
+    const root = makeProject({
+      'a.as': 'export interface User {\n  name: string\n}\n',
+      'e.as': 'export interface Addr {\n  name: string\n}\n',
+      'b.as': "import { User } from './a'\nexport type UA = User\n",
+      'c.as': "import { UA } from './b'\nannotate UA {\n  @meta.label 'c'\n  name\n}\n",
+      'u.as':
+        "import { User } from './a'\nimport { X } from './x'\nexport interface U {\n  u: User\n  x: X\n}\n",
+      'x.as': 'export interface X {\n  n: string\n}\n',
+    })
+    const repo = makeRepo(root)
+    const docs: Record<string, AtscriptDoc> = {}
+    for (const f of ['a.as', 'e.as', 'b.as', 'c.as', 'u.as', 'x.as']) {
+      docs[f] = await repo.openDocument(uri(root, f))
+      await repo.checkDoc(docs[f])
+    }
+    const names = (set: Set<AtscriptDoc>) => [...set].map(d => path.basename(d.id)).sort()
+    expect(names(blockTargetDocuments(docs['c.as']))).toEqual(['a.as'])
+    // (User's module, its users and what they import: whether the block is reachable)
+    expect(names(blockDependencies(docs['c.as']))).toEqual(['a.as', 'b.as', 'u.as', 'x.as'])
+    expect(names(blockTargetDocuments(docs['b.as']))).toEqual([])
+    // the alias retargeted
+    const b = await repo.openDocument(
+      uri(root, 'b.as'),
+      "import { Addr } from './e'\nexport type UA = Addr\n"
+    )
+    await repo.checkDoc(b)
+    expect(names(blockTargetDocuments(docs['c.as']))).toEqual(['e.as'])
+  })
+})
+
+describe('go to definition in a repo', () => {
+  it('the head of a chain goes to the declaration it names, an intersection alias too', async () => {
+    const root = makeProject({
+      'a.as': `export interface A {
+  y?: string
+}
+export interface B {
+  y?: string
+}
+export type M = A & B
+export type N = A
+export interface C {
+  v?: M.y
+  w?: N.y
+}
+`,
+    })
+    const repo = makeRepo(root)
+    const doc = (await repo.openDocument(uri(root, 'a.as')))!
+    const line = (l: number, c: number) => doc.getToDefinitionAt(l, c)?.[0]?.targetRange.start.line
+    // (`M` is the alias, not its first member `A`)
+    expect([line(9, 7), line(10, 7), line(9, 9)]).toEqual([6, 7, 1])
   })
 })

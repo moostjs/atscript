@@ -8,6 +8,7 @@ Plugins can register primitives, annotations, emit new output formats (another l
 - [Packaging](#packaging) — factory + peer deps
 - [New language extension](#new-language-extension) — patterns for Python/Java/Go/…
 - [`AnnotationSpec` and primitive annotations](#annotationspec-and-primitive-annotations)
+- [Runtime metadata from a plugin](#runtime-metadata-from-a-plugin) — `metadata.set` locality, layers (→ runtime.md)
 - [Message convention](#message-convention) — `doc.getDiagMessages()`
 - [Type guards](#type-guards) — `isInterface`, `isProp`, `isRef`, `isStructure`
 - [Testing a plugin](#testing-a-plugin) — unit / integration / end-to-end
@@ -165,6 +166,10 @@ A language extension = plugin whose `render()` emits another language. Pattern:
 Hover examples: `annotationExample(description, ...lines)` (since 0.1.109) → `description` + an **Example:** `atscript` code block, one arg per line (`''` = blank line), same format as the built-in hovers.
 
 Primitives use generic `annotations: Record<string, TPrimitiveAnnotationValue>` — no hardcoded `expect` property. See [primitives.md](primitives.md#extending-via-config). Annotation values on primitives are resolved against the registered `AnnotationSpec` (spec arg names → object keys, `multiple: true` → array).
+
+## Runtime metadata from a plugin
+
+Reading / writing generated types' `metadata` at runtime (layers, what `metadata.set` reaches, `delete`, append arrays, compiled checks, bundled schema) → [runtime.md](runtime.md#metadata-layers--runtime-writes). Rule of thumb: change types with `annotate` blocks; raw `metadata.set` is local to the held node and must run after all annotate modules loaded; a `passedWhenReferred: false` key written raw still does not pass a reference.
 
 ## Message convention
 

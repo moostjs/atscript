@@ -10,12 +10,29 @@ import type {
   TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
+import { metaEmpty } from './layers'
 import {
   DECIMAL_RE,
   fastCheckPasses,
+  WASTE_BEFORE_MEMO,
   getRegex,
   rejectsNullAsRequired,
 } from './validator-fast-check'
+import { arrayKeyProps } from './validator-keys'
+
+/**
+ * The outcome of a union over an object value at a path, recorded once the walk backtracks (see
+ * `Validator.unionMemo`): the branch that matched, or the error reported.
+ */
+interface TUnionOutcome {
+  def: TAtscriptAnnotatedType
+  path: string
+  unknownProps: TValidatorOptions['unknownProps']
+  /** `Validator.strips` when the union was entered: an outcome is reused only while it holds. */
+  strips: number
+  item?: TAtscriptAnnotatedType
+  error?: TError
+}
 
 interface TError {
   path: string
@@ -117,6 +134,25 @@ export class Validator<
   protected depth = 0
   protected limitExceeded = false
   protected context: unknown
+  /**
+   * The unions over objects this call decided inside union branches (value → outcomes). A union
+   * nested in its own branches, many branches each, is reached again with the same value and path
+   * from every branch of every union above it — (branches)^(depth) work. The memo is made once
+   * the call has wasted {@link WASTE_BEFORE_MEMO} union branches (failed after branches of nested
+   * unions over objects failed) since the outermost union, as in the pre-check — ordinary walks
+   * never make it. It decides each such union once, with the same result and the same error object
+   * (both depend only on these, the options and the input, which only a strip changes: see
+   * `strips`).
+   */
+  private unionMemo?: Map<object, TUnionOutcome[]>
+  /** Union branches being checked (`> 0`: inside a union branch). */
+  private unionDepth = 0
+  /** Failed branches of unions over objects inside union branches (see `unionMemo`). */
+  private nestedFailures = 0
+  /** Wasted union branches since the outermost union was entered (see `unionMemo`). */
+  private wasted = 0
+  /** Objects this call stripped keys from; an outcome recorded before a strip is not reused. */
+  private strips = 0
 
   protected buildPath(): string {
     if (this.depth <= 0) {
@@ -153,7 +189,7 @@ export class Validator<
     }
   }
 
-  protected error(message: string, path?: string, details?: TError[]) {
+  protected error(message: string, path?: string, details?: TError[]): TError {
     let errors = this.stackErrors[this.stackErrors.length - 1]
     if (!errors) {
       if (this.stackErrors.length > 0) {
@@ -169,6 +205,24 @@ export class Validator<
     }
     if (details?.length) {
       error.details = details
+    }
+    errors.push(error)
+    if (errors.length >= this.opts.errorLimit) {
+      this.limitExceeded = true
+    }
+    return error
+  }
+
+  /** Adds `error`, already made, to the errors of the current level (as {@link error} does). */
+  private report(error: TError) {
+    let errors = this.stackErrors[this.stackErrors.length - 1]
+    if (!errors) {
+      if (this.stackErrors.length > 0) {
+        errors = []
+        this.stackErrors[this.stackErrors.length - 1] = errors
+      } else {
+        errors = this.errors
+      }
     }
     errors.push(error)
     if (errors.length >= this.opts.errorLimit) {
@@ -208,8 +262,15 @@ export class Validator<
       return true
     }
     this.context = context
+    this.unionDepth = 0
+    // (a walk that threw left its memo: never reused)
+    this.unionMemo = undefined
     const passed = this.validateSafe(this.def, value)
     this.context = undefined
+    if (this.unionMemo !== undefined) {
+      // (made by this walk only once it wasted work: see `unionMemo`)
+      this.unionMemo = undefined
+    }
     if (!passed) {
       if (safe) {
         return false
@@ -229,18 +290,38 @@ export class Validator<
     return this.constructor === Validator && !this.hasPlugins && !this.hasReplace
   }
 
+  /** Validates `value` against `def` (after `replace`, `optional` and the plugins). */
   protected validateSafe(def: TAtscriptAnnotatedType, value: any): boolean {
+    // (as small as in 0.1.110, the engine inlines it in every walk step: the rest is apart)
     if (this.limitExceeded) {
       return false
     }
     if (this.hasReplace) {
-      let replaced = this.replaceCache!.get(def)
-      if (replaced === undefined) {
-        replaced = this.opts.replace!(def, this.buildPath())
-        this.replaceCache!.set(def, replaced)
-      }
-      def = replaced
+      def = this.replaced(def)
     }
+    if (def.optional && (value === undefined || value === null)) {
+      // `@meta.required` on an optional field: omitting it is fine, `null` is not
+      // (unless the type itself accepts null, e.g. `string | null`).
+      if (value === null && rejectsNullAsRequired(def)) {
+        this.error(requiredMessage(def))
+        return false
+      }
+      return true
+    }
+    if (this.hasPlugins) {
+      const decided = this.preCheck(def, value)
+      if (decided !== undefined) {
+        return decided
+      }
+    }
+    return this.validateAnnotatedType(def, value)
+  }
+
+  /**
+   * What {@link validateSafe} decides of `def` (replaced) before its own validation: an
+   * optional `def` passes `undefined` / `null`, a plugin may decide — `undefined` to go on.
+   */
+  private preCheck(def: TAtscriptAnnotatedType, value: any): boolean | undefined {
     if (def.optional && (value === undefined || value === null)) {
       // `@meta.required` on an optional field: omitting it is fine, `null` is not
       // (unless the type itself accepts null, e.g. `string | null`).
@@ -258,7 +339,17 @@ export class Validator<
         }
       }
     }
-    return this.validateAnnotatedType(def, value)
+    return undefined
+  }
+
+  /** `def` as the `replace` option replaces it at the current path (memoized per node). */
+  private replaced(def: TAtscriptAnnotatedType): TAtscriptAnnotatedType {
+    let replaced = this.replaceCache!.get(def)
+    if (replaced === undefined) {
+      replaced = this.opts.replace!(def, this.buildPath())
+      this.replaceCache!.set(def, replaced)
+    }
+    return replaced
   }
 
   protected get path() {
@@ -321,6 +412,31 @@ export class Validator<
         }
       }
     }
+    // (one union over an object inside a union branch is `nested`: its failed branches count, and
+    // once the call made the memo it is decided once per value and path — `path` set: see
+    // `unionMemo`)
+    let nested = false
+    let path: string | undefined
+    if (this.unionDepth > 0) {
+      if (typeof value === 'object' && value !== null) {
+        if (this.unionMemo !== undefined) {
+          path = this.buildPath()
+          const known = this.decided(def, value, path)
+          if (known !== undefined) {
+            if (known.error === undefined) {
+              return this.validateUnionConstraints(def, known.item!, value)
+            }
+            this.report(known.error)
+            return false
+          }
+        }
+        nested = true
+      }
+    } else {
+      // The outermost union: a new waste window (see `unionMemo`).
+      this.wasted = 0
+    }
+    const strips = this.strips
     let details: TError[] | undefined
 
     for (const item of items) {
@@ -329,9 +445,16 @@ export class Validator<
       // instead of "payment.[object(0)].number"), which is cleaner since they're
       // already grouped in the details array.
       this.stackErrors.push(null)
+      const failures = this.nestedFailures
+      this.unionDepth++
+      const passed = this.validateSafe(item, value)
+      this.unionDepth--
 
-      if (this.validateSafe(item, value)) {
+      if (passed) {
         this.stackErrors.pop()
+        if (path !== undefined) {
+          this.decide(def, value, path, strips, item, undefined)
+        }
         return this.validateUnionConstraints(def, item, value)
       }
 
@@ -339,6 +462,12 @@ export class Validator<
       // Reset limit flag — discarded branch errors don't count toward the limit
       if (this.limitExceeded) {
         this.limitExceeded = false
+      }
+      if (this.nestedFailures !== failures) {
+        this.wasteBranch()
+      }
+      if (nested) {
+        this.nestedFailures++
       }
       if (branchErrors) {
         if (details) {
@@ -351,11 +480,79 @@ export class Validator<
       }
     }
 
+    // (all of them: an outcome decided once — see `unionMemo` — is one error object wherever it
+    // is reported, so details of unions nested in their own branches share their errors)
     const expected = items
       .map((item, i) => `[${item.type.kind || (item.type as TAtscriptTypeFinal).designType}(${i})]`)
       .join(', ')
-    this.error(`Value does not match any of the allowed types: ${expected}`, undefined, details)
+    const error = this.error(
+      `Value does not match any of the allowed types: ${expected}`,
+      undefined,
+      details
+    )
+    if (path !== undefined) {
+      this.decide(def, value, path, strips, undefined, error)
+    }
     return false
+  }
+
+  /** A union branch failed after branches of nested unions over objects did (see `unionMemo`). */
+  private wasteBranch() {
+    if (++this.wasted === WASTE_BEFORE_MEMO && this.unionMemo === undefined) {
+      this.unionMemo = new Map()
+    }
+  }
+
+  /** The outcome this call recorded for union `def` over `value` at `path` (see `unionMemo`). */
+  private decided(
+    def: TAtscriptAnnotatedType,
+    value: object,
+    path: string
+  ): TUnionOutcome | undefined {
+    const outcomes = this.unionMemo!.get(value)
+    if (outcomes !== undefined) {
+      const { unknownProps } = this.opts
+      for (const outcome of outcomes) {
+        if (
+          outcome.def === def &&
+          outcome.path === path &&
+          outcome.unknownProps === unknownProps &&
+          outcome.strips === this.strips
+        ) {
+          return outcome
+        }
+      }
+    }
+    return undefined
+  }
+
+  /** Records the outcome of union `def` over `value` at `path`, entered at `strips`. */
+  private decide(
+    def: TAtscriptAnnotatedType,
+    value: object,
+    path: string,
+    strips: number,
+    item: TAtscriptAnnotatedType | undefined,
+    error: TError | undefined
+  ) {
+    if (strips !== this.strips) {
+      // A strip during the union: deciding it again could differ.
+      return
+    }
+    const outcome: TUnionOutcome = {
+      def,
+      path,
+      unknownProps: this.opts.unknownProps,
+      strips,
+      item,
+      error,
+    }
+    const outcomes = this.unionMemo!.get(value)
+    if (outcomes === undefined) {
+      this.unionMemo!.set(value, [outcome])
+    } else {
+      outcomes.push(outcome)
+    }
   }
 
   /**
@@ -369,7 +566,7 @@ export class Validator<
     value: any
   ): boolean {
     const metadata = def.metadata
-    if (metadata.size === 0 || (branch.type as TAtscriptTypeFinal).value !== undefined) {
+    if (metaEmpty(metadata) || (branch.type as TAtscriptTypeFinal).value !== undefined) {
       return true
     }
     switch (typeof value) {
@@ -394,6 +591,7 @@ export class Validator<
     }
   }
 
+  /** Every member must pass, each on its own (JSON Schema `allOf`). */
   protected validateIntersection(
     def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
     value: any
@@ -404,6 +602,36 @@ export class Validator<
       }
     }
     return true
+  }
+
+  /**
+   * An unknown key (`unknownProps`): 'error' reports it, 'strip' adds it to the keys to strip
+   * (returned; see `stripKeys`).
+   */
+  private unknownKey(key: string, keysToStrip: string[] | undefined): string[] | undefined {
+    if (this.opts.unknownProps === 'error') {
+      this.push(key)
+      this.error(`Unexpected property`)
+      this.pop(true)
+    } else if (this.opts.unknownProps === 'strip') {
+      ;(keysToStrip ??= []).push(key)
+    }
+    return keysToStrip
+  }
+
+  /** The `skipList` keys of the object at the current path. */
+  private skipListHere(): Set<string> | undefined {
+    if (!this.opts.skipList) {
+      return undefined
+    }
+    let skipList: Set<string> | undefined
+    const path = this.depth > 0 ? `${this.buildPath()}.` : ''
+    for (const item of this.opts.skipList) {
+      if (item.startsWith(path)) {
+        ;(skipList ??= new Set()).add(item.slice(path.length))
+      }
+    }
+    return skipList
   }
 
   protected validateTuple(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
@@ -429,7 +657,10 @@ export class Validator<
       this.error('Expected array')
       return false
     }
-    if (def.metadata.size > 0 && !this.validateArrayConstraints(def.metadata, value, def.type.of)) {
+    if (
+      !metaEmpty(def.metadata) &&
+      !this.validateArrayConstraints(def.metadata, value, def.type.of)
+    ) {
       return false
     }
     let i = 0
@@ -484,18 +715,11 @@ export class Validator<
     if (uniqueItems) {
       const separator = '▼↩'
       const seen = new Set<string>()
-      const keyProps = new Set<string>()
-      if (of?.type.kind === 'object') {
-        for (const [key, val] of of.type.props.entries()) {
-          if (val.metadata.get('expect.array.key')) {
-            keyProps.add(key)
-          }
-        }
-      }
+      const keyProps = arrayKeyProps(of)
       for (let idx = 0; idx < value.length; idx++) {
         const item = value[idx]
         let key: string
-        if (keyProps.size > 0) {
+        if (keyProps.length > 0) {
           key = ''
           for (const prop of keyProps) {
             key += JSON.stringify(item[prop]) + separator
@@ -524,19 +748,7 @@ export class Validator<
     let keysToStrip: string[] | undefined
 
     // prepare skipList for this object (rare)
-    let skipList: Set<string> | undefined
-    if (this.opts.skipList) {
-      const path = this.depth > 0 ? `${this.buildPath()}.` : ''
-      for (const item of this.opts.skipList) {
-        if (item.startsWith(path)) {
-          const key = item.slice(path.length)
-          if (!skipList) {
-            skipList = new Set()
-          }
-          skipList.add(key)
-        }
-      }
-    }
+    const skipList = this.opts.skipList ? this.skipListHere() : undefined
 
     let partialFunctionMatched = false
     if (typeof this.opts.partial === 'function') {
@@ -607,26 +819,19 @@ export class Validator<
           } else {
             this.pop(false)
           }
-        } else if (this.opts.unknownProps === 'error') {
-          this.push(key)
-          this.error(`Unexpected property`)
-          this.pop(true)
-          if (this.limitExceeded) {
-            return false
+        } else {
+          keysToStrip = this.unknownKey(key, keysToStrip)
+          if (this.opts.unknownProps === 'error') {
+            if (this.limitExceeded) {
+              return false
+            }
+            passed = false
           }
-          passed = false
-        } else if (this.opts.unknownProps === 'strip') {
-          if (!keysToStrip) {
-            keysToStrip = []
-          }
-          keysToStrip.push(key)
         }
       }
     }
-    if (passed && keysToStrip) {
-      for (const key of keysToStrip) {
-        delete value[key]
-      }
+    if (stripKeys(value, passed, keysToStrip)) {
+      this.strips++
     }
     return passed
   }
@@ -719,7 +924,7 @@ export class Validator<
     metadata: TMetadataMap<AtscriptMetadata>,
     value: string
   ): boolean {
-    if (metadata.size === 0) {
+    if (metaEmpty(metadata)) {
       return true
     }
     const filled = metadata.get('meta.required')
@@ -781,7 +986,7 @@ export class Validator<
     metadata: TMetadataMap<AtscriptMetadata>,
     value: number
   ): boolean {
-    if (metadata.size === 0) {
+    if (metaEmpty(metadata)) {
       return true
     }
     const int = metadata.get('expect.int') as boolean | { message?: string }
@@ -849,7 +1054,7 @@ export class Validator<
     metadata: TMetadataMap<AtscriptMetadata>,
     value: boolean
   ): boolean {
-    if (metadata.size === 0) {
+    if (metaEmpty(metadata)) {
       return true
     }
     const filled = metadata.get('meta.required')
@@ -913,4 +1118,19 @@ export class ValidatorError extends Error {
     // oxlint-disable-next-line prefer-template
     super(`${errors[0].path ? errors[0].path + ': ' : ''}${errors[0].message}`)
   }
+}
+
+/** Deletes the unknown keys recorded for stripping, once the object passed: whether it did. */
+function stripKeys(
+  value: Record<string, unknown>,
+  passed: boolean,
+  keys: string[] | undefined
+): boolean {
+  if (passed && keys && keys.length > 0) {
+    for (const key of keys) {
+      delete value[key]
+    }
+    return true
+  }
+  return false
 }

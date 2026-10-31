@@ -11,7 +11,7 @@
  *
  * A registered entry is also a template: a node referencing a class of another module
  * (an `EXT` site) binds that class's layout against itself — its own annotations feed `K`
- * — so cross-module references, aliases of imported types and cloned imported props run
+ * — so cross-module references, aliases of imported types and their derived props run
  * compiled code whenever their tree matches the referenced type's structure.
  *
  * The registry is module-local: classes registered with another copy of this runtime
@@ -19,6 +19,7 @@
  * simply validated by the interpreted pre-check.
  */
 import { isPhantomType, type TAtscriptAnnotatedType } from '../annotated-type'
+import { watchLayer } from '../layers'
 import type { TValidatorOptions } from '../validator'
 import {
   D_ARRAY,
@@ -67,7 +68,24 @@ export interface TCompiledHelpers {
   dec: RegExp
   /** `rejectsNullAsRequired` (read live: it depends on the node's whole subtree). */
   rn: (def: TAtscriptAnnotatedType) => boolean
+  /**
+   * The union memo of the current pre-check call (see `TUnionMemo` in validator-fast-check.ts):
+   * `m` the memo (made once the call wastes nested union work), `n` the failed branches of unions
+   * over objects inside union branches, `w` the wasted branches since the outermost union.
+   */
+  m: TUnionMemo | undefined
+  n: number
+  w: number
+  /** A union branch failed after branches of nested unions over objects did (see `unionWaste`). */
+  wa: () => void
+  /** The memoized outcome of union `key` over `value` with `flags`, or -1. */
+  mg: (key: object, value: object, flags: number, opts: TValidatorOptions) => number
+  /** Records the outcome of union `key` over `value` with `flags`. */
+  ms: (key: object, value: object, flags: number, opts: TValidatorOptions, result: number) => void
 }
+
+/** Union outcomes of one pre-check call: value → [key, flags, options, result]… */
+export type TUnionMemo = Map<object, unknown[]>
 
 /** What the binder needs from the interpreted pre-check. */
 export interface TCompiledEnv extends TCompiledHelpers, TKeyReader {
@@ -242,7 +260,9 @@ function bindLayout(
     if (!(metadata instanceof AnnotationMap)) {
       return false
     }
-    watch(metadata)
+    if (!watchLayer(metadata)) {
+      return false
+    }
     let k = at
     if (hasRejectSlot(site)) {
       K[k++] = n
@@ -356,6 +376,21 @@ function interpreted(node: TAtscriptAnnotatedType, env: TCompiledEnv): TCompiled
  * layout bound against the node when it matches, else the interpreted pre-check.
  */
 function externalCheck(node: TAtscriptAnnotatedType, env: TCompiledEnv): TCompiledCheck {
+  // (a node with a check of its own: a class, bound against itself)
+  const own = entries.get(node)
+  if (own !== undefined) {
+    if (own.binding) {
+      // (a recursion through such nodes: use the binding once it completes)
+      const fallback = interpreted(node, env)
+      return (value, flags, opts) => (own.fn ?? fallback)(value, flags, opts)
+    }
+    const fn = own.epoch === currentEpoch() ? own.fn : bind(own, own, node, env, false)
+    if (fn !== null) {
+      return fn
+    }
+    return interpreted(node, env)
+  }
+  // (a node referencing a class: its check, bound against this node)
   const entry = templateOf(node)
   if (entry !== undefined) {
     let binding = templates.get(node)
@@ -383,7 +418,9 @@ function externalCheck(node: TAtscriptAnnotatedType, env: TCompiledEnv): TCompil
  */
 function templateOf(node: TAtscriptAnnotatedType): TCompiledEntry | undefined {
   let ref = node.ref
-  for (let hops = 0; hops < 16 && ref !== undefined && ref.field === ''; hops++) {
+  // (through aliases however many; a cycle of them — a compile error — ends where it closes)
+  for (const seen = new Set<unknown>(); ref !== undefined && ref.field === '' && !seen.has(ref); ) {
+    seen.add(ref)
     let target: TAtscriptAnnotatedType
     try {
       target = ref.type()

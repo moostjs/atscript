@@ -1,12 +1,12 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { MyInterface } from "./annotate-nonmutating.as"
 
 export class ImportedAnnotated {
   static __is_atscript_annotated_type = true
-  static type = {}
+  static type = null
   static metadata = new Map()
   static id = "ImportedAnnotated"
   static toJsonSchema() {
@@ -14,43 +14,12 @@ export class ImportedAnnotated {
   }
 }
 
-$("object", ImportedAnnotated)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Imported Name")
-      .$type
-  ).prop(
-    "age",
-    $().designType("number")
-      .tags("number")
-      .annotate("label", "Original Age")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("email", "string")
-      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-      .$type
-  ).prop(
-    "address",
-    $("object")
-      .prop(
-        "street",
-        $().designType("string")
-          .tags("string")
-          .annotate("label", "Street")
-          .$type
-      ).prop(
-        "city",
-        $().designType("string")
-          .tags("string")
-          .annotate("label", "Imported City")
-          .$type
-      )
-      .$type
-  )
-  .annotate("meta.description", "Original")
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+$al(ImportedAnnotated, MyInterface)
+$blk(null, 0, ImportedAnnotated, [
+  [[["label", "Imported Name"]], [["name", 2]]],
+  [[["label", "Imported City"]], [["address", 2], ["city", 2]]],
+])
 
 // prettier-ignore-end

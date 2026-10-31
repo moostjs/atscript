@@ -23,6 +23,8 @@ const schema = buildJsonSchema(Product)
 
 The `.toJsonSchema()` method on generated types requires the `jsonSchema` plugin option to be set to `'lazy'` or `'bundle'` — otherwise it throws a runtime error. Alternatively, add the [`@emit.jsonSchema`](#per-interface-override-emit-jsonschema) annotation to individual interfaces.
 
+A schema embedded with `'bundle'` reflects the types as the build saw them; changes made at runtime (`metadata.set()`, `annotate()`) are only in `buildJsonSchema()` and `'lazy'` schemas. See [`jsonSchema`](/packages/typescript/configuration#jsonschema).
+
 ::: tip Manual use is always available
 Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/typescript/utils` and call it directly. The config option only affects the _generated_ `.toJsonSchema()` method — the standalone function always works.
 
@@ -54,25 +56,61 @@ export interface ApiResponse {
 
 Annotations from `.as` files are translated into JSON Schema constraints:
 
-| Annotation             | JSON Schema              | Notes                                                          |
-| ---------------------- | ------------------------ | -------------------------------------------------------------- |
-| `@meta.required`       | `minLength: 1`           | For string fields. Ensures at least one non-whitespace char    |
-| `@expect.minLength`    | `minLength` / `minItems` | `minLength` for strings, `minItems` for arrays                 |
-| `@expect.maxLength`    | `maxLength` / `maxItems` | `maxLength` for strings, `maxItems` for arrays                 |
-| `@expect.min`          | `minimum`                |                                                                |
-| `@expect.max`          | `maximum`                |                                                                |
-| `@expect.exclusiveMin` | `exclusiveMinimum`       | Since 0.1.109                                                  |
-| `@expect.exclusiveMax` | `exclusiveMaximum`       | Since 0.1.109                                                  |
-| `@expect.int`          | `type: 'integer'`        | Changes `number` to `integer`                                  |
-| `@expect.pattern`      | `pattern` / `allOf`      | Single pattern uses `pattern`, multiple become `allOf` entries |
+| Annotation                  | JSON Schema                                       | Notes                                                                                                        |
+| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `@meta.required`            | `minLength: 1` + `pattern: "\\S"` / `const: true` | For string fields: at least one non-whitespace character; for booleans: `true`                               |
+| `@expect.minLength`         | `minLength` / `minItems`                          | `minLength` for strings, `minItems` for arrays                                                               |
+| `@expect.maxLength`         | `maxLength` / `maxItems`                          | `maxLength` for strings, `maxItems` for arrays                                                               |
+| `@expect.min`               | `minimum`                                         |                                                                                                              |
+| `@expect.max`               | `maximum`                                         |                                                                                                              |
+| `@expect.exclusiveMin`      | `exclusiveMinimum`                                | Since 0.1.109                                                                                                |
+| `@expect.exclusiveMax`      | `exclusiveMaximum`                                | Since 0.1.109                                                                                                |
+| `@expect.int`               | `type: 'integer'`                                 | Changes `number` to `integer`                                                                                |
+| `@expect.pattern`           | `pattern` / `allOf`                               | Single pattern uses `pattern`, multiple become `allOf` entries; flags are applied to the pattern (see below) |
+| `@expect.array.uniqueItems` | `uniqueItems: true`                               | Not with `@expect.array.key` props on the items (see [Differences](#differences-from-the-validator))         |
 
 On a nullable field (`@expect.max 10` on `number | null`), the constraint goes onto the matching non-null `anyOf` member: `{ anyOf: [{ type: 'number', maximum: 10 }, { type: 'null' }] }` (since 0.1.103). When the member has its own bound, the stricter one is kept.
 
+## What the Validator Accepts
+
+A schema accepts exactly the JSON values the validator accepts with `unknownProps: 'ignore'` (a schema allows keys it does not list), except for the [differences](#differences-from-the-validator) below — checked with ajv 8 over the test generators' types and values:
+
+| Type                      | JSON Schema                                                                                                                                                                                                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Optional prop `p?: T`     | Also accepts `null` (as the validator does): `{ "type": ["string", "null"] }` for a schema of one `type`, else `{ "anyOf": [<T>, { "type": "null" }] }`. Not with `@meta.required` (`null` is rejected there) |
+| Tuple `[A, B]`            | `items: [A, B]`, `additionalItems: false`, `minItems: 2`, `maxItems: 2`                                                                                                                                       |
+| `decimal`                 | `{ "type": "string", "pattern": "^[+-]?\\d+(\\.\\d+)?$" }`                                                                                                                                                    |
+| `never`                   | `{ "not": {} }` (no value)                                                                                                                                                                                    |
+| Pattern props `[/^k/]: T` | `patternProperties`, each pattern excluding the declared prop names (the validator checks only keys the object does not declare)                                                                              |
+
+`fromJsonSchema()` reads them back: an optional prop's `type: [T, "null"]` as `p?: T`, `patternProperties` as pattern props.
+
+### Differences from the validator
+
+JSON Schema cannot express these, so a schema accepts or rejects a few values the validator does not:
+
+- **Uniqueness by key props.** `@expect.array.uniqueItems` on an array of objects with `@expect.array.key` props compares the key props only; the schema has no `uniqueItems` there (JSON Schema compares whole items), so it accepts items sharing their keys.
+- **Key order in unique items.** Without key props, the validator compares items as written: `{ "a": 1, "b": 2 }` and `{ "b": 2, "a": 1 }` are different items; JSON Schema `uniqueItems` ignores the order of keys and rejects them.
+- **A key matching several pattern props.** The validator wants it to pass one of them; `patternProperties` wants it to pass all of them.
+
 `fromJsonSchema()` maps `exclusiveMinimum` / `exclusiveMaximum` back to `@expect.exclusiveMin` / `@expect.exclusiveMax`. It also reads the draft-4 boolean form (`minimum: 0, exclusiveMinimum: true`) as `@expect.exclusiveMin 0`.
 
-::: warning Pattern properties are dropped
-Atscript's wildcard-key syntax (`[/regex/]: Type`) has no equivalent in `buildJsonSchema` output — those entries are silently omitted from the generated schema. If you need pattern-keyed maps in JSON Schema, model them as `additionalProperties` with an external post-process step.
-:::
+### Pattern flags
+
+A JSON Schema `pattern` has no flags, so the flags of `@expect.pattern` are written into the pattern, which then matches the strings the validator matches:
+
+| Flag | In the schema's `pattern`                                                                                                                                   |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `i`  | Each character with case variants becomes a class of them: `abc` → `[aA][bB][cC]`, `[a-f]` → `[a-fA-F]` (with `u`, also `ſ` / `K`, which fold to `s` / `k`) |
+| `s`  | Each `.` outside a character class becomes `[\s\S]`                                                                                                         |
+| `m`  | The pattern is wrapped in a modifier group: `(?m:…)`                                                                                                        |
+| `y`  | The pattern is anchored at the start of the value: `^(?:…)`                                                                                                 |
+| `g`  | Nothing (it changes nothing for validation)                                                                                                                 |
+| `u`  | Nothing: the pattern is written for a JSON Schema validator compiling patterns with `u` (ajv does by default)                                               |
+
+`i` has no flag-free form for a backreference (`(a)\1` matches `aA`), a Unicode property escape (`\p{Lu}` with `iu` matches lowercase letters too), `\b` / `\B` / a `\W` inside a class with `u`, or a range of more than 1024 characters with non-ASCII ones: such a pattern is also wrapped in `(?i:…)`.
+
+Modifier groups (`(?i:…)`, `(?m:…)`) are ES2025: JavaScript engines understand them from 2024 on (Node.js 23+); other regex dialects (.NET, PCRE2, Python 3.6+) have them too, some JSON Schema validators do not. A pattern written without `u` is emitted for a validator compiling it without `u`: compiled with `u` (ajv's default), it may differ on characters outside the Basic Multilingual Plane, and syntax only valid without `u` (`\-`, `a{`, `\p` meaning `p`) is not valid there — add `u` to patterns meant for JSON Schema.
 
 ## Example
 
@@ -161,7 +199,7 @@ Key behaviors:
 - Only **named object types** (those with an `id`) are extracted to `$defs`. Primitives, unions, and arrays stay inline.
 - The **root type** is never extracted — it IS the schema.
 - If the same named type is referenced multiple times, it appears once in `$defs` and all occurrences become `$ref`.
-- Types without an `id` (e.g., inline anonymous objects, hand-built types via `defineAnnotatedType()`) produce inline schemas as before.
+- Types without an `id` (e.g., inline anonymous objects, hand-built types via `defineAnnotatedType()`) produce inline schemas, unless the very same type object is held in several places of the tree: types refer to each other's nodes instead of copying them (an `extends`, an intersection, `annotate … as` and a chain reference such as `T.a` hold the original prop), so such a type is built once into `$defs` under its prop's name (`Recursive` when it reaches itself) and every place refers to it. Types without an `id` whose schemas are the same (their references leading to the same definitions too) are one `$defs` entry — a recursive intersection used at several places, say, which has nodes of its own at each place; a named type always has its own entry.
 
 ### Programmatic `id`
 
@@ -232,6 +270,7 @@ const roundTripped = buildJsonSchema(type)
 - Object types with `properties` and `required`
 - Arrays with `items`, `minItems`, `maxItems`
 - Tuples (array with `items` as an array and `additionalItems: false`)
+- `patternProperties` (as pattern props)
 - Unions (`anyOf`, `oneOf`)
 - Intersections (`allOf`)
 - Primitives (`string`, `number`, `integer`, `boolean`, `null`)
@@ -245,7 +284,7 @@ const roundTripped = buildJsonSchema(type)
 :::
 
 ::: warning Unsupported features
-Features like `not`, `if/then/else`, `patternProperties`, and `additionalProperties` have no Atscript equivalent and are silently ignored.
+Features like `not`, `if/then/else` and `additionalProperties` have no Atscript equivalent and are silently ignored.
 :::
 
 ## Merging Schemas (OpenAPI / Swagger)
@@ -267,7 +306,7 @@ const merged = mergeJsonSchemas([CatOrDog, Order])
 Each type passed to `mergeJsonSchemas` must have an `id` (all types compiled from `.as` files do). The function:
 
 1. Calls `buildJsonSchema` on each type
-2. Hoists all `$defs` into a shared pool, deduplicating by name
+2. Hoists all `$defs` into a shared pool: a definition equal to one already pooled (the same schema, its references leading to equal definitions) is shared; a different one asking for a name already taken (two types named alike, from different files) gets the next free `<name>_<n>`, and the references to it are renamed
 3. Returns individual schemas (without their `$defs`) alongside the merged definitions
 
 ## Next Steps

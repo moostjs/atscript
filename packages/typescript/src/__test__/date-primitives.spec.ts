@@ -49,7 +49,10 @@ describe('string.date / string.isoDate primitives', () => {
     iso => {
       const validator = DateBox.validator()
       expect(validator.validate({ d: '2024-01-15', iso }, true)).toBe(false)
-      expect(validator.errors[0]).toMatchObject({ path: 'iso', message: 'Invalid ISO date format.' })
+      expect(validator.errors[0]).toMatchObject({
+        path: 'iso',
+        message: 'Invalid ISO date format.',
+      })
     }
   )
 

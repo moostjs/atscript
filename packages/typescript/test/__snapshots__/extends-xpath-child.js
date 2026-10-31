@@ -1,8 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Helper as Helper_1 } from "./extends-xpath-b.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Helper } from "./extends-xpath-a.as"
 import { Base } from "./extends-xpath-b.as"
 
@@ -16,17 +15,10 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "payload",
-    $()
-      .refTo(() => Helper_1)
-      .$type
-  ).prop(
-    "fromUser",
-    $()
-      .refTo(() => Helper)
-      .$type
-  )
+  .prop("payload", $f(Base, "payload"))
+  .prop("fromUser", $().ref(Helper).$type)
 
 // prettier-ignore-end

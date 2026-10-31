@@ -50,11 +50,11 @@ Key points:
 
 ### DB entity statics
 
-Interfaces annotated with `@db.table`, `@db.view` or `@db.view.for` additionally get `static __flat` and `static __ownProps` — maps from every dot-notation path (`"address.zip"`) to its value type, which the [DB layer](https://db.atscript.dev) uses to type filters, `$select` and `$sort`. Intermediate paths are `never` and `@db.json` fields are `string`; since 0.1.93 optional entries are typed `<type> | null` (`"address.zip"?: string | null`) because the DB layer treats optional as nullable in filters — the instance properties keep their plain `zip?: string` shape.
+Interfaces annotated with `@db.table`, `@db.view` or `@db.view.for` additionally get `static __flat` and `static __ownProps` — maps from every dot-notation path (`"address.zip"`) to its value type, which the [DB layer](https://db.atscript.dev) uses to type filters, `$select` and `$sort`. Intermediate paths are `never` and `@db.json` fields are `string`; since 0.1.93 optional entries are typed `<type> | null` (`"address.zip"?: string | null`) because the DB layer treats optional as nullable in filters — the instance properties keep their plain `zip?: string` shape. A recursive type is listed down to where it repeats: a property leading back to a type already expanded on its path is listed as `never`, and nothing below it (`Category.parent` in `interface Category { parent?: Category }`). Earlier versions listed some paths below such a property (`children.parent.id`); filters on them no longer type-check. A table whose flattening reaches [mutually recursive merges](/packages/typescript/interfaces-types#merges-the-compiler-rejects) is a compile error.
 
 ### Interface Extends
 
-When an interface uses `extends`, the first parent becomes the TypeScript `extends` target; properties from additional parents and own properties are merged into the class body. Inherited annotations are merged into the runtime metadata tree, so `metadata.get(...)` works on every inherited prop without you needing to think about how it was assembled.
+When an interface uses `extends`, the first parent becomes the TypeScript `extends` target; properties from additional parents and own properties are merged into the class body. At runtime an inherited prop is the parent's own prop node, and a prop several parents declare reads through all of theirs (see [Interface Extends](/packages/typescript/interfaces-types#interface-extends)), so `metadata.get(...)` works on every inherited prop.
 
 For types (not interfaces), a companion `namespace` carries the same `__is_atscript_annotated_type`, `type`, `metadata`, `validator`, `toJsonSchema`, and `toExampleData` static members.
 

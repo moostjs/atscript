@@ -27,7 +27,7 @@ export const $n = {
   SemanticPrimitiveNode,
 }
 
-export { SemanticAnnotateNode } from './annotate-node'
+export { entryParts, SemanticAnnotateNode } from './annotate-node'
 export { SemanticArrayNode } from './array-node'
 export { SemanticConstNode } from './const-node'
 export { SemanticGroup } from './group-node'

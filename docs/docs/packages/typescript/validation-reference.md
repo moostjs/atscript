@@ -39,6 +39,8 @@ How to handle properties not defined in the type:
 - `'ignore'`
 - `'strip'`
 
+The compiler merges every intersection of object types in `.as` into one object type, which knows every member's keys. A node of kind `'intersection'` built at runtime (`defineAnnotatedType('intersection')`, `fromJsonSchema` with `allOf`) checks each member on its own, like JSON Schema `allOf`: a key only another member declares is unknown to a member (`'error'` reports it, `'strip'` removes it).
+
 ### `errorLimit`
 
 Maximum number of errors to collect before stopping. Default: `10`.
@@ -117,7 +119,7 @@ A bound of `0` is a real bound: `@expect.min 0` rejects `-1`, `@expect.max 0` re
 :::
 
 ::: warning `string.required` and `boolean.required` are enforced on every field (since 0.1.104)
-A field typed `string.required` or `boolean.required` — directly (`name: string.required`, `agreed?: boolean.required`) or through a type alias (`type Name = string.required`) — carries `@meta.required` again: `''` / whitespace-only strings fail with `Must not be empty`, `false` fails with `Must be checked`, and `buildJsonSchema()` emits `minLength: 1`. Versions 0.1.79–0.1.103 dropped the annotation from such fields, so they accepted any string or boolean; union members and array elements (`string.required | null`, `string.required[]`) were already checked. A field that references another field (`ownerName: User.name`) still does not inherit it.
+A field typed `string.required` or `boolean.required` — directly (`name: string.required`, `agreed?: boolean.required`) or through a type alias (`type Name = string.required`) — carries `@meta.required` again: `''` / whitespace-only strings fail with `Must not be empty`, `false` fails with `Must be checked`, and `buildJsonSchema()` emits `minLength: 1` (with `pattern: "\\S"`, matching the whitespace check; booleans `const: true`). Versions 0.1.79–0.1.103 dropped the annotation from such fields, so they accepted any string or boolean; union members and array elements (`string.required | null`, `string.required[]`) were already checked. A field that references another field (`ownerName: User.name`) still does not inherit it.
 
 **Upgrading:** payloads with an empty string or `false` in these fields now fail validation — fill them, or type the field `string` / `boolean` if empty is legal.
 :::

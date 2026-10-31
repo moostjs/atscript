@@ -16,14 +16,13 @@ import {
   type TAtscriptAnnotatedType,
   type TAtscriptTypeObject,
 } from '../runtime/annotated-type'
+import { F_ERROR, F_STRIP, F_TOP } from '../runtime/compiled-check/layout'
 import { __setAutoCompile } from '../runtime/compiled-check/registry'
 import { invalidateCompiledValidators } from '../runtime/compiled-check/tracking'
+import { deserializeAnnotatedType, serializeAnnotatedType } from '../runtime/serialize'
 import { Validator, type TValidatorOptions } from '../runtime/validator'
 import { COMPILED_ENV, fastCheckPasses } from '../runtime/validator-fast-check'
-import { prepareFixtures } from '../test-utils'
-
-/** Reference: a subclass never takes the pre-check, so it always runs the full walk. */
-class WalkValidator extends Validator {}
+import { prepareFixtures, rng, WalkValidator } from '../test-utils'
 
 const rootDir = path.join(__dirname, 'fixtures', 'compiled')
 
@@ -31,6 +30,7 @@ type TObj = TAtscriptAnnotatedType<TAtscriptTypeObject>
 
 let models: Record<string, any>
 let shared: Record<string, any>
+let cross: Record<string, any>
 
 beforeAll(async () => {
   // Generated checks only: no runtime compilation of what the generator left out.
@@ -38,6 +38,7 @@ beforeAll(async () => {
   await prepareFixtures({ rootDir, formats: ['js'], tsPluginOptions: { compileValidators: true } })
   models = await import(path.join(rootDir, 'models.as.js'))
   shared = await import(path.join(rootDir, 'shared.as.js'))
+  cross = await import(path.join(rootDir, 'cross-a.as.js'))
 })
 
 afterAll(() => {
@@ -79,18 +80,6 @@ function compare(def: TAtscriptAnnotatedType, opts: Partial<TValidatorOptions>, 
 }
 
 // ── random values ───────────────────────────────────────────────────────────
-
-function rng(seed: number) {
-  // mulberry32 — the int32 / uint32 coercions are intentional
-  // oxlint-disable unicorn/prefer-math-trunc
-  return () => {
-    seed = (seed + 0x6d_2b_79_f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296
-  }
-  // oxlint-enable unicorn/prefer-math-trunc
-}
 
 const POOL: unknown[] = [
   '',
@@ -165,8 +154,7 @@ function gen(def: TAtscriptAnnotatedType, r: () => number, depth = 0): unknown {
     case 'object': {
       const out: Record<string, unknown> = {}
       for (const [k, p] of t.props as Map<string, TAtscriptAnnotatedType>) {
-        // A `g` regex keeps `lastIndex` across validators: results depend on call order.
-        if ((depth > 3 && p.optional) || k === 'stateful') {
+        if (depth > 3 && p.optional) {
           continue
         }
         const v = gen(p, r, depth + 1)
@@ -368,12 +356,16 @@ describe('compiled validator checks — generated modules', { timeout: 30_000 },
     ).toBe(false)
   })
 
-  it('stateful patterns and prop patterns fall back to the walk', () => {
+  it('g / y patterns are checked (the same on every call); prop patterns fall back to the walk', () => {
     const { Order } = models
     const check = boundCheck(Order)!
     const opts = new Validator(Order)['opts']
-    // A `g` / `y` pattern bails (its `lastIndex` state belongs to the walk).
-    expect(check({ ...validOrder(), stateful: 'xa' }, 1, opts)).toBe(2)
+    // The pattern is compiled without `g` (no `lastIndex` kept between calls).
+    for (let i = 0; i < 3; i++) {
+      expect(check({ ...validOrder(), stateful: 'xa' }, 1, opts)).toBe(1)
+      expect(check({ ...validOrder(), stateful: 'ax' }, 1, opts)).toBe(0)
+      expect(compare(Order, {}, { ...validOrder(), stateful: 'xa' })).toBe(true)
+    }
     expect(check(validOrder(), 1, opts)).toBe(1)
     for (const value of [
       { ...validOrder(), meta: { a: 'b' } },
@@ -405,6 +397,21 @@ describe('compiled validator checks — generated modules', { timeout: 30_000 },
     }
   })
 
+  it('a recursive merge with another module’s member checks its unknown keys compiled', () => {
+    const { CrossA } = cross
+    const check = boundCheck(CrossA)!
+    expect(check).not.toBeNull()
+    const opts = new Validator(CrossA)['opts']
+    const value = (inner: object) => ({ a: 'x', b: { b: 'bb', a: { a: 'y', ...inner } } })
+    // `CrossB & CrossTag` (`CrossTag` from cross-b.as) is merged at build time: no bail.
+    expect(check(value({ tag: 't' }), F_TOP | F_ERROR, opts)).toBe(1)
+    expect(check(value({ tag: 't', zz: 1 }), F_TOP | F_ERROR, opts)).toBe(0)
+    expect(check(value({ tag: 'long' }), F_TOP | F_ERROR, opts)).toBe(0)
+    // Strips of a nested object are left to the walk.
+    expect(check(value({ zz: 1 }), F_TOP | F_STRIP, opts)).toBe(2)
+    expect(fuzz(CrossA, 12, 150, () => value({ tag: 't' }))).toBeGreaterThan(150)
+  })
+
   it('tracked mutations re-bind; raw writes need invalidateCompiledValidators()', () => {
     const { OrderLine } = models
     const sku = (OrderLine as TObj).type.props.get('sku')!
@@ -432,6 +439,76 @@ describe('compiled validator checks — generated modules', { timeout: 30_000 },
     sku.metadata.delete('expect.maxLength')
     expect(boundCheck(OrderLine)).not.toBeNull()
     expect(v.validate(validLine(), true)).toBe(true)
+  })
+})
+
+// ── per-type opt-in ─────────────────────────────────────────────────────────
+
+const validValue = () => ({
+  lines: [{ qty: 1, sku: 'AB' }],
+  status: 'open',
+  address: { street: 'Main' },
+})
+
+describe('compiled validator checks — @emit.compiledValidator', { timeout: 30_000 }, () => {
+  const dir = path.join(__dirname, 'fixtures', 'compiled-annotated')
+  let annotated: Record<string, any>
+  let ext: Record<string, any>
+
+  beforeAll(async () => {
+    // compileValidators off: only the annotated type gets a check.
+    await prepareFixtures({ rootDir: dir, formats: ['js'] })
+    annotated = await import(path.join(dir, 'models.as.js'))
+    ext = await import(path.join(dir, 'ext.as.js'))
+  })
+
+  it('registers only the annotated class; its check covers the same-file types it uses', () => {
+    invalidateCompiledValidators()
+    expect(boundCheck(annotated.Order)).not.toBeNull()
+    for (const def of [annotated.Line, annotated.Plain, ext.Address]) {
+      expect(boundCheck(def)).toBeNull()
+    }
+    // Line's constraints are compiled into Order's check (bound to Order's tree).
+    const v = new Validator(annotated.Order)
+    const qty = (annotated.Line as TObj).type.props.get('qty')!.metadata.get('expect.min') as any
+    const original = { ...qty }
+    try {
+      qty.minValue = 5 // a raw write: the bound check keeps the bind-time value
+      expect(v.validate(validValue(), true)).toBe(true)
+      invalidateCompiledValidators()
+      expect(v.validate(validValue(), true)).toBe(false)
+      expect(v.errors).toEqual([{ path: 'lines.0.qty', message: 'Expected minimum 5, got 1' }])
+    } finally {
+      Object.assign(qty, original)
+      invalidateCompiledValidators()
+    }
+  })
+
+  it('a reference to an unregistered class of another module runs interpreted', () => {
+    const interp = vi.spyOn(COMPILED_ENV, 'interp')
+    try {
+      invalidateCompiledValidators()
+      const v = new Validator(annotated.Order)
+      const walk = vi.spyOn(v as any, 'validateSafe')
+      expect(v.validate(validValue(), true)).toBe(true)
+      expect(walk).not.toHaveBeenCalled()
+      // `address` (EXT site): Address has no compiled check to bind as a template.
+      expect(interp).toHaveBeenCalled()
+      expect(interp.mock.calls.every(([def]) => def.type === ext.Address.type)).toBe(true)
+      expect(v.validate({ ...validValue(), billing: { street: 'x'.repeat(11) } }, true)).toBe(false)
+      expect(v.errors).toEqual([
+        {
+          path: 'billing.street',
+          message: 'Expected maximum length of 10 characters, got 11 characters',
+        },
+      ])
+    } finally {
+      interp.mockRestore()
+    }
+  })
+
+  it('parity with the walk (fuzz)', () => {
+    expect(fuzz(annotated.Order, 21, 300, validValue)).toBeGreaterThan(300)
   })
 })
 
@@ -488,10 +565,11 @@ describe('compiled validator checks — engine details', () => {
 // ── regressions ─────────────────────────────────────────────────────────────
 
 describe('compiled validator checks — registry and binding', () => {
-  it('a chained reference into an imported type compiles nothing and stays correct', () => {
-    // (Compiling this module used to crash the generator.)
+  it('a chained reference into an imported type compiles and stays correct', () => {
+    // (Compiling this module used to crash the generator. The layouts are built from the realm's
+    // objects, where the imported field is known: it compiles.)
     const { ChainAlias } = models
-    expect(boundCheck(ChainAlias)).toBeNull()
+    expect(boundCheck(ChainAlias)).not.toBeNull()
     for (const value of ['x', '', 'x'.repeat(101), 1, null]) {
       compare(ChainAlias, {}, value)
     }
@@ -542,7 +620,7 @@ describe('compiled validator checks — registry and binding', () => {
     const foreign = $('union')
       .item($().designType('string').$type)
       .item($('union').item(item.$type).$type).$type
-    const ref = $().refTo(foreign).optional().annotate('meta.required', true).$type
+    const ref = $().ref(foreign).optional().annotate('meta.required', true).$type
     const root = $('object').prop('a', ref).$type
     compileType(root, type => (type === foreign.type ? 'ext' : undefined))
     expect(boundCheck(root)).not.toBeNull()
@@ -653,5 +731,91 @@ describe('createAnnotatedTypeNode / defineAnnotatedType metadata identity', () =
     const t = $('object').prop('s', c).$type
     compileType(t)
     expect(boundCheck(t)).not.toBeNull()
+  })
+})
+
+// ── intersections kept at runtime ───────────────────────────────────────────
+
+describe('intersections kept at runtime — each member on its own (JSON Schema allOf)', () => {
+  const object = (props: Record<string, TAtscriptAnnotatedType>) => {
+    const h = $('object')
+    for (const [key, prop] of Object.entries(props)) {
+      h.prop(key, prop)
+    }
+    return h.$type
+  }
+  const intersection = (...items: TAtscriptAnnotatedType[]) => {
+    const h = $('intersection')
+    for (const item of items) {
+      h.item(item)
+    }
+    return h.$type
+  }
+  const string = () => $().designType('string').$type
+
+  /** The walk, the interpreted and the compiled pre-check, and a serialize round-trip agree. */
+  function engines(t: TAtscriptAnnotatedType, values: unknown[]) {
+    const restored = deserializeAnnotatedType(JSON.parse(JSON.stringify(serializeAnnotatedType(t))))
+    for (const def of [t, restored]) {
+      for (const value of values) {
+        for (const opts of OPTION_SETS) {
+          compare(def, opts, value)
+        }
+      }
+      compileType(def)
+      expect(boundCheck(def)).not.toBeNull()
+      for (const value of values) {
+        for (const opts of OPTION_SETS) {
+          compare(def, opts, value)
+        }
+      }
+    }
+  }
+
+  it('a key one member does not declare is unknown to that member (0.1.110)', () => {
+    const t = intersection(object({ a: string() }), object({ b: string() }))
+    expect(new WalkValidator(t).validate({ a: 'x', b: 'y' }, true)).toBe(false)
+    expect(new Validator(t).validate({ a: 'x', b: 'y' }, true)).toBe(false)
+    const ignore = { unknownProps: 'ignore' } as const
+    expect(new WalkValidator(t, ignore).validate({ a: 'x', b: 'y' }, true)).toBe(true)
+    expect(new Validator(t, ignore).validate({ a: 'x', b: 'y' }, true)).toBe(true)
+    expect(new Validator(t, ignore).validate({ a: 'x' }, true)).toBe(false)
+    engines(t, [{ a: 'x', b: 'y' }, { a: 'x' }, { a: 'x', b: 'y', z: 1 }, 'x'])
+  })
+
+  it('optional members pass `undefined` / `null`', () => {
+    const t = intersection(
+      { ...object({ a: string() }), optional: true },
+      { ...object({ b: string() }), optional: true }
+    )
+    for (const value of [undefined, null]) {
+      expect(new WalkValidator(t).validate(value, true)).toBe(true)
+      expect(fastCheckPasses({ ...t }, value, new Validator(t)['opts'])).toBe(true)
+    }
+    engines(t, [undefined, null, { a: 'x', b: 'y' }, { a: 1 }])
+  })
+
+  it('nested and recursive intersections, in arrays and unions', () => {
+    const a = object({ a: string() })
+    const b = object({ b: { ...string(), optional: true } })
+    const self = $('object').id('Self').$type
+    self.type = object({ s: string(), next: { ...intersection(self, b), optional: true } }).type
+    const t = object({
+      n: intersection(intersection(a, b), object({ c: string() })),
+      l: $('array').of(intersection(a, b)).$type,
+      u: $('union').item(intersection(a, b)).item(string()).$type,
+      r: intersection(self, b),
+      s: intersection(
+        string(),
+        $().designType('string').annotate('expect.minLength', { length: 2 }).$type
+      ),
+    })
+    const values = [
+      { n: { a: 'x', c: 'z' }, l: [{ a: 'x' }], u: 's', r: { s: 's' }, s: 'xy' },
+      { n: { a: 'x', b: 'y', c: 'z', q: 1 }, l: [], u: { a: 'x' }, r: { s: 's' }, s: 'xy' },
+      { n: { a: 'x', c: 'z' }, l: [{ a: 'x', q: 1 }], u: { a: 'x', q: 1 }, r: { s: 's' }, s: 'x' },
+      { n: { a: 'x', c: 'z' }, l: [], u: 's', r: { s: 's', next: { s: 't', b: 'b' } }, s: 'xy' },
+    ]
+    engines(t, values)
   })
 })

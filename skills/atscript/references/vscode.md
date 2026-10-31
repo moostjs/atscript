@@ -15,7 +15,7 @@ No configuration needed — walks up from the open `.as` to find `atscript.confi
 ## Features
 
 - **Syntax highlighting** — TextMate grammar for annotations, primitives, keywords, regex literals in pattern properties.
-- **Diagnostics** — parse errors + plugin messages surface as VSCode problems with file/line/column.
+- **Diagnostics** — parse errors + plugin messages surface as VSCode problems with file/line/column. Always equal to a fresh `asc` build of the same files: an edit re-checks every file importing it (directly or not); a closed `.as` changed/created/deleted on disk re-checks itself (cleared when deleted) and its importers, incl. those whose import of it failed. Import errors (`"./b" not found`) are reported once per check.
 - **Completions**:
   - `@` → every registered annotation namespace (`@meta.*`, `@expect.*`, `@emit.*`, plugin-contributed), with docstrings.
   - `.` in type position → primitive extensions (e.g. `string.` → `email`, `uuid`, `required`, …).

@@ -1,3 +1,4 @@
+import { metaEmpty } from '../layers'
 /**
  * Layout of a compiled validator check: the structure a check was compiled for, as plain
  * data. `buildLayout` (build-layout.ts) derives it from a type tree (the build-time model
@@ -19,7 +20,7 @@
  * - `keyMask` has a bit (by {@link VALIDATOR_KEYS} index) per validator annotation that is
  *   *effective* on the node and relevant to its def (present; flags: truthy).
  *   `patternShape` has one char per `@expect.pattern` entry: `e` (empty, skipped),
- *   `n` (checked), `s` (stateful `g` / `y` regex: the check bails to the walk there).
+ *   `n` (checked).
  * - `slot`: the site's first K slot (see {@link siteSlotCount}); `slotCount` is the total.
  * - `EXT`: an anonymous reference into another module's type; bound to that type's own
  *   compiled check (as a template, against the referring node) when it has one, else
@@ -37,7 +38,7 @@ import {
 } from '../validator-keys'
 
 /** Layout format version; checks of another version are ignored (interpreted). */
-export const LAYOUT_VERSION = 2
+export const LAYOUT_VERSION = 4
 
 export const EXT = -1
 export const INTERP = -2
@@ -274,7 +275,7 @@ export function readKeys(
   let mask = 0
   let shape = ''
   let k = at
-  if (metadata.size === 0) {
+  if (metaEmpty(metadata)) {
     return { mask, shape }
   }
   for (let i = 0; i < VALIDATOR_KEYS.length; i++) {
@@ -303,12 +304,8 @@ export function readKeys(
           shape += 'e'
           continue
         }
+        // compiled here even without `out`: an invalid pattern throws (see above)
         const re = reader.regex(pattern, flags)
-        if (re.global || re.sticky) {
-          shape += 's'
-          // later entries are never reached
-          break
-        }
         shape += 'n'
         if (out) {
           out[k] = re

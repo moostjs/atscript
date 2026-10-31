@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, registerCompiledCheck as $cv } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, registerCompiledCheck as $cv, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { User } from "./multiple-interface.as"
 import { TPrimitive, TNumber } from "./type.as"
 
@@ -15,28 +15,15 @@ export class People {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", People)
-  .prop(
-    "groupName",
-    $()
-      .refTo(() => TPrimitive)
-      .$type
-  ).prop(
-    "size",
-    $()
-      .refTo(() => TNumber)
-      .$type
-  ).prop(
-    "users",
-    $("array")
-      .of($()
-          .refTo(() => User)
-          .$type)
-      .$type
-  )
+  .prop("groupName", $().ref(TPrimitive).$type)
+  .prop("size", $().ref(TNumber).$type)
+  .prop("users", $("array").of($().ref(User).$type).$type)
 
 // Compiled validator checks
-$cv(People, 2, [[[1,["groupName","size","users"],[[0,0,-1,"",0],[0,0,-1,"",2],[0,0,1,"",6]]],[2,[0,0,-1,"",4]]],[0,0,0,"",6],6], (K, H) => {
+$cv(People, 4, [[[1,["groupName","size","users"],[[0,0,-1,"",0],[0,0,-1,"",2],[0,0,1,"",6]]],[2,[0,0,-1,"",4]]],[0,0,0,"",6],6], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0], k2 = K[2], k4 = K[4]
   function d0(v, f, o) {

@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base, Helper } from "./extends-dedup-base.as"
 
 export class Child {
@@ -14,17 +14,10 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "payload",
-    $()
-      .refTo(() => Helper)
-      .$type
-  ).prop(
-    "own",
-    $()
-      .refTo(() => Helper)
-      .$type
-  )
+  .prop("payload", $f(Base, "payload"))
+  .prop("own", $().ref(Helper).$type)
 
 // prettier-ignore-end

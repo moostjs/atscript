@@ -18,6 +18,7 @@ import type {
 import {
   AtscriptDoc,
   AtscriptRepo,
+  blockDependencies,
   BuildRepo,
   fileUriToPath,
   getRelPath,
@@ -57,6 +58,7 @@ import {
   CompletionItemKind,
   DiagnosticSeverity,
   DiagnosticTag,
+  FileChangeType,
   InsertTextFormat,
   ParameterInformation,
   SemanticTokensBuilder,
@@ -86,6 +88,16 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
   private readonly changedSet = new Set<string>()
 
+  /** The documents the editor closed, checked against the file on disk (see `revertClosed`). */
+  private readonly closedSet = new Set<string>()
+
+  /**
+   * What the diagnostics of each checked document's mutating `annotate` blocks read besides its
+   * imports (see `blockDependencies`), by document id, as of its last check: a change of one of
+   * them checks it again (see `revalidateReaders`).
+   */
+  private readonly blockReads = new Map<string, { doc: AtscriptDoc; ids: Set<string> }>()
+
   private idle = true
 
   checksDelay = CHECKS_DELAY
@@ -101,6 +113,14 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       this.addToChangeQueue(change.document.uri)
     })
 
+    // Closed in the editor (its unsaved edits discarded): the file on disk counts again.
+    this.documents.onDidClose(({ document }) => {
+      if (document.uri.endsWith('.as')) {
+        this.closedSet.add(document.uri)
+        this.addToRevalidateQueue(document.uri)
+      }
+    })
+
     documents.listen(connection)
     connection.listen()
 
@@ -109,7 +129,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         if (/atscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
           this.onConfigChanged(change.uri)
         } else if (change.uri.endsWith('.as')) {
-          await this.onAsFileChanged(change.uri)
+          await this.onAsFileChanged(change.uri, change.type === FileChangeType.Deleted)
         }
       }
     })
@@ -608,7 +628,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         } as Hover
       }
       if (!token.annotationRef && isRef(token.parentNode)) {
-        const unwound = atscript.unwindType(token.parentNode.id!, token.parentNode.chain)
+        const unwound = atscript.unwindRef(token.parentNode)
         const def = unwound?.def
         const node = unwound?.node
         const docs = [] as string[]
@@ -706,27 +726,76 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
    * until it is closed, so without this every importer kept resolving against
    * the stale parse until the server restarted. Closing the document makes
    * the next check of each dependant re-read it from disk; the dependants are
-   * queued for that check. The file itself is not queued: it may have been
-   * deleted (opening it would reject and stall `runChecks`), and its own
-   * diagnostics refresh the next time it is opened in the editor.
+   * queued for that check.
+   *
+   * The file itself is checked again when it exists (re-read from disk: a closed file's
+   * diagnostics follow its content), its diagnostics cleared when it was deleted.
    */
-  async onAsFileChanged(uri: string): Promise<void> {
+  async onAsFileChanged(uri: string, deleted = false): Promise<void> {
     if (this.documents.get(uri)) {
+      // (open: the editor feeds it) — created, its importers whose import of it failed
+      // (`"./b" not found`) check it again
+      for (const doc of await this.documentsImporting(uri)) {
+        this.revalidateDependants(doc)
+        doc.clearMessages()
+        this.addToRevalidateQueue(doc.id)
+      }
       return
     }
     const cached = this.atscripts.get(uri)
-    if (!cached) {
-      return
-    }
-    const dependants: string[] = await cached.then(
-      doc => Array.from(doc.dependants, d => d.id),
-      // A document that failed to open has no dependants wired to it.
-      () => []
+    // (a document that failed to open has no dependants wired to it)
+    const before = cached ? await cached.catch(() => undefined) : undefined
+    // The documents importing it, directly or not (their diagnostics may read its types through
+    // other files: `Unknown property "b.x"` of an alias of a type importing it) — and, for a
+    // file not open yet (created, or one whose open failed), those whose import of it failed
+    // (`"./b" not found`).
+    const dependants = new Set<AtscriptDoc>(
+      before ? [...before.transitive('dependants')].filter(d => d !== before) : []
     )
-    this.closeDocument(uri)
-    for (const id of dependants) {
-      this.addToRevalidateQueue(id)
+    for (const doc of await this.documentsImporting(uri)) {
+      dependants.add(doc)
+      for (const d of doc.transitive('dependants')) {
+        dependants.add(d)
+      }
     }
+    // (the documents whose blocks' diagnostics read it, or the documents it imported: whether
+    // their blocks are reachable)
+    if (before) {
+      this.revalidateReaders([before, ...before.dependencies], before)
+    }
+    this.closeDocument(uri)
+    for (const d of dependants) {
+      if (d.id !== uri) {
+        // (their diagnostics are computed again: they read the closed document)
+        d.clearMessages()
+        this.addToRevalidateQueue(d.id)
+      }
+    }
+    if (deleted) {
+      this.blockReads.delete(uri)
+      this.connection.sendDiagnostics({ uri, diagnostics: [] })
+    } else {
+      // (checked as changed: what reads it is checked again after it)
+      this.addToChangeQueue(uri)
+    }
+  }
+
+  /** The loaded documents (but `uri`'s) with an import of `uri`, resolved or not. */
+  private async documentsImporting(uri: string): Promise<AtscriptDoc[]> {
+    const out: AtscriptDoc[] = []
+    for (const cached of Array.from(this.atscripts.values())) {
+      const doc = await cached.catch(() => undefined)
+      if (!doc || doc.id === uri) {
+        continue
+      }
+      for (const { from } of doc.imports.values()) {
+        if (doc.resolveImportId(resolveAtscriptFromPath(from.text, doc.id)) === uri) {
+          out.push(doc)
+          break
+        }
+      }
+    }
+    return out
   }
 
   async provideSemanticTokens(uri: string, range?: Range) {
@@ -1233,25 +1302,78 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   async runChecks() {
     if (this.idle && (this.changeQueue.length > 0 || this.revalidateQueue.length > 0)) {
       this.idle = false
-      await new Promise(resolve => setTimeout(resolve, this.checksDelay))
-      while (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
-        const id = (this.changeQueue.shift() ?? this.revalidateQueue.shift())!
-        this.pendingCheck.delete(id)
-        const doc = await this.openDocument(id)
-        if (this.changedSet.has(id)) {
-          const text = this.documents.get(id)?.getText()
-          if (typeof text === 'string') {
-            doc.update(text)
+      // A check that throws must not stop the queue (or leave it non-idle for good).
+      try {
+        await new Promise(resolve => setTimeout(resolve, this.checksDelay))
+        while (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
+          const id = (this.changeQueue.shift() ?? this.revalidateQueue.shift())!
+          try {
+            await this.checkQueued(id)
+          } catch (error) {
+            console.error('Failed to check', id, error)
+          }
+          if (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, this.checksDelay))
           }
         }
-        const changed = this.changedSet.has(id)
-        this.changedSet.delete(id)
-        await this.checkDoc(doc, changed)
-        if (this.changeQueue.length > 0 || this.revalidateQueue.length > 0) {
-          await new Promise(resolve => setTimeout(resolve, this.checksDelay))
-        }
+      } finally {
+        this.idle = true
       }
-      this.idle = true
+    }
+  }
+
+  /**
+   * Checks one queued document, re-parsed first when its text changed. It stays marked changed
+   * until the re-parse succeeded, so a failed one is retried by the next check.
+   */
+  private async checkQueued(id: string) {
+    this.pendingCheck.delete(id)
+    if (this.closedSet.delete(id) && !this.documents.get(id) && (await this.revertClosed(id))) {
+      return
+    }
+    const doc = await this.openDocument(id)
+    const changed = this.changedSet.has(id)
+    if (changed) {
+      const text = this.documents.get(id)?.getText()
+      if (typeof text === 'string') {
+        doc.update(text)
+      }
+      this.changedSet.delete(id)
+    }
+    await this.checkDoc(doc, changed)
+  }
+
+  /**
+   * A document the editor closed: unsaved edits are discarded, so when the text it was parsed
+   * from is not the file's content on disk (or the file is gone), it is handled as a change on
+   * disk (`onAsFileChanged`): re-read (or dropped) and the documents importing it checked again.
+   * Returns whether it was (else it is checked as usual).
+   */
+  private async revertClosed(id: string): Promise<boolean> {
+    const cached = this.atscripts.get(id)
+    const doc = cached && (await cached.catch(() => undefined))
+    const disk = await this.readFromDisk(id)
+    // (not parsed — closed by a change on disk, say: read from disk by the usual check)
+    if (doc ? disk === doc.text : disk !== undefined) {
+      return false
+    }
+    if (this.documents.get(id)) {
+      // (opened again meanwhile: the editor feeds it, a change is queued)
+      return true
+    }
+    this.changedSet.delete(id)
+    await this.onAsFileChanged(id, disk === undefined)
+    return true
+  }
+
+  /** The content of `id` on disk (`undefined`: deleted or unreadable). */
+  private async readFromDisk(id: string): Promise<string | undefined> {
+    try {
+      const { manager } = await this.resolveConfig(id)
+      const content = await manager.load((await manager.resolve(id)) ?? id)
+      return typeof content === 'string' ? content : undefined
+    } catch {
+      return undefined
     }
   }
 
@@ -1292,19 +1414,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     atscript: AtscriptDoc,
     targetName: string
   ): (SemanticNode & { props: Map<string, SemanticPropNode> }) | undefined {
-    const unwound = atscript.unwindType(targetName)
-    if (!unwound?.def) {
-      return undefined
-    }
-    let targetDef: SemanticNode = atscript.mergeIntersection(unwound.def)
-    if (isInterface(targetDef)) {
-      const withExtends = unwound.doc.resolveInterfaceExtends(targetDef)
-      targetDef = withExtends || targetDef.getDefinition() || targetDef
-    }
-    if (!isStructure(targetDef) && !isInterface(targetDef)) {
-      return undefined
-    }
-    return targetDef
+    const targetDef = atscript.inlinedDefinition(atscript.unwindType(targetName))
+    return isStructure(targetDef) || isInterface(targetDef) ? targetDef : undefined
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
@@ -1333,30 +1444,87 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     return undefined
   }
 
-  revalidateDependants(atscript: AtscriptDoc) {
-    atscript.dependants.forEach(d => {
-      d.clearMessages()
-      this.addToRevalidateQueue(d.id)
-    })
+  /**
+   * Re-checks the documents importing `atscript`, directly or not: a change can alter the
+   * diagnostics of any of them (a chained reference, a definition inlined across imports) — and
+   * those whose blocks' diagnostics read it or the documents it imports (or imported `before`):
+   * their importers changed (see `revalidateReaders`).
+   */
+  revalidateDependants(atscript: AtscriptDoc, before: Iterable<AtscriptDoc> = []) {
+    for (const d of atscript.transitive('dependants')) {
+      if (d !== atscript) {
+        d.clearMessages()
+        this.addToRevalidateQueue(d.id)
+      }
+    }
+    this.revalidateReaders([atscript, ...atscript.dependencies, ...before], atscript)
+  }
+
+  /**
+   * Re-checks the documents (but `except`) whose mutating `annotate` blocks' diagnostics read one
+   * of `changed` as of their last check (see `blockDependencies`): a document changed (its text,
+   * or its imports), or the documents it imports now or imported before (their importers
+   * changed). Whether a block is reachable depends on the documents using its target — through
+   * plain aliases, in any file — and on what they import (see the warning of
+   * `AtscriptDoc.getDiagMessages`).
+   */
+  revalidateReaders(changed: Iterable<AtscriptDoc>, except?: AtscriptDoc) {
+    const ids = new Set([...changed].map(d => d.id))
+    const readsOne = (reads: Set<string>) => {
+      for (const changedId of ids) {
+        if (reads.has(changedId)) {
+          return true
+        }
+      }
+      return false
+    }
+    for (const [id, { doc, ids: reads }] of this.blockReads) {
+      if (id !== except?.id && readsOne(reads)) {
+        doc.clearMessages()
+        this.addToRevalidateQueue(id)
+      }
+    }
   }
 
   async checkDoc(atscript: AtscriptDoc, changed = false) {
-    await this.checkImports(atscript)
-    const unused = atscript.getUnusedTokens()
-    const messages = atscript.getDiagMessages()
-    this.connection.sendDiagnostics({
-      uri: atscript.id,
-      diagnostics: messages.concat(
-        ...unused.map(t => ({
-          severity: DiagnosticSeverity.Hint,
-          range: t.range,
-          message: `Unused token: ${t.text}`,
-          tags: [DiagnosticTag.Unnecessary],
-        }))
-      ),
-    })
-    if (changed) {
-      this.revalidateDependants(atscript)
+    const before = [...atscript.dependencies]
+    const closure = atscript.transitive('dependencies')
+    try {
+      await this.checkImports(atscript)
+      // Imports resolving otherwise (a file created, deleted, loaded for the first time — also
+      // a document it imports indirectly, whose imports now have one more dependant: LSP-UW):
+      // the documents whose blocks' diagnostics read one of them (now or before) are checked
+      // again.
+      const after = atscript.transitive('dependencies')
+      if (closure.size !== after.size || [...closure].some(d => !after.has(d))) {
+        this.revalidateReaders([atscript, ...after, ...closure, ...before], atscript)
+      }
+      const unused = atscript.getUnusedTokens()
+      const messages = atscript.getDiagMessages()
+      // (what its blocks' diagnostics read, as of now)
+      const reads = blockDependencies(atscript)
+      if (reads.size > 0) {
+        this.blockReads.set(atscript.id, { doc: atscript, ids: new Set([...reads].map(d => d.id)) })
+      } else {
+        this.blockReads.delete(atscript.id)
+      }
+      this.connection.sendDiagnostics({
+        uri: atscript.id,
+        diagnostics: messages.concat(
+          ...unused.map(t => ({
+            severity: DiagnosticSeverity.Hint,
+            range: t.range,
+            message: `Unused token: ${t.text}`,
+            tags: [DiagnosticTag.Unnecessary],
+          }))
+        ),
+      })
+    } finally {
+      // Even when the check failed: the dependants see the changed document (and the readers
+      // of the documents it imported before, see `revalidateReaders`).
+      if (changed) {
+        this.revalidateDependants(atscript, before)
+      }
     }
   }
 }

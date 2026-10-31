@@ -8,8 +8,12 @@ import type {
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
 import { compiledCheckFor, optionFlags, type TCompiledEnv } from './compiled-check/registry'
+import { metaEmpty } from './layers'
+import { statelessRegExp } from './stateless-regex'
 import type { TValidatorOptions } from './validator'
-import { ARRAY_KEYS, BOOLEAN_KEYS, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
+import { ARRAY_KEYS, BOOLEAN_KEYS, DECIMAL_RE, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
+
+export { DECIMAL_RE } from './validator-keys'
 
 /**
  * Allocation-free boolean pre-check used by {@link Validator.validate} before the
@@ -55,6 +59,14 @@ const TOP = 1
 /** Node is inside a union branch — failures must be exhaustive (see contract). */
 const IN_UNION = 2
 
+/**
+ * Wasted union branches (see {@link unionWaste}) after which a call memoizes nested unions: a
+ * union nested in its own branches, many branches each, is checked again from every branch of
+ * every union above it — (branches)^(depth) work. Ordinary unions waste a few branches at most;
+ * the memo would cost them more than it saves.
+ */
+export const WASTE_BEFORE_MEMO = 16
+
 /** Incremented per {@link fastCheckPasses} call; snapshots verified in older calls re-verify. */
 let stamp = 0
 
@@ -83,12 +95,21 @@ export function fastCheckPasses(
   }
   // A new call: every plan re-verifies itself against the live type when first reached.
   stamp++
+  // (the union memo is the call's own, made only once it wastes work: see `unionWaste`)
+  if (COMPILED_ENV.m !== undefined) {
+    COMPILED_ENV.m = undefined
+  }
+  let passed: boolean
   try {
-    return check(def, value, opts) === PASS
+    passed = check(def, value, opts) === PASS
   } catch {
     // Let the walk reproduce (or not) the failure with its own semantics.
-    return false
+    passed = false
   }
+  if (COMPILED_ENV.m !== undefined) {
+    COMPILED_ENV.m = undefined
+  }
+  return passed
 }
 
 /** {@link fastCheckPasses} for `unknownProps: 'strip'`: performs the recorded strips on a pass. */
@@ -103,6 +124,9 @@ function fastCheckStripping(
   }
   stamp++
   stripping = true
+  if (COMPILED_ENV.m !== undefined) {
+    COMPILED_ENV.m = undefined
+  }
   let passed: boolean
   try {
     passed = check(def, value, opts) === PASS
@@ -110,6 +134,9 @@ function fastCheckStripping(
     passed = false
   } finally {
     stripping = false
+  }
+  if (COMPILED_ENV.m !== undefined) {
+    COMPILED_ENV.m = undefined
   }
   // Outside the try: a failing `delete` throws from the walk too, at the same key.
   // Strips are only recorded for the top-level object, which is `value` itself.
@@ -137,11 +164,13 @@ function check(def: TAtscriptAnnotatedType, value: unknown, opts: TValidatorOpti
     : compiled(value, TOP | optionFlags(opts), opts)
 }
 
-export const DECIMAL_RE = /^[+-]?\d+(\.\d+)?$/
-
 const regexCache = new Map<string, Map<string, RegExp>>()
 
-/** Compiled `@expect.pattern` regex, cached per (pattern, flags). */
+/**
+ * Compiled `@expect.pattern` regex, cached per (pattern, flags). Compiled without the
+ * stateful `g` / `y` flags (see {@link statelessRegExp}): every engine tests with it, and
+ * gets the same result on every call.
+ */
 export function getRegex(pattern: string, flags?: string): RegExp {
   let byFlags = regexCache.get(pattern)
   if (!byFlags) {
@@ -151,7 +180,7 @@ export function getRegex(pattern: string, flags?: string): RegExp {
   const flagsKey = flags || ''
   let regex = byFlags.get(flagsKey)
   if (!regex) {
-    regex = new RegExp(pattern, flags)
+    regex = statelessRegExp(new RegExp(pattern, flags))
     byFlags.set(flagsKey, regex)
   }
   return regex
@@ -162,7 +191,7 @@ export function getRegex(pattern: string, flags?: string): RegExp {
  * type does not itself accept `null`. Shared by the walk and the fast pre-check.
  */
 export function rejectsNullAsRequired(def: TAtscriptAnnotatedType): boolean {
-  return def.metadata.size > 0 && !!def.metadata.get('meta.required') && !acceptsNull(def)
+  return !metaEmpty(def.metadata) && !!def.metadata.get('meta.required') && !acceptsNull(def)
 }
 
 function acceptsNull(def: TAtscriptAnnotatedType): boolean {
@@ -190,6 +219,211 @@ export const COMPILED_ENV: TCompiledEnv = {
   regex: getRegex,
   interp: fastCheck,
   rn: rejectsNullAsRequired,
+  m: undefined,
+  n: 0,
+  w: 0,
+  wa: unionWaste,
+  mg: memoGet,
+  ms: memoSet,
+}
+
+/**
+ * A union branch failed after branches of nested unions over objects did (`COMPILED_ENV.n`, the
+ * failed branches of unions over objects inside union branches, moved): work
+ * a later branch of the same outermost union may do again. Past {@link WASTE_BEFORE_MEMO} wasted
+ * branches since the outermost union was entered, the call memoizes the unions over objects it
+ * checks inside union branches (`memoGet` / `memoSet`): each such union is then decided once per
+ * value, flags and options — the same result (a pre-check outcome depends on nothing else: the
+ * walk's strips are not performed here, see the contract above).
+ */
+function unionWaste(): void {
+  if (++COMPILED_ENV.w === WASTE_BEFORE_MEMO && COMPILED_ENV.m === undefined) {
+    COMPILED_ENV.m = new Map()
+  }
+}
+
+/** The outcome memoized for union `key` (a node, or a compiled union's key) over `value`, or -1. */
+function memoGet(key: object, value: object, flags: number, opts: TValidatorOptions): number {
+  const entries = COMPILED_ENV.m!.get(value)
+  if (entries !== undefined) {
+    for (let i = 0; i < entries.length; i += 4) {
+      if (entries[i] === key && entries[i + 1] === flags && entries[i + 2] === opts) {
+        return entries[i + 3] as number
+      }
+    }
+  }
+  return -1
+}
+
+/** Memoizes the outcome of union `key` over `value` (see {@link memoGet}). */
+function memoSet(
+  key: object,
+  value: object,
+  flags: number,
+  opts: TValidatorOptions,
+  result: number
+): void {
+  const memo = COMPILED_ENV.m!
+  const entries = memo.get(value)
+  if (entries === undefined) {
+    memo.set(value, [key, flags, opts, result])
+  } else {
+    entries.push(key, flags, opts, result)
+  }
+}
+
+/**
+ * The `fastCheck` union case: branches in declared order (see the contract above). A union over
+ * an object inside a union branch counts its failed branches and, once the call made the memo,
+ * is decided once (see `unionWaste`).
+ */
+function fastCheckUnion(
+  def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+  value: any,
+  flags: number,
+  opts: TValidatorOptions
+): number {
+  let nested = false
+  if ((flags & IN_UNION) === 0) {
+    // The outermost union: a new waste window.
+    COMPILED_ENV.w = 0
+  } else if (typeof value === 'object' && value !== null) {
+    if (COMPILED_ENV.m !== undefined) {
+      return memoizedUnion(def, value, flags, opts)
+    }
+    nested = true
+  }
+  // (`unionBranches`, inlined: the hot path)
+  const branchFlags = flags | IN_UNION
+  for (const item of def.type.items) {
+    const failures = COMPILED_ENV.n
+    const result = fastCheck(item, value, branchFlags, opts)
+    if (result !== FAIL) {
+      return unionMatchResult(result, item, def.metadata, value)
+    }
+    if (COMPILED_ENV.n !== failures) {
+      unionWaste()
+    }
+    if (nested) {
+      COMPILED_ENV.n++
+    }
+    if (pendingKeys.length > 0) {
+      // The walk keeps the strips of a branch it rejects; the next branches would see them.
+      return BAIL
+    }
+  }
+  return FAIL
+}
+
+/** {@link fastCheckUnion} of a union plan (the same memo entries: keyed by the node). */
+function checkPlanUnion(plan: Plan, value: any, flags: number, opts: TValidatorOptions): number {
+  let nested = false
+  if ((flags & IN_UNION) === 0) {
+    COMPILED_ENV.w = 0
+  } else if (typeof value === 'object' && value !== null) {
+    if (COMPILED_ENV.m !== undefined) {
+      return memoizedUnion(
+        plan.def as TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+        value,
+        flags,
+        opts,
+        plan
+      )
+    }
+    nested = true
+  }
+  // (`planUnionBranches`, inlined: the hot path)
+  const branchFlags = flags | IN_UNION
+  for (const child of plan.children!) {
+    const failures = COMPILED_ENV.n
+    const result = checkPlan(child, value, branchFlags, opts)
+    if (result !== FAIL) {
+      return unionMatchResult(result, child.def, plan.metadata!, value)
+    }
+    if (COMPILED_ENV.n !== failures) {
+      unionWaste()
+    }
+    if (nested) {
+      COMPILED_ENV.n++
+    }
+  }
+  return FAIL
+}
+
+/** The branches of a union (see {@link fastCheckUnion}); `nested`: its failed branches count. */
+function unionBranches(
+  def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+  value: any,
+  flags: number,
+  opts: TValidatorOptions,
+  nested: boolean
+): number {
+  const branchFlags = flags | IN_UNION
+  for (const item of def.type.items) {
+    const failures = COMPILED_ENV.n
+    const result = fastCheck(item, value, branchFlags, opts)
+    if (result !== FAIL) {
+      return unionMatchResult(result, item, def.metadata, value)
+    }
+    if (COMPILED_ENV.n !== failures) {
+      unionWaste()
+    }
+    if (nested) {
+      COMPILED_ENV.n++
+    }
+    if (pendingKeys.length > 0) {
+      // The walk keeps the strips of a branch it rejects; the next branches would see them.
+      return BAIL
+    }
+  }
+  return FAIL
+}
+
+/** {@link unionBranches} of a union plan. */
+function planUnionBranches(
+  plan: Plan,
+  value: any,
+  flags: number,
+  opts: TValidatorOptions,
+  nested: boolean
+): number {
+  const branchFlags = flags | IN_UNION
+  for (const child of plan.children!) {
+    const failures = COMPILED_ENV.n
+    const result = checkPlan(child, value, branchFlags, opts)
+    if (result !== FAIL) {
+      return unionMatchResult(result, child.def, plan.metadata!, value)
+    }
+    if (COMPILED_ENV.n !== failures) {
+      unionWaste()
+    }
+    if (nested) {
+      COMPILED_ENV.n++
+    }
+  }
+  return FAIL
+}
+
+/** A union over object `value` inside a union branch, once the call made the memo. */
+function memoizedUnion(
+  def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+  value: object,
+  flags: number,
+  opts: TValidatorOptions,
+  plan?: Plan
+): number {
+  const known = memoGet(def, value, flags, opts)
+  if (known >= 0) {
+    return known
+  }
+  const result =
+    plan === undefined
+      ? unionBranches(def, value, flags, opts, true)
+      : planUnionBranches(plan, value, flags, opts, true)
+  if (result !== BAIL) {
+    memoSet(def, value, flags, opts, result)
+  }
+  return result
 }
 
 function fastCheck(
@@ -214,28 +448,10 @@ function fastCheck(
       return fastCheckArray(def as TAtscriptAnnotatedType<TAtscriptTypeArray>, value, flags, opts)
     }
     case 'union': {
-      const branchFlags = flags | IN_UNION
-      for (const item of (type as TAtscriptTypeComplex).items) {
-        const result = fastCheck(item, value, branchFlags, opts)
-        if (result !== FAIL) {
-          return unionMatchResult(result, item, def.metadata, value)
-        }
-        if (pendingKeys.length > 0) {
-          // The walk keeps the strips of a branch it rejects; the next branches would see them.
-          return BAIL
-        }
-      }
-      return FAIL
+      return fastCheckUnion(def as TAtscriptAnnotatedType<TAtscriptTypeComplex>, value, flags, opts)
     }
     case 'intersection': {
-      // The walk stops at the first failing member.
-      for (const item of (type as TAtscriptTypeComplex).items) {
-        const result = fastCheck(item, value, flags, opts)
-        if (result !== PASS) {
-          return result
-        }
-      }
-      return PASS
+      return fastCheckIntersection(type as TAtscriptTypeComplex, value, flags, opts)
     }
     case 'tuple': {
       const items = (type as TAtscriptTypeComplex).items
@@ -325,7 +541,7 @@ function unionMatchResult(
  * (`null` / objects pass; the caller skips literal branches).
  */
 function fastCheckUnionConstraints(metadata: TMetadata, value: any): number {
-  if (metadata.size === 0) {
+  if (metaEmpty(metadata)) {
     return PASS
   }
   switch (typeof value) {
@@ -348,11 +564,11 @@ function fastCheckUnionConstraints(metadata: TMetadata, value: any): number {
 }
 
 function fastCheckBoolean(metadata: TMetadata, value: boolean): number {
-  return metadata.size === 0 ? PASS : booleanConstraints(value, metadata.get('meta.required'))
+  return metaEmpty(metadata) ? PASS : booleanConstraints(value, metadata.get('meta.required'))
 }
 
 function fastCheckString(metadata: TMetadata, value: string): number {
-  if (metadata.size === 0) {
+  if (metaEmpty(metadata)) {
     return PASS
   }
   const filled = metadata.get('meta.required')
@@ -379,12 +595,7 @@ function fastCheckString(metadata: TMetadata, value: string): number {
       if (!pattern) {
         continue
       }
-      const regex = getRegex(pattern, flags)
-      if (regex.global || regex.sticky) {
-        // Stateful (`lastIndex`) regexes: testing here would shift the walk's result.
-        return BAIL
-      }
-      if (!regex.test(value)) {
+      if (!getRegex(pattern, flags).test(value)) {
         return FAIL
       }
     }
@@ -393,7 +604,7 @@ function fastCheckString(metadata: TMetadata, value: string): number {
 }
 
 function fastCheckNumber(metadata: TMetadata, value: number): number {
-  if (metadata.size === 0) {
+  if (metaEmpty(metadata)) {
     return PASS
   }
   return numberConstraints(
@@ -457,6 +668,26 @@ function lengthFails(
     (maxLength !== undefined &&
       length > (typeof maxLength === 'number' ? maxLength : maxLength.length))
   )
+}
+
+/**
+ * {@link fastCheck} of an intersection (a function of its own: `fastCheck` stays small, so the
+ * engine inlines it in the hot object and prop checks).
+ */
+function fastCheckIntersection(
+  type: TAtscriptTypeComplex,
+  value: any,
+  flags: number,
+  opts: TValidatorOptions
+): number {
+  // Each member on its own; the walk stops at the first failing one.
+  for (const item of type.items) {
+    const result = fastCheck(item, value, flags, opts)
+    if (result !== PASS) {
+      return result
+    }
+  }
+  return PASS
 }
 
 /** Array constraints; duplicate detection (`uniqueItems`) is left to the walk. */
@@ -576,7 +807,7 @@ function fastCheckArray(
     return FAIL
   }
   const metadata = def.metadata
-  if (metadata.size > 0) {
+  if (!metaEmpty(metadata)) {
     const result = fastCheckArrayConstraints(metadata, value)
     if (result !== PASS) {
       return result
@@ -651,8 +882,6 @@ interface TPlanRegex {
   pattern: string
   flags: string | undefined
   re: RegExp
-  /** `global` / `sticky` (flags are immutable). */
-  stateful: boolean
 }
 
 const plans = new WeakMap<TAtscriptAnnotatedType, Plan>()
@@ -795,18 +1024,17 @@ type TAnnotationReader = Map<string | undefined, unknown>
 function refreshMeta(plan: Plan): void {
   const metadata = plan.metadata as TAnnotationReader
   // Most nodes carry no annotations: one size check instead of four lookups.
-  const same =
-    metadata.size === 0
-      ? plan.m0 === undefined &&
-        plan.m1 === undefined &&
-        plan.m2 === undefined &&
-        plan.m3 === undefined &&
-        plan.m4 === undefined
-      : metadata.get(plan.k0) === plan.m0 &&
-        (plan.k1 === undefined || metadata.get(plan.k1) === plan.m1) &&
-        (plan.k2 === undefined || metadata.get(plan.k2) === plan.m2) &&
-        (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3) &&
-        (plan.k4 === undefined || metadata.get(plan.k4) === plan.m4)
+  const same = metaEmpty(metadata)
+    ? plan.m0 === undefined &&
+      plan.m1 === undefined &&
+      plan.m2 === undefined &&
+      plan.m3 === undefined &&
+      plan.m4 === undefined
+    : metadata.get(plan.k0) === plan.m0 &&
+      (plan.k1 === undefined || metadata.get(plan.k1) === plan.m1) &&
+      (plan.k2 === undefined || metadata.get(plan.k2) === plan.m2) &&
+      (plan.k3 === undefined || metadata.get(plan.k3) === plan.m3) &&
+      (plan.k4 === undefined || metadata.get(plan.k4) === plan.m4)
   if (!same) {
     snapshotMeta(plan)
   }
@@ -954,14 +1182,7 @@ function checkPlan(plan: Plan, value: any, flags: number, opts: TValidatorOption
       return checkArray(plan, value, flags, opts)
     }
     case OP_UNION: {
-      const branchFlags = flags | IN_UNION
-      for (const child of plan.children) {
-        const result = checkPlan(child, value, branchFlags, opts)
-        if (result !== FAIL) {
-          return unionMatchResult(result, child.def, plan.metadata!, value)
-        }
-      }
-      return FAIL
+      return checkPlanUnion(plan, value, flags, opts)
     }
     case OP_BOOLEAN: {
       if (typeof value !== 'boolean') {
@@ -1006,13 +1227,8 @@ function checkString(plan: Plan, value: string): number {
       }
       let entry = plan.regexes[i]
       if (entry === undefined || entry.pattern !== pattern || entry.flags !== flags) {
-        const re = getRegex(pattern, flags)
-        entry = { pattern, flags, re, stateful: re.global || re.sticky }
+        entry = { pattern, flags, re: getRegex(pattern, flags) }
         plan.regexes[i] = entry
-      }
-      if (entry.stateful) {
-        // Stateful (`lastIndex`) regexes: testing here would shift the walk's result.
-        return BAIL
       }
       if (!entry.re.test(value)) {
         return FAIL

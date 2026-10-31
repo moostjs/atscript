@@ -1,8 +1,8 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Base, Helper } from "./extends-cross-helper-base.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
+import { Base } from "./extends-cross-helper-base.as"
 
 export class Child {
   static __is_atscript_annotated_type = true
@@ -14,17 +14,11 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "payload",
-    $()
-      .refTo(() => Helper)
-      .$type
-  ).prop(
-    "id",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("payload", $f(Base, "payload"))
+  .prop("id", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

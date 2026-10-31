@@ -414,3 +414,50 @@ describe('createDataFromAnnotatedType — union handling', () => {
     expect(createDataFromAnnotatedType(union, { mode: 'default' })).toBe(0)
   })
 })
+
+describe('createDataFromAnnotatedType — recursive types', () => {
+  // `interface Node { name: string; next?: Node; children: Node[]; inner?: { back: Node } }`
+  function recursiveNode() {
+    const node = defineAnnotatedType('object')
+    const ref = () => defineAnnotatedType().ref(node.$type as never)
+    node
+      .prop('name', str())
+      .prop('next', ref().optional().$type)
+      .prop('children', defineAnnotatedType('array').of(ref().$type).$type)
+      .prop('inner', defineAnnotatedType('object').prop('back', ref().$type).optional().$type)
+    return node.$type
+  }
+
+  it('stops at the recursion (optional props omitted, arrays empty) in every mode', () => {
+    const type = recursiveNode()
+    // (`inner` requires `back`, the recursion: no value of it ends, it is left out)
+    expect(createDataFromAnnotatedType(type, { mode: 'example' })).toEqual({
+      name: '',
+      children: [],
+    })
+    expect(createDataFromAnnotatedType(type)).toEqual({ name: '', children: [] })
+  })
+
+  it('a recursive union takes a branch that ends', () => {
+    // `type J = J[] | string`
+    const j = defineAnnotatedType('union')
+    j.item(defineAnnotatedType('array').of(defineAnnotatedType().ref(j.$type as never).$type).$type)
+    j.item(str())
+    expect(createDataFromAnnotatedType(j.$type, { mode: 'example' })).toEqual([])
+    expect(createDataFromAnnotatedType(j.$type)).toEqual([])
+    // `type K = K[] | { k: K }`: no branch ends without the recursion — none is built.
+    const k = defineAnnotatedType('union')
+    k.item(
+      defineAnnotatedType('object').prop('k', defineAnnotatedType().ref(k.$type as never).$type)
+        .$type
+    )
+    expect(createDataFromAnnotatedType(k.$type, { mode: 'example' })).toEqual({})
+  })
+
+  it('an intersection of objects builds every member', () => {
+    const type = defineAnnotatedType('intersection')
+      .item(defineAnnotatedType('object').prop('a', str()).$type)
+      .item(defineAnnotatedType('object').prop('b', num()).$type).$type
+    expect(createDataFromAnnotatedType(type)).toEqual({ a: '', b: 0 })
+  })
+})

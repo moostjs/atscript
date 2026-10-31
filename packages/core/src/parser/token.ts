@@ -1,3 +1,4 @@
+import type { AtscriptDoc } from '../document'
 import type { TLexicalToken } from '../tokenizer/types'
 import type { SemanticNode } from './nodes'
 
@@ -65,6 +66,13 @@ export class Token {
    * All the references must be marked with this flag
    */
   public isReference?: boolean
+
+  /**
+   * References only: the document the reference was written in (whose imports its name
+   * resolves against). A definition inlined into another document (an intersection member,
+   * `extends`, `annotate … as …` of an imported type) keeps it. Unset on synthetic references.
+   */
+  public originDoc?: AtscriptDoc
 
   /**
    * All the import tokens must be marked with this flag

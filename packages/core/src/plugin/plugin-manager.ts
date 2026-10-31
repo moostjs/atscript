@@ -1,11 +1,12 @@
 import { readFile } from 'node:fs/promises'
+import { isAbsolute } from 'node:path'
 
 import { defu } from 'defu'
 
 import type { AnnotationSpec } from '../annotations'
-import { isAnnotationSpec } from '../annotations'
+import { forEachAnnotationSpec } from '../annotations'
 import type { TOutput } from '../build'
-import type { TAnnotationsTree, TAtscriptConfig } from '../config'
+import type { TAtscriptConfig } from '../config'
 import { getDefaultAtscriptConfig } from '../default-atscript-config'
 import type { AtscriptDoc, TAtscriptDocConfig } from '../document'
 import { SemanticPrimitiveNode } from '../parser/nodes'
@@ -18,7 +19,11 @@ export interface TOutputWithSource extends TPluginOutput {
 }
 
 export class PluginManager {
-  constructor(private readonly cfg: TAtscriptConfig) {}
+  constructor(
+    private readonly cfg: TAtscriptConfig,
+    /** The project root (absolute), the config's `rootDir` resolved. */
+    private readonly root?: string
+  ) {}
 
   private _config!: TAtscriptConfig
 
@@ -47,6 +52,8 @@ export class PluginManager {
         this._docConfig.annotations = { ...raw.annotations }
       }
       this._docConfig.unknownAnnotation = raw?.unknownAnnotation
+      this._docConfig.rootDir =
+        this.root ?? (raw?.rootDir && isAbsolute(raw.rootDir) ? raw.rootDir : undefined)
     }
     return this._docConfig
   }
@@ -122,31 +129,6 @@ export class PluginManager {
 
   async loopInAnnotationsSpec(cb: (name: string, a: AnnotationSpec) => void) {
     const config = await this.config()
-    const annotations = config.annotations || {}
-    return this._loopInAnnotationsSpec(annotations, cb)
-  }
-
-  private _loopInAnnotationsSpec(
-    annotations: TAnnotationsTree,
-    cb: (name: string, a: AnnotationSpec) => void,
-    prefix?: string
-  ) {
-    if (annotations.$self && prefix) {
-      cb(prefix, annotations.$self)
-    }
-    for (const [key, value] of Object.entries(annotations)) {
-      if (key === '$self') {
-        continue
-      }
-      if (isAnnotationSpec(value)) {
-        cb(prefix ? `${prefix}.${key}` : key, value)
-      } else {
-        this._loopInAnnotationsSpec(
-          value as TAnnotationsTree,
-          cb,
-          prefix ? `${prefix}.${key}` : key
-        )
-      }
-    }
+    forEachAnnotationSpec(config.annotations || {}, cb)
   }
 }

@@ -6,11 +6,15 @@ import { describe, expect, it } from 'vitest'
 import { AnnotationSpec } from './annotations'
 import { expectAnnotations } from './defaults/expect-annotations'
 import { AtscriptDoc } from './document'
-import type { SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
-import { isGroup, isPrimitive, type TAnnotationTokens } from './parser/nodes'
+import type { SemanticAnnotateNode, SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
+import { isAnnotate, isGroup, isPrimitive, type TAnnotationTokens } from './parser/nodes'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
 import { Token } from './parser/token'
+
+/** The `annotate` blocks of `doc` targeting `name`. */
+const blocksOf = (doc: AtscriptDoc, name: string) =>
+  doc.nodes.filter((n): n is SemanticAnnotateNode => isAnnotate(n) && n.targetName === name)
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
 primitives.set(
@@ -854,7 +858,7 @@ describe('document', () => {
     const originalAnnotations = doc.evalAnnotationsForNode(prop)
 
     // Get mutating annotate entry annotations
-    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const annotateNodes = blocksOf(doc, 'User').filter(n => n.isMutating)
     expect(annotateNodes).toHaveLength(1)
     const entry = annotateNodes[0].entries.find(e => e.id === 'name')!
     const adHocAnnotations = entry.annotations!
@@ -900,12 +904,12 @@ describe('document', () => {
     const originalAnnotations = doc.evalAnnotationsForNode(prop)
 
     // First: merge mutating annotate (abc2) with original (abc)
-    const mutatingNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const mutatingNodes = blocksOf(doc, 'User').filter(n => n.isMutating)
     const mutatingEntry = mutatingNodes[0].entries.find(e => e.id === 'name')!
     const afterMutating = doc.mergeNodesAnnotations(originalAnnotations, mutatingEntry.annotations!)
 
     // Then: merge non-mutating annotate (abc3) on top
-    const nonMutatingNodes = doc.getAnnotateNodesFor('User').filter(n => !n.isMutating)
+    const nonMutatingNodes = blocksOf(doc, 'User').filter(n => !n.isMutating)
     expect(nonMutatingNodes).toHaveLength(1)
     const nonMutatingEntry = nonMutatingNodes[0].entries.find(e => e.id === 'name')!
     const afterAll = doc.mergeNodesAnnotations(afterMutating, nonMutatingEntry.annotations!)
@@ -941,7 +945,7 @@ describe('document', () => {
     const iface = doc.nodes[0]
     const originalAnnotations = doc.evalAnnotationsForNode(iface)
 
-    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const annotateNodes = blocksOf(doc, 'User').filter(n => n.isMutating)
     expect(annotateNodes).toHaveLength(1)
     const adHocAnnotations = annotateNodes[0].annotations!
 
@@ -976,7 +980,7 @@ describe('document', () => {
     const iface = doc.nodes[0]
     const originalAnnotations = doc.evalAnnotationsForNode(iface)
 
-    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const annotateNodes = blocksOf(doc, 'User').filter(n => n.isMutating)
     const adHocAnnotations = annotateNodes[0].annotations!
 
     const merged = doc.mergeNodesAnnotations(originalAnnotations, adHocAnnotations)
@@ -1010,7 +1014,7 @@ describe('document', () => {
     const iface = doc.nodes[0]
     const originalAnnotations = doc.evalAnnotationsForNode(iface)
 
-    const nonMutatingNodes = doc.getAnnotateNodesFor('User').filter(n => !n.isMutating)
+    const nonMutatingNodes = blocksOf(doc, 'User').filter(n => !n.isMutating)
     expect(nonMutatingNodes).toHaveLength(1)
     const annotateAnnotations = nonMutatingNodes[0].annotations!
 
@@ -1047,7 +1051,7 @@ describe('document', () => {
     const prop = iface.props.get('name')!
     const originalAnnotations = doc.evalAnnotationsForNode(prop)
 
-    const annotateNodes = doc.getAnnotateNodesFor('User').filter(n => n.isMutating)
+    const annotateNodes = blocksOf(doc, 'User').filter(n => n.isMutating)
     const entry = annotateNodes[0].entries.find(e => e.id === 'name')!
     const merged = doc.mergeNodesAnnotations(originalAnnotations, entry.annotations!)
 
@@ -1057,7 +1061,7 @@ describe('document', () => {
     expect(labelAnnotations[0].args[0]!.text).toBe('mutated')
   })
 
-  it('folds a NESTED-field mutating annotate into an extends child (and not the base)', () => {
+  it('a NESTED-field mutating annotate is a layer of the base, which an extends child references', () => {
     const doc = new AtscriptDoc('file-1.as', { primitives })
     doc.update(`
     export interface Base {
@@ -1083,24 +1087,18 @@ describe('document', () => {
     const childNode = doc.nodes[1] as SemanticInterfaceNode
     const resolved = doc.resolveInterfaceExtends(childNode) as SemanticStructureNode
     expect(resolved).toBeDefined()
-
-    // Top-level inherited prop keeps its annotate-block label (regression guard)
-    const usernameProp = resolved.props.get('username')!
-    const usernameAnns = doc.evalAnnotationsForNode(usernameProp)!
-    expect(usernameAnns.find(a => a.name === 'label')?.args[0]!.text).toBe('Top')
-
-    // Nested inherited prop now carries the annotate-block label (the bug)
-    const accountDef = resolved.props.get('account')!.getDefinition() as SemanticStructureNode
-    const activeProp = accountDef.props.get('active')!
-    const activeAnns = doc.evalAnnotationsForNode(activeProp)!
-    expect(activeAnns.find(a => a.name === 'label')?.args[0]!.text).toBe('Nested')
-
-    // The base's own nested `active` node must stay untouched (path-only cloning)
-    const baseNode = doc.nodes[0].getDefinition() as SemanticInterfaceNode
-    const baseAccountDef = baseNode.props.get('account')!.getDefinition() as SemanticStructureNode
-    const baseActiveProp = baseAccountDef.props.get('active')!
-    expect(baseActiveProp).not.toBe(activeProp)
-    expect((baseActiveProp.annotations ?? []).some(a => a.name === 'label')).toBe(false)
+    // (MODEL §3: blocks are metadata — the child's inherited props are the base's nodes, and the
+    // blocks' entries are layers of the base at their paths)
+    const baseNode = doc.nodes[0].getDefinition() as SemanticStructureNode
+    expect(resolved.props.get('username')).toBe(baseNode.props.get('username'))
+    expect(resolved.props.get('account')).toBe(baseNode.props.get('account'))
+    const m = doc.structure()
+    const base = m.declOf(doc, 'Base')!
+    const label = (path: string[]) =>
+      m.layersAt(base, path).flatMap(l => l.entry.ref.annotations ?? [])[0]?.args[0]?.text
+    expect(label(['username'])).toBe('Top')
+    expect(label(['account', 'active'])).toBe('Nested')
+    expect(m.layersAt(m.declOf(doc, 'Child')!, ['account', 'active'])).toEqual([])
   })
 })
 
@@ -1113,9 +1111,7 @@ describe('document/merging intersections', () => {
     expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
       "
       ● [structure] ""  (
-          
           ● [prop] "a": [ref] "string" <>
-          
           ● [prop] "b": [ref] "number"
         )"
     `)
@@ -1128,11 +1124,9 @@ describe('document/merging intersections', () => {
     expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
       "
       ● [structure] ""  (
-          
           ● [prop] "a": [ref] "string" <>
           
           ● [prop] "c": [ref] "string" <>
-          
           ● [prop] "b": [ref] "number"
         )"
     `)
@@ -1145,11 +1139,9 @@ describe('document/merging intersections', () => {
     expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
       "
       ● [structure] ""  (
-          
           ● [prop] "a": [ref] "string" <>
           
           ● [prop] "c": [ref] "never" <>
-          
           ● [prop] "b": [ref] "number"
         )"
     `)
@@ -1162,16 +1154,17 @@ describe('document/merging intersections', () => {
     expect(doc.mergeIntersection(def as SemanticGroup).toString()).toMatchInlineSnapshot(`
       "
       ● [structure] ""  (
-          
           ● [prop] "a": [ref] "string" <>
           
           ● [prop] "b"
-            
-            = [structure] ""  (
-                
-                ● [prop] "c": [ref] "number" <>
-                
-                ● [prop] "d": [ref] "string"
+            = [group] ""  (
+                ● [structure] "{"  (
+                    ● [prop] "c": [ref] "number"
+                  ) <&>
+                ● [structure] "{"  (
+                    ● [prop] "c": [ref] "number" <>
+                    ● [prop] "d": [ref] "string"
+                  )
               )
           
         )"
@@ -1216,6 +1209,29 @@ describe('document/merging intersections', () => {
         message: expect.stringContaining('container type'),
       })
     )
+  })
+})
+
+describe('document/go-to-definition through a merge (GD-MERGE)', () => {
+  it('a merged field lands in the document of the node it is', () => {
+    const a = new AtscriptDoc('file:///p/a.as', { primitives })
+    a.update(`export interface A {\n  x?: string | number\n  y?: string\n}`)
+    const b = new AtscriptDoc('file:///p/b.as', { primitives })
+    b.update(`export interface B {\n  x?: 'a' | 'b'\n}`)
+    const h = new AtscriptDoc('file:///p/h.as', { primitives })
+    h.update(
+      `import { A } from './a'\nimport { B } from './b'\nexport type M = A & B\nexport interface H {\n  v?: M.x\n  w?: M.y\n}`
+    )
+    h.updateDependencies([a, b])
+    // (\`M.x\`: both members have it — the merged field's first contributor; \`M.y\`: A's own node)
+    expect(h.getToDefinitionAt(4, 8)?.[0]).toMatchObject({
+      targetUri: 'file:///p/a.as',
+      targetRange: { start: { line: 1, character: 2 } },
+    })
+    expect(h.getToDefinitionAt(5, 8)?.[0]).toMatchObject({
+      targetUri: 'file:///p/a.as',
+      targetRange: { start: { line: 2, character: 2 } },
+    })
   })
 })
 

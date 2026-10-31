@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, registerCompiledCheck as $cv } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, registerCompiledCheck as $cv, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class JsonValue {
   static __is_atscript_annotated_type = true
@@ -24,59 +24,29 @@ export class Base {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("union", JsonValue)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
   .item($().designType("number")
-      .tags("number")
-      .$type)
+    .tags("number").$type)
   .item($().designType("boolean")
-      .tags("boolean")
-      .$type)
+    .tags("boolean").$type)
   .item($().designType("null")
-      .tags("null")
-      .$type)
-  .item($("array")
-      .of($()
-          .refTo(JsonValue)
-          .$type)
-      .$type)
+    .tags("null").$type)
+  .item($("array").of($().ref(JsonValue).$type).$type)
   .item($("object")
-      .propPattern(
-        /^.+$/,
-        $()
-          .refTo(JsonValue)
-          .$type
-      )
-      .$type)
+    .propPattern(/^.+$/, $().ref(JsonValue).$type).$type)
 
 $("object", Base)
-  .prop(
-    "state",
-    $("object")
-      .prop(
-        "context",
-        $()
-          .refTo(JsonValue)
-          .$type
-      ).prop(
-        "meta",
-        $("object")
-          .propPattern(
-            /^.+$/,
-            $()
-              .refTo(JsonValue)
-              .$type
-          )
-          .optional()
-          .$type
-      )
-      .$type
-  )
+  .prop("state", $("object")
+    .prop("context", $().ref(JsonValue).$type)
+    .prop("meta", $("object")
+      .propPattern(/^.+$/, $().ref(JsonValue).$type).optional().$type).$type)
 
 // Compiled validator checks
-$cv(JsonValue, 2, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,0,"",0]],[7]],[0,0,0,"",0],0], (K, H) => {
+$cv(JsonValue, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,0,"",0]],[7]],[0,0,0,"",0],0], (K, H) => {
   const pk = H.pk
   function d0(v, f, o) {
     let t
@@ -129,7 +99,7 @@ $cv(JsonValue, 2, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0
   }
   return r
 })
-$cv(Base, 2, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],[1,0,9,"",0]]],[3,[[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0],[0,0,7,"",0],[0,0,8,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,2,"",0]],[7],[7]],[0,0,0,"",0],0], (K, H) => {
+$cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],[1,0,9,"",0]]],[3,[[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0],[0,0,7,"",0],[0,0,8,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,2,"",0]],[7],[7]],[0,0,0,"",0],0], (K, H) => {
   const pk = H.pk, ho = H.ho
   function d0(v, f, o) {
     const q = (f & 2) === 0

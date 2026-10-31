@@ -18,13 +18,17 @@ import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
 import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
 import {
+  SemanticArrayNode,
   SemanticGroup,
   SemanticPropNode,
   SemanticRefNode,
   SemanticStructureNode,
+  SemanticTupleNode,
 } from './parser/nodes'
 import {
   isAnnotate,
+  isArray,
+  isConst,
   isGroup,
   isInterface,
   isPrimitive,
@@ -32,9 +36,10 @@ import {
   isQueryFieldRef,
   isRef,
   isStructure,
+  isTuple,
   isType,
 } from './parser/nodes'
-import type { SemanticAnnotateNode } from './parser/nodes/annotate-node'
+import { entryParts, type SemanticAnnotateNode } from './parser/nodes/annotate-node'
 import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import type { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import { pipes } from './parser/pipes'
@@ -43,9 +48,15 @@ import { parseBacktickArg } from './parser/pipes/expr.pipe'
 import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
-import { resolveAtscriptFromPath } from './parser/utils'
+import { getRelPath, resolveAtscriptFromPath } from './parser/utils'
 import type { PluginManager } from './plugin/plugin-manager'
 import type { TAtscriptPlugin, TAtscriptRenderFormat } from './plugin/types'
+import {
+  MERGE_TOO_COMPLEX,
+  NOTHING_IN_COMMON,
+  StructureModel,
+  UNION_IN_RECURSIVE_MERGE,
+} from './structure'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
@@ -53,11 +64,351 @@ import { tokenize } from './tokenizer'
 import type { TCommentSpan } from './tokenizer'
 import type { TLexicalToken } from './tokenizer/types'
 
+/**
+ * Caches of resolutions (they read other documents): dropped whenever a document changes, and
+ * when a recording of the documents read starts (see {@link recordDocumentReads}).
+ */
+let caches: ReturnType<typeof newCaches> | undefined
+
+function newCaches() {
+  return {
+    /** The merge of each intersection (see `AtscriptDoc.mergeIntersection`). */
+    merged: new WeakMap<SemanticNode, SemanticNode>(),
+    /** Merges building new nodes, by their operands (see {@link memoMerge}). */
+    merges: new WeakMap<SemanticNode, Map<SemanticNode, TMergeResult>>(),
+    /** The type each `annotate … as` alias stands for (see `AtscriptDoc.aliasDefinition`). */
+    aliases: new WeakMap<SemanticNode, SemanticNode | undefined>(),
+    /** The declaration each reference names (see `AtscriptDoc.resolveRefOwner`). */
+    refOwners: new WeakMap<SemanticNode, unknown>(),
+    /** What each reference unwinds to (see `AtscriptDoc.unwindRef`). */
+    unwound: new WeakMap<SemanticNode, unknown>(),
+  }
+}
+
+function cache(): ReturnType<typeof newCaches> {
+  return (caches ??= newCaches())
+}
+
+function resetCaches(): void {
+  caches = undefined
+}
+
+type TMergeResult = [SemanticNode] | [SemanticNode, SemanticNode]
+
+/**
+ * The merge of definitions `left` and `right` that builds new nodes (arrays of an intersection,
+ * a distributed union), built once: the same nodes every time.
+ */
+function memoMerge(
+  left: SemanticNode,
+  right: SemanticNode,
+  merge: () => TMergeResult
+): TMergeResult {
+  let byRight = cache().merges.get(left)
+  if (!byRight) {
+    byRight = new Map()
+    cache().merges.set(left, byRight)
+  }
+  let result = byRight.get(right)
+  if (!result) {
+    result = merge()
+    byRight.set(right, result)
+  }
+  return result
+}
+
+/** The intersections being merged (see `AtscriptDoc.mergeIntersection`): re-entered, kept. */
+const merging = new Set<SemanticNode>()
+
+/** `node` is an intersection (`A & B`). */
+function isIntersection(node?: SemanticNode): node is SemanticGroup {
+  return isGroup(node) && node.op === '&'
+}
+
+/** The chained references being unwound (see `AtscriptDoc.unwindType`). */
+const unwinding = new Set<string>()
+/** Whether an unwinding met a chain reaching itself (see `AtscriptDoc.unwindType`). */
+let circularChain = false
+/** Whether an unwinding met an alias reaching itself (see `AtscriptDoc.unwindType`). */
+let circularAlias = false
+const chainNodeIds = new WeakMap<object, number>()
+let nextChainNodeId = 0
+
+/** A key of chain `chain` from declaration `node`. */
+function chainKey(node: SemanticNode | undefined, chain: string[] | Token[]): string {
+  let id = node ? chainNodeIds.get(node) : -1
+  if (id === undefined) {
+    id = nextChainNodeId++
+    chainNodeIds.set(node!, id)
+  }
+  return `${id}\0${chain.map(c => (typeof c === 'string' ? c : c.text)).join('.')}`
+}
+
+/** The active recordings of the documents read (see {@link recordDocumentReads}). */
+const readers = new Set<Set<AtscriptDoc>>()
+
+/**
+ * The documents a document imports, by id: every document a resolution reads (a type of
+ * another document, through its importer's map) is recorded by the active recordings.
+ */
+class DependenciesMap extends Map<string, AtscriptDoc> {
+  override get(id: string): AtscriptDoc | undefined {
+    const doc = super.get(id)
+    if (doc && readers.size > 0) {
+      recordRead(doc)
+    }
+    return doc
+  }
+}
+
+/** Records `doc` as read by the active recordings (see {@link recordDocumentReads}). */
+function recordRead(doc: AtscriptDoc): void {
+  for (const read of readers) {
+    read.add(doc)
+  }
+}
+
+/**
+ * Starts recording the documents read by resolutions (a type, an annotation, a definition of
+ * another document — directly or through other documents): what is derived meanwhile depends
+ * on them only (besides the documents read directly). Recordings may overlap (asynchronous
+ * work interleaving): each records every read while it is active, so none misses one. The
+ * caches are dropped first (a resolution cached earlier would skip the reads it made).
+ * Call `stop()` to end it and get the documents.
+ */
+export function recordDocumentReads(): { stop: () => Set<AtscriptDoc> } {
+  resetCaches()
+  const read = new Set<AtscriptDoc>()
+  readers.add(read)
+  return {
+    stop: () => {
+      readers.delete(read)
+      return read
+    },
+  }
+}
+
+/** Incremented on every change of a document (its text, or its imports). */
+let epoch = 0
+
+/** {@link AtscriptDoc.aliasedDeclaration}'s steps, with the epoch they were found at. */
+const aliasSteps = new WeakMap<
+  SemanticNode,
+  { epoch: number; step: { doc: AtscriptDoc; node: SemanticNode } | undefined }
+>()
+
+/**
+ * The current epoch of the documents: it changes whenever a document's text or imports change
+ * (see `AtscriptDoc.changedSince`).
+ */
+export function documentsEpoch(): number {
+  return epoch
+}
+
+/** The epoch {@link deepChanged} holds for, and the latest change of each document's imports. */
+let deepEpoch = -1
+let deepChanged = new WeakMap<AtscriptDoc, number>()
+
+/**
+ * The latest epoch at which `doc` or a document it imports (directly or not) changed: the
+ * strongly connected components of the import graph (Tarjan, iterative), each the latest of its
+ * documents' changes and of the components it imports — memoized until the next change.
+ */
+function deepChangedAt(doc: AtscriptDoc): number {
+  if (deepEpoch !== epoch) {
+    deepEpoch = epoch
+    deepChanged = new WeakMap()
+  }
+  const known = deepChanged.get(doc)
+  if (known !== undefined) {
+    return known
+  }
+  const index = new Map<AtscriptDoc, number>()
+  const low = new Map<AtscriptDoc, number>()
+  /** The latest change seen from each document on the stack (its own, those it reaches). */
+  const latest = new Map<AtscriptDoc, number>()
+  const stack: AtscriptDoc[] = []
+  const onStack = new Set<AtscriptDoc>()
+  const frames: Array<{ doc: AtscriptDoc; next: Iterator<AtscriptDoc> }> = []
+  const enter = (d: AtscriptDoc) => {
+    index.set(d, index.size)
+    low.set(d, index.get(d)!)
+    latest.set(d, d.changedAtEpoch)
+    stack.push(d)
+    onStack.add(d)
+    frames.push({ doc: d, next: d.dependencies[Symbol.iterator]() })
+  }
+  enter(doc)
+  while (frames.length > 0) {
+    const frame = frames.at(-1)!
+    const step = frame.next.next()
+    if (!step.done) {
+      const next = step.value
+      const decided = deepChanged.get(next)
+      if (decided !== undefined) {
+        latest.set(frame.doc, Math.max(latest.get(frame.doc)!, decided))
+      } else if (!index.has(next)) {
+        enter(next)
+      } else if (onStack.has(next)) {
+        low.set(frame.doc, Math.min(low.get(frame.doc)!, index.get(next)!))
+        latest.set(frame.doc, Math.max(latest.get(frame.doc)!, latest.get(next)!))
+      }
+      continue
+    }
+    frames.pop()
+    const d = frame.doc
+    const parent = frames.at(-1)
+    if (low.get(d) === index.get(d)) {
+      // A component: the latest change of its documents and of what they reach.
+      const component: AtscriptDoc[] = []
+      let value = 0
+      let member: AtscriptDoc
+      do {
+        member = stack.pop()!
+        onStack.delete(member)
+        component.push(member)
+        value = Math.max(value, latest.get(member)!)
+      } while (member !== d)
+      for (const m of component) {
+        deepChanged.set(m, value)
+      }
+      if (parent) {
+        latest.set(parent.doc, Math.max(latest.get(parent.doc)!, value))
+      }
+    } else if (parent) {
+      low.set(parent.doc, Math.min(low.get(parent.doc)!, low.get(d)!))
+      latest.set(parent.doc, Math.max(latest.get(parent.doc)!, latest.get(d)!))
+    }
+  }
+  return deepChanged.get(doc)!
+}
+
+/** `X | null` of the definitions of optional props (see `AtscriptDoc.orNullFor`). */
+const nullableDefs = new WeakMap<SemanticNode, SemanticGroup>()
+
+/** `node` is a union (`A | B`). */
+function isUnion(node?: SemanticNode): node is SemanticGroup {
+  return isGroup(node) && node.op === '|'
+}
+
+/**
+ * The values a scalar definition (resolved: a primitive or a literal) is made of: a literal's
+ * type, a primitive's final type (`decimal` is a string), `'never'` for `never`; `undefined`
+ * when not a scalar, or not known (`phantom`, a primitive of a complex type).
+ */
+function scalarDomain(node?: SemanticNode): string | undefined {
+  if (node?.entity === 'const') {
+    return node.token('identifier')?.type === 'number' ? 'number' : 'string'
+  }
+  if (!isPrimitive(node)) {
+    return undefined
+  }
+  if (node.id === 'never') {
+    return 'never'
+  }
+  const type =
+    typeof node.config.type === 'object' && node.config.type.kind === 'final'
+      ? node.config.type.value
+      : node.config.type
+  switch (type) {
+    case 'string':
+    case 'decimal': {
+      return 'string'
+    }
+    case 'number':
+    case 'boolean':
+    case 'null': {
+      return type
+    }
+    case 'void': {
+      return 'undefined'
+    }
+    default: {
+      return undefined
+    }
+  }
+}
+
+/** `node` without the parentheses around it (`({ a: string })`: a group of one item). */
+/** A new structure with the props of `struct` (shared: their owner stays `struct`). */
+function copyStructure(struct: SemanticStructureNode): SemanticStructureNode {
+  const copy = new SemanticStructureNode()
+  ;(copy as unknown as { nodes: SemanticNode[] }).nodes = struct.unwrap()
+  for (const [name, prop] of struct.props) {
+    copy.props.set(name, prop)
+  }
+  copy.annotations = struct.annotations
+  return copy
+}
+
+function unparenthesized(node: SemanticNode): SemanticNode {
+  while (node.entity === 'group' && (node as SemanticGroup).unwrap().length === 1) {
+    node = (node as SemanticGroup).unwrap()[0]
+  }
+  return node
+}
+
+/** `node` is a primitive or a literal (resolved). */
+function isScalar(node?: SemanticNode): boolean {
+  return isPrimitive(node) || isConst(node)
+}
+
+/** A literal's value (a number literal's number: `1` and `1.0` are the same). */
+function constValue(node: SemanticNode): string | number {
+  const id = node.id!
+  return node.token('identifier')?.type === 'number' ? Number(id) : id
+}
+
+/** Whether scalars `a` and `b` (resolved) certainly have no value in common. */
+function scalarsDisjoint(a: SemanticNode, b: SemanticNode): boolean {
+  const da = scalarDomain(a)
+  const db = scalarDomain(b)
+  if (da === 'never' || db === 'never') {
+    return true
+  }
+  if (da === undefined || db === undefined) {
+    return false
+  }
+  return da !== db || (isConst(a) && isConst(b) && constValue(a) !== constValue(b))
+}
+
+/**
+ * Whether a primitive checks anything beyond the domain of its values: annotations (an
+ * extension's built-in ones, `string.email`'s pattern) or a format of its own (`decimal`: a
+ * string of digits).
+ */
+function primitiveChecks(node: SemanticPrimitiveNode): boolean {
+  if ((node.annotations?.length ?? 0) > 0) {
+    return true
+  }
+  const type =
+    typeof node.config.type === 'object' && node.config.type.kind === 'final'
+      ? node.config.type.value
+      : node.config.type
+  return type === 'decimal'
+}
+
+/**
+ * Whether extension `ext` of primitive `base` checks all `base` checks: it inherits the base's
+ * annotations, unless it redefines one (with another value).
+ */
+function extensionCovers(ext: SemanticPrimitiveNode, base: SemanticPrimitiveNode): boolean {
+  const own = base.config.annotations ?? {}
+  const inherited = ext.config.annotations ?? {}
+  return Object.keys(own).every(
+    k =>
+      JSON.stringify(own[k as keyof typeof own]) ===
+      JSON.stringify(inherited[k as keyof typeof inherited])
+  )
+}
+
 export interface TAtscriptDocConfig {
   primitives?: Map<string, SemanticPrimitiveNode>
   annotations?: TAnnotationsTree
   unknownAnnotation?: 'allow' | 'warn' | 'error'
   plugins?: TAtscriptPlugin[]
+  /** The project root of the config the document is read with (see `TAtscriptConfig`). */
+  rootDir?: string
 }
 
 export class AtscriptDoc {
@@ -78,6 +429,24 @@ export class AtscriptDoc {
   public semanticMessages: TMessages = []
 
   public messages: TMessages = []
+
+  /**
+   * The messages of the last check of this document's imports (`"./b" not found`, no exported
+   * member…): replaced by every check (see `AtscriptRepo.checkImports`), so a file created or
+   * deleted since is reported anew, once.
+   */
+  public importMessages: TMessages = []
+
+  /** Replaces {@link importMessages}; the diagnostics are computed again when they changed. */
+  setImportMessages(messages: TMessages): void {
+    if (messages.length === 0 && this.importMessages.length === 0) {
+      return
+    }
+    if (JSON.stringify(messages) !== JSON.stringify(this.importMessages)) {
+      this.importMessages = messages
+      this.clearMessages()
+    }
+  }
 
   /**
    * All the non-blocks tokens, that could be referred
@@ -141,7 +510,7 @@ export class AtscriptDoc {
   /**
    * Map of dependencies (documents) by URI
    */
-  public readonly dependenciesMap = new Map<string, AtscriptDoc>()
+  public readonly dependenciesMap: Map<string, AtscriptDoc> = new DependenciesMap()
 
   get primitives() {
     return Array.from(this.config.primitives?.values() ?? [])
@@ -183,6 +552,13 @@ export class AtscriptDoc {
 
   updateDependencies(docs: AtscriptDoc[]) {
     const newDependencies = new Set(docs)
+    if (
+      newDependencies.size !== this.dependencies.size ||
+      docs.some(d => !this.dependencies.has(d))
+    ) {
+      resetCaches()
+      this.changed()
+    }
 
     this.dependencies.forEach(d => {
       if (!newDependencies.has(d)) {
@@ -198,9 +574,48 @@ export class AtscriptDoc {
     })
   }
 
+  /**
+   * The documents reachable from this one through `edge` (imports, or importers), breadth-first
+   * — this one itself only through a cycle.
+   */
+  transitive(edge: 'dependencies' | 'dependants'): Set<AtscriptDoc> {
+    const out = new Set(this[edge])
+    // The array iterator also visits the documents pushed meanwhile.
+    const queue = [...out]
+    for (const doc of queue) {
+      for (const next of doc[edge]) {
+        if (!out.has(next)) {
+          out.add(next)
+          queue.push(next)
+        }
+      }
+    }
+    return out
+  }
+
   public nodes: SemanticNode[] = []
   private _text: string = ''
-  private _annotateNodesByTarget: Map<string, SemanticAnnotateNode[]> | undefined
+  /** The {@link documentsEpoch} of this document's last change. */
+  private _changedAt = 0
+
+  /** This document's text or imports changed (see {@link changedSince}). */
+  private changed(): void {
+    this._changedAt = ++epoch
+  }
+
+  /**
+   * Whether this document or one it imports (directly or not) changed since `since` (a
+   * {@link documentsEpoch}): what is derived from them at that epoch no longer holds. Decided for
+   * every document at once per epoch, in time linear in the import graph.
+   */
+  changedSince(since: number): boolean {
+    return deepChangedAt(this) > since
+  }
+
+  /** The {@link documentsEpoch} of this document's last change. */
+  get changedAtEpoch(): number {
+    return this._changedAt
+  }
   get text() {
     return this._text
   }
@@ -226,6 +641,16 @@ export class AtscriptDoc {
   }
 
   update(text: string, debug = false) {
+    if (text === this._text && this.nodes.length > 0 && !debug) {
+      // (the same text: the same nodes — parsing it again would make new ones, and what was
+      // derived from the old ones at this epoch, keyed by them, would no longer hold; its
+      // diagnostics, derived from other documents too, are computed again)
+      this.clearMessages()
+      return
+    }
+    if (text !== this._text) {
+      this.changed()
+    }
     this._text = text
     this.cleanup()
     this.commentSpans = []
@@ -306,13 +731,14 @@ export class AtscriptDoc {
     this.registry.clear()
     this.importedDefs.clear()
     this.messages = []
+    this.importMessages = []
     this.referred = []
     this.queryFieldRefs = []
     this.fieldPathArgs = []
     this.imports.clear()
     this.resolvedImports.clear()
     this._allMessages = undefined
-    this._annotateNodesByTarget = undefined
+    resetCaches()
     this.tokensIndex = new TokensIndex()
     this.blocksIndex = new BlocksIndex()
     this.resolvedAnnotations = []
@@ -322,17 +748,287 @@ export class AtscriptDoc {
 
   private registerNodes(nodes: SemanticNode[]) {
     for (const node of nodes) {
+      declaringDocs.set(node, this)
       node.registerAtDocument(this)
       node.referredIdentifiers.forEach(t => {
         t.isReference = true
+        t.originDoc = this
         this.referred.push(t)
         this.tokensIndex.add(t)
       })
     }
   }
 
+  /** Records this document as the one declaring prop `prop` (see {@link declaringDoc}). */
+  registerProp(prop: SemanticNode): void {
+    declaringDocs.set(prop, this)
+  }
+
+  /**
+   * The document declaring `node` (a declaration, a prop; a merged field: its first
+   * contributor's, see `propUnion`), `fallback` when not known.
+   */
+  declaringDoc(node: SemanticNode | undefined, fallback: AtscriptDoc): AtscriptDoc {
+    return (node && declaringDocs.get(node)) || fallback
+  }
+
   public resolvedAnnotations: Token[] = []
   public annotations: TAnnotationTokens[] = []
+
+  /**
+   * The document a type reference was written in, where its name resolves (see
+   * {@link Token.originDoc}): this document for a synthetic reference.
+   */
+  refOrigin(ref: SemanticRefNode): AtscriptDoc {
+    return ref.token('identifier')?.originDoc ?? this
+  }
+
+  /** {@link unwindType} of a type reference, resolved in the document it was written in. */
+  unwindRef(ref: SemanticRefNode): ReturnType<AtscriptDoc['unwindType']> {
+    if (unwinding.size > 0) {
+      // (inside another unwinding: its cycles are its own)
+      return this.refOrigin(ref).unwindType(ref.id!, ref.chain)
+    }
+    const known = cache().unwound
+    if (known.has(ref)) {
+      return known.get(ref) as ReturnType<AtscriptDoc['unwindType']>
+    }
+    const value = this.refOrigin(ref).unwindType(ref.id!, ref.chain)
+    // (not when an unwinding met a cycle, which it reports: the flags are only set while unwinding)
+    if (value && !circularChain && !circularAlias) {
+      known.set(ref, value)
+    }
+    return value
+  }
+
+  /**
+   * The type non-mutating `annotate … as` alias `alias` (declared in this document) stands for:
+   * what its class is built from — its target's definition (with `extends` resolved, see
+   * {@link declDefinition}) — with the alias's entries folded into its props (over the target's
+   * blocks; through a reference, the referenced type inlined, as the alias's class does), and the
+   * type-level annotations of the alias (merged over its target's). The same node every time
+   * (until a document changes): a type of its own, like a hand-written copy (`Alias & Target`
+   * merges their props).
+   */
+  aliasDefinition(alias: SemanticAnnotateNode): SemanticNode | undefined {
+    const aliases = cache().aliases
+    if (aliases.has(alias)) {
+      return aliases.get(alias)
+    }
+    // (re-entered while it is built — an alias reaching itself — it stands for nothing)
+    aliases.set(alias, undefined)
+    const built = (() => {
+      const unwound = this.declTarget(alias.targetName)
+      const target = this.inlinedDefinition(unwound)
+      if (!unwound || !target) {
+        return undefined
+      }
+      const entries: Array<{ parts: string[]; anns: TAnnotationTokens[] }> = []
+      for (const entry of alias.annotatedEntries) {
+        entries.push({ parts: entryParts(entry), anns: entry.annotations! })
+      }
+      // (its target's type-level annotations, its own over them)
+      const annotations = this.evalAnnotationsForNode(alias)
+      if (!isStructure(target)) {
+        return target
+      }
+      const folded =
+        (entries.length > 0 && this.foldAnnotationsIntoStructure(target, entries)) ||
+        copyStructure(target)
+      folded.annotations = annotations
+      return folded
+    })()
+    aliases.set(alias, built)
+    return built
+  }
+
+  /**
+   * {@link unwindType} of type name `name` (resolved in this document, no chain) as its
+   * definition (see {@link declDefinition}) when it names a declaration.
+   */
+  declTarget(name: string): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+    const owner = this.getDeclarationOwnerNode(name)
+    if (!owner?.node || !isDeclarationNode(owner.node)) {
+      return this.unwindType(name)
+    }
+    return owner.doc.declDefinition(owner.node)
+  }
+
+  /** {@link declTarget} of a type reference, resolved where it was written. */
+  declRef(ref: SemanticRefNode): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+    if (ref.hasChain) {
+      return this.unwindRef(ref)
+    }
+    const owner = this.resolveRefOwner(ref)
+    if (!owner?.node || !isDeclarationNode(owner.node)) {
+      return this.unwindRef(ref)
+    }
+    return owner.doc.declDefinition(owner.node)
+  }
+
+  /**
+   * The declaration plain alias `decl` (of this document) stands for: `type A = B` (a reference,
+   * no chain) is B — through aliases of aliases. `undefined` for any other declaration. A block
+   * on a plain alias is a block on what it aliases (see {@link blockTarget}), like the runtime
+   * applies it (`ownPath` follows the alias's `refTo`).
+   */
+  aliasedDeclaration(decl: SemanticNode): { doc: AtscriptDoc; node: SemanticNode } | undefined {
+    let found: { doc: AtscriptDoc; node: SemanticNode } | undefined
+    let owner = { doc: this as AtscriptDoc, node: decl }
+    // (however long the chain; a cycle of aliases — a compile error — ends where it closes)
+    const seen = new Set<SemanticNode>([decl])
+    for (;;) {
+      const next = owner.doc.aliasStep(owner.node)
+      if (!next || seen.has(next.node)) {
+        break
+      }
+      seen.add(next.node)
+      owner = next
+      found = next
+    }
+    return found
+  }
+
+  /** The declaration plain alias `decl` (of this document) names directly, if it is one. */
+  private aliasStep(decl: SemanticNode): { doc: AtscriptDoc; node: SemanticNode } | undefined {
+    if (decl.entity !== 'type') {
+      return undefined
+    }
+    const known = aliasSteps.get(decl)
+    if (known?.epoch === epoch) {
+      return known.step
+    }
+    const step = this.findAliasStep(decl)
+    aliasSteps.set(decl, { epoch, step })
+    return step
+  }
+
+  private findAliasStep(decl: SemanticNode): { doc: AtscriptDoc; node: SemanticNode } | undefined {
+    // (`type X = T` / `type X = (T)`: a reference, no chain — the structure model's `aliasStep`)
+    const def = decl.getDefinition() && unparenthesized(decl.getDefinition()!)
+    if (!isRef(def) || def.hasChain) {
+      return undefined
+    }
+    const owner = this.resolveRefOwner(def)
+    return owner?.node && owner.node !== decl && isDeclarationNode(owner.node)
+      ? { doc: owner.doc, node: owner.node }
+      : undefined
+  }
+
+  /**
+   * The declaration mutating block `node` (of this document) annotates: its target — what it
+   * aliases, for a plain alias (`annotate UA {…}` with `type UA = User` is `annotate User {…}`).
+   */
+  blockTarget(node: SemanticAnnotateNode): { doc: AtscriptDoc; node: SemanticNode } | undefined {
+    const owner = this.getDeclarationOwnerNode(node.targetName)
+    if (!owner?.node) {
+      return undefined
+    }
+    return owner.doc.aliasedDeclaration(owner.node) ?? { doc: owner.doc, node: owner.node }
+  }
+
+  /**
+   * The type-level annotations of declaration `decl` (of this document) as build-time readers
+   * see them: its own, with the top-level annotations of its mutating blocks over them, in order.
+   */
+  declarationAnnotations(decl: SemanticNode): TAnnotationTokens[] | undefined {
+    let out = decl.annotations
+    // (the blocks of the build writing into it — on a plain alias of it too —, in block order:
+    // import depth, module id, source order)
+    for (const b of this.buildStructure().blocksOn(decl)) {
+      if (b.rank && b.node.annotations?.length) {
+        out = this.overlayAnnotations(out, b.node.annotations)
+      }
+    }
+    return out
+  }
+
+  /**
+   * `base` with the annotations of a mutating block (`overlay`) applied, like the block applies
+   * them to its target's metadata: an `append` annotation adds its values after the existing
+   * ones, any other replaces them.
+   */
+  overlayAnnotations(
+    base: TAnnotationTokens[] | undefined,
+    overlay: TAnnotationTokens[]
+  ): TAnnotationTokens[] {
+    const replaced = new Set<string>()
+    for (const a of overlay) {
+      const spec = this.resolveAnnotation(a.name)
+      if (!(spec?.config.multiple && spec.config.mergeStrategy === 'append')) {
+        replaced.add(a.name)
+      }
+    }
+    return [...(base ?? []).filter(a => !replaced.has(a.name)), ...overlay]
+  }
+
+  /**
+   * What declaration `decl` (of this document) is defined as — an alias's, its target's (an
+   * `annotate … as` alias's with its entries): what generated code builds from it.
+   */
+  declDefinition(decl: SemanticNode): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+    if (decl.entity === 'type') {
+      const def = decl.getDefinition()
+      return isRef(def) && !def.hasChain ? this.declRef(def) : this.unwindType(decl.id!)
+    }
+    if (decl.entity === 'annotate') {
+      const alias = decl as SemanticAnnotateNode
+      const def = alias.isMutating ? undefined : this.aliasDefinition(alias)
+      return def && { def, doc: this }
+    }
+    return { def: decl, doc: this }
+  }
+
+  /**
+   * The definition generated code inlines for a type: an interface's own (with `extends`
+   * resolved), an intersection merged, any other as it is.
+   */
+  inlinedDefinition(
+    unwound: { def: SemanticNode; doc: AtscriptDoc } | undefined
+  ): SemanticNode | undefined {
+    if (!unwound) {
+      return undefined
+    }
+    const def = this.mergeIntersection(unwound.def)
+    if (isInterface(def)) {
+      return (
+        (def.hasExtends && unwound.doc.resolveInterfaceExtends(def)) || def.getDefinition() || def
+      )
+    }
+    return def
+  }
+
+  /**
+   * The built-in primitive a type reference names, which generated code emits inline — not a
+   * named alias of one (`type MyString = string`), which stays a reference.
+   */
+  inlinedPrimitive(
+    ref: SemanticRefNode,
+    decl = this.unwindRef(ref)?.def
+  ): SemanticPrimitiveNode | undefined {
+    if (!isPrimitive(decl)) {
+      return undefined
+    }
+    const owner = this.resolveRefOwner(ref)?.node
+    return owner &&
+      (owner.entity === 'type' || owner.entity === 'interface' || owner.entity === 'annotate')
+      ? undefined
+      : decl
+  }
+
+  /**
+   * {@link getDeclarationOwnerNode} of a type reference's name, resolved in the document it
+   * was written in.
+   */
+  resolveRefOwner(ref: SemanticRefNode): ReturnType<AtscriptDoc['getDeclarationOwnerNode']> {
+    const owners = cache().refOwners
+    if (owners.has(ref)) {
+      return owners.get(ref) as ReturnType<AtscriptDoc['getDeclarationOwnerNode']>
+    }
+    const owner = this.refOrigin(ref).getDeclarationOwnerNode(ref.id!)
+    owners.set(ref, owner)
+    return owner
+  }
 
   /**
    * Annotation tokens survive merges across refs, chain refs and `extends`
@@ -379,9 +1075,11 @@ export class AtscriptDoc {
             const typeToken = refToken.clone({ text: refToken.text.slice(0, dotIdx) })
             typeToken.annotationRef = refToken.annotationRef
             typeToken.isReference = true
+            typeToken.originDoc = this
             this.referred.push(typeToken)
           } else {
             refToken.isReference = true
+            refToken.originDoc = this
             this.referred.push(refToken)
           }
         }
@@ -437,12 +1135,55 @@ export class AtscriptDoc {
    *   - `def`: The final resolved `SemanticNode`.
    *
    * If the type cannot be resolved or does not exist, returns `undefined`.
+   *
+   * `watchCb` gets each declaration and prop met on the way; `declaring` is true for those met
+   * on the way to a chain's field (its head, the props and types it goes through: what declares
+   * the field — not what the field is).
    */
   unwindType(
     name: string,
     chain: string[] | Token[] = [],
-    watchCb?: (def: SemanticNode) => void,
-    _tracked?: Set<SemanticNode>
+    watchCb?: (def: SemanticNode, declaring: boolean) => void,
+    _tracked?: Set<SemanticNode>,
+    _declaring = false
+  ):
+    | {
+        doc: AtscriptDoc
+        node?: SemanticNode
+        def: SemanticNode
+      }
+    | undefined {
+    const decl = this.getDeclarationOwnerNode(name)
+    if (!decl) {
+      return undefined
+    }
+    // A chain reaching itself (`W { w?: W.w2; w2?: W.w }`) resolves to nothing (reported as a
+    // circular chain reference).
+    // (and an alias reaching itself, `type A = B`, `type B = A`: nothing either — reported as a
+    // circular alias)
+    const key = chainKey(decl.node, chain)
+    if (unwinding.has(key)) {
+      if (chain.length > 0) {
+        circularChain = true
+      } else {
+        circularAlias = true
+      }
+      return undefined
+    }
+    unwinding.add(key)
+    try {
+      return this.unwindDeclaration(decl, chain, watchCb, _tracked, _declaring)
+    } finally {
+      unwinding.delete(key)
+    }
+  }
+
+  private unwindDeclaration(
+    decl: { node?: SemanticNode; doc: AtscriptDoc },
+    chain: string[] | Token[],
+    watchCb?: (def: SemanticNode, declaring: boolean) => void,
+    _tracked?: Set<SemanticNode>,
+    _declaring = false
   ):
     | {
         doc: AtscriptDoc
@@ -451,21 +1192,22 @@ export class AtscriptDoc {
       }
     | undefined {
     const tracked = _tracked || new Set()
-    const decl = this.getDeclarationOwnerNode(name)
-    if (!decl) {
-      return undefined
-    }
+    // (on the way to a chain's field: what declares it, see `unwindType`)
+    let declaring = _declaring || chain.length > 0
     const callCb = watchCb
       ? () => {
           if (
             def &&
-            !tracked.has(def) &&
+            (declaring || !tracked.has(def)) &&
             ['type', 'primitive', 'prop', 'interface'].includes(def.entity)
           ) {
             // tracking all the nodes while unwinding
             // so we can gather annotations to merge
-            tracked.add(def)
-            watchCb(def)
+            // (what declares a field is not tracked: the field's type may be met again)
+            if (!declaring) {
+              tracked.add(def)
+            }
+            watchCb(def, declaring)
           }
         }
       : () => {}
@@ -474,7 +1216,10 @@ export class AtscriptDoc {
     let doc = decl.doc
     const resolveRef = () => {
       if (isRef(def)) {
-        const d = doc.unwindType(def.token('identifier')!.text, def.chain, watchCb, tracked)
+        // (in the document it was written in: a prop an interface inherits from another document)
+        const d = doc
+          .refOrigin(def)
+          .unwindType(def.token('identifier')!.text, def.chain, watchCb, tracked, declaring)
         doc = d?.doc || doc
         def = d?.def
       }
@@ -482,7 +1227,9 @@ export class AtscriptDoc {
     const resolveType = () => {
       while (isType(def)) {
         callCb() // collection type on our way
+        // (parentheses do not change a type: `type P = (Base)` is Base)
         def = def.getDefinition()
+        def = def?.entity === 'group' && !(def as SemanticGroup).op ? unparenthesized(def) : def
         node = def
         resolveRef()
       }
@@ -491,9 +1238,16 @@ export class AtscriptDoc {
     if (!def) {
       return undefined
     }
-    // Non-mutating annotate is an alias for the target interface
+    // A non-mutating annotate is an alias: the type it stands for is a copy of its target with
+    // its annotations (see `aliasDefinition`), wherever it is reused (`extends`, an intersection
+    // operand, a reference to one of its props).
     if (isAnnotate(def)) {
-      return doc.unwindType(def.targetName, chain, watchCb, tracked)
+      const alias = def
+      node = alias
+      def = doc.aliasDefinition(alias)
+      if (!def) {
+        return undefined
+      }
     }
     for (const item of chain) {
       const itemText = typeof item === 'string' ? item : item.text
@@ -501,21 +1255,49 @@ export class AtscriptDoc {
       if (!def) {
         return undefined
       }
+      // A type defined as an intersection (`type OX = O & { n?: string }`): its props are its
+      // merge's, like the props of a prop typed by one (below).
+      if (isIntersection(def)) {
+        const group = def
+        const groupDoc = doc
+        def = groupDoc.mergeIntersection(group)
+        resolveRef()
+        resolveType()
+        if (!def) {
+          return undefined
+        }
+      }
       if (isProp(def)) {
         if (def.nestedProps?.get(itemText)) {
           def = def.nestedProps.get(itemText)
         } else {
-          def = def.nestedType
+          // A prop typed by a reference, or by an intersection (its merge: `next?: Self & D`)
+          const inner: SemanticNode | undefined = def.getDefinition()
+          def = isIntersection(inner) ? inner : def.nestedType
           resolveRef()
           resolveType()
+          const reached = def
+          const reachedDoc = doc
+          def = reached && reachedDoc.mergeIntersection(reached)
+          // (an interface's props include those it inherits)
+          if (isInterface(def) && def.hasExtends) {
+            const resolved = doc.resolveInterfaceExtends(def)
+            def = isStructure(resolved) ? resolved : def
+          }
           if (isStructure(def) || isInterface(def)) {
             def = def.props.get(itemText)
           }
         }
+      } else if (isInterface(def) && def.hasExtends) {
+        // (an interface's props include those it inherits)
+        const resolved = doc.resolveInterfaceExtends(def)
+        def = (isStructure(resolved) ? resolved : def).props.get(itemText)
       } else if (isStructure(def) || isInterface(def) || isPrimitive(def)) {
         def = def.props.get(itemText)
       }
     }
+    // (the field reached: what it is from here on)
+    declaring = _declaring
     if (_tracked) {
       callCb() // collecting one more item in chain
     }
@@ -536,10 +1318,56 @@ export class AtscriptDoc {
     }
   }
 
-  evalAnnotationsForNode(givenNode: SemanticNode, own = givenNode.annotations) {
+  /**
+   * The type-level annotations of `givenNode` (its own: `own`) over those of what it references.
+   * `blocks`: a declaration reached on the way has its mutating blocks' top-level annotations
+   * too (see {@link declarationAnnotations}) — what a reader showing the type's full set wants
+   * (the LSP hover, `.d.ts` comments); generated code writes the declaration's own (the blocks
+   * apply theirs at runtime).
+   */
+  evalAnnotationsForNode(
+    givenNode: SemanticNode,
+    own = givenNode.annotations,
+    blocks = false
+  ): TAnnotationTokens[] | undefined {
+    if (isAnnotate(givenNode) && !givenNode.isMutating) {
+      // An `annotate … as` alias: its target's type-level annotations, its own over them (like
+      // its class, and a hand-written copy).
+      const target = this.getDeclarationOwnerNode(givenNode.targetName)
+      return this.mergeNodesAnnotations(
+        target?.node && target.node !== givenNode
+          ? target.doc.evalAnnotationsForNode(
+              target.node,
+              annotationsOf(target.node, blocks),
+              blocks
+            )
+          : undefined,
+        own
+      )
+    }
+    return this.evalAnnotationsForDefinition(givenNode.getDefinition(), own, givenNode, blocks)
+  }
+
+  /**
+   * {@link evalAnnotationsForNode} of a node defined as `definition` (e.g. a reference used as
+   * a union / tuple / intersection member or an array element: `A.x | null`), with annotations
+   * `own` of its own.
+   */
+  evalAnnotationsForDefinition(
+    definition: SemanticNode | undefined,
+    own?: TAnnotationTokens[],
+    givenNode?: SemanticNode,
+    blocks = false
+  ) {
     let right = own
-    let def = givenNode.getDefinition()
-    if (def) {
+    let def = definition
+    // A next round evaluates the reference an intersection merges into (`number.int & number`
+    // is `number.int`: its built-in `expect.int`), like a definition written as that reference.
+    for (let round = 0; def && round < 4; round++) {
+      // (parentheses: what they hold — `type P = (Base)` is `Base`)
+      if (def.entity === 'group' && !(def as SemanticGroup).op) {
+        def = unparenthesized(def)
+      }
       const refDef = isRef(def) ? def : undefined
       // A primitive's intrinsic annotations follow type refs and aliases, but
       // stop at a reference to a prop (`Order.createdAt`), like the prop's own.
@@ -554,18 +1382,25 @@ export class AtscriptDoc {
         const unwound = this.unwindType(
           refDef.token('identifier')!.text,
           refDef.chain,
-          intermediate => {
+          (intermediate, declaring) => {
             if (isProp(intermediate) && intermediate !== givenNode) {
               viaProp = true
             }
-            if (intermediate?.annotations?.length) {
+            // (a chain is its field: not what declares it — `v?: KR.r.c` has neither KR's nor
+            // the class of `r`'s type)
+            if (!declaring && annotationsOf(intermediate, blocks)?.length) {
               chainNodes.push(intermediate)
             }
           }
         )
+        // (`blocks`: a chain's field with the blocks' entries at its path over its own)
+        const fieldBlocks = blocks && refDef.hasChain ? this.chainBlockAnnotations(refDef) : []
         if (unwound?.node && unwound.node !== givenNode) {
           viaProp ||= isProp(unwound.node)
-          if (unwound.node.annotations?.length && !chainNodes.includes(unwound.node)) {
+          if (
+            (annotationsOf(unwound.node, blocks)?.length || fieldBlocks.length > 0) &&
+            !chainNodes.includes(unwound.node)
+          ) {
             chainNodes.unshift(unwound.node)
           }
         }
@@ -575,22 +1410,54 @@ export class AtscriptDoc {
           if (chainNode === unwound?.def) {
             continue
           }
-          right = this.mergeNodesAnnotations(
-            this.filterPassedWhenReferred(chainNode.annotations, viaProp),
-            right
-          )
+          const anns =
+            chainNode === unwound?.node && fieldBlocks.length > 0
+              ? this.overlayAnnotations(chainNode.annotations, fieldBlocks)
+              : annotationsOf(chainNode, blocks)
+          right = this.mergeNodesAnnotations(this.filterPassedWhenReferred(anns, viaProp), right)
         }
         def = unwound?.def || def
       }
       if (def) {
         const merged = this.mergeIntersection(def)
+        if (merged !== def && isRef(merged)) {
+          right = this.mergeNodesAnnotations(merged.annotations, right)
+          def = merged
+          continue
+        }
+        // (an intersection's: its members' type-level ones, see `intersectionAnnotations`)
+        const written = unparenthesized(def)
+        const own = isIntersection(written)
+          ? this.intersectionAnnotations(written, blocks).map(p => p.an)
+          : refDef
+            ? annotationsOf(merged, blocks)
+            : merged.annotations
         right = this.mergeNodesAnnotations(
-          refDef ? this.filterPassedWhenReferred(merged.annotations, viaProp) : merged.annotations,
+          refDef ? this.filterPassedWhenReferred(own, viaProp) : own,
           right
         )
       }
+      break
     }
     return right
+  }
+
+  /**
+   * The annotations the blocks of the build write at the field chain reference `ref` names
+   * (`T.a.b`: the structure model's layers of T at `a.b`), in block order, each
+   * applied over the earlier ones.
+   */
+  private chainBlockAnnotations(ref: SemanticRefNode): TAnnotationTokens[] {
+    const owner = this.resolveRefOwner(ref)
+    const m = owner?.node && owner.doc.buildStructure()
+    const decl = m && m.declOfNode(owner.node!)
+    let out: TAnnotationTokens[] = []
+    if (m && decl) {
+      for (const l of m.orderedLayersAt(m.plainTarget(decl), entryParts(ref).slice(1))) {
+        out = this.overlayAnnotations(out, l.entry.ref.annotations ?? [])
+      }
+    }
+    return out
   }
 
   /**
@@ -599,9 +1466,13 @@ export class AtscriptDoc {
    * before the merge, so a dropped one cannot shadow a primitive's intrinsic
    * annotation of the same name (`@meta.required 'msg'` on `type N = string.required`).
    */
-  evalReferredAnnotations(node: SemanticNode) {
+  evalReferredAnnotations(node: SemanticNode, blocks = false) {
     return this.filterPassedWhenReferred(
-      this.evalAnnotationsForNode(node, this.filterPassedWhenReferred(node.annotations))
+      this.evalAnnotationsForNode(
+        node,
+        this.filterPassedWhenReferred(annotationsOf(node, blocks)),
+        blocks
+      )
     )
   }
 
@@ -669,39 +1540,46 @@ export class AtscriptDoc {
     if (!block) {
       return { def: node, doc: this }
     }
-    const chain = [node.id!, ...node.chain.map(c => c.text)]
-    const unwound = this.unwindType(block.targetName, chain)
-    // A leaf union/intersection: unwindType hands back the group itself. When it
-    // actually resolved the full chain (its node id is the last chain member) keep its
-    // own doc — it may live in another file than the one holding the annotate block.
-    if (unwound?.def && (!isGroup(unwound.def) || unwound.node?.id === chain.at(-1))) {
-      return { def: unwound.def, doc: unwound.doc }
-    }
-    const merged = this.resolveChainWithMerge(block.targetName, chain)
-    return merged ? { def: merged, doc: this } : undefined
+    return this.entryType(block, entryParts(node)) ?? undefined
   }
 
   /**
-   * Collects ad-hoc annotations from all `annotate` blocks targeting a given type/interface.
-   * Returns a map of property path (dot-joined) → annotations array.
-   * For entries without a chain (root-level), the key is the entry identifier.
+   * The type entry `names` of `annotate` block `block` (of this document) names, from the
+   * structure model: the entry's first normalized path, the types
+   * written at its node — one: that type; several (a merged field): the core algebra's merge of
+   * them —, resolved through a reference. `null`: the model refuses the path; `undefined`: the
+   * model does not know the target.
    */
-  getAnnotateNodesFor(targetName: string): SemanticAnnotateNode[] {
-    if (!this._annotateNodesByTarget) {
-      const index = new Map<string, SemanticAnnotateNode[]>()
-      for (const node of this.nodes) {
-        if (isAnnotate(node)) {
-          const existing = index.get(node.targetName)
-          if (existing) {
-            existing.push(node)
-          } else {
-            index.set(node.targetName, [node])
-          }
-        }
-      }
-      this._annotateNodesByTarget = index
+  private entryType(
+    block: SemanticAnnotateNode,
+    names: string[]
+  ): { def: SemanticNode; doc: AtscriptDoc } | null | undefined {
+    const m = this.structure()
+    const decl = block.isMutating ? m.declOf(this, block.targetName) : m.declOfNode(block)
+    if (!decl) {
+      return undefined
     }
-    return this._annotateNodesByTarget.get(targetName) ?? []
+    const target = block.isMutating ? m.plainTarget(decl) : decl
+    const paths = m.normalize(target, names, block.isMutating)
+    if (typeof paths === 'string') {
+      return null
+    }
+    const slot = m.slotAt(target, paths[0])
+    const ends = (slot?.ends ?? []).filter(e => e.node)
+    if (ends.length === 0) {
+      return null
+    }
+    const nodes = ends.map(e => e.node!)
+    const def =
+      nodes.length === 1 ? nodes[0] : this.mergeIntersection(new SemanticGroup(nodes, '&'))
+    if (isRef(def)) {
+      const unwound = this.unwindRef(def)
+      return unwound ? { def: unwound.def, doc: unwound.doc } : null
+    }
+    // (a type written in place: in the document declaring the node holding it)
+    const unit = slot?.owner?.unit
+    const doc = (ends.length === 1 && unit && m.declById(unit)?.doc) || target.doc
+    return { def, doc }
   }
 
   /**
@@ -709,13 +1587,8 @@ export class AtscriptDoc {
    * Parents are merged left-to-right, then own props overlay on top (own takes priority).
    * Only merges props and their annotations; interface-level annotations are NOT inherited.
    *
-   * Mutating `annotate <Ancestor> { @x field }` blocks contribute to the merged view, so
-   * inherited fields carry annotate-block metadata in the child's flat prop view. At each
-   * level of the chain we consult: (1) the immediate parent's own document and (2) the
-   * `_originDoc` — the document that started the resolution (typically the leaf child).
-   * Threading `_originDoc` is what lets `annotate <Grandparent> { ... }` blocks living in
-   * the child's file apply to grandparent-inherited fields, even when the chain crosses
-   * package boundaries (child → mid → grandparent, all in different .as files).
+   * Mutating `annotate` blocks are not folded in: they are metadata, applied at runtime
+   *.
    */
   resolveInterfaceExtends(
     node: SemanticInterfaceNode,
@@ -739,52 +1612,37 @@ export class AtscriptDoc {
     let mergedStruct: SemanticNode | undefined
 
     for (const extendsToken of node.extendsTokens) {
-      const unwound = this.unwindType(extendsToken.text)
+      // (the parent's definition as written: blocks are metadata, applied at runtime)
+      const unwound = this.declTarget(extendsToken.text)
       if (!unwound?.def) {
         continue
       }
 
       let parentDef = unwound.def
-      // Capture the parent's declaration name from its own doc before any mutation
-      // of `parentDef`. For a plain interface ref this is `parentDef.id`; for a type
-      // alias chain `unwindType` already set `unwound.node` to the alias node.
-      const parentDeclName = unwound.node?.id ?? parentDef.id
-      // If parent is also an interface with extends, resolve recursively
-      if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
-        const resolved = unwound.doc.resolveInterfaceExtends(
-          parentDef as SemanticInterfaceNode,
-          visited,
-          originDoc
-        )
-        parentDef = resolved || parentDef.getDefinition() || parentDef
-      } else if (isInterface(parentDef)) {
-        parentDef = parentDef.getDefinition() || parentDef
-      }
-
-      parentDef = this.mergeIntersection(parentDef)
-
-      // Fold annotate-block contributions targeting this parent into its struct's props
-      // before merging, so inherited fields see annotate-block metadata in the child view.
-      const annotateNodes: SemanticAnnotateNode[] = []
-      const collect = (doc: AtscriptDoc, name: string | undefined) => {
-        if (!name) {
-          return
+      let parentDoc = unwound.doc
+      // (a nullable parent — `type N = I | null`, an all-nullable merge: its one item that is
+      // not `null`, whose props the child's class has; each definition looked at once)
+      for (const seen = new Set<SemanticNode>(); !seen.has(parentDef); ) {
+        seen.add(parentDef)
+        // If parent is also an interface with extends, resolve recursively
+        if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
+          const resolved = parentDoc.resolveInterfaceExtends(
+            parentDef as SemanticInterfaceNode,
+            visited,
+            originDoc
+          )
+          parentDef = resolved || parentDef.getDefinition() || parentDef
+        } else if (isInterface(parentDef)) {
+          parentDef = parentDef.getDefinition() || parentDef
         }
-        for (const n of doc.getAnnotateNodesFor(name)) {
-          if (n.isMutating) {
-            annotateNodes.push(n)
-          }
+        parentDef = this.mergeIntersection(parentDef)
+        const item = this.nonNullItem(parentDef)
+        const resolved = item && isRef(item) ? this.unwindRef(item) : undefined
+        if (!item || (isRef(item) && !resolved?.def)) {
+          break
         }
-      }
-      collect(unwound.doc, parentDeclName)
-      if (this !== unwound.doc) {
-        collect(this, extendsToken.text)
-      }
-      if (originDoc !== this && originDoc !== unwound.doc) {
-        collect(originDoc, parentDeclName)
-      }
-      if (annotateNodes.length > 0) {
-        parentDef = this.applyAnnotateBlocksToStructure(parentDef, annotateNodes)
+        parentDef = resolved?.def ?? item
+        parentDoc = resolved?.doc ?? parentDoc
       }
 
       if (!mergedStruct) {
@@ -806,42 +1664,12 @@ export class AtscriptDoc {
   }
 
   /**
-   * Returns a structure equivalent to `struct` with annotate-block contributions
-   * folded into matching props' annotation arrays. Chained entries
-   * (e.g. `annotate Parent { account.active }`) are folded recursively into the
-   * matching inline-object prop's nested structure. Only props/structures along a
-   * touched path are cloned — siblings are reused by reference, so the base's own
-   * (shared) nodes are never mutated.
-   */
-  private applyAnnotateBlocksToStructure(
-    struct: SemanticNode,
-    annotateNodes: SemanticAnnotateNode[]
-  ): SemanticNode {
-    if (!isStructure(struct)) {
-      return struct
-    }
-    const entries: Array<{ parts: string[]; anns: TAnnotationTokens[] }> = []
-    for (const annotateNode of annotateNodes) {
-      for (const entry of annotateNode.entries) {
-        const anns = entry.annotations
-        if (!entry.id || !anns || anns.length === 0) {
-          continue
-        }
-        const parts = entry.hasChain ? [entry.id, ...entry.chain.map(c => c.text)] : [entry.id]
-        entries.push({ parts, anns })
-      }
-    }
-    if (entries.length === 0) {
-      return struct
-    }
-    return this.foldAnnotationsIntoStructure(struct as SemanticStructureNode, entries) ?? struct
-  }
-
-  /**
-   * Recursively folds annotate-block entries into a structure's props. Each entry's
-   * `parts[0]` names a prop in `struct`; remaining parts target a nested inline-object
-   * prop. Returns a new structure with cloned props/structures along touched paths, or
-   * `undefined` when nothing matched (so callers can reuse the original by reference).
+   * Folds an `annotate … as` alias's entries into a structure's props (see `aliasDefinition`).
+   * Each entry's `parts[0]` names a prop in `struct`; remaining parts target a nested prop —
+   * through a prop typed by a reference, the referenced type inlined: the folded structures are
+   * types of their own (`Alias & Target` merges like a hand-written copy). Returns a new
+   * structure with cloned props/structures along touched paths, or `undefined` when nothing
+   * matched (so callers can reuse the original by reference).
    */
   private foldAnnotationsIntoStructure(
     struct: SemanticStructureNode,
@@ -874,16 +1702,10 @@ export class AtscriptDoc {
         continue
       }
       const propDef = prop.getDefinition()
-      let newDef = propDef
-      // Recurse only into inline-object props. A nested entry whose prop is a `ref`
-      // to a named type is not folded here (we must not mutate the shared definition);
-      // that case is covered at runtime by the codegen's `$a()` / `cloneRefProp` path.
-      if (group.nested.length > 0 && propDef && isStructure(propDef)) {
-        const foldedNested = this.foldAnnotationsIntoStructure(propDef, group.nested)
-        if (foldedNested) {
-          newDef = foldedNested
-        }
-      }
+      // (through an inline object, a union branch or an intersection member having the prop,
+      // a reference: see `foldIntoNode`)
+      const newDef =
+        (group.nested.length > 0 && propDef && this.foldIntoNode(propDef, group.nested)) || propDef
       if (group.own.length === 0 && newDef === propDef) {
         newProps.push(prop)
         continue
@@ -897,9 +1719,9 @@ export class AtscriptDoc {
         cloned.define(newDef)
       }
       cloned.annotations =
-        group.own.length > 0
-          ? this.mergeNodesAnnotations(prop.annotations, group.own)
-          : prop.annotations
+        group.own.length === 0
+          ? prop.annotations
+          : this.mergeNodesAnnotations(prop.annotations, group.own)
       const optionalToken = prop.token('optional')
       if (optionalToken) {
         cloned.saveToken(optionalToken, 'optional')
@@ -914,6 +1736,37 @@ export class AtscriptDoc {
     newStruct.setProps(newProps)
     newStruct.annotations = struct.annotations
     return newStruct
+  }
+
+  /**
+   * Folds the entries (relative to `def`) into definition `def`: an inline object's props (an
+   * intersection: its merge's); the branches of a union and the items of a tuple having them;
+   * through a reference, the referenced type's definition inlined. `undefined` when nothing
+   * matched.
+   */
+  private foldIntoNode(
+    def: SemanticNode,
+    entries: Array<{ parts: string[]; anns: TAnnotationTokens[] }>
+  ): SemanticNode | undefined {
+    const node = this.mergeIntersection(def)
+    if (isStructure(node)) {
+      return this.foldAnnotationsIntoStructure(node, entries)
+    }
+    if (isRef(node)) {
+      if (node.hasChain) {
+        return undefined
+      }
+      const inlined = this.inlinedDefinition(this.declRef(node))
+      return inlined && this.foldIntoNode(inlined, entries)
+    }
+    if (isGroup(node) && node.op !== '&') {
+      const items = (node as SemanticGroup).unwrap()
+      const mapped = items.map(item => this.foldIntoNode(item, entries) ?? item)
+      return mapped.every((item, i) => item === items[i])
+        ? undefined
+        : withItems(node as SemanticGroup, mapped)
+    }
+    return undefined
   }
 
   /**
@@ -1167,7 +2020,7 @@ export class AtscriptDoc {
         const unwound = this.unwindType(targetName, chain)
         return unwound?.node
           ? this.definitionLink(token, {
-              uri: unwound.doc.id,
+              uri: this.declaringDoc(unwound.node, unwound.doc).id,
               range: unwound.node.token('identifier')?.range,
             })
           : undefined
@@ -1196,12 +2049,23 @@ export class AtscriptDoc {
       if (isProp(token.parentNode)) {
         return this.definitionLink(token, { uri: this.id, range: token.range })
       }
+      if (token.isChain && isRef(token.parentNode) && token.index === 0) {
+        // (the head of a chain: the declaration it names — an intersection alias too, not what it
+        // merges)
+        const owner = this.resolveRefOwner(token.parentNode)
+        return owner?.node
+          ? this.definitionLink(token, {
+              uri: owner.doc.id,
+              range: owner.node.token('identifier')?.range,
+            })
+          : undefined
+      }
       if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
         const id = token.parentNode.id!
         const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
         if (unwound?.node) {
           return this.definitionLink(token, {
-            uri: unwound.doc.id,
+            uri: this.declaringDoc(unwound.node, unwound.doc).id,
             range: unwound.node.token('identifier')?.range,
           })
         }
@@ -1402,6 +2266,7 @@ export class AtscriptDoc {
         ...this.registry.getErrors(),
         ...this.semanticMessages,
         ...this.messages,
+        ...this.importMessages,
       ] as TMessages
       // Validate interface extends targets
       for (const node of this.nodes) {
@@ -1487,15 +2352,14 @@ export class AtscriptDoc {
             isRef(t.parentNode) && t.parentNode.hasChain
               ? [t.text, ...t.parentNode.chain.map(c => c.text)]
               : [t.text]
-          const unwound = this.unwindType(targetName, chain)
-          // unwindType returns the group node itself when it can't walk the
-          // chain through a union/intersection; in that case fall back to the
-          // merge-aware resolver, which also yields the actual leaf type.
-          const chainResolved = unwound?.def && !isGroup(unwound.def)
-          const resolvedType = chainResolved
-            ? unwound!.def
-            : this.resolveChainWithMerge(targetName, chain)
-          if (!resolvedType) {
+          // The entry names a node of the structure model; its type:
+          // the types written there (see `entryType`).
+          const entry = this.entryType(annotateBlock, chain)
+          if (entry === undefined) {
+            continue // (a target the model does not know: reported as an unknown identifier)
+          }
+          const resolvedType = entry?.def
+          if (!entry) {
             const lastToken =
               chain.length > 1 && isRef(t.parentNode)
                 ? t.parentNode.chain[t.parentNode.chain.length - 1] || t
@@ -1505,23 +2369,9 @@ export class AtscriptDoc {
               message: `Unknown property "${chain.join('.')}" in "${targetName}"`,
               range: lastToken.range,
             })
-          } else if (isRef(t.parentNode) && t.parentNode.hasChain) {
-            // Also validate intermediate chain members
-            const length = t.parentNode.chain.length - 1
-            for (let i = length; i >= 0; i--) {
-              const token = t.parentNode.chain[i]
-              const memberChain = [t.text, ...t.parentNode.chain.slice(0, i + 1).map(c => c.text)]
-              const decl = this.unwindType(targetName, memberChain)
-              const memberResolved = decl?.def && !isGroup(decl.def)
-              if (!memberResolved && !this.resolveChainWithMerge(targetName, memberChain)) {
-                this._allMessages.push({
-                  severity: 1,
-                  message: `Unknown property "${memberChain.join('.')}" in "${targetName}"`,
-                  range: token.range,
-                })
-              }
-            }
           }
+          // (the chain's members are props on the way: a path found for the chain goes through
+          // each of them, or through the target's own props it is cut to)
           // Deferred from parse time: validate type-guarded annotations on the
           // entry (e.g. `@expect.minLength` wants string|array) against the
           // resolved target prop type. Imported targets — and union/intersection
@@ -1530,11 +2380,7 @@ export class AtscriptDoc {
           if (resolvedType && isRef(t.parentNode) && t.parentNode.annotations) {
             for (const a of t.parentNode.annotations) {
               const spec = this.resolveAnnotation(a.token.text.slice(1))
-              const msgs = spec?.validateTargetType(
-                resolvedType,
-                a.token.range,
-                unwound?.doc || this
-              )
+              const msgs = spec?.validateTargetType(resolvedType, a.token.range, entry?.doc)
               if (msgs) {
                 this._allMessages.push(...msgs)
               }
@@ -1546,9 +2392,19 @@ export class AtscriptDoc {
           continue
         }
         if (isRef(t.parentNode)) {
-          const def = this.unwindType(t.parentNode.id!, t.parentNode.chain)?.def
-          if (isPrimitive(def) && !def.config.type) {
-            // disallow using primitives with undefined type
+          circularAlias = false
+          const def = this.unwindRef(t.parentNode)?.def
+          if (!def && circularAlias && !t.parentNode.hasChain) {
+            this._allMessages.push({
+              severity: 1,
+              message: `Circular type alias "${t.parentNode.id!}": it resolves to itself`,
+              range: t.range,
+            })
+            continue
+          }
+          if (isPrimitive(def) && !def.config.type && !this.chainToNever(t.parentNode)) {
+            // disallow using primitives with undefined type (a chain to a prop a merge made
+            // `never` is that `never` — its merge reported, see `neverMessages`)
             const token = t.parentNode.chain[t.parentNode.chain.length - 1] || t
             this._allMessages.push({
               severity: 1,
@@ -1569,11 +2425,18 @@ export class AtscriptDoc {
             const length = t.parentNode.chain.length - 1
             for (let i = length; i >= 0; i--) {
               const token = t.parentNode.chain[i]
+              circularChain = false
               const decl = this.unwindType(t.parentNode.id!, t.parentNode.chain.slice(0, i + 1))
               if (!decl?.def) {
+                const chain = [
+                  t.parentNode.id!,
+                  ...t.parentNode.chain.slice(0, i + 1).map(c => c.text),
+                ]
                 this._allMessages.push({
                   severity: 1,
-                  message: `Unknown member "${token.text}"`,
+                  message: circularChain
+                    ? `Circular chain reference "${chain.join('.')}": it resolves to itself`
+                    : `Unknown member "${token.text}"`,
                   range: token.range,
                 })
               }
@@ -1594,96 +2457,278 @@ export class AtscriptDoc {
           this._allMessages.push(...(spec.validateDeferred(a.token, a.args, this) || []))
         }
       }
+      this._allMessages.push(...this.neverMessages())
+      this._allMessages.push(...this.unreachableBlockMessages())
+      this._allMessages.push(...this.structureMessages(this._allMessages))
     }
     return this._allMessages
   }
 
   /**
-   * Walks a property chain step-by-step, applying mergeIntersection at each
-   * level. Mirrors the completion logic in the LSP server so that intersection
-   * types like `{ a: string } & { b: number }` are handled correctly.
-   *
-   * Returns the resolved leaf definition (unwound through refs, parity with
-   * `unwindType`), or `undefined` when the chain can't be resolved. Callers that
-   * only need a yes/no resolution check use the truthiness of the result.
+   * The structure model's compile errors of this module: a union member of a
+   * merge on a recursion cycle, too many merge classes, a type operand of its own merge.
    */
-  private resolveChainWithMerge(targetName: string, chain: string[]): SemanticNode | undefined {
-    let def: SemanticNode | undefined = this.unwindType(targetName)?.def
-    if (!def) {
-      return undefined
-    }
-    for (const prop of chain) {
-      // A nested prop typed by a named type (`addr: Addr`) holds a ref: walk through it.
-      if (isRef(def)) {
-        def = this.unwindType(def.id!, def.chain)?.def
-        if (!def) {
-          return undefined
-        }
+  private structureMessages(known: TMessages): TMessages {
+    const out: TMessages = []
+    const sameLine = (a: TMessages[number]['range'], b: TMessages[number]['range']) =>
+      a.start.line === b.start.line
+    for (const e of this.structure().structureErrors()) {
+      if (e.doc !== this) {
+        continue
       }
-      def = this.mergeIntersection(def)
-      if (isProp(def)) {
-        const inner = def.getDefinition()
-        if (inner) {
-          def = this.mergeIntersection(inner)
+      const range = e.node?.token('identifier')?.range ??
+        this.nodes[0]?.token('identifier')?.range ?? {
+          start: { line: 0, character: 0 },
+          end: { line: 0, character: 0 },
         }
+      // (an annotate entry the document reports already: one diagnostic)
+      if (e.entry && known.some(m => m.severity === TSeverity.Error && sameLine(m.range, range))) {
+        continue
       }
-      if (isStructure(def) || isInterface(def)) {
-        const next = def.props.get(prop)
-        if (!next) {
-          return undefined
-        }
-        def = next.getDefinition() || next
-      } else if (isGroup(def)) {
-        // Search union/intersection items for the prop
-        const found = this.findPropInGroup(def as SemanticGroup, prop)
-        if (!found) {
-          return undefined
-        }
-        def = found
-      } else {
-        return undefined
+      if (!out.some(m => m.message === e.message && m.range === range)) {
+        out.push({ severity: TSeverity.Error, message: e.message, range })
       }
     }
-    // Unwind a leaf ref to its underlying type so callers see e.g. the `number`
-    // primitive rather than the `number` ref (matches unwindType's leaf).
-    if (isRef(def)) {
-      def = this.unwindType(def.id!, def.chain)?.def || def
-    }
-    return def
+    return out
   }
 
-  private findPropInGroup(group: SemanticGroup, propName: string): SemanticNode | undefined {
-    for (const item of group.unwrap()) {
-      const merged = this.mergeIntersection(item)
-      if (isStructure(merged) || isInterface(merged)) {
-        const prop = merged.props.get(propName)
-        if (prop) {
-          return prop.getDefinition() || prop
+  private _structure?: { epoch: number; model: StructureModel }
+
+  /**
+   * Why a scalar merge of the core algebra (`node`: written types, merged here when an
+   * intersection) has `never` in it — itself, a tuple item, an array element (what
+   * generated code prints as `never`) —; `undefined` when nothing is `never`. A union's branch
+   * with nothing in common is dropped (`X | never` = X), and references are other declarations'.
+   */
+  neverReasonIn(node: SemanticNode | undefined, depth = 0): string | undefined {
+    if (!node || depth > 50) {
+      return undefined
+    }
+    const merged = unparenthesized(isIntersection(node) ? this.mergeIntersection(node) : node)
+    const reason = neverReasons.get(merged)
+    if (reason) {
+      return reason
+    }
+    if (isTuple(merged)) {
+      for (const item of merged.unwrap()) {
+        const r = this.neverReasonIn(item, depth + 1)
+        if (r) {
+          return r
         }
       }
-      if (isGroup(merged)) {
-        const found = this.findPropInGroup(merged as SemanticGroup, propName)
-        if (found) {
-          return found
-        }
-      }
+    } else if (isArray(merged)) {
+      return this.neverReasonIn(merged.getDefinition(), depth + 1)
     }
     return undefined
   }
 
+  /**
+   * The structure model of this document and those it imports (directly or not), per documents'
+   * epoch: what diagnostics read (blocks of importers change metadata only).
+   */
+  structure(): StructureModel {
+    if (this._structure?.epoch !== epoch) {
+      this._structure = { epoch, model: new StructureModel([this]) }
+    }
+    return this._structure.model
+  }
+
+  private _buildStructure?: { epoch: number; model: StructureModel }
+
+  /**
+   * The structure model of this document and those importing it (directly or not), per
+   * documents' epoch: every block of the build that may write into this document's types.
+   */
+  buildStructure(): StructureModel {
+    if (this._buildStructure?.epoch !== epoch) {
+      this._buildStructure = {
+        epoch,
+        model: new StructureModel([this, ...this.transitive('dependants')]),
+      }
+    }
+    return this._buildStructure.model
+  }
+
+  /** Whether chain ref `ref` names a field a merge makes `never` (the structure model's shape). */
+  private chainToNever(ref: SemanticRefNode): boolean {
+    if (!ref.hasChain || !ref.id) {
+      return false
+    }
+    const m = this.structure()
+    const decl = m.declOf(this, ref.id)
+    const slot =
+      decl &&
+      m.slotAt(
+        decl,
+        ref.chain.map(c => c.text)
+      )
+    return !!slot && m.slotShape(slot).k === 'never'
+  }
+
+  /**
+   * Warnings for the positions of this document's declarations an unmergeable merge makes
+   * `never` (see `StructureModel.neverWarnings`).
+   */
+  private neverMessages(): TMessages {
+    const messages: TMessages = []
+    // (a module refused as too complex is not built: its merges are not computed — bounded time)
+    const refused = this.structure()
+      .structureErrors()
+      .some(
+        e =>
+          e.doc === this &&
+          (e.message === MERGE_TOO_COMPLEX || e.message === UNION_IN_RECURSIVE_MERGE)
+      )
+    if (refused) {
+      return messages
+    }
+    for (const { decl, path, reason } of this.structure().neverWarnings(this)) {
+      const token = decl.node.token('identifier')
+      if (token && reason === MERGE_TOO_COMPLEX) {
+        // (a merge distributing past the bound is the "merge too complex" error at the type)
+        messages.push({ severity: TSeverity.Error, message: MERGE_TOO_COMPLEX, range: token.range })
+      } else if (token) {
+        messages.push({
+          severity: TSeverity.Warning,
+          message: `Intersection of ${reason} cannot be merged${path.length > 0 ? ` at "${decl.name}.${path.join('.')}"` : ` in "${decl.name}"`}; the type resolves to never`,
+          range: token.range,
+        })
+      }
+    }
+    return messages
+  }
+
+  /**
+   * Errors for references to a type another document does not export, in definitions inlined
+   * from that document (`extends`, an intersection member, `annotate … as …`): the generated
+   * code of this document would have to import it from there. Checks what codegen emits (see
+   * {@link emittedRefs}).
+   */
+  /**
+   * Warnings for the mutating `annotate` blocks of this document whose target another document
+   * declares, when the block is not reachable: the declaring document does not import this one
+   * (directly or not), and a document using the target does not either. A block is part of its
+   * target's definition, built into whatever uses the target in the same build — a build of a
+   * document using it without this one (another entry, the target's package built on its own)
+   * would not have it.
+   */
+  private unreachableBlockMessages(): TMessages {
+    const messages: TMessages = []
+    // (whether a document imports this one, directly or not: each found once)
+    const known = new Map<AtscriptDoc, boolean>()
+    const importsThis = (d: AtscriptDoc) => {
+      let hit = known.get(d)
+      if (hit === undefined) {
+        hit = d.transitive('dependencies').has(this)
+        known.set(d, hit)
+      }
+      return hit
+    }
+    for (const node of this.nodes) {
+      if (!isAnnotate(node) || !node.isMutating) {
+        continue
+      }
+      // (what it annotates: a plain alias's target)
+      const owner = this.blockTarget(node)
+      const target = owner?.doc
+      if (!target || !owner.node || target === this || importsThis(target)) {
+        continue
+      }
+      const missing = [...target.documentsUsing(owner.node)].filter(
+        d => d !== this && !importsThis(d)
+      )
+      if (missing.length > 0) {
+        const token = node.token('target')!
+        const users = missing.map(d => relDocPath(this.id, d.id)).sort()
+        messages.push({
+          severity: 2,
+          message: `"${owner.node.id}" (declared in ${relDocPath(this.id, target.id)}) is used by ${users.join(', ')} without importing this file (directly or not): this annotate applies only in builds including this file — import it from ${relDocPath(this.id, target.id)} or from the files using "${owner.node.id}"`,
+          range: token.range,
+        })
+      }
+    }
+    return messages
+  }
+
+  /**
+   * The documents using declaration `decl` (of this document) other than through mutating
+   * `annotate` blocks: this one when another of its declarations references it, and those
+   * importing it that reference it.
+   */
+  documentsUsing(decl: SemanticNode): Set<AtscriptDoc> {
+    const out = new Set<AtscriptDoc>()
+    const name = decl.id
+    if (!name) {
+      return out
+    }
+    // (a reference inside the declaration itself — a recursive type — is the type, not a use;
+    // nor is an import, nor an `annotate` block's target)
+    const own = declarationTokens(decl)
+    const uses = (doc: AtscriptDoc) =>
+      doc.referred.some(
+        t =>
+          t.text === name &&
+          !t.imported &&
+          !isMutatingTarget(t) &&
+          !own.has(t) &&
+          doc.getDeclarationOwnerNode(name)?.node === decl
+      )
+    if (uses(this)) {
+      out.add(this)
+    }
+    for (const d of this.dependants) {
+      // (what is derived from this answer depends on each importer's uses: read, see
+      // `recordDocumentReads`)
+      recordRead(d)
+      if (d !== this && uses(d)) {
+        out.add(d)
+      }
+    }
+    return out
+  }
+
+  /**
+   * Merges an intersection (anything else is returned as it is): scalars by the core algebra,
+   * objects into their structural prop union (see `propUnion`), a union operand distributed. The
+   * same node every time (until a document changes). Generated code reads the structure model
+   *; this is for build-time readers and the scalar merges.
+   */
   mergeIntersection(node: SemanticNode): SemanticNode {
-    if (!isGroup(node)) {
+    if (!isIntersection(node)) {
       return node
     }
-    if (node.op !== '&') {
+    const known = cache().merged.get(node)
+    if (known) {
+      return known
+    }
+    if (merging.has(node)) {
+      // (re-entered through distributed unions: a recursion, kept as it is)
       return node
     }
-    const nodes = node.unwrap()
+    merging.add(node)
+    try {
+      const merged = this.mergeGroup(node)
+      cache().merged.set(node, merged)
+      return merged
+    } finally {
+      merging.delete(node)
+    }
+  }
+
+  private mergeGroup(node: SemanticGroup): SemanticNode {
+    const nodes = this.intersectionOperands(node)
     if (nodes.length === 0) {
       return node
     }
     if (nodes.length === 1) {
-      return nodes[0]
+      // `type X = A & X`: `A`, merged into its own structure like any intersection of objects
+      // (an alias of `A` would reference `X` from inside the type it copies).
+      const def = node.unwrap().length > 1 ? this.mergeMember(nodes[0], this).def : undefined
+      if (isIntersection(def)) {
+        // `M & M` with `type M = A & B`: `M`'s merge
+        return this.mergeIntersection(def)
+      }
+      return isStructure(def) || isInterface(def) ? this.mergeDefs(nodes[0], nodes[0])[0] : nodes[0]
     }
     const newGroup = [] as SemanticNode[]
     let left = nodes[0]
@@ -1691,88 +2736,592 @@ export class AtscriptDoc {
       const right = nodes[i]
       const merged = this.mergeDefs(left, right)
       if (merged.length === 2) {
-        left = merged[1]
         newGroup.push(merged[0])
+        left = merged[1]
       } else {
         left = merged[0]
       }
     }
-    newGroup.push(left)
-    if (newGroup.length > 1) {
-      const newNode = new SemanticGroup(newGroup, '&')
-      return newNode
-    } else {
-      return newGroup[0]
+    if (newGroup.length > 0) {
+      newGroup.push(left)
+      // An intersection with `never` (`string.email & 'x' & 'y'`) is `never`.
+      const never = newGroup.find(n => isRef(n) && this.unwindRef(n)?.def?.id === 'never')
+      return never ?? new SemanticGroup(newGroup, '&')
     }
+    // A union distributed into one intersection (`(A | null) & B` is `A & B`): merged too.
+    if (isIntersection(left) && left !== node) {
+      return this.mergeIntersection(left)
+    }
+    return left
+  }
+
+  /**
+   * The operands of intersection `group`, a nested intersection (`E & (B & A)`, or a reference
+   * to an intersection alias) contributing its own: they all merge as one (`A & A` is `A`).
+   */
+  private intersectionOperands(group: SemanticGroup): SemanticNode[] {
+    const operands: SemanticNode[] = []
+    /** Intersections expanded (`type X = A & X` must not expand forever). */
+    const expanded = new Set<SemanticNode>([group])
+    const add = (node: SemanticNode) => {
+      node = unparenthesized(node)
+      const def = isRef(node) ? this.unwindRef(node)?.def : node
+      const nested = def && unparenthesized(def)
+      if (isIntersection(nested)) {
+        if (!expanded.has(nested)) {
+          expanded.add(nested)
+          nested.unwrap().forEach(add)
+        }
+      } else {
+        // (a type repeated counts once, where it last occurs: the later member wins — its
+        // annotations, and the members of the merges nested in it, see `planScope`)
+        const same = operands.findIndex(o => this.sameOperand(o, node))
+        if (same >= 0) {
+          operands.splice(same, 1)
+        }
+        operands.push(node)
+      }
+    }
+    group.unwrap().forEach(add)
+    return operands
+  }
+
+  /**
+   * The definition `def` of an optional prop intersected with `other` of a required one: `def |
+   * null` when `other` may be `null` (an optional prop passes `null`), else `def`. The same node
+   * for the same `def` (a merge must build the same nodes every time, see `memoMerge`).
+   */
+  private orNullFor(def: SemanticNode, other: SemanticNode): SemanticNode {
+    const nullDef = this.unwindRef(createSyntheticRef('null'))?.def
+    const otherDef = this.mergeMember(other, this).def
+    if (!nullDef || !otherDef || !this.mayIntersect(nullDef, otherDef)) {
+      return def
+    }
+    let nullable = nullableDefs.get(def)
+    if (!nullable) {
+      nullable = new SemanticGroup([def, createSyntheticRef('null')], '|')
+      nullableDefs.set(def, nullable)
+    }
+    return nullable
+  }
+
+  /**
+   * The merge of a merged field's contributors' written types (`optional`: written `?`): an
+   * optional one passes `null` when a required one may be `null` (see {@link orNullFor}), as the
+   * merge of their props does.
+   */
+  mergeFieldTypes(cs: Array<{ def: SemanticNode; optional: boolean }>): SemanticNode {
+    const required = cs.filter(c => !c.optional)
+    const defs = cs.map(c =>
+      c.optional && required.length > 0
+        ? required.reduce((d, o) => this.orNullFor(d, o.def), c.def)
+        : c.def
+    )
+    return defs.length > 1 ? this.mergeIntersection(new SemanticGroup(defs, '&')) : defs[0]
+  }
+
+  /**
+   * Whether intersection operands `a` and `b` are the same type: the same node (or copies of
+   * it), or references to it (`A & A` is `A`, `(A | B) & (A | B)` is `A | B`, like TypeScript).
+   */
+  private sameOperand(a: SemanticNode, b: SemanticNode): boolean {
+    if (a === b) {
+      return true
+    }
+    if (!isRef(a) && !isRef(b)) {
+      return false
+    }
+    const da = isRef(a) ? this.unwindRef(a)?.def : a
+    const db = isRef(b) ? this.unwindRef(b)?.def : b
+    if (!da || !db || da !== db) {
+      return false
+    }
+    // The same definition reached through different annotated aliases or props
+    // (`S3 & string`, with `@expect.minLength 3` on `type S3 = string`) is not the same type.
+    const ma = this.operandAnnotations(a)
+    const mb = this.operandAnnotations(b)
+    return ma.length === mb.length && ma.every((an, i) => an === mb[i])
+  }
+
+  /**
+   * The annotations an intersection operand carries on top of its resolved definition: those
+   * of the aliases and props its reference goes through (`S3` of `type S3 = string` with
+   * `@expect.minLength 3`, `A.x`'s prop annotations), nearest first. None for a definition
+   * written inline.
+   */
+  private operandAnnotations(node: SemanticNode): TAnnotationTokens[] {
+    node = unparenthesized(node)
+    if (!isRef(node)) {
+      return node.annotations ?? []
+    }
+    const out: TAnnotationTokens[] = [...(node.annotations ?? [])]
+    const nodes: SemanticNode[] = []
+    const unwound = this.refOrigin(node).unwindType(
+      node.id!,
+      node.chain,
+      (intermediate, declaring) => {
+        if (!declaring && intermediate.annotations?.length && !nodes.includes(intermediate)) {
+          nodes.push(intermediate)
+        }
+      }
+    )
+    if (unwound?.node && unwound.node.annotations?.length && !nodes.includes(unwound.node)) {
+      nodes.unshift(unwound.node)
+    }
+    for (const n of nodes) {
+      // the resolved definition's own (a primitive's) are its checks, not the reference's
+      if (n !== unwound?.def) {
+        out.push(...n.annotations!)
+      }
+    }
+    return out
+  }
+
+  /**
+   * An intersection member, unwound through a reference, and the document declaring it (`doc`
+   * for one that is not a reference).
+   */
+  private mergeMember(
+    node: SemanticNode,
+    doc: AtscriptDoc
+  ): { def?: SemanticNode; doc: AtscriptDoc } {
+    node = unparenthesized(node)
+    if (!isRef(node)) {
+      return { def: node, doc }
+    }
+    // (a declaration: its definition as generated code builds from it)
+    const unwound = this.declRef(node)
+    const def = unwound?.def && unparenthesized(unwound.def)
+    return { def, doc: unwound?.doc ?? this }
+  }
+
+  /** The props an intersection member contributes: an interface's include inherited ones. */
+  private memberProps(
+    node: SemanticStructureNode | SemanticInterfaceNode,
+    doc: AtscriptDoc
+  ): Map<string, SemanticPropNode> {
+    const resolved = isInterface(node) ? doc.resolveInterfaceExtends(node) : undefined
+    return resolved && isStructure(resolved) ? resolved.props : node.props
   }
 
   mergeDefs(
     _left: SemanticNode,
     _right: SemanticNode
   ): [SemanticNode] | [SemanticNode, SemanticNode] {
-    let left: SemanticNode | undefined = _left
-    let right: SemanticNode | undefined = _right
-    if (isRef(left)) {
-      left = this.unwindType(left.id!, left.chain)?.def
+    return this.mergeOperands(_left, this, _right, this)
+  }
+
+  /**
+   * {@link mergeDefs} of operands written in documents `leftDoc` / `rightDoc` (where a member
+   * that is not a reference resolves its `extends`).
+   */
+  private mergeOperands(
+    _left: SemanticNode,
+    leftDoc: AtscriptDoc,
+    _right: SemanticNode,
+    rightDoc: AtscriptDoc
+  ): [SemanticNode] | [SemanticNode, SemanticNode] {
+    // (a merge that could not be merged stays that `never`, with its reason)
+    for (const side of [_left, _right]) {
+      if (neverReasons.has(unparenthesized(side))) {
+        return [unparenthesized(side)]
+      }
     }
-    if (isRef(right)) {
-      right = this.unwindType(right.id!, right.chain)?.def
-    }
-    if (!left || !right) {
+    const l = this.mergeMember(_left, leftDoc)
+    const r = this.mergeMember(_right, rightDoc)
+    if (!l.def || !r.def) {
       return [_left, _right]
+    }
+    if (isUnion(l.def) || isUnion(r.def)) {
+      return memoMerge(l.def, r.def, () => this.mergeUnions(_left, l, _right, r))
+    }
+    if (isIntersection(l.def) || isIntersection(r.def)) {
+      // A distributed intersection (see `mergeUnions`) intersected further: one intersection.
+      return [this.mergeIntersection(new SemanticGroup([_left, _right], '&'))]
+    }
+    if (isScalar(l.def) && isScalar(r.def)) {
+      return this.mergeScalars(_left, l.def, _right, r.def)
+    }
+    return this.mergeResolvedDefs(l.def, l.doc, r.def, r.doc)
+  }
+
+  /**
+   * Scalars (primitives and literals, resolved: `left` / `right`) intersected, like TypeScript:
+   * `never` when they have no value in common; a literal narrows a primitive of its type
+   * (`'x' & string` is `'x'`), an extension its base (`string & string.email` is
+   * `string.email`, which carries the base's constraints too). A side is dropped only when it
+   * checks nothing the other does not — no annotations of its own or of the aliases and props
+   * its reference goes through (`@expect.minLength 3 type S3 = string`), no built-in checks
+   * (an extension's, `decimal`'s format) — so the result does not depend on the operand order.
+   * Otherwise (`string.email & string.uuid`, a literal and an extension, `S3 & L4`) both stay,
+   * a runtime intersection checking both.
+   */
+  private mergeScalars(
+    _left: SemanticNode,
+    left: SemanticNode,
+    _right: SemanticNode,
+    right: SemanticNode
+  ): [SemanticNode] | [SemanticNode, SemanticNode] {
+    if (scalarsDisjoint(left, right)) {
+      return [neverMerge(NOTHING_IN_COMMON)]
+    }
+    const both: [SemanticNode, SemanticNode] = [_left, _right]
+    const lRef = this.operandAnnotations(_left).length > 0
+    const rRef = this.operandAnnotations(_right).length > 0
+    const samePrimitive =
+      isPrimitive(left) && isPrimitive(right) && (left === right || left.key === right.key)
+    if (samePrimitive || (isConst(left) && isConst(right))) {
+      // The same primitive, or equal literals (not disjoint): the same checks but those the
+      // references carry.
+      if (lRef && rRef) {
+        return this.sameOperand(_left, _right) ? [_left] : both
+      }
+      return [rRef ? _right : _left]
+    }
+    if (isConst(left) || isConst(right)) {
+      const [lit, prim, primRef] = isConst(left) ? [_left, right, rRef] : [_right, left, lRef]
+      if (isPrimitive(prim) && scalarDomain(prim) !== undefined) {
+        return primRef || primitiveChecks(prim) ? both : [lit]
+      }
+      return both
+    }
+    const l = left as SemanticPrimitiveNode
+    const r = right as SemanticPrimitiveNode
+    if (r.key.startsWith(`${l.key}.`)) {
+      return lRef || !extensionCovers(r, l) ? both : [_right]
+    }
+    if (l.key.startsWith(`${r.key}.`)) {
+      return rRef || !extensionCovers(l, r) ? both : [_left]
+    }
+    return both
+  }
+
+  /**
+   * What a definition (resolved) can be, for {@link mayIntersect}: an object, an array (or a
+   * tuple), a scalar (itself) — `undefined` when not known (a union, an intersection of no
+   * objects nor arrays).
+   */
+  private valueShape(
+    def?: SemanticNode,
+    seen = new Set<SemanticNode>()
+  ): 'object' | 'array' | 'never' | SemanticNode | undefined {
+    if (isStructure(def) || isInterface(def)) {
+      return 'object'
+    }
+    if (isArray(def) || isTuple(def)) {
+      return 'array'
+    }
+    if (isScalar(def)) {
+      return def
+    }
+    if (isIntersection(def) && !seen.has(def)) {
+      // An intersection with an object (or an array) member is an object (an array), or never;
+      // one of scalars a scalar, or never when two of them have no value in common (a branch of
+      // a distributed union: `string & number`, `null & null & { k?: string }`).
+      seen.add(def)
+      let shape: 'object' | 'array' | undefined
+      const scalars: SemanticNode[] = []
+      for (const member of def.unwrap()) {
+        const s = this.valueShape(this.mergeMember(member, this).def, seen)
+        if (s === 'never') {
+          return 'never'
+        }
+        if (s === 'object' || s === 'array') {
+          if (shape && shape !== s) {
+            return 'never'
+          }
+          shape = s
+        } else if (s !== undefined) {
+          scalars.push(s)
+        }
+      }
+      if (scalars.some((a, i) => scalars.some((b, j) => j > i && scalarsDisjoint(a, b)))) {
+        return 'never'
+      }
+      if (shape && scalars.some(s => scalarDomain(s) !== undefined)) {
+        return 'never'
+      }
+      return (
+        shape ??
+        (scalars.length > 0 && scalars.length === def.unwrap().length ? scalars[0] : undefined)
+      )
+    }
+    return undefined
+  }
+
+  /**
+   * Whether a value may match both definitions (resolved): not a scalar and an object or array,
+   * nor scalars having no value in common (see `scalarsDisjoint`), nor an array and an object.
+   * When not known (a union, …), it may.
+   */
+  private mayIntersect(a?: SemanticNode, b?: SemanticNode): boolean {
+    const sa = this.valueShape(a)
+    const sb = this.valueShape(b)
+    if (sa === 'never' || sb === 'never') {
+      return false
+    }
+    if (sa === undefined || sb === undefined) {
+      return true
+    }
+    if (typeof sa === 'object' && typeof sb === 'object') {
+      return !scalarsDisjoint(sa, sb)
+    }
+    return sa === sb
+  }
+
+  /**
+   * An intersection with a union, distributed (`(A | null) & B` is `(A & B) | (null & B)`): the
+   * union of the intersections of the branches that can match together (`null & B` cannot).
+   * Each stays an intersection, merged by a reader stepping into it — merging
+   * them here would multiply the merges of every union nested in their props. A branch whose
+   * merge is `never` (`2 & (number & 1)`) is no branch. However many branches there are.
+   */
+  private mergeUnions(
+    _left: SemanticNode,
+    left: { def?: SemanticNode; doc: AtscriptDoc },
+    _right: SemanticNode,
+    right: { def?: SemanticNode; doc: AtscriptDoc }
+  ): [SemanticNode] | [SemanticNode, SemanticNode] {
+    // A union's branches, a branch that is a union itself (`(A | B) | C`, or a reference to a
+    // union type) contributing its own.
+    const branches = (operand: SemanticNode, side: { def?: SemanticNode; doc: AtscriptDoc }) => {
+      const out: Array<{ node: SemanticNode; def?: SemanticNode }> = []
+      const expanded = new Set<SemanticNode>()
+      const add = (node: SemanticNode, def: SemanticNode | undefined, doc: AtscriptDoc) => {
+        // (a branch that is an intersection distributing into a union — `A | (B & (C | D))`:
+        // that union's branches, as the runtime distributes them)
+        if (isIntersection(def) && !expanded.has(def)) {
+          const merged = unparenthesized(this.mergeIntersection(def))
+          if (isUnion(merged)) {
+            expanded.add(def)
+            for (const item of merged.unwrap()) {
+              out.push({ node: item, def: item })
+            }
+            return
+          }
+        }
+        if (!isUnion(def)) {
+          out.push({ node, def })
+        } else if (!expanded.has(def)) {
+          expanded.add(def)
+          for (const item of def.unwrap()) {
+            const member = this.mergeMember(item, doc)
+            add(item, member.def, member.doc)
+          }
+        }
+      }
+      add(operand, side.def, side.doc)
+      return out
+    }
+    const leftBranches = branches(_left, left)
+    const rightBranches = branches(_right, right)
+    const out: SemanticNode[] = []
+    for (const l of leftBranches) {
+      for (const r of rightBranches) {
+        if (this.mayIntersect(l.def, r.def)) {
+          const branch = new SemanticGroup([l.node, r.node], '&')
+          if (!this.mergesToNever(branch)) {
+            out.push(branch)
+          }
+        }
+      }
+    }
+    if (out.length === 0) {
+      return [createSyntheticRef('never')]
+    }
+    return [out.length === 1 ? out[0] : new SemanticGroup(out, '|')]
+  }
+
+  /** Whether intersection `group` (a distributed branch) merges into `never`. */
+  private mergesToNever(group: SemanticGroup): boolean {
+    const merged = unparenthesized(this.mergeIntersection(group))
+    return (
+      isRef(merged) && (neverReasons.has(merged) || this.unwindRef(merged)?.def?.id === 'never')
+    )
+  }
+
+  private mergeResolvedDefs(
+    left: SemanticNode,
+    leftDoc: AtscriptDoc,
+    right: SemanticNode,
+    rightDoc: AtscriptDoc
+  ): [SemanticNode] | [SemanticNode, SemanticNode] {
+    if (isArray(left) && isArray(right)) {
+      // `A[] & B[]`: arrays of `A & B` (merged by a reader stepping into it, see `mergeUnions`).
+      return memoMerge(left, right, () => {
+        const array = new SemanticArrayNode()
+        array.define(new SemanticGroup([left.getDefinition()!, right.getDefinition()!], '&'))
+        array.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
+        return [array]
+      })
+    }
+    if ((isTuple(left) || isArray(left)) && (isTuple(right) || isArray(right))) {
+      // `[A] & [B]`: a tuple of the items' intersections (`[A & B]`, an array's element
+      // intersecting each item); tuples of different lengths have no value in common.
+      const items = (node: SemanticNode, length: number) =>
+        isTuple(node) ? node.unwrap() : Array.from({ length }, () => node.getDefinition()!)
+      const length = isTuple(left) ? left.unwrap().length : (right as SemanticGroup).unwrap().length
+      if (isTuple(left) && isTuple(right) && left.unwrap().length !== right.unwrap().length) {
+        return [createSyntheticRef('never')]
+      }
+      if (this.containsObject(left) && this.containsObject(right)) {
+        // (tuples are written in place, no structure-model def: their items' objects cannot be
+        // matched — `never`)
+        return [neverMerge('tuples of objects')]
+      }
+      return memoMerge(left, right, () => {
+        const l = items(left, length)
+        const r = items(right, length)
+        const tuple = new SemanticTupleNode()
+        tuple.define(
+          new SemanticGroup(
+            l.map((item, i) => new SemanticGroup([item, r[i]], '&')),
+            ','
+          )
+        )
+        tuple.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
+        return [tuple]
+      })
     }
     if (isPrimitive(left) && isPrimitive(right)) {
       // todo: properly merge primitives
       if (left.config.type === right.config.type) {
         return [left]
       }
-      return [createSyntheticRef('never')]
+      return [neverMerge(NOTHING_IN_COMMON)]
     }
     if ((isStructure(left) || isInterface(left)) && (isStructure(right) || isInterface(right))) {
-      // merging objects
-      const mergedProps: SemanticPropNode[] = []
-      const allProps = new Set([...left.props.keys(), ...right.props.keys()])
-      for (const key of allProps) {
-        const leftProp = left.props.get(key)
-        const rightProp = right.props.get(key)
-        let mergedDef: SemanticNode
-        if (leftProp && rightProp) {
-          const grp = new SemanticGroup(
-            [leftProp.getDefinition()!, rightProp.getDefinition()!],
-            '&'
-          )
-          mergedDef = this.mergeIntersection(grp)
-        } else {
-          const oldProp = (leftProp || rightProp)!
-          mergedDef = this.mergeIntersection(oldProp.getDefinition()!)
-        }
-        const prop = new SemanticPropNode()
-        prop.saveToken((leftProp || rightProp)!.token('identifier')!, 'identifier')
-        if (isPrimitive(mergedDef)) {
-          mergedDef = createSyntheticRef(mergedDef.id!)
-        }
-        prop.define(mergedDef)
-        prop.annotations = this.mergeNodesAnnotations(leftProp?.annotations, rightProp?.annotations)
-        const oldProps = [leftProp, rightProp].filter(Boolean) as SemanticPropNode[]
-        let optionalToken = oldProps[0]?.token('optional')
-        for (const oldProp of oldProps) {
-          if (!oldProp.token('optional')) {
-            optionalToken = undefined
-            break
-          }
-        }
-        if (optionalToken) {
-          prop.saveToken(optionalToken, 'optional')
-        }
-        mergedProps.push(prop)
-      }
-      const mergedStructure = new SemanticStructureNode()
-      mergedStructure.setProps(mergedProps)
-      mergedStructure.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
-      return [mergedStructure]
+      return [this.propUnion(left, leftDoc, right, rightDoc)]
     }
     // all other cases are not supported, returning never
-    return [createSyntheticRef('never')]
+    return [neverMerge(NOTHING_IN_COMMON)]
+  }
+
+  /** The one item of nullable union `def` (`X | null`) that is not `null` / `undefined`. */
+  private nonNullItem(def: SemanticNode): SemanticNode | undefined {
+    const group = unparenthesized(def)
+    if (!isGroup(group) || group.op !== '|') {
+      return undefined
+    }
+    const items = group.unwrap().filter(i => {
+      // (`null & null`, a distributed all-nullable merge's: `null`)
+      const item = this.mergeIntersection(unparenthesized(i))
+      const d = isRef(item) ? this.unwindRef(item)?.def : item
+      return !(isPrimitive(d) && (d.key === 'null' || d.key === 'undefined'))
+    })
+    return items.length === 1 && items.length < group.unwrap().length
+      ? unparenthesized(items[0])
+      : undefined
+  }
+
+  /** Whether a value of definition `def` may hold an object (a structure, an interface). */
+  private containsObject(def: SemanticNode | undefined, seen = new Set<SemanticNode>()): boolean {
+    const node = def && this.mergeMember(def, this).def
+    if (!node || seen.has(node)) {
+      return false
+    }
+    seen.add(node)
+    if (isStructure(node) || isInterface(node)) {
+      return true
+    }
+    if (isGroup(node)) {
+      return node.unwrap().some(item => this.containsObject(item, seen))
+    }
+    return isArray(node) && this.containsObject(node.getDefinition(), seen)
+  }
+
+  /**
+   * The structural prop union of two objects (an interface's props include those it inherits),
+   * for build-time readers (generated code reads the structure model): a prop only one
+   * side has is that side's own node (go-to-definition lands in its document); a prop both have
+   * is a new prop — required if one side's is — whose definition is the intersection of theirs
+   * (merged by a reader stepping into it; scalars merged here, by the core algebra), its
+   * annotations the later side's over the earlier's.
+   */
+  private propUnion(
+    left: SemanticStructureNode | SemanticInterfaceNode,
+    leftDoc: AtscriptDoc,
+    right: SemanticStructureNode | SemanticInterfaceNode,
+    rightDoc: AtscriptDoc
+  ): SemanticStructureNode {
+    const props: SemanticPropNode[] = []
+    const leftProps = this.memberProps(left, leftDoc)
+    const rightProps = this.memberProps(right, rightDoc)
+    for (const key of new Set([...leftProps.keys(), ...rightProps.keys()])) {
+      const l = leftProps.get(key)
+      const r = rightProps.get(key)
+      if (!l || !r || l === r) {
+        props.push((l ?? r)!)
+        continue
+      }
+      const lDef = l.getDefinition()!
+      const rDef = r.getDefinition()!
+      const lOptional = !!l.token('optional')
+      const rOptional = !!r.token('optional')
+      let def: SemanticNode
+      if (lDef === rDef && lOptional === rOptional) {
+        def = lDef
+      } else {
+        // (an optional prop passes `null`: intersected with a required one that may be `null`, it
+        // is `X | null`; a type repeated counts once, where it last occurs)
+        const members: SemanticNode[] = []
+        for (const d of [
+          lOptional && !rOptional ? this.orNullFor(lDef, rDef) : lDef,
+          rOptional && !lOptional ? this.orNullFor(rDef, lDef) : rDef,
+        ].flatMap(d => {
+          const u = unparenthesized(d)
+          return isIntersection(u) ? u.unwrap() : [d]
+        })) {
+          const same = members.findIndex(m => this.sameOperand(m, d))
+          const kept = same >= 0 ? members[same] : d
+          if (same >= 0) {
+            members.splice(same, 1)
+          }
+          members.push(kept)
+        }
+        def =
+          members.length === 1
+            ? members[0]
+            : members.every(m => this.scalarsOnly(m))
+              ? this.mergeIntersection(new SemanticGroup(members, '&'))
+              : new SemanticGroup(members, '&')
+        if (isPrimitive(def)) {
+          // The full key: an extension (`number.int`) is not reachable by its own id.
+          def = createSyntheticRef(def.key)
+        }
+      }
+      const prop = new SemanticPropNode()
+      prop.saveToken(l.token('identifier')!, 'identifier')
+      prop.define(def)
+      prop.annotations = this.mergeNodesAnnotations(l.annotations, r.annotations)
+      keepOptional(prop, l, r)
+      declaringDocs.set(prop, declaringDocs.get(l) ?? leftDoc)
+      props.push(prop)
+    }
+    const merged = new SemanticStructureNode()
+    merged.setProps(props)
+    merged.annotations = this.mergeNodesAnnotations(left.annotations, right.annotations)
+    return merged
+  }
+
+  /**
+   * Whether definition `def` holds scalars only (primitives, literals, unions and intersections
+   * of them, through references): what {@link propUnion} merges in place.
+   */
+  private scalarsOnly(def: SemanticNode, seen = new Set<SemanticNode>()): boolean {
+    const node = unparenthesized(def)
+    if (seen.has(node)) {
+      return false
+    }
+    seen.add(node)
+    if (isRef(node)) {
+      const target = this.unwindRef(node)?.def
+      return !!target && this.scalarsOnly(target, seen)
+    }
+    if (isGroup(node) && (node.op === '|' || node.op === '&')) {
+      return node.unwrap().every(item => this.scalarsOnly(item, seen))
+    }
+    return isScalar(node)
   }
 
   /**
@@ -1787,6 +3336,116 @@ export class AtscriptDoc {
    * @param right - An optional array of annotation tokens to merge (higher priority).
    * @returns A merged array of annotation tokens, preserving order while preventing duplicates.
    */
+  /**
+   * The type-level annotations intersection `group` carries: those of the declarations its
+   * operands name (interfaces, types, `annotate … as` aliases; intersections written in place
+   * expanded), the later member winning (`append` ones concatenated) — with the node each comes
+   * from. Generated code links them live (`.members(…)`) and writes these build-time values under
+   * them (`.inherit(…)`).
+   */
+  intersectionAnnotations(
+    group: SemanticGroup,
+    blocks = false
+  ): Array<{ node: SemanticNode; an: TAnnotationTokens }> {
+    let out: Array<{ node: SemanticNode; an: TAnnotationTokens }> = []
+    for (const ref of this.intersectionMemberRefs(group)) {
+      const owner = this.resolveRefOwner(ref)!
+      const node = owner.node!
+      // (a field — a chain, `A.x` — is a member of its own: its type may merge `A` itself)
+      const key = ref.hasChain ? chainKey(node, ref.chain) : node
+      if (evaluatingMembers.has(key)) {
+        // (an intersection alias including itself, `type X = A & X`: once)
+        continue
+      }
+      evaluatingMembers.add(key)
+      let anns: TAnnotationTokens[]
+      try {
+        // (an operand is a reference: without the `passedWhenReferred: false` ones; a field — a
+        // chain — is what a reference to it gets: the field's, over its type's)
+        anns =
+          (ref.hasChain
+            ? this.filterPassedWhenReferred(
+                this.evalAnnotationsForDefinition(ref, undefined, undefined, blocks),
+                true
+              )
+            : owner.doc.evalReferredAnnotations(node, blocks)) ?? []
+      } finally {
+        evaluatingMembers.delete(key)
+      }
+      const append = (an: TAnnotationTokens) => {
+        const spec = this.resolveAnnotation(an.name)
+        return !!spec?.config.multiple && spec.config.mergeStrategy === 'append'
+      }
+      const replaced = new Set(anns.filter(an => !append(an)).map(an => an.name))
+      // (a later member's `append` values first, like the merge of annotations)
+      out = [
+        ...anns.filter(append).map(an => ({ node, an })),
+        ...out.filter(p => !replaced.has(p.an.name)),
+        ...anns.filter(an => !append(an)).map(an => ({ node, an })),
+      ]
+    }
+    return out
+  }
+
+  /**
+   * The references to declarations (interfaces, types, `annotate … as` aliases) whose type-level
+   * annotations intersection `group` carries, lower priority first: its operands naming one
+   * (intersections written in place expanded), looked through a nullable union (`(X | null) & Z`
+   * is `X & Z`; an alias `XN = X | null`: X, then XN's own).
+   */
+  intersectionMemberRefs(group: SemanticGroup): SemanticRefNode[] {
+    const out: SemanticRefNode[] = []
+    const seen = new Set<SemanticNode>()
+    const add = (written: SemanticNode) => {
+      const item = unparenthesized(written)
+      if (seen.has(item)) {
+        return
+      }
+      seen.add(item)
+      if (isIntersection(item)) {
+        item.unwrap().forEach(add)
+        return
+      }
+      if (isGroup(item) && item.op === '|') {
+        // (a nullable union: its one item that is not `null` / `undefined`)
+        const kept = item.unwrap().filter(i => {
+          const def = isRef(unparenthesized(i))
+            ? this.unwindRef(unparenthesized(i) as SemanticRefNode)?.def
+            : undefined
+          return !(isPrimitive(def) && (def.key === 'null' || def.key === 'undefined'))
+        })
+        if (kept.length === 1) {
+          add(kept[0])
+        }
+        return
+      }
+      if (!isRef(item) || this.inlinedPrimitive(item)) {
+        return
+      }
+      const node = this.resolveRefOwner(item)?.node
+      if (
+        !node ||
+        !(
+          node.entity === 'interface' ||
+          node.entity === 'type' ||
+          (isAnnotate(node) && !node.isMutating)
+        )
+      ) {
+        return
+      }
+      const def =
+        node.entity === 'type' && !item.hasChain
+          ? unparenthesized(node.getDefinition()!)
+          : undefined
+      if (def && isGroup(def) && def.op === '|') {
+        add(def)
+      }
+      out.push(item)
+    }
+    add(group)
+    return out
+  }
+
   mergeNodesAnnotations(left?: TAnnotationTokens[], right?: TAnnotationTokens[]) {
     const annotations = [] as TAnnotationTokens[]
     const savedAnnotations = new Set<string>()
@@ -1821,15 +3480,92 @@ const zeroRange = {
   },
 }
 
+/**
+ * A merged prop is optional when every member's is (a `never` one too: `{ u?: X | Y } & { u?: Z }`
+ * accepts a value without `u`, as 0.1.110 did).
+ */
+function keepOptional(prop: SemanticPropNode, ...members: SemanticPropNode[]): void {
+  const token = members[0]?.token('optional')
+  if (token && members.every(m => m.token('optional'))) {
+    prop.saveToken(token, 'optional')
+  }
+}
+
+/** The declarations whose type-level annotations are being evaluated (see `intersectionAnnotations`). */
+const evaluatingMembers = new Set<unknown>()
+
+/** Why each `never` a merge built could not merge its members (see `neverReasonIn`). */
+const neverReasons = new WeakMap<SemanticNode, string>()
+
+/** A `never` for a merge of members whose slots cannot be matched (`shape`: why). */
+function neverMerge(shape: string): SemanticRefNode {
+  const never = createSyntheticRef('never')
+  neverReasons.set(never, shape)
+  return never
+}
+
+/** A reference to `name`; a dotted name (`number.int`) becomes the id plus a chain. */
 function createSyntheticRef(name: string): SemanticRefNode {
   const ref = new SemanticRefNode()
-  ref.saveToken(
-    new Token({
-      text: name,
-      type: 'identifier',
-      getRange: () => zeroRange,
-    }),
-    'identifier'
-  )
+  const token = (text: string) => new Token({ text, type: 'identifier', getRange: () => zeroRange })
+  const [id, ...chain] = name.split('.')
+  ref.saveToken(token(id), 'identifier')
+  for (const part of chain) {
+    ref.addChain(token(part))
+  }
   return ref
+}
+
+/** `to`'s path relative to `from` (`./b.as`), or its id when not a file. */
+function relDocPath(from: string, to: string): string {
+  try {
+    return `${getRelPath(from, to)}.as`
+  } catch {
+    return to
+  }
+}
+
+/** Group `group` (a union, an intersection, a tuple, parentheses) with `items` instead. */
+function withItems(group: SemanticGroup, items: SemanticNode[]): SemanticGroup {
+  const copy = Object.create(group) as SemanticGroup
+  ;(copy as unknown as { nodes: SemanticNode[] }).nodes = items
+  return copy
+}
+
+/** The document of each top-level node (a declaration, an `annotate` block). */
+const declaringDocs = new WeakMap<SemanticNode, AtscriptDoc>()
+
+/** A declaration other types are built from: an interface, a type, an `annotate … as` alias. */
+function isDeclarationNode(node: SemanticNode): boolean {
+  return (
+    node.entity === 'interface' || node.entity === 'type' || (isAnnotate(node) && !node.isMutating)
+  )
+}
+
+/**
+ * The annotations of `node`; `blocks`: a declaration's with its mutating blocks' top-level
+ * annotations (see `AtscriptDoc.declarationAnnotations`).
+ */
+function annotationsOf(node: SemanticNode, blocks: boolean): TAnnotationTokens[] | undefined {
+  const doc = blocks && isDeclarationNode(node) ? declaringDocs.get(node) : undefined
+  return doc ? doc.declarationAnnotations(node) : node.annotations
+}
+
+/** Whether `token` is the target of a mutating `annotate` block (`annotate T { … }`). */
+function isMutatingTarget(token: Token): boolean {
+  const parent = token.parentNode
+  return !!parent && isAnnotate(parent) && parent.isMutating && parent.token('target') === token
+}
+
+/** The reference tokens inside declaration `decl` (its own definition), and its name. */
+function declarationTokens(decl: SemanticNode): Set<Token> {
+  const out = new Set<Token>()
+  const name = decl.token('identifier')
+  if (name) {
+    out.add(name)
+  }
+  for (const t of decl.referredIdentifiers) {
+    out.add(t)
+  }
+  return out
 }

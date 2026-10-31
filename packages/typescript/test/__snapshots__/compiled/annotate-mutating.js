@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d, registerCompiledCheck as $cv } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, registerCompiledCheck as $cv, $f as $f, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class MyInterface {
   static __is_atscript_annotated_type = true
@@ -13,51 +13,31 @@ export class MyInterface {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+const $R = [0, "@atscript/typescript:test/fixtures/annotate-mutating.as"]
 $("object", MyInterface)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Original Name")
-      .$type
-  ).prop(
-    "age",
-    $().designType("number")
-      .tags("number")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("email", "string")
-      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-      .$type
-  ).prop(
-    "address",
-    $("object")
-      .prop(
-        "street",
-        $().designType("string")
-          .tags("string")
-          .$type
-      ).prop(
-        "city",
-        $().designType("string")
-          .tags("string")
-          .$type
-      )
-      .$type
-  )
+  .prop("name", $().designType("string")
+    .tags("string").annotate("label", "Original Name").$type)
+  .prop("age", $().designType("number")
+    .tags("number").$type)
+  .prop("email", $().designType("string")
+    .tags("email", "string").annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true).$type)
+  .prop("address", $("object")
+    .prop("street", $().designType("string")
+      .tags("string").$type)
+    .prop("city", $().designType("string")
+      .tags("string").$type).$type)
 
-// Ad-hoc annotations for MyInterface
-$a(MyInterface.type.props.get("name")?.metadata, "label", "Mutated Name")
-MyInterface.type.props.get("name")?.metadata.delete("mul")
-$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)
-$a(MyInterface.type.props.get("age")?.metadata, "label", "Mutated Age")
-$a(MyInterface.type.props.get("address")?.type.props.get("city")?.metadata, "label", "Mutated City")
-$a(MyInterface.metadata, "meta.description", "Mutated Interface")
+$blk($R, 0, MyInterface, [
+  [[["meta.description", "Mutated Interface"]], []],
+  [[["label", "Mutated Name"], ["mul", 42, 1]], [["name", 0]]],
+  [[["label", "Mutated Age"]], [["age", 0]]],
+  [[["label", "Mutated City"]], [["address", 0], ["city", 0]]],
+])
 
 // Compiled validator checks
-$cv(MyInterface, 2, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,3,"n",0],[0,0,4,"",1]]],[0,"string"],[0,"number"],[0,"string"],[1,["street","city"],[[0,0,5,"",1],[0,0,6,"",1]]],[0,"string"],[0,"string"]],[0,0,0,"",1],1], (K, H) => {
+$cv(MyInterface, 4, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,3,"n",0],[0,0,4,"",1]]],[0,"string"],[0,"number"],[0,"string"],[1,["street","city"],[[0,0,5,"",1],[0,0,6,"",1]]],[0,"string"],[0,"string"]],[0,0,0,"",1],1], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {

@@ -4,7 +4,7 @@ export type StampOrNull = stamp.auto | null
 
 export type Stamp2 = Stamp
 
-@structural 'alias'
+@stamped 'alias'
 export type StampRelabeled = Stamp
 
 export type StampRelabeled2 = StampRelabeled
@@ -26,7 +26,7 @@ export interface Uses {
     member: stamp.auto | null
     viaProp: Source.at
     viaPropAlias: SourceAt
-    @structural 'own'
+    @stamped 'own'
     overridden: stamp.auto
     name: string.required
     agreed: boolean.required

@@ -80,29 +80,26 @@ describe('runtime ref contract (eager and lazy refTo record the same shape)', ()
       await import('../test/fixtures/ref-contract.as')
     const { RcCustomer } = await import('../test/fixtures/ref-contract-common.as')
 
-    expect(RcLocalAlias.ref!.type()).toBe(RcAddress)
-    expect(RcLocalAlias.ref!.field).toBe('')
-    // alias keeps its own id and a cloned body
-    expect(RcLocalAlias.id).toBe('RcLocalAlias')
-    expect(RcLocalAlias.type).not.toBe(RcAddress.type)
+    // MODEL §10 D3: a bare plain alias IS its target (no reference node, no ref of its own)
+    expect(RcLocalAlias).toBe(RcAddress)
 
     expect(RcChainAlias.ref!.type()).toBe(RcAddress)
     expect(RcChainAlias.ref!.field).toBe('city')
 
     expect(RcCustomerAlias.type.kind).toBe('object')
-    expect(RcCustomerAlias.ref!.type()).toBe(RcCustomer)
-    expect(RcCustomerAlias.ref!.field).toBe('')
-    expect(RcCustomerAlias.id).toBe('RcCustomerAlias')
+    // MODEL §10 D3: a bare plain alias IS its target
+    expect(RcCustomerAlias).toBe(RcCustomer)
   })
 
-  it("an object alias's cloned props keep their refs", async () => {
+  it("an object alias's props are its target's (with their refs)", async () => {
     const { RcOrderAlias, RcOrder } = await import('../test/fixtures/ref-contract.as')
-    expect(RcOrderAlias.type).not.toBe(RcOrder.type)
+    // MODEL §10 D3: a bare plain alias IS its target
+    expect(RcOrderAlias).toBe(RcOrder)
     for (const name of ['address', 'city', 'customer', 'customerId']) {
-      const cloned = prop(RcOrderAlias, name)
+      const shared = prop(RcOrderAlias, name)
       const original = prop(RcOrder, name)
-      expect(cloned).not.toBe(original)
-      expect(cloned.ref).toBe(original.ref)
+      expect(shared).toBe(original)
+      expect(shared.ref).toBe(original.ref)
     }
   })
 
@@ -141,35 +138,5 @@ describe('runtime ref contract (eager and lazy refTo record the same shape)', ()
     const stripped = (serializeAnnotatedType(RcOrder).type as TSerializedTypeObject).props
     expect(stripped.address.ref).toBeUndefined()
     expect(stripped.customer.ref).toBeUndefined()
-  })
-})
-
-describe('refTo builder (programmatic)', () => {
-  it('eager plain refTo (no chain or an empty one) records ref with field ""', () => {
-    const target = defineAnnotatedType('object')
-      .id('Target')
-      .prop('id', defineAnnotatedType().designType('string').$type).$type
-    const node = defineAnnotatedType().refTo(target).$type
-    expect(node.ref!.field).toBe('')
-    expect(node.ref!.type()).toBe(target)
-    expect(node.type).toBe(target.type)
-    expect(node.id).toBe('Target')
-    expect(defineAnnotatedType().refTo(target, []).$type.ref!.field).toBe('')
-  })
-
-  it('eager and lazy refTo produce the same ref shape', () => {
-    const target = defineAnnotatedType('object')
-      .id('Target')
-      .prop(
-        'a',
-        defineAnnotatedType('object').prop('b', defineAnnotatedType().designType('number').$type)
-          .$type
-      ).$type
-    const eager = defineAnnotatedType().refTo(target, ['a', 'b']).$type
-    const lazy = defineAnnotatedType().refTo(() => target, ['a', 'b']).$type
-    expect(eager.ref!.field).toBe('a.b')
-    expect(lazy.ref!.field).toBe('a.b')
-    expect(eager.ref!.type()).toBe(lazy.ref!.type())
-    expect(eager.type).toBe(lazy.type)
   })
 })

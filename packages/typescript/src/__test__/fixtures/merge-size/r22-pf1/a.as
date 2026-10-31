@@ -1,0 +1,87 @@
+export interface S1 {
+  @expect.maxLength 20
+  p0?: string
+  @expect.maxLength 20
+  p1?: string
+  @expect.maxLength 20
+  p2?: string
+  @expect.maxLength 20
+  p3?: string
+  @expect.maxLength 20
+  p4?: string
+  @expect.maxLength 20
+  p5?: string
+  @expect.maxLength 20
+  p6?: string
+  @expect.maxLength 20
+  p7?: string
+  @expect.maxLength 20
+  p8?: string
+  @expect.maxLength 20
+  p9?: string
+  @expect.maxLength 20
+  p10?: string
+  @expect.maxLength 20
+  p11?: string
+  @expect.maxLength 20
+  p12?: string
+  @expect.maxLength 20
+  p13?: string
+  @expect.maxLength 20
+  p14?: string
+  @expect.maxLength 20
+  p15?: string
+  @expect.maxLength 20
+  p16?: string
+  @expect.maxLength 20
+  p17?: string
+  @expect.maxLength 20
+  p18?: string
+  @expect.maxLength 20
+  p19?: string
+}
+export interface S2 {
+  @expect.maxLength 20
+  p0?: string
+  @expect.maxLength 20
+  p1?: string
+  @expect.maxLength 20
+  p2?: string
+  @expect.maxLength 20
+  p3?: string
+  @expect.maxLength 20
+  p4?: string
+  @expect.maxLength 20
+  p5?: string
+  @expect.maxLength 20
+  p6?: string
+  @expect.maxLength 20
+  p7?: string
+  @expect.maxLength 20
+  p8?: string
+  @expect.maxLength 20
+  p9?: string
+  @expect.maxLength 20
+  p10?: string
+  @expect.maxLength 20
+  p11?: string
+  @expect.maxLength 20
+  p12?: string
+  @expect.maxLength 20
+  p13?: string
+  @expect.maxLength 20
+  p14?: string
+  @expect.maxLength 20
+  p15?: string
+  @expect.maxLength 20
+  p16?: string
+  @expect.maxLength 20
+  p17?: string
+  @expect.maxLength 20
+  p18?: string
+  @expect.maxLength 20
+  p19?: string
+}
+export interface P { s?: S1; a?: string }
+export interface Q { s?: S2; b?: string }
+export type M = P & Q

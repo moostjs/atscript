@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import type { TAtscriptDocConfig } from './document'
 import { AtscriptDoc } from './document'
-import { flattenInterfaceNode, isDbEntityNode } from './flatten'
+import { flatDefinitions, isDbEntityNode, isPhantomNode } from './flatten'
 import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import { PluginManager } from './plugin/plugin-manager'
 
@@ -26,228 +26,104 @@ function getInterface(doc: AtscriptDoc, name?: string): SemanticInterfaceNode {
   return node as SemanticInterfaceNode
 }
 
-describe('flattenInterfaceNode', () => {
-  it('should flatten simple flat interface', () => {
-    const doc = createDoc(`
-      @db.table "test"
-      interface User {
-        name: string
-        age: number
-        active: boolean
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
+/** The types written at `path` of interface `name` (references: by name). */
+function writtenAt(doc: AtscriptDoc, name: string, path: string): Array<string | undefined> {
+  return flatDefinitions(doc, getInterface(doc, name))(path).map(d => d.prop.getDefinition()?.id)
+}
 
-    expect(Array.from(flat.keys())).toEqual(['name', 'age', 'active'])
-    // All are leaf entries
-    expect(flat.get('name')!.intermediate).toBeFalsy()
-    expect(flat.get('age')!.intermediate).toBeFalsy()
-  })
-
-  it('should flatten nested inline object with intermediate entry', () => {
-    const doc = createDoc(`
-      @db.table "test"
-      interface User {
-        name: string
-        address: {
-          street: string
-          city: string
-        }
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(Array.from(flat.keys())).toEqual(['name', 'address', 'address.street', 'address.city'])
-    // address is intermediate (structure)
-    expect(flat.get('address')!.intermediate).toBe(true)
-    // sub-paths are leaves
-    expect(flat.get('address.street')!.intermediate).toBeFalsy()
-    expect(flat.get('address.city')!.intermediate).toBeFalsy()
-  })
-
-  it('should flatten named nested type via ref with intermediate entry', () => {
+describe('flatDefinitions', () => {
+  it('finds the props of a path through nested structures, references and arrays', () => {
     const doc = createDoc(`
       interface Address {
         street: string
-        city: string
+        geo: { lat: number }
       }
-
-      @db.table "test"
       interface User {
         name: string
         home: Address
+        contacts: { email: string }[]
+        homes: Address[][]
       }
     `)
-    const node = getInterface(doc, 'User')
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(Array.from(flat.keys())).toEqual(['name', 'home', 'home.street', 'home.city'])
-    expect(flat.get('home')!.intermediate).toBe(true)
-    expect(flat.get('home.street')!.intermediate).toBeFalsy()
+    const at = (path: string) => flatDefinitions(doc, getInterface(doc, 'User'))(path)
+    expect(at('name').map(d => d.prop.id)).toEqual(['name'])
+    expect(at('home.street').map(d => d.prop.id)).toEqual(['street'])
+    expect(at('home.geo.lat').map(d => d.prop.id)).toEqual(['lat'])
+    expect(at('contacts.email').map(d => d.prop.id)).toEqual(['email'])
+    expect(at('homes.geo.lat').map(d => d.prop.id)).toEqual(['lat'])
+    expect(at('missing')).toEqual([])
+    expect(at('name.length')).toEqual([])
+    // (the definition resolved: a reference to an interface is its structure)
+    expect(at('home')[0].def.entity).toBe('structure')
   })
 
-  it('should flatten through arrays with intermediate for complex elements', () => {
+  it('reads inherited props (`extends`) and merges (`&`)', () => {
     const doc = createDoc(`
-      @db.table "test"
-      interface User {
-        tags: string[]
-        contacts: {
-          name: string
-          email: string
-        }[]
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(Array.from(flat.keys())).toEqual(['tags', 'contacts', 'contacts.name', 'contacts.email'])
-    // tags is array of primitive — leaf
-    expect(flat.get('tags')!.intermediate).toBeFalsy()
-    // contacts is array of structure — intermediate
-    expect(flat.get('contacts')!.intermediate).toBe(true)
-    expect(flat.get('contacts.name')!.intermediate).toBeFalsy()
-  })
-
-  it('should stop flattening at @db.json fields', () => {
-    const doc = createDoc(`
-      @db.table "test"
-      interface User {
-        name: string
-        @db.json
-        metadata: {
-          key: string
-          value: string
-        }
-        @db.json
-        items: {
-          label: string
-        }[]
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    // metadata and items should be leaves — no sub-paths
-    expect(Array.from(flat.keys())).toEqual(['name', 'metadata', 'items'])
-    // @db.json fields are NOT intermediate — they are opaque leaf entries
-    expect(flat.get('metadata')!.intermediate).toBeFalsy()
-    expect(flat.get('items')!.intermediate).toBeFalsy()
-    // @db.json flag is set
-    expect(flat.get('metadata')!.dbJson).toBe(true)
-    expect(flat.get('items')!.dbJson).toBe(true)
-    expect(flat.get('name')!.dbJson).toBeFalsy()
-  })
-
-  it('should merge union branch paths with intermediate entry', () => {
-    const doc = createDoc(`
-      @db.table "test"
-      interface Data {
-        field: { a: string, b: number } | { a: number, c: boolean }
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    const keys = Array.from(flat.keys())
-    // Union of only structures — 'field' is intermediate
-    expect(keys).toContain('field')
-    expect(flat.get('field')!.intermediate).toBe(true)
-    expect(keys).toContain('field.a') // merged from both branches
-    expect(keys).toContain('field.b') // only in first branch
-    expect(keys).toContain('field.c') // only in second branch
-  })
-
-  it('should track optional fields with propagation', () => {
-    const doc = createDoc(`
-      @db.table "test"
-      interface User {
-        name: string
-        nickname?: string
-        address?: {
-          street: string
-        }
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(flat.get('name')!.optional).toBe(false)
-    expect(flat.get('nickname')!.optional).toBe(true)
-    // address is intermediate, still tracked as optional
-    expect(flat.get('address')!.optional).toBe(true)
-    expect(flat.get('address')!.intermediate).toBe(true)
-    // sub-path inherits optional from parent
-    expect(flat.get('address.street')!.optional).toBe(true)
-  })
-
-  it('should include inherited fields from extends', () => {
-    const doc = createDoc(`
-      interface Base {
-        id: string
-        createdAt: number
-      }
-
-      @db.table "test"
+      interface Base { id: string, meta: { created: number } }
+      interface Extra { note?: string }
+      type Merged = Base & Extra
       interface User extends Base {
         name: string
-        email: string
+        both: Merged
+        inPlace: Base & { flag: boolean }
       }
     `)
-    const node = getInterface(doc, 'User')
-    const flat = flattenInterfaceNode(doc, node)
-
-    const keys = Array.from(flat.keys())
-    expect(keys).toContain('id')
-    expect(keys).toContain('createdAt')
-    expect(keys).toContain('name')
-    expect(keys).toContain('email')
+    expect(writtenAt(doc, 'User', 'id')).toEqual(['string'])
+    expect(writtenAt(doc, 'User', 'meta.created')).toEqual(['number'])
+    expect(flatDefinitions(doc, getInterface(doc, 'User'))('both.note')[0].prop.id).toBe('note')
+    expect(flatDefinitions(doc, getInterface(doc, 'User'))('both.meta.created')).toHaveLength(1)
+    expect(flatDefinitions(doc, getInterface(doc, 'User'))('inPlace.flag')).toHaveLength(1)
+    expect(flatDefinitions(doc, getInterface(doc, 'User'))('inPlace.id')).toHaveLength(1)
   })
 
-  it('should skip pattern properties', () => {
+  it('collects every branch of a union (`| null` too) and tuple at one path', () => {
     const doc = createDoc(`
-      @db.table "test"
-      interface Config {
-        name: string
-        [*]: string
-      }
-    `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(Array.from(flat.keys())).toEqual(['name'])
-  })
-
-  it('should flatten deep nesting with intermediate entries', () => {
-    const doc = createDoc(`
-      @db.table "test"
+      interface A { a: string, b: number }
+      interface B { a: number, c: boolean }
       interface Data {
-        level1: {
-          level2: {
-            level3: string
-          }
-        }
+        field: A | B
+        nullable: A | null
+        pair: [A, B]
+        list: (A | B)[]
       }
     `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
-
-    expect(Array.from(flat.keys())).toEqual(['level1', 'level1.level2', 'level1.level2.level3'])
-    expect(flat.get('level1')!.intermediate).toBe(true)
-    expect(flat.get('level1.level2')!.intermediate).toBe(true)
-    expect(flat.get('level1.level2.level3')!.intermediate).toBeFalsy()
+    expect(writtenAt(doc, 'Data', 'field.a')).toEqual(['string', 'number'])
+    expect(writtenAt(doc, 'Data', 'field.b')).toEqual(['number'])
+    expect(writtenAt(doc, 'Data', 'field.c')).toEqual(['boolean'])
+    expect(writtenAt(doc, 'Data', 'nullable.a')).toEqual(['string'])
+    expect(writtenAt(doc, 'Data', 'pair.a')).toEqual(['string', 'number'])
+    expect(writtenAt(doc, 'Data', 'list.c')).toEqual(['boolean'])
   })
 
-  it('should return empty map for empty interface', () => {
+  it('follows chain references and recursive types one step at a time', () => {
     const doc = createDoc(`
-      @db.table "test"
-      interface Empty {}
+      interface Inner { deep: { x: string } }
+      interface Holder { inner: Inner }
+      interface Node {
+        value: string
+        next?: Node
+        chained: Holder.inner
+      }
     `)
-    const node = getInterface(doc)
-    const flat = flattenInterfaceNode(doc, node)
+    expect(writtenAt(doc, 'Node', 'chained.deep.x')).toEqual(['string'])
+    expect(writtenAt(doc, 'Node', 'next.next.next.value')).toEqual(['string'])
+  })
+})
 
-    expect(flat.size).toBe(0)
+describe('isPhantomNode', () => {
+  it('detects a phantom type, through a reference', () => {
+    const doc = createDoc(`
+      type P = phantom
+      interface T {
+        a: phantom
+        b: P
+        c: string
+      }
+    `)
+    const props = (getInterface(doc, 'T').getDefinition() as any).props
+    expect(isPhantomNode(doc, props.get('a').getDefinition())).toBe(true)
+    expect(isPhantomNode(doc, props.get('b').getDefinition())).toBe(true)
+    expect(isPhantomNode(doc, props.get('c').getDefinition())).toBe(false)
   })
 })
 

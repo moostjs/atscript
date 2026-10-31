@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 class TAddress {
   static __is_atscript_annotated_type = true
@@ -24,38 +24,17 @@ export class ExplorationForm {
   }
 }
 
-$("object", TAddress)
-  .prop(
-    "street",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Street")
-      .$type
-  ).prop(
-    "city",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "City")
-      .$type
-  )
-  .annotate("label", "Address")
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+$("object", TAddress).annotate("label", "Address")
+  .prop("street", $().designType("string")
+    .tags("string").annotate("label", "Street").$type)
+  .prop("city", $().designType("string")
+    .tags("string").annotate("label", "City").$type)
 
 $("object", ExplorationForm)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Name")
-      .$type
-  ).prop(
-    "addresses",
-    $("array")
-      .of($()
-          .refTo(TAddress)
-          .annotate("label", "Address")
-          .$type)
-      .annotate("label", "Addresses")
-      .$type
-  )
+  .prop("name", $().designType("string")
+    .tags("string").annotate("label", "Name").$type)
+  .prop("addresses", $("array").of($().ref(TAddress).$type).annotate("label", "Addresses").$type)
 
 // prettier-ignore-end

@@ -80,7 +80,7 @@ The extension reports errors in real-time as you type, with a short debounce del
 
 - Unused tokens — displayed as faded/dimmed text, helping you identify dead code
 
-Diagnostics update automatically when related files change. If you modify a type that other files import, those files are re-validated too.
+Diagnostics update automatically when related files change. If you modify a type that other files import, those files are re-validated too — directly or through other files. The same goes for `.as` files changed, created or deleted on disk while they are not open (a `git checkout`, a generator): the file is checked again (its problems cleared when it was deleted), and so is every file importing it, directly or not, including those whose import of it failed (`"./b" not found`). The problems shown are always those `asc` reports for the same files, each once.
 
 ## Navigation
 

@@ -58,7 +58,9 @@ beforeAll(async () => {
 
 describe('annotation ref arguments inherited across files are bound', () => {
   it('chain-ref-inherited annotation imports the target (exact import line)', () => {
-    expect(js['vh-view.as.js']).toContain('import { VhDict } from "./vh-dict.as"')
+    // P4B default format switch (MODEL intro, §1, §5): a chain ref is a reference that reads the
+    // inherited annotation through VhTicket.color's node; nothing is copied, so nothing is imported
+    expect(js['vh-view.as.js']).not.toMatch(/VhDict/)
   })
 
   it('chain-ref-inherited ref argument evaluates without ReferenceError', async () => {
@@ -87,12 +89,14 @@ describe('annotation ref arguments inherited across files are bound', () => {
   })
 
   it('imports are emitted once per origin even with several inherited annotations', () => {
-    expect(js['vh-view.as.js'].match(/import \{ VhDict \}/g)).toHaveLength(1)
+    // P4B default format switch (MODEL intro, §1, §5): inherited annotations are read through, not imported
+    expect(js['vh-view.as.js'].match(/import \{ VhDict \}/g) ?? []).toHaveLength(0)
   })
 
   it('a local name clash gets an aliased import', async () => {
-    expect(js['vh-clash.as.js']).toContain('import { VhDict as VhDict_1 } from "./vh-dict.as"')
-    expect(js['vh-clash.as.js']).toContain('target: () => VhDict_1')
+    // P4B default format switch (MODEL intro, §1, §5): the inherited annotation is read through the
+    // reference, so no import of the other VhDict (and no clash) is generated
+    expect(js['vh-clash.as.js']).not.toContain('VhDict_1')
     const { VhClash } = await import('../test/fixtures/vh-clash.as')
     const { VhDict } = await import('../test/fixtures/vh-dict.as')
     const vh = vhMeta(VhClash, 'color')
@@ -100,7 +104,8 @@ describe('annotation ref arguments inherited across files are bound', () => {
   })
 
   it('multi-hop (file → view → table) inheritance is bound', async () => {
-    expect(js['vh-multi-hop.as.js']).toContain('import { VhDict } from "./vh-dict.as"')
+    // P4B default format switch (MODEL intro, §1, §5): read through the references, not imported
+    expect(js['vh-multi-hop.as.js']).not.toMatch(/VhDict/)
     const { VhHop } = await import('../test/fixtures/vh-multi-hop.as')
     const { VhDict } = await import('../test/fixtures/vh-dict.as')
     const vh = vhMeta(VhHop, 'color')

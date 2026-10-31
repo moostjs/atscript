@@ -56,9 +56,11 @@ export async function build(config: Partial<TAtscriptConfigInput>) {
 
   const docs = documents.filter(Boolean) as AtscriptDoc[]
 
-  // Load all dependencies upfront so cross-file annotation validation works
+  // Load all dependencies upfront so cross-file annotation validation works (each document's
+  // imports checked once: the entries share what they checked)
+  const checked = new Set<string>()
   for (const doc of docs) {
-    await repo.checkDoc(doc)
+    await repo.checkImports(doc, checked)
   }
 
   return new BuildRepo(rootDir, repo, docs)

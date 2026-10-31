@@ -15,6 +15,11 @@
  *   jumps past the failed node. `q` (`IN_UNION` unset) picks between the two when only the
  *   runtime flags tell. BAIL is always `return 2`.
  * - Annotation values are closure constants `k<slot>` read from `K` once per bind.
+ * - The pre-check's union memo (`H.n` / `H.w` / `H.m`, see `unionWaste` in
+ *   validator-fast-check.ts), for the unions whose checks can repeat exponentially (see
+ *   {@link CheckEmitter.memoDefs}): inside a union branch such a union over an object counts its
+ *   failed branches and, once the call made the memo, is decided once per value and flags (key:
+ *   the factory constant `mk<def>`); a failed branch that reaches them and saw one fail is waste.
  */
 import { validIdentifier } from '../../codegen/utils'
 import { literalSource } from './build-layout'
@@ -79,8 +84,32 @@ const HELPERS: Array<[name: string, use: RegExp]> = [
 ]
 
 /** Source of the check factory `(K, H) => check` of `layout`. */
-export function emitCheckFactory(layout: TLayout): string {
-  return new CheckEmitter(layout).emit()
+/** The most props one function checks (see `CheckEmitter.objectBody`). */
+const PROPS_PER_FUNCTION = 64
+
+/** `sk`: a missing required prop is skipped (`partial: 'deep'`, or `partial: true` at the top). */
+function skLine(): string {
+  const top = F_PARTIAL_TOP | F_TOP
+  return `const sk = (f & ${F_PARTIAL_DEEP}) !== 0 || (f & ${top}) === ${top}`
+}
+
+/**
+ * What each `EXT` site of a layout reaches in its own module's check (by its first slot): bits
+ * {@link EXT_OBJECT_UNION}, {@link EXT_MULTI_UNION}, {@link EXT_MEMO_UNION} — so the memo decision
+ * (see `CheckEmitter.memoDefs`) is the one the whole type tree makes, wherever it is cut into
+ * modules' checks.
+ */
+export type TExtReach = (slot: number) => number
+
+/** An `EXT` site reaches a union over objects. */
+export const EXT_OBJECT_UNION = 1
+/** … a union branching into several branches reaching such unions (see `memoDefs`). */
+export const EXT_MULTI_UNION = 2
+/** … a union taking part in the memo. */
+export const EXT_MEMO_UNION = 4
+
+export function emitCheckFactory(layout: TLayout, extReach?: TExtReach): string {
+  return new CheckEmitter(layout, extReach).emit()
 }
 
 class CheckEmitter {
@@ -90,10 +119,21 @@ class CheckEmitter {
   private uid = 0
   /** Calls emitted so far (a union branch without calls cannot record strips). */
   private calls = 0
+  /** The functions checking the props of large objects (see `objectBody`). */
+  private readonly extra: string[] = []
+  /** Def index → a union taking part in the memo (see {@link memoDefs}). */
+  private readonly memo: boolean[]
+  /** Def index → reaches such a union (see {@link reaches}). */
+  private readonly reach: boolean[]
 
-  constructor(private readonly layout: TLayout) {
+  constructor(
+    private readonly layout: TLayout,
+    private readonly extReach: TExtReach = () => 0
+  ) {
     this.defs = layout[0]
     this.fn = this.functionDefs()
+    this.memo = this.memoDefs()
+    this.reach = this.reaching(d => this.memo[d], EXT_MEMO_UNION)
   }
 
   emit(): string {
@@ -103,6 +143,7 @@ class CheckEmitter {
         body.push(...this.defFunction(d))
       }
     }
+    body.push(...this.extra)
     const root = this.layout[1]
     const rootDef = root[2] >= 0 ? this.defs[root[2]][0] : -1
     if (
@@ -124,6 +165,10 @@ class CheckEmitter {
     const helpers = HELPERS.filter(([, use]) => use.test(code)).map(([h]) => `${h} = H.${h}`)
     if (helpers.length > 0) {
       head.push(`const ${helpers.join(', ')}`)
+    }
+    const keys = [...new Set(Array.from(code.matchAll(/\bmk(\d+)\b/g), m => m[1]))]
+    if (keys.length > 0) {
+      head.push(`const ${keys.map(d => `mk${d} = {}`).join(', ')}`)
     }
     const slots = [...new Set(Array.from(code.matchAll(/\bk(\d+)\b/g), m => Number(m[1])))]
       .filter(k => k < this.layout[2])
@@ -170,6 +215,113 @@ class CheckEmitter {
     return fn
   }
 
+  /**
+   * The defs reaching (through any child, transitively, themselves included) a def `is` holds of,
+   * or an EXT site reaching what `extBit` tells (see {@link TExtReach}). (Interpreted sites
+   * memoize by themselves.)
+   */
+  private reaching(is: (d: number) => boolean, extBit: number): boolean[] {
+    const defs = this.defs
+    const parents: number[][] = defs.map(() => [])
+    const out = defs.map(() => false)
+    const stack: number[] = []
+    defs.forEach((def, d) => {
+      let seed = is(d)
+      for (const site of childSites(def)) {
+        if (site[2] >= 0) {
+          parents[site[2]].push(d)
+        } else if (site[2] === EXT && (this.extReach(site[4]) & extBit) !== 0) {
+          seed = true
+        }
+      }
+      if (seed) {
+        out[d] = true
+        stack.push(d)
+      }
+    })
+    while (stack.length > 0) {
+      for (const p of parents[stack.pop()!]) {
+        if (!out[p]) {
+          out[p] = true
+          stack.push(p)
+        }
+      }
+    }
+    return out
+  }
+
+  /**
+   * The unions whose checks can repeat exponentially, which take part in the memo: a union whose
+   * branches (two or more) reach unions that do the same — a union branching into several
+   * branches that reach unions over objects (`multi`). Such unions nested in one another, or a
+   * recursive one, check the same values again from every branch above. Other unions do not: one
+   * branch reaching nested unions (a tree's `Leaf | Branch`), or branches reaching only
+   * unions of that kind (`{x: Shape} | {y: Shape}`), multiply nothing with depth.
+   */
+  private memoDefs(): boolean[] {
+    const defs = this.defs
+    const branchesReaching = (d: number, reach: boolean[], extBit: number) =>
+      (defs[d][1] as TSite[]).filter(site => this.siteReaches(site, reach, extBit)).length
+    const isUnion = (d: number) =>
+      defs[d][0] === D_UNION && this.mayHoldObject(defs[d][1] as TSite[])
+    const objectUnions = this.reaching(isUnion, EXT_OBJECT_UNION)
+    const multi = defs.map(
+      (_, d) => isUnion(d) && branchesReaching(d, objectUnions, EXT_OBJECT_UNION) >= 2
+    )
+    const multiReach = this.reaching(d => multi[d], EXT_MULTI_UNION)
+    return defs.map((_, d) => multi[d] && branchesReaching(d, multiReach, EXT_MULTI_UNION) >= 2)
+  }
+
+  /** Whether `site` reaches what `reach` marks (an EXT site: what `extBit` tells). */
+  private siteReaches(site: TSite, reach: boolean[], extBit: number): boolean {
+    return site[2] >= 0
+      ? reach[site[2]]
+      : site[2] === EXT && (this.extReach(site[4]) & extBit) !== 0
+  }
+
+  /** Whether `site` reaches a memoized union (see {@link memoDefs}). */
+  private reaches(site: TSite): boolean {
+    return this.siteReaches(site, this.reach, EXT_MEMO_UNION)
+  }
+
+  /** Whether a union of `items` may hold an object. */
+  private mayHoldObject(items: TSite[]): boolean {
+    return items.some(item => item[2] < 0 || this.defs[item[2]][0] !== D_FINAL)
+  }
+
+  /**
+   * The entry of a memoized union over `x`: `m` tells whether it takes part (an object inside
+   * a union branch: `nested`; its failed branches count, see {@link unionBranches}); `onKnown`
+   * handles a memoized outcome `t`. Outside union branches it is the outermost union: a new
+   * waste window.
+   */
+  private memoEntry(
+    m: string,
+    key: string,
+    x: string,
+    fl: string,
+    nested: string,
+    onKnown: string[]
+  ): string[] {
+    return [
+      `const ${m} = ${nested === 'true' ? '' : `${nested} && `}typeof ${x} === "object" && ${x} !== null`,
+      `if (${m}) {`,
+      '  if (H.m !== undefined) {',
+      `    t = H.mg(${key}, ${x}, ${fl}, o)`,
+      ...indent(onKnown, 4),
+      '  }',
+      nested === 'true' ? '}' : `} else if (!(${nested})) H.w = 0`,
+    ]
+  }
+
+  /** Flags passed to a callee. */
+  private flags(ctx: TCtx): string {
+    if (ctx.clearTop) {
+      return ctx.union ? `(f & ${~F_TOP}) | ${F_IN_UNION}` : `f & ${~F_TOP}`
+    }
+    return ctx.union ? `f | ${F_IN_UNION}` : 'f'
+  }
+
   private next(prefix: string): string {
     return `${prefix}${this.uid++}`
   }
@@ -208,10 +360,34 @@ class CheckEmitter {
         case D_UNION: {
           // 1: matched a non-literal branch (the caller applies its union-level constraints),
           // 3: matched a literal branch.
-          const branches = this.unionBranches(def[1] as TSite[], 'v', false, item => [
-            `return ${choose(this.literalExpr(item), '3', '1')}`,
-          ])
-          return [...branches, 'return 0']
+          const items = def[1] as TSite[]
+          if (!this.memo[d]) {
+            const branches = this.unionBranches(items, 'v', false, item => [
+              `return ${choose(this.literalExpr(item), '3', '1')}`,
+            ])
+            return [...branches, 'return 0']
+          }
+          const m = this.next('m')
+          const record = (code: string) =>
+            `if (${m} && H.m !== undefined) H.ms(mk${d}, v, f, o, ${code})`
+          const branches = this.unionBranches(
+            items,
+            'v',
+            false,
+            item => {
+              const code = choose(this.literalExpr(item), '3', '1')
+              return [record(code), `return ${code}`]
+            },
+            m
+          )
+          return [
+            ...this.memoEntry(m, `mk${d}`, 'v', 'f', `(f & ${F_IN_UNION}) !== 0`, [
+              'if (t >= 0) return t',
+            ]),
+            ...branches,
+            record('0'),
+            'return 0',
+          ]
         }
         case D_TUPLE: {
           return [...this.tuple(def[1] as TSite[], 'v', ROOT_CTX), 'return 1']
@@ -229,35 +405,55 @@ class CheckEmitter {
     })
   }
 
-  /** Mirrors `fastCheckObject` (+ `pendStrips` / `hasUnknownKey`). */
-  private objectBody(def: TDef): string[] {
+  /** An object def's props the checks visit (phantom props are unknown keys to the walk). */
+  private objectProps(def: TDef): Array<{ key: string; site: TSite }> {
     const sites = def[2] as TSite[]
-    const props = (def[1] as string[])
+    return (def[1] as string[])
       .map((key, i) => ({ key, site: sites[i] }))
       .filter(p => !this.isPhantom(p.site))
+  }
+
+  /** Mirrors `fastCheckObject` (+ `pendStrips` / `hasUnknownKey`). */
+  private objectBody(def: TDef): string[] {
+    const props = this.objectProps(def)
     const lines = [
       `if (${notObject('v')}) return 0`,
       // The walk reads the top-level object again after stripping it (an intersection).
       'if (pk.length !== 0) return 2',
     ]
-    if (props.some(p => p.site[0] === 0 || p.site[2] === INTERP)) {
-      // partial: 'deep', or partial: true at depth 0
-      const top = F_PARTIAL_TOP | F_TOP
-      lines.push(`const sk = (f & ${F_PARTIAL_DEEP}) !== 0 || (f & ${top}) === ${top}`)
+    if (
+      props.length <= PROPS_PER_FUNCTION &&
+      props.some(p => p.site[0] === 0 || p.site[2] === INTERP)
+    ) {
+      lines.push(skLine())
     }
     if (props.length > 0) {
       lines.push('let r = 1')
     }
-    for (const { key, site } of props) {
-      const p = this.next('P')
-      const x = this.next('x')
-      const access = validIdentifier.test(key) ? `v.${key}` : `v[${literalSource(key)}]`
-      lines.push(`${p}: {`, `  const ${x} = ${access}`)
-      if (site[0] === 0 || site[2] === INTERP) {
-        lines.push(`  if (${x} === undefined && sk) break ${p}`)
+    if (props.length <= PROPS_PER_FUNCTION) {
+      lines.push(...this.propChecks(props))
+    } else {
+      // (a large object: its props checked by functions of `PROPS_PER_FUNCTION` each — small
+      // functions the engine optimizes as soon as they are hot, whatever the object's size)
+      for (let i = 0; i < props.length; i += PROPS_PER_FUNCTION) {
+        const chunk = props.slice(i, i + PROPS_PER_FUNCTION)
+        const name = this.next('c')
+        this.extra.push(
+          ...this.fnLines(name, () => {
+            const body = this.propChecks(chunk)
+            return [
+              ...(body.some(l => l.includes('&& sk)')) ? [skLine()] : []),
+              'let r = 1',
+              ...body,
+              'return r',
+            ]
+          })
+        )
+        lines.push(
+          `t = ${name}(v, f, o)`,
+          'if (t !== 1) { if (t === 2) return 2; if (q) return 0; r = 0 }'
+        )
       }
-      const ctx = recordingCtx(`r = 0; break ${p}`, false, true)
-      lines.push(...indent(this.site(site, x, ctx)), '}')
     }
     if (props.length > 0) {
       // The walk never strips a failing object.
@@ -282,6 +478,23 @@ class CheckEmitter {
             '}',
           ]
     lines.push(`if ((f & ${F_ERROR | F_STRIP}) !== 0) {`, ...indent(scan), '}', 'return 1')
+    return lines
+  }
+
+  /** The checks of object props `props` (labeled blocks: a failure sets `r = 0`). */
+  private propChecks(props: Array<{ key: string; site: TSite }>): string[] {
+    const lines: string[] = []
+    for (const { key, site } of props) {
+      const p = this.next('P')
+      const x = this.next('x')
+      const access = validIdentifier.test(key) ? `v.${key}` : `v[${literalSource(key)}]`
+      lines.push(`${p}: {`, `  const ${x} = ${access}`)
+      if (site[0] === 0 || site[2] === INTERP) {
+        lines.push(`  if (${x} === undefined && sk) break ${p}`)
+      }
+      const ctx = recordingCtx(`r = 0; break ${p}`, false, true)
+      lines.push(...indent(this.site(site, x, ctx)), '}')
+    }
     return lines
   }
 
@@ -353,7 +566,7 @@ class CheckEmitter {
   private call(fn: string, x: string, ctx: TCtx): string[] {
     this.calls++
     return [
-      `t = ${fn}(${x}, ${flags(ctx)}, o)`,
+      `t = ${fn}(${x}, ${this.flags(ctx)}, o)`,
       `if (t !== 1) { if (t === 2) return 2; ${unblock(ctx.fail)} }`,
     ]
   }
@@ -378,11 +591,11 @@ class CheckEmitter {
       case D_UNION: {
         const constraints = this.unionConstraints(mask, shape, at, x, ctx.fail)
         if (!this.fn[d]) {
-          return this.union(def[1] as TSite[], { mask, shape, at }, constraints, x, ctx)
+          return this.union(def[1] as TSite[], { mask, shape, at }, constraints, x, ctx, d)
         }
         this.calls++
         const lines = [
-          `t = d${d}(${x}, ${flags(ctx)}, o)`,
+          `t = d${d}(${x}, ${this.flags(ctx)}, o)`,
           'if (t === 2) return 2',
           `if (t === 0) ${ctx.fail}`,
         ]
@@ -483,10 +696,6 @@ class CheckEmitter {
     for (const c of shape) {
       if (c === 'n') {
         lines.push(`if (!k${ks.patterns[p++]}.test(${x})) ${fail}`)
-      } else if (c === 's') {
-        // Stateful (`lastIndex`) regex: testing here would shift the walk's result.
-        lines.push('return 2')
-        break
       }
     }
     return lines
@@ -616,7 +825,9 @@ class CheckEmitter {
     items: TSite[],
     x: string,
     clearTop: boolean,
-    onMatch: (item: TSite) => string[]
+    onMatch: (item: TSite) => string[],
+    /** The memo local of a memoized union: its failed branches count (see `memoEntry`). */
+    m?: string
   ): string[] {
     const lines: string[] = []
     for (const item of items) {
@@ -627,7 +838,18 @@ class CheckEmitter {
       const calls = this.calls
       const fail = `break ${b}`
       const body = this.site(item, x, { fail, inUnionFail: fail, union: true, clearTop })
-      lines.push(`${b}: {`, ...indent([...body, ...onMatch(item)]), '}')
+      if (this.reaches(item)) {
+        // A failed branch that entered nested unions over objects wasted work (see the file
+        // comment).
+        const c = this.next('c')
+        lines.push(`const ${c} = H.n`, `${b}: {`, ...indent([...body, ...onMatch(item)]), '}')
+        lines.push(`if (H.n !== ${c}) H.wa()`)
+      } else {
+        lines.push(`${b}: {`, ...indent([...body, ...onMatch(item)]), '}')
+      }
+      if (m !== undefined) {
+        lines.push(`if (${m}) H.n++`)
+      }
       if (this.calls !== calls) {
         // The walk keeps the strips of a branch it rejects; the next branches would see them.
         lines.push('if (pk.length !== 0) return 2')
@@ -642,22 +864,54 @@ class CheckEmitter {
     keys: TSiteKeys,
     constraints: string[],
     x: string,
-    ctx: TCtx
+    ctx: TCtx,
+    d?: number
   ): string[] {
     const u = this.next('U')
-    const branches = this.unionBranches(items, x, ctx.clearTop, item => {
-      const lines: string[] = []
-      const literal = constraints.length > 0 ? this.literalExpr(item) : 'true'
-      if (literal === 'false') {
-        lines.push(...this.branchConstraints(item, keys, constraints, x, ctx.fail))
-      } else if (literal !== 'true') {
-        // Literal branches skip the union-level constraints.
-        lines.push(`if (!${literal}) {`, ...indent(constraints), '}')
-      }
-      lines.push(`break ${u}`)
-      return lines
-    })
-    return [`${u}: {`, ...indent([...branches, ctx.fail]), '}']
+    const memo = d !== undefined && this.memo[d]
+    const m = memo ? this.next('m') : undefined
+    const branches = this.unionBranches(
+      items,
+      x,
+      ctx.clearTop,
+      item => {
+        const lines: string[] = []
+        const literal = constraints.length > 0 ? this.literalExpr(item) : 'true'
+        if (literal === 'false') {
+          lines.push(...this.branchConstraints(item, keys, constraints, x, ctx.fail))
+        } else if (literal !== 'true') {
+          // Literal branches skip the union-level constraints.
+          lines.push(`if (!${literal}) {`, ...indent(constraints), '}')
+        }
+        lines.push(`break ${u}`)
+        return lines
+      },
+      m
+    )
+    if (m === undefined) {
+      return [`${u}: {`, ...indent([...branches, ctx.fail]), '}']
+    }
+    // A pass breaks out of `u` (recorded after it), a memoized pass out of `w`.
+    const w = this.next('W')
+    const fl = this.flags(ctx)
+    const record = (code: string) =>
+      `if (${m} && H.m !== undefined) H.ms(mk${d}, ${x}, ${fl}, o, ${code})`
+    const nested = ctx.union ? 'true' : `(f & ${F_IN_UNION}) !== 0`
+    const entry = this.memoEntry(m, `mk${d}`, x, fl, nested, [
+      `if (t === 1) break ${w}`,
+      `if (t === 0) ${ctx.fail}`,
+    ])
+    return [
+      `${w}: {`,
+      ...indent([
+        ...entry,
+        `${u}: {`,
+        ...indent([...branches, record('0'), ctx.fail]),
+        '}',
+        record('1'),
+      ]),
+      '}',
+    ]
   }
 
   /** Mirrors `checkItems`: every item is visited inside a union (BAIL beats FAIL). */
@@ -703,14 +957,6 @@ function recordingCtx(record: string, union: boolean, clearTop: boolean): TCtx {
     union,
     clearTop,
   }
-}
-
-/** Flags passed to a callee. */
-function flags(ctx: TCtx): string {
-  if (ctx.clearTop) {
-    return ctx.union ? `(f & ${~F_TOP}) | ${F_IN_UNION}` : `f & ${~F_TOP}`
-  }
-  return ctx.union ? `f | ${F_IN_UNION}` : 'f'
 }
 
 /** The statements of a `{ … }` block statement (other statements as they are). */

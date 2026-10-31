@@ -57,11 +57,11 @@ plugins: [ts({ jsonSchema: 'lazy' })]
 
 Controls how JSON Schema support is handled in generated code. On the frontend, pulling in the `buildJsonSchema` function adds unnecessary weight when you don't need it — so Atscript lets you choose the right trade-off for your use case.
 
-| Value               | Import added               | `toJsonSchema()` behavior                           |
-| ------------------- | -------------------------- | --------------------------------------------------- |
-| `false` _(default)_ | None                       | Throws a runtime error                              |
-| `'lazy'`            | `buildJsonSchema` imported | Computed on first call, cached                      |
-| `'bundle'`          | None                       | Pre-computed at build time, embedded as static JSON |
+| Value               | Import added                                                 | `toJsonSchema()` behavior                                                                                                          |
+| ------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `false` _(default)_ | None                                                         | Throws a runtime error                                                                                                             |
+| `'lazy'`            | `buildJsonSchema` imported                                   | Computed on first call, cached until the next metadata write                                                                       |
+| `'bundle'`          | `bundledSchemaOf` (with `buildJsonSchema` as its fallback)   | Pre-computed at build time, embedded as static JSON (built at runtime instead when the loaded `annotate` blocks differ, see below) |
 
 ```javascript
 // Default — no JSON schema overhead (best for frontend)
@@ -73,6 +73,10 @@ plugins: [ts({ jsonSchema: 'lazy' })]
 // Backend — pre-compute at build time for fastest runtime
 plugins: [ts({ jsonSchema: 'bundle' })]
 ```
+
+A pre-computed schema is the one `buildJsonSchema()` returns for the types as the build saw them: with the mutating `annotate` blocks of the module, of the modules it imports, and of the other modules of the build annotating its types, in their [fixed order](/packages/typescript/ad-hoc-annotations#two-blocks-setting-the-same-annotation). `toJsonSchema()` returns it while the modules whose blocks have applied are exactly the ones the build accounted for. Otherwise (a block's module is not loaded, or one the build did not see is) it builds the schema from the runtime types with `buildJsonSchema()`. This is why a bundle of `'bundle'` modules includes `buildJsonSchema`.
+
+A schema embedded at build time does not see changes made at runtime with `metadata.set()` or `annotate()`; `'lazy'` schemas are rebuilt after them. Call `buildJsonSchema(type)` for a schema of the type as it is now.
 
 Individual interfaces can also opt into build-time embedding via the `@emit.jsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
 
@@ -131,9 +135,9 @@ plugins: [ts({ moduleExtension: '.as.mjs' })]
 
 Emits a build-time compiled validator check for each type into the generated `.js`. `validate()` uses it automatically, and results stay the same as without it.
 
-| Value               | Generated `.js`                                         |
-| ------------------- | ------------------------------------------------------- |
-| `false` _(default)_ | Validation is interpreted at runtime                    |
+| Value               | Generated `.js`                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `false` _(default)_ | Interpreted at runtime, except types annotated with `@emit.compiledValidator`          |
 | `true`              | Adds a compiled check per type: faster validation of valid input, more code per module |
 
 ```javascript
@@ -141,7 +145,7 @@ Emits a build-time compiled validator check for each type into the generated `.j
 plugins: [ts({ compileValidators: true })]
 ```
 
-Keep it off for frontend bundles. `unplugin-atscript` can override it per build, for example to compile only the SSR build of a Vite app. See [Compiled Validators](/packages/typescript/compiled-validators) for when checks stay interpreted and how to change types at runtime safely.
+Keep it off for frontend bundles. While it is off, individual types can still opt in with the `@emit.compiledValidator` annotation. `unplugin-atscript` can override it per build, for example to compile only the SSR build of a Vite app. See [Compiled Validators](/packages/typescript/compiled-validators) for the per-type opt-in, when checks stay interpreted and how to change types at runtime safely.
 
 ## The `atscript.d.ts` File
 

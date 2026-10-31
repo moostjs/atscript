@@ -20,7 +20,7 @@ interface TAtscriptAnnotatedType<T = TAtscriptTypeDef, DataType = InferDataType<
 }
 ```
 
-`ref` is present on every node authored as a reference to another named type — nav props (`customer: Customer`), chain refs (`customerId: Customer.id`), array elements (`Line[]` → on `type.of`) and aliases (`export type X = Y`). `ref.type()` returns the referenced type; `ref.field` is the dot-joined chain, or `''` for a plain reference. Since 0.1.95 this holds for same-file and imported targets alike — earlier versions set `ref` on same-file targets only for chain refs.
+`ref` is present on every node authored as a reference to another named type — nav props (`customer: Customer`), chain refs (`customerId: Customer.id`), array elements (`Line[]` → on `type.of`), aliases with annotations of their own (`@meta.description 'x' export type X = Y`) and `annotate Y as X` copies. A bare alias (`export type X = Y`) is `Y` itself, so it has `Y`'s `ref` (none, for a declared type). `ref.type()` returns the referenced type; `ref.field` is the dot-joined chain, or `''` for a plain reference. Since 0.1.95 this holds for same-file and imported targets alike — earlier versions set `ref` on same-file targets only for chain refs.
 
 Generated interfaces expose this as static members:
 
@@ -31,6 +31,8 @@ Product.type // TAtscriptTypeObject — the type structure
 Product.metadata // TMetadataMap — top-level annotations
 Product.validator() // Validator<typeof Product> — with type guard support
 ```
+
+A reference node reads its structure from the referenced type and its `metadata` through it: see [Runtime Metadata](/plugin-development/runtime-metadata) for which nodes are shared and how a runtime write spreads.
 
 ## Type Kinds
 
@@ -126,7 +128,7 @@ const description = forAnnotatedType(someType, {
 | `tuple`                | `TAtscriptAnnotatedType<TAtscriptTypeComplex>` | `items` (positional types)                  |
 | `phantom` _(optional)_ | `TAtscriptAnnotatedType<TAtscriptTypeFinal>`   | Same as `final`, `designType === 'phantom'` |
 
-The optional `phantom` handler intercepts [phantom](/packages/typescript/primitives#phantom-type) types before they reach `final`. If omitted, phantom types fall through to `final`.
+The optional `phantom` handler intercepts [phantom](/packages/typescript/primitives#phantom) types before they reach `final`. If omitted, phantom types fall through to `final`.
 
 ### Recursive Walking
 
@@ -298,7 +300,11 @@ Each entry in the map is a full `TAtscriptAnnotatedType` — with metadata, tags
 
 **Union merging:** When multiple union branches contribute different types at the same path, `flattenAnnotatedType` merges them into a synthetic union type. For example, `{ a: string } | { a: number, b: string }` produces `a → union(string, number)` and `b → string`.
 
+**Intersections:** An intersection of objects is an object at runtime (the compiler writes the merged type), so `pt: { lat: number } & { lng: number }` produces `pt → object`, `pt.lat` and `pt.lng` (see [How a merge is built](/packages/typescript/interfaces-types#how-a-merge-is-built)). A node of kind `'intersection'` (two sides that each check something, or a type built by hand) is flattened item by item, as in 0.1.110.
+
 **Arrays:** The function recurses into array element types using the same path prefix (no `[]` suffix), so `items: { label: string }[]` produces `items.label → string`.
+
+**Recursion:** A type reached again on the same path — the declaration it names, else its definition (`next?: Node` inside `Node`) — is reported at that path and not expanded further; primitives are never cut. A merge is a type of its own: below `n?: A & B`, a reference to `A` is expanded once more. So is a reference to a prop of a type that reaches itself through that prop (`d?: { x?: T.d }` gives `d`, `d.x`, `d.x.x` and `d.x.s`, `d.s`), cut where the reference repeats.
 
 #### Options
 
@@ -330,13 +336,13 @@ const flatMap = flattenAnnotatedType(collectionType, {
 
 **`topLevelArrayTag`** marks array fields that are direct properties of the root object (not arrays nested inside other arrays or unions). This is useful for systems like MongoDB that treat top-level arrays differently.
 
-**`excludePhantomTypes`** controls whether [phantom](/packages/typescript/primitives#phantom-type) properties appear in the result. By default phantom types are included — form builders may want to render them as non-data UI elements (links, headings). Set to `true` when only data-bearing fields matter (e.g. database schemas).
+**`excludePhantomTypes`** controls whether [phantom](/packages/typescript/primitives#phantom) properties appear in the result. By default phantom types are included — form builders may want to render them as non-data UI elements (links, headings). Set to `true` when only data-bearing fields matter (e.g. database schemas).
 
 ## Type Guards
 
 - `isAnnotatedType(value)` — returns `true` if the value is a `TAtscriptAnnotatedType`
 - `isAnnotatedTypeOfPrimitive(type)` — returns `true` if the type resolves to a primitive shape (not object or array). Recursively checks union/intersection/tuple members.
-- `isPhantomType(def)` — returns `true` if the type is a [phantom](/packages/typescript/primitives#phantom-type) type (`kind === ''` and `designType === 'phantom'`)
+- `isPhantomType(def)` — returns `true` if the type is a [phantom](/packages/typescript/primitives#phantom) type (`kind === ''` and `designType === 'phantom'`)
 
 ## Default Data Generation
 
@@ -461,6 +467,12 @@ In `'example'` mode, arrays generate **one sample item** from the element type i
 ```
 
 If `@meta.example` is annotated on the array itself, that annotation takes priority over the generated item.
+
+### Recursive Types
+
+A recursive type (`next?: Node`, `children: Node[]`) is built down to the point where it would repeat. An optional prop leading back to a type being built is omitted (also in `'example'` mode), an array of it is empty, and a union takes its first branch that does not lead back. The result is always finite.
+
+A runtime intersection of object types (built by hand) gets the props of all its members.
 
 ## Next Steps
 

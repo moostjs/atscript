@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class TPrimitive {
   static __is_atscript_annotated_type = true
@@ -211,16 +211,17 @@ export class TObjectIntersection {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+let $i_TObjectIntersection_0, $i_TObjectIntersection_1
 $("", TPrimitive).designType("string")
   .tags("string")
 
 $("union", TPirmiitiveUn)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
   .item($().designType("number")
-      .tags("number")
-      .$type)
+    .tags("number").$type)
 
 $("", TLiteral)
   .designType("string")
@@ -232,175 +233,100 @@ $("", TNumber)
 
 $("tuple", TTuple1)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
 
 $("tuple", TTuple2)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
 
-$("array", TTupleArray)
-  .of($("tuple")
+$("array", TTupleArray).of($("tuple")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($().designType("string")
+      .tags("string").$type).$type)
+
+$("array", TArray).of($().designType("string")
+    .tags("string").$type)
+
+$("array", TArray2).of($("array").of($().designType("string")
+      .tags("string").$type).$type)
+
+$("array", TArray3).of($("array").of($("array").of($().designType("string")
+        .tags("string").$type).$type).$type)
+
+$("array", TComplexArray).of($("union")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($().designType("number")
+      .tags("number").$type).$type)
+
+$("array", TComplexArray2).of($("array").of($("union")
       .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .$type)
-
-$("array", TArray)
-  .of($().designType("string")
-      .tags("string")
-      .$type)
-
-$("array", TArray2)
-  .of($("array")
-      .of($().designType("string")
-          .tags("string")
-          .$type)
-      .$type)
-
-$("array", TArray3)
-  .of($("array")
-      .of($("array")
-          .of($().designType("string")
-              .tags("string")
-              .$type)
-          .$type)
-      .$type)
-
-$("array", TComplexArray)
-  .of($("union")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
+        .tags("string").$type)
       .item($().designType("number")
-          .tags("number")
-          .$type)
-      .$type)
+        .tags("number").$type).$type).$type)
 
-$("array", TComplexArray2)
-  .of($("array")
-      .of($("union")
-          .item($().designType("string")
-              .tags("string")
-              .$type)
-          .item($().designType("number")
-              .tags("number")
-              .$type)
-          .$type)
-      .$type)
-
-$("array", TComplexArray3)
-  .of($("array")
-      .of($("array")
-          .of($("union")
-              .item($().designType("string")
-                  .tags("string")
-                  .$type)
-              .item($().designType("number")
-                  .tags("number")
-                  .$type)
-              .$type)
-          .$type)
-      .$type)
+$("array", TComplexArray3).of($("array").of($("array").of($("union")
+        .item($().designType("string")
+          .tags("string").$type)
+        .item($().designType("number")
+          .tags("number").$type).$type).$type).$type)
 
 $("union", TComplexArray4)
   .item($().designType("string")
-      .tags("string")
-      .$type)
-  .item($("array")
-      .of($().designType("number")
-          .tags("number")
-          .$type)
-      .$type)
+    .tags("string").$type)
+  .item($("array").of($().designType("number")
+      .tags("number").$type).$type)
 
 $("union", TComplexArray5)
-  .item($("array")
-      .of($().designType("string")
-          .tags("string")
-          .$type)
-      .$type)
+  .item($("array").of($().designType("string")
+      .tags("string").$type).$type)
   .item($().designType("number")
-      .tags("number")
-      .$type)
+    .tags("number").$type)
 
 $("object", TObject)
-  .prop(
-    "prop1",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "prop2",
-    $().designType("number")
-      .tags("number")
-      .optional()
-      .$type
-  ).prop(
-    "nested",
-    $("object")
-      .prop(
-        "prop3",
-        $().designType("boolean")
-          .tags("boolean")
-          .$type
-      ).prop(
-        "prop4",
-        $().designType("boolean")
-          .tags("boolean")
-          .optional()
-          .$type
-      )
-      .$type
-  )
+  .prop("prop1", $().designType("string")
+    .tags("string").$type)
+  .prop("prop2", $().designType("number")
+    .tags("number").optional().$type)
+  .prop("nested", $("object")
+    .prop("prop3", $().designType("boolean")
+      .tags("boolean").$type)
+    .prop("prop4", $().designType("boolean")
+      .tags("boolean").optional().$type).$type)
 
 $("union", TObjectUnion1)
   .item($("object")
-      .prop(
-        "a",
-        $()
-          .designType("string")
-          .value("a")
-          .$type
-      )
-      .$type)
+    .prop("a", $()
+      .designType("string")
+      .value("a").$type).$type)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
 
 $("union", TObjectUnion2)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
   .item($("object")
-      .prop(
-        "a",
-        $()
-          .designType("string")
-          .value("a")
-          .$type
-      )
-      .$type)
+    .prop("a", $()
+      .designType("string")
+      .value("a").$type).$type)
+
+$i_TObjectIntersection_0 = $("object")
+  .prop("a", $()
+    .designType("string")
+    .value("a").$type).$type
+
+$i_TObjectIntersection_1 = $("object")
+  .prop("b", $()
+    .designType("string")
+    .value("b").$type).$type
 
 $("object", TObjectIntersection)
-  .prop(
-    "a",
-    $()
-      .designType("string")
-      .value("a")
-      .$type
-  ).prop(
-    "b",
-    $()
-      .designType("string")
-      .value("b")
-      .$type
-  )
+  .prop("a", $f($i_TObjectIntersection_0, "a"))
+  .prop("b", $f($i_TObjectIntersection_1, "b"))
 
+export { $i_TObjectIntersection_0 }
+export { $i_TObjectIntersection_1 }
 // prettier-ignore-end

@@ -5,19 +5,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { afterRawWrite } from '../../test/compiled-engine'
 import {
   annotate,
-  cloneRefProp,
   defineAnnotatedType as $,
   type TAtscriptAnnotatedType,
   type TAtscriptTypeObject,
 } from '../runtime/annotated-type'
 import { Validator, type TValidatorOptions } from '../runtime/validator'
-import { prepareFixtures } from '../test-utils'
-
-/**
- * Reference: a subclass never takes the allocation-free pre-check nor the literal-union
- * shortcut, so it runs exactly the original error-collecting walk.
- */
-class WalkValidator extends Validator {}
+import { prepareFixtures, rng, WalkValidator } from '../test-utils'
 
 // ── fixtures ────────────────────────────────────────────────────────────────
 
@@ -348,18 +341,6 @@ function makeTree() {
 
 // ── random value generation ─────────────────────────────────────────────────
 
-function rng(seed: number) {
-  // mulberry32 — the int32 / uint32 coercions are intentional
-  // oxlint-disable unicorn/prefer-math-trunc
-  return () => {
-    seed = (seed + 0x6d_2b_79_f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296
-  }
-  // oxlint-enable unicorn/prefer-math-trunc
-}
-
 const POOL: unknown[] = [
   '',
   '   ',
@@ -461,7 +442,11 @@ function genFromType(def: TAtscriptAnnotatedType, r: () => number, depth = 0): u
       return genFromType(t.items[Math.floor(r() * t.items.length)], r, depth)
     }
     case 'intersection': {
-      return genFromType(t.items[0], r, depth)
+      // Objects: a value for every member (their props merged), else the first member's.
+      const items = t.items as TAtscriptAnnotatedType[]
+      return items.every(i => i.type.kind === 'object' || i.type.kind === 'intersection')
+        ? Object.assign({}, ...items.map(i => genFromType(i, r, depth)))
+        : genFromType(items[0], r, depth)
     }
   }
   return undefined
@@ -668,6 +653,45 @@ describe('Validator fast path — equivalence with the full walk', { timeout: 30
   it('unions, tuples, intersections, nullable: randomized', () =>
     fuzz(makeUnions(), validUnions, 2))
   it('misc primitives, patterns, arrays, phantom: randomized', () => fuzz(makeMisc(), validMisc, 3))
+  it('intersections of objects (nested, in arrays, unions, recursive): randomized', () => {
+    const inter = (...items: TAtscriptAnnotatedType[]) => {
+      const t = $('intersection')
+      items.forEach(i => t.item(i))
+      return t.$type
+    }
+    const node = obj({ name: str({ 'expect.minLength': { length: 2 } }).$type }).$type
+    const extra = obj({ tag: str().optional().$type }).$type
+    const both = inter(node, extra)
+    // A recursive one, as the compiler emits `children?: (Node & Extra)[]`.
+    ;(node.type as any).props.set('children', arr(both).optional().$type)
+    const t = obj({
+      both,
+      nested: inter(
+        inter(obj({ x: num().$type }).$type, obj({ y: str().optional().$type }).$type),
+        obj({ z: bool().optional().$type }).$type
+      ),
+      list: arr(inter(obj({ a: num().$type }).$type, obj({ b: num().optional().$type }).$type))
+        .$type,
+      either: union(
+        inter(obj({ k: lit(1).$type }).$type, obj({ v: num().$type }).$type),
+        obj({ k: lit(2).$type }).$type
+      ).$type,
+    }).$type
+    fuzz(
+      t,
+      () => ({
+        both: {
+          name: 'ab',
+          tag: 't',
+          children: [{ name: 'cd', children: [{ name: 'ef', tag: 'x' }] }],
+        },
+        nested: { x: 1, y: 'y', z: true },
+        list: [{ a: 1, b: 2 }, { a: 3 }],
+        either: { k: 1, v: 2 },
+      }),
+      10
+    )
+  })
   it('union-level constraints and optional @meta.required: randomized', () =>
     fuzz(makeUnionConstraints(), validUnionConstraints, 8))
   it('union-level constraints in nested / intersected / tupled / mixed unions: randomized', () =>
@@ -821,16 +845,17 @@ describe('Validator fast path — equivalence with the full walk', { timeout: 30
     expect(new Validator(t).validate({ ...validMisc(), nev: 1 }, true)).toBe(false)
   })
 
-  it('stateful (g) patterns keep the walk semantics', () => {
-    // distinct pattern strings → distinct cached RegExp objects (lastIndex is shared per regex)
-    const fast = new Validator(str({ 'expect.pattern': { pattern: 'ab', flags: 'g' } }).$type)
-    const walk = new WalkValidator(
-      str({ 'expect.pattern': { pattern: 'a(?:b)', flags: 'g' } }).$type
-    )
-    const r1 = [fast.validate('ab', true), fast.validate('ab', true), fast.validate('ab', true)]
-    const r2 = [walk.validate('ab', true), walk.validate('ab', true), walk.validate('ab', true)]
-    expect(r1).toEqual([true, false, true])
-    expect(r1).toEqual(r2)
+  it('stateful (g / y) patterns give the same result on every call', () => {
+    // distinct pattern strings → distinct cached RegExp objects
+    for (const flags of ['g', 'y', 'gy']) {
+      const fast = new Validator(str({ 'expect.pattern': { pattern: 'ab', flags } }).$type)
+      const walk = new WalkValidator(str({ 'expect.pattern': { pattern: 'a(?:b)', flags } }).$type)
+      const r1 = [fast.validate('ab', true), fast.validate('ab', true), fast.validate('ab', true)]
+      const r2 = [walk.validate('ab', true), walk.validate('ab', true), walk.validate('ab', true)]
+      // it used to be [true, false, true]: `test` resumed from the previous match
+      expect(r1).toEqual([true, true, true])
+      expect(r2).toEqual(r1)
+    }
   })
 
   it('uses the pre-check for valid values and the walk for invalid ones', () => {
@@ -1070,20 +1095,6 @@ describe('Validator fast path — metadata / structure mutated after first valid
       false
     )
   })
-  it('cloneRefProp() then annotate the clone', () => {
-    check(
-      t => {
-        cloneRefProp(t.type, 'billing')
-        annotate(
-          (prop(t, 'billing').type as TAtscriptTypeObject).props.get('city')!.metadata,
-          'expect.minLength',
-          50
-        )
-      },
-      validOrder(),
-      false
-    )
-  })
   it('propPattern added later', () => {
     const v = validOrder()
     v['x-a'] = 'too long'
@@ -1254,17 +1265,6 @@ describe('Validator fast path — metadata / structure mutated after first valid
     expect(v.validate(tree(6), true)).toBe(false)
     compare(node.$type, {}, tree(6))
   })
-  it('lazy ref resolved after the validator was created', () => {
-    const box: { target?: TAtscriptAnnotatedType } = {}
-    const holder = $('object')
-    const ref = $().refTo(() => box.target as any)
-    holder.prop('r', ref.$type)
-    const v = new Validator(holder.$type)
-    box.target = obj({ x: num({ 'expect.min': 2 }).$type }).$type
-    expect(v.validate({ r: { x: 3 } }, true)).toBe(true)
-    expect(v.validate({ r: { x: 1 } }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'r.x', message: 'Expected minimum 2, got 1' }])
-  })
 })
 
 describe('Validator literal-union shortcut', () => {
@@ -1320,7 +1320,7 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     const address = obj({
       street: str({ 'expect.minLength': 1 }).$type,
       zip: str({ 'expect.pattern': { pattern: '^\\d{5}$' } }).$type,
-      geo: $().refTo(geo).optional().$type,
+      geo: $().ref(geo).optional().$type,
       hidden: prim('phantom').$type,
     }).$type
     const item = obj({
@@ -1341,7 +1341,7 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     return obj({
       id: str().$type,
       address,
-      billing: $().refTo(address).optional().$type,
+      billing: $().ref(address).optional().$type,
       items: arr(item).$type,
       pay: union(card, paypal).$type,
       payments: arr(union(card, paypal, nul).$type).$type,

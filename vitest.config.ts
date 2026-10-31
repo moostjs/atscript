@@ -18,6 +18,8 @@ export default defineConfig({
   test: {
     // `__DYE_*` are compile-time defines of the dye bundler plugin — specs run the sources
     setupFiles: ['./packages/typescript/test/dye-stub.ts'],
+    // the build-time realm's runtime, bundled from the sources (see `src/codegen/realm.ts`)
+    globalSetup: ['./packages/typescript/test/realm-runtime.setup.ts'],
     // Generated `.as.js` fixtures share the runtime under test (incl. the mutation tracking
     // of compiled validator checks) instead of the built dist.
     alias: {

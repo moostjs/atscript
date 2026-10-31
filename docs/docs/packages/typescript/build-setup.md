@@ -149,7 +149,13 @@ Everything else (primitives, annotations, plugins, `include`/`exclude`) lives in
 3. **Runtime JS** — for each imported `.as` it emits the runtime metadata module (the same output as `asc -f js`)
 4. **Import Resolution** — lets you import `.as` files directly in TypeScript/JavaScript
 
-In development the plugin compiles on demand with hot module replacement (native on Vite/Webpack/Rspack/Farm; via watch mode on Rollup/Rolldown). In production it pre-compiles during the build.
+In development the plugin compiles on demand with hot module replacement (native on Vite/Webpack/Rspack/Farm; via watch mode on Rollup/Rolldown). In production it pre-compiles during the build. With Vite, editing an `.as` file also re-generates the `.as` modules importing it, directly or not, whose generated code can depend on it (those reading its definitions, and all of them when its imports changed), and reloads those whose generated code changed — in the client and the SSR environments, with or without HMR (for example a server-side module runner that re-imports the app). Modules that only reference its types keep their code, so an edit stays fast in large projects. Deleting an `.as` file and creating it again reloads the modules importing it.
+
+**Editing a module with `annotate` blocks reloads the page in full.** A mutating block writes into its target type when its module loads, and there is no undo, so the plugin does not hot-update such a module: a change to a file that has (or had) mutating `annotate` blocks, or to a file whose re-evaluation would run blocks on types it does not re-evaluate, triggers a full page reload, and every module is loaded fresh. Ordinary type edits still hot-update.
+
+### Import cycles need native ES modules
+
+The generated `.as.js` modules are ES modules. `.as` files that import each other (an import cycle) work under native ESM — Vite, Rollup, Rolldown, Node.js `import`. A bundler or test runner that rewrites the generated code to CommonJS (`require`) handles `.as` modules without import cycles only; for a cycle, keep the generated modules ESM. `@atscript/typescript/utils` itself ships both ESM and CommonJS builds.
 
 ::: warning Type artifacts are not written by the bundler plugin
 `unplugin-atscript` never writes `.as.d.ts` or the project-level `atscript.d.ts` to disk. For type checking and IDE support, generate types with the [CLI](/packages/typescript/cli): `asc -f dts` (e.g. as a `postinstall` and pre-build step), or let the [VSCode extension](/packages/vscode/) regenerate them on save. (Declaration *bundling* in library builds is a separate concern — see [below](#library-builds-with-declaration-bundling).)
@@ -186,6 +192,12 @@ import { t as User } from './user-ABC123.mjs'
 ```
 
 If you see this, the plugin was not wired into the declaration build (or you are on an `unplugin-atscript` version that predates declaration support).
+
+## Packages Built with an Earlier Version
+
+Generated `.as.js` modules are built against the runtime of the version that generated them. **Rebuild `.as` packages built with atscript 0.1.110 or earlier** before using them with this version: their modules call builder methods the runtime no longer has (`refTo`, `cloneRefProp`). Rebuild every package you depend on that ships generated `.as` code; there is no compatibility mode.
+
+The same goes for code of your own that builds types by hand: `defineAnnotatedType().refTo(…)` and `cloneRefProp` are removed from `@atscript/typescript/utils`. Reference a type with `defineAnnotatedType().ref(Target)` (or `.ref(Target, ['field'])` for a chain reference): the node reads its structure and annotations from `Target`.
 
 ## Bundling for Production
 

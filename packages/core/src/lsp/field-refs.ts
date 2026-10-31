@@ -130,7 +130,9 @@ function resolveFieldPath(
     return undefined
   }
   const prop = parent.def.props.get(name)
-  return prop && { typeName, range: segment.range, prop, doc: parent.doc }
+  return (
+    prop && { typeName, range: segment.range, prop, doc: parent.doc.declaringDoc(prop, parent.doc) }
+  )
 }
 
 /**

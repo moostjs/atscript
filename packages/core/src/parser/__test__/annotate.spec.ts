@@ -163,7 +163,7 @@ export annotate MyInterface as MyInterface2 {
     expect(doc.exports.has('MyInterface2')).toBe(true)
   })
 
-  it('getAnnotateNodesFor returns matching annotate nodes', () => {
+  it('annotate nodes keep their target name', () => {
     const source = `
 interface MyInterface { prop1: string }
 annotate MyInterface {
@@ -177,7 +177,9 @@ annotate MyInterface as MyInterface2 {
 `
     const doc = new AtscriptDoc('test', {})
     doc.update(source)
-    const annotateNodes = doc.getAnnotateNodesFor('MyInterface')
+    const annotateNodes = doc.nodes.filter(
+      n => n.entity === 'annotate' && (n as SemanticAnnotateNode).targetName === 'MyInterface'
+    )
     expect(annotateNodes).toHaveLength(2)
   })
 
@@ -413,12 +415,15 @@ annotate User as UserForm {
   firstName
 }
 `)
-    // UserForm should resolve to the same structure as User
+    // UserForm resolves to a copy of User's structure (its props, with the alias's
+    // annotations) — the same type to the intersections, its own annotations
     const userDef = doc.unwindType('User')
     const formDef = doc.unwindType('UserForm')
     expect(userDef?.def.entity).toBe('interface')
-    expect(formDef?.def.entity).toBe('interface')
-    expect(formDef?.def).toBe(userDef?.def)
+    expect(formDef?.def.entity).toBe('structure')
+    expect(formDef?.node?.entity).toBe('annotate')
+    expect([...(formDef!.def as any).props.keys()]).toEqual(['firstName', 'address'])
+    expect(doc.unwindType('UserForm')?.def).toBe(formDef?.def)
 
     // Chained resolution should also work
     const userCity = doc.unwindType('User', ['address', 'city'])

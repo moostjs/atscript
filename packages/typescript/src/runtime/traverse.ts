@@ -57,3 +57,32 @@ export function forAnnotatedType<R>(
     }
   }
 }
+
+/**
+ * One level of a walk over a type tree that may be arbitrarily deep: a generator that yields the
+ * walk of a child and is resumed with its result (see {@link runWalk}).
+ */
+export type TWalk<T> = Generator<TWalk<unknown>, T, unknown>
+
+/**
+ * Runs `walk`, and every child walk it yields, on an explicit stack: the depth of the tree costs
+ * heap, never the call stack (a 3000-deep chain of types serializes / deserializes / builds its
+ * data). A throw ends the whole walk.
+ */
+export function runWalk<T>(walk: TWalk<T>): T {
+  const stack: Array<TWalk<unknown>> = [walk]
+  let input: unknown
+  for (;;) {
+    const step = stack.at(-1)!.next(input)
+    if (step.done) {
+      stack.pop()
+      if (stack.length === 0) {
+        return step.value as T
+      }
+      input = step.value
+    } else {
+      stack.push(step.value)
+      input = undefined
+    }
+  }
+}

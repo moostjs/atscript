@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class PlaygroundForm {
   static __is_atscript_annotated_type = true
@@ -46,71 +46,33 @@ class MyString {
   }
 }
 
-$("object", PlaygroundForm)
-  .prop(
-    "addresses",
-    $("array")
-      .of($("union")
-          .item($()
-              .refTo(Address)
-              .annotate("label", "Address")
-              .$type)
-          .item($()
-              .refTo(Contact)
-              .annotate("label", "Contact")
-              .$type)
-          .item($()
-              .refTo(MyString)
-              .annotate("label", "My String Label")
-              .$type)
-          .$type)
-      .annotate("label", "Addresses /Contacts")
-      .$type
-  )
-  .annotate("label", "Playground Form")
-
-$("object", Address)
-  .prop(
-    "type",
-    $()
-      .designType("string")
-      .value("address")
-      .$type
-  ).prop(
-    "street",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "city",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
-  .annotate("label", "Address")
-
-$("object", Contact)
-  .prop(
-    "type",
-    $()
-      .designType("string")
-      .value("phone")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "phone",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
-  .annotate("label", "Contact")
-
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("", MyString).designType("string")
-  .tags("string")
-  .annotate("label", "My String Label")
+  .tags("string").annotate("label", "My String Label")
+
+$("object", PlaygroundForm).annotate("label", "Playground Form")
+  .prop("addresses", $("array").of($("union")
+      .item($().ref(Address).$type)
+      .item($().ref(Contact).$type)
+      .item($().ref(MyString).$type).$type).annotate("label", "Addresses /Contacts").$type)
+
+$("object", Address).annotate("label", "Address")
+  .prop("type", $()
+    .designType("string")
+    .value("address").$type)
+  .prop("street", $().designType("string")
+    .tags("string").$type)
+  .prop("city", $().designType("string")
+    .tags("string").$type)
+
+$("object", Contact).annotate("label", "Contact")
+  .prop("type", $()
+    .designType("string")
+    .value("phone").$type)
+  .prop("email", $().designType("string")
+    .tags("string").$type)
+  .prop("phone", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

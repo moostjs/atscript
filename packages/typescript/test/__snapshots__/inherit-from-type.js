@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 class TFirstName {
   static __is_atscript_annotated_type = true
@@ -46,40 +46,20 @@ export class ITarget {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("", TFirstName).designType("string")
-  .tags("string")
-  .annotate("label", "First Name")
+  .tags("string").annotate("label", "First Name")
 
 $("", TLastName).designType("string")
-  .tags("string")
-  .annotate("label", "Last Name")
+  .tags("string").annotate("label", "Last Name")
 
 $("", TAge).designType("number")
-  .tags("number")
-  .annotate("min", 18)
+  .tags("number").annotate("min", 18)
 
 $("object", ITarget)
-  .prop(
-    "firstName",
-    $()
-      .refTo(TFirstName)
-      .annotate("label", "First Name")
-      .$type
-  ).prop(
-    "lastName",
-    $()
-      .refTo(TLastName)
-      .annotate("label", "Last Name")
-      .annotate("label", "Last Name (optional)")
-      .annotate("required", false)
-      .optional()
-      .$type
-  ).prop(
-    "age",
-    $()
-      .refTo(TAge)
-      .annotate("min", 18)
-      .$type
-  )
+  .prop("firstName", $().ref(TFirstName).$type)
+  .prop("lastName", $().ref(TLastName).annotate("label", "Last Name (optional)").annotate("required", false).optional().$type)
+  .prop("age", $().ref(TAge).$type)
 
 // prettier-ignore-end

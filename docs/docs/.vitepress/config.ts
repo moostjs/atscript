@@ -442,6 +442,7 @@ export default defineConfig({
           items: [
             { text: 'Plugin Architecture', link: '/plugin-development/architecture' },
             { text: 'Plugin Hooks Reference', link: '/plugin-development/plugin-hooks' },
+            { text: 'Runtime Metadata', link: '/plugin-development/runtime-metadata' },
             {
               text: 'Validation Specification',
               link: '/plugin-development/validation-spec',

@@ -2,10 +2,37 @@ import { AnnotationSpec, annotationExample, nonNullishMembers } from '../annotat
 import type { TAnnotationsTree } from '../config'
 import { isArray, isPrimitive, isRef, type SemanticNode } from '../parser/nodes'
 import type { TMessages } from '../parser/types'
+import { statefulRegexFlagsMessage } from '../parser/utils'
 
 const NULLABLE_NOTE =
   'Also allowed on a nullable field (`T | null`, `T | undefined`): `null` passes, ' +
   'any other value must satisfy the constraint.'
+
+/** Whether `flags` are flags of a JS regular expression. */
+function validFlags(flags: string): boolean {
+  try {
+    new RegExp('', flags)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Whether `pattern` compiles with `flags` as the runtime compiles it: as written, and with `y`,
+ * anchored at the start of the value without `g` / `y` (see the runtime's `statelessRegExp`).
+ */
+function compiles(pattern: string, flags: string): boolean {
+  try {
+    new RegExp(pattern, flags)
+    if (flags.includes('y')) {
+      new RegExp(`^(?:${pattern})`, flags.replace(/[gy]/g, ''))
+    }
+    return true
+  } catch {
+    return false
+  }
+}
 
 /** `@expect.min` / `max` / `exclusiveMin` / `exclusiveMax`: a number bound plus an optional message. */
 function numberBoundSpec(
@@ -135,6 +162,8 @@ export const expectAnnotations: TAnnotationsTree = {
         optional: true,
         type: 'string',
         values: [
+          // (no flags: lets a message follow)
+          '',
           'g',
           'gi',
           'gim',
@@ -210,18 +239,22 @@ export const expectAnnotations: TAnnotationsTree = {
     ],
     validate(mainToken, args) {
       if (args[0]) {
-        try {
-          new RegExp(args[0].text)
-          return []
-        } catch (error) {
+        // Compiled with its flags, like the runtime (`u` changes what is valid: `a{`, `\\-`);
+        // flags that are not valid are reported by the argument check (their values).
+        const flags = args[1] && validFlags(args[1].text) ? args[1].text : ''
+        if (!compiles(args[0].text, flags)) {
           return [
             {
-              message: 'Invalid regular expression',
+              message: flags
+                ? `Invalid regular expression with flags "${flags}"`
+                : 'Invalid regular expression',
               range: args[0].range,
               severity: 1,
             },
           ]
         }
+        const flagsMessage = args[1] && statefulRegexFlagsMessage(args[1].text, 'value')
+        return flagsMessage ? [{ message: flagsMessage, range: args[1].range, severity: 2 }] : []
       }
       return []
     },
@@ -272,7 +305,7 @@ export const expectAnnotations: TAnnotationsTree = {
         let def: SemanticNode | undefined = definition
         let defDoc = doc
         if (isRef(definition)) {
-          const unwound = doc.unwindType(definition.id!, definition.chain)
+          const unwound = doc.unwindRef(definition)
           def = unwound?.def
           defDoc = unwound?.doc || doc
         }
@@ -338,7 +371,7 @@ export const expectAnnotations: TAnnotationsTree = {
         }
         let wrongType = false
         if (isRef(definition)) {
-          const def = doc.unwindType(definition.id!, definition.chain)?.def
+          const def = doc.unwindRef(definition)?.def
           if (isPrimitive(def) && !['string', 'number'].includes(def.config.type as string)) {
             wrongType = true
           }

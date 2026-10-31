@@ -92,4 +92,4 @@ vitest run -u                            # Update snapshots
 - **`CodePrinter`**: all renderers use indentation tracking. Never construct output strings manually.
 - **Global `AtscriptMetadata` interface**: generated `atscript.d.ts` provides typed metadata keys.
 - **`jsonSchema` option**: `false` (default, no support), `'lazy'` (runtime compute + cache), or `'bundle'` (build-time embed). `@emit.jsonSchema` annotation overrides per interface.
-- **Type `id`**: Every interface/type/annotate-alias gets a `static id` string on the generated class and an `id` field on `TAtscriptAnnotatedType`. Used by `buildJsonSchema()` to extract named object types into `$defs` and reference via `$ref`. The `id()` builder method sets it programmatically. Carried through `refTo()` and preserved in serialization.
+- **Type `id`**: Every interface/type/annotate-alias gets a `static id` string on the generated class and an `id` field on `TAtscriptAnnotatedType`. Used by `buildJsonSchema()` to extract named object types into `$defs` and reference via `$ref`. The `id()` builder method sets it programmatically. Carried through `ref()` and preserved in serialization.

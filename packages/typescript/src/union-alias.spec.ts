@@ -35,15 +35,16 @@ describe('type alias runtime type (refTo in-place base patch)', () => {
     const { DealerStatus } = await import('../test/fixtures/union-alias.as')
     expect(DealerStatus.type.kind).toBe('union')
     expect(literalValues(DealerStatus)).toEqual(['ACTIVE', 'INACTIVE'])
-    // alias keeps its own id, not the target's
-    expect(DealerStatus.id).toBe('DealerStatus')
+    // MODEL §10 D3: a bare plain alias IS its target in the generated JS (its id is the target's)
+    expect(DealerStatus.id).toBe('EntityStatus')
   })
 
   it('same-file alias of a union resolves to a union (eager refTo)', async () => {
     const { LocalAlias } = await import('../test/fixtures/union-alias.as')
     expect(LocalAlias.type.kind).toBe('union')
     expect(literalValues(LocalAlias)).toEqual(['LO', 'HI'])
-    expect(LocalAlias.id).toBe('LocalAlias')
+    // MODEL §10 D3: a bare plain alias IS its target
+    expect(LocalAlias.id).toBe('LocalStatus')
   })
 
   it('a field typed as a union alias flattens to a union (value-help restored)', async () => {
@@ -71,27 +72,23 @@ describe('type alias runtime type (refTo in-place base patch)', () => {
     expect(flat.get('status')!.type.kind).toBe(flat.get('inlineStatus')!.type.kind)
   })
 
-  it('object alias resolves to an object, keeps its own id, and is cloned (no leak)', async () => {
+  it("object alias resolves to an object, keeps its own id, and shares the target's props", async () => {
     const { ProfileAlias } = await import('../test/fixtures/union-alias.as')
     const { Profile } = await import('../test/fixtures/union-alias-common.as')
 
     expect(ProfileAlias.type.kind).toBe('object')
     expect([...asObject(ProfileAlias).props.keys()]).toEqual(['name', 'age'])
 
-    // distinct ids -> distinct json-schema $defs (id must NOT be clobbered to the target's)
-    expect(ProfileAlias.id).toBe('ProfileAlias')
-    expect(Profile.id).toBe('Profile')
+    // MODEL §10 D3: a bare plain alias IS its target (one class, the target's id)
+    expect(ProfileAlias).toBe(Profile)
+    expect(ProfileAlias.id).toBe('Profile')
 
     // type-level annotations are preserved on the alias...
     expect(asObject(ProfileAlias).props.get('name')!.metadata.get('meta.label')).toBe('Full Name')
 
-    // ...but the alias does NOT share the target's nodes/maps by reference, so mutating
-    // ad-hoc annotations on the alias cannot leak onto the referenced type.
-    expect(ProfileAlias.type).not.toBe(Profile.type)
-    expect(asObject(ProfileAlias).props.get('name')).not.toBe(asObject(Profile).props.get('name'))
-    expect(asObject(ProfileAlias).props.get('name')!.metadata).not.toBe(
-      asObject(Profile).props.get('name')!.metadata
-    )
+    // An alias is its target (MODEL §10 D3): the target's def and prop nodes themselves.
+    expect(ProfileAlias.type).toBe(Profile.type)
+    expect(asObject(ProfileAlias).props.get('name')).toBe(asObject(Profile).props.get('name'))
   })
 
   it('object alias builds a non-empty json schema', async () => {

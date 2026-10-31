@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class MyForm {
   static __is_atscript_annotated_type = true
@@ -13,40 +13,18 @@ export class MyForm {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", MyForm)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Name")
-      .$type
-  ).prop(
-    "info",
-    $().designType("phantom")
-      .tags("paragraph", "ui")
-      .annotate("label", "Info paragraph")
-      .annotate("component", "paragraph")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("email", "string")
-      .annotate("label", "Email")
-      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-      .$type
-  ).prop(
-    "resetPassword",
-    $().designType("phantom")
-      .tags("action", "ui")
-      .annotate("label", "Reset password")
-      .annotate("component", "link")
-      .$type
-  ).prop(
-    "optional",
-    $().designType("string")
-      .tags("string")
-      .optional()
-      .$type
-  )
+  .prop("name", $().designType("string")
+    .tags("string").annotate("label", "Name").$type)
+  .prop("info", $().designType("phantom")
+    .tags("paragraph", "ui").annotate("label", "Info paragraph").annotate("component", "paragraph").$type)
+  .prop("email", $().designType("string")
+    .tags("email", "string").annotate("label", "Email").annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true).$type)
+  .prop("resetPassword", $().designType("phantom")
+    .tags("action", "ui").annotate("label", "Reset password").annotate("component", "link").$type)
+  .prop("optional", $().designType("string")
+    .tags("string").optional().$type)
 
 // prettier-ignore-end

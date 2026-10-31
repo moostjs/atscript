@@ -2,7 +2,6 @@ import type { TAtscriptAnnotatedType, TAtscriptDataType } from './runtime/annota
 
 export {
   annotate,
-  cloneRefProp,
   createAnnotatedTypeNode,
   defineAnnotatedType,
   isAnnotatedType,
@@ -82,6 +81,8 @@ export type { TCreateDataOptions, TValueResolver } from './runtime/default-value
 
 export { throwFeatureDisabled } from './runtime/throw-disabled'
 
+export { lazyJsonSchema } from './runtime/bundled-schema'
+
 export { registerCompiledCheck } from './runtime/compiled-check/registry'
 export { invalidateCompiledValidators } from './runtime/compiled-check/tracking'
 
@@ -113,3 +114,21 @@ export type {
   TSerializeOptions,
   TProcessAnnotationContext,
 } from './runtime/serialize'
+
+// The generated structure (`runtime/blocks.ts`, `runtime/layers.ts`): metadata layers, shells,
+// blocks with static ranks, the import-cycle queue.
+export { LayerMap, metaEmpty, watchLayer, $ak, $nr } from './runtime/layers'
+export {
+  $f,
+  $ft,
+  $fc,
+  $alias,
+  $sh,
+  $ps,
+  $blk,
+  $q,
+  $end,
+  appliedBlockModules,
+  pendingStatements,
+} from './runtime/blocks'
+export { bundledSchemaOf } from './runtime/bundled-schema'

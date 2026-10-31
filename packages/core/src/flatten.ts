@@ -1,109 +1,18 @@
 import type { AtscriptDoc } from './document'
 import { isArray, isGroup, isInterface, isPrimitive, isRef, isStructure } from './parser/nodes'
-import type { SemanticArrayNode } from './parser/nodes/array-node'
-import { SemanticGroup } from './parser/nodes/group-node'
 import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import type { SemanticPropNode } from './parser/nodes/prop-node'
-import type { SemanticRefNode } from './parser/nodes/ref-node'
 import type { SemanticNode } from './parser/nodes/semantic-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
 
-/**
- * Descriptor for a single field in the flattened interface map.
- */
-export interface TFlatFieldDescriptor {
-  /** The resolved type definition node. */
-  def: SemanticNode
-  /** The owning document (may differ from root for cross-file refs). */
-  doc: AtscriptDoc
-  /** Whether the field is optional. */
-  optional: boolean
-  /** The property node (for annotation access). Undefined for the root entry. */
-  propNode?: SemanticPropNode
-  /**
-   * Whether this is an intermediate (non-leaf) path — a structure, array of structures,
-   * or union of only complex types. Intermediate entries should be typed as `never`
-   * in the rendered output to prevent meaningless `$eq` comparisons, while still
-   * appearing in autocomplete for `$select` and `$exists` checks.
-   */
-  intermediate?: boolean
-  /** Whether this field has the `@db.json` annotation (stored as JSON string in DB). */
-  dbJson?: boolean
-}
-
-export interface TFlattenOptions {
-  /** When true, skip properties annotated with @db.rel.to, @db.rel.from, or @db.rel.via. */
-  skipNavProps?: boolean
-}
-
-/**
- * Flattens an interface node into a map of dot-notation paths to their type descriptors.
- *
- * This utility exists to improve type-safety for filter expressions and `$select`/`$sort`
- * operations in the DB layer. The generated `__flat` static property on `@db.table`
- * interfaces uses this map to provide autocomplete and compile-time checks for
- * dot-notation query paths.
- *
- * Walks the interface structure (including inherited props from `extends`) and collects
- * all reachable field paths. Nested objects are recursed into, arrays are recursed through
- * their element types, and unions/intersections are recursed through each branch (with
- * colliding paths merged into union groups).
- *
- * Fields annotated with `@db.json` are treated as leaves — their sub-paths are NOT included,
- * because `@db.json` fields are stored as a single JSON column in the database and their
- * sub-paths are not individually queryable.
- *
- * @param doc - The document owning the interface node.
- * @param node - The interface node to flatten.
- * @returns A map of dot-separated paths to their field descriptors.
- */
-export function flattenInterfaceNode(
-  doc: AtscriptDoc,
-  node: SemanticInterfaceNode,
-  options?: TFlattenOptions
-): Map<string, TFlatFieldDescriptor> {
-  const flatMap = new Map<string, TFlatFieldDescriptor>()
-  const stack = new Set<SemanticNode>()
-
-  // Resolve the full structure (including extends)
-  let struct: SemanticNode | undefined
-  if (node.hasExtends) {
-    struct = doc.resolveInterfaceExtends(node)
-  }
-  if (!struct) {
-    struct = node.getDefinition()
-  }
-  if (!struct || !isStructure(struct)) {
-    return flatMap
-  }
-
-  walkStructure(doc, struct as SemanticStructureNode, '', false, flatMap, stack, options)
-  return flatMap
-}
-
-/**
- * Checks whether a property has the `@db.json` annotation.
- *
- * NOTE: This is intentionally hardcoded to `db.json` (rather than being
- * configurable) because the flattening behavior is tightly coupled to DB
- * semantics — `@db.json` fields are stored as a single JSON column, so their
- * sub-paths must not appear in the flat map (they are not individually
- * queryable in filters or selectable in projections).
- */
-function hasDbJsonAnnotation(prop: SemanticPropNode): boolean {
-  if (!prop.annotations) {
-    return false
-  }
-  return prop.annotations.some(a => a.name === 'db.json')
-}
+/** Annotations that make a prop a navigation property (a relation, not a stored field). */
+export const NAV_PROP_ANNOTATIONS = ['db.rel.to', 'db.rel.from', 'db.rel.via'] as const
 
 export function hasNavPropAnnotation(prop: SemanticPropNode): boolean {
   if (!prop.annotations) {
     return false
   }
-  return prop.annotations.some(
-    a => a.name === 'db.rel.to' || a.name === 'db.rel.from' || a.name === 'db.rel.via'
-  )
+  return prop.annotations.some(a => NAV_PROP_ANNOTATIONS.some(name => name === a.name))
 }
 
 /**
@@ -127,298 +36,132 @@ export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
     return true
   }
   if (isRef(def)) {
-    const unwound = doc.unwindType(def.id!, def.chain)
+    const unwound = doc.unwindRef(def)
     return !!(unwound?.def && isPrimitive(unwound.def) && unwound.def.config.type === 'phantom')
   }
   return false
 }
 
-function resolveNode(
-  doc: AtscriptDoc,
+/** A definition written at a path of a type (see {@link flatDefinitions}). */
+export interface TFlatDefinition {
+  /** The prop at the path's last step. */
+  prop: SemanticPropNode
+  /** Its type, resolved through references and declarations (an interface: its structure). */
   def: SemanticNode
-): { def: SemanticNode; doc: AtscriptDoc } | undefined {
-  if (isRef(def)) {
-    const ref = def as SemanticRefNode
-    const unwound = doc.unwindType(ref.id!, ref.chain)
-    if (unwound?.def) {
-      // Recursively resolve in case ref points to an interface
-      return resolveNode(unwound.doc, unwound.def)
-    }
-    return undefined
-  }
-  if (isInterface(def)) {
-    const iface = def as SemanticInterfaceNode
-    let struct: SemanticNode | undefined
-    if (iface.hasExtends) {
-      struct = doc.resolveInterfaceExtends(iface)
-    }
-    if (!struct) {
-      struct = iface.getDefinition()
-    }
-    if (struct) {
-      return { def: struct, doc }
-    }
-    return undefined
-  }
-  return { def, doc }
-}
-
-function isComplexNode(def: SemanticNode): boolean {
-  return isStructure(def) || isArray(def) || (isGroup(def) && def.entity !== 'tuple')
-}
-
-function addToFlatMap(
-  flatMap: Map<string, TFlatFieldDescriptor>,
-  path: string,
-  descriptor: TFlatFieldDescriptor
-) {
-  const existing = flatMap.get(path)
-  if (existing) {
-    // Merge: wrap both defs in a union group (synthetic union for colliding paths)
-    const group = new SemanticGroup([existing.def, descriptor.def], '|')
-    flatMap.set(path, {
-      def: group,
-      doc: existing.doc,
-      optional: existing.optional || descriptor.optional,
-      propNode: existing.propNode,
-      intermediate: existing.intermediate && descriptor.intermediate ? true : undefined,
-    })
-  } else {
-    flatMap.set(path, descriptor)
-  }
-}
-
-function walkStructure(
-  doc: AtscriptDoc,
-  struct: SemanticStructureNode,
-  prefix: string,
-  parentOptional: boolean,
-  flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>,
-  options?: TFlattenOptions
-) {
-  for (const [name, prop] of struct.props) {
-    // Skip pattern properties ([key: string])
-    if (prop.token('identifier')?.pattern) {
-      continue
-    }
-
-    const propDef = prop.getDefinition()
-
-    // Skip phantom types
-    if (isPhantomNode(doc, propDef)) {
-      continue
-    }
-
-    // Skip navigation properties when requested
-    if (options?.skipNavProps && hasNavPropAnnotation(prop)) {
-      continue
-    }
-
-    const path = prefix ? `${prefix}.${name}` : name
-    const optional = parentOptional || !!prop.token('optional')
-    const dbJson = hasDbJsonAnnotation(prop)
-
-    if (!propDef) {
-      addToFlatMap(flatMap, path, { def: prop, doc, optional, propNode: prop })
-      continue
-    }
-
-    const resolved = resolveNode(doc, propDef)
-    if (!resolved) {
-      addToFlatMap(flatMap, path, { def: propDef, doc, optional, propNode: prop })
-      continue
-    }
-
-    // @db.json fields are always leaves — do not recurse
-    if (dbJson) {
-      addToFlatMap(flatMap, path, {
-        def: resolved.def,
-        doc: resolved.doc,
-        optional,
-        propNode: prop,
-        dbJson: true,
-      })
-      continue
-    }
-
-    walkNode(resolved.doc, resolved.def, path, optional, prop, flatMap, stack, options)
-  }
-}
-
-function walkNode(
-  doc: AtscriptDoc,
-  def: SemanticNode,
-  path: string,
-  optional: boolean,
-  propNode: SemanticPropNode | undefined,
-  flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>,
-  options?: TFlattenOptions
-) {
-  // Circular reference guard (tracks current recursion stack)
-  if (stack.has(def)) {
-    addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-    return
-  }
-  stack.add(def)
-
-  try {
-    if (isStructure(def)) {
-      // Structure is intermediate — add entry typed as never, then recurse sub-paths
-      addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
-      walkStructure(doc, def as SemanticStructureNode, path, optional, flatMap, stack, options)
-    } else if (isArray(def)) {
-      // Check if array element is a complex type (structure/group/array)
-      const elementDef = (def as SemanticArrayNode).getDefinition()
-      const resolvedElement = elementDef ? resolveNode(doc, elementDef) : undefined
-      const isComplexElement =
-        resolvedElement &&
-        (isStructure(resolvedElement.def) ||
-          (isGroup(resolvedElement.def) && resolvedElement.def.entity !== 'tuple') ||
-          isArray(resolvedElement.def))
-      if (isComplexElement) {
-        // Array of complex type — intermediate entry, then recurse element sub-paths
-        addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
-        walkArrayElement(doc, def as SemanticArrayNode, path, optional, flatMap, stack, options)
-      } else {
-        // Array of primitive/leaf — leaf entry
-        addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-      }
-    } else if (isGroup(def) && def.entity !== 'structure') {
-      const group = def as SemanticGroup
-      if (group.op === '&') {
-        // Collapse intersection then re-dispatch
-        const merged = doc.mergeIntersection(def)
-        if (merged !== def && isStructure(merged)) {
-          addToFlatMap(flatMap, path, { def: merged, doc, optional, propNode, intermediate: true })
-          walkStructure(
-            doc,
-            merged as SemanticStructureNode,
-            path,
-            optional,
-            flatMap,
-            stack,
-            options
-          )
-        } else {
-          addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-        }
-      } else if (group.op === '|') {
-        // Union: check branches for complexity
-        const branches = group.unwrap()
-        let hasComplexBranch = false
-        let hasLeafBranch = false
-        for (const branch of branches) {
-          const resolved = resolveNode(doc, branch)
-          if (resolved && isComplexNode(resolved.def)) {
-            hasComplexBranch = true
-          } else {
-            hasLeafBranch = true
-          }
-        }
-        if (hasComplexBranch) {
-          // Has at least one complex branch — recurse all branches for sub-paths
-          if (hasLeafBranch) {
-            // Mixed union (some primitive, some complex) — add as leaf (primitive branches usable in $eq)
-            addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-          } else {
-            // All complex — intermediate, typed as never
-            addToFlatMap(flatMap, path, { def, doc, optional, propNode, intermediate: true })
-          }
-          for (const branch of branches) {
-            const resolved = resolveNode(doc, branch)
-            if (resolved) {
-              walkBranch(resolved.doc, resolved.def, path, optional, flatMap, stack, options)
-            }
-          }
-        } else {
-          // All branches are leaves — add as leaf
-          addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-        }
-      } else {
-        // Tuple or other
-        addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-      }
-    } else {
-      // Primitive, const, resolved ref — leaf
-      addToFlatMap(flatMap, path, { def, doc, optional, propNode })
-    }
-  } finally {
-    stack.delete(def) // allow revisiting from different paths
-  }
-}
-
-function walkArrayElement(
-  doc: AtscriptDoc,
-  arrayNode: SemanticArrayNode,
-  prefix: string,
-  parentOptional: boolean,
-  flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>,
-  options?: TFlattenOptions
-) {
-  const elementDef = arrayNode.getDefinition()
-  if (!elementDef) {
-    return
-  }
-
-  const resolved = resolveNode(doc, elementDef)
-  if (!resolved) {
-    return
-  }
-
-  walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack, options)
+  /** The document `def` is read in. */
+  doc: AtscriptDoc
 }
 
 /**
- * Walks a branch (union branch or array element) to collect sub-paths.
- * Does NOT add an entry for the branch itself — the parent already did that.
+ * The written definitions at the dot-separated paths of interface `node` (for the TS types of
+ * its flattened paths; the paths themselves are the runtime flatten's, `flattenAnnotatedType`):
+ * the props a path's last step names in every structure its prefix reaches — through
+ * references, aliases, `extends`, merges (`&`), unions (`| null` too), arrays, tuples and chain
+ * references. Several when branches (or merge members) reach different props at one path.
+ * A path is looked up step by step from its longest prefix looked up already (memoized).
  */
-function walkBranch(
+export function flatDefinitions(
   doc: AtscriptDoc,
-  def: SemanticNode,
-  prefix: string,
-  parentOptional: boolean,
-  flatMap: Map<string, TFlatFieldDescriptor>,
-  stack: Set<SemanticNode>,
-  options?: TFlattenOptions
-) {
-  if (isStructure(def)) {
-    walkStructure(
-      doc,
-      def as SemanticStructureNode,
-      prefix,
-      parentOptional,
-      flatMap,
-      stack,
-      options
-    )
-  } else if (isArray(def)) {
-    walkArrayElement(doc, def as SemanticArrayNode, prefix, parentOptional, flatMap, stack, options)
-  } else if (isGroup(def) && def.entity !== 'structure') {
-    const group = def as SemanticGroup
-    if (group.op === '&') {
-      const merged = doc.mergeIntersection(def)
-      if (isStructure(merged)) {
-        walkStructure(
-          doc,
-          merged as SemanticStructureNode,
-          prefix,
-          parentOptional,
-          flatMap,
-          stack,
-          options
-        )
-      }
-    } else if (group.op === '|') {
-      for (const branch of group.unwrap()) {
-        const resolved = resolveNode(doc, branch)
-        if (resolved) {
-          walkBranch(resolved.doc, resolved.def, prefix, parentOptional, flatMap, stack, options)
-        }
+  node: SemanticInterfaceNode
+): (path: string) => TFlatDefinition[] {
+  const root = resolveDefinition(doc, node)
+  const memo = new Map<string, TFlatDefinition[]>()
+  return path => {
+    // (the longest prefix looked up already: `at` its end, -1 none)
+    let at = path.length
+    let found = memo.get(path)
+    while (!found && at > 0) {
+      at = path.lastIndexOf('.', at - 1)
+      found = at > 0 ? memo.get(path.slice(0, at)) : undefined
+    }
+    let defs: Array<{ def: SemanticNode; doc: AtscriptDoc }> = found ?? (root ? [root] : [])
+    for (let start = at + 1; start <= path.length; ) {
+      const dot = path.indexOf('.', start)
+      const end = dot < 0 ? path.length : dot
+      const step = propsNamed(defs, path.slice(start, end))
+      memo.set(path.slice(0, end), step)
+      defs = step
+      start = end + 1
+    }
+    return defs as TFlatDefinition[]
+  }
+}
+
+/** The props `name` names in the structures `defs` hold (each prop once). */
+function propsNamed(
+  defs: Array<{ def: SemanticNode; doc: AtscriptDoc }>,
+  name: string
+): TFlatDefinition[] {
+  const out: TFlatDefinition[] = []
+  const seen = new Set<SemanticPropNode>()
+  for (const parent of defs) {
+    for (const { struct, doc } of structuresOf(parent.def, parent.doc)) {
+      const prop = struct.props.get(name)
+      if (prop && !seen.has(prop)) {
+        seen.add(prop)
+        const written = prop.getDefinition()
+        const resolved = written ? resolveDefinition(doc, written) : undefined
+        out.push({ prop, def: resolved?.def ?? written ?? prop, doc: resolved?.doc ?? doc })
       }
     }
   }
-  // Primitives/consts: no further sub-paths
+  return out
+}
+
+/** `def` through references and declarations (an interface: its structure). */
+function resolveDefinition(
+  doc: AtscriptDoc,
+  def: SemanticNode
+): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+  for (const seen = new Set<SemanticNode>(); !seen.has(def); ) {
+    seen.add(def)
+    if (isRef(def)) {
+      const target = doc.declRef(def)
+      if (!target?.def) {
+        return undefined
+      }
+      ;({ def, doc } = target)
+    } else if (isInterface(def)) {
+      const struct = (def.hasExtends && doc.resolveInterfaceExtends(def)) || def.getDefinition()
+      return struct ? { def: struct, doc } : undefined
+    } else {
+      return { def, doc }
+    }
+  }
+  return undefined
+}
+
+/** The structures `def` holds at its own level: itself, its elements, branches and merges. */
+function structuresOf(
+  def: SemanticNode,
+  doc: AtscriptDoc
+): Array<{ struct: SemanticStructureNode; doc: AtscriptDoc }> {
+  const out: Array<{ struct: SemanticStructureNode; doc: AtscriptDoc }> = []
+  const seen = new Set<SemanticNode>()
+  const pending: Array<{ def: SemanticNode; doc: AtscriptDoc }> = [{ def, doc }]
+  for (let next = pending.pop(); next; next = pending.pop()) {
+    const resolved = resolveDefinition(next.doc, next.def)
+    if (!resolved || seen.has(resolved.def)) {
+      continue
+    }
+    seen.add(resolved.def)
+    const node = resolved.def
+    if (isStructure(node)) {
+      out.push({ struct: node, doc: resolved.doc })
+    } else if (isArray(node)) {
+      const element = node.getDefinition()
+      if (element) {
+        pending.push({ def: element, doc: resolved.doc })
+      }
+    } else if (isGroup(node)) {
+      // (a merge: the structure it merges into — or a union of such —, its members when it does
+      // not merge; a union, a tuple: its branches, items)
+      const merged = node.op === '&' ? resolved.doc.mergeIntersection(node) : node
+      const items = merged === node ? node.unwrap() : [merged]
+      for (let i = items.length - 1; i >= 0; i--) {
+        pending.push({ def: items[i], doc: resolved.doc })
+      }
+    }
+  }
+  return out
 }

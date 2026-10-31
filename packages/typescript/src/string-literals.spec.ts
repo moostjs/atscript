@@ -31,7 +31,9 @@ describe('string literal codegen round-trip', () => {
 
   it('keeps escaped quotes raw across multiple args', () => {
     expect(meta('quoted', 'expect.pattern')).toEqual([
-      { pattern: '^[^\\"]+$', flags: 'u', message: 'no \\"quotes\\"' },
+      // (MODEL §12 Q8: a module with error diagnostics is not generated — flag `u` made `\\"` an
+      // invalid regular expression there, an error diagnostic; `i` keeps the escapes valid)
+      { pattern: '^[^\\"]+$', flags: 'i', message: 'no \\"quotes\\"' },
     ])
     expect(meta('raw', 'expect.pattern')).toEqual([
       { pattern: '^\\S+\\\\$', flags: '', message: "it\\'s raw" },

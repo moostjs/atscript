@@ -746,7 +746,7 @@ describe('named type referenced with its own annotations', () => {
 
   /** A node over the same type def and id, carrying its own merged metadata (what `refTo` builds). */
   const refNode = (target: TAtscriptAnnotatedType, label: string, optional = false) => {
-    const node = defineAnnotatedType().refTo(target).$type
+    const node = defineAnnotatedType().ref(target).$type
     node.metadata = new Map(target.metadata)
     node.metadata.set('meta.label' as never, label as never)
     if (optional) {
@@ -795,7 +795,9 @@ describe('named type referenced with its own annotations', () => {
 })
 
 describe('named type with annotation bindings that are type getters', () => {
-  const code = () => defineAnnotatedType().designType('string').id('Code').$type
+  // One named type; each use is a reference to it (as generated code builds it).
+  const Code = defineAnnotatedType().designType('string').id('Code').$type
+  const code = () => defineAnnotatedType().ref(Code).$type
   const dict = (id: string) => defineAnnotatedType('object').id(id).$type
   const bound = (target: () => TAtscriptAnnotatedType) => {
     const node = code()
@@ -829,6 +831,35 @@ describe('named type with annotation bindings that are type getters', () => {
     })
   }
 
+  // Regression: targets were compared by id, so distinct types of the same name collapsed.
+  it('bindings to distinct targets sharing an id keep their own', () => {
+    const CountryA = dict('Country')
+    const CountryB = dict('Country')
+    const root = defineAnnotatedType('object')
+      .prop(
+        'a',
+        bound(() => CountryA)
+      )
+      .prop(
+        'b',
+        bound(() => CountryB)
+      ).$type
+    const json = serializeAnnotatedType(root, { refDepth: 0.5 })
+    expect((json.type as TSerializedTypeObject).props.b.type).toMatchObject({ own: true })
+  })
+
+  it('FKs to distinct targets sharing an id keep their own ref', () => {
+    const entity = () =>
+      defineAnnotatedType('object').id('Party').prop('code', defineAnnotatedType().ref(Code).$type)
+        .$type
+    const [A, B] = [entity(), entity()]
+    const root = defineAnnotatedType('object')
+      .prop('a', defineAnnotatedType().ref(A, ['code']).$type)
+      .prop('b', defineAnnotatedType().ref(B, ['code']).$type).$type
+    const json = serializeAnnotatedType(root, { refDepth: 1 })
+    expect((json.type as TSerializedTypeObject).props.b.type).toMatchObject({ own: true })
+  })
+
   it('equal targets behind different getters still collapse', () => {
     const Country = dict('Country')
     const root = defineAnnotatedType('object')
@@ -846,12 +877,13 @@ describe('named type with annotation bindings that are type getters', () => {
 })
 
 describe('use-site ref on a named type referenced more than once', () => {
-  const Code = () => defineAnnotatedType().designType('string').id('Code').$type
+  const CodeType = defineAnnotatedType().designType('string').id('Code').$type
+  const Code = () => CodeType
   const entity = (name: string) =>
-    defineAnnotatedType('object').id(name).prop('code', defineAnnotatedType().refTo(Code()).$type)
+    defineAnnotatedType('object').id(name).prop('code', defineAnnotatedType().ref(Code()).$type)
       .$type
   const fk = (target: TAtscriptAnnotatedType, label?: string) => {
-    const node = defineAnnotatedType().refTo(target, ['code']).$type
+    const node = defineAnnotatedType().ref(target, ['code']).$type
     if (label) {
       node.metadata.set('meta.label' as never, label as never)
     }
@@ -948,7 +980,7 @@ describe('ref serialization', () => {
 
     const source = defineAnnotatedType('object').prop(
       'targetId',
-      defineAnnotatedType().refTo(target, ['id']).$type
+      defineAnnotatedType().ref(target, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(source)
@@ -969,7 +1001,7 @@ describe('ref serialization', () => {
 
     const source = defineAnnotatedType('object').prop(
       'targetId',
-      defineAnnotatedType().refTo(target, ['id']).$type
+      defineAnnotatedType().ref(target, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(source, { refDepth: 1 })
@@ -998,11 +1030,11 @@ describe('ref serialization', () => {
     const typeB = defineAnnotatedType('object')
       .id('TypeB')
       .prop('id', defineAnnotatedType().designType('string').$type)
-      .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
+      .prop('cId', defineAnnotatedType().ref(typeC, ['id']).$type).$type
 
     const typeA = defineAnnotatedType('object').prop(
       'bId',
-      defineAnnotatedType().refTo(typeB, ['id']).$type
+      defineAnnotatedType().ref(typeB, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(typeA, { refDepth: 1 })
@@ -1027,11 +1059,11 @@ describe('ref serialization', () => {
     const typeB = defineAnnotatedType('object')
       .id('TypeB2')
       .prop('id', defineAnnotatedType().designType('string').$type)
-      .prop('cId', defineAnnotatedType().refTo(typeC, ['id']).$type).$type
+      .prop('cId', defineAnnotatedType().ref(typeC, ['id']).$type).$type
 
     const typeA = defineAnnotatedType('object').prop(
       'bId',
-      defineAnnotatedType().refTo(typeB, ['id']).$type
+      defineAnnotatedType().ref(typeB, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(typeA, { refDepth: 2 })
@@ -1054,7 +1086,7 @@ describe('ref serialization', () => {
       .prop('id', defineAnnotatedType().designType('string').$type)
       .prop('name', defineAnnotatedType().designType('string').$type)
 
-    employee.prop('managerId', defineAnnotatedType().refTo(employee.$type, ['id']).$type)
+    employee.prop('managerId', defineAnnotatedType().ref(employee.$type, ['id']).$type)
 
     const serialized = serializeAnnotatedType(employee.$type, { refDepth: 1 })
     const serializedObj = serialized.type as TSerializedTypeObject
@@ -1083,7 +1115,7 @@ describe('ref serialization', () => {
 
     const source = defineAnnotatedType('object').prop(
       'fk',
-      defineAnnotatedType().refTo(target, ['id']).$type
+      defineAnnotatedType().ref(target, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(source, {
@@ -1115,7 +1147,7 @@ describe('ref serialization', () => {
 
     const source = defineAnnotatedType('object').prop(
       'fk',
-      defineAnnotatedType().refTo(target, ['id']).$type
+      defineAnnotatedType().ref(target, ['id']).$type
     ).$type
 
     const serialized = serializeAnnotatedType(source, { refDepth: 1 })
@@ -1329,7 +1361,7 @@ describe('annotationOverrides', () => {
   it('is keyed by node identity and reaches every metadata site', () => {
     const Target = entity('Target', { 'meta.label': 'T' })
     const Other = entity('Other')
-    const fk = defineAnnotatedType().refTo(Target, ['id']).$type
+    const fk = defineAnnotatedType().ref(Target, ['id']).$type
     const root = defineAnnotatedType('object')
       .id('Root')
       .prop('fk', fk)
@@ -1363,7 +1395,7 @@ describe('annotationOverrides', () => {
     const Target = entity('Target2')
     const root = defineAnnotatedType('object')
       .prop('h', Holder)
-      .prop('fk', defineAnnotatedType().refTo(Target, ['id']).$type).$type
+      .prop('fk', defineAnnotatedType().ref(Target, ['id']).$type).$type
     const json = serializeAnnotatedType(root, {
       refDepth: 1,
       annotationOverrides: t => ({ 'x.mark': t.id ?? 'none' }),
@@ -1412,9 +1444,8 @@ describe('annotationOverrides', () => {
   })
 
   it('a collapsed repeated-type use restores to the first node, which carries the override', () => {
-    const Code = () => defineAnnotatedType().designType('string').id('Code').$type
-    const a = Code()
-    const b = Code()
+    const a = defineAnnotatedType().designType('string').id('Code').$type
+    const b = defineAnnotatedType().ref(a).$type
     const root = defineAnnotatedType('object').prop('a', a).prop('b', b).$type
     const json = serializeAnnotatedType(root, {
       annotationOverrides: t => (t.id === 'Code' ? { 'db.http.path': '/c' } : undefined),
@@ -1426,5 +1457,81 @@ describe('annotationOverrides', () => {
     const restored = asObject(deserializeAnnotatedType(JSON.parse(JSON.stringify(json))))
     expect(restored.props.get('b')).toBe(restored.props.get('a'))
     expect(restored.props.get('b')!.metadata.get('db.http.path' as never)).toBe('/c')
+  })
+})
+
+// Regression: distinct types sharing a name (from different modules) collapsed onto the first
+// one serialized, so the round-trip validated against the wrong type.
+describe('distinct named types sharing an id', () => {
+  const helper = (prop: string, type: string) =>
+    defineAnnotatedType('object')
+      .prop(prop, defineAnnotatedType().designType(type as 'string').$type)
+      .id('Helper').$type
+  const root = () =>
+    defineAnnotatedType('object')
+      .prop('payload', helper('fromParent', 'string'))
+      .prop('a', helper('fromChild', 'number'))
+      .prop('b', helper('alsoFromChild', 'boolean')).$type
+  const value = { payload: { fromParent: 'x' }, a: { fromChild: 1 }, b: { alsoFromChild: true } }
+
+  it('get unique payload ids and validate the same after a round-trip', () => {
+    const original = root()
+    expect(original.validator().validate(value, true)).toBe(true)
+    const json = serializeAnnotatedType(original)
+    const props = (json.type as TSerializedTypeObject).props
+    expect([props.payload.id, props.a.id, props.b.id]).toEqual(['Helper', 'Helper@1', 'Helper@2'])
+    expect([props.payload.origId, props.a.origId, props.b.origId]).toEqual([
+      undefined,
+      'Helper',
+      'Helper',
+    ])
+    const restored = asObject(deserializeAnnotatedType(JSON.parse(JSON.stringify(json))))
+    expect(['payload', 'a', 'b'].map(k => restored.props.get(k)!.id)).toEqual([
+      'Helper',
+      'Helper',
+      'Helper',
+    ])
+    const restoredType = deserializeAnnotatedType(json)
+    expect(restoredType.validator().validate(value, true)).toBe(true)
+    expect(restoredType.validator().validate({ ...value, a: { fromChild: 'x' } }, true)).toBe(false)
+    // Twice: the restored types are distinct too.
+    const twice = deserializeAnnotatedType(serializeAnnotatedType(restoredType))
+    expect(twice.validator().validate(value, true)).toBe(true)
+  })
+
+  it('a type literally named like a suffixed payload id does not collide', () => {
+    const str = () => defineAnnotatedType().designType('string').$type
+    const h0 = defineAnnotatedType('object').prop('a', str()).id('Helper').$type
+    const h1 = defineAnnotatedType('object').prop('b', str()).id('Helper').$type
+    const lit = defineAnnotatedType('object').prop('c', str()).id('Helper@1').$type
+    for (const order of [
+      [h0, h1, lit],
+      [lit, h0, h1],
+      [h0, lit, h1],
+    ]) {
+      const root = defineAnnotatedType('object')
+        .prop('p0', order[0])
+        .prop('p1', order[1])
+        .prop('p2', order[2]).$type
+      const restored = asObject(
+        deserializeAnnotatedType(JSON.parse(JSON.stringify(serializeAnnotatedType(root))))
+      )
+      const shape = (t: TAtscriptAnnotatedType) => `${t.id}{${[...asObject(t).props.keys()]}}`
+      expect(['p0', 'p1', 'p2'].map(k => shape(restored.props.get(k)!))).toEqual(order.map(shape))
+    }
+  })
+
+  it('references to the second type use its payload id', () => {
+    const second = helper('fromChild', 'number')
+    const original = defineAnnotatedType('object')
+      .prop('payload', helper('fromParent', 'string'))
+      .prop('a', second)
+      .prop('again', defineAnnotatedType().ref(second).$type).$type
+    const json = serializeAnnotatedType(original)
+    const again = (json.type as TSerializedTypeObject).props.again
+    expect(again.type).toEqual({ kind: '$ref', id: 'Helper@1' })
+    expect(again.origId).toBe('Helper')
+    const restored = asObject(deserializeAnnotatedType(json))
+    expect(restored.props.get('again')).toBe(restored.props.get('a'))
   })
 })

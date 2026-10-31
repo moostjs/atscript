@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, registerCompiledCheck as $cv } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, registerCompiledCheck as $cv, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class PublicInterface {
   static __is_atscript_annotated_type = true
@@ -13,275 +13,134 @@ export class PublicInterface {
   }
 }
 
-$("object", PublicInterface)
-  .prop(
-    "primitive",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "pirmiitiveUn",
-    $("union")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($().designType("number")
-          .tags("number")
-          .$type)
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("email", "string")
-      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-      .$type
-  ).prop(
-    "interger",
-    $().designType("number")
-      .tags("int", "number")
-      .annotate("expect.int", true)
-      .$type
-  ).prop(
-    "literal",
-    $()
-      .designType("string")
-      .value("value")
-      .$type
-  ).prop(
-    "number",
-    $()
-      .designType("number")
-      .value(5)
-      .$type
-  ).prop(
-    "tuple1",
-    $("tuple")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .$type
-  ).prop(
-    "tuple2",
-    $("tuple")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .$type
-  ).prop(
-    "tupleArray",
-    $("array")
-      .of($("tuple")
-          .item($().designType("string")
-              .tags("string")
-              .$type)
-          .item($().designType("string")
-              .tags("string")
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "array",
-    $("array")
-      .of($().designType("string")
-          .tags("string")
-          .$type)
-      .$type
-  ).prop(
-    "array2",
-    $("array")
-      .of($("array")
-          .of($().designType("string")
-              .tags("string")
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "array3",
-    $("array")
-      .of($("array")
-          .of($("array")
-              .of($().designType("string")
-                  .tags("string")
-                  .$type)
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "complexArray",
-    $("array")
-      .of($("union")
-          .item($().designType("string")
-              .tags("string")
-              .$type)
-          .item($().designType("number")
-              .tags("number")
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "complexArray2",
-    $("array")
-      .of($("array")
-          .of($("union")
-              .item($().designType("string")
-                  .tags("string")
-                  .$type)
-              .item($().designType("number")
-                  .tags("number")
-                  .$type)
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "complexArray3",
-    $("array")
-      .of($("array")
-          .of($("array")
-              .of($("union")
-                  .item($().designType("string")
-                      .tags("string")
-                      .$type)
-                  .item($().designType("number")
-                      .tags("number")
-                      .$type)
-                  .$type)
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "complexArray4",
-    $("union")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($("array")
-          .of($().designType("number")
-              .tags("number")
-              .$type)
-          .$type)
-      .$type
-  ).prop(
-    "complexArray5",
-    $("union")
-      .item($("array")
-          .of($().designType("string")
-              .tags("string")
-              .$type)
-          .$type)
-      .item($().designType("number")
-          .tags("number")
-          .$type)
-      .$type
-  ).prop(
-    "object",
-    $("object")
-      .prop(
-        "prop1",
-        $().designType("string")
-          .tags("string")
-          .$type
-      ).prop(
-        "prop2",
-        $().designType("number")
-          .tags("number")
-          .optional()
-          .$type
-      ).prop(
-        "nested",
-        $("object")
-          .prop(
-            "prop3",
-            $().designType("boolean")
-              .tags("boolean")
-              .$type
-          ).prop(
-            "prop4",
-            $().designType("boolean")
-              .tags("boolean")
-              .optional()
-              .$type
-          )
-          .$type
-      )
-      .$type
-  ).prop(
-    "optional",
-    $().designType("string")
-      .tags("string")
-      .optional()
-      .$type
-  ).prop(
-    "objectUnion1",
-    $("union")
-      .item($("object")
-          .prop(
-            "a",
-            $()
-              .designType("string")
-              .value("a")
-              .$type
-          )
-          .$type)
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .$type
-  ).prop(
-    "objectUnion2",
-    $("union")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($("object")
-          .prop(
-            "a",
-            $()
-              .designType("string")
-              .value("a")
-              .$type
-          )
-          .$type)
-      .$type
-  ).prop(
-    "objectIntersection",
-    $("object")
-      .prop(
-        "a",
-        $()
-          .designType("string")
-          .value("a")
-          .$type
-      ).prop(
-        "b",
-        $()
-          .designType("string")
-          .value("b")
-          .$type
-      )
-      .$type
-  ).prop(
-    "grouping",
-    $("union")
-      .item($().designType("string")
-          .tags("string")
-          .$type)
-      .item($("union")
-          .item($().designType("never")
-              .tags("never")
-              .$type)
-          .item($()
-              .designType("string")
-              .value("c")
-              .$type)
-          .$type)
-      .$type
-  )
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+let $i_PublicInterface_objectIntersection_0, $i_PublicInterface_objectIntersection_1, $i_PublicInterface_grouping__1__0_2
+class $M0 { static __is_atscript_annotated_type = true; static type = {}; static metadata = new Map() }
 
+$i_PublicInterface_objectIntersection_0 = $("object")
+  .prop("a", $()
+    .designType("string")
+    .value("a").$type).$type
+
+$i_PublicInterface_objectIntersection_1 = $("object")
+  .prop("b", $()
+    .designType("string")
+    .value("b").$type).$type
+
+$("object", $M0)
+  .prop("a", $f($i_PublicInterface_objectIntersection_0, "a"))
+  .prop("b", $f($i_PublicInterface_objectIntersection_1, "b"))
+
+$i_PublicInterface_grouping__1__0_2 = $("object")
+  .prop("a", $()
+    .designType("string")
+    .value("b").$type).$type
+
+$("object", PublicInterface)
+  .prop("primitive", $().designType("string")
+    .tags("string").$type)
+  .prop("pirmiitiveUn", $("union")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($().designType("number")
+      .tags("number").$type).$type)
+  .prop("email", $().designType("string")
+    .tags("email", "string").annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true).$type)
+  .prop("interger", $().designType("number")
+    .tags("int", "number").annotate("expect.int", true).$type)
+  .prop("literal", $()
+    .designType("string")
+    .value("value").$type)
+  .prop("number", $()
+    .designType("number")
+    .value(5).$type)
+  .prop("tuple1", $("tuple")
+    .item($().designType("string")
+      .tags("string").$type).$type)
+  .prop("tuple2", $("tuple")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($().designType("string")
+      .tags("string").$type).$type)
+  .prop("tupleArray", $("array").of($("tuple")
+      .item($().designType("string")
+        .tags("string").$type)
+      .item($().designType("string")
+        .tags("string").$type).$type).$type)
+  .prop("array", $("array").of($().designType("string")
+      .tags("string").$type).$type)
+  .prop("array2", $("array").of($("array").of($().designType("string")
+        .tags("string").$type).$type).$type)
+  .prop("array3", $("array").of($("array").of($("array").of($().designType("string")
+          .tags("string").$type).$type).$type).$type)
+  .prop("complexArray", $("array").of($("union")
+      .item($().designType("string")
+        .tags("string").$type)
+      .item($().designType("number")
+        .tags("number").$type).$type).$type)
+  .prop("complexArray2", $("array").of($("array").of($("union")
+        .item($().designType("string")
+          .tags("string").$type)
+        .item($().designType("number")
+          .tags("number").$type).$type).$type).$type)
+  .prop("complexArray3", $("array").of($("array").of($("array").of($("union")
+          .item($().designType("string")
+            .tags("string").$type)
+          .item($().designType("number")
+            .tags("number").$type).$type).$type).$type).$type)
+  .prop("complexArray4", $("union")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($("array").of($().designType("number")
+        .tags("number").$type).$type).$type)
+  .prop("complexArray5", $("union")
+    .item($("array").of($().designType("string")
+        .tags("string").$type).$type)
+    .item($().designType("number")
+      .tags("number").$type).$type)
+  .prop("object", $("object")
+    .prop("prop1", $().designType("string")
+      .tags("string").$type)
+    .prop("prop2", $().designType("number")
+      .tags("number").optional().$type)
+    .prop("nested", $("object")
+      .prop("prop3", $().designType("boolean")
+        .tags("boolean").$type)
+      .prop("prop4", $().designType("boolean")
+        .tags("boolean").optional().$type).$type).$type)
+  .prop("optional", $().designType("string")
+    .tags("string").optional().$type)
+  .prop("objectUnion1", $("union")
+    .item($("object")
+      .prop("a", $()
+        .designType("string")
+        .value("a").$type).$type)
+    .item($().designType("string")
+      .tags("string").$type).$type)
+  .prop("objectUnion2", $("union")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($("object")
+      .prop("a", $()
+        .designType("string")
+        .value("a").$type).$type).$type)
+  .prop("objectIntersection", $().type($M0).$type)
+  .prop("grouping", $("union")
+    .item($().designType("string")
+      .tags("string").$type)
+    .item($("union")
+      .item($().designType("never").tags("never").$type)
+      .item($()
+        .designType("string")
+        .value("c").$type).$type).$type)
+
+export { $i_PublicInterface_objectIntersection_0 }
+export { $i_PublicInterface_objectIntersection_1 }
+export { $M0 as $h_PublicInterface_objectIntersection }
+export { $i_PublicInterface_grouping__1__0_2 }
 // Compiled validator checks
-$cv(PublicInterface, 2, [[[1,["primitive","pirmiitiveUn","email","interger","literal","number","tuple1","tuple2","tupleArray","array","array2","array3","complexArray","complexArray2","complexArray3","complexArray4","complexArray5","object","optional","objectUnion1","objectUnion2","objectIntersection","grouping"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,5,"n",0],[0,16,6,"",1],[0,0,7,"",1],[0,0,8,"",1],[0,0,9,"",1],[0,0,11,"",1],[0,0,14,"",1],[0,0,18,"",1],[0,0,20,"",1],[0,0,23,"",1],[0,0,27,"",1],[0,0,31,"",1],[0,0,36,"",1],[0,0,42,"",1],[0,0,46,"",1],[0,0,50,"",1],[1,0,56,"",1],[0,0,57,"",1],[0,0,61,"",1],[0,0,65,"",1],[0,0,68,"",1]]],[0,"string"],[3,[[0,0,3,"",0],[0,0,4,"",0]]],[0,"string"],[0,"number"],[0,"string"],[0,"number"],[0,"string","value"],[0,"number",5],[5,[[0,0,10,"",1]]],[0,"string"],[5,[[0,0,12,"",1],[0,0,13,"",1]]],[0,"string"],[0,"string"],[2,[0,0,15,"",1]],[5,[[0,0,16,"",1],[0,0,17,"",1]]],[0,"string"],[0,"string"],[2,[0,0,19,"",1]],[0,"string"],[2,[0,0,21,"",1]],[2,[0,0,22,"",1]],[0,"string"],[2,[0,0,24,"",1]],[2,[0,0,25,"",1]],[2,[0,0,26,"",1]],[0,"string"],[2,[0,0,28,"",1]],[3,[[0,0,29,"",1],[0,0,30,"",1]]],[0,"string"],[0,"number"],[2,[0,0,32,"",1]],[2,[0,0,33,"",1]],[3,[[0,0,34,"",1],[0,0,35,"",1]]],[0,"string"],[0,"number"],[2,[0,0,37,"",1]],[2,[0,0,38,"",1]],[2,[0,0,39,"",1]],[3,[[0,0,40,"",1],[0,0,41,"",1]]],[0,"string"],[0,"number"],[3,[[0,0,43,"",1],[0,0,44,"",1]]],[0,"string"],[2,[0,0,45,"",1]],[0,"number"],[3,[[0,0,47,"",1],[0,0,49,"",1]]],[2,[0,0,48,"",1]],[0,"string"],[0,"number"],[1,["prop1","prop2","nested"],[[0,0,51,"",1],[1,0,52,"",1],[0,0,53,"",1]]],[0,"string"],[0,"number"],[1,["prop3","prop4"],[[0,0,54,"",1],[1,0,55,"",1]]],[0,"boolean"],[0,"boolean"],[0,"string"],[3,[[0,0,58,"",1],[0,0,60,"",1]]],[1,["a"],[[0,0,59,"",1]]],[0,"string","a"],[0,"string"],[3,[[0,0,62,"",1],[0,0,63,"",1]]],[0,"string"],[1,["a"],[[0,0,64,"",1]]],[0,"string","a"],[1,["a","b"],[[0,0,66,"",1],[0,0,67,"",1]]],[0,"string","a"],[0,"string","b"],[3,[[0,0,69,"",1],[0,0,70,"",1]]],[0,"string"],[3,[[0,0,71,"",1],[0,0,72,"",1]]],[0,"never"],[0,"string","c"]],[0,0,0,"",1],1], (K, H) => {
+$cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","literal","number","tuple1","tuple2","tupleArray","array","array2","array3","complexArray","complexArray2","complexArray3","complexArray4","complexArray5","object","optional","objectUnion1","objectUnion2","objectIntersection","grouping"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,5,"n",0],[0,16,6,"",1],[0,0,7,"",1],[0,0,8,"",1],[0,0,9,"",1],[0,0,11,"",1],[0,0,14,"",1],[0,0,18,"",1],[0,0,20,"",1],[0,0,23,"",1],[0,0,27,"",1],[0,0,31,"",1],[0,0,36,"",1],[0,0,42,"",1],[0,0,46,"",1],[0,0,50,"",1],[1,0,56,"",1],[0,0,57,"",1],[0,0,61,"",1],[0,0,65,"",1],[0,0,68,"",1]]],[0,"string"],[3,[[0,0,3,"",0],[0,0,4,"",0]]],[0,"string"],[0,"number"],[0,"string"],[0,"number"],[0,"string","value"],[0,"number",5],[5,[[0,0,10,"",1]]],[0,"string"],[5,[[0,0,12,"",1],[0,0,13,"",1]]],[0,"string"],[0,"string"],[2,[0,0,15,"",1]],[5,[[0,0,16,"",1],[0,0,17,"",1]]],[0,"string"],[0,"string"],[2,[0,0,19,"",1]],[0,"string"],[2,[0,0,21,"",1]],[2,[0,0,22,"",1]],[0,"string"],[2,[0,0,24,"",1]],[2,[0,0,25,"",1]],[2,[0,0,26,"",1]],[0,"string"],[2,[0,0,28,"",1]],[3,[[0,0,29,"",1],[0,0,30,"",1]]],[0,"string"],[0,"number"],[2,[0,0,32,"",1]],[2,[0,0,33,"",1]],[3,[[0,0,34,"",1],[0,0,35,"",1]]],[0,"string"],[0,"number"],[2,[0,0,37,"",1]],[2,[0,0,38,"",1]],[2,[0,0,39,"",1]],[3,[[0,0,40,"",1],[0,0,41,"",1]]],[0,"string"],[0,"number"],[3,[[0,0,43,"",1],[0,0,44,"",1]]],[0,"string"],[2,[0,0,45,"",1]],[0,"number"],[3,[[0,0,47,"",1],[0,0,49,"",1]]],[2,[0,0,48,"",1]],[0,"string"],[0,"number"],[1,["prop1","prop2","nested"],[[0,0,51,"",1],[1,0,52,"",1],[0,0,53,"",1]]],[0,"string"],[0,"number"],[1,["prop3","prop4"],[[0,0,54,"",1],[1,0,55,"",1]]],[0,"boolean"],[0,"boolean"],[0,"string"],[3,[[0,0,58,"",1],[0,0,60,"",1]]],[1,["a"],[[0,0,59,"",1]]],[0,"string","a"],[0,"string"],[3,[[0,0,62,"",1],[0,0,63,"",1]]],[0,"string"],[1,["a"],[[0,0,64,"",1]]],[0,"string","a"],[1,["a","b"],[[0,0,66,"",1],[0,0,67,"",1]]],[0,"string","a"],[0,"string","b"],[3,[[0,0,69,"",1],[0,0,70,"",1]]],[0,"string"],[3,[[0,0,71,"",1],[0,0,72,"",1]]],[0,"never"],[0,"string","c"]],[0,0,0,"",1],1], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {

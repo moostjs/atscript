@@ -12,7 +12,7 @@ import type {
   TPrimitiveTypeDef,
 } from '@atscript/core'
 import {
-  flattenInterfaceNode,
+  flatDefinitions,
   hasNavPropAnnotation,
   isArray,
   isConst,
@@ -22,11 +22,20 @@ import {
   isPrimitive,
   isRef,
   isStructure,
-  type TFlatFieldDescriptor,
+  NAV_PROP_ANNOTATIONS,
+  SemanticGroup,
+  type TFlatDefinition,
 } from '@atscript/core'
 
-import { type TTsPluginOptions, resolveJsonSchemaMode } from '../plugin'
+import { type TTsPluginOptions, compileValidatorsMode, resolveJsonSchemaMode } from '../plugin'
+import type {
+  TAtscriptAnnotatedType,
+  TAtscriptTypeArray,
+  TAtscriptTypeComplex,
+  TAtscriptTypeObject,
+} from '../runtime/annotated-type'
 import { BaseRenderer } from './base-renderer'
+import { moduleRealm } from './js-next'
 import { escapeQuotes, wrapProp } from './utils'
 
 export class TypeRenderer extends BaseRenderer {
@@ -74,13 +83,22 @@ export class TypeRenderer extends BaseRenderer {
       const tuple = def.entity === 'tuple'
       const operator = tuple ? ', ' : ` ${def.op!} `
       const children = def.unwrap()
-      const hasSubgroup = !tuple && children.some(c => c.entity === 'group')
+      // `&` binds tighter than `|`: a union in an intersection is parenthesized (the
+      // intersection as a whole then needs none).
+      const isUnion = (c: SemanticNode) =>
+        (isGroup(c) && c.entity !== 'tuple' && c.op === '|') || this.primitiveKind(c) === 'union'
+      const wrapUnions = !tuple && def.op === '&' && children.some(isUnion)
+      const hasSubgroup = !tuple && !wrapUnions && children.some(c => c.entity === 'group')
       this.write(tuple ? '[' : hasSubgroup ? '(' : '')
-      this.renderTypeDef(def.first)
-      for (const child of children.slice(1)) {
-        this.write(operator)
+      children.forEach((child, i) => {
+        if (i > 0) {
+          this.write(operator)
+        }
+        const wrap = wrapUnions && isUnion(child)
+        this.write(wrap ? '(' : '')
         this.renderTypeDef(child)
-      }
+        this.write(wrap ? ')' : '')
+      })
       return this.write(tuple ? ']' : hasSubgroup ? ')' : '')
     }
     if (isConst(def)) {
@@ -90,7 +108,7 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (isRef(def)) {
       const node = def as SemanticRefNode
-      const unwound = this.doc.unwindType(node.id!, node.chain)
+      const unwound = this.doc.unwindRef(node)
       if (isPrimitive(unwound?.def)) {
         this.write(renderPrimitiveTypeDef(unwound.def.config.type))
         if (node.hasChain) {
@@ -107,7 +125,8 @@ export class TypeRenderer extends BaseRenderer {
     if (isArray(def)) {
       const node = def as SemanticArrayNode
       const def2 = node.getDefinition()
-      const isGrp = def2?.entity === 'group'
+      const kind = def2 && this.primitiveKind(def2)
+      const isGrp = def2?.entity === 'group' || kind === 'union' || kind === 'intersection'
       if (isGrp) {
         this.write('(')
       }
@@ -122,6 +141,13 @@ export class TypeRenderer extends BaseRenderer {
         renderPrimitiveTypeDef((def as unknown as SemanticPrimitiveNode).config.type)
       )
     }
+  }
+
+  /** The kind of the type a reference to a primitive renders (`string | number`: `union`). */
+  private primitiveKind(node: SemanticNode): string | undefined {
+    const def = isRef(node) ? this.doc.unwindRef(node)?.def : undefined
+    const type = isPrimitive(def) ? def.config.type : undefined
+    return typeof type === 'object' ? type.kind : undefined
   }
 
   renderStructure(
@@ -202,8 +228,7 @@ export class TypeRenderer extends BaseRenderer {
     // Only DB entities get the `__flat`, `__pk`, `__ownProps` and `__navProps` statics —
     // they exist solely to type filters, `$select`/`$sort` and `$with` in the DB layer.
     if (interfaceNode && isDbEntityNode(interfaceNode)) {
-      this.renderFlat(interfaceNode)
-      this.renderOwnProps(interfaceNode)
+      this.renderFlatMaps(interfaceNode)
       this.renderNavProps(interfaceNode)
       this.renderPk(interfaceNode)
       this.renderDimMeasure(interfaceNode)
@@ -268,6 +293,7 @@ export class TypeRenderer extends BaseRenderer {
     this.renderJsDoc(node)
     this.write(exported ? 'export ' : 'declare ')
     this.write(`type ${node.id!} = `)
+    // (`type X = A & X` is a compile error, its module is not generated)
     this.renderTypeDef(node.getDefinition())
     this.writeln()
     this.renderTypeNamespace(node)
@@ -308,7 +334,7 @@ export class TypeRenderer extends BaseRenderer {
     if (inputDef) {
       let realDef = inputDef
       if (isRef(inputDef)) {
-        realDef = this.doc.unwindType(inputDef.id!, inputDef.chain)?.def || realDef
+        realDef = this.doc.unwindRef(inputDef)?.def || realDef
       }
       realDef = this.doc.mergeIntersection(realDef)
       if (isStructure(realDef) || isInterface(realDef)) {
@@ -343,50 +369,71 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   /**
-   * Renders the `static __flat` property — a map of all dot-notation paths
-   * to their TypeScript value types.
+   * Renders the `static __flat` property — a map of all dot-notation paths to their TypeScript
+   * value types — and `static __ownProps` — the table-owned paths only (no nav props).
    *
    * This enables type-safe autocomplete for filter keys and `$select`/`$sort`
    * paths when using `AtscriptDbTable`. The `FlatOf<T>` utility type extracts
    * this map at the type level.
    *
-   * Special rendering rules:
-   * - **Intermediate paths** (structures, arrays of structures) → `never`
-   *   (prevents `$eq` comparisons, but allows `$select` and `$exists`)
-   * - **`@db.json` fields** → `string` (stored as serialized JSON in DB,
-   *   not individually queryable)
-   * - **Leaf fields** → their original TypeScript type
+   * The paths are the runtime flatten's (`flattenAnnotatedType`, as the db layer flattens the
+   * table) of the type's class in the build-time realm (see `realm.ts`); their TS types are the
+   * types written at them (see `flatDefinitions`). A type whose module fails to evaluate in the
+   * realm has neither (a comment in the output says so).
    */
-  private renderFlat(node: SemanticInterfaceNode) {
-    this.renderFlatMap('__flat', flattenInterfaceNode(this.doc, node))
-  }
-
-  /**
-   * Renders the `static __ownProps` property — table-owned fields only (no nav props).
-   */
-  private renderOwnProps(node: SemanticInterfaceNode) {
-    this.renderFlatMap('__ownProps', flattenInterfaceNode(this.doc, node, { skipNavProps: true }), {
+  private renderFlatMaps(node: SemanticInterfaceNode) {
+    let flat: Map<string, TAtscriptAnnotatedType>
+    try {
+      const realm = moduleRealm(this.doc, this.opts, compileValidatorsMode('js', this.opts))
+      const type = realm.classOf(this.doc, node.id!) as TAtscriptAnnotatedType<TAtscriptTypeObject>
+      if (type?.type?.kind !== 'object') {
+        // (its statements never ran: an import cycle they wait on each other in)
+        throw new Error(`${node.id} not built`)
+      }
+      flat = realm.rt.flattenAnnotatedType(type, { excludePhantomTypes: true })
+    } catch {
+      // (its module does not evaluate — error diagnostics — or the class is not
+      // built: no runtime paths)
+      this.writeln('// __flat / __ownProps omitted: the type failed to evaluate at build time')
+      return
+    }
+    const defs = flatDefinitions(this.doc, node)
+    this.renderFlatMap('__flat', flat, defs)
+    this.renderFlatMap('__ownProps', flat, defs, {
+      ownProps: true,
       leadingNewline: true,
       trailingNewline: true,
     })
   }
 
   /**
-   * Shared renderer for flat-map static properties (`__flat`, `__ownProps`).
+   * Shared renderer for flat-map static properties (`__flat`, `__ownProps`): the paths of `flat`
+   * (the runtime flatten) except the root and the sub-paths of `@db.json` fields (and, with
+   * `ownProps`, nav props and their sub-paths).
    *
    * Special rendering rules:
-   * - **Intermediate paths** (structures, arrays of structures) → `never`
+   * - **Intermediate paths** (structures, arrays of complex elements, unions of complex
+   *   branches only) → `never`
    * - **`@db.json` fields** → `string` (stored as serialized JSON in DB)
    * - **Leaf fields** → their original TypeScript type
-   * - **Optional leaf / `@db.json` fields** → `<type> | null` — the DB layer treats
-   *   optional as nullable in filters, so `null` must be assignable to the path's type
+   * - **Optional paths** (the field or one it is in is optional) → `?` and, unless
+   *   intermediate, `<type> | null` — the DB layer treats optional as nullable in filters, so
+   *   `null` must be assignable to the path's type
    */
   private renderFlatMap(
     propName: string,
-    flatMap: Map<string, TFlatFieldDescriptor>,
-    opts?: { leadingNewline?: boolean; trailingNewline?: boolean }
+    flat: Map<string, TAtscriptAnnotatedType>,
+    defs: ReturnType<typeof flatDefinitions>,
+    opts?: { ownProps?: boolean; leadingNewline?: boolean; trailingNewline?: boolean }
   ) {
-    if (flatMap.size === 0) {
+    const paths: Array<[string, TAtscriptAnnotatedType, boolean]> = []
+    for (const [path, type] of flat) {
+      const optional = path ? flatPathOptional(flat, path, type, !!opts?.ownProps) : undefined
+      if (optional !== undefined) {
+        paths.push([path, type, optional])
+      }
+    }
+    if (paths.length === 0) {
       return
     }
     if (opts?.leadingNewline) {
@@ -394,27 +441,19 @@ export class TypeRenderer extends BaseRenderer {
     }
     this.write(`static ${propName}: `)
     this.blockln('{}')
-    for (const [path, descriptor] of flatMap) {
+    for (const [path, type, optional] of paths) {
       this.write(`"${escapeQuotes(path)}"`)
-      if (descriptor.optional) {
+      if (optional) {
         this.write('?')
       }
       this.write(': ')
-      const nullable = descriptor.optional ? ' | null' : ''
-      if (descriptor.intermediate) {
-        this.writeln('never')
-      } else if (descriptor.dbJson) {
+      const nullable = optional ? ' | null' : ''
+      if (dbJson(type)) {
         this.writeln(`string${nullable}`)
+      } else if (intermediatePath(type)) {
+        this.writeln('never')
       } else {
-        // Use the original prop definition for rendering (preserves named refs like Address,
-        // and gives the renderer ref nodes it knows how to resolve to TS types).
-        // Fall back to descriptor.def for synthetic union merges or missing propNode.
-        const originalDef = descriptor.propNode?.getDefinition()
-        const defToRender =
-          originalDef && !(isGroup(descriptor.def) && descriptor.def !== originalDef)
-            ? originalDef
-            : descriptor.def
-        const lines = this.renderTypeDefString(defToRender).split('\n')
+        const lines = this.renderTypeDefString(flatTypeDef(defs(path))).split('\n')
         lines[lines.length - 1] += nullable
         lines.forEach(l => this.writeln(l))
       }
@@ -643,7 +682,7 @@ export class TypeRenderer extends BaseRenderer {
     }
     if (isRef(def)) {
       const ref = def as SemanticRefNode
-      const unwound = this.doc.unwindType(ref.id!, ref.chain)?.def
+      const unwound = this.doc.unwindRef(ref)?.def
       if (isPrimitive(unwound) && unwound.config.type === 'phantom') {
         return ref.hasChain ? `${ref.id!}.${ref.chain.map(c => c.text).join('.')}` : ref.id!
       }
@@ -679,6 +718,105 @@ export class TypeRenderer extends BaseRenderer {
   }
 }
 
+/** Whether flattened `type` is a `@db.json` field: a leaf, stored as a JSON string. */
+function dbJson(type: TAtscriptAnnotatedType): boolean {
+  return (type.metadata as Map<string, unknown>).has('db.json')
+}
+
+/** Whether flattened `type` is a nav prop (see `NAV_PROP_ANNOTATIONS`). */
+function navProp(type: TAtscriptAnnotatedType): boolean {
+  const metadata = type.metadata as Map<string, unknown>
+  return NAV_PROP_ANNOTATIONS.some(name => metadata.has(name))
+}
+
+/**
+ * Whether `path` (of `type`) of runtime flatten `flat` is optional (it or a path it is in is, see
+ * {@link optionalPath}); `undefined` when it is not listed: below a `@db.json` field, or with
+ * `ownProps` a nav prop or below one.
+ */
+function flatPathOptional(
+  flat: Map<string, TAtscriptAnnotatedType>,
+  path: string,
+  type: TAtscriptAnnotatedType,
+  ownProps: boolean
+): boolean | undefined {
+  let optional = false
+  for (let dot = path.indexOf('.'); dot >= 0; dot = path.indexOf('.', dot + 1)) {
+    const above = flat.get(path.slice(0, dot))
+    if (above && (dbJson(above) || (ownProps && navProp(above)))) {
+      return undefined
+    }
+    optional ||= !!above && optionalPath(above)
+  }
+  return ownProps && navProp(type) ? undefined : optional || optionalPath(type)
+}
+
+/**
+ * Whether the path of flattened `type` is optional: the field is, or (paths colliding into a
+ * union of their types) one of the fields there is.
+ */
+function optionalPath(type: TAtscriptAnnotatedType): boolean {
+  return (
+    !!type.optional ||
+    (type.type.kind === 'union' && (type.type as TAtscriptTypeComplex).items.some(i => i.optional))
+  )
+}
+
+/**
+ * Whether the path of flattened `type` is intermediate (rendered `never`): an object, an array of
+ * complex elements, a union (or tuple) of complex branches only (a mixed union is a leaf: its
+ * scalar branches compare).
+ */
+function intermediatePath(type: TAtscriptAnnotatedType): boolean {
+  switch (type.type.kind) {
+    case 'object': {
+      return true
+    }
+    case 'array': {
+      return complexType((type.type as TAtscriptTypeArray).of)
+    }
+    case 'union':
+    case 'tuple': {
+      const { items } = type.type as TAtscriptTypeComplex
+      return items.length > 0 && items.every(item => complexType(item))
+    }
+    default: {
+      return false
+    }
+  }
+}
+
+/** Whether `type` has sub-paths: an object, an array, a complex type with a complex item. */
+function complexType(type: TAtscriptAnnotatedType, seen = new Set<unknown>()): boolean {
+  const { kind } = type.type
+  if (kind === 'object' || kind === 'array') {
+    return true
+  }
+  if (kind === '' || seen.has(type.type)) {
+    return false
+  }
+  seen.add(type.type)
+  return (type.type as TAtscriptTypeComplex).items.some(item => complexType(item, seen))
+}
+
+/**
+ * The definition rendered as the TS type of a leaf path written as `defs` (see
+ * `flatDefinitions`): the prop's type as written (a named type stays named), its resolved
+ * definition when that is a union or tuple of another declaration, the union of them when
+ * several fields meet at the path.
+ */
+function flatTypeDef(defs: TFlatDefinition[]): SemanticNode | undefined {
+  if (defs.length > 1) {
+    return new SemanticGroup(
+      defs.map(d => d.def),
+      '|'
+    )
+  }
+  const [only] = defs
+  const written = only?.prop.getDefinition()
+  return written && !(isGroup(only.def) && only.def !== written) ? written : only?.def
+}
+
 function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
   if (!def) {
     return 'unknown'
@@ -696,13 +834,24 @@ function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
       return def.items.map(renderPrimitiveTypeDef).join(' | ')
     }
     case 'intersection': {
-      return def.items.map(renderPrimitiveTypeDef).join(' & ')
+      // `&` binds tighter than `|`: a union member is parenthesized.
+      return def.items
+        .map(item =>
+          typeof item === 'object' && item.kind === 'union'
+            ? `(${renderPrimitiveTypeDef(item)})`
+            : renderPrimitiveTypeDef(item)
+        )
+        .join(' & ')
     }
     case 'tuple': {
       return `[${def.items.map(renderPrimitiveTypeDef).join(', ')}]`
     }
     case 'array': {
-      return `${renderPrimitiveTypeDef(def.of)}[]`
+      const of = renderPrimitiveTypeDef(def.of)
+      return typeof def.of === 'object' &&
+        (def.of.kind === 'union' || def.of.kind === 'intersection')
+        ? `(${of})[]`
+        : `${of}[]`
     }
     case 'object': {
       const props = Object.entries(def.props)

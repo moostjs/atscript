@@ -1,8 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Helper } from "./extends-nested-base.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base } from "./extends-nested-base.as"
 
 export class Child {
@@ -15,39 +14,11 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "state",
-    $("object")
-      .prop(
-        "context",
-        $()
-          .refTo(() => Helper)
-          .$type
-      ).prop(
-        "items",
-        $("array")
-          .of($()
-              .refTo(() => Helper)
-              .$type)
-          .$type
-      ).prop(
-        "union",
-        $("union")
-          .item($()
-              .refTo(() => Helper)
-              .$type)
-          .item($().designType("string")
-              .tags("string")
-              .$type)
-          .$type
-      )
-      .$type
-  ).prop(
-    "id",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("state", $f(Base, "state"))
+  .prop("id", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

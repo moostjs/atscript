@@ -65,9 +65,9 @@ declare namespace T {
  */
 export declare class I1 {
   all: T
-  a: T["a"]
-  b: T["b"]
-  c: T["c"]
+  a: string /* a */
+  b: number /* b */
+  c: string /* c */
   static __is_atscript_annotated_type: true
   static type: TAtscriptTypeObject<keyof I1, I1>
   static metadata: TMetadataMap<AtscriptMetadata>

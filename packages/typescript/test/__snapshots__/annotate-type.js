@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class TString {
   static __is_atscript_annotated_type = true
@@ -16,7 +16,7 @@ export class TString {
 
 export class TString2 {
   static __is_atscript_annotated_type = true
-  static type = {}
+  static type = null
   static metadata = new Map()
   static id = "TString2"
   static toJsonSchema() {
@@ -38,7 +38,7 @@ class TO {
 
 export class TO2 {
   static __is_atscript_annotated_type = true
-  static type = {}
+  static type = null
   static metadata = new Map()
   static id = "TO2"
   static toJsonSchema() {
@@ -46,91 +46,47 @@ export class TO2 {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+const $R = [0, "@atscript/typescript:test/fixtures/annotate-type.as"]
 $("union", TString)
   .item($().designType("string")
-      .tags("string")
-      .$type)
+    .tags("string").$type)
   .item($().designType("number")
-      .tags("number")
-      .$type)
+    .tags("number").$type)
 
-// Ad-hoc annotations for TString
-$a(TString.metadata, "meta.label", "Labeled String")
-
-$("union", TString2)
-  .item($().designType("string")
-      .tags("string")
-      .$type)
-  .item($().designType("number")
-      .tags("number")
-      .$type)
-  .annotate("meta.label", "Labeled String 2")
+$al(TString2, TString)
+$a(TString2.metadata, "meta.label", "Labeled String 2")
 
 $("union", TO)
   .item($("object")
-      .prop(
-        "name",
-        $().designType("string")
-          .tags("string")
-          .$type
-      ).prop(
-        "age",
-        $().designType("number")
-          .tags("number")
-          .$type
-      )
-      .$type)
+    .prop("name", $().designType("string")
+      .tags("string").$type)
+    .prop("age", $().designType("number")
+      .tags("number").$type).$type)
   .item($("object")
-      .prop(
-        "kind",
-        $("union")
-          .item($()
-              .designType("string")
-              .value("abc")
-              .$type)
-          .item($()
-              .designType("string")
-              .value("def")
-              .$type)
-          .$type
-      )
-      .$type)
+    .prop("kind", $("union")
+      .item($()
+        .designType("string")
+        .value("abc").$type)
+      .item($()
+        .designType("string")
+        .value("def").$type).$type).$type)
 
-// Ad-hoc annotations for TO
-$a(TO.type.items[0].type.props.get("age")?.metadata, "meta.description", "Mutated Descr Age")
-$a(TO.type.items[1].type.props.get("kind")?.metadata, "meta.description", "Mutated Descr Kind")
-$a(TO.metadata, "meta.description", "Mutated Descr")
+$al(TO2, TO)
+$blk(null, 0, TO2, [
+  [[["meta.label", "Age"]], [["|0", 2], ["age", 2]]],
+  [[["meta.label", "Kind"]], [["|1", 2], ["kind", 2]]],
+])
 
-$("union", TO2)
-  .item($("object")
-      .prop(
-        "name",
-        $().designType("string")
-          .tags("string")
-          .$type
-      ).prop(
-        "age",
-        $().designType("number")
-          .tags("number")
-          .annotate("meta.label", "Age")
-          .$type
-      )
-      .$type)
-  .item($("object")
-      .prop(
-        "kind",
-        $("union")
-          .item($()
-              .designType("string")
-              .value("abc")
-              .$type)
-          .item($()
-              .designType("string")
-              .value("def")
-              .$type)
-          .annotate("meta.label", "Kind")
-          .$type
-      )
-      .$type)
+$blk($R, 0, TString, [
+  [[["meta.label", "Labeled String"]], []],
+])
+
+$blk($R, 1, TO, [
+  [[["meta.description", "Mutated Descr"]], []],
+  [[["meta.description", "Mutated Descr Age"]], [["|0", 0], ["age", 0]]],
+  [[["meta.description", "Mutated Descr Kind"]], [["|1", 0], ["kind", 0]]],
+])
 
 // prettier-ignore-end

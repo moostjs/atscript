@@ -189,10 +189,14 @@ Each branch attempt should be evaluated in its own error scope. If a branch fail
 
 ### Intersections
 
-An intersection (`A & B`) passes if the value matches **all** items:
+An intersection of object types is not an intersection node at runtime: the compiler [merges it](/packages/typescript/interfaces-types#how-a-merge-is-built) into one object type (`kind: 'object'`) whose props carry the merged annotations, and a union operand into a union of such objects. Validate it as an [object](#objects) or a [union](#unions); a key is unknown only when the merged object does not declare it.
+
+A node of `kind: 'intersection'` remains only where two sides each check something the merge cannot fold into one type (`'x' & S3`, `1 & number.int`, `string.email & string.uuid`) and in types built by hand with `defineAnnotatedType('intersection')`. It passes if the value matches **all** items:
 
 1. Validate against each item in order
 2. First failure → return fail immediately (short-circuit)
+
+Each item is checked on its own, like JSON Schema `allOf`: an object item reports a key only another item declares as unknown (with `unknownProps: 'error'`; `'strip'` removes it). Merge object types in `.as` (`A & B`) to get one object that knows every key.
 
 ### Tuples
 
@@ -222,6 +226,8 @@ Applied when the value is a valid string:
 **Evaluation order**: `@meta.required` first (fail fast on empty), then `@expect.minLength`, then `@expect.maxLength`, then `@expect.pattern`.
 
 **Pattern stacking**: `@expect.pattern` can appear multiple times on the same field (`multiple: true`, `mergeStrategy: 'append'`). All patterns must match — the first failing pattern produces the error.
+
+**Stateful flags**: the regex is compiled without `g` and `y`, so a value gets the same result on every call (with them, `RegExp.test` would resume from the `lastIndex` of the previous call). `g` changes nothing; `y` matches at the start of the value only, like `^` (also under `m`, where `^` matches after a line break too). The same holds for the regex of a pattern property (`[/^k/g]: string`). The compiler warns about both flags.
 
 ### Number Constraints
 
@@ -330,6 +336,8 @@ Accept a configurable maximum number of errors (default: 10). Once exceeded, sto
 ### Union Error Aggregation
 
 When a union fails (no branch matches), produce a single top-level error with all branch errors nested in `details`. This lets the consumer see exactly why each branch was rejected.
+
+A union nested in its own branches, with many branches each, rejects a value that fails deep down from every branch of every union above it: written out, its details grow exponentially with the depth. The reference validator decides such a union once per value and path within one `validate()` call, so the time stays proportional to the type and the value, and the result and the errors are the same as deciding it each time. The details are complete (nothing is left out): an outcome decided once is one error object wherever it is reported, so the error tree shares those objects and its memory stays proportional to the work. Walking every error of such a tree (or `JSON.stringify` of it) visits a shared error once per place it appears. Ordinary unions produce no shared errors.
 
 ## Partial Validation
 

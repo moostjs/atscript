@@ -13,6 +13,7 @@ import {
   type SemanticPrimitiveNode,
   type TNodeEntity,
 } from '../parser/nodes'
+import type { SemanticAnnotateNode } from '../parser/nodes/annotate-node'
 import type { Token } from '../parser/token'
 import type { TMessages } from '../parser/types'
 import type { TLexicalToken } from '../tokenizer/types'
@@ -208,7 +209,9 @@ export class AnnotationSpec {
 
     // 1. Check node type
     // Annotate block entries are ref nodes that reference props,
-    // so treat 'ref' as equivalent to 'prop' for nodeType checking
+    // so treat 'ref' as equivalent to 'prop' for nodeType checking. A top-level annotation of an
+    // `annotate` block applies to its target: checked against the target's node type once it
+    // resolves (see `validateDeferred`), unless the spec lists 'annotate' itself.
     const effectiveEntity =
       mainToken.parentNode.entity === 'ref' && this.config.nodeType?.includes('prop')
         ? 'prop'
@@ -216,7 +219,8 @@ export class AnnotationSpec {
     if (
       this.config.nodeType &&
       this.config.nodeType.length > 0 &&
-      !this.config.nodeType.includes(effectiveEntity)
+      !this.config.nodeType.includes(effectiveEntity) &&
+      effectiveEntity !== 'annotate'
     ) {
       messages.push({
         severity: 1,
@@ -309,16 +313,43 @@ export class AnnotationSpec {
     }
     const messages: TMessages = []
 
+    const nodeType = this.config.nodeType
+    if (
+      nodeType &&
+      nodeType.length > 0 &&
+      mainToken.parentNode.entity === 'annotate' &&
+      !nodeType.includes('annotate')
+    ) {
+      const entity = annotateTargetEntity(mainToken.parentNode as SemanticAnnotateNode, doc)
+      if (entity && !nodeType.includes(entity as TNodeEntity)) {
+        messages.push({
+          severity: 1,
+          message: `${mainToken.text} applies only to ${nodeType.join(', ')} nodes.`,
+          range: mainToken.range,
+        })
+      }
+    }
+
     if (this.config.defType?.length) {
       const parentNode = mainToken.parentNode
       const idToken = isRef(parentNode) ? parentNode.token('identifier') : undefined
       const isAnnotateEntry =
         !!idToken && !!doc.annotateBlockAt(idToken.range.start.line, idToken.range.start.character)
-      if (!isAnnotateEntry) {
+      if (parentNode.entity === 'annotate') {
+        // A top-level annotation of an `annotate` block applies to its target: checked against
+        // the type the target resolves to (through aliases and `annotate … as` aliases), like
+        // the same annotation written on the target's declaration.
+        const unwound = doc.unwindType((parentNode as SemanticAnnotateNode).targetName)
+        if (unwound?.def) {
+          messages.push(
+            ...(this.validateTargetType(unwound.def, mainToken.range, unwound.doc) || [])
+          )
+        }
+      } else if (!isAnnotateEntry) {
         let def = parentNode.getDefinition()
         let defDoc = doc
         if (isRef(def)) {
-          const unwound = doc.unwindType(def.id!, def.chain)
+          const unwound = doc.unwindRef(def)
           def = unwound?.def || def
           defDoc = unwound?.doc || doc
         }
@@ -359,7 +390,7 @@ export class AnnotationSpec {
       return undefined
     }
     let got: string
-    if (isGroup(def) && def.entity !== 'tuple' && def.op !== '&') {
+    if (isGroup(def) && describeNode(def) === 'union') {
       const members = doc ? nonNullishMembers(def, doc) : undefined
       if (members?.length && members.every(m => matchesDefType(m, defType))) {
         return undefined
@@ -425,6 +456,40 @@ export class AnnotationSpec {
 
 export function isAnnotationSpec(a?: TAnnotationsTree | AnnotationSpec): a is AnnotationSpec {
   return Boolean(a) && (a as AnnotationSpec).__is_annotation_spec
+}
+
+/**
+ * Calls `cb` with the full name (`db.table`, `$self` entries as their parent's name) of every
+ * annotation spec in `tree`. A tree reaching itself stops there; a spec several names share is
+ * reported under each.
+ */
+export function forEachAnnotationSpec(
+  tree: TAnnotationsTree,
+  cb: (name: string, spec: AnnotationSpec) => void
+): void {
+  const above = new Set<object>()
+  const walk = (node: TAnnotationsTree, prefix?: string) => {
+    if (above.has(node)) {
+      return
+    }
+    above.add(node)
+    if (node.$self && prefix) {
+      cb(prefix, node.$self)
+    }
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '$self' || !value || typeof value !== 'object') {
+        continue
+      }
+      const name = prefix ? `${prefix}.${key}` : key
+      if (isAnnotationSpec(value)) {
+        cb(name, value)
+      } else {
+        walk(value, name)
+      }
+    }
+    above.delete(node)
+  }
+  walk(tree)
 }
 
 export function resolveAnnotation(
@@ -493,7 +558,7 @@ function walkUnionMembers(
     let member: SemanticNode | undefined = item
     let memberDoc = doc
     if (isRef(member)) {
-      const unwound = doc?.unwindType(member.id!, member.chain)
+      const unwound = doc?.unwindRef(member)
       member = unwound?.def
       memberDoc = unwound?.doc || doc
     }
@@ -545,4 +610,25 @@ export function nonNullishMembers(
     }
   })
   return members
+}
+
+/**
+ * The node type an `annotate` block's top-level annotations apply to: its target's (`interface`
+ * or `type`; through an `annotate … as` alias, the alias's target's). `undefined` while the
+ * target does not resolve (reported elsewhere).
+ */
+function annotateTargetEntity(
+  node: SemanticAnnotateNode,
+  doc: AtscriptDoc,
+  seen = new Set<SemanticNode>()
+): string | undefined {
+  const owner = doc.getDeclarationOwnerNode(node.targetName)
+  const target = owner?.node
+  if (!target || seen.has(target)) {
+    return undefined
+  }
+  seen.add(target)
+  return target.entity === 'annotate'
+    ? annotateTargetEntity(target as SemanticAnnotateNode, owner.doc, seen)
+    : target.entity
 }

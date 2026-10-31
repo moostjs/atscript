@@ -169,6 +169,7 @@ function createMockConnection() {
 function createMockDocuments(textDocs: Map<string, TextDocument>) {
   return {
     onDidChangeContent: vi.fn(),
+    onDidClose: vi.fn(),
     listen: vi.fn(),
     get: vi.fn((uri: string) => textDocs.get(uri)),
   }
@@ -571,6 +572,46 @@ describe('rename', () => {
 })
 
 describe('completions', () => {
+  it('completes and diagnoses a recursive intersection', async () => {
+    const uri = 'file:///test.as'
+    const source = [
+      'export interface D {\n  d?: string\n}',
+      'export interface Self {\n  s: string\n  next?: Self & D\n}',
+      'annotate Self {\n  next.\n}',
+    ].join('\n')
+    const { handlers, connection, repo } = singleDocRepo(uri, source)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 8, character: 7 },
+    })
+    expect(result.map((i: any) => i.label)).toEqual(expect.arrayContaining(['s', 'next', 'd']))
+    await repo.checkDoc(await repo.openDocument(uri))
+    expect(connection.sendDiagnostics).toHaveBeenCalled()
+  })
+
+  it('completes two levels through an intersection-typed prop', async () => {
+    const uri = 'file:///test.as'
+    const source = [
+      'export interface D {\n  d?: string\n}',
+      'export interface Self {\n  s: string\n  next?: Self & D\n}',
+      'annotate Self {\n  next.next.\n}',
+      'export type Deep = Self.next.next.d',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, source)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 8, character: 12 },
+    })
+    expect((result ?? []).map((i: any) => i.label)).toEqual(
+      expect.arrayContaining(['s', 'next', 'd'])
+    )
+    // A chain reference through it resolves (go to definition of `d`).
+    const doc = createDoc(uri, source)
+    const definition = doc.getToDefinitionAt(10, 34)
+    expect(definition?.[0]?.targetRange.start.line).toBe(1)
+    expect(doc.unwindType('Self', ['next', 'next', 'd'])?.def).toBeDefined()
+  })
+
   it('suggests top-level keywords at empty line', async () => {
     const uri = 'file:///test.as'
     const { handlers } = singleDocRepo(uri, '')
@@ -971,6 +1012,31 @@ describe('type-guarded annotations on nullable fields', () => {
   })
 })
 
+describe('built-in @emit annotations', () => {
+  let builtIns: TAtscriptDocConfig
+  beforeAll(async () => {
+    builtIns = await new PluginManager({ unknownAnnotation: 'allow' }).getDocConfig()
+  })
+
+  it('offers and hovers @emit.compiledValidator from the built-in specs', async () => {
+    const uri = 'file:///test.as'
+    const source = '@emit.compiledValidator\n@emit.\ninterface User {\n  name: string\n}'
+    const { handlers } = singleDocRepo(uri, source, builtIns)
+    const completion = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 1, character: 6 },
+    })
+    const labels = completion.map((i: any) => i.label)
+    expect(labels).toContain('compiledValidator')
+    expect(labels).toContain('jsonSchema')
+    const hover = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 0, character: 10 },
+    })
+    expect(hover.contents.value).toContain('compiled validator check')
+  })
+})
+
 describe('signature help', () => {
   it('returns signature for annotation with args', async () => {
     const uri = 'file:///test.as'
@@ -1052,6 +1118,147 @@ describe('queue and debounce', () => {
     expect((repo as any).revalidateQueue.filter((id: string) => id === uri)).toHaveLength(1)
   })
 
+  it('runChecks keeps going (and returns to idle) when a check throws', async () => {
+    const uri = 'file:///test.as'
+    const { repo, connection } = singleDocRepo(uri, 'type T = string')
+    repo.checksDelay = 0
+    const checkDoc = vi.spyOn(repo, 'checkDoc').mockRejectedValueOnce(new Error('boom'))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      repo.addToChangeQueue(uri)
+      await repo.currentCheck
+      expect((repo as any).idle).toBe(true)
+      repo.addToChangeQueue(uri)
+      await repo.currentCheck
+      expect(checkDoc).toHaveBeenCalledTimes(2)
+      expect(connection.sendDiagnostics).toHaveBeenCalled()
+    } finally {
+      error.mockRestore()
+    }
+  })
+
+  it('a failed re-parse keeps the document marked changed (re-parsed by the next check)', async () => {
+    const uri = 'file:///test.as'
+    const { repo } = singleDocRepo(uri, 'type T = string')
+    repo.checksDelay = 0
+    const doc = await repo.openDocument(uri)
+    const update = vi.spyOn(doc, 'update').mockImplementationOnce(() => {
+      throw new Error('boom')
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      repo.addToChangeQueue(uri)
+      await repo.currentCheck
+      expect((repo as any).changedSet.has(uri)).toBe(true)
+      repo.addToChangeQueue(uri)
+      await repo.currentCheck
+      expect(update).toHaveBeenCalledTimes(2)
+      expect((repo as any).changedSet.has(uri)).toBe(false)
+    } finally {
+      error.mockRestore()
+    }
+  })
+
+  it('a changed document whose check throws still re-checks its dependants', async () => {
+    const [aUri, bUri] = ['file:///a.as', 'file:///b.as']
+    const a = createDoc(aUri, 'export interface A {\n  id: string\n}')
+    const b = createDoc(bUri, 'import { A } from "./a"\n\nexport interface B extends A {}')
+    b.updateDependencies([a])
+    const { repo } = createTestableRepo(
+      new Map(),
+      new Map([
+        [aUri, a],
+        [bUri, b],
+      ])
+    )
+    vi.spyOn(a, 'getDiagMessages').mockImplementation(() => {
+      throw new Error('boom')
+    })
+    await expect(repo.checkDoc(a, true)).rejects.toThrow('boom')
+    expect((repo as any).revalidateQueue).toEqual([bUri])
+  })
+
+  it('a change re-checks the documents importing it directly or not', () => {
+    const [aUri, bUri, cUri] = ['file:///a.as', 'file:///b.as', 'file:///c.as']
+    const a = createDoc(aUri, 'export interface A {\n  id: string\n}')
+    const b = createDoc(bUri, 'import { A } from "./a"\n\nexport interface B extends A {}')
+    const c = createDoc(cUri, 'import { B } from "./b"\n\nexport interface C extends B {}')
+    b.updateDependencies([a])
+    c.updateDependencies([b])
+    const { repo } = createTestableRepo(
+      new Map(),
+      new Map([
+        [aUri, a],
+        [bUri, b],
+        [cUri, c],
+      ])
+    )
+    repo.revalidateDependants(a)
+    expect((repo as any).revalidateQueue).toEqual([bUri, cUri])
+  })
+
+  describe('a change re-checks every importer, directly or not', () => {
+    /** Files a ← b ← c (c imports b imports a), checked once; `a` then gets `changed`. */
+    function chain(sources: [string, string, string], changed: string) {
+      const uris = ['a', 'b', 'c'].map(n => `file:///p/${n}.as`)
+      const [a, b, c] = sources.map((text, i) => createDoc(uris[i], text))
+      b.updateDependencies([a])
+      c.updateDependencies([b])
+      const { repo } = createTestableRepo(
+        new Map(),
+        new Map(uris.map((uri, i) => [uri, [a, b, c][i]]))
+      )
+      const before = c.getDiagMessages().map(m => m.message)
+      a.update(changed)
+      repo.revalidateDependants(a)
+      expect((repo as any).revalidateQueue).toEqual([uris[1], uris[2]])
+      return { before, after: c.getDiagMessages().map(m => m.message) }
+    }
+
+    it('a chained reference into a renamed member', () => {
+      const { before, after } = chain(
+        [
+          'export interface A {\n  x: { y: string }\n}',
+          'import { A } from "./a"\n\nexport interface B {\n  a: A\n}',
+          'import { B } from "./b"\n\nexport type T = B.a.x.y',
+        ],
+        'export interface A {\n  x: { z: string }\n}'
+      )
+      expect(before).toEqual([])
+      expect(after).toEqual([expect.stringContaining('"y"')])
+    })
+
+    it('an annotation through an alias chain whose type changed', () => {
+      const { before, after } = chain(
+        [
+          'export type S = string',
+          'import { S } from "./a"\n\nexport type S2 = S',
+          'import { S2 } from "./b"\n\nexport interface C {\n  @expect.pattern "x"\n  s: S2\n}',
+        ],
+        'export type S = number'
+      )
+      expect(before).toEqual([])
+      expect(after).not.toEqual([])
+    })
+
+    it('a type no longer exported, inlined through a merge', () => {
+      // (a union member merged with each branch: the branches' types are shared, imported)
+      const { before, after } = chain(
+        [
+          'export interface H {\n  h: string\n}\n\nexport type HU = H | { k?: string }',
+          'import { HU } from "./a"\n\nexport type BU = HU',
+          'import { BU } from "./b"\n\nexport type C = BU & { e?: string }',
+        ],
+        'interface H {\n  h: string\n}\n\nexport type HU = H | { k?: string }'
+      )
+      // (the merge is built from c.as's operands — references —: C never names H, so H no
+      // longer exported is not an error of c.as; `annotate-referenced.spec.ts` "a merge through
+      // an alias of a union whose member is not exported" loads and validates C)
+      expect(before).toEqual([])
+      expect(after).toEqual([])
+    })
+  })
+
   it('runChecks processes queue and sends diagnostics', async () => {
     const uri = 'file:///test.as'
     const { repo, connection } = singleDocRepo(uri, 'type T = string')
@@ -1083,7 +1290,7 @@ describe('watched .as file changes', () => {
     return { ...createTestableRepo(textDocs, atscriptDocs), a, b }
   }
 
-  it('closes a changed file that is not open in the editor and re-checks its dependants', async () => {
+  it('closes a changed file that is not open in the editor and re-checks it and its dependants', async () => {
     const { repo, connection, a, b } = importerRepo([aUri])
     repo.checksDelay = 0
 
@@ -1092,15 +1299,21 @@ describe('watched .as file changes', () => {
     expect((repo as any).atscripts.has(bUri)).toBe(false)
     expect((repo as any).atscripts.has(aUri)).toBe(true)
     expect((repo as any).revalidateQueue).toEqual([aUri])
+    // (the changed file itself too: read again from disk, checked as changed)
+    expect((repo as any).changeQueue).toEqual([bUri])
     // The dependant keeps its wiring until its own check re-opens the import.
     expect(a.dependencies.has(b)).toBe(true)
 
     await repo.currentCheck
     expect(connection.sendDiagnostics).toHaveBeenCalledWith(expect.objectContaining({ uri: aUri }))
-    // The changed file itself is not re-opened: it may no longer exist.
-    expect(connection.sendDiagnostics).not.toHaveBeenCalledWith(
-      expect.objectContaining({ uri: bUri })
-    )
+  })
+
+  it('clears the problems of a deleted file that is not open, and re-checks its dependants', async () => {
+    const { repo, connection } = importerRepo([aUri])
+    repo.checksDelay = 0
+    await repo.onAsFileChanged(bUri, true)
+    expect((repo as any).revalidateQueue).toEqual([aUri])
+    expect(connection.sendDiagnostics).toHaveBeenCalledWith({ uri: bUri, diagnostics: [] })
   })
 
   it('leaves a file that is open in the editor alone', async () => {
@@ -1110,20 +1323,21 @@ describe('watched .as file changes', () => {
     expect((repo as any).revalidateQueue).toEqual([])
   })
 
-  it('ignores a file the repo never opened', async () => {
+  it('checks a file the repo never opened (created), and no other', async () => {
     const { repo } = importerRepo([aUri])
     await repo.onAsFileChanged('file:///c.as')
     expect((repo as any).atscripts.size).toBe(2)
     expect((repo as any).revalidateQueue).toEqual([])
+    expect((repo as any).changeQueue).toEqual(['file:///c.as'])
   })
 
-  it('drops a cached open that failed without queueing anything', async () => {
+  it('drops a cached open that failed, and checks the file again', async () => {
     const { repo } = importerRepo([aUri])
     const cUri = 'file:///c.as'
     ;(repo as any).atscripts.set(cUri, Promise.reject(new Error('Document not found')))
     await repo.onAsFileChanged(cUri)
     expect((repo as any).atscripts.has(cUri)).toBe(false)
-    expect((repo as any).revalidateQueue).toEqual([])
+    expect((repo as any).changeQueue).toEqual([cUri])
   })
 
   it('is driven by onDidChangeWatchedFiles for .as uris only', async () => {
@@ -1136,7 +1350,7 @@ describe('watched .as file changes', () => {
       ],
     })
     expect(spy).toHaveBeenCalledTimes(1)
-    expect(spy).toHaveBeenCalledWith(bUri)
+    expect(spy).toHaveBeenCalledWith(bUri, false)
   })
 })
 
@@ -1648,6 +1862,21 @@ interface Customer {
       expect(messages.filter((m: string) => m.includes('Unknown property'))).toEqual([])
       expect(messages.filter((m: string) => m.includes("'amount'"))).toEqual([])
     })
+  })
+  it('checks a top-level annotation of an annotate block against the node type of its target', async () => {
+    const { repo, connection, doc, textDoc } = hookRepo(
+      `interface Tgt {\n  a: number\n}\ntype Shape = {\n  a: number\n}\n@test.table\nannotate Tgt {\n  a\n}\n@test.table\nannotate Shape {\n  a\n}\n@test.table\nexport annotate Tgt as TgtAlias {\n  a\n}\n@test.table\nannotate TgtAlias {\n  a\n}\n`
+    )
+    await repo.checkDoc(doc)
+    const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+    const text = textDoc.getText()
+    const shapeLine = textDoc.positionAt(text.indexOf('@test.table\nannotate Shape')).line
+    // (only the block of the type: `@test.table` applies to interfaces, the others' targets are)
+    expect(
+      diagnostics
+        .filter((d: any) => d.message.includes('applies only to'))
+        .map((d: any) => [d.range.start.line, d.message])
+    ).toEqual([[shapeLine, '@test.table applies only to interface nodes.']])
   })
   describe('valueScope argument (values declared elsewhere in the document)', () => {
     const union = `type Status = 'open' | 'in_progress' | 'closed'\n`

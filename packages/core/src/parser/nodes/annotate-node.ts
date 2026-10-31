@@ -35,6 +35,14 @@ export class SemanticAnnotateNode extends SemanticNode {
     return []
   }
 
+  private _annotatedEntries?: SemanticRefNode[]
+
+  /** The entries that carry annotations (an entry without any annotates nothing). */
+  get annotatedEntries(): SemanticRefNode[] {
+    this._annotatedEntries ??= this.entries.filter(e => !!e.annotations?.length)
+    return this._annotatedEntries
+  }
+
   get id() {
     return this.token('identifier')?.text ?? this.targetName
   }
@@ -68,10 +76,8 @@ export class SemanticAnnotateNode extends SemanticNode {
     // Detect duplicate entries (same approach as SemanticStructureNode for props)
     const seenEntries = new Set<string>()
     for (const entry of this.entries) {
-      const entryPath = entry.hasChain
-        ? `${entry.id}.${entry.chain.map(c => c.text).join('.')}`
-        : entry.id!
-      if (seenEntries.has(entryPath)) {
+      const path = entryPath(entry)
+      if (seenEntries.has(path)) {
         const idRange = entry.token('identifier')!.range
         const endRange = entry.hasChain ? entry.chain[entry.chain.length - 1].range : idRange
         doc.messages.push({
@@ -81,7 +87,7 @@ export class SemanticAnnotateNode extends SemanticNode {
         })
         continue
       }
-      seenEntries.add(entryPath)
+      seenEntries.add(path)
     }
 
     // Register child refs into tokensIndex (for chain completions/hover).
@@ -94,4 +100,14 @@ export class SemanticAnnotateNode extends SemanticNode {
       doc.registerAnnotation(val)
     })
   }
+}
+
+/** The prop path (`['a', 'b', 'c']`) an `annotate` entry addresses. */
+export function entryParts(entry: SemanticRefNode): string[] {
+  return [entry.id!, ...entry.chain.map(c => c.text)]
+}
+
+/** The dotted path (`a.b.c`) an `annotate` entry addresses. */
+function entryPath(entry: SemanticRefNode): string {
+  return entry.hasChain ? entryParts(entry).join('.') : entry.id!
 }

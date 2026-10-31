@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $ft as $ft, $fc as $fc, $alias as $al, $blk as $blk, $sh as $sh, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 class Contact {
   static __is_atscript_annotated_type = true
@@ -38,7 +38,7 @@ export class Deep {
 
 export class AliasedDeep {
   static __is_atscript_annotated_type = true
-  static type = {}
+  static type = null
   static metadata = new Map()
   static id = "AliasedDeep"
   static toJsonSchema() {
@@ -46,93 +46,38 @@ export class AliasedDeep {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+const $R = [0, "@atscript/typescript:test/fixtures/annotate-deep-ref.as"]
 $("object", Contact)
-  .prop(
-    "phone",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Phone")
-      .$type
-  ).prop(
-    "email",
-    $().designType("string")
-      .tags("email", "string")
-      .annotate("label", "Email")
-      .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-      .$type
-  )
+  .prop("phone", $().designType("string")
+    .tags("string").annotate("label", "Phone").$type)
+  .prop("email", $().designType("string")
+    .tags("email", "string").annotate("label", "Email").annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true).$type)
 
 $("object", Address)
-  .prop(
-    "street",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Street")
-      .$type
-  ).prop(
-    "contact",
-    $()
-      .refTo(Contact)
-      .$type
-  )
+  .prop("street", $().designType("string")
+    .tags("string").annotate("label", "Street").$type)
+  .prop("contact", $().ref(Contact).$type)
 
 $("object", Deep)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Name")
-      .$type
-  ).prop(
-    "address",
-    $()
-      .refTo(Address)
-      .$type
-  )
+  .prop("name", $().designType("string")
+    .tags("string").annotate("label", "Name").$type)
+  .prop("address", $().ref(Address).$type)
 
-// Ad-hoc annotations for Deep
-$c(Deep.type, "address")
-$c(Deep.type.props.get("address")?.type, "contact")
-$a(Deep.type.props.get("address")?.type.props.get("contact")?.type.props.get("phone")?.metadata, "label", "Mobile Phone")
-$a(Deep.metadata, "meta.description", "Mutated Deep")
+$sh(Deep, [[["address", 0], ["contact", 2]]])
 
-$("object", AliasedDeep)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Name")
-      .$type
-  ).prop(
-    "address",
-    $("object")
-      .prop(
-        "street",
-        $().designType("string")
-          .tags("string")
-          .annotate("label", "Street")
-          .$type
-      ).prop(
-        "contact",
-        $("object")
-          .prop(
-            "phone",
-            $().designType("string")
-              .tags("string")
-              .annotate("label", "Work Phone")
-              .$type
-          ).prop(
-            "email",
-            $().designType("string")
-              .tags("email", "string")
-              .annotate("label", "Email")
-              .annotate("expect.pattern", { pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",  flags: "",  message: "Invalid email format." }, true)
-              .$type
-          )
-          .$type
-      )
-      .$type
-  )
-  .annotate("meta.description", "Aliased Deep")
+$sh(Deep, [[["address", 0], ["contact", 2], ["phone", 2]]])
+
+$al(AliasedDeep, Deep)
+$a(AliasedDeep.metadata, "meta.description", "Aliased Deep")
+$blk(null, 0, AliasedDeep, [
+  [[["label", "Work Phone"]], [["address", 2], ["contact", 2], ["phone", 2]]],
+])
+
+$blk($R, 0, Deep, [
+  [[["meta.description", "Mutated Deep"]], []],
+  [[["label", "Mobile Phone"]], [["address", 0], ["contact", 2], ["phone", 2]]],
+])
 
 // prettier-ignore-end

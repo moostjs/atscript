@@ -1,8 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, registerCompiledCheck as $cv } from "@atscript/typescript/utils"
-import { JsonValue } from "./extends-recursive-base.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, registerCompiledCheck as $cv, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base } from "./extends-recursive-base.as"
 
 export class Child {
@@ -15,37 +14,15 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "state",
-    $("object")
-      .prop(
-        "context",
-        $()
-          .refTo(() => JsonValue)
-          .$type
-      ).prop(
-        "meta",
-        $("object")
-          .propPattern(
-            /^.+$/,
-            $()
-              .refTo(() => JsonValue)
-              .$type
-          )
-          .optional()
-          .$type
-      )
-      .$type
-  ).prop(
-    "id",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("state", $f(Base, "state"))
+  .prop("id", $().designType("string")
+    .tags("string").$type)
 
 // Compiled validator checks
-$cv(Child, 2, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","meta"],[[0,0,-1,"",0],[1,0,2,"",2]]],[7],[0,"string"]],[0,0,0,"",2],2], (K, H) => {
+$cv(Child, 4, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","meta"],[[0,0,-1,"",0],[1,0,2,"",2]]],[7],[0,"string"]],[0,0,0,"",2],2], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {

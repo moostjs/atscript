@@ -63,9 +63,14 @@ export class BaseRenderer extends CodePrinter {
       isUnusedImport = false
     }
     if (!isUnusedImport) {
-      this.writeln(`import { ${refs.join(', ')} } from "${from}"`)
+      const line = `import { ${refs.join(', ')} } from "${from}"`
+      this.writeln(line)
+      this.importKept(node, refs, line)
     }
   }
+
+  /** An import the rendered module keeps (`names`: those it uses; `line`: its statement). */
+  protected importKept(_node: SemanticImportNode, _names: string[], _line: string) {}
 
   renderNode(node: SemanticNode) {
     switch (node.entity) {

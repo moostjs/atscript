@@ -1,246 +1,293 @@
+import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import {
-  annotate,
-  cloneRefProp,
-  defineAnnotatedType,
-  type TAnnotatedTypeHandle,
-  type TAtscriptAnnotatedType,
-  type TAtscriptTypeDef,
-} from '../runtime/annotated-type'
-import { buildLayout, layoutSource } from '../runtime/compiled-check/build-layout'
-import { emitCheckFactory } from '../runtime/compiled-check/emit'
+  buildLayout,
+  layoutSource,
+  LayoutTooLarge,
+  type TClassifyType,
+} from '../runtime/compiled-check/build-layout'
+import {
+  emitCheckFactory,
+  EXT_MEMO_UNION,
+  EXT_MULTI_UNION,
+  EXT_OBJECT_UNION,
+  type TExtReach,
+} from '../runtime/compiled-check/emit'
 import { D_UNKNOWN, INTERP, LAYOUT_VERSION } from '../runtime/compiled-check/layout'
-import { isValidatorKey } from '../runtime/compiled-check/tracking'
+import type { TLayout } from '../runtime/compiled-check/layout'
 import { getRegex } from '../runtime/validator-fast-check'
 
-/** One step of a mutating-annotate accessor path (see `JsRenderer.buildMutatingAccessors`). */
-export type TAccessorStep = 'type' | ['props', string] | ['items', number]
-
-/** Kinds of the opaque types standing for another module's types (see {@link classifyType}). */
-const EXT_KIND = '#ext'
-const INTERP_KIND = '#interp'
-
-/**
- * How the layout treats a model type: `'ext'` — another module's type referenced as a
- * whole (also an alias / prop clone of one: `cloneTypeDef` keeps the kind); `'interp'` — a
- * chained reference into another module's type, only known at runtime.
- */
-function classifyType(type: unknown): 'ext' | 'interp' | undefined {
-  const kind = (type as { kind?: unknown } | null | undefined)?.kind
-  return kind === EXT_KIND ? 'ext' : kind === INTERP_KIND ? 'interp' : undefined
+/** A generated module, as its compiled checks see it (see {@link compiledCheckRegistrations}). */
+export interface TCompiledModule {
+  /** Its classes (evaluated), by name. */
+  classes: ReadonlyMap<string, TAtscriptAnnotatedType>
+  /** The classes that get a compiled check, in the order their chains run. */
+  compiled: readonly string[]
+  /** The types of every class of the build (the realm's modules). */
+  allClasses: ReadonlySet<unknown>
 }
 
 /**
- * Build-time model of the runtime type trees a generated `.as.js` module builds, used to
- * compile validator checks (`compileValidators`).
+ * The arguments of the `$cv(Name, version, layout, factory[, steps])` registrations of a
+ * generated module's compiled validator checks (`compileValidators`) — and of the merges written
+ * in classes' trees their checks bind to (see `layoutOf`) —, the classes that cannot be compiled
+ * left out (their root type unknown: a class whose chain built nothing).
  *
- * The renderer drives it in lockstep with the builder chains it emits, through the real
- * runtime builder (`defineAnnotatedType`, `annotate`, `cloneRefProp`), so the model has
- * the same structure, the same type-def sharing (by identity) and the same validator
- * annotations as the module after its initialisation. Only the annotations the validator
- * pre-check reads are recorded. Types of other modules are opaque markers: a reference to
- * one (also an alias or a cloned prop of one) compiles to a cross-module site, bound at
- * runtime to the referenced class's own compiled check (see compiled-check/registry.ts).
- *
- * Anything the model cannot follow marks it broken; nothing is compiled then. A model that
- * nevertheless diverges from the runtime only costs speed: the runtime bind detects it and
- * the interpreted pre-check runs.
+ * Runs in the build-time realm (see `codegen/realm.ts`, `realm-runtime.ts`) on the objects the
+ * generated modules of the build build: the layouts describe them, with every block of the build
+ * applied. A runtime that differs (another set of modules loaded, a later write) only costs speed:
+ * the bind verifies the live tree and the key masks, and the interpreted pre-check runs.
  */
-export class ValidationModel {
-  /** The model could not follow the emitted code: compile nothing. */
-  broken = false
-  /** Handle of the chain being emitted (the target of `.annotate(…)` lines). */
-  current: TAnnotatedTypeHandle | undefined
-  private readonly classes = new Map<string, TAtscriptAnnotatedType>()
-  private readonly markers = new Map<string, TAtscriptAnnotatedType>()
+export function compiledCheckRegistrations(module: TCompiledModule): string[] {
+  return new CompiledChecks(module).registrations()
+}
 
-  /** Runs a model step; a throw marks the model broken. */
-  run<T>(step: () => T): T | undefined {
-    if (this.broken) {
-      return undefined
-    }
-    try {
-      return step()
-    } catch {
-      this.broken = true
-      return undefined
-    }
+class CompiledChecks {
+  /** The types of the module's classes. */
+  private readonly classTypes: Set<unknown>
+
+  constructor(private readonly module: TCompiledModule) {
+    this.classTypes = new Set([...module.classes.values()].map(c => c.type as unknown))
   }
 
-  /** Declares a generated class (`static type = {}; static metadata = new Map()`). */
-  declare(name: string): void {
-    this.classes.set(name, {
-      __is_atscript_annotated_type: true,
-      type: {},
-      metadata: new Map(),
-      name,
-    } as any)
-  }
-
-  /** The model of a class declared in this module (anything else: the emitted code throws). */
-  private classBase(name: string): TAtscriptAnnotatedType {
-    const cls = this.classes.get(name)
-    if (!cls) {
-      throw new Error(`${name} is not a class of this module`)
-    }
-    return cls
-  }
-
-  /** `$(kind, name?)`. */
-  handle(kind: string, name?: string): TAnnotatedTypeHandle | undefined {
-    return this.run(() =>
-      defineAnnotatedType(kind as any, name === undefined ? undefined : this.classBase(name))
-    )
-  }
-
-  /** `.refTo(Local)` / `.refTo(() => Imported)` (with an optional chain). */
-  refTo(
-    handle: TAnnotatedTypeHandle | undefined,
-    name: string,
-    imported: boolean,
-    chain?: string[]
-  ) {
-    this.run(() => {
-      if (!handle) {
-        throw new Error('no chain')
-      }
-      if (imported) {
-        // A chained import resolves to a nested type only the runtime knows.
-        const marker = this.marker(name, chain ? INTERP_KIND : EXT_KIND)
-        handle.refTo(() => marker as any, chain)
-      } else {
-        handle.refTo(this.classBase(name) as any, chain)
-      }
-    })
-  }
-
-  /** The opaque stand-in of another module's type `name`. */
-  private marker(name: string, kind: string): TAtscriptAnnotatedType {
-    const key = `${name}${kind}`
-    let marker = this.markers.get(key)
-    if (!marker) {
-      marker = { __is_atscript_annotated_type: true, type: { kind }, metadata: new Map() } as any
-      this.markers.set(key, marker!)
-    }
-    return marker!
-  }
-
-  /** `.annotate(key, value, multiple)` on the current chain (validator keys only). */
-  annotate(key: string, value: unknown, multiple: boolean) {
-    if (!isValidatorKey(key)) {
-      return
-    }
-    this.run(() => {
-      if (!this.current) {
-        throw new Error('no chain')
-      }
-      this.current.annotate(key as any, value, multiple)
-    })
-  }
-
-  /** The node a mutating-annotate accessor (`Name.type.props.get("a")?…`) points at. */
-  private resolve(name: string, steps: TAccessorStep[]): any {
-    let cur: any = this.classes.get(name)
-    for (const step of steps) {
-      if (cur === undefined || cur === null) {
-        return undefined
-      }
-      if (step === 'type') {
-        cur = cur.type
-        // Opaque (another module's) types are mutated by their own module's model.
-        if (classifyType(cur) !== undefined) {
-          return undefined
-        }
-      } else if (step[0] === 'props') {
-        cur = cur.props?.get(step[1])
-      } else {
-        cur = cur.items?.[step[1]]
+  registrations(): string[] {
+    const out: string[] = []
+    for (const name of this.module.compiled) {
+      const cls = this.module.classes.get(name)
+      const found = cls && this.layoutOf(cls)
+      if (found) {
+        const { layout, ext } = found
+        out.push(
+          `${name}, ${LAYOUT_VERSION}, ${layoutSource(layout)}, ${emitCheckFactory(layout, extReach(ext))}`
+        )
       }
     }
-    return cur
-  }
-
-  /** `$c(<accessor>, "prop")`. */
-  cloneProp(name: string, steps: TAccessorStep[], prop: string) {
-    this.run(() => {
-      const parent = this.resolve(name, steps) as TAtscriptTypeDef | undefined
-      if (parent) {
-        cloneRefProp(parent, prop)
-      }
-    })
-  }
-
-  /** `<accessor>.metadata.delete(key)`. */
-  deleteAnnotation(name: string, steps: TAccessorStep[], key: string) {
-    this.run(() => {
-      this.resolve(name, steps)?.metadata?.delete(key)
-    })
-  }
-
-  /** `$a(<accessor>.metadata, key, value, multiple)`. */
-  mutateAnnotation(
-    name: string,
-    steps: TAccessorStep[],
-    key: string,
-    value: unknown,
-    multiple: boolean
-  ) {
-    if (!isValidatorKey(key)) {
-      return
-    }
-    this.run(() => {
-      annotate(this.resolve(name, steps)?.metadata, key as any, value as any, multiple)
-    })
+    return out
   }
 
   /**
-   * `$cv(Name, version, layout, factory)` for class `name`, or `undefined` when it cannot be
-   * compiled (its root type is only known at runtime, or the model is broken).
+   * Another module's class: always a site, bound at runtime to that class's own check — at a
+   * reference to it, or at a node typed by a merge's hidden class. A node holding the def itself
+   * (its own prop, which an alias class of the field shares, `ChainAlias = Address.street`:
+   * references, not copies) is inlined like any.
    */
-  registration(name: string): string | undefined {
-    if (this.broken) {
-      return undefined
-    }
-    const cls = this.classes.get(name)
-    if (!cls) {
-      return undefined
-    }
-    let layout
+  private readonly foreign: TClassifyType = (type, node) =>
+    this.module.allClasses.has(type) &&
+    !this.classTypes.has(type) &&
+    (node === undefined || (node as TAtscriptAnnotatedType).ref !== undefined)
+      ? 'ext'
+      : undefined
+
+  /**
+   * The layout of the check of class `root`: what it reaches inlined — or, beyond
+   * `MAX_INLINED_DEFS`, the other classes it references as sites bound at runtime to their own
+   * compiled checks, so its code covers its own tree, however large (a class of thousands of props
+   * compiles like any; a chain of classes compiles in code linear in its length), with the node
+   * of each of its EXT sites (by its first slot). `undefined` when it cannot be compiled.
+   */
+  private layoutOf(
+    root: TAtscriptAnnotatedType
+  ): { layout: TLayout; ext: Map<number, TAtscriptAnnotatedType> } | undefined {
+    /** The check of a node holding another class: theirs (`whole`), or only when it is large. */
+    const classify =
+      (whole: boolean): TClassifyType =>
+      (type, node) => {
+        if (node === root || type === root.type) {
+          return undefined
+        }
+        if (this.foreign(type, node)) {
+          return 'ext'
+        }
+        if (
+          this.classTypes.has(type) &&
+          (whole || this.reachesMany(node as TAtscriptAnnotatedType))
+        ) {
+          return 'ext'
+        }
+        return undefined
+      }
+    /** The node of each EXT site (by its first slot). */
+    const ext = new Map<number, TAtscriptAnnotatedType>()
+    const onExt = (slot: number, node: TAtscriptAnnotatedType) => ext.set(slot, node)
+    let layout: TLayout
     try {
-      layout = buildLayout(cls, { regex: getRegex }, classifyType)
-    } catch {
-      return undefined
+      layout = buildLayout(root, { regex: getRegex }, classify(false), {
+        maxDefs: MAX_INLINED_DEFS,
+        onExt,
+      })
+    } catch (error) {
+      if (!(error instanceof LayoutTooLarge)) {
+        return undefined
+      }
+      ext.clear()
+      try {
+        layout = buildLayout(root, { regex: getRegex }, classify(true), { onExt })
+      } catch {
+        return undefined
+      }
     }
-    const root = layout[1][2]
+    const top = layout[1][2]
     // A root only known at runtime, or one the module never builds (a forward alias).
-    if (root === INTERP || (root >= 0 && layout[0][root][0] === D_UNKNOWN)) {
+    if (top === INTERP || (top >= 0 && layout[0][top][0] === D_UNKNOWN)) {
       return undefined
     }
-    return `$cv(${name}, ${LAYOUT_VERSION}, ${layoutSource(layout)}, ${emitCheckFactory(layout)})`
+    return { layout, ext }
+  }
+
+  /** Whether node `node` reaches more than `MAX_SHARED_INLINED_DEFS` type defs (by type). */
+  private reachesMany(node: TAtscriptAnnotatedType): boolean {
+    let many = this.many.get(node.type)
+    if (many === undefined) {
+      try {
+        buildLayout(node, { regex: getRegex }, this.foreign, {
+          maxDefs: MAX_SHARED_INLINED_DEFS,
+        })
+        many = false
+      } catch {
+        many = true
+      }
+      this.many.set(node.type, many)
+    }
+    return many
+  }
+
+  private readonly many = new Map<unknown, boolean>()
+}
+
+/**
+ * A class, or a merge, reaching more type defs than this has its own check, which the checks of
+ * other classes and merges call instead of inlining it (see `layoutOf`): small ones are inlined
+ * (what makes compiled checks fast), large ones compile once, not once per class reaching them.
+ */
+const MAX_SHARED_INLINED_DEFS = 128
+
+/**
+ * The most type defs a class's compiled check inlines of the other classes of its module it
+ * reaches: beyond it, they are sites bound at runtime to their own compiled checks (see
+ * `layoutOf`) — a chain of classes compiles in code linear in its length, not quadratic.
+ * Every class compiles whatever its size.
+ */
+const MAX_INLINED_DEFS = 500
+
+/** The defs of the sites below def `def`, as a layout describes them (see `buildLayout`). */
+function childDefs(def: any): object[] {
+  let nodes: TAtscriptAnnotatedType[]
+  switch (def.kind) {
+    case 'object': {
+      nodes = def.propsPatterns?.length > 0 ? [] : [...def.props.values()]
+      break
+    }
+    case 'array': {
+      nodes = [def.of]
+      break
+    }
+    case 'union':
+    case 'intersection':
+    case 'tuple': {
+      nodes = def.items
+      break
+    }
+    default: {
+      nodes = []
+    }
+  }
+  return nodes.map(n => n?.type).filter(d => d && typeof d === 'object') as object[]
+}
+
+/** What each def reaches (see {@link unionReach}), once known. */
+const reachMemo = new WeakMap<object, number>()
+
+/** What the EXT sites of a layout reach in the whole type tree (`ext`: their nodes, by slot). */
+function extReach(ext: Map<number, TAtscriptAnnotatedType>): TExtReach {
+  return slot => {
+    const node = ext.get(slot)
+    return node ? unionReach(node) : 0
   }
 }
 
 /**
- * Runtime value of an annotation argument the emitted code writes as a raw expression
- * (`true`, `5`, `-1.5`, …). Anything else is opaque (truthy and not a number): the bind
- * compares only presence / truthiness and reads the real values at runtime.
+ * What the check of `node` reaches in the whole type tree — across modules: a union over objects
+ * ({@link EXT_OBJECT_UNION}), a union branching into several branches reaching such unions
+ * ({@link EXT_MULTI_UNION}), a union taking part in the memo ({@link EXT_MEMO_UNION}) — the rules
+ * of `CheckEmitter.memoDefs`, on the tree as if nothing were cut into modules' checks. An EXT
+ * site counts so in the check that calls it: a structure exponential only across modules
+ * memoizes as one inlined would, and an ordinary union of imported types gets the code it gets
+ * inlined.
  */
-export function rawLiteralValue(text: string): unknown {
-  switch (text) {
-    case 'true': {
-      return true
-    }
-    case 'false': {
-      return false
-    }
-    case 'null': {
-      return null
-    }
-    case 'undefined': {
-      return undefined
-    }
-    default: {
-      const n = Number(text)
-      return text.trim() !== '' && !Number.isNaN(n) ? n : { opaque: text }
+function unionReach(node: TAtscriptAnnotatedType): number {
+  const start = node.type as unknown
+  if (!start || typeof start !== 'object') {
+    return 0
+  }
+  const known = reachMemo.get(start)
+  if (known !== undefined) {
+    return known
+  }
+  // (the defs below it not known yet; those known are leaves)
+  const defs: any[] = []
+  const index = new Map<object, number>()
+  const kids: object[][] = []
+  const stack: object[] = []
+  const visit = (d: object) => {
+    if (!reachMemo.has(d) && !index.has(d)) {
+      index.set(d, defs.length)
+      defs.push(d)
+      stack.push(d)
     }
   }
+  visit(start)
+  while (stack.length > 0) {
+    const d = stack.pop()!
+    const children = childDefs(d)
+    kids[index.get(d)!] = children
+    children.forEach(visit)
+  }
+  const parents: number[][] = defs.map(() => [])
+  kids.forEach((children, i) => {
+    for (const c of children) {
+      const j = index.get(c)
+      if (j !== undefined) {
+        parents[j].push(i)
+      }
+    }
+  })
+  const bits: number[] = defs.map(() => 0)
+  const has = (c: object, bit: number) => {
+    const j = index.get(c)
+    return ((j === undefined ? (reachMemo.get(c) ?? 0) : bits[j]) & bit) !== 0
+  }
+  /** Marks the defs reaching a seed (themselves included), or a known def with `bit`. */
+  const spread = (bit: number, seed: (i: number) => boolean) => {
+    const work: number[] = []
+    defs.forEach((_, i) => {
+      if (seed(i) || kids[i].some(c => !index.has(c) && has(c, bit))) {
+        bits[i] |= bit
+        work.push(i)
+      }
+    })
+    while (work.length > 0) {
+      for (const p of parents[work.pop()!]) {
+        if ((bits[p] & bit) === 0) {
+          bits[p] |= bit
+          work.push(p)
+        }
+      }
+    }
+  }
+  const branches = (i: number, bit: number) =>
+    defs[i].kind === 'union' ? kids[i].filter(c => has(c, bit)).length : 0
+  // (a union that may hold an object: an item not a final type, or not known)
+  const objectUnion = defs.map(
+    d =>
+      d.kind === 'union' &&
+      (d.items as TAtscriptAnnotatedType[]).some(item => {
+        const def = item?.type as { kind?: unknown } | undefined
+        return !def || def.kind !== ''
+      })
+  )
+  spread(EXT_OBJECT_UNION, i => objectUnion[i])
+  const multi = defs.map((_, i) => objectUnion[i] && branches(i, EXT_OBJECT_UNION) >= 2)
+  spread(EXT_MULTI_UNION, i => multi[i])
+  spread(EXT_MEMO_UNION, i => multi[i] && branches(i, EXT_MULTI_UNION) >= 2)
+  defs.forEach((d, i) => reachMemo.set(d, bits[i]))
+  return bits[0]
 }

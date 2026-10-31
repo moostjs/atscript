@@ -30,3 +30,5 @@ export {
   type TQueryCursorContext,
 } from './lsp/field-refs'
 export { BACKTICK_ARG_VOCABULARY } from './parser/pipes/expr.pipe'
+export { moduleId } from './module-id'
+export * from './structure'

@@ -19,6 +19,8 @@ export default defineConfig({
 
 This is useful for quick prototyping, but for production projects, define your annotations explicitly for better tooling support.
 
+Without a spec, nothing says what an argument means, so the runtime metadata keeps it as written: strings, numbers, `true` / `false` / `null` / `undefined` as such, and any other name (`@ui.ref User`, `@ui.ref User.email`) or backtick argument as the string of its source (`'User'`, `'User.email'`). An argument left empty (`@ui.hint , 'x'`) is `undefined`. Give the annotation a spec with a `ref` argument to get a reference to the type itself.
+
 ## Quick Example
 
 Add annotations under the `annotations` key using `AnnotationSpec`:
@@ -89,7 +91,7 @@ nameProp?.metadata.get('grid.tag') // ['primary', 'searchable']
 | `nodeType`      | `string[]`              | Where annotation can be applied: `'interface'`, `'type'`, `'prop'`                                                                |
 | `argument`      | `object \| object[]`    | Argument definition(s): `{ name, type, optional?, description?, values? }`. `type` must be one of `'string' \| 'number' \| 'boolean' \| 'ref' \| 'query' \| 'expr' \| 'order'` ([backtick argument types](/plugin-development/annotation-system#expression-and-order-arguments)) |
 | `multiple`      | `boolean`               | Whether the annotation can appear more than once on the same node                                                                 |
-| `mergeStrategy` | `'replace' \| 'append'` | How values combine during [annotation inheritance](/packages/typescript/annotations#annotation-inheritance). Default: `'replace'` |
+| `mergeStrategy` | `'replace' \| 'append'` | How values combine during [annotation inheritance](/packages/typescript/annotations-reference#annotation-inheritance). Default: `'replace'` |
 | `defType`       | `string[]`              | Restrict to the underlying definition type. Valid values: `'string'`, `'number'`, `'boolean'`, `'decimal'`, `'phantom'`, `'null'`, `'void'`, `'never'`, `'object'`, `'array'`, `'union'`, `'intersection'`                                |
 | `validate`      | `function`              | Custom validation function for complex checks                                                                                     |
 | `modify`        | `function`              | Hook to modify the AST after annotation is parsed                                                                                 |

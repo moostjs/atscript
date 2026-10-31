@@ -1,6 +1,7 @@
 import type { TAtscriptAnnotatedType, TAtscriptTypeFinal } from './annotated-type'
 import { isPhantomType } from './annotated-type'
-import { forAnnotatedType } from './traverse'
+import { enterCut, type TCutPath } from './cut'
+import { runWalk, type TWalk } from './traverse'
 
 /**
  * Custom resolver function for computing field values.
@@ -136,6 +137,13 @@ function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown 
 }
 
 /**
+ * What {@link build} returns for a type it does not build: a recursive type reached again, or a
+ * type holding one where a value is required (a required prop, a tuple item, an intersection
+ * member) — its value would have to hold its ancestor's again.
+ */
+const STOPPED = Symbol('stopped')
+
+/**
  * Creates a data object from an ATScript annotated type definition.
  *
  * Supports five modes:
@@ -157,28 +165,69 @@ export function createDataFromAnnotatedType(
   type: TAtscriptAnnotatedType,
   opts?: TCreateDataOptions
 ): unknown {
-  return build(type, '', opts?.mode)
+  const data = runWalk(build(type, '', opts?.mode, { path: undefined, lenient: false }))
+  // (a type whose required props lead back to it has no value: what it has, as before)
+  return built(
+    data === STOPPED
+      ? runWalk(build(type, '', opts?.mode, { path: undefined, lenient: true }))
+      : data
+  )
 }
 
-function build(
+/**
+ * Where {@link build} is: the path above the node built, for the readers' recursion cut (see
+ * `cut.ts`: where `flattenAnnotatedType` cuts a recursive type).
+ */
+interface TBuilding {
+  path: TCutPath | undefined
+  /**
+   * Builds what it can of a type whose required props lead back (the root, see above): a
+   * required prop, tuple item or member not built is left out, the container built all the same.
+   */
+  lenient: boolean
+}
+
+/**
+ * Builds the data of `def`. A recursive type stops where the path reaches it again
+ * ({@link STOPPED}): an optional prop or an array item leading back is left out, a union takes a
+ * branch that does not, and anything else holding it stops too.
+ */
+function* build(
   def: TAtscriptAnnotatedType,
   path: string,
-  mode: TCreateDataOptions['mode']
-): unknown {
+  mode: TCreateDataOptions['mode'],
+  walk: TBuilding
+): TWalk<unknown> {
   // Try to resolve a value from the mode before structural defaults
   const resolved = resolveValue(def, path, mode)
   if (resolved !== undefined) {
     return resolved.value
   }
+  const below = enterCut(walk.path, def)
+  if (below === false) {
+    return STOPPED
+  }
+  return yield buildStructure(def, path, mode, { ...walk, path: below })
+}
 
-  return forAnnotatedType(def, {
-    phantom: () => undefined,
-
-    final: d => finalDefault(d),
-
-    object: d => {
+function* buildStructure(
+  def: TAtscriptAnnotatedType,
+  path: string,
+  mode: TCreateDataOptions['mode'],
+  walk: TBuilding
+): TWalk<unknown> {
+  const recursive = (node: TAtscriptAnnotatedType) => enterCut(walk.path, node) === false
+  const stops = (value: unknown) => value === STOPPED && !walk.lenient
+  const type = def.type
+  switch (type.kind) {
+    case '': {
+      return type.designType === 'phantom'
+        ? undefined
+        : finalDefault(def as TAtscriptAnnotatedType<TAtscriptTypeFinal>)
+    }
+    case 'object': {
       const data: Record<string, unknown> = {}
-      for (const [key, prop] of d.type.props.entries()) {
+      for (const [key, prop] of type.props.entries()) {
         if (isPhantomType(prop)) {
           continue
         }
@@ -186,10 +235,10 @@ function build(
 
         if (prop.optional) {
           if (mode === 'example') {
-            // Example mode: always include optional props for a complete example
-            data[key] = build(prop, childPath, mode)
+            if (!recursive(prop)) {
+              setBuilt(data, key, yield build(prop, childPath, mode, walk))
+            }
           } else {
-            // Other modes: only include if mode provides a value
             const childResolved = resolveValue(prop, childPath, mode)
             if (childResolved !== undefined) {
               data[key] = childResolved.value
@@ -198,30 +247,71 @@ function build(
           continue
         }
 
-        data[key] = build(prop, childPath, mode)
+        const value = yield build(prop, childPath, mode, walk)
+        if (stops(value)) {
+          return STOPPED
+        }
+        setBuilt(data, key, value)
       }
       return data
-    },
-
-    array: d => {
-      if (mode === 'example') {
-        // In example mode, generate one sample item so the array isn't uselessly empty
-        const item = build(d.type.of, `${path}.0`, mode)
-        return item !== undefined ? [item] : []
+    }
+    case 'array': {
+      if (mode === 'example' && !recursive(type.of)) {
+        const item = yield build(type.of, `${path}.0`, mode, walk)
+        return item !== undefined && item !== STOPPED ? [item] : []
       }
       return []
-    },
+    }
+    case 'tuple': {
+      const items: unknown[] = []
+      for (const [i, item] of type.items.entries()) {
+        items.push(yield build(item, `${path}.${i}`, mode, walk))
+      }
+      return items.some(stops) ? STOPPED : items.map(built)
+    }
+    case 'union': {
+      for (const item of type.items) {
+        if (recursive(item)) {
+          continue
+        }
+        const value = yield build(item, path, mode, walk)
+        if (value !== STOPPED || walk.lenient) {
+          return built(value)
+        }
+      }
+      return walk.lenient ? undefined : STOPPED
+    }
+    case 'intersection': {
+      const items: unknown[] = []
+      for (const item of type.items) {
+        items.push(yield build(item, path, mode, walk))
+      }
+      if (items.some(stops)) {
+        return STOPPED
+      }
+      const values = items.filter(item => item !== STOPPED)
+      return values.length > 0 && values.every(isPlainObject)
+        ? Object.assign({}, ...values)
+        : values[0]
+    }
+    default: {
+      throw new Error(`Unknown type kind "${(type as { kind: string }).kind}"`)
+    }
+  }
+}
 
-    tuple: d => d.type.items.map((item, i) => build(item, `${path}.${i}`, mode)),
+/** Sets `data[key]` unless nothing was built (see {@link STOPPED}). */
+function setBuilt(data: Record<string, unknown>, key: string, value: unknown) {
+  if (value !== STOPPED) {
+    data[key] = value
+  }
+}
 
-    union: d => {
-      const first = d.type.items[0]
-      return first ? build(first, path, mode) : undefined
-    },
+/** A built value (`undefined` for {@link STOPPED}). */
+function built(value: unknown): unknown {
+  return value === STOPPED ? undefined : value
+}
 
-    intersection: d => {
-      const first = d.type.items[0]
-      return first ? build(first, path, mode) : undefined
-    },
-  })
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

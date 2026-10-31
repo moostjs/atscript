@@ -1,9 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Helper } from "./extends-synth-multi-base1.as"
-import { Helper as Helper_1 } from "./extends-synth-multi-base2.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base1 } from "./extends-synth-multi-base1.as"
 import { Base2 } from "./extends-synth-multi-base2.as"
 
@@ -17,22 +15,12 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "propA",
-    $()
-      .refTo(() => Helper)
-      .$type
-  ).prop(
-    "propB",
-    $()
-      .refTo(() => Helper_1)
-      .$type
-  ).prop(
-    "id",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("propA", $f(Base1, "propA"))
+  .prop("propB", $f(Base2, "propB"))
+  .prop("id", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

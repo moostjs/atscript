@@ -1,7 +1,7 @@
 export interface StringLiterals {
   @meta.label "a\\"
   @meta.description 'b\\'
-  @expect.pattern "^[^\"]+$", "u", "no \"quotes\""
+  @expect.pattern "^[^\"]+$", "i", "no \"quotes\""
   quoted: string
 
   @expect.pattern '^\S+\\$', "", 'it\'s raw'

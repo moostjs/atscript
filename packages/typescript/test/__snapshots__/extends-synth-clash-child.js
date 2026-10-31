@@ -1,8 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Helper as Helper_1 } from "./extends-synth-clash-base.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 import { Base } from "./extends-synth-clash-base.as"
 
 export class Helper {
@@ -26,25 +25,14 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Helper)
-  .prop(
-    "fromChild",
-    $().designType("number")
-      .tags("number")
-      .$type
-  )
+  .prop("fromChild", $().designType("number")
+    .tags("number").$type)
 
 $("object", Child)
-  .prop(
-    "payload",
-    $()
-      .refTo(() => Helper_1)
-      .$type
-  ).prop(
-    "own",
-    $()
-      .refTo(Helper)
-      .$type
-  )
+  .prop("payload", $f(Base, "payload"))
+  .prop("own", $().ref(Helper).$type)
 
 // prettier-ignore-end

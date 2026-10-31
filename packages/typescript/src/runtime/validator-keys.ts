@@ -2,6 +2,10 @@
  * Annotation keys the validator pre-check reads, per kind of checked value — shared by the
  * interpreted pre-check (validator-fast-check.ts) and the compiled checks (compiled-check/).
  */
+import type { TAtscriptAnnotatedType, TAtscriptTypeObject } from './annotated-type'
+
+/** The format of a `decimal` value (a string). */
+export const DECIMAL_RE = /^[+-]?\d+(\.\d+)?$/
 
 /** Annotations of a string node, in check order. */
 export const STRING_KEYS = [
@@ -56,4 +60,17 @@ export function boundOf<T extends object, K extends keyof T>(
   field: K
 ): number | T[K] {
   return typeof m === 'number' ? m : m[field]
+}
+
+/** The props of array item type `of` (an object) marked `@expect.array.key`, in order. */
+export function arrayKeyProps(of: TAtscriptAnnotatedType | undefined): string[] {
+  const out: string[] = []
+  if (of?.type.kind === 'object') {
+    for (const [key, prop] of (of.type as TAtscriptTypeObject<string>).props) {
+      if (prop.metadata.get('expect.array.key')) {
+        out.push(key)
+      }
+    }
+  }
+  return out
 }

@@ -30,6 +30,7 @@ export function getBuildOptions(ws) {
     formats: build.format ? [build.format] : ['esm', 'cjs'],
     dts: build.dts ?? true,
     external: build.external,
+    name: build.name,
   }))
 }
 

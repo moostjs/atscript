@@ -96,6 +96,11 @@ const FORMATS = {
     ext: '.cjs',
     format: 'cjs',
   },
+  // (a self-contained script; `name`: its global, see the package's `build` entries)
+  iife: {
+    ext: '.js',
+    format: 'iife',
+  },
 }
 
 async function rollupTypes(ws) {
@@ -143,7 +148,7 @@ async function generateBundles() {
 
 async function rolldownPackages(ws) {
   const builds = getBuildOptions(ws)
-  for (const { entries, formats, external } of builds) {
+  for (const { entries, formats, external, name } of builds) {
     // Build input map: { name: path } for code-splitting across entries
     const input = {}
     for (const entry of entries) {
@@ -171,7 +176,7 @@ async function rolldownPackages(ws) {
     const created = []
     for (const f of formats) {
       const { ext, format } = FORMATS[f]
-      const { output } = await bundle.generate({ format })
+      const { output } = await bundle.generate({ format, name })
       for (const chunk of output) {
         if (chunk.type !== 'chunk') {
           continue

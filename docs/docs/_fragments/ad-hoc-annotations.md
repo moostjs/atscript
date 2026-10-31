@@ -19,7 +19,13 @@ annotate User {
 }
 ```
 
-The `User` type's metadata is modified in-place when this module is loaded. No new type is created.
+The block changes `User` itself, as if its annotations had been written in `User`'s source from the start. No new type is created.
+
+Every place that uses `User` sees the change: properties typed `User`, arrays and unions of it, `interface Admin extends User`, intersections with `User`, aliases of it and `annotate User as …` copies. The order of the declarations and of the blocks does not matter, and neither does the file holding the block, as long as its module is loaded before the type is first used (see [When blocks apply](#when-blocks-apply)).
+
+A type alias without annotations is the type it names, so a block on it is a block on that type: with `type Account = User` (or `type Member = Account`, `type Account = (User)`), `annotate Account { @meta.label 'Name' name }` changes `User` itself, exactly like `annotate User { … }`. The same goes for an alias with type-level annotations of its own (`@meta.description 'Account' type Account = User`): its properties are `User`'s. A reference to a property (`type City = User.home`) is not a plain alias: a block on it annotates that type only.
+
+A named merge is a type of its own: with `type AdminUser = User & Extra`, `annotate AdminUser { name }` annotates `AdminUser.name` only. It reaches neither `User` nor another `User & Extra` (see [How a merge is built](/packages/typescript/interfaces-types#how-a-merge-is-built)).
 
 ### Non-mutating (Alias)
 
@@ -38,6 +44,12 @@ export annotate User as UserForm {
 
 `UserForm` is a standalone type with its own class, type definition, and metadata. `User` remains unchanged.
 
+`UserForm` is a copy of `User` that keeps reading from it: its structure is `User`'s, and its annotations sit on top of `User`'s, with the alias's entries (`Full Name`, `Email Address`) winning. So:
+
+- a block on `User` reaches `UserForm` too, in any order, unless the alias sets that annotation itself;
+- a block on `UserForm` (`annotate UserForm { @meta.label 'Name' name }`) annotates the alias only, and wins over the alias's own entries;
+- wherever `UserForm` is used it is this type: `interface Signup extends UserForm` inherits the alias's properties (`Full Name`), and so do intersections, references to a property (`UserForm.name`), union members and array items. As with any interface, the alias's type-level annotations are not inherited through `extends`.
+
 ## Entry Syntax
 
 Each entry inside the annotate block references a property of the target type by name. Annotations placed before the entry are applied to that property.
@@ -50,6 +62,15 @@ annotate User {
     @ui.placeholder 'you@example.com'
     @expect.maxLength 100
     email                      // multiple annotations on one property
+}
+```
+
+An entry without annotations does nothing. An entry the compiler cannot place (a path that does not exist, a path into a `never`) is an error, and the module is not generated until you fix it:
+
+```atscript
+annotate User {
+    @meta.label 'Nickname'
+    nickname              // Error: Unknown property "nickname" in "User"
 }
 ```
 
@@ -69,6 +90,59 @@ annotate User {
 
 This navigates into the nested `address` structure and annotates its `city` and `street` properties.
 
+Two rules decide where a path lands.
+
+**A path into another type is the referrer's own, at exactly that path.** The other type and its other uses are not annotated:
+
+```atscript
+interface Address {
+    @meta.label 'City'
+    @meta.description 'Where it is'
+    city: string
+    next?: Address
+}
+
+interface Client {
+    home: Address
+    billing: Address
+}
+
+annotate Client {
+    @meta.label 'Home City'
+    home.city
+    @meta.label 'Billing City'
+    billing.city
+}
+```
+
+Only `Client.home.city` is labelled `'Home City'` and only `Client.billing.city` `'Billing City'`; `Address.city` and every other use of `Address` keep `'City'`. Each override sits on top of `Address.city`: it reads every other annotation from it, now and later (its description is `'Where it is'`, and a later `annotate Address { @meta.description 'x' city }` reaches it too), and on the same annotation the override wins.
+
+The path is exact: `Client.home.next.city` is `Address.city` as it is. To annotate a deeper spot, write its path (`annotate Client { home.next.city }`), which overrides exactly that spot.
+
+**A step that reaches the annotated type itself is the annotated type.** The annotation then lands on the type's own property, so it applies at every depth, the top level included. This holds when the step reaches the type through a direct reference, an alias, an array or `| null`, also through other types (mutual recursion):
+
+```atscript
+interface Node {
+    name: string
+    next?: Node
+    kids?: Node[]
+    parent?: Node | null
+}
+
+annotate Node {
+    @meta.label 'x'
+    next.name   // same as: name
+}
+```
+
+`name`, `next.name`, `next.next.name`, `kids[0].name` and `parent.name` all carry it. With `interface Dept { title: string; lead?: Person }` and `interface Person { name: string; dept?: Dept }`, `annotate Dept { lead.dept.title }` is `annotate Dept { title }`.
+
+It does **not** hold through a union with another type or through an intersection member. With `either?: Node | Other` and `merged?: Node & Meta`, `annotate Node { either.name }` and `annotate Node { merged.name }` are exact paths of `Node`: `Node.name` is not annotated.
+
+**A path through a union** lands on every branch that has the property, as the referrer's own override. With `contact: Email | Phone | Fax` where `Email` and `Phone` have `value`, `annotate Contactable { contact.value }` annotates `value` in the `Email` and `Phone` branches and skips `Fax`. When no branch has the property (or no branch takes the whole path), it is an error.
+
+Paths go through arrays like any other step: with `type BoxL = Box[]` and `boxes?: BoxL`, `annotate User { boxes.name }` overrides the `name` of `User`'s box elements.
+
 ## Top-level Annotations
 
 Annotations placed before the `annotate` keyword apply to the type itself (not to individual properties):
@@ -80,6 +154,10 @@ annotate User as RegistrationForm {
     name
 }
 ```
+
+Their node type is the target's: an annotation whose spec applies to interfaces (`nodeType: ['interface']`) is valid on an `annotate` block of an interface (or of an alias of one), not on one of a `type`. A spec listing `'annotate'` itself is valid on any `annotate` block.
+
+The same goes for a spec's `defType`: it checks the type the target resolves to (through type aliases and `annotate … as` aliases), exactly like the annotation written on the target's declaration. With `type Name = string`, `@expect.minLength 2` is valid on `annotate Name {}` and on `annotate Name as ShortName {}`, and `@expect.min 2` is reported there (`Expected type is (number), got "string"`).
 
 For mutating annotate, top-level annotations modify the target's own metadata:
 
@@ -153,6 +231,54 @@ annotate User {
 // Result: both patterns are validated
 ```
 
+### Two Blocks Setting the Same Annotation
+
+When several blocks set the same single-value annotation on the same property (or on the type itself), the winner is decided by a fixed order, not by the order modules happen to load in. Blocks are ordered by:
+
+1. **import depth** of their module: a module importing no `.as` file has depth 0, any other module one more than the deepest module it imports (modules importing each other share a depth);
+2. **module id** (package name and path), for modules of the same depth;
+3. **source order**, within a module.
+
+The last block in that order wins.
+
+```atscript
+// user.as (depth 0)
+export interface User {
+    @meta.label 'Name'
+    name: string
+}
+
+// labels-a.as (depth 1: imports user.as)
+import { User } from './user'
+annotate User {
+    @meta.label 'Label A'
+    name
+}
+
+// labels-b.as (depth 1)
+import { User } from './user'
+annotate User {
+    @meta.label 'Label B'
+    name
+}
+
+// profile.as (depth 1)
+import { User } from './user'
+export interface Profile {
+    user: User
+}
+
+// app-labels.as (depth 2: imports profile.as)
+import { User } from './user'
+import { Profile } from './profile'
+annotate User {
+    @meta.label 'App label'
+    name
+}
+```
+
+Without `app-labels.as`, `User.name` is `'Label B'` (`labels-b.as` comes after `labels-a.as` by id) whichever of the two loads first. With it, `User.name` is `'App label'`: its module is deeper. Everything referring to `User` has that same value. The result is stable, but it is easy to misread: set each annotation in one place.
+
 ### Non-mutating Aliases
 
 Non-mutating annotate creates a new type with annotations merged from the original. The original is not affected:
@@ -167,7 +293,7 @@ export interface User {
 
 export annotate User as AdminUser {
     @meta.label 'Admin Name'   // Replaces 'Name'
-    @tag 'admin'               // Appends to ['core'] → ['admin', 'core']
+    @tag 'admin'               // Appends to ['core'] → ['core', 'admin']
     name
 }
 // User is unchanged. AdminUser has merged annotations.
@@ -214,14 +340,14 @@ annotate Response {
 }
 ```
 
-When a property like `status` appears in multiple union branches, the annotation is applied to every matching branch at runtime.
+When a property like `status` appears in multiple union branches, the annotation is applied to every branch that has it, including a branch that is a reference to an interface declaring the property or inheriting it with `extends` (there it is the union type's own override, as for [a path into another type](#deep-property-chains)). A branch without the property is left as it is.
 
 Properties that don't exist in any branch are reported as errors:
 
 ```atscript
 annotate Response {
     @meta.label 'Color'
-    color              // Error: unknown property "color" in "Response"
+    color              // Error: Unknown property "color" in "Response"
 }
 ```
 
@@ -245,6 +371,23 @@ export annotate User as AdminUser {
 }
 ```
 
+### When blocks apply
+
+A block applies when its module is loaded. Two consequences:
+
+- **Load annotate modules before their types are first used.** A path override (`annotate Client { home.city }`) from a module loaded later, for example through a lazy `import()`, is not seen by merges and readers that already read the type. Import the modules holding your blocks at startup, from the files declaring or using the types.
+- **A block in a file the app never imports does not apply.** The compiler warns when a block of another file's type may be missed — neither the file declaring the type nor every file using it imports the block's file, directly or not: `"User" (declared in ./user.as) is used by ./api.as without importing this file (directly or not): this annotate applies only in builds including this file …`. Import the block's file from the type's file, or from every file using the type.
+
+In development, the Vite plugin reloads the page in full when a module with blocks changes, so the blocks apply to fresh types (see [Build Setup](/packages/typescript/build-setup#how-it-works)).
+
+A library built and published on its own has its merges built without your app's blocks: a path override you add to a member's type does not reach a merged property that several members of the library's merge declare. Annotate the library's merged type itself, or the property directly on the member type (`annotate Address { city }`), which every merge reads.
+
+### Import cycles
+
+`.as` files may import each other, directly or through other files. Such import cycles are supported only under native ES modules, which is what the compiler generates. A CommonJS rewrite of the generated code (a bundler or test runner converting it to `require`) works for `.as` modules that do not import each other; for a cycle, load the generated modules as ES modules.
+
+The blocks of a cycle's modules apply in the [fixed order](#two-blocks-setting-the-same-annotation) like any others: modules of one cycle share an import depth and are ordered by id.
+
 ## Export Rules
 
 Non-mutating annotate can be exported:
@@ -264,10 +407,10 @@ export annotate User { ... }
 
 When using a bundler (Vite, Rollup, etc.) with `unplugin-atscript`, tree-shaking works automatically:
 
-- **Mutating annotate** produces side effects (runtime metadata mutations), so the module is included when the target type is used
+- **Mutating annotate** produces side effects (it writes into the target type when its module loads), so the plugin keeps a module with mutating blocks — and every module of an `.as` import cycle — in the bundle even when none of its exports is used
 - **Non-mutating annotate** produces a standalone class. If `UserForm` is never imported by consuming code, the bundler removes it
 
-The unplugin sets `moduleSideEffects: false` to enable this behavior.
+The unplugin marks the other generated modules `moduleSideEffects: false` to enable this behavior.
 
 ## Generated Output
 
@@ -285,7 +428,7 @@ export annotate User as UserForm {
 }
 ```
 
-The generated JS creates `UserForm` as its own class with the full type definition inlined, applying `"Form Name"` as the label for `name` while preserving all other annotations from `User`.
+The generated JS creates `UserForm` as its own class over `User`'s structure, with an override of `name` labelled `"Form Name"`; every other annotation is read from `User`.
 
 ### Mutating
 
@@ -303,4 +446,4 @@ annotate User {
 }
 ```
 
-The generated code imports `User` and mutates metadata on its `name` and `address.city` properties at runtime, applying the annotation merge strategy (replace or append) for each annotation.
+The generated code imports `User` and writes the annotations into its `name` property when the module loads, applying the annotation merge strategy (replace or append) for each annotation. `address.city` is a path into another type, so it gets `User`'s own override of `Address.city` (see [Deep Property Chains](#deep-property-chains)).

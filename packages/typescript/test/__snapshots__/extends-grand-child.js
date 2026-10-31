@@ -1,8 +1,8 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
-import { Helper } from "./extends-grand-grand.as"
+import { defineAnnotatedType as $, throwFeatureDisabled as $d, $f as $f, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
+import { Grand } from "./extends-grand-grand.as"
 import { Mid } from "./extends-grand-mid.as"
 
 export class Child {
@@ -15,22 +15,12 @@ export class Child {
   }
 }
 
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
 $("object", Child)
-  .prop(
-    "g",
-    $()
-      .refTo(() => Helper)
-      .$type
-  ).prop(
-    "m",
-    $().designType("string")
-      .tags("string")
-      .$type
-  ).prop(
-    "c",
-    $().designType("string")
-      .tags("string")
-      .$type
-  )
+  .prop("g", $f(Grand, "g"))
+  .prop("m", $f(Mid, "m"))
+  .prop("c", $().designType("string")
+    .tags("string").$type)
 
 // prettier-ignore-end

@@ -4,7 +4,7 @@ import path from 'path'
 import type { TAtscriptPlugin } from '@atscript/core'
 import { DEFAULT_FORMAT } from '@atscript/core'
 
-import { TypeRenderer, JsRenderer } from './codegen'
+import { JsNextRenderer, TypeRenderer } from './codegen'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export interface TTsPluginOptions {
@@ -43,7 +43,7 @@ export interface TTsPluginOptions {
    * `validate()` then runs the type's compiled check instead of the interpreted pre-check
    * (results and errors are identical; only speed differs). The check binds to the live
    * type on first use and re-binds after mutations made through `annotate()`, the
-   * metadata / props `Map` methods, the `defineAnnotatedType()` handle and `cloneRefProp()`.
+   * metadata / props `Map` methods and the `defineAnnotatedType()` handle.
    * Raw writes need `invalidateCompiledValidators()`: property writes (`node.optional = …`,
    * `type.items.push(…)`, …) and in-place edits of annotation values (mutating a constraint
    * object, pushing onto an `@expect.pattern` array directly) — the check keeps the values
@@ -54,19 +54,45 @@ export interface TTsPluginOptions {
    * before.
    *
    * Adds code to every `.as.js`: meant for backend builds — leave it off for bundles
-   * shipped to browsers (the code is CSP-safe: no `eval` / `new Function`). The
-   * `'js:compiled'` / `'js:interpreted'` render formats force it on / off per render.
+   * shipped to browsers (the code is CSP-safe: no `eval` / `new Function`).
+   *
+   * Off (the default), only types annotated with `@emit.compiledValidator` get a compiled
+   * check. The `'js:compiled'` render format compiles every type; `'js:interpreted'`
+   * compiles none, ignoring `@emit.compiledValidator` (see {@link JS_INTERPRETED_FORMAT}).
    * *(default: `false`)*
    */
   compileValidators?: boolean
 }
 
 /**
+ * Which types a JS render emits compiled validator checks for: `'all'`, only those
+ * annotated with `@emit.compiledValidator` (`'annotated'`), or `'none'`.
+ */
+export type TCompileValidatorsMode = 'all' | 'annotated' | 'none'
+
+/**
  * Render formats of the JS output that override {@link TTsPluginOptions.compileValidators}
- * (used by `unplugin-atscript`'s `compileValidators` option).
+ * (used by `unplugin-atscript`'s `compileValidators` option): `'js:compiled'` compiles
+ * every type; `'js:interpreted'` compiles none — `@emit.compiledValidator` included (a
+ * forced-interpreted build, e.g. a browser bundle).
  */
 export const JS_COMPILED_FORMAT = 'js:compiled'
 export const JS_INTERPRETED_FORMAT = 'js:interpreted'
+
+/** The JS render formats, with the compiled-validator mode each one forces (if any). */
+const JS_FORMATS = new Map<string, TCompileValidatorsMode | undefined>([
+  ['js', undefined],
+  [JS_COMPILED_FORMAT, 'all'],
+  [JS_INTERPRETED_FORMAT, 'none'],
+])
+
+/** The compiled-validator mode of a JS render `format` (see {@link TCompileValidatorsMode}). */
+export function compileValidatorsMode(
+  format: string,
+  opts?: TTsPluginOptions
+): TCompileValidatorsMode {
+  return JS_FORMATS.get(format) ?? (opts?.compileValidators ? 'all' : 'annotated')
+}
 
 /**
  * Resolves the effective JSON schema mode from plugin options.
@@ -91,13 +117,11 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
           },
         ]
       }
-      if (format === 'js' || format === JS_COMPILED_FORMAT || format === JS_INTERPRETED_FORMAT) {
-        const jsOpts =
-          format === 'js' ? opts : { ...opts, compileValidators: format === JS_COMPILED_FORMAT }
+      if (JS_FORMATS.has(format)) {
         return [
           {
             fileName: `${doc.name}.js`,
-            content: new JsRenderer(doc, jsOpts).render(),
+            content: new JsNextRenderer(doc, opts, compileValidatorsMode(format, opts)).render(),
           },
         ]
       }

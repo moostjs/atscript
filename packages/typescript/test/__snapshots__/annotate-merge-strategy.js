@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, cloneRefProp as $c, throwFeatureDisabled as $d } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class User {
   static __is_atscript_annotated_type = true
@@ -16,7 +16,7 @@ export class User {
 
 export class User2 {
   static __is_atscript_annotated_type = true
-  static type = {}
+  static type = null
   static metadata = new Map()
   static id = "User2"
   static toJsonSchema() {
@@ -24,38 +24,22 @@ export class User2 {
   }
 }
 
-$("object", User)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Original Name")
-      .annotate("mulAppend", "prop-original", true)
-      .annotate("mul", 1, true)
-      .annotate("mul", 2, true)
-      .$type
-  )
-  .annotate("mulAppend", "top-original", true)
+$ak("expect.pattern", "mulAppend")
+$nk("meta.default", "meta.id", "meta.readonly", "meta.required")
+const $R = [0, "@atscript/typescript:test/fixtures/annotate-merge-strategy.as"]
+$("object", User).annotate("mulAppend", "top-original", true)
+  .prop("name", $().designType("string")
+    .tags("string").annotate("label", "Original Name").annotate("mulAppend", "prop-original", true).annotate("mul", 1, true).annotate("mul", 2, true).$type)
 
-// Ad-hoc annotations for User
-$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")
-$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)
-User.type.props.get("name")?.metadata.delete("mul")
-$a(User.type.props.get("name")?.metadata, "mul", 99, true)
-$a(User.metadata, "mulAppend", "top-mutated", true)
+$al(User2, User)
+$a(User2.metadata, "mulAppend", "top-aliased", true)
+$blk(null, 0, User2, [
+  [[["label", "Aliased Name"], ["mulAppend", "prop-aliased", 1], ["mul", 77, 1]], [["name", 2]]],
+])
 
-$("object", User2)
-  .prop(
-    "name",
-    $().designType("string")
-      .tags("string")
-      .annotate("label", "Aliased Name")
-      .annotate("mulAppend", "prop-aliased", true)
-      .annotate("mul", 77, true)
-      .annotate("mulAppend", "prop-original", true)
-      .$type
-  )
-  .annotate("mulAppend", "top-aliased", true)
-  .annotate("mulAppend", "top-original", true)
+$blk($R, 0, User, [
+  [[["mulAppend", "top-mutated", 1]], []],
+  [[["label", "Mutated Name"], ["mulAppend", "prop-mutated", 1], ["mul", 99, 1]], [["name", 0]]],
+])
 
 // prettier-ignore-end

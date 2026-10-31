@@ -9,7 +9,7 @@ import {
 } from '../runtime/annotated-type'
 import { coerceForType } from '../runtime/coerce'
 import { forAnnotatedType } from '../runtime/traverse'
-import { prepareFixtures } from '../test-utils'
+import { prepareFixtures, rng } from '../test-utils'
 
 // ── reference: the previous handler-object implementation, verbatim ─────────
 
@@ -256,18 +256,6 @@ const LEAVES: unknown[] = [
   Object.create(null),
   new Date(0),
 ]
-
-function rng(seed: number) {
-  // mulberry32 — the int32 / uint32 coercions are intentional
-  // oxlint-disable unicorn/prefer-math-trunc
-  return () => {
-    seed = (seed + 0x6d_2b_79_f5) | 0
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296
-  }
-  // oxlint-enable unicorn/prefer-math-trunc
-}
 
 function randomInput(r: () => number, depth = 0): unknown {
   const p = r()

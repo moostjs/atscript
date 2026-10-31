@@ -7,8 +7,10 @@ import path from 'node:path'
 import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
 import { AtscriptDoc } from './document'
+import { isAnnotate } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
+import type { TMessages } from './parser/types'
 import { fileUriToPath, resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { isBareId, resolveBareSpecifier } from './resolve-bare'
@@ -17,6 +19,60 @@ export interface TPluginManagers {
   manager: PluginManager
   file?: string
   dependants: Set<string>
+}
+
+/** Whether `doc` has a mutating `annotate` block (its generated module applies it). */
+export function hasMutatingAnnotates(doc: AtscriptDoc): boolean {
+  return doc.nodes.some(node => isAnnotate(node) && node.isMutating)
+}
+
+/**
+ * The documents declaring the types the mutating `annotate` blocks of `doc` annotate, other than
+ * `doc` itself: resolved as codegen and the runtime apply them (a block on a plain alias is a
+ * block on what it aliases, see `AtscriptDoc.blockTarget`). Their runtime state (and generated
+ * code, with bundled schemas) changes with these blocks.
+ */
+export function blockTargetDocuments(doc: AtscriptDoc): Set<AtscriptDoc> {
+  const out = new Set<AtscriptDoc>()
+  for (const node of doc.nodes) {
+    if (isAnnotate(node) && node.isMutating) {
+      const target = doc.blockTarget(node)?.doc
+      if (target && target !== doc) {
+        out.add(target)
+      }
+    }
+  }
+  return out
+}
+
+/**
+ * What the diagnostics of the mutating `annotate` blocks of `doc` read besides the documents it
+ * imports (directly or not): for each type they annotate that another document T declares (see
+ * {@link blockTargetDocuments}), T, the documents importing T (those using it) and the documents
+ * T and each of them import, directly or not (whether a block is reachable from them, see the
+ * warning of `AtscriptDoc.getDiagMessages`). When one of these documents changes — its text, or
+ * its imports (then also the documents it imports, now or before: their importers changed) —
+ * `doc`'s diagnostics are computed again.
+ */
+export function blockDependencies(doc: AtscriptDoc): Set<AtscriptDoc> {
+  const out = new Set<AtscriptDoc>()
+  const add = (d: AtscriptDoc) => {
+    if (out.has(d)) {
+      // (added with the documents it imports, or as one of them)
+      return
+    }
+    out.add(d)
+    for (const dep of d.transitive('dependencies')) {
+      out.add(dep)
+    }
+  }
+  for (const target of blockTargetDocuments(doc)) {
+    add(target)
+    for (const user of target.dependants) {
+      add(user)
+    }
+  }
+  return out
 }
 
 export class AtscriptRepo {
@@ -181,7 +237,10 @@ export class AtscriptRepo {
     if (this.sharedConfig) {
       if (!this.sharedPluginManager) {
         this.sharedPluginManager = {
-          manager: new PluginManager(this.sharedConfig),
+          manager: new PluginManager(
+            this.sharedConfig,
+            path.resolve(this.root, this.sharedConfig.rootDir ?? '.')
+          ),
           dependants: new Set(),
         }
       }
@@ -197,7 +256,10 @@ export class AtscriptRepo {
       if (!rawConfig.rootDir) {
         rawConfig.rootDir = path.dirname(configFile)
       }
-      const manager = new PluginManager(rawConfig)
+      const manager = new PluginManager(
+        rawConfig,
+        path.resolve(path.dirname(configFile), rawConfig.rootDir)
+      )
       await manager.getDocConfig()
       return {
         file: configFile,
@@ -205,9 +267,7 @@ export class AtscriptRepo {
         dependants: new Set(),
       }
     } else {
-      const manager = new PluginManager({
-        rootDir: process.cwd(),
-      })
+      const manager = new PluginManager({ rootDir: process.cwd() }, process.cwd())
       await manager.getDocConfig()
       return {
         manager,
@@ -231,7 +291,8 @@ export class AtscriptRepo {
   async openDocument(id: string, text?: string): Promise<AtscriptDoc> {
     let atscript = this.atscripts.get(id)
     if (atscript) {
-      if (text) {
+      // (an empty text is a text: a file emptied is parsed as empty)
+      if (text !== undefined) {
         atscript = atscript.then(d => {
           d.update(text)
           return d
@@ -285,7 +346,7 @@ export class AtscriptRepo {
     if (!newId) {
       throw new Error(`Document not resolved: ${id}`)
     }
-    const content = text || (await manager.load(newId))
+    const content = text ?? (await manager.load(newId))
     if (typeof content !== 'string') {
       throw new TypeError(`Document not found: ${newId}`)
     }
@@ -305,21 +366,34 @@ export class AtscriptRepo {
       return
     }
     _checked.add(atscript.id)
+    const messages: TMessages = []
     const promise = Promise.all(
       Array.from(atscript.imports.values(), async ({ from, imports }) =>
-        this.checkImport(atscript, from, imports, _checked)
+        this.checkImport(atscript, from, imports, _checked, messages)
       )
     )
     const results = await promise
     atscript.updateDependencies(results.filter(Boolean) as AtscriptDoc[])
+    // (this check's messages, in import order: those of a previous check are replaced)
+    atscript.setImportMessages(
+      messages.sort(
+        (a, b) =>
+          a.range.start.line - b.range.start.line ||
+          a.range.start.character - b.range.start.character
+      )
+    )
   }
 
   async checkImport(
     atscript: AtscriptDoc,
     from: Token,
     imports: Token[],
-    checked?: Set<string>
+    checked?: Set<string>,
+    /** where the messages go (the document's import messages; registered when not given) */
+    messages?: TMessages
   ): Promise<AtscriptDoc | undefined> {
+    const report = (list: TMessages) =>
+      messages ? messages.push(...list) : atscript.registerMessages(list)
     let forId = resolveAtscriptFromPath(from.text, atscript.id)
 
     // Resolve bare specifier placeholders (bare:xxx.as) to actual file:// URIs
@@ -327,7 +401,7 @@ export class AtscriptRepo {
       const fromDir = fileUriToPath(atscript.id).split('/').slice(0, -1).join('/')
       const resolved = await resolveBareSpecifier(from.text, fromDir)
       if (!resolved) {
-        atscript.registerMessages([
+        report([
           {
             severity: 1,
             message: `"${from.text}" not found`,
@@ -344,7 +418,7 @@ export class AtscriptRepo {
     }
 
     if (forId === atscript.id) {
-      atscript.registerMessages([
+      report([
         {
           severity: 1,
           message: '"import" cannot import itself',
@@ -360,7 +434,7 @@ export class AtscriptRepo {
       await this.checkImports(external, checked)
       for (const token of imports) {
         if (!external.exports.has(token.text)) {
-          atscript.registerMessages([
+          report([
             {
               severity: 1,
               message: `"${from.text}" has no exported member "${token.text}"`,
@@ -370,7 +444,7 @@ export class AtscriptRepo {
         }
       }
     } catch (error) {
-      atscript.registerMessages([
+      report([
         {
           severity: 1,
           message: `"${from.text}" not found`,

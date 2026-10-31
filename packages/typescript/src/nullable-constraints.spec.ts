@@ -7,10 +7,7 @@ import { tsPlugin } from './plugin'
 import { defineAnnotatedType as $ } from './runtime/annotated-type'
 import { buildJsonSchema, fromJsonSchema } from './runtime/json-schema'
 import { Validator, type TValidatorOptions } from './runtime/validator'
-import { prepareFixtures } from './test-utils'
-
-/** A subclass never takes the fast pre-check, so it always runs the error-collecting walk. */
-class WalkValidator extends Validator {}
+import { prepareFixtures, WalkValidator } from './test-utils'
 
 const rootDir = path.join(__dirname, '..', 'test', 'fixtures')
 
@@ -296,9 +293,15 @@ describe('JSON schema for union-level constraints', () => {
         { type: 'null' },
       ],
     })
-    expect(p.title).toEqual({ anyOf: [{ type: 'string', minLength: 1 }, { type: 'null' }] })
+    // (`@meta.required`: a character other than whitespace)
+    expect(p.title).toEqual({
+      anyOf: [{ type: 'string', minLength: 1, pattern: '\\S' }, { type: 'null' }],
+    })
     expect(p.tags).toEqual({
-      anyOf: [{ type: 'array', items: { type: 'string' }, maxItems: 2 }, { type: 'null' }],
+      anyOf: [
+        { type: 'array', items: { type: 'string' }, maxItems: 2, uniqueItems: true },
+        { type: 'null' },
+      ],
     })
     expect(p.nested.properties.n).toEqual({
       anyOf: [{ type: 'number', maximum: 3 }, { type: 'null' }],

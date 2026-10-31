@@ -160,7 +160,8 @@ You usually do not need `resolve()`, `load()`, or `onDocument()` for a first plu
 
 1. **[Plugin Architecture](/plugin-development/architecture)** — understand the document model and the processing pipeline.
 2. **[Plugin Hooks Reference](/plugin-development/plugin-hooks)** — exact signatures and hook behavior.
-3. **[Validation Specification](/plugin-development/validation-spec)** — implement validation in non-TypeScript targets.
+3. **[Runtime Metadata](/plugin-development/runtime-metadata)** — how generated types' metadata maps read through the types they refer to, and what a runtime write reaches.
+4. **[Validation Specification](/plugin-development/validation-spec)** — implement validation in non-TypeScript targets.
 
 ## Prerequisites
 

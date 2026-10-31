@@ -24,7 +24,7 @@ import {
  * How a build-time model marks nodes whose type is only known at runtime: `'ext'` for an
  * anonymous reference into another module's type, `'interp'` for anything else unknown.
  */
-export type TClassifyType = (type: unknown) => 'ext' | 'interp' | undefined
+export type TClassifyType = (type: unknown, node?: unknown) => 'ext' | 'interp' | undefined
 
 /**
  * Derives the layout of `root` (see layout.ts). Shared / recursive type defs are recorded
@@ -33,8 +33,15 @@ export type TClassifyType = (type: unknown) => 'ext' | 'interp' | undefined
 export function buildLayout(
   root: TAtscriptAnnotatedType,
   reader: TKeyReader,
-  classify?: TClassifyType
+  classify?: TClassifyType,
+  opts: {
+    /** The most type defs the layout may record (more throw {@link LayoutTooLarge}). */
+    maxDefs?: number
+    /** Gets each `EXT` site's first slot and its node. */
+    onExt?: (slot: number, node: TAtscriptAnnotatedType) => void
+  } = {}
 ): TLayout {
+  const maxDefs = opts.maxDefs ?? Infinity
   const defs: TDef[] = []
   const index = new Map<unknown, number>()
   let slots = 0
@@ -69,7 +76,7 @@ export function buildLayout(
 
   function site(node: TAtscriptAnnotatedType): TSite {
     const type = node.type as any
-    const marker = classify?.(type)
+    const marker = classify?.(type, node)
     const optional = !marker || marker === 'ext' ? (node.optional ? 1 : 0) : 0
     let d: number
     let keys = { mask: 0, shape: '' }
@@ -82,6 +89,9 @@ export function buildLayout(
       d = index.get(type) ?? -1
       if (d < 0) {
         d = defs.length
+        if (d >= maxDefs) {
+          throw new LayoutTooLarge()
+        }
         defs.push([])
         index.set(type, d)
         defs[d] = describeDef(type)
@@ -89,12 +99,22 @@ export function buildLayout(
       keys = readKeys(node.metadata as any, siteBits(type, optional === 1), reader)
     }
     const result: TSite = [optional, keys.mask, d, keys.shape, slots]
+    if (d === EXT) {
+      opts.onExt?.(slots, node)
+    }
     slots += siteSlotCount(result)
     return result
   }
 
   const rootSite = site(root)
   return [defs, rootSite, slots]
+}
+
+/** A layout over more type defs than allowed (see {@link buildLayout}). */
+export class LayoutTooLarge extends Error {
+  constructor() {
+    super('Compiled check layout too large')
+  }
 }
 
 /** JS source of a layout literal (plain arrays, strings and numbers incl. NaN / ±Infinity / -0). */

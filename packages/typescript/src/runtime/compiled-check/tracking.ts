@@ -7,13 +7,15 @@
  * read bumps one global epoch, which makes every compiled check re-bind on its next use.
  *
  * Tracked: `annotate()`, the metadata / props `Map` methods (`set` / `delete` / `clear`),
- * the `defineAnnotatedType()` handle methods and `cloneRefProp()`. Raw property writes
+ * the `defineAnnotatedType()` handle methods. Raw property writes
  * (`node.optional = …`, `type.items.push(…)`, editing a constraint object in place, …)
  * cannot be seen: call {@link invalidateCompiledValidators} after them.
  */
 import { VALIDATOR_KEYS } from '../validator-keys'
 
 const VALIDATOR_KEY_SET = new Set<unknown>(VALIDATOR_KEYS)
+
+const mapSet = Map.prototype.set
 
 /** Global mutation epoch: compiled checks bound in an older epoch re-bind before use. */
 let epoch = 0
@@ -47,8 +49,8 @@ export function touched(obj: object): void {
  * its next use.
  *
  * Compiled checks (emitted with `tsPlugin({ compileValidators: true })`) see mutations made
- * through `annotate()`, the metadata / props `Map` methods, the `defineAnnotatedType()`
- * handle methods and `cloneRefProp()` automatically. Call this after changing a type tree
+ * through `annotate()`, the metadata / props `Map` methods and the `defineAnnotatedType()`
+ * handle methods automatically. Call this after changing a type tree
  * any other way:
  * - a raw property write: `node.optional = …`, `node.type = …`, `node.metadata = …`,
  *   `type.items.push(…)`, `type.of = …`, `type.propsPatterns.push(…)`;
@@ -68,22 +70,73 @@ export function invalidateCompiledValidators(): void {
 }
 
 /**
+ * Writes of metadata maps so far (any map, any key: `annotate()`, the `Map` methods): a lazy JSON
+ * schema built before the last one is built again (see `lazyJsonSchema`).
+ */
+let metadataWrites = 0
+
+/** The number of metadata writes so far (see `metadataWrites`). */
+export function metadataWriteCount(): number {
+  return metadataWrites
+}
+
+/** Records a write of a node's metadata the maps do not see: the node's map replaced. */
+export function metadataReplaced(): void {
+  metadataWrites++
+}
+
+/**
+ * `annotate(m, key, value, true)` where map `m` holds `own` as its own value of `key`: appended in
+ * place to an own list (the map sees no write: tracked here as one), else a list of both.
+ */
+export function appendOwn(
+  m: Map<unknown, unknown>,
+  key: unknown,
+  own: unknown,
+  value: unknown
+): void {
+  if (Array.isArray(own)) {
+    own.push(value)
+    if (VALIDATOR_KEY_SET.has(key)) {
+      touched(m)
+    }
+    metadataWrites++
+  } else {
+    m.set(key, [own, value])
+  }
+}
+
+/**
  * Metadata map of runtime type nodes: a `Map` whose writes to validator annotation keys
  * are tracked (see {@link invalidateCompiledValidators}). Reads are the builtin ones.
  */
 export class AnnotationMap<K = unknown, V = unknown> extends Map<K, V> {
+  /** A new map holding `entries`: no write (a new map is in no compiled check nor schema). */
+  constructor(entries?: Iterable<readonly [K, V]> | null) {
+    super()
+    if (entries) {
+      for (const [key, value] of entries) {
+        mapSet.call(this, key, value)
+      }
+    }
+  }
+
   override set(key: K, value: V): this {
     super.set(key, value)
     if (tracking && VALIDATOR_KEY_SET.has(key)) {
       touched(this)
     }
+    metadataWrites++
     return this
   }
 
   override delete(key: K): boolean {
     const deleted = super.delete(key)
-    if (deleted && tracking && VALIDATOR_KEY_SET.has(key)) {
-      touched(this)
+    if (deleted) {
+      if (tracking && VALIDATOR_KEY_SET.has(key)) {
+        touched(this)
+      }
+      metadataWrites++
     }
     return deleted
   }
@@ -91,12 +144,23 @@ export class AnnotationMap<K = unknown, V = unknown> extends Map<K, V> {
   override clear(): void {
     super.clear()
     touched(this)
+    metadataWrites++
   }
 }
 
 /** Props map of runtime object types: a `Map` whose writes are tracked. */
 // oxlint-disable-next-line max-classes-per-file
 export class PropsMap<K = unknown, V = unknown> extends Map<K, V> {
+  /** A new map holding `entries` (untracked: a new map is in no compiled check). */
+  constructor(entries?: Iterable<readonly [K, V]> | null) {
+    super()
+    if (entries) {
+      for (const [key, value] of entries) {
+        mapSet.call(this, key, value)
+      }
+    }
+  }
+
   override set(key: K, value: V): this {
     super.set(key, value)
     touched(this)
@@ -115,9 +179,4 @@ export class PropsMap<K = unknown, V = unknown> extends Map<K, V> {
     super.clear()
     touched(this)
   }
-}
-
-/** `true` when `key` is an annotation the validator pre-check reads. */
-export function isValidatorKey(key: unknown): boolean {
-  return VALIDATOR_KEY_SET.has(key)
 }

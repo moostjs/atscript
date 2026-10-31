@@ -85,6 +85,8 @@ unknownAnnotation: 'warn' // Warn but continue
 unknownAnnotation: 'error' // Treat as error (strict)
 ```
 
+An annotation without a spec (accepted with `'allow'` / `'warn'`) keeps only its **first argument** at runtime, as written: a string, a number, `true` / `false` / `null` / `undefined`, any other name (`User`, `User.email`) or a backtick argument as the string of its source, an empty argument (`@x , 'y'`) as `undefined`. Written more than once on the same node, or with several arguments, its value is a list (of the first arguments). Its shape is decided where it is written: an `annotate` entry (mutating or `annotate … as`) overriding it on a prop gives the prop the entry's occurrences — written once, a single value; more than once, a list — whatever the target wrote, like a hand-written copy declaring them, and so does everything built from the alias (`extends`, an intersection, an alias of it). A prop inherited through `extends` has the same metadata in the interface inheriting it, whichever file declares that interface. Declare a spec (see [custom annotations](/packages/typescript/custom-annotations)) to keep every argument or to reference a type.
+
 #### `primitives`
 
 - **Type:** `Record<string, PrimitiveConfig>`

@@ -81,6 +81,24 @@ export class CodePrinter {
     return this.toString()
   }
 
+  /** What `fn` prints, captured (not added to the output), from indentation 0. */
+  capture(fn: () => void): string {
+    const saved = [this.lines, this.currentLine, this.indentLevel, this.blockStack] as const
+    this.lines = []
+    this.currentLine = ''
+    this.indentLevel = 0
+    this.blockStack = []
+    try {
+      fn()
+      if (this.currentLine) {
+        this.lines.push(this.currentLine)
+      }
+      return this.lines.join('\n')
+    } finally {
+      ;[this.lines, this.currentLine, this.indentLevel, this.blockStack] = saved
+    }
+  }
+
   /**
    * Return the entire code as a string. Removes any half-finished current line if empty.
    */

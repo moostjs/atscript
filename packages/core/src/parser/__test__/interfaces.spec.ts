@@ -393,7 +393,19 @@ describe('annotate-through-extends', () => {
     return resolved.props.get(propName)!
   }
 
-  it('folds annotate-block annotations from same doc into inherited prop', () => {
+  /** The annotations blocks write at `path` of `target` (the structure model's layers). */
+  function blockAnnotations(doc: AtscriptDoc, target: string, path: string[]) {
+    const m = doc.structure()
+    return m.layersAt(m.declOf(doc, target)!, path).flatMap(l => l.entry.ref.annotations ?? [])
+  }
+
+  /** The prop node `name` declaration `decl` writes. */
+  function ownProp(doc: AtscriptDoc, decl: string, name: string) {
+    const node = doc.nodes.find(n => n.id === decl) as SemanticInterfaceNode
+    return (node.getDefinition() as SemanticStructureNode).props.get(name)
+  }
+
+  it('an annotate block on the parent is a layer of the node the inherited prop is', () => {
     const doc = new AtscriptDoc('test.as', docConfig)
     doc.update(`
 interface Parent { username: string }
@@ -403,9 +415,9 @@ annotate Parent {
   username
 }
 `)
-    const prop = getChildProp(doc, 'Child', 'username')
-    const ann = prop.annotations?.find(a => a.name === 'meta.id')
-    expect(ann).toBeDefined()
+    // (MODEL §3: the block is metadata of Parent's node, which the child's prop is)
+    expect(getChildProp(doc, 'Child', 'username')).toBe(ownProp(doc, 'Parent', 'username'))
+    expect(blockAnnotations(doc, 'Parent', ['username']).map(a => a.name)).toEqual(['meta.id'])
   })
 
   it('annotate-block on parent in same doc applies even when child also extends', () => {
@@ -421,11 +433,10 @@ annotate Parent {
   username
 }
 `)
-    const prop = getChildProp(doc, 'Child', 'username')
-    const labels = prop.annotations?.filter(a => a.name === 'label') ?? []
-    // Right-side wins: annotate-block label overrides parent's own
-    const lastLabel = labels[labels.length - 1]
-    expect(lastLabel?.args[0]?.text).toBe('annotate-label')
+    // (the block's label is a layer over Parent's node, which the child's prop is)
+    expect(getChildProp(doc, 'Child', 'username')).toBe(ownProp(doc, 'Parent', 'username'))
+    const labels = blockAnnotations(doc, 'Parent', ['username'])
+    expect(labels.map(a => a.args[0]?.text)).toEqual(['annotate-label'])
   })
 
   it('does not apply non-mutating annotate (with alias)', () => {
@@ -443,7 +454,7 @@ export annotate Parent as ParentTagged {
     expect(ann).toBeUndefined()
   })
 
-  it('folds annotate-block contributions through chained extends', () => {
+  it('an annotate block on a grandparent is a layer of the inherited node', () => {
     const doc = new AtscriptDoc('test.as', docConfig)
     doc.update(`
 interface Grand { username: string }
@@ -454,8 +465,7 @@ annotate Grand {
   username
 }
 `)
-    const prop = getChildProp(doc, 'Child', 'username')
-    const ann = prop.annotations?.find(a => a.name === 'meta.id')
-    expect(ann).toBeDefined()
+    expect(getChildProp(doc, 'Child', 'username')).toBe(ownProp(doc, 'Grand', 'username'))
+    expect(blockAnnotations(doc, 'Grand', ['username']).map(a => a.name)).toEqual(['meta.id'])
   })
 })

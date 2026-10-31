@@ -34,13 +34,22 @@ export class SemanticGroup extends SemanticNode {
   }
 
   define(node: SemanticNode): this {
-    if (isGroup(node)) {
+    if (this.adoptsMembers(node)) {
       this.nodes = node.unwrap()
       this.operator = node.op
     } else {
       this.nodes = [node]
     }
     return this
+  }
+
+  /**
+   * Whether `node` (what the parser defines this group with) is a list of members to adopt
+   * rather than a single member: only a plain group is — a structure or a tuple is one
+   * member (unwrapping it would turn `({ a: string })` into its props, `([a, b])` into `a & b`).
+   */
+  protected adoptsMembers(node: SemanticNode): node is SemanticGroup {
+    return isGroup(node) && node.entity === 'group'
   }
 
   wrap(node: SemanticNode, token: Token) {

@@ -8,7 +8,10 @@ import {
   createObjectTypeDef,
   isAnnotatedType,
 } from './annotated-type'
-import { forAnnotatedType } from './traverse'
+import { cutAs, cutKey } from './cut'
+import { statelessRegExp } from './stateless-regex'
+import { runWalk, type TWalk } from './traverse'
+import { uniqueName } from './unique-name'
 import type { Validator } from './validator'
 
 // ---------------------------------------------------------------------------
@@ -30,6 +33,24 @@ export interface TSerializedAnnotatedTypeInner {
   metadata: Record<string, unknown>
   optional?: boolean
   id?: string
+  /**
+   * The type's own id when the payload `id` differs from it: distinct types sharing a name
+   * (from different modules) get unique payload ids (`Name`, `Name@1`, `Name@2`, …), which
+   * `$ref` entries use; `deserializeAnnotatedType` restores this one as the type's `id`.
+   */
+  origId?: string
+  /**
+   * The node has no id of its own: `id` is a payload id given to a reference without one that
+   * reaches itself (a reference to a prop of a type, inside that prop: `d?: { x?: T.d }`), so
+   * the `$ref` entries below it can point to it. `deserializeAnnotatedType` gives it no id.
+   */
+  anon?: true
+  /**
+   * The readers' recursion cut (see `cut.ts`) of a node without an id whose def stands for the
+   * same type as other defs of the payload (a path override's copy of a def and that def): one
+   * tag per type, restored on the deserialized defs.
+   */
+  cut?: number
   /** Reference to another named type (chain/FK or plain); shallow `{ id, metadata }` target when `refDepth` has a `.5` fractional part. */
   ref?: { type: TSerializedAnnotatedTypeInner | TSerializedShallowRefTarget; field: string }
 }
@@ -167,32 +188,58 @@ export function serializeAnnotatedType(
   options?: TSerializeOptions
 ): TSerializedAnnotatedType {
   const visited = new Visited()
-  const result = serializeNode(type, [], options, visited) as TSerializedAnnotatedType
+  const refDepth = options?.refDepth ?? 0
+  indexPayload(type, refDepth, visited)
+  const result = runWalk(serializeNode(type, [], options, visited)) as TSerializedAnnotatedType
   result.$v = SERIALIZE_VERSION
   return result
 }
 
 /**
- * Named types serialized so far. `own` keeps, per id, the first node serialized under it (and
- * the `refDepth` it was serialized at); a later reference is compared against it, by a
- * fingerprint of what it carries (metadata, `optional` and `ref`), to tell a reference that adds
- * nothing from one whose prop annotations or FK target differ. The first node's key is computed
- * only when a revisit needs it, and memoized.
+ * Named types serialized so far, by payload id (see {@link Visited.keyOf}). `own` keeps, per
+ * id, the first node serialized under it (and the `refDepth` it was serialized at); a later
+ * reference is compared against it, by a fingerprint of what it carries (metadata, `optional`
+ * and `ref`), to tell a reference that adds nothing from one whose prop annotations or FK target
+ * differ. The first node's fingerprint is computed only when a revisit needs it, and memoized.
  */
-class Visited extends Set<string> {
+class Visited {
   readonly own = new Map<string, { def: TAtscriptAnnotatedType; refDepth: number }>()
+  /**
+   * The nodes without an id met more than once (see `indexPayload`): serialized once, with a
+   * payload id, and referenced (`$ref`, `anon`) wherever else they are.
+   */
+  readonly repeated = new Set<object>()
   private readonly firstKeys = new Map<string, string>()
   private readonly identities = new WeakMap<object, number>()
   private nextId = 0
+  /** Payload ids by type def (see {@link keyOf}). */
+  private readonly keys = new WeakMap<object, string>()
+  /** The payload ids given so far. */
+  private readonly taken = new Set<string>()
+  /** The `cut` payload of defs (see `indexPayload`). */
+  readonly cutKeys = new WeakMap<object, number>()
 
-  /** Whether `def` (revisiting its id at `refDepth`) carries something other than the first node. */
-  differsFromFirst(def: TAtscriptAnnotatedType, refDepth: number): boolean {
-    const id = def.id!
-    let first = this.firstKeys.get(id)
+  /**
+   * The payload id of named type `def`: its id, unless a different type (another type def)
+   * took it first (`Name@1`, `Name@2`, …) — distinct types never collapse onto one another.
+   */
+  keyOf(def: TAtscriptAnnotatedType): string {
+    let key = this.keys.get(def.type)
+    if (key === undefined) {
+      key = uniqueName(def.id ?? ANON_ID, k => this.taken.has(k), '@')
+      this.taken.add(key)
+      this.keys.set(def.type, key)
+    }
+    return key
+  }
+
+  /** Whether `def` (revisiting `key` at `refDepth`) carries something other than the first node. */
+  differsFromFirst(def: TAtscriptAnnotatedType, key: string, refDepth: number): boolean {
+    let first = this.firstKeys.get(key)
     if (first === undefined) {
-      const { def: firstDef, refDepth: firstDepth } = this.own.get(id)!
+      const { def: firstDef, refDepth: firstDepth } = this.own.get(key)!
       first = ownKey(firstDef, this, firstDepth)
-      this.firstKeys.set(id, first)
+      this.firstKeys.set(key, first)
     }
     return first !== ownKey(def, this, refDepth)
   }
@@ -264,9 +311,12 @@ function isPlainOrArray(value: object): boolean {
   return Array.isArray(value) || proto === Object.prototype || proto === null
 }
 
-/** Comparison key of a resolved annotation target: its id, else its identity. */
+/**
+ * Comparison key of a resolved annotation target: its type def's identity (two references to
+ * one type compare equal; distinct types sharing an id do not).
+ */
 function targetKey(target: TAtscriptAnnotatedType, visited: Visited): string {
-  return target.id ? `ref#${target.id}` : `ref@${visited.identity(target)}`
+  return `ref@${visited.identity(target.type ?? target)}`
 }
 
 /** What a node carries of its own (metadata, optionality, FK target), as a comparison key. */
@@ -275,15 +325,15 @@ function ownKey(def: TAtscriptAnnotatedType, visited: Visited, refDepth: number)
     ([k, v]) => `${JSON.stringify(k)}:${fingerprint(v, visited)}`
   )
   const refTarget = refDepth > 0 ? def.ref?.type() : undefined
-  const ref = def.ref && refTarget ? `${refTarget.id ?? ''}.${def.ref.field}` : ''
+  const ref = def.ref && refTarget ? `${targetKey(refTarget, visited)}.${def.ref.field}` : ''
   return `${entries.join(',')}|${def.optional ? 1 : 0}|${ref}`
 }
 
-function serializeRef(
+function* serializeRef(
   def: TAtscriptAnnotatedType,
   options: TSerializeOptions | undefined,
   visited: Visited
-): TSerializedAnnotatedTypeInner['ref'] {
+): TWalk<TSerializedAnnotatedTypeInner['ref']> {
   const refDepth = options?.refDepth ?? 0
   if (refDepth > 0 && def.ref) {
     const refTarget = def.ref.type()
@@ -298,19 +348,24 @@ function serializeRef(
                 { visited, depth: 1 },
                 true
               ) as TSerializedShallowRefTarget)
-            : serializeNode(refTarget, [], { ...options!, refDepth: refDepth - 1 }, visited),
+            : ((yield serializeNode(
+                refTarget,
+                [],
+                { ...options!, refDepth: refDepth - 1 },
+                visited
+              )) as TSerializedAnnotatedTypeInner),
       }
     }
   }
   return undefined
 }
 
-function serializeNode(
+function* serializeNode(
   def: TAtscriptAnnotatedType,
   path: string[],
   options: TSerializeOptions | undefined,
   visited: Visited
-): TSerializedAnnotatedTypeInner {
+): TWalk<TSerializedAnnotatedTypeInner> {
   const refDepth = options?.refDepth ?? 0
   const metadata = () =>
     serializeMetadata(def, { path, kind: def.type.kind }, options, { visited, depth: 0 })
@@ -319,112 +374,244 @@ function serializeNode(
   // merged over the type's, another FK target) says so (`own`), so it does not collapse onto
   // the first node on the way back. A collapsed reference carries no metadata, so
   // `processAnnotation` is not consulted for it.
-  if (def.id && visited.has(def.id)) {
-    const differs = visited.differsFromFirst(def, refDepth)
-    const ref = differs ? serializeRef(def, options, visited) : undefined
-    return {
-      type: { kind: '$ref' as const, id: def.id, ...(differs ? { own: true as const } : {}) },
+  // (a node without an id held in several places of the tree — a type built from another holds
+  // its nodes, a reference to a prop of a type, `T.d`, may reach itself through that prop —:
+  // keyed by its type def like a named one, see `anon`; once, it is serialized in place, so the
+  // payload is the same after a round trip)
+  const key = def.id || visited.repeated.has(def.type) ? visited.keyOf(def) : undefined
+  if (key !== undefined && visited.own.has(key)) {
+    // (another declaration over the same def — an annotated alias reached inside its target —
+    // is a node of its own too: read back as the first node, it would lose its id, which the
+    // readers' recursion cut keys it by)
+    const differs =
+      (def.id !== undefined && def.id !== visited.own.get(key)!.def.id) ||
+      visited.differsFromFirst(def, key, refDepth)
+    const ref = differs
+      ? ((yield serializeRef(def, options, visited)) as TSerializedAnnotatedTypeInner['ref'])
+      : undefined
+    const node: TSerializedAnnotatedTypeInner = {
+      type: { kind: '$ref' as const, id: key, ...(differs ? { own: true as const } : {}) },
       metadata: differs ? metadata() : {},
-      ...(def.optional ? { optional: true } : {}),
-      id: def.id,
-      ...(ref ? { ref } : {}),
     }
+    if (def.optional) {
+      node.optional = true
+    }
+    node.id = key
+    if (!def.id) {
+      node.anon = true
+    } else if (key !== def.id) {
+      node.origId = def.id
+    }
+    if (ref) {
+      node.ref = ref
+    }
+    return node
   }
-  if (def.id) {
-    visited.add(def.id)
-    visited.own.set(def.id, { def, refDepth })
+  if (key !== undefined) {
+    visited.own.set(key, { def, refDepth })
   }
   const result: TSerializedAnnotatedTypeInner = {
-    type: serializeTypeDef(def, path, options, visited),
+    type: (yield serializeTypeDef(def, path, options, visited)) as TSerializedTypeDef,
     metadata: metadata(),
   }
   if (def.optional) {
     result.optional = true
   }
-  if (def.id) {
-    result.id = def.id
+  if (key !== undefined) {
+    result.id = key
+    if (!def.id) {
+      result.anon = true
+    } else if (key !== def.id) {
+      result.origId = def.id
+    }
   }
-  const ref = serializeRef(def, options, visited)
+  const cutTag = visited.cutKeys.get(def.type)
+  if (cutTag !== undefined) {
+    result.cut = cutTag
+  }
+  const ref = (yield serializeRef(def, options, visited)) as TSerializedAnnotatedTypeInner['ref']
   if (ref) {
     result.ref = ref
   }
   return result
 }
 
+/**
+ * Walks the nodes the payload of `root` holds, in the order `serializeNode` writes them: its tree
+ * and — `refDepth` permitting — the tree of each FK target, right after the node referencing it
+ * (at one level less). `reach(node, first)` for every node met; `first` when its type is met for
+ * the first time, the only time its children (and FK target) are walked — the payload writes a
+ * type's tree once — except a primitive's FK target, written wherever the primitive is.
+ */
+function walkPayload(
+  root: TAtscriptAnnotatedType,
+  refDepth: number,
+  reach: (node: TAtscriptAnnotatedType, first: boolean) => void
+): void {
+  const walked = new Set<object>()
+  const pending: Array<[TAtscriptAnnotatedType | undefined, number]> = [[root, refDepth]]
+  const next: Array<[TAtscriptAnnotatedType | undefined, number]> = []
+  while (pending.length > 0) {
+    const [node, depth] = pending.pop()!
+    const type = node?.type
+    if (!node || !type) {
+      continue
+    }
+    const first = !walked.has(type)
+    reach(node, first)
+    if (first) {
+      walked.add(type)
+      if (type.kind === 'object') {
+        for (const prop of type.props.values()) {
+          next.push([prop, depth])
+        }
+        for (const { def } of type.propsPatterns) {
+          next.push([def, depth])
+        }
+      } else if (type.kind === 'array') {
+        next.push([type.of, depth])
+      } else if (type.kind !== '') {
+        for (const item of type.items) {
+          next.push([item, depth])
+        }
+      }
+    }
+    if ((first || type.kind === '') && depth >= 1 && node.ref) {
+      // (a half step, `refDepth` 0.5, writes the target's metadata only: see `serializeRef`)
+      next.push([node.ref.type(), depth - 1])
+    }
+    while (next.length > 0) {
+      pending.push(next.pop()!)
+    }
+  }
+}
+
+/**
+ * Indexes the payload of `root` (one walk, see {@link walkPayload}; decided before anything is
+ * written, so a copy deserialized from the payload, which shares exactly these nodes, decides
+ * alike):
+ * - `visited.repeated`: the types (by def) of the nodes without an id (not primitives) the
+ *   payload holds in more than one place (FK targets included, so a node shared by the tree and a
+ *   target's tree is written once wherever it is met first): a type built from another one
+ *   references that one's nodes, a merge with the type itself holds its own merged prop.
+ *   Serialized once each (see `serializeNode`).
+ * - `visited.cutKeys`: the `cut` payload (see `TSerializedAnnotatedTypeInner.cut`) of the nodes
+ *   without an id: the defs standing for one type to the cut (`cutKey`) get one tag, in the order
+ *   first met, so a copy cuts and serializes alike.
+ */
+function indexPayload(root: TAtscriptAnnotatedType, refDepth: number, visited: Visited): void {
+  const counted = new Set<object>()
+  const groups = new Map<unknown, object[]>()
+  walkPayload(root, refDepth, (node, first) => {
+    const type = node.type
+    if (type.kind === '') {
+      return
+    }
+    // (a node without an id holding a def met before — also one a named node holds: a chain
+    // alias `type L = T.x` is the field's def — is written once)
+    if (counted.has(type) && !node.id) {
+      visited.repeated.add(type)
+    }
+    counted.add(type)
+    if (!first || node.id) {
+      return
+    }
+    const key = cutKey(node)
+    const group = groups.get(key)
+    if (!group) {
+      groups.set(key, [type])
+    } else if (!group.includes(type)) {
+      group.push(type)
+    }
+  })
+  let tag = 0
+  for (const defs of groups.values()) {
+    if (defs.length > 1) {
+      for (const def of defs) {
+        visited.cutKeys.set(def, tag)
+      }
+      tag++
+    }
+  }
+}
+
+/** The payload id base of a reference without an id (see `anon`). */
+const ANON_ID = 'Recursive'
+
 function isHalfStep(refDepth: number): boolean {
   return refDepth - Math.floor(refDepth) === 0.5
 }
 
-function serializeTypeDef(
+function* serializeTypeDef(
   def: TAtscriptAnnotatedType,
   path: string[],
   options: TSerializeOptions | undefined,
   visited: Visited
-): TSerializedTypeDef {
-  return forAnnotatedType<TSerializedTypeDef>(def, {
-    phantom(d) {
-      return {
-        kind: '' as const,
-        designType: d.type.designType,
-        tags: Array.from(d.type.tags),
-      }
-    },
-    final(d) {
+): TWalk<TSerializedTypeDef> {
+  const type = def.type
+  switch (type.kind) {
+    case '': {
       const result: TSerializedTypeFinal = {
         kind: '',
-        designType: d.type.designType,
-        tags: Array.from(d.type.tags),
+        designType: type.designType,
+        tags: Array.from(type.tags),
       }
-      if (d.type.value !== undefined) {
-        result.value = d.type.value
+      if (type.value !== undefined && type.designType !== 'phantom') {
+        result.value = type.value
       }
       return result
-    },
-    object(d) {
+    }
+    case 'object': {
       const props: Record<string, TSerializedAnnotatedTypeInner> = {}
-      for (const [key, val] of d.type.props.entries()) {
-        props[key] = serializeNode(val, [...path, key], options, visited)
+      for (const [key, val] of type.props.entries()) {
+        props[key] = (yield serializeNode(
+          val,
+          [...path, key],
+          options,
+          visited
+        )) as TSerializedAnnotatedTypeInner
       }
-      const propsPatterns = d.type.propsPatterns.map(pp => ({
-        pattern: { source: pp.pattern.source, flags: pp.pattern.flags },
-        def: serializeNode(pp.def, path, options, visited),
-      }))
+      const propsPatterns: TSerializedTypeObject['propsPatterns'] = []
+      for (const pp of type.propsPatterns) {
+        propsPatterns.push({
+          pattern: { source: pp.pattern.source, flags: pp.pattern.flags },
+          def: (yield serializeNode(
+            pp.def,
+            path,
+            options,
+            visited
+          )) as TSerializedAnnotatedTypeInner,
+        })
+      }
       return {
         kind: 'object' as const,
         props,
         propsPatterns,
-        tags: Array.from(d.type.tags),
+        tags: Array.from(type.tags),
       }
-    },
-    array(d) {
+    }
+    case 'array': {
       return {
         kind: 'array' as const,
-        of: serializeNode(d.type.of, path, options, visited),
-        tags: Array.from(d.type.tags),
+        of: (yield serializeNode(type.of, path, options, visited)) as TSerializedAnnotatedTypeInner,
+        tags: Array.from(type.tags),
       }
-    },
-    union(d) {
-      return {
-        kind: 'union' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
-        tags: Array.from(d.type.tags),
+    }
+    case 'union':
+    case 'intersection':
+    case 'tuple': {
+      const items: TSerializedAnnotatedTypeInner[] = []
+      for (const item of type.items) {
+        items.push(
+          (yield serializeNode(item, path, options, visited)) as TSerializedAnnotatedTypeInner
+        )
       }
-    },
-    intersection(d) {
-      return {
-        kind: 'intersection' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
-        tags: Array.from(d.type.tags),
-      }
-    },
-    tuple(d) {
-      return {
-        kind: 'tuple' as const,
-        items: d.type.items.map(item => serializeNode(item, path, options, visited)),
-        tags: Array.from(d.type.tags),
-      }
-    },
-  })
+      return { kind: type.kind, items, tags: Array.from(type.tags) }
+    }
+    default: {
+      throw new Error(`Unknown type kind "${(type as { kind: string }).kind}"`)
+    }
+  }
 }
 
 /**
@@ -598,7 +785,25 @@ export function deserializeAnnotatedType(data: TSerializedAnnotatedType): TAtscr
     )
   }
   const resolved = new Map<string, TAtscriptAnnotatedType>()
-  return deserializeNode(data, resolved)
+  return runWalk(deserializeNode(data, resolved))
+}
+
+/** The anonymous type of each `cut` tag of a payload being deserialized (by its `resolved`). */
+const cutTokens = new WeakMap<object, Map<number, object>>()
+
+/** The anonymous type `cut` tag `tag` of the payload `resolved` belongs to stands for. */
+function cutToken(resolved: Map<string, TAtscriptAnnotatedType>, tag: number): object {
+  let tokens = cutTokens.get(resolved)
+  if (!tokens) {
+    tokens = new Map()
+    cutTokens.set(resolved, tokens)
+  }
+  let token = tokens.get(tag)
+  if (!token) {
+    token = {}
+    tokens.set(tag, token)
+  }
+  return token
 }
 
 function emptyObjectTypeDef(): TAtscriptTypeDef {
@@ -609,16 +814,19 @@ function toMetadataMap(record: Record<string, unknown>): TMetadataMap<AtscriptMe
   return createMetadataMap(Object.entries(record))
 }
 
-function deserializeRef(
+function* deserializeRef(
   data: TSerializedAnnotatedTypeInner,
   resolved: Map<string, TAtscriptAnnotatedType>
-): { type: () => TAtscriptAnnotatedType; field: string } | undefined {
+): TWalk<{ type: () => TAtscriptAnnotatedType; field: string } | undefined> {
   if (!data.ref) {
     return undefined
   }
   const refTargetData = data.ref.type
   if ('type' in refTargetData) {
-    const deserializedRefTarget = deserializeNode(refTargetData, resolved)
+    const deserializedRefTarget = (yield deserializeNode(
+      refTargetData,
+      resolved
+    )) as TAtscriptAnnotatedType
     return { type: () => deserializedRefTarget, field: data.ref.field }
   }
   // Shallow ref: empty props is the "body unavailable" signal; consumers must fetch
@@ -631,27 +839,27 @@ function deserializeRef(
   return { type: () => sentinel, field: data.ref.field }
 }
 
-function deserializeNode(
+function* deserializeNode(
   data: TSerializedAnnotatedTypeInner,
   resolved: Map<string, TAtscriptAnnotatedType>
-): TAtscriptAnnotatedType {
+): TWalk<TAtscriptAnnotatedType> {
   if (data.type.kind === '$ref') {
     const { id: refId, own } = data.type as TSerializedTypeRef
     const target = resolved.get(refId)
+    const id = data.anon ? undefined : (data.origId ?? target?.id ?? refId)
     if (!own) {
-      return (
-        target ||
-        createAnnotatedTypeNode(emptyObjectTypeDef(), createMetadataMap(), {
-          id: refId,
-        })
-      )
+      return target || createAnnotatedTypeNode(emptyObjectTypeDef(), createMetadataMap(), { id })
     }
     // A node of its own (the referencing prop's annotations) over the shared type. The type is
     // read through the target, which may still be under construction (a cyclic reference).
     const node = createAnnotatedTypeNode(
       target?.type ?? emptyObjectTypeDef(),
       toMetadataMap(data.metadata),
-      { id: refId, optional: data.optional || undefined, ref: deserializeRef(data, resolved) }
+      {
+        id,
+        optional: data.optional || undefined,
+        ref: (yield deserializeRef(data, resolved)) as TAtscriptAnnotatedType['ref'],
+      }
     )
     if (target) {
       Object.defineProperty(node, 'type', {
@@ -677,14 +885,18 @@ function deserializeNode(
     }
     result = createAnnotatedTypeNode(emptyObjectTypeDef(), metadata, {
       optional: data.optional || undefined,
-      id: data.id,
+      id: data.anon ? undefined : (data.origId ?? data.id),
     })
     resolved.set(data.id, result)
   }
 
-  const type = deserializeTypeDef(data.type, resolved)
+  const type = (yield deserializeTypeDef(data.type, resolved)) as TAtscriptTypeDef
 
-  const ref = deserializeRef(data, resolved)
+  const ref = (yield deserializeRef(data, resolved)) as TAtscriptAnnotatedType['ref']
+
+  if (data.cut !== undefined) {
+    cutAs(type, cutToken(resolved, data.cut))
+  }
 
   if (result) {
     result.type = type
@@ -701,10 +913,10 @@ function deserializeNode(
   })
 }
 
-function deserializeTypeDef(
+function* deserializeTypeDef(
   t: TSerializedTypeDef,
   resolved: Map<string, TAtscriptAnnotatedType>
-): TAtscriptTypeDef {
+): TWalk<TAtscriptTypeDef> {
   const tags = ('tags' in t ? new Set(t.tags) : new Set()) as Set<AtscriptPrimitiveTags>
 
   switch (t.kind) {
@@ -722,25 +934,33 @@ function deserializeTypeDef(
     case 'object': {
       const def = createObjectTypeDef(tags)
       for (const [key, val] of Object.entries(t.props)) {
-        def.props.set(key, deserializeNode(val, resolved))
+        def.props.set(key, (yield deserializeNode(val, resolved)) as TAtscriptAnnotatedType)
       }
-      def.propsPatterns = t.propsPatterns.map(pp => ({
-        pattern: new RegExp(pp.pattern.source, pp.pattern.flags),
-        def: deserializeNode(pp.def, resolved),
-      }))
+      const patterns: typeof def.propsPatterns = []
+      for (const pp of t.propsPatterns) {
+        patterns.push({
+          pattern: statelessRegExp(new RegExp(pp.pattern.source, pp.pattern.flags)),
+          def: (yield deserializeNode(pp.def, resolved)) as TAtscriptAnnotatedType,
+        })
+      }
+      def.propsPatterns = patterns
       return def
     }
     case 'array': {
-      return { kind: 'array', of: deserializeNode(t.of, resolved), tags }
+      return {
+        kind: 'array',
+        of: (yield deserializeNode(t.of, resolved)) as TAtscriptAnnotatedType,
+        tags,
+      }
     }
     case 'union':
     case 'intersection':
     case 'tuple': {
-      return {
-        kind: t.kind,
-        items: t.items.map(item => deserializeNode(item, resolved)),
-        tags,
+      const items: TAtscriptAnnotatedType[] = []
+      for (const item of t.items) {
+        items.push((yield deserializeNode(item, resolved)) as TAtscriptAnnotatedType)
       }
+      return { kind: t.kind, items, tags }
     }
     case '$ref': {
       // $ref is normally handled in deserializeNode; this is a defensive fallback.

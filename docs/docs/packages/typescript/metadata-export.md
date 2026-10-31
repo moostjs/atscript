@@ -20,6 +20,8 @@ nameProp?.metadata.get('expect.minLength') // { length: 3, message?: string }
 
 The metadata map is typed via the global `AtscriptMetadata` interface, so you get IntelliSense for annotation keys and their value types.
 
+A map returns the annotations in effect at that node: its own, plus those it reads from the type it refers to (a property typed `Address` has `Address`'s annotations under its own). Treat the maps as read-only; to change a type, write an [`annotate` block](/packages/typescript/ad-hoc-annotations). Writing at runtime is covered in [Runtime Metadata](/plugin-development/runtime-metadata).
+
 ## Iterating Properties
 
 Walk all properties and their metadata using the `props` map:

@@ -1,12 +1,15 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import path from 'path'
 
-import { build } from '@atscript/core'
+import { type AtscriptDoc, build } from '@atscript/core'
 import { describe, expect, it } from 'vitest'
 
 import { tsPlugin } from './plugin'
 import type { TAtscriptAnnotatedType } from './runtime/annotated-type'
 import { defineAnnotatedType as $ } from './runtime/annotated-type'
 import { buildJsonSchema as $$, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
+import { deserializeAnnotatedType, serializeAnnotatedType } from './runtime/serialize'
 import { prepareFixtures } from './test-utils'
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
 
@@ -161,7 +164,7 @@ const expectedSchema = {
       type: 'object',
     },
     optional: {
-      type: 'string',
+      type: ['string', 'null'],
     },
     optionalObj: {
       properties: {
@@ -176,7 +179,7 @@ const expectedSchema = {
         },
       },
       required: ['a', 'b', 'c'],
-      type: 'object',
+      type: ['object', 'null'],
     },
     s: {
       type: 'string',
@@ -184,6 +187,51 @@ const expectedSchema = {
   },
   required: ['s', 'n', 'c', 'obj', 'a', 'aObj', 'deep'],
   type: 'object',
+}
+
+/** Each class of `entries` (in `rootDir`): its bundled schema equals the one built at runtime. */
+async function expectBundleAsRuntime(rootDir: string, entries: string[]) {
+  // Generated into a directory of its own: other specs load the fixtures' default output.
+  const outDir = mkdtempSync(path.join(tmpdir(), 'atscript-bundle-'))
+  try {
+    // The entries and the modules they import (MODEL §12 Q8: a module with error diagnostics is
+    // not generated — the directory holds other specs' fixtures that build only with their own
+    // primitives and annotations; it built every module of the directory). The entries' own
+    // unknown annotations are rendered, not diagnosed, here.
+    const repo = await build({
+      rootDir,
+      entries,
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+      unknownAnnotation: 'allow',
+    })
+    const docs = new Set<AtscriptDoc>()
+    for (const entry of entries) {
+      const doc = repo.getDoc(`file://${path.join(rootDir, entry)}`)!
+      docs.add(doc)
+      for (const dep of doc.transitive('dependencies')) {
+        docs.add(dep)
+      }
+    }
+    for (const file of await repo.generate({ format: 'js' }, [...docs])) {
+      const source = file.target ?? path.join(rootDir, file.fileName)
+      writeFileSync(path.join(outDir, path.basename(source)), file.content)
+    }
+    for (const entry of entries) {
+      const module = await import(path.join(outDir, `${entry}.js`))
+      for (const [name, type] of Object.entries<
+        TAtscriptAnnotatedType & { toJsonSchema(): unknown }
+      >(module)) {
+        // (`$i_…` / `$h_…`: in-place merge operands and hidden merge classes, extra module exports
+        // that are not declarations)
+        if (name.startsWith('$i_') || name.startsWith('$h_')) {
+          continue
+        }
+        expect([entry, name, type.toJsonSchema()]).toEqual([entry, name, $$(type)])
+      }
+    }
+  } finally {
+    rmSync(outDir, { recursive: true, force: true })
+  }
 }
 
 describe('json-schema', () => {
@@ -223,17 +271,241 @@ describe('json-schema', () => {
     const { TreeNode, Holder, Forest, Point, Shape, AliasOfPoint, Pair } = await import(
       path.join(wd, 'test/fixtures/jsonschema-recursive.as.js')
     )
-    expect(bundled).toEqual(
-      [TreeNode, Holder, Forest, Point, Shape, AliasOfPoint, Pair].map(t => $$(t))
-    )
+    // MODEL §10 D3: a bare plain alias is literally its target (`AliasOfPoint` is `Point`, no
+    // class and no bundled schema of its own).
+    expect(AliasOfPoint).toBe(Point)
+    expect(bundled).toEqual([TreeNode, Holder, Forest, Point, Shape, Pair].map(t => $$(t)))
     expect(bundled[0].$defs.TreeNode.properties.children.items).toEqual({
       $ref: '#/$defs/TreeNode',
     })
-    // A reference to an alias points at the alias, not at what it unwinds to.
-    expect(bundled[6].properties.id.items).toEqual([
+    // A reference to a bare alias is a reference to what it aliases (MODEL §10 D3).
+    expect(bundled[5].properties.id.items).toEqual([
       { $ref: '#/$defs/Point' },
-      { $ref: '#/$defs/AliasOfPoint' },
+      { $ref: '#/$defs/Point' },
     ])
+  })
+
+  // Regression: recursion through a non-object type (a union / array alias) overflowed the
+  // stack, at build time (bundle) and at runtime (lazy).
+  it('must render recursive non-object types with $defs (bundle same as runtime)', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/jsonschema-recursive-alias.as'],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+    })
+    const out = await repo.generate({ format: 'js' })
+    const bundled = out[0].content
+      .split('\n')
+      .filter(s => s.trim().startsWith('return {'))
+      .map(s => JSON.parse(s.trim().slice('return '.length)))
+    await prepareFixtures({
+      rootDir: path.join(wd, 'test/fixtures'),
+      entries: ['jsonschema-recursive-alias.as'],
+      formats: ['js'],
+    })
+    const { Json, Nested, Doc } = await import(
+      path.join(wd, 'test/fixtures/jsonschema-recursive-alias.as.js')
+    )
+    expect(bundled).toEqual([Json, Nested, Doc].map(t => $$(t)))
+    const json = {
+      anyOf: [
+        { type: 'string' },
+        { type: 'number' },
+        { type: 'array', items: { $ref: '#/$defs/Json' } },
+      ],
+    }
+    expect(bundled[0]).toEqual({ ...json, $defs: { Json: json } })
+    expect(bundled[2].properties).toEqual({
+      json: { $ref: '#/$defs/Json' },
+      // (an optional prop passes `null`)
+      nested: { anyOf: [{ $ref: '#/$defs/Nested' }, { type: 'null' }] },
+      tree: { type: 'array', items: { $ref: '#/$defs/Json' } },
+    })
+    expect(bundled[2].$defs.Json).toEqual(json)
+    expect(bundled[2].$defs.Nested.anyOf[1].properties.a).toEqual({ $ref: '#/$defs/Nested' })
+  })
+
+  it('must give recursion without an id a generated $defs name', () => {
+    // A chained reference into a prop (no id) that recurses through it.
+    const node = $('object')
+    const list = $('union').item($().designType('string').$type)
+    list.item($('array').of(list.$type).$type)
+    node.prop('list', list.$type)
+    expect($$(node.$type).properties.list).toEqual({ $ref: '#/$defs/Recursive' })
+    expect($$(node.$type).$defs.Recursive.anyOf[1].items).toEqual({ $ref: '#/$defs/Recursive' })
+  })
+
+  /** The bundled schemas of `entry`'s classes, and the module built at runtime. */
+  const bundleAndLoad = async (dir: string, entries: string[], entry: string) => {
+    const repo = await build({
+      rootDir: dir,
+      entries: [entry],
+      plugins: [tsPlugin({ jsonSchema: 'bundle' })],
+    })
+    const bundled = (await repo.generate({ format: 'js' }))
+      .find(f => f.fileName.endsWith(`${entry}.js`))!
+      .content.split('\n')
+      .filter(s => s.trim().startsWith('return {'))
+      .map(s => JSON.parse(s.trim().slice('return '.length)))
+    await prepareFixtures({ rootDir: dir, entries, formats: ['js'] })
+    return { bundled, module: await import(path.join(dir, `${entry}.js`)) }
+  }
+
+  // Regression: the recursive alias's $defs body took the first referencing prop's constraints.
+  it('must keep per-reference constraints out of a recursive $defs body', async () => {
+    const dir = path.join(wd, 'test/fixtures')
+    const entry = 'jsonschema-recursive-constraints.as'
+    const { bundled, module } = await bundleAndLoad(dir, [entry], entry)
+    expect(bundled).toEqual([$$(module.Json), $$(module.H)])
+    const items = { $ref: '#/$defs/Json' }
+    expect(bundled[1].$defs).toEqual({
+      Json: { anyOf: [{ type: 'string' }, { type: 'array', items }] },
+    })
+    expect(bundled[1].properties).toEqual({
+      a: {
+        anyOf: [
+          { type: 'string', maxLength: 3 },
+          { type: 'array', items, maxItems: 3 },
+        ],
+      },
+      b: { $ref: '#/$defs/Json' },
+    })
+  })
+
+  // Regression: a chained reference (`W.j`) to a recursive alias built the shared $defs body
+  // from its own metadata (the referencing prop's constraints leaked, depending on prop order).
+  it('must build a recursive $defs body from the declaration reached by a chained reference', async () => {
+    const dir = path.join(wd, 'test/fixtures')
+    const entry = 'jsonschema-recursive-chain.as'
+    const { bundled, module } = await bundleAndLoad(dir, [entry], entry)
+    const { Json, W, H, H2 } = module
+    expect(bundled).toEqual([Json, W, H, H2].map(t => $$(t)))
+    const values = [
+      { first: 'abc', second: 'abcd' },
+      { first: 'abcd', second: 'abc' },
+      { first: ['a', 'b', 'c'], second: ['a', 'b', 'c', 'd'] },
+      { first: ['a', 'b', 'c', 'd'], second: [] },
+      { first: [['abcd', 'e', 'f', 'g']], second: [['abcd']] },
+    ]
+    for (const type of [H, H2]) {
+      const schema = $$(type)
+      expect(schema.$defs.Json).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'array', items: { $ref: '#/$defs/Json' } }],
+      })
+      const fromSchema = fromJsonSchema(schema)
+      for (const value of values) {
+        expect(fromSchema.validator().validate(value, true)).toBe(
+          type.validator().validate(value, true)
+        )
+      }
+    }
+  })
+
+  // Regression: a deserialized type has no `ref`s, so the recursive body was built from the
+  // first use's metadata (its constraints applied to every use).
+  it('must keep use-site constraints out of the $defs of a deserialized recursive type', async () => {
+    const dir = path.join(wd, 'test/fixtures')
+    const constraints = 'jsonschema-recursive-constraints.as'
+    const chain = 'jsonschema-recursive-chain.as'
+    const { module: c } = await bundleAndLoad(dir, [constraints], constraints)
+    const { module: ch } = await bundleAndLoad(dir, [chain], chain)
+    const roundTrip = (t: TAtscriptAnnotatedType) =>
+      deserializeAnnotatedType(JSON.parse(JSON.stringify(serializeAnnotatedType(t))))
+    const body = { anyOf: [{ type: 'string' }, { type: 'array', items: { $ref: '#/$defs/Json' } }] }
+    expect($$(roundTrip(c.H)).$defs.Json).toEqual(body)
+    const values = [
+      { a: 'abc', b: 'abcd', first: 'abc', second: 'abcd' },
+      { a: 'abcd', b: 'abc', first: 'abcd', second: 'abc' },
+      { a: ['a', 'b', 'c', 'd'], b: [], first: [], second: ['a', 'b', 'c', 'd'] },
+    ]
+    for (const type of [c.H, ch.H, ch.H2]) {
+      const restored = roundTrip(type)
+      const schema = $$(restored)
+      expect(schema.$defs.Json).toEqual(body)
+      const fromSchema = fromJsonSchema(schema)
+      for (const value of values) {
+        expect(fromSchema.validator({ unknownProps: 'ignore' }).validate(value, true)).toBe(
+          type.validator({ unknownProps: 'ignore' }).validate(value, true)
+        )
+      }
+    }
+  })
+
+  // Regression: the bundled schema of an `annotate … as` alias was `{}`, an intersection was
+  // bundled as `allOf` (the module merges it), a chained reference into an intersection
+  // pointed at the whole type, `void` stayed `void`.
+  it('must bundle aliases, intersections and chained references as the module builds them', async () => {
+    const cases: Array<[string, string[]]> = [
+      ['test/fixtures', ['annotate-type.as', 'annotate-import.as', 'intersections.as', 'type.as']],
+      [
+        'test/fixtures',
+        ['annotate-deep-ref.as', 'interface-metadata.as', 'nullable-constraints.as'],
+      ],
+      ['src/__test__/fixtures/codegen-regressions', ['intersect-a.as', 'deep-annotate-x.as']],
+      [
+        'src/__test__/fixtures/codegen-regressions',
+        ['rec-merge.as', 'rec-inline-a.as', 'rec-annotate.as'],
+      ],
+    ]
+    for (const [rel, entries] of cases) {
+      await expectBundleAsRuntime(path.join(wd, rel), entries)
+    }
+  })
+
+  // Regression: each constrained anonymous level was built twice (exponential in depth).
+  it('must build nested constrained types once (linear in depth)', () => {
+    let t: TAtscriptAnnotatedType = $().designType('string').$type
+    for (let i = 0; i < 20; i++) {
+      t = $('object').prop(
+        'x',
+        $('array').of(t).annotate('expect.minLength', { length: 1 }).$type
+      ).$type
+    }
+    const start = Date.now()
+    const schema = $$(t)
+    expect(Date.now() - start).toBeLessThan(200)
+    expect(schema.properties.x.minItems).toBe(1)
+  })
+
+  it('must name $defs after Object.prototype keys and keep literal suffixed names', () => {
+    const obj = (id: string, prop: string) =>
+      $('object').prop(prop, $().designType('string').$type).id(id).$type
+    const special = $('object')
+      .prop('a', obj('constructor', 'x'))
+      .prop('b', obj('__proto__', 'y'))
+      .prop('c', obj('toString', 'z')).$type
+    const schema = $$(special)
+    expect(Object.keys(schema.$defs)).toEqual(['constructor', '__proto__', 'toString'])
+    expect(schema.properties.b).toEqual({ $ref: '#/$defs/__proto__' })
+    expect(Object.getOwnPropertyDescriptor(schema.$defs, '__proto__')?.value.properties).toEqual({
+      y: { type: 'string' },
+    })
+    // Two distinct `Helper`s and a type named `Helper_1`: only the real collision is renamed.
+    const helpers = $('object')
+      .prop('a', obj('Helper', 'a'))
+      .prop('b', obj('Helper', 'b'))
+      .prop('c', obj('Helper_1', 'c')).$type
+    expect($$(helpers).properties).toEqual({
+      a: { $ref: '#/$defs/Helper' },
+      b: { $ref: '#/$defs/Helper_2' },
+      c: { $ref: '#/$defs/Helper_1' },
+    })
+  })
+
+  // Regression: a `$defs` name taken by another type (here an imported interface) was reused.
+  it('must give distinct types sharing a name distinct $defs entries', async () => {
+    const dir = path.join(wd, 'test/fixtures/jsonschema-collision')
+    const { bundled, module } = await bundleAndLoad(dir, ['x.as', 'z.as', 'y.as'], 'y.as')
+    expect(bundled).toEqual([$$(module.Json), $$(module.H)])
+    const h = bundled[1]
+    expect(h.properties).toEqual({ a: { $ref: '#/$defs/Json' }, w: { $ref: '#/$defs/Wrap' } })
+    expect(h.$defs.Wrap.properties.j).toEqual({ $ref: '#/$defs/Json_1' })
+    expect(h.$defs.Json_1).toEqual({
+      type: 'object',
+      properties: { k: { type: 'string' } },
+      required: ['k'],
+    })
+    expect(h.$defs.Json.anyOf[1].items).toEqual({ $ref: '#/$defs/Json' })
   })
 
   it('must pre-render json schema of aliases of imported aliases (same as built at runtime)', async () => {
@@ -251,15 +523,15 @@ describe('json-schema', () => {
       .map(s => JSON.parse(s.trim().slice('return '.length)))
     await prepareFixtures({ rootDir: dir, entries: ['target.as', 'uses.as'], formats: ['js'] })
     const { ReAlias, UsesAlias } = await import(path.join(dir, 'uses.as.js'))
-    // A lazy (cross-module) reference adopts its target's id once resolved: resolve them all.
-    for (const item of UsesAlias.type.props.get('b').type.items) {
-      expect(item.type.kind).toBe('object')
-    }
-    expect(bundled).toEqual([$$(ReAlias), $$(UsesAlias)])
-    expect(bundled[0].properties).toEqual({ x: { type: 'number' } })
-    expect(bundled[1].properties.b.items).toEqual([
-      { $ref: '#/$defs/AliasOfPoint' },
-      { $ref: '#/$defs/ReAlias' },
+    const { Point } = await import(path.join(dir, 'target.as.js'))
+    // MODEL §10 D3: a bare plain alias (of a bare alias) is literally its target: `ReAlias` is
+    // `Point`, with no bundled schema of its own; references to it are references to `Point`.
+    expect(ReAlias).toBe(Point)
+    expect(bundled).toEqual([$$(UsesAlias)])
+    expect($$(ReAlias).properties).toEqual({ x: { type: 'number' } })
+    expect(bundled[0].properties.b.items).toEqual([
+      { $ref: '#/$defs/Point' },
+      { $ref: '#/$defs/Point' },
     ])
   })
 })
@@ -573,6 +845,8 @@ describe('fromJsonSchema', () => {
         type: 'array',
         items: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }],
         additionalItems: false,
+        minItems: 3,
+        maxItems: 3,
       }
       expect($$(fromJsonSchema(schema))).toEqual(schema)
     })
@@ -931,6 +1205,54 @@ describe('mergeJsonSchemas', () => {
     expect(merged.$defs.Dog).toBeDefined()
     // Pets schema should not have its own $defs
     expect(merged.schemas.Pets.$defs).toBeUndefined()
+  })
+
+  it('renames a different definition asking for a taken name, and its references', () => {
+    // Two modules' `Address` types: the second schema's references kept pointing to the first.
+    const str = () => $().designType('string').tags('string').$type
+    const street = $('object').prop('street', str()).id('Address')
+    const zip = $('object').prop('zip', $().designType('number').tags('number').$type).id('Address')
+    const a = $('object').prop('addr', street.$type).id('A')
+    const b = $('object').prop('addr', zip.$type).prop('again', street.$type).id('B')
+    const merged = mergeJsonSchemas([a.$type, b.$type])
+    expect(merged.schemas.A.properties!.addr).toEqual({ $ref: '#/$defs/Address' })
+    expect(merged.schemas.B.properties!.addr).toEqual({ $ref: '#/$defs/Address_1' })
+    // The same definition is shared, whatever name it had in its own schema.
+    expect(merged.schemas.B.properties!.again).toEqual({ $ref: '#/$defs/Address' })
+    expect(merged.$defs.Address.properties).toEqual({ street: { type: 'string' } })
+    expect(merged.$defs.Address_1.properties).toEqual({ zip: { type: 'number' } })
+  })
+
+  it('shares recursive definitions equal across schemas, renaming their references', () => {
+    // `T` annotated at `next.name`: its schema has the copies `T`, `T_1`; another schema
+    // referencing them names them in another order.
+    const str = () => $().designType('string').tags('string').$type
+    const node = (name: TAtscriptAnnotatedType) => {
+      const handle = $('object').id('T')
+      handle.prop('name', name).prop('next', handle.$type)
+      handle.$type.type.props.get('next')!.optional = true
+      return handle
+    }
+    const plain = node(str())
+    const labelled = $().designType('string').tags('string').annotate('expect.minLength', {
+      length: 3,
+    }).$type
+    const annotated = $('object').id('T').prop('name', str()).prop('next', node(labelled).$type)
+    const holder = $('object').prop('a', plain.$type).prop('b', annotated.$type).id('H')
+    const merged = mergeJsonSchemas([annotated.$type, holder.$type])
+    // (an optional prop's schema: `anyOf: [{ $ref }, { type: 'null' }]`)
+    const resolve = (ref: { $ref?: string; anyOf?: Array<{ $ref?: string }> }) =>
+      merged.$defs[(ref.$ref ?? ref.anyOf![0].$ref)!.split('/').pop()!]
+    const next = resolve(merged.schemas.T.properties!.next as never)
+    expect(next.properties!.name).toEqual({ type: 'string', minLength: 3 })
+    const fromHolder = resolve(merged.schemas.H.properties!.b as never)
+    expect(resolve(fromHolder.properties!.next as never).properties!.name).toEqual({
+      type: 'string',
+      minLength: 3,
+    })
+    expect(resolve(merged.schemas.H.properties!.a as never).properties!.name).toEqual({
+      type: 'string',
+    })
   })
 
   it('should throw when a type has no id', () => {

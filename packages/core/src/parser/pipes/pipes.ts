@@ -15,8 +15,8 @@ import {
 import { $token, block, identifier, pun, text } from './tokens.pipe'
 
 const ref = $pipe('ref', [refWithChain()]) // defineValuePipe('ref', 'identifier', true)
-const constText = defineValuePipe('const', 'text', false)
-const constNumber = defineValuePipe('const', 'number', false)
+const constText = defineValuePipe('const', 'text', true)
+const constNumber = defineValuePipe('const', 'number', true)
 
 const allowedValuesPipeArray: TPipe[] = [
   constNumber,

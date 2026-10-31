@@ -148,6 +148,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/interface-metadata.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -171,6 +174,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/inherit-metadata.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -194,6 +200,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/inherit-from-type.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -217,6 +226,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/inherit-chain.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -265,17 +277,44 @@ describe('ts-plugin', () => {
     // Source keeps its own declarations
     expect(block('Source')).toContain('.annotate("structural", "by_code", true)')
     expect(block('Source')).toContain('.annotate("label", "Code")')
+    // (P4B default format: the generated JS mirrors the .as structure: a reference is printed as a reference, MODEL §1, its
+    // metadata a layer over the target's read at runtime, MODEL §2 / §9 U3 — it was a copy,
+    // `.inherit(…)`; the values are checked on the loaded module below)
     // One-hop ref: presentation rides, structural does not
-    expect(block('OneHop')).toContain('.annotate("label", "Code")')
+    // (s5: a chain ref into this module is a placeholder its own statement makes a thin node over
+    // the field — `$al(node, T, chain)` —, so declaration order is not semantics, MODEL intro / §1)
+    expect(code).toContain('$al($f(OneHop, "code"), Source, ["code"])')
     expect(block('OneHop')).not.toContain('"structural"')
     // Two-hop ref (through Dict): presentation still rides, inherited structural
     // still dropped, local structural declaration untouched
-    expect(block('TwoHop')).toContain('.annotate("label", "Code")')
+    expect(code).toContain('$al($f(TwoHop, "code"), Dict, ["code"])')
     expect(block('TwoHop')).toContain('.annotate("structural", "local_idx", true)')
     expect(block('TwoHop')).not.toContain('"by_code"')
-    // extends is not a ref boundary: structural inherits with the prop
-    expect(block('Extended')).toContain('.annotate("structural", "by_code", true)')
-    expect(block('Extended')).toContain('.annotate("label", "Code")')
+    // extends is not a ref boundary: the child holds the parent's prop itself, structural
+    // annotation included (MODEL §5: a field only one parent has is that parent's node)
+    expect(block('Extended')).toContain('.prop("code", $f(Source, "code"))')
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-ref-scope-'))
+    try {
+      writeFileSync(path.join(dir, 'm.as.js'), code)
+      const m = await import(path.join(dir, 'm.as.js'))
+      const at = (t: any) => t.type.props.get('code').metadata
+      expect([at(m.OneHop).get('label'), at(m.OneHop).get('structural')]).toEqual([
+        'Code',
+        undefined,
+      ])
+      expect([at(m.TwoHop).get('label'), at(m.TwoHop).get('structural')]).toEqual([
+        'Code',
+        ['local_idx'],
+      ])
+      expect([at(m.Extended).get('label'), at(m.Extended).get('structural')]).toEqual([
+        'Code',
+        ['by_code'],
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
   it("keeps a primitive's intrinsic passedWhenReferred:false annotations across type refs, not prop refs", async () => {
     const repo = await build({
@@ -284,7 +323,9 @@ describe('ts-plugin', () => {
       plugins: [tsPlugin()],
       annotations: {
         ...annotations,
-        structural: new AnnotationSpec({
+        // (not `structural`: the ref-scope test above registers that key as an append key, and a
+        // runtime's key flags are process-wide)
+        stamped: new AnnotationSpec({
           passedWhenReferred: false,
           argument: { name: 'value', type: 'string' },
         }),
@@ -292,47 +333,57 @@ describe('ts-plugin', () => {
       primitives: {
         stamp: {
           type: 'number',
-          extensions: { auto: { annotations: { structural: 'intrinsic', mulAppend: 'm' } } },
+          extensions: { auto: { annotations: { stamped: 'intrinsic', mulAppend: 'm' } } },
         },
       },
     })
     const out = await repo.generate({ format: 'js' })
     const code = out[0].content
-    const slice = (from: string, to: string) => {
-      const start = code.indexOf(from)
-      expect(start).toBeGreaterThanOrEqual(0)
-      const end = code.indexOf(to, start + from.length)
-      return end === -1 ? code.slice(start) : code.slice(start, end)
+    // (MODEL §12 Q11: the primitive's intrinsic annotations are part of the type. P4B default format:
+    // a reference is a layer over its target, MODEL §1/§2, not a copy — the alias class carries
+    // them, marked `.intrinsic(…)`, so they pass the reference layers over it although the key is
+    // `passedWhenReferred: false`; it was a copy, `.annotate(…)` on every referencing prop. The
+    // values are read from the loaded module.)
+    expect(code).toMatch(/\$\("", Stamp\)[^\n]*\n?[^]*?\.intrinsic\("stamped"/)
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-primitive-ref-scope-'))
+    try {
+      writeFileSync(path.join(dir, 'm.as.js'), code)
+      const m = await import(path.join(dir, 'm.as.js'))
+      const at = (name: string) => m.Uses.type.props.get(name).metadata
+      const stamped = (name: string) => at(name).get('stamped')
+      // the primitive used directly, optional, through an alias (twice), as a union member
+      expect(stamped('direct')).toBe('intrinsic')
+      expect(stamped('optional')).toBe('intrinsic')
+      expect(stamped('aliased')).toBe('intrinsic')
+      expect(stamped('aliasedTwice')).toBe('intrinsic')
+      expect(m.Stamp.metadata.get('stamped')).toBe('intrinsic')
+      expect(m.Uses.type.props.get('member').type.items[0].metadata.get('stamped')).toBe(
+        'intrinsic'
+      )
+      // an alias redeclaring it: the alias's own value stays on the alias, the intrinsic one
+      // reaches its users
+      expect(m.StampRelabeled.metadata.get('stamped')).toBe('alias')
+      expect(stamped('relabeled')).toBe('intrinsic')
+      expect(stamped('relabeled2')).toBe('intrinsic')
+      // read once, however long the ref chain
+      for (const name of ['aliasedTwice', 'viaProp']) {
+        expect([name, at(name).get('mulAppend')]).toEqual([name, ['m']])
+      }
+      // a reference to a prop drops it, like the prop's own passedWhenReferred:false ones
+      expect(stamped('viaProp')).toBeUndefined()
+      expect(at('viaProp').get('label')).toBe('At')
+      expect(stamped('viaPropAlias')).toBeUndefined()
+      expect(m.SourceAt.metadata.get('stamped')).toBeUndefined()
+      // the prop's own declaration wins
+      expect(stamped('overridden')).toBe('own')
+      // core's built-in passedWhenReferred:false primitive annotations
+      expect(at('name').get('meta.required')).toBeDefined()
+      expect(at('agreed').get('meta.required')).toBeDefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
     }
-    const prop = (name: string) => slice(`"${name}",`, '.$type')
-    const intrinsic = '.annotate("structural", "intrinsic")'
-    // the primitive used directly, optional, through an alias, as a union member
-    expect(prop('direct')).toContain(intrinsic)
-    expect(prop('optional')).toContain(intrinsic)
-    expect(prop('aliased')).toContain(intrinsic)
-    expect(slice('$("", Stamp)', '\n\n')).toContain(intrinsic)
-    expect(slice('"member",', '.item($().designType("null")')).toContain(intrinsic)
-    // an alias redeclaring it: the alias's own value stays on the alias, the intrinsic one reaches its users
-    expect(prop('relabeled')).toContain(intrinsic)
-    expect(prop('relabeled')).not.toContain('"alias"')
-    expect(prop('relabeled2')).toContain(intrinsic)
-    expect(slice('$("", StampRelabeled2)', '\n\n')).toContain(intrinsic)
-    // merged once, however long the ref chain
-    const appended = '.annotate("mulAppend", "m", true)'
-    for (const name of ['aliasedTwice', 'viaProp']) {
-      expect(prop(name).split(appended)).toHaveLength(2)
-    }
-    // a reference to a prop drops it, like the prop's own passedWhenReferred:false ones
-    expect(prop('viaProp')).not.toContain('"structural"')
-    expect(prop('viaProp')).toContain('.annotate("label", "At")')
-    expect(prop('viaPropAlias')).not.toContain('"structural"')
-    expect(slice('$("", SourceAt)', '\n\n')).not.toContain('"structural"')
-    // the prop's own declaration wins
-    expect(prop('overridden')).toContain('.annotate("structural", "own")')
-    expect(prop('overridden')).not.toContain(intrinsic)
-    // core's built-in passedWhenReferred:false primitive annotations
-    expect(prop('name')).toContain('.annotate("meta.required", {')
-    expect(prop('agreed')).toContain('.annotate("meta.required", {')
   })
   it('emits append-merged annotations across a ref: the referenced type first, then the prop', async () => {
     const repo = await build({
@@ -343,10 +394,20 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     const code = out[0].content
-    const holder = code.slice(code.indexOf('$("object", Holder)'))
-    const values = [...holder.matchAll(/\.annotate\("mulAppend", "([^"]+)", true\)/g)].map(
-      m => m[1]
-    )
+    // (P4B default format: the generated JS mirrors the .as structure: the prop is a reference to Shared, MODEL §1, with its own
+    // entries; append keys read the bases' values first, then the own ones, MODEL §2 — it was a
+    // copy, `.inherit(…)` then `.annotate(…)`: the values are read from the loaded module)
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-append-order-'))
+    let values: unknown
+    try {
+      writeFileSync(path.join(dir, 'm.as.js'), code)
+      const { Holder } = await import(path.join(dir, 'm.as.js'))
+      values = Holder.type.props.get('field').metadata.get('mulAppend')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
     // A consumer keying entries into a Map (last wins) lets the prop's own entry override the type's.
     expect(values).toEqual(['type-1', 'type-2', 'own-1', 'own-2'])
   })
@@ -416,6 +477,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/intersections.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -428,6 +492,19 @@ describe('ts-plugin', () => {
     expect(outDts[0].fileName).toBe('intersections.as.d.ts')
     await expect(outDts[0].content).toMatchFileSnapshot(
       path.join(wd, 'test/__snapshots__/intersections.as.d.ts')
+    )
+  })
+  it('must render intersections of unions, tuples and of themselves', async () => {
+    const repo = await build({
+      rootDir: wd,
+      entries: ['test/fixtures/intersection-precedence.as'],
+      plugins: [tsPlugin()],
+      annotations,
+    })
+    const outDts = await repo.generate({ format: 'dts' })
+    expect(outDts[0].fileName).toBe('intersection-precedence.as.d.ts')
+    await expect(outDts[0].content).toMatchFileSnapshot(
+      path.join(wd, 'test/__snapshots__/intersection-precedence.as.d.ts')
     )
   })
   it('must render interfaces with prop patterns', async () => {
@@ -466,8 +543,11 @@ describe('ts-plugin', () => {
     )
     // Top-level annotation on original interface
     expect(out[0].content).toContain('.annotate("meta.description", "Original")')
-    // Top-level annotation on non-mutating annotate replaces the original in alias
-    expect(out[0].content).toContain('.annotate("meta.description", "Annotated")')
+    // Top-level annotation on non-mutating annotate replaces the original in alias (P4B default format: the generated JS mirrors the .as structure:
+    // the `as` copy's own entry over the target, MODEL §8)
+    expect(out[0].content).toContain(
+      '$a(AnnotatedInterface.metadata, "meta.description", "Annotated")'
+    )
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-nonmutating.as.d.ts')
@@ -489,16 +569,15 @@ describe('ts-plugin', () => {
     await expect(out[0].content).toMatchFileSnapshot(
       path.join(wd, 'test/__snapshots__/annotate-mutating.js')
     )
-    // Deep chain mutation navigates via .type.props.get()
-    expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
-    // Multiple+replace annotation clears before appending
-    expect(out[0].content).toContain('metadata.delete("mul")')
+    // (P4B default format: the generated JS mirrors the .as structure: a block is printed as data, `$blk(…)`, its entries with their
+    // paths, MODEL §3)
+    // Deep chain mutation writes the node at the path
+    expect(out[0].content).toContain('[[["label", "Mutated City"]], [["address", 0], ["city", 0]]]')
+    // Multiple+replace annotation: the entry's values replace the list (`[key, value, 1]`)
+    expect(out[0].content).toContain('[[["label", "Mutated Name"], ["mul", 42, 1]], [["name", 0]]]')
+    // Top-level annotation on mutating annotate: an entry at the target's root
     expect(out[0].content).toContain(
-      '$a(MyInterface.type.props.get("name")?.metadata, "mul", 42, true)'
-    )
-    // Top-level annotation on mutating annotate generates mutation on target's metadata
-    expect(out[0].content).toContain(
-      '$a(MyInterface.metadata, "meta.description", "Mutated Interface")'
+      '$blk($R, 0, MyInterface, [\n  [[["meta.description", "Mutated Interface"]], []],'
     )
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
@@ -523,12 +602,13 @@ describe('ts-plugin', () => {
       path.join(wd, 'test/__snapshots__/annotate-import.js')
     )
     // Import is present — bundler handles tree-shaking via moduleSideEffects: false
-    // Should inline the full type definition with overridden annotations
+    // An alias of the target (its nodes shared), its entries its own overrides
     expect(out[0].content).toContain('ImportedAnnotated')
     expect(out[0].content).toContain('"Imported Name"')
     expect(out[0].content).toContain('"Imported City"')
-    // Cross-file non-mutating annotate carries over target's type-level annotation
-    expect(out[0].content).toContain('.annotate("meta.description", "Original")')
+    // Cross-file non-mutating annotate carries over target's type-level annotation (P4B default format: the generated JS mirrors the .as structure:
+    // the `as` copy's metadata is a layer over the target's, MODEL §8; it was a copy, `.inherit(…)`)
+    expect(out[0].content).toContain('$al(ImportedAnnotated, MyInterface)')
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-import.as.d.ts')
@@ -553,14 +633,15 @@ describe('ts-plugin', () => {
     )
     // Mutating annotate MUST import the target (needed at runtime)
     expect(out[0].content).toContain('import { MyInterface }')
-    // Should generate mutation code
-    expect(out[0].content).toContain('MyInterface.type.props.get("name")')
-    expect(out[0].content).toContain('$a(MyInterface.type.props.get("name")?.metadata, "label"')
+    // Should generate mutation code (P4B default format: the generated JS mirrors the .as structure: a block printed as data, `$blk(…)`)
+    expect(out[0].content).toContain('[[["label", "Cross-File Name"]], [["name", 0]]]')
     // Deep chain mutation for address.city
-    expect(out[0].content).toContain('.type.props.get("address")?.type.props.get("city")?')
+    expect(out[0].content).toContain(
+      '[[["label", "Cross-File City"]], [["address", 0], ["city", 0]]]'
+    )
     // Top-level annotation on cross-file mutating annotate
     expect(out[0].content).toContain(
-      '$a(MyInterface.metadata, "meta.description", "Cross-File Mutated")'
+      '$blk($R, 0, MyInterface, [\n  [[["meta.description", "Cross-File Mutated"]], []],'
     )
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
@@ -583,9 +664,10 @@ describe('ts-plugin', () => {
     await expect(out[0].content).toMatchFileSnapshot(
       path.join(wd, 'test/__snapshots__/annotate-type.js')
     )
-    // Mutating annotate on union type uses items[N] path, not direct .props
-    expect(out[0].content).toContain('.items[')
-    expect(out[0].content).not.toContain('TO.type.props.get(')
+    // Mutating annotate on union type: the path goes through the union's items (by index) — every
+    // branch that has the prop (MODEL §9 U4, §12 Q6/Q7; P4B default format: `$blk` steps)
+    expect(out[0].content).toContain('[["|0", 0], ["age", 0]]')
+    expect(out[0].content).toContain('[["|1", 0], ["kind", 0]]')
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts).toHaveLength(2)
     expect(outDts[0].fileName).toBe('annotate-type.as.d.ts')
@@ -614,11 +696,18 @@ describe('ts-plugin', () => {
     await expect(out[0].content).toMatchFileSnapshot(
       path.join(wd, 'test/__snapshots__/annotate-deep-ref.js')
     )
-    // BUG 1: Mutating annotate should clone ref boundaries before mutating
-    expect(out[0].content).toContain('$c(')
-    expect(out[0].content).toContain('"Mobile Phone"')
-    // BUG 2: Non-mutating annotate should inline through refs and carry annotations
-    expect(out[0].content).toContain('"Work Phone"')
+    // (P4B default format: the generated JS mirrors the .as structure: blocks printed as data, `$blk(…)`; the shells along a path
+    // through references, `$sh(…)`, MODEL §4)
+    // A mutating path through references overrides them at that spot
+    expect(out[0].content).toContain('$sh(Deep, [[["address", 0], ["contact", 2], ["phone", 2]]])')
+    expect(out[0].content).toContain(
+      '[[["label", "Mobile Phone"]], [["address", 0], ["contact", 2], ["phone", 2]]]'
+    )
+    // A non-mutating annotate's entry through references: the alias's own override (its
+    // entries below every block: rank `null`, MODEL §8)
+    expect(out[0].content).toContain(
+      '$blk(null, 0, AliasedDeep, [\n  [[["label", "Work Phone"]], [["address", 2], ["contact", 2], ["phone", 2]]],'
+    )
 
     const outDts = await repo.generate({ format: 'dts' })
     await expect(outDts[0].content).toMatchFileSnapshot(
@@ -642,52 +731,36 @@ describe('ts-plugin', () => {
     const js = out[0].content
 
     // Split output into sections for targeted assertions
-    const userInline = js.slice(js.indexOf('$("object", User)'), js.indexOf('\n$a('))
-    const mutationSection = js.slice(js.indexOf('\n$a('), js.indexOf('$("object", User2)'))
-    const user2Section = js.slice(js.indexOf('$("object", User2)'))
-
-    // --- User inline definition (original annotations only, no ad-hoc merge) ---
-    expect(userInline).toContain('.annotate("label", "Original Name")')
-    expect(userInline).toContain('.annotate("mulAppend", "prop-original", true)')
-    expect(userInline).toContain('.annotate("mul", 1, true)')
-    expect(userInline).toContain('.annotate("mul", 2, true)')
-    // Ad-hoc annotations are NOT in the inline definition
-    expect(userInline).not.toContain('"Mutated Name"')
-    expect(userInline).not.toContain('"prop-mutated"')
-    expect(userInline).not.toContain('.annotate("mul", 99')
-    // Top-level: only original
-    expect(userInline).toContain('\n  .annotate("mulAppend", "top-original", true)')
-
-    // --- Mutation statements (right after User, before User2) ---
-    // Replace (single): label mutation does NOT use asArray
-    expect(mutationSection).toContain(
-      '$a(User.type.props.get("name")?.metadata, "label", "Mutated Name")'
-    )
-    expect(mutationSection).not.toContain('"label", "Mutated Name", true)')
-    // Replace (multiple): mul clears existing before appending
-    expect(mutationSection).toContain('metadata.delete("mul")')
-    expect(mutationSection).toContain('$a(User.type.props.get("name")?.metadata, "mul", 99, true)')
-    // Append: mulAppend does NOT clear, just appends
-    expect(mutationSection).not.toContain('metadata.delete("mulAppend")')
-    expect(mutationSection).toContain(
-      '$a(User.type.props.get("name")?.metadata, "mulAppend", "prop-mutated", true)'
-    )
-    expect(mutationSection).toContain('$a(User.metadata, "mulAppend", "top-mutated", true)')
-
-    // --- User2 inline definition (non-mutating annotate alias — merged) ---
-    // Replace: label replaced to "Aliased Name"
-    expect(user2Section).toContain('.annotate("label", "Aliased Name")')
-    expect(user2Section).not.toContain('"Original Name"')
-    // Replace: mul replaced to 77 (originals 1,2 gone)
-    expect(user2Section).toContain('.annotate("mul", 77, true)')
-    expect(user2Section).not.toContain('.annotate("mul", 1')
-    expect(user2Section).not.toContain('.annotate("mul", 2')
-    // Append: both prop-level mulAppend values present
-    expect(user2Section).toContain('.annotate("mulAppend", "prop-aliased", true)')
-    expect(user2Section).toContain('.annotate("mulAppend", "prop-original", true)')
-    // Top-level: both aliased and original present (append)
-    expect(user2Section).toContain('.annotate("mulAppend", "top-aliased", true)')
-    expect(user2Section).toContain('.annotate("mulAppend", "top-original", true)')
+    // The values the runtime has: the blocks write the type's own nodes, the alias's entries
+    // its own overrides over them (replace / append like a merge: the alias's first).
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-merge-strategy-'))
+    try {
+      writeFileSync(path.join(dir, 'm.as.js'), js)
+      const { User, User2 } = await import(path.join(dir, 'm.as.js'))
+      const name = (t: any) => t.type.props.get('name').metadata
+      expect(name(User).get('label')).toBe('Mutated Name')
+      expect(name(User).get('mul')).toEqual([99])
+      expect(name(User).get('mulAppend')).toEqual(['prop-original', 'prop-mutated'])
+      expect(User.metadata.get('mulAppend')).toEqual(['top-original', 'top-mutated'])
+      expect(name(User2).get('label')).toBe('Aliased Name')
+      expect(name(User2).get('mul')).toEqual([77])
+      // (MODEL §2: append keys read the bases' values first, then the own ones; §8: the `as`
+      // copy's entries are its own, over the target's — it was the alias's first)
+      expect(name(User2).get('mulAppend')).toEqual([
+        'prop-original',
+        'prop-mutated',
+        'prop-aliased',
+      ])
+      expect(User2.metadata.get('mulAppend')).toEqual([
+        'top-original',
+        'top-mutated',
+        'top-aliased',
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('must render phantom props as comments in dts and as runtime props in js', async () => {
@@ -696,6 +769,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/phantom.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
@@ -728,6 +804,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/phantom-custom.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
       primitives: {
         ui: {
           type: 'phantom',
@@ -789,8 +868,8 @@ describe('ts-plugin', () => {
       annotations,
     })
     const out = await repo.generate({ format: 'js' })
-    expect(out[0].content).toContain('buildJsonSchema as $$')
-    expect(out[0].content).toContain('this._jsonSchema ?? (this._jsonSchema = $$(this))')
+    expect(out[0].content).toContain('lazyJsonSchema as $jl')
+    expect(out[0].content).toContain('return $jl(this)')
   })
 
   it('must pre-render json schema (bundle mode)', async () => {
@@ -884,8 +963,8 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     const content = out[0].content
-    // $$ import present for lazy mode (for non-annotated interfaces)
-    expect(content).toContain('buildJsonSchema as $$')
+    // $jl import present for lazy mode (for non-annotated interfaces)
+    expect(content).toContain('lazyJsonSchema as $jl')
     // User interface has @emit.jsonSchema — should have embedded schema (not lazy)
     const userSection = content.slice(
       content.indexOf('class User'),
@@ -895,7 +974,7 @@ describe('ts-plugin', () => {
     expect(userSection).not.toContain('$$(this)')
     // NoAnnotation should use lazy mode
     const noAnnotationSection = content.slice(content.indexOf('class NoAnnotation'))
-    expect(noAnnotationSection).toContain('this._jsonSchema ?? (this._jsonSchema = $$(this))')
+    expect(noAnnotationSection).toContain('return $jl(this)')
   })
 
   // --- DTS output tests for jsonSchema modes ---
@@ -976,8 +1055,9 @@ describe('ts-plugin', () => {
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
     expect(out[0].fileName).toBe('union-type-alias-ref.as.js')
-    // The third union item (MyString) should use refTo, not inline primitive
-    expect(out[0].content).toContain('.refTo(MyString)')
+    // The third union item (MyString) should be a reference, not an inline primitive (P4B default format: the generated JS mirrors the .as structure,
+    // MODEL §1)
+    expect(out[0].content).toContain('.item($().ref(MyString).$type)')
     // The MyString ref should carry its label annotation
     expect(out[0].content).toContain('.annotate("label", "My String Label")')
     await expect(out[0].content).toMatchFileSnapshot(
@@ -996,6 +1076,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/db-table-flat.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (`__flat` comes from the module evaluated at build time: a module with error
+      // diagnostics — unknown `@db.*` here — is not, MODEL §12 Q8)
+      unknownAnnotation: 'allow',
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].fileName).toBe('db-table-flat.as.d.ts')
@@ -1018,6 +1101,7 @@ describe('ts-plugin', () => {
           },
         },
       },
+      unknownAnnotation: 'allow',
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].fileName).toBe('db-table-pk.as.d.ts')
@@ -1032,6 +1116,9 @@ describe('ts-plugin', () => {
       entries: ['test/fixtures/db-table-agg.as'],
       plugins: [tsPlugin()],
       annotations,
+      // (MODEL §12 Q8: a module with error diagnostics is not generated; the fixture's unknown
+      // annotations are rendered, not diagnosed, here)
+      unknownAnnotation: 'allow',
     })
     const outDts = await repo.generate({ format: 'dts' })
     expect(outDts[0].fileName).toBe('db-table-agg.as.d.ts')
@@ -1090,185 +1177,186 @@ describe('ts-plugin', () => {
     )
   })
 
-  it('must keep imports referenced only via cross-file `extends` parent prop tree', async () => {
+  // An interface extending another holds the parent's prop nodes themselves (`.share(…)`): the
+  // types inside the parent's props are the parent module's business — the child imports only
+  // the parent (no helper of the parent's tree is synthesized into it any more).
+  const generateChild = async (fixture: string) => {
     const repo = await build({
       rootDir: wd,
-      entries: ['test/fixtures/extends-cross-helper-child.as'],
+      entries: [`test/fixtures/${fixture}.as`],
       plugins: [tsPlugin()],
       annotations,
     })
     const out = await repo.generate({ format: 'js' })
     expect(out).toHaveLength(1)
-    expect(out[0].fileName).toBe('extends-cross-helper-child.as.js')
-    // Codegen must emit a refTo() for the inherited prop's helper type
-    expect(out[0].content).toContain('() => Helper')
-    // Helper must survive in the import list — it is only referenced through
-    // Base's resolved prop tree, never directly in the child source.
-    const importMatch = out[0].content.match(
-      /import \{([^}]+)\} from "\.\/extends-cross-helper-base\.as"/
-    )
-    expect(importMatch).not.toBeNull()
-    const importedNames = importMatch![1].split(',').map(s => s.trim())
-    expect(importedNames).toContain('Helper')
-    expect(importedNames).toContain('Base')
     await expect(out[0].content).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-cross-helper-child.js')
+      path.join(wd, `test/__snapshots__/${fixture}.js`)
     )
+    return out[0].content
+  }
+
+  it('an inherited prop is the parent’s node: no import of the types inside it', async () => {
+    // (P4B default format: the generated JS mirrors the .as structure: a field only the parent has is the parent's node, MODEL §5,
+    // printed `$f(Parent, "field")`; it was `.share(…)`)
+    const js = await generateChild('extends-cross-helper-child')
+    expect(js).toContain('.prop("payload", $f(Base, "payload"))')
+    const importMatch = js.match(/import \{([^}]+)\} from "\.\/extends-cross-helper-base\.as"/)
+    expect(importMatch![1].split(',').map(n => n.trim())).toEqual(['Base'])
+    for (const fixture of [
+      'extends-synth-child',
+      'extends-nested-child',
+      'extends-annot-child',
+      'extends-reexport-child',
+      'extends-recursive-child',
+    ]) {
+      const code = await generateChild(fixture)
+      expect(code).toMatch(/\.prop\("(payload|state)", \$f\(Base, "(payload|state)"\)\)/)
+      expect(code).not.toMatch(/import \{[^}]*\bHelper\b/)
+      expect(code).not.toMatch(/import \{[^}]*\bJsonValue\b/)
+    }
   })
 
-  it('must synthesize import for cross-file `extends` parent prop helper when not user-imported', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-synth-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    expect(out).toHaveLength(1)
-    const js = out[0].content
-    // Synthesized import for Helper from parent module
-    expect(js).toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-synth-base\.as"/)
-    // refTo uses Helper (no clash, no alias needed)
-    expect(js).toContain('() => Helper')
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-synth-child.js'))
+  it('an inherited prop never clashes with the child’s names (nothing synthesized)', async () => {
+    // (P4B default format: the generated JS mirrors the .as structure: `$f(Parent, "field")` for the parent's node, `$().ref(T)` for a
+    // reference, MODEL §1 / §5)
+    const clash = await generateChild('extends-synth-clash-child')
+    expect(clash).toContain('.prop("payload", $f(Base, "payload"))')
+    expect(clash).not.toContain('Helper_1')
+    expect(clash.slice(clash.indexOf('"own"'))).toContain('$().ref(Helper)')
+    const xpath = await generateChild('extends-xpath-child')
+    expect(xpath).toMatch(/import \{ Helper \} from "\.\/extends-xpath-a\.as"/)
+    expect(xpath).not.toContain('Helper_1')
+    expect(xpath.slice(xpath.indexOf('"fromUser"'))).toContain('$().ref(Helper)')
+    const fallback = await generateChild('extends-fallback-child')
+    expect(fallback).not.toContain('Helper_2')
+    expect(fallback).toContain('export class Helper_1 {')
+    const dedup = await generateChild('extends-dedup-child')
+    const baseImports = dedup.match(/import \{[^}]*\} from "\.\/extends-dedup-base\.as"/g) || []
+    expect(baseImports).toEqual(['import { Base, Helper } from "./extends-dedup-base.as"'])
   })
 
-  it('must alias synthesized import when local def shadows parent helper name', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-synth-clash-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    expect(out).toHaveLength(1)
-    const js = out[0].content
-    // Synthesized import aliases parent's Helper to Helper_1
-    expect(js).toMatch(
-      /import \{[^}]*Helper as Helper_1[^}]*\} from "\.\/extends-synth-clash-base\.as"/
-    )
-    // Parent-originated payload prop refTo uses the aliased Helper_1
-    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"own"'))
-    expect(payloadSection).toContain('() => Helper_1')
-    expect(payloadSection).not.toMatch(/refTo\(\(\) => Helper\b\)/)
-    // Child's own prop refers to the local Helper class — eager, no alias
-    const ownSection = js.slice(js.indexOf('"own"'))
-    expect(ownSection).toContain('.refTo(Helper)')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-synth-clash-child.js')
-    )
+  it('a child of several parents, and of a parent extending another, shares each parent’s props', async () => {
+    // (P4B default format: the generated JS mirrors the .as structure: `$f(Parent, "field")` for the parent's node, MODEL §5)
+    const multi = await generateChild('extends-synth-multi-child')
+    expect(multi).toContain('.prop("propA", $f(Base1, "propA"))')
+    expect(multi).toContain('.prop("propB", $f(Base2, "propB"))')
+    expect(multi).not.toMatch(/import \{[^}]*\bHelper\b/)
+    // (from the parent it extends: the grandparent's prop through it)
+    const grand = await generateChild('extends-grand-child')
+    // (Mid.g is Grand.g itself, MODEL §5: printed as the grandparent's node)
+    expect(grand).toContain('.prop("g", $f(Grand, "g"))')
+    expect(grand).toContain('.prop("m", $f(Mid, "m"))')
+    expect(grand).not.toMatch(/import \{[^}]*\bHelper\b/)
+    // (a chain reference and a type alias in the parent's props stay the parent's)
+    const chain = await generateChild('extends-chain-child')
+    expect(chain).toContain('.prop("userName", $f(Base, "userName"))')
+    expect(chain).not.toMatch(/import \{[^}]*\bUser\b/)
+    const alias = await generateChild('extends-typealias-child')
+    expect(alias).toContain('.prop("field", $f(Base, "field"))')
+    expect(alias).not.toMatch(/import \{[^}]*\bMyAlias\b/)
   })
 
-  it('must give distinct aliases when two parents define same-named helper in different files', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-synth-multi-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    expect(out).toHaveLength(1)
-    const js = out[0].content
-    // First parent's Helper imported under original name
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-synth-multi-base1\.as"/)
-    // Second parent's Helper aliased to Helper_1
-    expect(js).toMatch(/import \{ Helper as Helper_1 \} from "\.\/extends-synth-multi-base2\.as"/)
-    const propASection = js.slice(js.indexOf('"propA"'), js.indexOf('"propB"'))
-    const propBSection = js.slice(js.indexOf('"propB"'))
-    expect(propASection).toContain('() => Helper')
-    expect(propASection).not.toContain('Helper_1')
-    expect(propBSection).toContain('() => Helper_1')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-synth-multi-child.js')
-    )
+  // The downstream patterns the parents' prop trees carry — a recursive type alias, a type-alias
+  // helper, a chain reference — reached through `extends` across files: the child loads,
+  // validates (interpreted and compiled), has the parent's metadata (a block of the chain's
+  // target included), and its JSON schemas and serialized form terminate and agree.
+  it('a child holding a parent prop tree of recursive aliases, alias helpers and chains works', async () => {
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const { buildJsonSchema } = await import('./runtime/json-schema')
+    const { serializeAnnotatedType, deserializeAnnotatedType } = await import('./runtime/serialize')
+    const { Validator } = await import('./runtime/validator')
+    const files = {
+      'base.as': [
+        "@meta.label 'Json'",
+        'export type JsonValue = string | number | boolean | null | JsonValue[] | { [/^.+$/]: JsonValue }',
+        "@meta.label 'Alias'",
+        'export type MyAlias = string | number | { kind: string }',
+        'export interface User {',
+        "  @meta.label 'User name'",
+        '  @expect.maxLength 4',
+        '  name: string',
+        '}',
+        'export interface Base {',
+        '  state: {',
+        '    context: JsonValue',
+        '    meta?: { [/^.+$/]: JsonValue }',
+        '  }',
+        '  field: MyAlias',
+        '  userName: User.name',
+        '}',
+      ].join('\n'),
+      'child.as': [
+        "import { Base, User } from './base'",
+        'export interface Child extends Base {',
+        '  id: string',
+        '}',
+        'annotate User {',
+        "  @meta.description 'D'",
+        '  name',
+        '}',
+      ].join('\n'),
+    }
+    const valid = {
+      id: 'x',
+      state: { context: { a: [1, 'b', null, { c: true }] }, meta: { k: [] } },
+      field: { kind: 'k' },
+      userName: 'abcd',
+    }
+    const invalid = [
+      { ...valid, userName: 'abcde' },
+      { ...valid, state: { context: { a: [1, { b: () => 1 }] } } },
+      { ...valid, field: { kind: 1 } },
+      { ...valid, id: 1 },
+    ]
+    const check = async (compileValidators: boolean) => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'atscript-extends-trees-'))
+      try {
+        for (const [name, text] of Object.entries(files)) {
+          writeFileSync(path.join(dir, name), text)
+        }
+        const repo = await build({
+          rootDir: dir,
+          entries: Object.keys(files),
+          plugins: [tsPlugin({ jsonSchema: 'bundle', compileValidators })],
+        })
+        const errors = [...(await repo.diagnostics()).values()].flat().filter(m => m.severity === 1)
+        expect(errors.map(m => m.message)).toEqual([])
+        for (const out of await repo.generate({ format: 'js' })) {
+          writeFileSync(path.join(dir, `${path.basename(out.source)}.js`), out.content)
+        }
+        const { Base } = await import(path.join(dir, 'base.as.js'))
+        const { Child } = await import(path.join(dir, 'child.as.js'))
+        const prop = (t: any, name: string) => t.type.props.get(name)
+        // (the parent's nodes themselves)
+        for (const name of ['state', 'field', 'userName']) {
+          expect(prop(Child, name)).toBe(prop(Base, name))
+        }
+        expect(Object.fromEntries(prop(Child, 'userName').metadata)).toEqual({
+          'meta.label': 'User name',
+          'expect.maxLength': { length: 4 },
+          'meta.description': 'D',
+        })
+        expect(prop(Child, 'field').metadata.get('meta.label')).toBe('Alias')
+        expect(prop(prop(Child, 'state'), 'context').metadata.get('meta.label')).toBe('Json')
+        const verdicts = (t: any) =>
+          [valid, ...invalid].map(v => new Validator(t).validate(v, true))
+        expect(verdicts(Child)).toEqual([true, false, false, false, false])
+        expect(Child.toJsonSchema()).toEqual(buildJsonSchema(Child))
+        const copy = deserializeAnnotatedType(
+          JSON.parse(JSON.stringify(serializeAnnotatedType(Child)))
+        )
+        expect(verdicts(copy)).toEqual([true, false, false, false, false])
+        expect(prop(copy, 'userName').metadata.get('meta.description')).toBe('D')
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    }
+    await check(false)
+    await check(true)
   })
 
-  it('must alias synthesized helper when user already imports same name from a different path', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-xpath-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // User's own Helper import preserved unchanged (no alias on user's side)
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-xpath-a\.as"/)
-    // Parent's Helper synthesized under Helper_1 from the OTHER path
-    expect(js).toMatch(/import \{ Helper as Helper_1 \} from "\.\/extends-xpath-b\.as"/)
-    // Parent-origin payload uses aliased name
-    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"fromUser"'))
-    expect(payloadSection).toContain('() => Helper_1')
-    // Child's own fromUser uses the user-imported (same name, different module)
-    const fromUserSection = js.slice(js.indexOf('"fromUser"'))
-    expect(fromUserSection).toContain('() => Helper')
-    expect(fromUserSection).not.toContain('Helper_1')
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-xpath-child.js'))
-  })
-
-  it('must synthesize imports for helpers nested deep in parent prop tree (object/array/union)', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-nested-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-nested-base\.as"/)
-    // Helper appears via three different containers — confirm the walker reaches each
-    const stateSection = js.slice(js.indexOf('"state"'), js.indexOf('"id"'))
-    // context: Helper (direct prop in nested struct)
-    expect(stateSection).toContain('"context"')
-    expect(stateSection).toMatch(/"context"[\s\S]*?refTo\(\(\) => Helper\)/)
-    // items: Helper[] (inside array)
-    expect(stateSection).toContain('"items"')
-    expect(stateSection).toMatch(/"items"[\s\S]*?\.of\(\$\(\)[\s\S]*?refTo\(\(\) => Helper\)/)
-    // union: Helper | string (inside group)
-    expect(stateSection).toContain('"union"')
-    expect(stateSection).toMatch(/"union"[\s\S]*?union[\s\S]*?refTo\(\(\) => Helper\)/)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-nested-child.js')
-    )
-  })
-
-  it('must synthesize import through multi-level extends (Child → Mid → Grand)', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-grand-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // Helper lives in Grand's file — synth should target that file directly
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-grand-grand\.as"/)
-    // Inherited prop g comes from Grand and references Helper
-    expect(js).toContain('"g"')
-    expect(js).toMatch(/"g"[\s\S]*?refTo\(\(\) => Helper\)/)
-    // Mid is imported by the user (line for it stays); Helper must NOT be sourced from mid
-    expect(js).not.toMatch(/import \{[^}]*\bHelper\b[^}]*\} from "\.\/extends-grand-mid\.as"/)
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-grand-child.js'))
-  })
-
-  it('must re-emit type-level annotations on synthesized helper using parent doc context', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-annot-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-annot-base\.as"/)
-    // The refTo for the inherited payload should be followed by Helper's type-level annotation
-    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"id"'))
-    expect(payloadSection).toContain('refTo(() => Helper)')
-    expect(payloadSection).toContain('.annotate("label", "Helper Label")')
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-annot-child.js'))
-  })
-
-  it('must bake annotate-block contributions into inherited props of an extending child', async () => {
+  it('an annotate block of the parent reaches the child through the shared prop', async () => {
     const repo = await build({
       rootDir: wd,
       entries: ['test/fixtures/annotate-extends-child.as'],
@@ -1277,135 +1365,13 @@ describe('ts-plugin', () => {
     })
     const out = await repo.generate({ format: 'js' })
     const js = out[0].content
-    // The annotate-block targets the imported parent, but the child must carry the
-    // annotation on its own inherited `username` prop — otherwise consumers reading
-    // the child's flat prop view at runtime won't see it.
-    const usernameSection = js.slice(js.indexOf('"username"'), js.indexOf('"extra"'))
-    expect(usernameSection).toContain('"username"')
-    expect(usernameSection).toMatch(/\.annotate\("meta\.id"/)
-    // The annotate block in the same file still emits its mutating $a() call against
-    // the parent type (existing behavior; not removed).
-    expect(js).toMatch(
-      /\$a\(AnnotateExtendsBase\.type\.props\.get\("username"\)\?\.metadata, "meta\.id"/
-    )
-  })
-
-  it('must not duplicate the import line when user imports helper from the same path as synth target', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-dedup-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // Exactly ONE import line targeting the base module
-    const baseImports = js.match(/import \{[^}]*\} from "\.\/extends-dedup-base\.as"/g) || []
-    expect(baseImports).toHaveLength(1)
-    // Both Base and Helper present in that line
-    expect(baseImports[0]).toContain('Base')
-    expect(baseImports[0]).toContain('Helper')
-    // No aliasing — user's name matches what synth would have picked
-    expect(js).not.toContain('Helper as ')
-    // payload (parent-origin) and own (child-origin) both refer to same Helper
-    expect(js).toContain('() => Helper')
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-dedup-child.js'))
-  })
-
-  it('must skip past taken `_1` and use `_2` when both base name and `_1` are reserved', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-fallback-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // Both Helper and Helper_1 are local in child; synth must fall through to Helper_2
-    expect(js).toMatch(/import \{ Helper as Helper_2 \} from "\.\/extends-fallback-base\.as"/)
-    // Local Helper and Helper_1 still rendered as classes
-    expect(js).toContain('export class Helper {')
-    expect(js).toContain('export class Helper_1 {')
-    // Parent-originated payload uses Helper_2
-    const payloadSection = js.slice(js.indexOf('"payload"'), js.indexOf('"a"'))
-    expect(payloadSection).toContain('() => Helper_2')
-    // Child's own a/b refer to local classes
-    const aSection = js.slice(js.indexOf('"a"'), js.indexOf('"b"'))
-    const bSection = js.slice(js.indexOf('"b"'))
-    expect(aSection).toContain('.refTo(Helper)')
-    expect(bSection).toContain('.refTo(Helper_1)')
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-fallback-child.js')
-    )
-  })
-
-  it('must synthesize import from ultimate owner doc when parent re-exports through a chain', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-reexport-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // Helper's actual declaration is in leaf; synth must point there, not at mid
-    expect(js).toMatch(/import \{ Helper \} from "\.\/extends-reexport-leaf\.as"/)
-    expect(js).not.toMatch(/import \{ Helper \} from "\.\/extends-reexport-mid\.as"/)
-    expect(js).toMatch(/refTo\(\(\) => Helper\)/)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-reexport-child.js')
-    )
-  })
-
-  it('must synthesize the outer type for chain refs sourced from parent prop tree', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-chain-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // Outer User must be importable for `() => User` to resolve
-    expect(js).toMatch(/import \{ User \} from "\.\/extends-chain-base\.as"/)
-    // Chain ref preserved — refTo with chain array
-    expect(js).toMatch(/refTo\(\(\) => User, \["name"\]\)/)
-    await expect(js).toMatchFileSnapshot(path.join(wd, 'test/__snapshots__/extends-chain-child.js'))
-  })
-
-  it('must synthesize a recursive type alias used through `extends` (matches atscript-ui JsonValue pattern)', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-recursive-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    // JsonValue is a recursive type alias — synth should still work.
-    expect(js).toMatch(/import \{ JsonValue \} from "\.\/extends-recursive-base\.as"/)
-    // Both context and meta values should refTo JsonValue
-    const stateSection = js.slice(js.indexOf('"state"'), js.indexOf('"id"'))
-    const refToCount = (stateSection.match(/refTo\(\(\) => JsonValue\)/g) || []).length
-    expect(refToCount).toBeGreaterThanOrEqual(2)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-recursive-child.js')
-    )
-  })
-
-  it('must synthesize a type-alias helper (not just interface) used through `extends`', async () => {
-    const repo = await build({
-      rootDir: wd,
-      entries: ['test/fixtures/extends-typealias-child.as'],
-      plugins: [tsPlugin()],
-      annotations,
-    })
-    const out = await repo.generate({ format: 'js' })
-    const js = out[0].content
-    expect(js).toMatch(/import \{ MyAlias \} from "\.\/extends-typealias-base\.as"/)
-    expect(js).toMatch(/refTo\(\(\) => MyAlias\)/)
-    await expect(js).toMatchFileSnapshot(
-      path.join(wd, 'test/__snapshots__/extends-typealias-child.js')
+    // The child holds the parent's `username` node: the block, written once on the parent's
+    // node, is the child's too (nothing baked into the child's chain).
+    // (P4B default format: the generated JS mirrors the .as structure: the parent's node `$f(Parent, "field")`, MODEL §5; the block as
+    // data on the parent, MODEL §3)
+    expect(js).toContain('.prop("username", $f(AnnotateExtendsBase, "username"))')
+    expect(js).toContain(
+      '$blk($R, 0, AnnotateExtendsBase, [\n  [[["meta.id", true]], [["username", 0]]],'
     )
   })
 
@@ -1498,6 +1464,23 @@ describe('ts-plugin', () => {
 })
 
 describe('ts-plugin — compileValidators', () => {
+  const annotatedDir = path.join(wd, 'src/__test__/fixtures/compiled-annotated')
+
+  /** The JS module rendered for `entry` (relative to `rootDir`). */
+  const render = async (
+    entry: string,
+    opts: { format?: string; compileValidators?: boolean; rootDir?: string } = {}
+  ) => {
+    const repo = await build({
+      rootDir: opts.rootDir ?? wd,
+      entries: [entry],
+      plugins: [tsPlugin({ compileValidators: opts.compileValidators })],
+      annotations,
+    })
+    const out = await repo.generate({ format: opts.format ?? 'js' })
+    return out.find(f => f.fileName === `${path.basename(entry)}.js`)!.content
+  }
+
   // Off by default: covered by every snapshot above (byte-identical output).
   for (const [fixture, snapshot] of [
     ['interface.as', 'interface.js'],
@@ -1507,14 +1490,7 @@ describe('ts-plugin — compileValidators', () => {
     ['extends-recursive-child.as', 'extends-recursive-child.js'],
   ]) {
     it(`must emit compiled validator checks (${fixture})`, async () => {
-      const repo = await build({
-        rootDir: wd,
-        entries: [`test/fixtures/${fixture}`],
-        plugins: [tsPlugin({ compileValidators: true })],
-        annotations,
-      })
-      const out = await repo.generate({ format: 'js' })
-      const content = out.find(f => f.fileName === `${fixture}.js`)!.content
+      const content = await render(`test/fixtures/${fixture}`, { compileValidators: true })
       expect(content).toContain('registerCompiledCheck as $cv')
       expect(content).not.toMatch(/\bnew Function\b|\bFunction\(|\beval\(/)
       await expect(content).toMatchFileSnapshot(
@@ -1523,19 +1499,89 @@ describe('ts-plugin — compileValidators', () => {
     })
   }
 
+  describe('@emit.compiledValidator (option off)', () => {
+    const renderAnnotated = (entry: string, opts: Parameters<typeof render>[1] = {}) =>
+      render(entry, { ...opts, rootDir: annotatedDir })
+
+    it('compiles only the annotated types', async () => {
+      const content = await renderAnnotated('models.as')
+      expect(content).toContain('registerCompiledCheck as $cv')
+      expect(content.match(/^\$cv\((\w+)/gm)).toEqual(['$cv(Status', '$cv(Order'])
+      await expect(content).toMatchFileSnapshot(
+        path.join(wd, 'test/__snapshots__/compiled/compiled-annotated.js')
+      )
+    })
+
+    it('a chained reference into an imported type compiles (the realm knows the field)', async () => {
+      const content = await renderAnnotated('runtime.as')
+      expect(content).toContain('registerCompiledCheck as $cv')
+      expect(content.match(/^\$cv\((\w+)/gm)).toEqual(['$cv(Street'])
+    })
+
+    it('js:interpreted ignores the annotation; with the option on it is redundant', async () => {
+      expect(await renderAnnotated('models.as', { format: 'js:interpreted' })).not.toContain('$cv')
+      const all = await renderAnnotated('models.as', { compileValidators: true })
+      expect(all.match(/^\$cv\((\w+)/gm)).toEqual([
+        '$cv(Line',
+        '$cv(Status',
+        '$cv(Order',
+        '$cv(Plain',
+      ])
+      expect(await renderAnnotated('models.as', { format: 'js:compiled' })).toBe(all)
+    })
+
+    it('a class the model cannot follow does not disable an unrelated annotated class', async () => {
+      // `Street` (a chained reference through an alias of an imported type) is beyond the
+      // validation model; Small does not reference it.
+      const content = await renderAnnotated('unrelated.as')
+      // (P4B default format: the generated JS mirrors the .as structure; MODEL §10 D3: the bare alias AddressAlias is Address)
+      expect(content).toContain('$al(Street, Address, ["street"])')
+      expect(content.match(/^\$cv\((\w+)/gm)).toEqual(['$cv(Small'])
+    })
+
+    it('warns about a mutating annotate of an imported type', async () => {
+      const repo = await build({ rootDir: annotatedDir, entries: ['unrelated.as'], annotations })
+      const diagnostics = await repo.diagnostics()
+      const messages = [...diagnostics.values()].flat().map(m => m.message)
+      expect(messages).toEqual([
+        expect.stringContaining('@emit.compiledValidator has no effect on a mutating annotate'),
+      ])
+    })
+  })
+
   it('the js:compiled / js:interpreted formats override the option', async () => {
-    const render = async (format: string, compileValidators?: boolean) => {
-      const repo = await build({
-        rootDir: wd,
-        entries: ['test/fixtures/interface.as'],
-        plugins: [tsPlugin({ compileValidators })],
-        annotations,
-      })
-      return (await repo.generate({ format }))[0].content
-    }
-    const plain = await render('js')
+    const entry = 'test/fixtures/interface.as'
+    const plain = await render(entry)
     expect(plain).not.toContain('$cv')
-    expect(await render('js:interpreted', true)).toBe(plain)
-    expect(await render('js:compiled')).toBe(await render('js', true))
+    expect(await render(entry, { format: 'js:interpreted', compileValidators: true })).toBe(plain)
+    expect(await render(entry, { format: 'js:compiled' })).toBe(
+      await render(entry, { compileValidators: true })
+    )
+  })
+})
+
+describe('ts-plugin — dts of a primitive whose type is a union', () => {
+  it('is parenthesized in an intersection and as an array item', async () => {
+    const { mkdtempSync, rmSync, writeFileSync } = await import('fs')
+    const { tmpdir } = await import('os')
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-prim-'))
+    try {
+      writeFileSync(
+        path.join(dir, 'prim.as'),
+        'export type List = strnum[]\nexport type Both = strnum & string\nexport type Either = strnum | boolean\n'
+      )
+      const repo = await build({
+        rootDir: dir,
+        entries: ['prim.as'],
+        plugins: [tsPlugin()],
+        primitives: { strnum: { type: { kind: 'union', items: ['string', 'number'] } } },
+      })
+      const [dts] = await repo.generate({ format: 'dts' })
+      expect(dts.content).toContain('export type List = (string | number)[]\n')
+      expect(dts.content).toContain('export type Both = (string | number) & string\n')
+      expect(dts.content).toContain('export type Either = string | number | boolean\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
