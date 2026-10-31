@@ -37,14 +37,13 @@ $blk($R, 0, MyInterface, [
 ])
 
 // Compiled validator checks
-$cv(MyInterface, 4, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,3,"n",0],[0,0,4,"",1]]],[0,"string"],[0,"number"],[0,"string"],[1,["street","city"],[[0,0,5,"",1],[0,0,6,"",1]]],[0,"string"],[0,"string"]],[0,0,0,"",1],1], (K, H) => {
+$cv(MyInterface, 5, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,3,"n",0],[0,0,4,"",1]]],[0,"string"],[0,"number"],[0,"string"],[1,["street","city"],[[0,0,5,"",1],[0,0,6,"",1]]],[0,"string"],[0,"string"]],[0,0,0,"",1],1], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -79,7 +78,7 @@ $cv(MyInterface, 4, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"
           case "address":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -88,7 +87,6 @@ $cv(MyInterface, 4, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"
   function d4(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P8: {
@@ -109,7 +107,7 @@ $cv(MyInterface, 4, [[[1,["name","age","email","address"],[[0,0,1,"",0],[0,0,2,"
           case "city":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }

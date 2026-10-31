@@ -366,11 +366,17 @@ Example: with `partial: true` and `name: string.required`:
 
 When the data object contains keys that are not declared in the type definition:
 
-| Policy              | Behavior                                                   |
-| ------------------- | ---------------------------------------------------------- |
-| `'error'` (default) | Emit `"Unexpected property"` error                         |
-| `'strip'`           | Delete the key from the data object (destructive mutation) |
-| `'ignore'`          | Silently skip                                              |
+| Policy              | Behavior                                                               |
+| ------------------- | ---------------------------------------------------------------------- |
+| `'error'` (default) | Emit `"Unexpected property"` error                                     |
+| `'strip'`           | Delete the key from the data object once validation passes (see below) |
+| `'ignore'`          | Silently skip                                                          |
+
+`'strip'` deletes on success only:
+
+- Validation reads the data as it was passed. Each object that passes records its unknown keys.
+- A rejected union branch (or a failed pattern property attempt) drops the keys it recorded.
+- When the whole value passes, the recorded keys are deleted, object by object in the order the objects finished, each object's keys in key order. When validation fails, nothing is deleted, and `errorLimit` never changes what is deleted.
 
 ### Pattern Properties
 

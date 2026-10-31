@@ -37,7 +37,9 @@ How to handle properties not defined in the type:
 
 - `'error'` (default)
 - `'ignore'`
-- `'strip'`
+- `'strip'` — deletes the unknown keys from the value, only when `validate()` passes
+
+With `'strip'`, validation reads the value as you passed it. The keys are deleted after the whole value has passed, so a failed validation leaves the value unchanged. A rejected union branch strips nothing: only the keys unknown to the branch that matched are deleted.
 
 The compiler merges every intersection of object types in `.as` into one object type, which knows every member's keys. A node of kind `'intersection'` built at runtime (`defineAnnotatedType('intersection')`, `fromJsonSchema` with `allOf`) checks each member on its own, like JSON Schema `allOf`: a key only another member declares is unknown to a member (`'error'` reports it, `'strip'` removes it).
 

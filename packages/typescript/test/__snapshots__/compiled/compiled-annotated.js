@@ -74,7 +74,7 @@ $("object", Plain)
     .tags("string").$type)
 
 // Compiled validator checks
-$cv(Status, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0]]],[0,"string","open"],[0,"string","closed"]],[0,0,0,"",0],0], (K, H) => {
+$cv(Status, 5, [[[3,[[0,0,1,"",0],[0,0,2,"",0]]],[0,"string","open"],[0,"string","closed"]],[0,0,0,"",0],0], (K, H) => {
   function r(v, f, o) {
     U0: {
       B1: {
@@ -91,14 +91,13 @@ $cv(Status, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0]]],[0,"string","open"],[0,"string"
   }
   return r
 })
-$cv(Order, 4, [[[1,["lines","status","address","billing"],[[0,2,1,"",2],[0,0,5,"",3],[0,0,-1,"",3],[1,0,-1,"",5]]],[2,[0,0,2,"",2]],[1,["qty","sku"],[[0,32,3,"",0],[0,8,4,"n",1]]],[0,"number"],[0,"string"],[3,[[0,0,6,"",3],[0,0,7,"",3]]],[0,"string","open"],[0,"string","closed"]],[0,0,0,"",7],7], (K, H) => {
+$cv(Order, 5, [[[1,["lines","status","address","billing"],[[0,2,1,"",2],[0,0,5,"",3],[0,0,-1,"",3],[1,0,-1,"",5]]],[2,[0,0,2,"",2]],[1,["qty","sku"],[[0,32,3,"",0],[0,8,4,"n",1]]],[0,"number"],[0,"string"],[3,[[0,0,6,"",3],[0,0,7,"",3]]],[0,"string","open"],[0,"string","closed"]],[0,0,0,"",7],7], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0], k1 = K[1], k2 = K[2], k3 = K[3], k5 = K[5]
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -151,7 +150,7 @@ $cv(Order, 4, [[[1,["lines","status","address","billing"],[[0,2,1,"",2],[0,0,5,"
           case "billing":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -160,7 +159,6 @@ $cv(Order, 4, [[[1,["lines","status","address","billing"],[[0,2,1,"",2],[0,0,5,"
   function d2(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P13: {
@@ -182,7 +180,7 @@ $cv(Order, 4, [[[1,["lines","status","address","billing"],[[0,2,1,"",2],[0,0,5,"
           case "sku":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }

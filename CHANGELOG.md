@@ -1,3 +1,7 @@
+### Upgrade notes (0.2.0)
+
+* **typescript:** strip now deletes unknown keys only when validation passes; a rejected union branch or failed validation no longer strips (`unknownProps: 'strip'`)
+
 ## [0.1.110](https://github.com/moostjs/atscript/compare/v0.1.109...v0.1.110) (2026-10-19)
 
 

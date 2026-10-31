@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { boundCheck, compileType } from '../../test/compiled-engine'
 import {
@@ -54,6 +54,24 @@ function countedChain(depth: number, k: string, deepest: string, reads: { n: num
     })
   }
   return v
+}
+
+/** Adds the unknown key `z` to every object of a chain value (made by the helpers above). */
+function withUnknown(v: any): any {
+  for (let o = v; typeof o === 'object'; o = o.d) {
+    o.z = 1
+  }
+  return v
+}
+
+/** Whether no object of a chain value has the key `z` any more. */
+function stripped(v: any): boolean {
+  for (let o = v; typeof o === 'object'; o = o.d) {
+    if ('z' in o) {
+      return false
+    }
+  }
+  return true
 }
 
 /** The walk (no pre-check), counting the object nodes it visits. */
@@ -168,6 +186,17 @@ describe('union backtracking (round 24 part 3)', () => {
     }
   })
 
+  // 'strip' records the strips of an accepted branch, and a memoized union records them again on
+  // every reuse: a passing value with unknown keys is decided once per union, value and path too.
+  it("'strip' with unknown keys at every level: passes decided once, every key stripped", () => {
+    const u = chainUnion(6)
+    const w = new CountingWalk(u, { unknownProps: 'strip' })
+    const value = withUnknown(chainValue(7, 'k5', 'k5'))
+    expect(w.validate(value, true)).toBe(true)
+    expect(w.objects).toBeLessThan(1000)
+    expect(stripped(value)).toBe(true)
+  })
+
   it('ordinary unions: the full details, as before', () => {
     const u = chainUnion(2)
     const w = new Validator(u)
@@ -242,6 +271,16 @@ describe('union backtracking (round 24 part 3)', () => {
         // was 2 015 538 reads
         expect(reads.n).toBeLessThan(1000)
       }
+      // 'strip' with unknown keys at every level: decided by the pre-check, which records each
+      // memoized union's strips again on a reuse
+      const reads = { n: 0 }
+      const value = withUnknown(countedChain(8, 'k5', 'k5', reads))
+      const v = new Validator(u, { unknownProps: 'strip' })
+      const walk = vi.spyOn(v as any, 'validateSafe')
+      expect(v.validate(value, true)).toBe(true)
+      expect(walk).not.toHaveBeenCalled()
+      expect(reads.n).toBeLessThan(1000)
+      expect(stripped(value)).toBe(true)
     })
 
     it(`the ${engine} pre-check and the walk of a value failing deep down`, () => {

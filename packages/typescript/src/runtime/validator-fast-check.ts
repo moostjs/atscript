@@ -29,25 +29,20 @@ export { DECIMAL_RE } from './validator-keys'
  * after a validator was created are always honoured — the same as the full walk.
  *
  * Result contract (relative to the full walk over the same node and value):
- * - `PASS` — the walk returns `true`, collects no errors and has no side effects other
- *   than the strips recorded here (see below).
+ * - `PASS` — the walk returns `true`, collects no errors and records the strips recorded
+ *   here (see below).
  * - `FAIL` — the walk returns `false`. Inside a union, every node the walk would visit
- *   was visited here too (so a walk that would throw makes this throw first) and the
- *   walk's only side effects for this node are the strips recorded here. Outside unions
+ *   was visited here too (so a walk that would throw makes this throw first). Outside unions
  *   a `FAIL` always ends in the walk, so it may be returned early.
  * - `BAIL` — not decidable here; the caller must run the full walk.
  *
  * Union branches are tried in declared order, continuing past `FAIL` and stopping
  * at `BAIL`, which keeps union results identical to the walk.
  *
- * `unknownProps: 'strip'`: the walk deletes an object's unknown keys right after the object
- * passes (even when an ancestor fails later). This check records those deletions only for
- * the top-level object (`pendingKeys`), whose strip is the walk's last read of the input:
- * deferring an earlier strip past later reads could be observed by them (a prototype, a
- * proxy or an accessor over the stripped object), so a nested object with unknown keys
- * bails, as does any object visit once a strip is pending (a later intersection member).
- * The recorded keys are deleted, in the walk's order, only when the whole value passes —
- * so a `PASS` result still has exactly the walk's side effects, and `FAIL` / `BAIL` leave
+ * `unknownProps: 'strip'`: like the walk, this check records the unknown keys of each object
+ * that passes (`pendingStrips`, in the order the objects complete), drops what a rejected union
+ * branch recorded, and deletes the keys only when the whole value passes. Neither reads a
+ * stripped input, so a `PASS` performs exactly the walk's deletions and `FAIL` / `BAIL` leave
  * the value untouched for the walk.
  */
 const FAIL = 0
@@ -74,10 +69,10 @@ let stamp = 0
 let stripping = false
 
 /**
- * Unknown keys of the top-level object the walk would delete (`unknownProps: 'strip'`), in
- * the walk's deletion order. Deleted when the call passes, dropped otherwise.
+ * The unknown keys the walk would delete (`unknownProps: 'strip'`): `object, key, …` in the
+ * walk's deletion order. Deleted when the call passes, dropped otherwise.
  */
-const pendingKeys: string[] = []
+const pendingStrips: unknown[] = []
 
 /**
  * `true` only when the full walk over `value` is guaranteed to pass with no errors and
@@ -139,15 +134,14 @@ function fastCheckStripping(
     COMPILED_ENV.m = undefined
   }
   // Outside the try: a failing `delete` throws from the walk too, at the same key.
-  // Strips are only recorded for the top-level object, which is `value` itself.
   try {
     if (passed) {
-      for (const key of pendingKeys) {
-        delete (value as Record<string, unknown>)[key]
+      for (let i = 0; i < pendingStrips.length; i += 2) {
+        delete (pendingStrips[i] as Record<string, unknown>)[pendingStrips[i + 1] as string]
       }
     }
   } finally {
-    pendingKeys.length = 0
+    pendingStrips.length = 0
   }
   return passed
 }
@@ -212,7 +206,7 @@ function acceptsNull(def: TAtscriptAnnotatedType): boolean {
 
 /** What compiled checks share with the interpreted pre-check. */
 export const COMPILED_ENV: TCompiledEnv = {
-  pk: pendingKeys,
+  pk: pendingStrips,
   // oxlint-disable-next-line @typescript-eslint/unbound-method
   ho: Object.prototype.hasOwnProperty,
   dec: DECIMAL_RE,
@@ -234,7 +228,8 @@ export const COMPILED_ENV: TCompiledEnv = {
  * branches since the outermost union was entered, the call memoizes the unions over objects it
  * checks inside union branches (`memoGet` / `memoSet`): each such union is then decided once per
  * value, flags and options — the same result (a pre-check outcome depends on nothing else: the
- * walk's strips are not performed here, see the contract above).
+ * input is not changed during the call, see the contract above) and the same strips, recorded
+ * again on a reuse.
  */
 function unionWaste(): void {
   if (++COMPILED_ENV.w === WASTE_BEFORE_MEMO && COMPILED_ENV.m === undefined) {
@@ -242,12 +237,16 @@ function unionWaste(): void {
   }
 }
 
-/** The outcome memoized for union `key` (a node, or a compiled union's key) over `value`, or -1. */
+/**
+ * The outcome memoized for union `key` (a node, or a compiled union's key) over `value`, or -1;
+ * records the strips the union recorded when it was decided.
+ */
 function memoGet(key: object, value: object, flags: number, opts: TValidatorOptions): number {
   const entries = COMPILED_ENV.m!.get(value)
   if (entries !== undefined) {
-    for (let i = 0; i < entries.length; i += 4) {
+    for (let i = 0; i < entries.length; i += 5) {
       if (entries[i] === key && entries[i + 1] === flags && entries[i + 2] === opts) {
+        stripAgain(entries[i + 4] as unknown[] | undefined)
         return entries[i + 3] as number
       }
     }
@@ -255,20 +254,34 @@ function memoGet(key: object, value: object, flags: number, opts: TValidatorOpti
   return -1
 }
 
-/** Memoizes the outcome of union `key` over `value` (see {@link memoGet}). */
+/** Records again the strips a memoized union recorded (see {@link memoSet}). */
+function stripAgain(strips: unknown[] | undefined): void {
+  if (strips !== undefined) {
+    for (const entry of strips) {
+      pendingStrips.push(entry)
+    }
+  }
+}
+
+/**
+ * Memoizes the outcome of union `key` over `value` (see {@link memoGet}), entered with `kept`
+ * pending strips (the ones after them are its own).
+ */
 function memoSet(
   key: object,
   value: object,
   flags: number,
   opts: TValidatorOptions,
-  result: number
+  result: number,
+  kept: number
 ): void {
   const memo = COMPILED_ENV.m!
+  const strips = pendingStrips.length > kept ? pendingStrips.slice(kept) : undefined
   const entries = memo.get(value)
   if (entries === undefined) {
-    memo.set(value, [key, flags, opts, result])
+    memo.set(value, [key, flags, opts, result, strips])
   } else {
-    entries.push(key, flags, opts, result)
+    entries.push(key, flags, opts, result, strips)
   }
 }
 
@@ -295,6 +308,8 @@ function fastCheckUnion(
   }
   // (`unionBranches`, inlined: the hot path)
   const branchFlags = flags | IN_UNION
+  // (a rejected branch strips nothing: what it recorded is dropped)
+  const kept = pendingStrips.length
   for (const item of def.type.items) {
     const failures = COMPILED_ENV.n
     const result = fastCheck(item, value, branchFlags, opts)
@@ -307,9 +322,8 @@ function fastCheckUnion(
     if (nested) {
       COMPILED_ENV.n++
     }
-    if (pendingKeys.length > 0) {
-      // The walk keeps the strips of a branch it rejects; the next branches would see them.
-      return BAIL
+    if (pendingStrips.length !== kept) {
+      pendingStrips.length = kept
     }
   }
   return FAIL
@@ -334,6 +348,7 @@ function checkPlanUnion(plan: Plan, value: any, flags: number, opts: TValidatorO
   }
   // (`planUnionBranches`, inlined: the hot path)
   const branchFlags = flags | IN_UNION
+  const kept = pendingStrips.length
   for (const child of plan.children!) {
     const failures = COMPILED_ENV.n
     const result = checkPlan(child, value, branchFlags, opts)
@@ -345,6 +360,9 @@ function checkPlanUnion(plan: Plan, value: any, flags: number, opts: TValidatorO
     }
     if (nested) {
       COMPILED_ENV.n++
+    }
+    if (pendingStrips.length !== kept) {
+      pendingStrips.length = kept
     }
   }
   return FAIL
@@ -359,6 +377,7 @@ function unionBranches(
   nested: boolean
 ): number {
   const branchFlags = flags | IN_UNION
+  const kept = pendingStrips.length
   for (const item of def.type.items) {
     const failures = COMPILED_ENV.n
     const result = fastCheck(item, value, branchFlags, opts)
@@ -371,9 +390,8 @@ function unionBranches(
     if (nested) {
       COMPILED_ENV.n++
     }
-    if (pendingKeys.length > 0) {
-      // The walk keeps the strips of a branch it rejects; the next branches would see them.
-      return BAIL
+    if (pendingStrips.length !== kept) {
+      pendingStrips.length = kept
     }
   }
   return FAIL
@@ -388,6 +406,7 @@ function planUnionBranches(
   nested: boolean
 ): number {
   const branchFlags = flags | IN_UNION
+  const kept = pendingStrips.length
   for (const child of plan.children!) {
     const failures = COMPILED_ENV.n
     const result = checkPlan(child, value, branchFlags, opts)
@@ -399,6 +418,9 @@ function planUnionBranches(
     }
     if (nested) {
       COMPILED_ENV.n++
+    }
+    if (pendingStrips.length !== kept) {
+      pendingStrips.length = kept
     }
   }
   return FAIL
@@ -416,12 +438,13 @@ function memoizedUnion(
   if (known >= 0) {
     return known
   }
+  const kept = pendingStrips.length
   const result =
     plan === undefined
       ? unionBranches(def, value, flags, opts, true)
       : planUnionBranches(plan, value, flags, opts, true)
   if (result !== BAIL) {
-    memoSet(def, value, flags, opts, result)
+    memoSet(def, value, flags, opts, result, kept)
   }
   return result
 }
@@ -720,10 +743,6 @@ function fastCheckObject(
   if (type.propsPatterns.length > 0) {
     return BAIL
   }
-  if (pendingKeys.length > 0) {
-    // The walk reads the top-level object again after stripping it (an intersection).
-    return BAIL
-  }
   const unknownProps = opts.unknownProps
   const inUnion = (flags & IN_UNION) !== 0
   if (unknownProps === 'error' && !inUnion && hasUnknownKey(type.props, value)) {
@@ -758,31 +777,20 @@ function fastCheckObject(
     return result
   }
   if (unknownProps === 'strip') {
-    return pendStrips(type.props, value, flags)
+    pendStrips(type.props, value)
+    return PASS
   }
   // 'error' outside unions was scanned before the props.
   return unknownProps === 'error' && inUnion && hasUnknownKey(type.props, value) ? FAIL : PASS
 }
 
-/**
- * Records the unknown keys of a passing top-level object: the walk deletes them at this
- * point, after its last read of the input. A nested object's strip would be followed by
- * more reads, so it is left to the walk.
- */
-function pendStrips(
-  props: Map<string, TAtscriptAnnotatedType>,
-  value: Record<string, unknown>,
-  flags: number
-): number {
+/** Records the unknown keys of a passing object (see `pendingStrips`). */
+function pendStrips(props: Map<string, TAtscriptAnnotatedType>, value: Record<string, unknown>) {
   for (const key of Object.keys(value)) {
     if (isUnknownKey(props, key)) {
-      if ((flags & TOP) === 0) {
-        return BAIL
-      }
-      pendingKeys.push(key)
+      pendingStrips.push(value, key)
     }
   }
-  return PASS
 }
 
 /** `true` when `value` has a key the walk treats as unknown. */
@@ -1330,10 +1338,13 @@ function checkObject(plan: Plan, value: any, flags: number, opts: TValidatorOpti
     const byKey = plan.byKey!
     for (const key of Object.keys(value)) {
       const known = byKey.get(key)
-      if (known === undefined || known.op === OP_PHANTOM) {
-        // Plans check nested nodes only: their strips are left to the walk (see pendStrips).
-        return unknownProps === 'error' ? FAIL : BAIL
+      if (known !== undefined && known.op !== OP_PHANTOM) {
+        continue
       }
+      if (unknownProps === 'error') {
+        return FAIL
+      }
+      pendingStrips.push(value, key)
     }
   }
   return PASS

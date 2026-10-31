@@ -22,14 +22,13 @@ $("object", Child)
     .tags("string").$type)
 
 // Compiled validator checks
-$cv(Child, 4, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","meta"],[[0,0,-1,"",0],[1,0,2,"",2]]],[7],[0,"string"]],[0,0,0,"",2],2], (K, H) => {
+$cv(Child, 5, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","meta"],[[0,0,-1,"",0],[1,0,2,"",2]]],[7],[0,"string"]],[0,0,0,"",2],2], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -51,7 +50,7 @@ $cv(Child, 4, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","me
           case "id":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -61,7 +60,6 @@ $cv(Child, 4, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","me
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P4: {
@@ -85,7 +83,7 @@ $cv(Child, 4, [[[1,["state","id"],[[0,0,1,"",2],[0,0,3,"",2]]],[1,["context","me
           case "meta":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }

@@ -140,14 +140,13 @@ export { $i_PublicInterface_objectIntersection_1 }
 export { $M0 as $h_PublicInterface_objectIntersection }
 export { $i_PublicInterface_grouping__1__0_2 }
 // Compiled validator checks
-$cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","literal","number","tuple1","tuple2","tupleArray","array","array2","array3","complexArray","complexArray2","complexArray3","complexArray4","complexArray5","object","optional","objectUnion1","objectUnion2","objectIntersection","grouping"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,5,"n",0],[0,16,6,"",1],[0,0,7,"",1],[0,0,8,"",1],[0,0,9,"",1],[0,0,11,"",1],[0,0,14,"",1],[0,0,18,"",1],[0,0,20,"",1],[0,0,23,"",1],[0,0,27,"",1],[0,0,31,"",1],[0,0,36,"",1],[0,0,42,"",1],[0,0,46,"",1],[0,0,50,"",1],[1,0,56,"",1],[0,0,57,"",1],[0,0,61,"",1],[0,0,65,"",1],[0,0,68,"",1]]],[0,"string"],[3,[[0,0,3,"",0],[0,0,4,"",0]]],[0,"string"],[0,"number"],[0,"string"],[0,"number"],[0,"string","value"],[0,"number",5],[5,[[0,0,10,"",1]]],[0,"string"],[5,[[0,0,12,"",1],[0,0,13,"",1]]],[0,"string"],[0,"string"],[2,[0,0,15,"",1]],[5,[[0,0,16,"",1],[0,0,17,"",1]]],[0,"string"],[0,"string"],[2,[0,0,19,"",1]],[0,"string"],[2,[0,0,21,"",1]],[2,[0,0,22,"",1]],[0,"string"],[2,[0,0,24,"",1]],[2,[0,0,25,"",1]],[2,[0,0,26,"",1]],[0,"string"],[2,[0,0,28,"",1]],[3,[[0,0,29,"",1],[0,0,30,"",1]]],[0,"string"],[0,"number"],[2,[0,0,32,"",1]],[2,[0,0,33,"",1]],[3,[[0,0,34,"",1],[0,0,35,"",1]]],[0,"string"],[0,"number"],[2,[0,0,37,"",1]],[2,[0,0,38,"",1]],[2,[0,0,39,"",1]],[3,[[0,0,40,"",1],[0,0,41,"",1]]],[0,"string"],[0,"number"],[3,[[0,0,43,"",1],[0,0,44,"",1]]],[0,"string"],[2,[0,0,45,"",1]],[0,"number"],[3,[[0,0,47,"",1],[0,0,49,"",1]]],[2,[0,0,48,"",1]],[0,"string"],[0,"number"],[1,["prop1","prop2","nested"],[[0,0,51,"",1],[1,0,52,"",1],[0,0,53,"",1]]],[0,"string"],[0,"number"],[1,["prop3","prop4"],[[0,0,54,"",1],[1,0,55,"",1]]],[0,"boolean"],[0,"boolean"],[0,"string"],[3,[[0,0,58,"",1],[0,0,60,"",1]]],[1,["a"],[[0,0,59,"",1]]],[0,"string","a"],[0,"string"],[3,[[0,0,62,"",1],[0,0,63,"",1]]],[0,"string"],[1,["a"],[[0,0,64,"",1]]],[0,"string","a"],[1,["a","b"],[[0,0,66,"",1],[0,0,67,"",1]]],[0,"string","a"],[0,"string","b"],[3,[[0,0,69,"",1],[0,0,70,"",1]]],[0,"string"],[3,[[0,0,71,"",1],[0,0,72,"",1]]],[0,"never"],[0,"string","c"]],[0,0,0,"",1],1], (K, H) => {
+$cv(PublicInterface, 5, [[[1,["primitive","pirmiitiveUn","email","interger","literal","number","tuple1","tuple2","tupleArray","array","array2","array3","complexArray","complexArray2","complexArray3","complexArray4","complexArray5","object","optional","objectUnion1","objectUnion2","objectIntersection","grouping"],[[0,0,1,"",0],[0,0,2,"",0],[0,8,5,"n",0],[0,16,6,"",1],[0,0,7,"",1],[0,0,8,"",1],[0,0,9,"",1],[0,0,11,"",1],[0,0,14,"",1],[0,0,18,"",1],[0,0,20,"",1],[0,0,23,"",1],[0,0,27,"",1],[0,0,31,"",1],[0,0,36,"",1],[0,0,42,"",1],[0,0,46,"",1],[0,0,50,"",1],[1,0,56,"",1],[0,0,57,"",1],[0,0,61,"",1],[0,0,65,"",1],[0,0,68,"",1]]],[0,"string"],[3,[[0,0,3,"",0],[0,0,4,"",0]]],[0,"string"],[0,"number"],[0,"string"],[0,"number"],[0,"string","value"],[0,"number",5],[5,[[0,0,10,"",1]]],[0,"string"],[5,[[0,0,12,"",1],[0,0,13,"",1]]],[0,"string"],[0,"string"],[2,[0,0,15,"",1]],[5,[[0,0,16,"",1],[0,0,17,"",1]]],[0,"string"],[0,"string"],[2,[0,0,19,"",1]],[0,"string"],[2,[0,0,21,"",1]],[2,[0,0,22,"",1]],[0,"string"],[2,[0,0,24,"",1]],[2,[0,0,25,"",1]],[2,[0,0,26,"",1]],[0,"string"],[2,[0,0,28,"",1]],[3,[[0,0,29,"",1],[0,0,30,"",1]]],[0,"string"],[0,"number"],[2,[0,0,32,"",1]],[2,[0,0,33,"",1]],[3,[[0,0,34,"",1],[0,0,35,"",1]]],[0,"string"],[0,"number"],[2,[0,0,37,"",1]],[2,[0,0,38,"",1]],[2,[0,0,39,"",1]],[3,[[0,0,40,"",1],[0,0,41,"",1]]],[0,"string"],[0,"number"],[3,[[0,0,43,"",1],[0,0,44,"",1]]],[0,"string"],[2,[0,0,45,"",1]],[0,"number"],[3,[[0,0,47,"",1],[0,0,49,"",1]]],[2,[0,0,48,"",1]],[0,"string"],[0,"number"],[1,["prop1","prop2","nested"],[[0,0,51,"",1],[1,0,52,"",1],[0,0,53,"",1]]],[0,"string"],[0,"number"],[1,["prop3","prop4"],[[0,0,54,"",1],[1,0,55,"",1]]],[0,"boolean"],[0,"boolean"],[0,"string"],[3,[[0,0,58,"",1],[0,0,60,"",1]]],[1,["a"],[[0,0,59,"",1]]],[0,"string","a"],[0,"string"],[3,[[0,0,62,"",1],[0,0,63,"",1]]],[0,"string"],[1,["a"],[[0,0,64,"",1]]],[0,"string","a"],[1,["a","b"],[[0,0,66,"",1],[0,0,67,"",1]]],[0,"string","a"],[0,"string","b"],[3,[[0,0,69,"",1],[0,0,70,"",1]]],[0,"string"],[3,[[0,0,71,"",1],[0,0,72,"",1]]],[0,"never"],[0,"string","c"]],[0,0,0,"",1],1], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0]
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -397,12 +396,13 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
       const x92 = v.objectUnion1
       if (x92 === undefined && sk) break P91
       U93: {
+        const s94 = pk.length
         B94: {
           t = d58(x92, (f & -2) | 2, o)
           if (t !== 1) { if (t === 2) return 2; break B94 }
           break U93
         }
-        if (pk.length !== 0) return 2
+        if (pk.length !== s94) pk.length = s94
         B95: {
           if (typeof x92 !== "string") break B95
           break U93
@@ -414,6 +414,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
       const x97 = v.objectUnion2
       if (x97 === undefined && sk) break P96
       U98: {
+        const s99 = pk.length
         B99: {
           if (typeof x97 !== "string") break B99
           break U98
@@ -423,7 +424,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           if (t !== 1) { if (t === 2) return 2; break B100 }
           break U98
         }
-        if (pk.length !== 0) return 2
+        if (pk.length !== s99) pk.length = s99
         { if (q) return 0; r = 0; break P96 }
       }
     }
@@ -483,7 +484,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "grouping":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -493,7 +494,6 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P110: {
@@ -522,7 +522,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "nested":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -531,7 +531,6 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
   function d53(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P116: {
@@ -553,7 +552,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "prop4":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -562,7 +561,6 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
   function d58(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P120: {
@@ -577,7 +575,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "a":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -586,7 +584,6 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
   function d63(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P122: {
@@ -601,7 +598,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "a":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -610,7 +607,6 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
   function d65(v, f, o) {
     const q = (f & 2) === 0
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P124: {
@@ -631,7 +627,7 @@ $cv(PublicInterface, 4, [[[1,["primitive","pirmiitiveUn","email","interger","lit
           case "b":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }

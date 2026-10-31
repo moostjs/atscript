@@ -117,7 +117,7 @@ class CheckEmitter {
   /** Def index → emitted as its own function. */
   private readonly fn: boolean[]
   private uid = 0
-  /** Calls emitted so far (a union branch without calls cannot record strips). */
+  /** Calls emitted so far (a union without calls cannot record strips). */
   private calls = 0
   /** The functions checking the props of large objects (see `objectBody`). */
   private readonly extra: string[] = []
@@ -362,15 +362,17 @@ class CheckEmitter {
           // 3: matched a literal branch.
           const items = def[1] as TSite[]
           if (!this.memo[d]) {
-            const branches = this.unionBranches(items, 'v', false, item => [
+            const { kept, branches } = this.unionBranches(items, 'v', false, item => [
               `return ${choose(this.literalExpr(item), '3', '1')}`,
             ])
-            return [...branches, 'return 0']
+            return [...kept, ...branches, 'return 0']
           }
           const m = this.next('m')
+          // (with the strips count kept at its start, see `unionBranches`)
+          const s = this.keptName()
           const record = (code: string) =>
-            `if (${m} && H.m !== undefined) H.ms(mk${d}, v, f, o, ${code})`
-          const branches = this.unionBranches(
+            `if (${m} && H.m !== undefined) H.ms(mk${d}, v, f, o, ${code}, ${s})`
+          const { kept, branches } = this.unionBranches(
             items,
             'v',
             false,
@@ -384,6 +386,7 @@ class CheckEmitter {
             ...this.memoEntry(m, `mk${d}`, 'v', 'f', `(f & ${F_IN_UNION}) !== 0`, [
               'if (t >= 0) return t',
             ]),
+            ...kept,
             ...branches,
             record('0'),
             'return 0',
@@ -416,11 +419,7 @@ class CheckEmitter {
   /** Mirrors `fastCheckObject` (+ `pendStrips` / `hasUnknownKey`). */
   private objectBody(def: TDef): string[] {
     const props = this.objectProps(def)
-    const lines = [
-      `if (${notObject('v')}) return 0`,
-      // The walk reads the top-level object again after stripping it (an intersection).
-      'if (pk.length !== 0) return 2',
-    ]
+    const lines = [`if (${notObject('v')}) return 0`]
     if (
       props.length <= PROPS_PER_FUNCTION &&
       props.some(p => p.site[0] === 0 || p.site[2] === INTERP)
@@ -460,10 +459,10 @@ class CheckEmitter {
       lines.push('if (r === 0) return 0')
     }
     // Unknown keys, after the props: 'error' fails (outside unions a FAIL may come late, as it
-    // ends in the walk; inside, the props must be visited first); 'strip' records the keys
-    // of the top-level object (deferred strips) and bails on nested ones.
+    // ends in the walk; inside, the props must be visited first); 'strip' records them (deleted
+    // once the whole value passed).
     const known = props.map(p => p.key)
-    const onUnknown = `{ if ((f & ${F_ERROR}) !== 0) return 0; if ((f & ${F_TOP}) === 0) return 2; pk.push(k) }`
+    const onUnknown = `{ if ((f & ${F_ERROR}) !== 0) return 0; pk.push(v, k) }`
     const scan =
       known.length === 0
         ? [`for (const k in v) if (ho.call(v, k)) ${onUnknown}`]
@@ -818,8 +817,19 @@ class CheckEmitter {
   }
 
   /**
+   * The name of the strips count kept by the union whose branches are emitted next (see
+   * {@link unionBranches}): numbered after its first branch label, so the other names stay.
+   */
+  private keptName(): string {
+    return `s${this.uid}`
+  }
+
+  /**
    * Mirrors the `fastCheck` union case: branches in declared order, each a labelled block a
-   * FAIL breaks out of; `onMatch` ends a passing branch.
+   * FAIL breaks out of; `onMatch` ends a passing branch. A rejected branch drops the strips it
+   * recorded: `pk` goes back to its length at the union's start, kept by the `kept` statement
+   * (none when no branch calls a check). A memoized union (`m`) always keeps it: its outcome is
+   * memoized with the strips it recorded.
    */
   private unionBranches(
     items: TSite[],
@@ -828,8 +838,10 @@ class CheckEmitter {
     onMatch: (item: TSite) => string[],
     /** The memo local of a memoized union: its failed branches count (see `memoEntry`). */
     m?: string
-  ): string[] {
+  ): { kept: string[]; branches: string[] } {
     const lines: string[] = []
+    const s = this.keptName()
+    const unionCalls = this.calls
     for (const item of items) {
       if (this.isNever(item)) {
         continue
@@ -851,11 +863,12 @@ class CheckEmitter {
         lines.push(`if (${m}) H.n++`)
       }
       if (this.calls !== calls) {
-        // The walk keeps the strips of a branch it rejects; the next branches would see them.
-        lines.push('if (pk.length !== 0) return 2')
+        lines.push(`if (pk.length !== ${s}) pk.length = ${s}`)
       }
     }
-    return lines
+    // (a union without calls records no strips)
+    const kept = m !== undefined || this.calls !== unionCalls ? [`const ${s} = pk.length`] : []
+    return { kept, branches: lines }
   }
 
   /** An inline union: the first matching branch passes after the union-level constraints. */
@@ -870,7 +883,9 @@ class CheckEmitter {
     const u = this.next('U')
     const memo = d !== undefined && this.memo[d]
     const m = memo ? this.next('m') : undefined
-    const branches = this.unionBranches(
+    // (with the strips count kept at its start, see `unionBranches`)
+    const s = this.keptName()
+    const { kept, branches } = this.unionBranches(
       items,
       x,
       ctx.clearTop,
@@ -889,13 +904,13 @@ class CheckEmitter {
       m
     )
     if (m === undefined) {
-      return [`${u}: {`, ...indent([...branches, ctx.fail]), '}']
+      return [`${u}: {`, ...indent([...kept, ...branches, ctx.fail]), '}']
     }
     // A pass breaks out of `u` (recorded after it), a memoized pass out of `w`.
     const w = this.next('W')
     const fl = this.flags(ctx)
     const record = (code: string) =>
-      `if (${m} && H.m !== undefined) H.ms(mk${d}, ${x}, ${fl}, o, ${code})`
+      `if (${m} && H.m !== undefined) H.ms(mk${d}, ${x}, ${fl}, o, ${code}, ${s})`
     const nested = ctx.union ? 'true' : `(f & ${F_IN_UNION}) !== 0`
     const entry = this.memoEntry(m, `mk${d}`, x, fl, nested, [
       `if (t === 1) break ${w}`,
@@ -905,6 +920,7 @@ class CheckEmitter {
       `${w}: {`,
       ...indent([
         ...entry,
+        ...kept,
         `${u}: {`,
         ...indent([...branches, record('0'), ctx.fail]),
         '}',

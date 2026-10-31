@@ -10,6 +10,7 @@ const VALIDATOR_SPECS = [
   'packages/typescript/src/serialize.spec.ts',
   'packages/typescript/src/json-schema.spec.ts',
   'packages/typescript/src/__test__/validator-fast-path.spec.ts',
+  'packages/typescript/src/__test__/strip-on-success.spec.ts',
   'packages/typescript/src/__test__/coerce.spec.ts',
   'packages/typescript/src/__test__/date-primitives.spec.ts',
 ]

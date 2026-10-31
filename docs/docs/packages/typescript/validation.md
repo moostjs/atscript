@@ -77,7 +77,7 @@ Options:
 
 - `'error'` — fail validation if an extra field is present
 - `'ignore'` — leave extra fields alone
-- `'strip'` — remove extra fields from the value
+- `'strip'` — remove extra fields from the value, once the whole value has passed (a failed validation leaves it unchanged)
 
 `'strip'` is often useful for request payloads.
 
@@ -151,7 +151,7 @@ For array uniqueness and other less common rules, see the [Validation Reference]
 ## DOs and DON'Ts
 
 - **DO expect extra fields to fail validation by default.** `unknownProps` defaults to `'error'` — if a payload may carry extra fields, choose `'strip'` or `'ignore'` deliberately.
-- **DON'T forget that `'strip'` mutates your input.** It deletes the extra fields from the object you passed in — clone the payload first if you still need the original.
+- **DON'T forget that `'strip'` mutates your input.** When validation passes, it deletes the extra fields from the object you passed in — clone the payload first if you still need the original.
 - **DO create the validator once and reuse it in hot paths.** `.validator()` builds a fresh instance on every call. Reuse is safe: each `validate()` call resets `validator.errors` before running.
 - **DO raise `errorLimit` when a form needs every message.** Validation stops collecting after 10 errors by default, so long forms may show an incomplete error list.
 - **DO consider [compiled validators](/packages/typescript/compiled-validators) for server builds.** They are opt-in and make validating valid input faster without changing results.

@@ -23,14 +23,13 @@ $("object", People)
   .prop("users", $("array").of($().ref(User).$type).$type)
 
 // Compiled validator checks
-$cv(People, 4, [[[1,["groupName","size","users"],[[0,0,-1,"",0],[0,0,-1,"",2],[0,0,1,"",6]]],[2,[0,0,-1,"",4]]],[0,0,0,"",6],6], (K, H) => {
+$cv(People, 5, [[[1,["groupName","size","users"],[[0,0,-1,"",0],[0,0,-1,"",2],[0,0,1,"",6]]],[2,[0,0,-1,"",4]]],[0,0,0,"",6],6], (K, H) => {
   const pk = H.pk, ho = H.ho
   const k0 = K[0], k2 = K[2], k4 = K[4]
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -65,7 +64,7 @@ $cv(People, 4, [[[1,["groupName","size","users"],[[0,0,-1,"",0],[0,0,-1,"",2],[0
           case "users":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }

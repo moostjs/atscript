@@ -407,8 +407,12 @@ describe('compiled validator checks — generated modules', { timeout: 30_000 },
     expect(check(value({ tag: 't' }), F_TOP | F_ERROR, opts)).toBe(1)
     expect(check(value({ tag: 't', zz: 1 }), F_TOP | F_ERROR, opts)).toBe(0)
     expect(check(value({ tag: 'long' }), F_TOP | F_ERROR, opts)).toBe(0)
-    // Strips of a nested object are left to the walk.
-    expect(check(value({ zz: 1 }), F_TOP | F_STRIP, opts)).toBe(2)
+    // A nested object's unknown keys are recorded for the strip (deleted once the whole value
+    // passed: 'strip' deletes on success only), not left to the walk.
+    const stripped = value({ zz: 1 })
+    expect(check(stripped, F_TOP | F_STRIP, opts)).toBe(1)
+    expect(COMPILED_ENV.pk).toEqual([stripped.b.a, 'zz'])
+    COMPILED_ENV.pk.length = 0
     expect(fuzz(CrossA, 12, 150, () => value({ tag: 't' }))).toBeGreaterThan(150)
   })
 

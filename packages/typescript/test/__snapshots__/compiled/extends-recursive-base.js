@@ -46,10 +46,11 @@ $("object", Base)
       .propPattern(/^.+$/, $().ref(JsonValue).$type).optional().$type).$type)
 
 // Compiled validator checks
-$cv(JsonValue, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,0,"",0]],[7]],[0,0,0,"",0],0], (K, H) => {
+$cv(JsonValue, 5, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,0,"",0]],[7]],[0,0,0,"",0],0], (K, H) => {
   const pk = H.pk
   function d0(v, f, o) {
     let t
+    const s0 = pk.length
     B0: {
       if (typeof v !== "string") break B0
       return 1
@@ -77,13 +78,13 @@ $cv(JsonValue, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0
       if (a6 === 0) break B4
       return 1
     }
-    if (pk.length !== 0) return 2
+    if (pk.length !== s0) pk.length = s0
     B7: {
       t = d6(v, f | 2, o)
       if (t !== 1) { if (t === 2) return 2; break B7 }
       return 1
     }
-    if (pk.length !== 0) return 2
+    if (pk.length !== s0) pk.length = s0
     return 0
   }
   function d6(v, f, o) {
@@ -99,13 +100,12 @@ $cv(JsonValue, 4, [[[3,[[0,0,1,"",0],[0,0,2,"",0],[0,0,3,"",0],[0,0,4,"",0],[0,0
   }
   return r
 })
-$cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],[1,0,9,"",0]]],[3,[[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0],[0,0,7,"",0],[0,0,8,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,2,"",0]],[7],[7]],[0,0,0,"",0],0], (K, H) => {
+$cv(Base, 5, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],[1,0,9,"",0]]],[3,[[0,0,3,"",0],[0,0,4,"",0],[0,0,5,"",0],[0,0,6,"",0],[0,0,7,"",0],[0,0,8,"",0]]],[0,"string"],[0,"number"],[0,"boolean"],[0,"null"],[2,[0,0,2,"",0]],[7],[7]],[0,0,0,"",0],0], (K, H) => {
   const pk = H.pk, ho = H.ho
   function d0(v, f, o) {
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P0: {
@@ -121,7 +121,7 @@ $cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],
           case "state":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -131,7 +131,6 @@ $cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],
     const q = (f & 2) === 0
     let t
     if (typeof v !== "object" || v === null || Array.isArray(v)) return 0
-    if (pk.length !== 0) return 2
     const sk = (f & 16) !== 0 || (f & 33) === 33
     let r = 1
     P2: {
@@ -156,7 +155,7 @@ $cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],
           case "meta":
             break
           default:
-            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; if ((f & 1) === 0) return 2; pk.push(k) }
+            if (ho.call(v, k)) { if ((f & 4) !== 0) return 0; pk.push(v, k) }
         }
       }
     }
@@ -164,6 +163,7 @@ $cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],
   }
   function d2(v, f, o) {
     let t
+    const s6 = pk.length
     B6: {
       if (typeof v !== "string") break B6
       return 1
@@ -191,13 +191,13 @@ $cv(Base, 4, [[[1,["state"],[[0,0,1,"",0]]],[1,["context","meta"],[[0,0,2,"",0],
       if (a12 === 0) break B10
       return 1
     }
-    if (pk.length !== 0) return 2
+    if (pk.length !== s6) pk.length = s6
     B13: {
       t = d8(v, f | 2, o)
       if (t !== 1) { if (t === 2) return 2; break B13 }
       return 1
     }
-    if (pk.length !== 0) return 2
+    if (pk.length !== s6) pk.length = s6
     return 0
   }
   function d8(v, f, o) {

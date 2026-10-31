@@ -28,10 +28,10 @@ interface TUnionOutcome {
   def: TAtscriptAnnotatedType
   path: string
   unknownProps: TValidatorOptions['unknownProps']
-  /** `Validator.strips` when the union was entered: an outcome is reused only while it holds. */
-  strips: number
   item?: TAtscriptAnnotatedType
   error?: TError
+  /** The strips the union recorded (`Validator.strips` entries), recorded again on a reuse. */
+  strips?: unknown[]
 }
 
 interface TError {
@@ -141,8 +141,8 @@ export class Validator<
    * the call has wasted {@link WASTE_BEFORE_MEMO} union branches (failed after branches of nested
    * unions over objects failed) since the outermost union, as in the pre-check — ordinary walks
    * never make it. It decides each such union once, with the same result and the same error object
-   * (both depend only on these, the options and the input, which only a strip changes: see
-   * `strips`).
+   * (both depend only on these, the options and the input, which the walk never changes), and
+   * records the same strips again.
    */
   private unionMemo?: Map<object, TUnionOutcome[]>
   /** Union branches being checked (`> 0`: inside a union branch). */
@@ -151,8 +151,12 @@ export class Validator<
   private nestedFailures = 0
   /** Wasted union branches since the outermost union was entered (see `unionMemo`). */
   private wasted = 0
-  /** Objects this call stripped keys from; an outcome recorded before a strip is not reused. */
-  private strips = 0
+  /**
+   * `unknownProps: 'strip'`: the objects that passed with unknown keys, and those keys
+   * (`object, keys, …`), in the order the objects completed. A rejected union branch or pattern
+   * property attempt drops what it recorded; the keys are deleted once the whole call passes.
+   */
+  private strips: unknown[] = []
 
   protected buildPath(): string {
     if (this.depth <= 0) {
@@ -265,11 +269,19 @@ export class Validator<
     this.unionDepth = 0
     // (a walk that threw left its memo: never reused)
     this.unionMemo = undefined
+    if (this.strips.length > 0) {
+      // (a walk that threw left its strips: never performed)
+      this.strips.length = 0
+    }
     const passed = this.validateSafe(this.def, value)
     this.context = undefined
     if (this.unionMemo !== undefined) {
       // (made by this walk only once it wasted work: see `unionMemo`)
       this.unionMemo = undefined
+    }
+    if (this.strips.length > 0) {
+      // 'strip' deletes only when the whole value passed
+      this.performStrips(passed)
     }
     if (!passed) {
       if (safe) {
@@ -278,6 +290,23 @@ export class Validator<
       this.throw()
     }
     return true
+  }
+
+  /** Deletes the recorded unknown keys when the call `passed` (see `strips`); drops them anyway. */
+  private performStrips(passed: boolean) {
+    const strips = this.strips
+    try {
+      if (passed) {
+        for (let i = 0; i < strips.length; i += 2) {
+          const value = strips[i] as Record<string, unknown>
+          for (const key of strips[i + 1] as string[]) {
+            delete value[key]
+          }
+        }
+      }
+    } finally {
+      strips.length = 0
+    }
   }
 
   /**
@@ -424,6 +453,11 @@ export class Validator<
           const known = this.decided(def, value, path)
           if (known !== undefined) {
             if (known.error === undefined) {
+              if (known.strips !== undefined) {
+                for (const entry of known.strips) {
+                  this.strips.push(entry)
+                }
+              }
               return this.validateUnionConstraints(def, known.item!, value)
             }
             this.report(known.error)
@@ -436,7 +470,8 @@ export class Validator<
       // The outermost union: a new waste window (see `unionMemo`).
       this.wasted = 0
     }
-    const strips = this.strips
+    // (a rejected branch strips nothing: what it recorded is dropped)
+    const kept = this.strips.length
     let details: TError[] | undefined
 
     for (const item of items) {
@@ -453,11 +488,14 @@ export class Validator<
       if (passed) {
         this.stackErrors.pop()
         if (path !== undefined) {
-          this.decide(def, value, path, strips, item, undefined)
+          this.decide(def, value, path, kept, item, undefined)
         }
         return this.validateUnionConstraints(def, item, value)
       }
 
+      if (this.strips.length !== kept) {
+        this.strips.length = kept
+      }
       const branchErrors = this.stackErrors.pop()
       // Reset limit flag — discarded branch errors don't count toward the limit
       if (this.limitExceeded) {
@@ -491,7 +529,7 @@ export class Validator<
       details
     )
     if (path !== undefined) {
-      this.decide(def, value, path, strips, undefined, error)
+      this.decide(def, value, path, kept, undefined, error)
     }
     return false
   }
@@ -513,12 +551,7 @@ export class Validator<
     if (outcomes !== undefined) {
       const { unknownProps } = this.opts
       for (const outcome of outcomes) {
-        if (
-          outcome.def === def &&
-          outcome.path === path &&
-          outcome.unknownProps === unknownProps &&
-          outcome.strips === this.strips
-        ) {
+        if (outcome.def === def && outcome.path === path && outcome.unknownProps === unknownProps) {
           return outcome
         }
       }
@@ -526,26 +559,25 @@ export class Validator<
     return undefined
   }
 
-  /** Records the outcome of union `def` over `value` at `path`, entered at `strips`. */
+  /**
+   * Records the outcome of union `def` over `value` at `path`, entered with `kept` strips (the
+   * ones after them are its own).
+   */
   private decide(
     def: TAtscriptAnnotatedType,
     value: object,
     path: string,
-    strips: number,
+    kept: number,
     item: TAtscriptAnnotatedType | undefined,
     error: TError | undefined
   ) {
-    if (strips !== this.strips) {
-      // A strip during the union: deciding it again could differ.
-      return
-    }
     const outcome: TUnionOutcome = {
       def,
       path,
       unknownProps: this.opts.unknownProps,
-      strips,
       item,
       error,
+      strips: this.strips.length > kept ? this.strips.slice(kept) : undefined,
     }
     const outcomes = this.unionMemo!.get(value)
     if (outcomes === undefined) {
@@ -606,7 +638,7 @@ export class Validator<
 
   /**
    * An unknown key (`unknownProps`): 'error' reports it, 'strip' adds it to the keys to strip
-   * (returned; see `stripKeys`).
+   * (returned; recorded in `strips` once the object passed).
    */
   private unknownKey(key: string, keysToStrip: string[] | undefined): string[] | undefined {
     if (this.opts.unknownProps === 'error') {
@@ -803,10 +835,15 @@ export class Validator<
         if (matched.length > 0) {
           this.push(key)
           let keyPassed = false
+          // (a failed attempt strips nothing: what it recorded is dropped)
+          const kept = this.strips.length
           for (const { def: propDef } of matched) {
             if (this.validateSafe(propDef, value[key])) {
               keyPassed = true
               break
+            }
+            if (this.strips.length !== kept) {
+              this.strips.length = kept
             }
             this.clear()
           }
@@ -831,8 +868,8 @@ export class Validator<
         }
       }
     }
-    if (stripKeys(value, passed, keysToStrip)) {
-      this.strips++
+    if (passed && keysToStrip !== undefined) {
+      this.strips.push(value, keysToStrip)
     }
     return passed
   }
@@ -1122,19 +1159,4 @@ export class ValidatorError extends Error {
     // oxlint-disable-next-line prefer-template
     super(`${errors[0].path ? errors[0].path + ': ' : ''}${errors[0].message}`)
   }
-}
-
-/** Deletes the unknown keys recorded for stripping, once the object passed: whether it did. */
-function stripKeys(
-  value: Record<string, unknown>,
-  passed: boolean,
-  keys: string[] | undefined
-): boolean {
-  if (passed && keys && keys.length > 0) {
-    for (const key of keys) {
-      delete value[key]
-    }
-    return true
-  }
-  return false
 }

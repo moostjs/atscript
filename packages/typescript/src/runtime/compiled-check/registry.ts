@@ -60,8 +60,8 @@ export type TCompiledFactory = (K: unknown[], H: TCompiledHelpers) => TCompiledC
 
 /** Runtime helpers the emitted factories use. */
 export interface TCompiledHelpers {
-  /** Pending top-level strips (shared with the interpreted pre-check). */
-  pk: string[]
+  /** Pending strips, `object, key, …` (shared with the interpreted pre-check). */
+  pk: unknown[]
   /** `Object.prototype.hasOwnProperty`. */
   ho: (this: object, key: PropertyKey) => boolean
   /** Decimal-string regex. */
@@ -78,13 +78,20 @@ export interface TCompiledHelpers {
   w: number
   /** A union branch failed after branches of nested unions over objects did (see `unionWaste`). */
   wa: () => void
-  /** The memoized outcome of union `key` over `value` with `flags`, or -1. */
+  /** The memoized outcome of union `key` over `value` with `flags`, or -1 (records its strips). */
   mg: (key: object, value: object, flags: number, opts: TValidatorOptions) => number
-  /** Records the outcome of union `key` over `value` with `flags`. */
-  ms: (key: object, value: object, flags: number, opts: TValidatorOptions, result: number) => void
+  /** Records the outcome of union `key` over `value` with `flags`, entered with `kept` strips. */
+  ms: (
+    key: object,
+    value: object,
+    flags: number,
+    opts: TValidatorOptions,
+    result: number,
+    kept: number
+  ) => void
 }
 
-/** Union outcomes of one pre-check call: value → [key, flags, options, result]… */
+/** Union outcomes of one pre-check call: value → [key, flags, options, result, strips]… */
 export type TUnionMemo = Map<object, unknown[]>
 
 /** What the binder needs from the interpreted pre-check. */

@@ -96,7 +96,6 @@ Nothing breaks in these cases. `validate()` takes the interpreted path as before
 - pattern properties
 - arrays with `@expect.array.uniqueItems`
 - `@expect.pattern` with the `g` or `y` flag
-- in `unknownProps: 'strip'` mode, unknown keys on a nested object. That call falls back to the full walk.
 
 **The type reaches too many types.** A compiled check covers the type and every same-file type it reaches. When that is more than a few hundred type nodes (for example a long chain of types that each extend and intersect the previous one), the class gets no compiled check, so the generated code does not grow with every type it reaches.
 

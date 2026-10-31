@@ -509,9 +509,22 @@ function compare(
   const r2 = run(walk, b)
   expect(r1).toBe(r2)
   expect(fast.errors).toEqual(walk.errors)
-  // strip mutates the input; the mutation must match too
+  // strip mutates the input; the mutation must match too, key order included
   expect(a).toEqual(b)
+  expect(keyOrder(a)).toEqual(keyOrder(b))
   return r1
+}
+
+/** The keys of every object inside `value`, in order, depth-first (each object once). */
+function keyOrder(value: unknown, seen = new Set<object>(), out: string[][] = []): string[][] {
+  if (typeof value === 'object' && value !== null && !seen.has(value)) {
+    seen.add(value)
+    out.push(Object.keys(value))
+    for (const v of Object.values(value)) {
+      keyOrder(v, seen, out)
+    }
+  }
+  return out
 }
 
 /** The node at `path` inside `value`. */
@@ -1301,8 +1314,9 @@ describe('Validator literal-union shortcut', () => {
   })
 })
 
-// The pre-check handles unknown keys itself: 'strip' records the walk's deletions and
-// performs them on a pass, 'error' fails early outside unions.
+// The pre-check handles unknown keys itself: 'strip' records the walk's deletions at every
+// depth and performs them on a pass (deleting on success only, like the walk), 'error' fails
+// early outside unions.
 describe('Validator fast path — unknown props (strip / error)', { timeout: 30_000 }, () => {
   const MODES: Array<Partial<TValidatorOptions>> = [
     { unknownProps: 'strip' },
@@ -1464,7 +1478,7 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     }
     expect(passed).toBeGreaterThan(300)
     expect(failed).toBeGreaterThan(300)
-    // the pre-check really decides strip passes with (top-level) unknown keys (no walk)
+    // the pre-check really decides strip passes with unknown keys (no walk)
     expect(stats.fastStrips).toBeGreaterThan(0)
   })
 
@@ -1506,7 +1520,9 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     expect(Object.keys(value)).toEqual(['id', 'items'])
   })
 
-  it('nested unknown keys are stripped by the walk', () => {
+  // New in 0.2.0 (strip deletes on success only): the pre-check records nested strips too,
+  // so a passing value with unknown keys at any depth no longer needs the walk.
+  it('nested unknown keys are stripped by the pre-check (no walk)', () => {
     const v = new Validator(makeModel(), { unknownProps: 'strip' })
     const spy = vi.spyOn(v as any, 'validateSafe')
     const value = valid()
@@ -1517,16 +1533,18 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     value.tree.children[0].y = 1
     const reference = structuredClone(value)
     expect(v.validate(value)).toBe(true)
-    expect(spy).toHaveBeenCalled()
+    expect(spy).not.toHaveBeenCalled()
     expect(new WalkValidator(makeModel(), { unknownProps: 'strip' }).validate(reference)).toBe(true)
     expect(value).toEqual(reference)
+    expect(keyOrder(value)).toEqual(keyOrder(reference))
     // (the intersection's second member strips the first member's `a`, as the walk does)
     expect(value).toEqual({ ...valid(), both: {} })
   })
 
-  // A deferred nested strip would be observable by later reads that reach the stripped
-  // object without being it: a prototype, a proxy, an accessor.
-  it('later reads through a prototype / proxy / accessor see the walk’s nested strips', () => {
+  // Changed in 0.2.0 (strip deletes on success only): the checks read the input untouched, so
+  // reads through a prototype / proxy / accessor see the keys a strip deletes later. Before,
+  // the walk deleted each object's keys as soon as it passed, and these values failed.
+  it('reads through a prototype / proxy / accessor see the untouched input', () => {
     const named = obj({ name: str().$type }).$type
     const cases: Array<[TAtscriptAnnotatedType, () => any]> = [
       // `x` inherits `extra` from the stripped `a`
@@ -1580,7 +1598,7 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
       const r1 = run(new Validator(t, { unknownProps: 'strip' }), a)
       const r2 = run(new WalkValidator(t, { unknownProps: 'strip' }), b)
       expect(r1).toBe(r2)
-      expect(r1).toBe(false)
+      expect(r1).toBe(true)
       expect({ ...a }).toEqual({ ...b })
     }
   })
@@ -1612,20 +1630,33 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
     }
   })
 
-  it('a failing value is left untouched for the walk (which strips passing nested objects)', () => {
+  // Changed in 0.2.0 (strip deletes on success only): a failing value keeps every key. Before,
+  // the walk deleted `a.junk` because `a` passed before the root failed.
+  it('a failing value is left untouched (no partial strips)', () => {
     const t = obj({ a: obj({ x: num().$type }).$type, b: num().$type }).$type
-    const fast = new Validator(t, { unknownProps: 'strip' })
-    const value: any = { a: { x: 1, junk: 1 }, b: 'no', junk: 2 }
-    expect(fast.validate(value, true)).toBe(false)
-    // the walk strips `a` (it passed), not the failing root
-    expect(value).toEqual({ a: { x: 1 }, b: 'no', junk: 2 })
+    for (const V of [Validator, WalkValidator]) {
+      const value: any = { a: { x: 1, junk: 1 }, b: 'no', junk: 2 }
+      expect(new V(t, { unknownProps: 'strip' }).validate(value, true)).toBe(false)
+      expect(value).toEqual({ a: { x: 1, junk: 1 }, b: 'no', junk: 2 })
+    }
   })
 
-  it('aliased objects, intersections and cycles see the walk’s earlier strips', () => {
+  // Changed in 0.2.0 (strip deletes on success only): every visit reads the untouched object.
+  // Before, a visit saw the keys an earlier visit of the same object had stripped.
+  it('aliased objects, intersections and cycles read the untouched input', () => {
     const inner = obj({ x: num().$type }).$type
     const wider = obj({ x: num().$type, y: num().$type }).$type
     const shared: any = { x: 1, y: 2 }
-    // stripped as `inner` first, then read as `wider` (y is gone in the walk)
+    // `inner` records `y`, `wider` still reads it: both pass, then `y` is deleted (before, the
+    // walk deleted `y` first and `wider` failed)
+    for (const V of [Validator, WalkValidator]) {
+      const value: any = { a: { ...shared }, b: undefined }
+      value.b = value.a
+      expect(
+        new V(obj({ a: inner, b: wider }).$type, { unknownProps: 'strip' }).validate(value, true)
+      ).toBe(true)
+      expect(value.b).toEqual({ x: 1 })
+    }
     compare(obj({ a: inner, b: wider }).$type, { unknownProps: 'strip' }, { a: shared, b: shared })
     compare(obj({ b: wider, a: inner }).$type, { unknownProps: 'strip' }, { b: shared, a: shared })
     // same object twice in an array
@@ -1639,16 +1670,35 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
         compare(inter, opts, value)
       }
     }
-    // a nested visit of the same object strips keys its outer visit still reads
+    for (const V of [Validator, WalkValidator]) {
+      // the second member reads `b: 2` (before, the first member had deleted it and it passed)
+      const bad = { a: 1, b: 2 }
+      expect(new V(inter, { unknownProps: 'strip' }).validate(bad, true)).toBe(false)
+      expect(bad).toEqual({ a: 1, b: 2 })
+      // each member strips the key only the other declares
+      const good = { a: 1, b: 'x' }
+      expect(new V(inter, { unknownProps: 'strip' }).validate(good, true)).toBe(true)
+      expect(good).toEqual({})
+    }
+    // a nested visit of the same object records keys its outer visit still reads (before, it
+    // deleted them first and the outer visit failed on `b`)
     const cyc = obj({ a: inner, b: str().$type }).$type
     const loop: any = { b: 's', x: 1 }
     loop.a = loop
     for (const opts of MODES) {
       compare(cyc, opts, loop)
     }
+    for (const V of [Validator, WalkValidator]) {
+      const value: any = { b: 's', x: 1 }
+      value.a = value
+      expect(new V(cyc, { unknownProps: 'strip' }).validate(value, true)).toBe(true)
+      expect(Object.keys(value)).toEqual([])
+    }
   })
 
-  it('a rejected union branch keeps its nested strips for the next branches', () => {
+  // Changed in 0.2.0 (strip deletes on success only): a rejected branch strips nothing. Before,
+  // branch 1 deleted `n.y` and branch 2 then failed on `{ n: { x: 1, y: 2 }, k: 2 }`.
+  it('a rejected union branch strips nothing', () => {
     const t = union(
       obj({ n: obj({ x: num().$type }).$type, k: lit(1).$type }).$type,
       obj({ n: obj({ x: num().$type, y: num().$type }).$type, k: lit(2).$type }).$type,
@@ -1664,16 +1714,34 @@ describe('Validator fast path — unknown props (strip / error)', { timeout: 30_
         compare(t, opts, value)
       }
     }
+    // branch 2 accepts it (the first two branches alone: before, the value failed)
+    const two = union(
+      obj({ n: obj({ x: num().$type }).$type, k: lit(1).$type }).$type,
+      obj({ n: obj({ x: num().$type, y: num().$type }).$type, k: lit(2).$type }).$type
+    ).$type
+    for (const V of [Validator, WalkValidator]) {
+      const value = { n: { x: 1, y: 2, z: 3 }, k: 2 }
+      expect(new V(two, { unknownProps: 'strip' }).validate(value, true)).toBe(true)
+      expect(value).toEqual({ n: { x: 1, y: 2 }, k: 2 })
+    }
   })
 
-  it('with errorLimit, a rejected branch may stop before nested objects it would strip', () => {
-    // branch 1 fails on `k` first: with errorLimit 1 the walk never reaches (nor strips) `n`
+  // Changed in 0.2.0 (strip deletes on success only): what is deleted no longer depends on
+  // `errorLimit`. Before, with errorLimit 10 the rejected branch 1 reached `n` and deleted
+  // `n.junk`; with errorLimit 1 it stopped at `k` first and kept it.
+  it('errorLimit does not change what a strip deletes', () => {
     const t = union(
       obj({ k: lit(1).$type, n: obj({ x: num().$type }).$type }).$type,
       obj({ k: lit(2).$type, n: prim('any').$type }).$type
     ).$type
     for (const errorLimit of [1, 10]) {
       compare(t, { unknownProps: 'strip', errorLimit }, { k: 2, n: { x: 1, junk: 1 } })
+      for (const V of [Validator, WalkValidator]) {
+        const value = { k: 2, n: { x: 1, junk: 1 } }
+        expect(new V(t, { unknownProps: 'strip', errorLimit }).validate(value, true)).toBe(true)
+        // `n` is `any` in the accepted branch: nothing to strip
+        expect(value).toEqual({ k: 2, n: { x: 1, junk: 1 } })
+      }
     }
   })
 

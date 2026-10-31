@@ -37,8 +37,12 @@ import {
   VALIDATOR_KEYS,
 } from '../validator-keys'
 
-/** Layout format version; checks of another version are ignored (interpreted). */
-export const LAYOUT_VERSION = 4
+/**
+ * Layout format version, also of the emitted checks' contract with the runtime (5: 'strip'
+ * records `object, key` pairs at every depth); checks of another version are ignored
+ * (interpreted).
+ */
+export const LAYOUT_VERSION = 5
 
 export const EXT = -1
 export const INTERP = -2
