@@ -349,9 +349,10 @@ export class AnnotationSpec {
         let def = parentNode.getDefinition()
         let defDoc = doc
         if (isRef(def)) {
-          const unwound = doc.unwindRef(def)
-          def = unwound?.def || def
-          defDoc = unwound?.doc || doc
+          // (a chain ref through a union: the union of the branches' fields, see `refFieldType`)
+          const resolved = doc.refFieldType(def)
+          def = resolved?.def || def
+          defDoc = resolved?.doc || doc
         }
         messages.push(...(this.validateTargetType(def, mainToken.range, defDoc) || []))
       }

@@ -57,6 +57,7 @@ import {
   StructureModel,
   UNION_IN_RECURSIVE_MERGE,
 } from './structure'
+import type { TStructSlot } from './structure'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
@@ -1564,7 +1565,20 @@ export class AtscriptDoc {
     if (typeof paths === 'string') {
       return null
     }
-    const slot = m.slotAt(target, paths[0])
+    return this.slotType(m, m.slotAt(target, paths[0]), target.doc)
+  }
+
+  /**
+   * The type of structure-model node `slot`: the types written at it — one: that type; several
+   * (a merged field): the core algebra's merge of them —, resolved through a reference. `null`
+   * when nothing is written there. `doc`: the document of a type written in place whose node's
+   * unit the model does not name.
+   */
+  private slotType(
+    m: StructureModel,
+    slot: TStructSlot | undefined,
+    doc: AtscriptDoc
+  ): { def: SemanticNode; doc: AtscriptDoc } | null {
     const ends = (slot?.ends ?? []).filter(e => e.node)
     if (ends.length === 0) {
       return null
@@ -1578,8 +1592,33 @@ export class AtscriptDoc {
     }
     // (a type written in place: in the document declaring the node holding it)
     const unit = slot?.owner?.unit
-    const doc = (ends.length === 1 && unit && m.declById(unit)?.doc) || target.doc
-    return { def, doc }
+    return { def, doc: (ends.length === 1 && unit && m.declById(unit)?.doc) || doc }
+  }
+
+  /**
+   * The type a reference written as a field's type resolves to, for the checks of what may apply
+   * to the field (a `defType` guard, an annotation's `validate` hook). A chain ref names a node of
+   * the structure model, as an annotate entry does: through a union, the union of the fields of
+   * the branches that have the prop (one such branch: that field). Otherwise, and when the model
+   * does not resolve the chain (an unknown member, reported elsewhere), {@link unwindRef}.
+   */
+  refFieldType(ref: SemanticRefNode): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+    if (ref.hasChain) {
+      const m = this.structure()
+      const t = m.exprOf(this.refOrigin(ref), ref)
+      const types = (t.k === 'uni' ? t.items : [t]).map(c =>
+        c.k === 'chain' ? this.slotType(m, m.slotAt(c.decl, c.path), c.decl.doc) : null
+      )
+      if (types.length === 1 && types[0]) {
+        return types[0]
+      }
+      if (types.length > 1 && types.every(x => x !== null)) {
+        const fields = types.map(x => x.def)
+        return { def: new SemanticGroup(fields, '|'), doc: this }
+      }
+    }
+    const unwound = this.unwindRef(ref)
+    return unwound && { def: unwound.def, doc: unwound.doc }
   }
 
   /**

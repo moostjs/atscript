@@ -297,3 +297,93 @@ interface Foo {
     expect(doc.getDiagMessages().length).toBe(2)
   })
 })
+
+// A chain ref through a union names the union of the branches' fields (one branch with the
+// prop: that field), as the structure model resolves it; the guard checks that type. The guard
+// used to read the union the chain starts from (oracle seed 6988).
+describe('type-guarded annotations on chain refs through unions', () => {
+  const types = `
+interface I0 {
+  h: string
+}
+interface I2 {
+  work: I0
+}
+interface I5 {
+  work: number
+}
+interface I6 {
+  work: { h: string.email }
+}
+interface I7 {
+  list: string[]
+}
+`
+
+  it('checks the field a chain through an all-nullable merge names', () => {
+    const doc = createDoc(`${types}
+type M0 = (I2 | null) & (I2 | null)
+interface Foo {
+  @expect.pattern "^[^q]*$"
+  @expect.maxLength 3
+  v?: M0.work.h
+  @expect.min 1
+  w?: M0.work.h
+}
+`)
+    expect(targetErrors(doc)).toEqual(['Expected type is (number), got "string"'])
+  })
+
+  it('checks the field a chain through a nullable union names', () => {
+    const doc = createDoc(`${types}
+type M1 = I2 | null
+type M2 = I7 | null
+interface Foo {
+  @expect.pattern "^[^q]*$"
+  v?: M1.work.h
+  @expect.array.uniqueItems
+  @expect.minLength 1
+  l?: M2.list
+}
+`)
+    expect(targetErrors(doc)).toEqual([])
+    expect(doc.getDiagMessages()).toEqual([])
+  })
+
+  it('checks every field of a chain through a union of objects', () => {
+    const doc = createDoc(`${types}
+type U1 = I2 | I6
+type U2 = I2 | I5
+interface Foo {
+  @expect.pattern "^[^q]*$"
+  a?: U1.work.h
+  @expect.min 1
+  b?: U1.work.h
+  @expect.min 1
+  c?: U2.work
+}
+`)
+    expect(targetErrors(doc)).toEqual([
+      'Expected type is (number), got union (string)',
+      'Expected type is (number), got union (object | number)',
+    ])
+  })
+
+  it('resolves the chain through imported types', () => {
+    const doc = createImportingDoc(
+      `
+import { M0 } from './model'
+interface Foo {
+  @expect.pattern "^[^q]*$"
+  v?: M0.work.h
+}
+`,
+      `${types}
+export type P1 = I2
+export type M0 = (I2 | null) & (P1 | null)
+`
+    )
+    expect(targetErrors(doc)).toEqual([])
+    expect(doc.getDiagMessages()).toEqual([])
+  })
+})
