@@ -46,7 +46,7 @@ export interface Post extends Base, Audited {
 
 - Multiple parents (comma-separated). Own props add to inherited.
 - Inherited props ARE the parent's prop nodes (blocks on the parent reach every child; a runtime write through a child changes the parent). A prop several parents declare merges, last parent wins (M2 below). Interface-level annotations don't inherit.
-- No overrides — redeclaring a parent prop is a diagnostic. Self/circular extends detected. To **add** annotations to an inherited prop without redeclaring it, use a mutating [`annotate`](#annotate) block (see below).
+- No overrides — redeclaring a parent prop is a diagnostic. Self/circular extends detected. Extending a union of 2+ non-`null` branches is a compile error ("An interface can't extend a union; use a merge (`U & { … }`)"); extending `N` with `type N = X | null` = extending `X`. To **add** annotations to an inherited prop without redeclaring it, use a mutating [`annotate`](#annotate) block (see below).
 - For inline composition use `&` intersection instead.
 
 ## `type`
@@ -65,9 +65,9 @@ Both `interface` and `type` carry runtime metadata via their `.as.js` counterpar
 | # | Rule |
 |---|---|
 | P1 | No branch reaches the end → `Unknown member "…"` compile error (also when the path starts at `T \| null`). |
-| P2 | One branch → that field, exactly as without the union. |
-| P3 | Several → the UNION of the fields, each keeping its own annotations; the referring prop gets no single field's annotations. |
-| P4 | Several fields are `phantom` only if all are; a phantom/data mix is a compile error. |
+| P2 | One branch → that field, exactly as without the union. Branches reaching the SAME declared prop with the same blocks on the way are one (`T \| T`, `Admin \| User` with `Admin extends User`, a field one merge operand declares in every branch; a block on the union itself applies on every branch). |
+| P3 | Several → the UNION of the fields, each keeping its own annotations; the referring prop gets no single field's annotations. A block on some branches only makes the same prop two fields (union; validates the same). |
+| P4 | Several fields are `phantom` only if all are (then the field is `phantom` at runtime too); a phantom/data mix is a compile error. |
 | P5 | `.d.ts`: scalar field → its type; else each step is `TAtscriptField<T, "k">` (`@atscript/typescript/utils`): the union of the branches' fields, safe through optional props. |
 
 ## Unions / intersections

@@ -86,6 +86,11 @@ export function isPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode 
   return node?.entity === 'primitive'
 }
 
+/** `node` is a primitive whose type is `phantom` (`phantom` or a phantom extension, resolved). */
+export function isPhantomPrimitive(node?: SemanticNode): node is SemanticPrimitiveNode {
+  return isPrimitive(node) && node.config.type === 'phantom'
+}
+
 export function isAnnotate(node?: SemanticNode): node is SemanticAnnotateNode {
   return node?.entity === 'annotate'
 }

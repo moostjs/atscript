@@ -37,15 +37,20 @@ export type FlatOf<T> = T extends { __flat: infer F }
 
 /**
  * The type of field `K` of `T`: one step of a type path (`T.a.b`) in generated `.d.ts` files.
- * Each object branch of `T` that has `K` gives its field (an optional field: `| undefined`);
- * other branches (`null`, scalars, objects without `K`) give nothing. A path through a union
- * names the union of the fields, as in the `.as` file.
+ * Each object branch of `T` that declares `K` gives its field (an optional field:
+ * `| undefined`); other branches (`null`, scalars, arrays, objects without `K` — a key only
+ * pattern props match is not a field) give nothing. A path through a union names the union of
+ * the fields, as in the `.as` file.
  */
-export type TAtscriptField<T, K extends PropertyKey> = T extends object
-  ? K extends keyof T
-    ? T[K]
+export type TAtscriptField<T, K extends PropertyKey> = T extends readonly unknown[]
+  ? never
+  : T extends object
+    ? K extends keyof {
+        [P in keyof T as string extends P ? never : number extends P ? never : P]: 0
+      }
+      ? T[K]
+      : never
     : never
-  : never
 
 /**
  * Extracts the primary key type from an Atscript annotated type.

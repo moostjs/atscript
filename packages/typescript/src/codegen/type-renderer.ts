@@ -12,6 +12,7 @@ import type {
   TPrimitiveTypeDef,
 } from '@atscript/core'
 import {
+  entryParts,
   flatDefinitions,
   hasNavPropAnnotation,
   isArray,
@@ -676,17 +677,10 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   private phantomPropType(def?: SemanticNode): string | undefined {
-    if (!def) {
+    if (!def || !isPhantomNode(this.doc, def)) {
       return undefined
     }
-    if (isPrimitive(def) && def.config.type === 'phantom') {
-      return def.id!
-    }
-    if (isRef(def) && isPhantomNode(this.doc, def)) {
-      const ref = def as SemanticRefNode
-      return ref.hasChain ? `${ref.id!}.${ref.chain.map(c => c.text).join('.')}` : ref.id!
-    }
-    return undefined
+    return isRef(def) ? entryParts(def).join('.') : def.id!
   }
 
   private isTypeTarget(name: string, doc?: AtscriptDoc): boolean {

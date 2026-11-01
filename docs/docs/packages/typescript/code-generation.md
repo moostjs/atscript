@@ -67,7 +67,7 @@ A [type path](/packages/typescript/interfaces-types#reference-a-field-type-paths
 office?: TAtscriptField<TAtscriptField<Account, "job">, "office">
 ```
 
-`TAtscriptField<T, K>` is `T[K]` for each object branch of `T` that has `K`, and nothing for the other branches (`null`, scalars, objects without `K`). So a path through a union is the union of its fields, and a step through an optional property (`work?: Job`) does not index `undefined`. Earlier versions wrote `Account["job"]["office"]`, which failed to type-check through a union or an optional property.
+`TAtscriptField<T, K>` is `T[K]` for each object branch of `T` that declares `K`, and nothing for the other branches (`null`, scalars, arrays, objects without `K`; a key that only pattern properties match is not a declared property). So a path through a union is the union of its fields, and a step through an optional property (`work?: Job`) does not index `undefined`. Earlier versions wrote `Account["job"]["office"]`, which failed to type-check through a union or an optional property.
 
 ## JS Format
 

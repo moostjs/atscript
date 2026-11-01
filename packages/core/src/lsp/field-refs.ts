@@ -5,6 +5,7 @@ import type {
   TValueCandidate,
 } from '../annotations/annotation-spec'
 import type { AtscriptDoc } from '../document'
+import { unwoundFields } from '../document'
 import {
   isProp,
   isQueryFieldRef,
@@ -112,20 +113,19 @@ function getFieldPathTarget(argToken: Token, doc: AtscriptDoc): string | undefin
 }
 
 /**
- * Resolve a (possibly dotted) field path of a type to the property it names and the
- * document that declares that property.
+ * Resolve a (possibly dotted) field path of a type to the properties it names (the type path's
+ * rule: through a union, every field), each with the document that declares it.
  */
 function resolveFieldPath(
   doc: AtscriptDoc,
   typeName: string,
   segment: TFieldPathSegment
-): TFieldRefTarget | undefined {
-  // (the type path's rule: through a union, the first of the fields it names)
-  const field = doc.unwindType(typeName, segment.path.split('.'))
-  const { node: prop, doc: declaring } = field?.fields?.[0] ?? field ?? {}
-  return isProp(prop) && declaring
-    ? { typeName, range: segment.range, prop, doc: declaring.declaringDoc(prop, declaring) }
-    : undefined
+): TFieldRefTarget[] {
+  return unwoundFields(doc.unwindType(typeName, segment.path.split('.'))).flatMap(f =>
+    isProp(f.node)
+      ? [{ typeName, range: segment.range, prop: f.node, doc: f.doc.declaringDoc(f.node, f.doc) }]
+      : []
+  )
 }
 
 /**
@@ -172,26 +172,36 @@ function fieldPathSegmentAt(argToken: Token, character?: number): TFieldPathSegm
  *   only up to the segment under the cursor — `'address.city'` with the cursor on
  *   `address` resolves `address` — and `range` is that segment's range.
  *
- * Returns `undefined` for any other token, or when the scope or the path does not resolve.
+ * Returns `undefined` for any other token, when the scope or the path does not resolve, and
+ * when the path names several fields through a union (see {@link resolveFieldRefsAt}).
  */
 export function resolveFieldRefAt(
   token: Token,
   doc: AtscriptDoc,
   character?: number
 ): TFieldRefTarget | undefined {
+  const targets = resolveFieldRefsAt(token, doc, character)
+  return targets.length === 1 ? targets[0] : undefined
+}
+
+/**
+ * {@link resolveFieldRefAt}, with every field a path through a union names (go-to-definition,
+ * references and hover list each).
+ */
+export function resolveFieldRefsAt(
+  token: Token,
+  doc: AtscriptDoc,
+  character?: number
+): TFieldRefTarget[] {
   if (isQueryFieldRef(token.parentNode)) {
     const { fieldRef, typeRef, queryArgToken } = token.parentNode
     const scope =
       token === fieldRef && queryArgToken ? getQueryScope(queryArgToken, doc) : undefined
     const typeName = scope && (typeRef?.text ?? scope.unqualifiedTarget)
-    return typeName
-      ? resolveFieldPath(doc, typeName, { path: token.text, range: token.range })
-      : undefined
+    return typeName ? resolveFieldPath(doc, typeName, { path: token.text, range: token.range }) : []
   }
   const typeName = getFieldPathTarget(token, doc)
-  return typeName
-    ? resolveFieldPath(doc, typeName, fieldPathSegmentAt(token, character))
-    : undefined
+  return typeName ? resolveFieldPath(doc, typeName, fieldPathSegmentAt(token, character)) : []
 }
 
 /**
@@ -210,14 +220,7 @@ export function resolveFieldPathArgSegments(
   if (!typeName) {
     return []
   }
-  const targets: TFieldRefTarget[] = []
-  for (const segment of segments) {
-    const target = resolveFieldPath(doc, typeName, segment)
-    if (target) {
-      targets.push(target)
-    }
-  }
-  return targets
+  return segments.flatMap(segment => resolveFieldPath(doc, typeName, segment))
 }
 
 /**
@@ -230,9 +233,11 @@ export function resolveQueryFieldRef(
 ): { targetUri: string; doc: AtscriptDoc; prop?: SemanticPropNode } | undefined {
   const typeName = fieldRefNode.typeRef?.text ?? scope.unqualifiedTarget
   const { fieldRef } = fieldRefNode
-  const resolved = typeName
+  // (one field: a path naming several through a union has no one target)
+  const targets = typeName
     ? resolveFieldPath(doc, typeName, { path: fieldRef.text, range: fieldRef.range })
-    : undefined
+    : []
+  const resolved = targets.length === 1 ? targets[0] : undefined
   return resolved && { targetUri: resolved.doc.id, doc: resolved.doc, prop: resolved.prop }
 }
 

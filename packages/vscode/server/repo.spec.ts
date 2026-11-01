@@ -244,74 +244,6 @@ function singleDocRepo(uri: string, source: string, config?: TAtscriptDocConfig)
 // ===========================================================================
 
 describe('helper methods', () => {
-  it('resolveAnnotateTarget resolves interface with props', () => {
-    const doc = createDoc('file:///test.as', 'interface User {\n  name: string\n  age: number\n}')
-    const { repo } = singleDocRepo('file:///test.as', '')
-    const target = repo.resolveAnnotateTarget(doc, 'User')
-    expect(target).toBeDefined()
-    expect(target!.props.size).toBe(2)
-    expect(target!.props.has('name')).toBe(true)
-    expect(target!.props.has('age')).toBe(true)
-  })
-
-  it('resolveAnnotateTarget returns undefined for non-existent type', () => {
-    const doc = createDoc('file:///test.as', 'interface User { name: string }')
-    const { repo } = singleDocRepo('file:///test.as', '')
-    expect(repo.resolveAnnotateTarget(doc, 'NonExistent')).toBeUndefined()
-  })
-
-  it('resolveAnnotateTarget includes inherited props from extends chain', () => {
-    const source = [
-      'interface Credentials {',
-      '  username: string',
-      '  password: string',
-      '}',
-      'interface ArbacCredentials extends Credentials {',
-      '  roles: string[]',
-      '}',
-    ].join('\n')
-    const doc = createDoc('file:///test.as', source)
-    const { repo } = singleDocRepo('file:///test.as', '')
-    const target = repo.resolveAnnotateTarget(doc, 'ArbacCredentials')
-    expect(target).toBeDefined()
-    const propNames = Array.from(target!.props.keys())
-    expect(propNames).toContain('roles')
-    expect(propNames).toContain('username')
-    expect(propNames).toContain('password')
-  })
-
-  it('resolveAnnotateTarget follows type alias to interface', () => {
-    const doc = createDoc(
-      'file:///test.as',
-      'interface User {\n  name: string\n}\ntype Alias = User'
-    )
-    const { repo } = singleDocRepo('file:///test.as', '')
-    const target = repo.resolveAnnotateTarget(doc, 'Alias')
-    expect(target).toBeDefined()
-    expect(target!.props.has('name')).toBe(true)
-  })
-
-  it('getPropsFromDef extracts from interface and structure', () => {
-    const doc = createDoc(
-      'file:///test.as',
-      'interface User {\n  name: string\n  address: { street: string }\n}'
-    )
-    const { repo } = singleDocRepo('file:///test.as', '')
-
-    // Interface props
-    const iface = doc.nodes.find(n => n.entity === 'interface')! as SemanticInterfaceNode
-    const ifaceProps = repo.getPropsFromDef(iface)
-    expect(ifaceProps).toBeDefined()
-    expect(ifaceProps!.length).toBe(2)
-
-    // Nested structure props
-    const addressProp = iface.props.get('address')!
-    const structDef = addressProp.getDefinition()!
-    const structProps = repo.getPropsFromDef(structDef)
-    expect(structProps).toBeDefined()
-    expect(structProps!.some(p => p.id === 'street')).toBe(true)
-  })
-
   it('propsToCompletionItems maps props correctly and returns undefined for undefined', () => {
     const doc = createDoc('file:///test.as', 'interface User {\n  name: string\n}')
     const { repo } = singleDocRepo('file:///test.as', '')
@@ -2292,5 +2224,43 @@ describe('type paths through unions', () => {
       position: { line: 16, character: 13 },
     })
     expect(result.map((i: any) => i.label)).toEqual(['h', 'k'])
+  })
+
+  it('hover notes a phantom path once, whatever the number of fields', async () => {
+    const phantomSource = [
+      'interface P0 { p: phantom }',
+      'interface P5 { p: phantom }',
+      'interface P2 { work: P0 }',
+      'interface P3 { work: P5 }',
+      'type PU = P2 | P3',
+      'interface CH {',
+      '  d?: PU.work.p',
+      '}',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, phantomSource)
+    const hover = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 6, character: 14 },
+    })
+    expect(hover.contents.value.split('phantom — excluded').length - 1).toBe(1)
+  })
+
+  it('reports an interface extending a union', async () => {
+    const extendsSource = [
+      'interface I1 { f: string }',
+      'interface I2 { g: string }',
+      'type U = I1 | I2',
+      'type N = I1 | null',
+      'export interface E extends U {}',
+      'export interface C extends N {}',
+    ].join('\n')
+    // (the built-in primitives, `null` included)
+    const builtIns = await new PluginManager({ unknownAnnotation: 'allow' }).getDocConfig()
+    const { repo, connection, doc } = singleDocRepo(uri, extendsSource, builtIns)
+    await repo.checkDoc(doc)
+    const { diagnostics } = connection.sendDiagnostics.mock.calls.at(-1)![0]
+    expect(diagnostics.map((d: any) => [d.range.start.line, d.message])).toEqual([
+      [4, "An interface can't extend a union; use a merge (`U & { … }`)"],
+    ])
   })
 })

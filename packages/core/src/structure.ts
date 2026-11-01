@@ -41,6 +41,7 @@ import {
   isStructure,
   isTuple,
 } from './parser/nodes'
+import type { Token } from './parser/token'
 
 /** More hidden merge classes than this in one module is a compile error. */
 export const MERGE_CAP = 200
@@ -168,6 +169,8 @@ export interface TStructSlot {
   owner?: { unit: string; path: string[] }
   /** a shell node: the node it shells (its base) */
   shell?: TStructSlot
+  /** the prop declaring the node (an own field; a shell keeps its base's): none for an element or a merged field */
+  prop?: SemanticPropNode
 }
 
 /** The shape at a position (coarse). */
@@ -213,6 +216,8 @@ export interface TStructRank {
 export interface TStructError {
   doc: AtscriptDoc
   node?: SemanticNode
+  /** where it is reported, when not at `node`'s name */
+  token?: Token
   message: string
   /** an annotate entry the model refuses */
   entry?: boolean
@@ -443,7 +448,6 @@ function webCycle(comp: string[], merges: string[], succ: (k: string) => string[
   return false
 }
 
-/** One structure model per set of documents (a build). */
 /**
  * The written types of a merged field's contributors as one merge reads them: one written type
  * reached through several operands (`I4 & (I4 | null)`, `I4 & I5` with `I5 extends I4`) counts
@@ -458,6 +462,13 @@ function fansOut(def: TStructDef, s: string): boolean {
   return !!def.branch && def.size !== undefined && (!!def.uni || def.slot(s) === undefined)
 }
 
+/** A position of a type path being walked (see `StructureModel.typePathPositions`): its internal path and the def there. */
+interface TPathAt {
+  path: string[]
+  def: TStructDef | undefined
+}
+
+/** One structure model per set of documents (a build). */
 export class StructureModel {
   readonly docs: AtscriptDoc[]
   private readonly docIndex = new Map<AtscriptDoc, number>()
@@ -469,6 +480,15 @@ export class StructureModel {
   /** layers per unit: path key -> layers (blocks and `as` entries) */
   private readonly layers = new Map<string, Map<string, Layer[]>>()
   private readonly exprMemo = new Map<SemanticNode, TStructExpr>()
+  /** whether every block's layers are in (see {@link collectLayers}) */
+  private layersReady = false
+  /** a chain ref's positions (see {@link typePathPositions}), with every block's layers */
+  private readonly chainPaths = new Map<SemanticNode, string[][]>()
+  /** chain refs walked before every block's layers were in: by declared field only */
+  private readonly provisional = new Map<
+    SemanticNode,
+    { t: TStructExpr & { k: 'chain' }; paths: string[][] }
+  >()
 
   constructor(docs: Iterable<AtscriptDoc>) {
     const all: AtscriptDoc[] = []
@@ -576,6 +596,17 @@ export class StructureModel {
       : undefined
   }
 
+  /** The declaration whose structure `d` has: an `as` copy's (through copies of copies) target. */
+  structureRoot(d: TStructDecl): TStructDecl | undefined {
+    const seen = new Set<TStructDecl>()
+    let root: TStructDecl | undefined = d
+    while (root?.kind === 'as' && !seen.has(root)) {
+      seen.add(root)
+      root = this.asTarget(root)
+    }
+    return root
+  }
+
   /** An interface's parents, in order. */
   extendsOf(d: TStructDecl): TStructDecl[] {
     if (!isInterface(d.node)) {
@@ -626,47 +657,151 @@ export class StructureModel {
   }
 
   /**
-   * A chain ref through a union of objects: a union of the fields, one chain per
-   * branch that has the path (`|i` steps; a branch that dead-ends deeper is skipped); one such
-   * branch: that field; none: the chain as written (core reports the unknown member).
+   * A chain ref through a union of objects: one chain per position the path reaches (see
+   * {@link typePathPositions}); one: that field; none: the chain as written (core reports the
+   * unknown member). Several fields, every one phantom: the `phantom` type — a phantom field
+   * none of which is its target (MODEL §15 CHAIN-1 U4; a mix is a compile error).
    */
   private chainThroughUnions(t: TStructExpr & { k: 'chain' }): TStructExpr {
-    let paths: string[][] = [[]]
-    let crossed = false
-    for (const s of t.path) {
-      const next: string[][] = []
-      for (const p of paths) {
-        const def = this.defAt(t.decl, p)
-        if (def && fansOut(def, s)) {
-          const branches = this.branchPaths(def, p, s, new Set())
-          next.push(...branches)
-          crossed ||= branches.length > 0
-        } else if (!crossed || def?.slot(s)) {
-          next.push([...p, s])
-        }
+    let paths = this.chainPaths.get(t.node)
+    if (!paths) {
+      const found = this.typePathPositions(t.decl, t.path, this.layersReady)
+      paths = found ?? [t.path]
+      if (this.layersReady) {
+        this.chainPaths.set(t.node, paths)
+      } else if (found) {
+        this.provisional.set(t.node, { t, paths })
       }
-      paths = next
     }
-    if (!crossed || paths.length === 0) {
-      return t
+    if (paths.length === 1) {
+      return paths[0] === t.path ? t : { ...t, path: paths[0] }
     }
     const chains = paths.map(path => ({ ...t, path }))
-    return chains.length === 1 ? chains[0] : { k: 'uni', node: t.node, items: chains }
+    const phantom = chains.every(c => this.phantomField(c))
+    const prim = phantom && t.decl.doc.getDeclarationOwnerNode('phantom')?.node
+    return prim
+      ? { k: 'scalar', node: prim, doc: t.decl.doc }
+      : { k: 'uni', node: t.node, items: chains }
   }
 
-  /** The paths into the branches of union `def` (at `p`) that have prop `s`, nested unions flattened. */
-  private branchPaths(def: TStructDef, p: string[], s: string, seen: Set<string>): string[][] {
+  /** Whether the field chain `c` names is phantom: every type written there is the `phantom` primitive (through aliases, chains). */
+  private phantomField(c: TStructExpr & { k: 'chain' }, seen = new Set<TStructExpr>()): boolean {
+    seen.add(c)
+    const ends = this.slotAt(c.decl, c.path)?.ends ?? []
+    return (
+      ends.length > 0 &&
+      ends.every(e => {
+        const u = this.pastAliases(e)
+        return u.k === 'chain'
+          ? !seen.has(u) && this.phantomField(u, seen)
+          : u.k === 'scalar' &&
+              isPrimitive(u.node) &&
+              (u.node as SemanticPrimitiveNode).config.type === 'phantom'
+      })
+    )
+  }
+
+  /**
+   * The positions type path `path` of `d` reaches through unions (MODEL §15 CHAIN-1, POS-1), as
+   * internal paths (`|i` steps): a union — or a distributed merge without the prop — fans out
+   * into its branches (nested unions flattened), each step keeps the positions that have the
+   * prop (a branch that dead-ends deeper is skipped), and branches reaching one position
+   * ({@link positionKey}; `blocks` false: by the declared field only) are one, the first.
+   * `undefined` when the path crosses no union or no position reaches its end.
+   *
+   * (Core's `AtscriptDoc.pathWalk` is the same chain step on semantic nodes: the two must stay
+   * in step.)
+   */
+  typePathPositions(d: TStructDecl, path: string[], blocks = true): string[][] | undefined {
+    let at: TPathAt[] = [{ path: [], def: this.refDef(d) }]
+    let crossed = false
+    for (const s of path) {
+      const next: TPathAt[] = []
+      for (const p of at) {
+        if (p.def && fansOut(p.def, s)) {
+          const branches = this.branchesWith(p.def, p.path, s, new Set())
+          next.push(...branches)
+          crossed ||= branches.length > 0
+        } else if (!crossed || p.def?.slot(s)) {
+          next.push({ path: [...p.path, s], def: p.def?.slot(s)?.def })
+        }
+      }
+      at = crossed && next.length > 1 ? this.onePerPosition(d, next, blocks) : next
+    }
+    return crossed && at.length > 0 ? at.map(p => p.path) : undefined
+  }
+
+  /** {@link typePathPositions}'s step into the branches of union `def` (at `p`) that have prop `s`, nested unions flattened. */
+  private branchesWith(def: TStructDef, p: string[], s: string, seen: Set<string>): TPathAt[] {
     seen.add(def.key)
-    const out: string[][] = []
+    const out: TPathAt[] = []
     for (let i = 0; i < (def.size ?? 0); i++) {
       const b = def.branch?.(i)
-      if (b?.slot(s)) {
-        out.push([...p, `|${i}`, s])
+      const slot = b?.slot(s)
+      if (slot) {
+        out.push({ path: [...p, `|${i}`, s], def: slot.def })
       } else if (b && fansOut(b, s) && !seen.has(b.key)) {
-        out.push(...this.branchPaths(b, [...p, `|${i}`], s, seen))
+        out.push(...this.branchesWith(b, [...p, `|${i}`], s, seen))
       }
     }
     return out
+  }
+
+  /** Positions `at` of a type path of `d`, one per {@link positionKey} (the first). */
+  private onePerPosition(d: TStructDecl, at: TPathAt[], blocks: boolean): TPathAt[] {
+    const keys = new Set<string>()
+    return at.filter(p => {
+      const k = this.positionKey(d, p.path, blocks)
+      return !keys.has(k) && !!keys.add(k)
+    })
+  }
+
+  /**
+   * The identity of position (d, path) of a type path (MODEL §15 POS-1): the declared field its
+   * node is — shells looked through — and the blocks on the way: per shell (and the field itself),
+   * the entries its unit's layers have at or below it, relative to it. Equal keys: one position.
+   * `blocks` false: the field only.
+   */
+  positionKey(d: TStructDecl, path: string[], blocks = true): string {
+    let s = this.slotAt(d, path)
+    const parts: string[] = []
+    while (s) {
+      if (blocks && s.owner) {
+        parts.push(this.entriesBelow(s.owner.unit, s.owner.path))
+      }
+      if (!s.shell) {
+        parts.push(s.loc)
+        break
+      }
+      s = s.shell
+    }
+    return parts.join('>')
+  }
+
+  /** The declared prop of the field at position (d, path) (shells looked through); none for a merged field. */
+  declaredProp(d: TStructDecl, path: string[]): SemanticPropNode | undefined {
+    return this.slotAt(d, path)?.prop
+  }
+
+  private entryIds?: Map<TStructEntry, number>
+
+  /** The entries unit `U`'s layers have at or below `at`: `relative path=entry`, sorted. */
+  private entriesBelow(U: string, at: string[]): string {
+    const ids = (this.entryIds ??= new Map())
+    const pre = pk(at)
+    const out: string[] = []
+    for (const [k, ls] of this.layers.get(U) ?? []) {
+      if (pre === '' || k === pre || k.startsWith(`${pre}.`)) {
+        for (const l of ls) {
+          let id = ids.get(l.entry)
+          if (id === undefined) {
+            ids.set(l.entry, (id = ids.size))
+          }
+          out.push(`${k.slice(pre.length)}=${id}`)
+        }
+      }
+    }
+    return out.sort().join(',')
   }
 
   private exprOf0(doc: AtscriptDoc, node: SemanticNode): TStructExpr {
@@ -727,6 +862,52 @@ export class StructureModel {
   // ------------------------------------------------------------ blocks and layers
 
   private collectLayers(): void {
+    // A chain ref through a union walked while the blocks are collected (an entry through a prop
+    // typed by a type path) has its positions by declared field only: POS-1 needs every block's
+    // layers. With every block in, they are found again (and kept); when blocks split one, the
+    // blocks are collected again over them (each round fixes more chains: it ends).
+    for (;;) {
+      this.collectBlocks()
+      // (defs computed while normalizing lack the later layers)
+      this.clearDefs()
+      this.layersReady = true
+      let split = false
+      for (const [node, { t, paths }] of this.provisional) {
+        const final = this.typePathPositions(t.decl, t.path) ?? [t.path]
+        this.chainPaths.set(node, final)
+        split ||= final.length !== paths.length
+      }
+      this.provisional.clear()
+      if (!split) {
+        break
+      }
+      this.layersReady = false
+      this.layers.clear()
+      this.blocks.length = 0
+      this.errors.length = 0
+      this.exprMemo.clear()
+      this.shapeMemo.clear()
+      this.distMemo.clear()
+      this.clearDefs()
+    }
+    // kinds from the final model
+    for (const b of this.blocks) {
+      for (const e of b.entries) {
+        e.kinds = e.paths.map(p => this.shellSteps(b.target, p))
+      }
+    }
+  }
+
+  private clearDefs(): void {
+    this.defMemo.clear()
+    this.slotAtMemo.clear()
+    this.declDefMemo.clear()
+    this.layerPathMemo.clear()
+    this.locMemo.clear()
+  }
+
+  /** Every block's (and `as` copy's) entries, normalized, as layers. */
+  private collectBlocks(): void {
     // (`annotate T as X { … }` entries: X's own layers, at their path only: no collapse)
     for (const d of this.decls) {
       if (d.kind !== 'as') {
@@ -778,18 +959,6 @@ export class StructureModel {
           }
         }
         this.blocks.push(block)
-      }
-    }
-    // (defs computed while normalizing lack the later layers)
-    this.defMemo.clear()
-    this.slotAtMemo.clear()
-    this.declDefMemo.clear()
-    this.layerPathMemo.clear()
-    this.locMemo.clear()
-    // kinds from the final model
-    for (const b of this.blocks) {
-      for (const e of b.entries) {
-        e.kinds = e.paths.map(p => this.shellSteps(b.target, p))
       }
     }
   }
@@ -992,24 +1161,25 @@ export class StructureModel {
     }))
   }
 
-  /** The node of a field of U at Q written as `t` (a prop or an element): U's own. */
-  private fieldSlot(U: string, Q: string[], t: TStructExpr, optional: boolean): TStructSlot {
+  /** The node of a field of U at Q written as `t` (a prop `prop`, or an element): U's own. */
+  private fieldSlot(U: string, Q: string[], t: TStructExpr, prop?: TStructProp): TStructSlot {
     return {
       loc: `${U}:${pk(Q)}`,
       owner: { unit: U, path: Q },
       def: this.wrapDef(U, Q, this.exprDef(U, Q, t)),
       ends: [t],
-      optional,
+      optional: !!prop?.optional,
+      prop: prop?.node,
     }
   }
 
   private builderDef(U: string, q: string[], t: TStructExpr): TStructDef {
     const raw = (k: string): TStructSlot | undefined => {
       if (t.k === 'arr') {
-        return k === '[]' ? this.fieldSlot(U, [...q, k], t.of, false) : undefined
+        return k === '[]' ? this.fieldSlot(U, [...q, k], t.of) : undefined
       }
       const p = t.k === 'obj' ? t.props.find(x => x.name === k) : undefined
-      return p && this.fieldSlot(U, [...q, k], p.type, p.optional)
+      return p && this.fieldSlot(U, [...q, k], p.type, p)
     }
     return this.mk(`b:${U}:${pk(q)}`, () => ({
       kind: 'builder',
@@ -1121,6 +1291,7 @@ export class StructureModel {
     if (fcs) {
       wcs ??= cs
     }
+    const ends = xs.flatMap(x => x.ends)
     const merged: TStructSlot = {
       loc: `${U}:${k}`,
       owner: { unit: U, path: [k] },
@@ -1128,10 +1299,7 @@ export class StructureModel {
       // without a def — scalars — take part in a distribution's `never` test; arrays and
       // tuples: a tuple of the item intersections, written by the core algebra)
       def:
-        this.neverShape(
-          xs.flatMap(x => x.ends),
-          xs
-        ) || this.tupleShape(xs.flatMap(x => x.ends))
+        this.neverShape(ends, xs) || this.tupleShape(ends)
           ? undefined
           : this.mergeOf(
               xs.map(x => x.def),
@@ -1139,7 +1307,7 @@ export class StructureModel {
               xs.filter(x => !x.def).flatMap(x => x.ends),
               (wcs ?? xs).map(x => x?.def)
             ),
-      ends: xs.flatMap(x => x.ends),
+      ends,
       optional: xs.every(x => x.optional),
       contributors: xs,
     }
@@ -1204,7 +1372,7 @@ export class StructureModel {
       const slot = (k: string, shell: boolean) => {
         const p = own.find(x => x.name === k)
         if (p) {
-          return this.fieldSlot(U, [k], p.type, p.optional)
+          return this.fieldSlot(U, [k], p.type, p)
         }
         return this.guarded(`${U}/${k}/${shell}`, () =>
           this.classSlot(
@@ -1453,16 +1621,14 @@ export class StructureModel {
         if (cs.length === 1 || cs.every(c => c.loc === cs[0].loc)) {
           return cs[0]
         }
+        const ends = cs.flatMap(c => c.ends)
         return {
           loc: `m:${key}/${k}`,
           owner: { unit: `m:${key}`, path: [k] },
           // (unmergeable shapes are `never`: no merge of their types; arrays and
           // tuples: a tuple of the item intersections, written by the core algebra)
           def:
-            this.neverShape(
-              cs.flatMap(c => c.ends),
-              cs
-            ) || this.tupleShape(cs.flatMap(c => c.ends))
+            this.neverShape(ends, cs) || this.tupleShape(ends)
               ? undefined
               : this.mergeOf(
                   cs.map(c => c.def),
@@ -1470,7 +1636,7 @@ export class StructureModel {
                   cs.filter(c => !c.def).flatMap(c => c.ends),
                   (wdefs ?? defs).map(t => t.slot(k)?.def)
                 ),
-          ends: cs.flatMap(c => c.ends),
+          ends,
           optional: cs.every(c => c.optional),
           contributors: cs,
         }
@@ -2359,7 +2525,7 @@ export class StructureModel {
     if (
       cs &&
       cs.every(c => (c.def && structKey(c.def)) === (cs[0].def && structKey(cs[0].def))) &&
-      ends.every(e => e === ends[0] || e.node === ends[0].node)
+      ends.every(e => e.node === ends[0].node)
     ) {
       return undefined
     }
@@ -2929,9 +3095,52 @@ export class StructureModel {
     for (const d of this.flatWebs()) {
       out.push({ doc: d.doc, node: d.node, message: FLATTEN_WEB })
     }
+    out.push(...this.extendsUnions())
     // (an annotate entry the model refuses is a diagnostic, never a silent drop)
     out.push(...this.errors)
     return out
+  }
+
+  private extendsMemo?: TStructError[]
+
+  /**
+   * An interface extending a union of two or more branches that are not `null` (a union, or a
+   * merge distributing into one) is a compile error: it has no props to inherit (MODEL §15
+   * EXT-U). `extends X | null` is `extends X`.
+   */
+  private extendsUnions(): TStructError[] {
+    if (!this.extendsMemo) {
+      this.extendsMemo = []
+      for (const d of this.decls) {
+        for (const t of isInterface(d.node) ? d.node.extendsTokens : []) {
+          const p = this.declOf(d.doc, t.text)
+          if (p && this.unionOfTwo(p)) {
+            this.extendsMemo.push({
+              doc: d.doc,
+              node: d.node,
+              token: t,
+              message: `An interface can't extend a union; use a merge (\`${t.text} & { … }\`)`,
+            })
+          }
+        }
+      }
+    }
+    return this.extendsMemo
+  }
+
+  /** Whether declaration `p` is a union of two or more branches that are not `null`. */
+  private unionOfTwo(p: TStructDecl): boolean {
+    const def = this.refDef(p)
+    if (def?.uni) {
+      let n = 0
+      for (let i = 0; i < (def.size ?? 0); i++) {
+        n += def.bsrc?.(i).some(x => !isNull(this.pastAliases(x))) ? 1 : 0
+      }
+      return n >= 2
+    }
+    // (a union holding no object: its branches as written)
+    const u = this.pastAliases({ k: 'ref', decl: p, node: p.node })
+    return u.k === 'uni' && u.items.filter(x => !isNull(this.pastAliases(x))).length >= 2
   }
 
   private rankMemo?: Map<AtscriptDoc, TStructRank>

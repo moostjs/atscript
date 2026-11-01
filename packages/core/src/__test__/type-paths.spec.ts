@@ -284,6 +284,10 @@ describe('type paths: core and the structure model agree', () => {
       'type U = I2 | I3\ntype UU = U | I7\ninterface CH {\n  a?: UU.work.h\n  b?: UU.work.p\n}',
     plain: 'interface CH {\n  a?: I2.work.h\n  b?: I2.work\n}',
     none: 'type M0 = I2 | null\ninterface CH {\n  a?: M0.work.zz\n}',
+    samePosition:
+      'type U = I2 | I7\ntype UU = U | I2\ntype D = I2 | I2\ntype M0 = I2 | null\ntype MM = M0 | I2\ninterface CH {\n  a?: UU.work.h\n  b?: D.work.h\n  c?: MM.work.h\n}',
+    branchBlock:
+      'interface I9 {\n  work: I0\n}\ntype U = I2 | I9\nannotate I2 {\n  @meta.description "blk"\n  work.h\n}\ninterface CH {\n  a?: U.work.h\n}',
   }
   it.each(Object.entries(sources))('%s', (_, source) => {
     const doc = createDoc(`${types}\n${source}\n`)
@@ -292,6 +296,11 @@ describe('type paths: core and the structure model agree', () => {
       const u = doc.unwindRef(ref)
       const core = u ? (u.fields ?? [u]).map(f => f.def) : []
       const t = m.exprOf(doc, ref)
+      if (t.k === 'scalar') {
+        // (several fields, all phantom: the model's `phantom` type — U4)
+        expect(isPhantomNode(doc, ref) && core.length > 1, text).toBe(true)
+        continue
+      }
       const chains = t.k === 'uni' ? t.items : [t]
       const model = chains.flatMap(c => {
         const end = c.k === 'chain' ? m.slotAt(c.decl, c.path)?.ends[0]?.node : undefined
@@ -300,5 +309,200 @@ describe('type paths: core and the structure model agree', () => {
       expect(core.length, text).toBe(model.length)
       core.forEach((d, i) => expect(d === model[i], `${text} field ${i}`).toBe(true))
     }
+  })
+})
+
+describe('type paths through unions: one position (POS-1)', () => {
+  // Branches are one position when they reach the same declared field with the same blocks on
+  // the way (MODEL §15 POS-1): core (`unwindRef`) and the structure model (`exprOf`) alike.
+  const fieldsOf = (doc: AtscriptDoc, text: string) => {
+    const ref = refAt(doc, text)
+    const u = doc.unwindRef(ref)
+    const t = doc.structure().exprOf(doc, ref)
+    return {
+      core: (u?.fields ?? (u ? [u] : [])).map(f => fieldName(doc, f.node)),
+      model: (t.k === 'uni' ? t.items : [t]).map(c => (c.k === 'chain' ? c.path.join('.') : c.k)),
+    }
+  }
+
+  it('the same declared field through several branches is one field', () => {
+    const doc = createDoc(`${types}
+interface I8 extends I2 {
+  z: string
+}
+interface I4 {
+  @meta.label 'I4.k'
+  k: string
+}
+type U = I2 | I7
+type UU = U | I2
+type D = I2 | I2
+type M0 = I2 | null
+type MM = M0 | I2
+type X8 = I8 | I2
+type DM = (I2 | I3) & I4
+interface CH {
+  a?: UU.work.h
+  b?: D.work.h
+  c?: MM.work.h
+  d?: X8.work
+  e?: X8.work.h
+  f?: DM.k
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'UU.work.h')).toEqual({ core: ['I0.h'], model: ['|0.|0.work.h'] })
+    expect(fieldsOf(doc, 'D.work.h')).toEqual({ core: ['I0.h'], model: ['|0.work.h'] })
+    expect(fieldsOf(doc, 'MM.work.h')).toEqual({ core: ['I0.h'], model: ['|0.work.h'] })
+    // (an inherited prop is the parent's node)
+    expect(fieldsOf(doc, 'X8.work')).toEqual({ core: ['I2.work'], model: ['|0.work'] })
+    expect(fieldsOf(doc, 'X8.work.h')).toEqual({ core: ['I0.h'], model: ['|0.work.h'] })
+    // (a field one operand of a distributed merge declares: that node on every branch)
+    expect(fieldsOf(doc, 'DM.k')).toEqual({ core: ['I4.k'], model: ['|0.k'] })
+  })
+
+  it("the same block on every branch: one field, with the block's annotations", () => {
+    const doc = createDoc(`${types}
+interface I9 {
+  work: I0
+}
+type V = I2 | I9
+annotate V {
+  @meta.description 'blkV'
+  work.h
+}
+interface CH {
+  b?: V.work.h
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'V.work.h')).toEqual({ core: ['I0.h'], model: ['|0.work.h'] })
+    const prop = (doc.nodes.find(n => n.id === 'CH') as any).getDefinition().props.get('b')
+    const anns = doc.evalAnnotationsForNode(prop, prop.annotations, true) ?? []
+    expect(anns.map(a => `${a.name}=${a.args[0]?.text}`)).toEqual([
+      'meta.label=I0.h',
+      'meta.description=blkV',
+    ])
+  })
+
+  it('a block on some branches only: a union of the fields (the same declared field twice)', () => {
+    const doc = createDoc(`${types}
+interface I9 {
+  work: I0
+}
+interface I8 extends I2 {
+  z: string
+}
+type U = I2 | I9
+type X8 = I8 | I2
+annotate I2 {
+  @meta.description 'blkI2'
+  work.h
+}
+annotate I8 {
+  @meta.description 'blkI8'
+  work.h
+}
+interface CH {
+  a?: U.work.h
+  b?: X8.work.h
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'U.work.h')).toEqual({
+      core: ['I0.h', 'I0.h'],
+      model: ['|0.work.h', '|1.work.h'],
+    })
+    expect(fieldsOf(doc, 'X8.work.h')).toEqual({
+      core: ['I0.h', 'I0.h'],
+      model: ['|0.work.h', '|1.work.h'],
+    })
+    // (go-to-definition: each field)
+    const line = doc.text.split('\n').findIndex(l => l.includes('U.work.h'))
+    const ch = doc.text.split('\n')[line].indexOf('U.work.h') + 'U.work.'.length + 1
+    expect(doc.getToDefinitionAt(line, ch)?.length).toBe(2)
+  })
+
+  it('an entry through a prop typed by such a path follows its final positions', () => {
+    const doc = createDoc(`${types}
+interface X {
+  x: string
+}
+interface J0 {
+  h: X
+}
+interface J2 {
+  work: J0
+}
+interface J9 {
+  work: J0
+}
+type U = J2 | J9
+interface CH {
+  a?: U.work.h
+}
+annotate CH {
+  @meta.description 'blkCH'
+  a.x
+}
+annotate J2 {
+  @meta.description 'blkJ2'
+  work.h
+}
+`)
+    expect(errors(doc)).toEqual([])
+    const m = doc.structure()
+    const block = m.blocks.find(b => b.target.name === 'CH')
+    expect(block?.entries[0].paths.map(p => p.join('.'))).toEqual(['a.|0.x', 'a.|1.x'])
+  })
+})
+
+/** The compile error of an interface extending union `name` (MODEL §15 EXT-U). */
+const extendsUnion = (name: string) =>
+  `An interface can't extend a union; use a merge (\`${name} & { … }\`)`
+
+describe('interfaces extending a union (EXT-U)', () => {
+  it('extending a union of two or more branches that are not null is a compile error', () => {
+    const doc = createDoc(`${types}
+type U = I2 | I3
+type S = string | number
+type M = I2 | string
+type N3 = I2 | I3 | null
+type DU = (I2 | I3) & { z: string }
+interface E1 extends U { q?: string }
+interface E2 extends S { q?: string }
+interface E3 extends M { q?: string }
+interface E4 extends N3 { q?: string }
+interface E5 extends DU { q?: string }
+`)
+    expect(errors(doc).map(e => e.replace(/^\d+: /, ''))).toEqual(
+      ['U', 'S', 'M', 'N3', 'DU'].map(extendsUnion)
+    )
+    // (reported at the name extended)
+    const e1 = doc.getDiagMessages().find(m => m.message === extendsUnion('U'))!
+    const line = doc.text.split('\n')[e1.range.start.line]
+    expect(line.slice(e1.range.start.character, e1.range.end.character)).toBe('U')
+  })
+
+  it('`extends X | null` is `extends X` in every reader', () => {
+    const doc = createDoc(`${types}
+interface J1 {
+  f?: string
+}
+type N0 = J1 | null
+type M1 = J1 & { g?: string }
+type N1 = M1 | null
+interface C0 extends N0 {}
+interface C1 extends N1 {}
+interface CH {
+  v?: C0.f
+  w?: C1.g
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldName(doc, doc.unwindRef(refAt(doc, 'C0.f'))?.node)).toBe('J1.f')
+    expect(getFieldsForType(doc, 'C1').map(p => p.id)).toEqual(['f', 'g'])
+    const m = doc.structure()
+    expect(m.slotAt(m.declOf(doc, 'C1')!, ['g'])).toBeDefined()
   })
 })

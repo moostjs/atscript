@@ -10,6 +10,7 @@ import {
   getFieldsForType,
   getQueryScope,
   resolveFieldRefAt,
+  resolveFieldRefsAt,
 } from './field-refs'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
@@ -259,6 +260,51 @@ interface Report {
     it('query mode is unchanged by arithmetic characters', () => {
       expect(analyzeQueryCursorContext('amount > -5 ')).toEqual({ type: 'after-comparison' })
       expect(analyzeQueryCursorContext('amount ')).toEqual({ type: 'after-field' })
+    })
+  })
+
+  describe('field paths through a union (every field it names)', () => {
+    const annotations = {
+      test: {
+        ufield: new AnnotationSpec({
+          argument: {
+            name: 'field',
+            type: 'string',
+            fieldScope: () => ({ allowedTypes: [], unqualifiedTarget: 'AB' }),
+          },
+        }),
+      },
+    }
+    const body = `
+interface A {
+  k: string
+}
+interface B {
+  k: number
+}
+type AB = A | B
+interface Report {
+  @test.ufield 'k'
+  total: number
+}
+`
+
+    it('go-to-definition, references and resolveFieldRefsAt list each field', () => {
+      const doc = createDoc(body, annotations)
+      const arg = posOf(doc, `'k'`, 1)
+      const token = doc.tokensIndex.at(arg.line, arg.character)!
+      expect(
+        resolveFieldRefsAt(token, doc).map(t => t.prop.token('identifier')!.range.start)
+      ).toEqual([posOf(doc, 'k: string'), posOf(doc, 'k: number')])
+      // (no one target)
+      expect(resolveFieldRefAt(token, doc)).toBeUndefined()
+      expect(
+        doc.getToDefinitionAt(arg.line, arg.character)?.map(l => l.targetSelectionRange.start)
+      ).toEqual([posOf(doc, 'k: string'), posOf(doc, 'k: number')])
+      // (the string is a reference of each field)
+      for (const def of [posOf(doc, 'k: string'), posOf(doc, 'k: number')]) {
+        expect(doc.getUsageListAt(def.line, def.character)?.map(u => u.range.start)).toEqual([arg])
+      }
     })
   })
 

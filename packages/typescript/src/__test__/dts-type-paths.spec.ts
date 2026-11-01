@@ -144,4 +144,61 @@ describe('.d.ts type paths', () => {
       .map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
     expect(messages).toEqual([])
   }, 60_000)
+
+  it('array branches and pattern props give no field', async () => {
+    const { dir } = await dts(`
+export interface J0 {
+  h: string
+}
+export interface J2 {
+  work: J0
+}
+export interface J3 {
+  length: J0
+  work: J0
+}
+export interface PP {
+  [*]: number
+}
+export interface PQ {
+  work: J0
+  [*]: J0
+}
+export type UA = J2[] | J3
+export type UP = J2 | PP
+export type UQ = J2 | PQ
+export interface CH {
+  a: UA.length
+  b: UP.work
+  c: UA.work
+  d: UQ.work
+}
+`)
+    writeFileSync(
+      path.join(dir, 'use.ts'),
+      [
+        "import type { CH, J0 } from './a.as'",
+        'type Eq<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false',
+        "export const a: Eq<CH['a'], J0> = true",
+        "export const b: Eq<CH['b'], J0> = true",
+        "export const c: Eq<CH['c'], J0> = true",
+        "export const d: Eq<CH['d'], J0> = true",
+      ].join('\n')
+    )
+    const globals = path.resolve(__dirname, '../../test/fixtures/atscript.d.ts')
+    const program = ts.createProgram([path.join(dir, 'use.ts'), globals], {
+      strict: true,
+      noEmit: true,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      target: ts.ScriptTarget.ES2022,
+      types: [],
+      paths: { '@atscript/typescript/utils': [path.resolve(__dirname, '../utils.ts')] },
+    })
+    const messages = ts
+      .getPreEmitDiagnostics(program)
+      .filter(d => d.file?.fileName.endsWith('use.ts'))
+      .map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
+    expect(messages).toEqual([])
+  }, 60_000)
 })

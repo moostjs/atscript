@@ -122,7 +122,9 @@ A path goes through unions. Each step keeps the union branches that have the pro
 
 A branch where the path stops deeper (`Contact = Email | Phone` with `Contact.info.label`, where only `Email.info` has `label`) is skipped; the path is an error only when no branch reaches its end.
 
-A path that names several fields is `phantom` only when every field is `phantom`. A mix of `phantom` and data fields is a compile error.
+Branches that reach the same declared property count once, when the same blocks apply on the way. `type Pair = User | User`, `type Member = Admin | User` with `Admin extends User`, and a property that one operand of a merge declares in every branch all give one field. A block on the union itself (`annotate Member { address.city }`) applies on every branch, so it is still one field. A block on some branches only (`annotate Admin { address.city }`) makes them different fields: the path is the union of the two (they validate the same).
+
+A path that names several fields is `phantom` only when every field is `phantom`, and it is then a `phantom` field like any other (excluded from validation, JSON Schema and the `.d.ts` data type). A mix of `phantom` and data fields is a compile error.
 
 In the generated `.d.ts`, each step of a path is `TAtscriptField<T, "a">` from `@atscript/typescript/utils`: the field of every object branch of `T` that has it. A path through a union therefore has the TypeScript type of the union of its fields, and a step through an optional property does not fail on `undefined`.
 
@@ -154,6 +156,7 @@ Rules:
 - Interface-level annotations are not inherited.
 - Overriding a parent property in a child is not allowed. To **add** annotations to an inherited property without redeclaring it, use a mutating [`annotate`](/packages/typescript/ad-hoc-annotations) block: `annotate Post { @meta.label 'Post id' id }` annotates `Post.id` only (`Post`'s own property on top of `BaseEntity.id`), and `annotate BaseEntity { id }` annotates the parent and every child.
 - Self-extends and circular extends are detected as errors.
+- An interface can't extend a union of two or more branches that are not `null` (a compile error: "An interface can't extend a union; use a merge (`U & { … }`)"). Use a merge instead: `type Post = Content & { title: string }`. Extending an alias of `User | null` (every branch but one is `null`) is extending `User`.
 
 ### Intersection Types
 

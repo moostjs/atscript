@@ -1,5 +1,13 @@
-import type { AtscriptDoc } from './document'
-import { isArray, isGroup, isInterface, isPrimitive, isRef, isStructure } from './parser/nodes'
+import type { AtscriptDoc, TUnwound } from './document'
+import { unwoundFields } from './document'
+import {
+  isArray,
+  isGroup,
+  isInterface,
+  isPhantomPrimitive,
+  isRef,
+  isStructure,
+} from './parser/nodes'
 import type { SemanticInterfaceNode } from './parser/nodes/interface-node'
 import type { SemanticPropNode } from './parser/nodes/prop-node'
 import type { SemanticNode } from './parser/nodes/semantic-node'
@@ -28,28 +36,22 @@ export function isDbEntityNode(node: SemanticNode): boolean {
   return !!node.annotations?.some(a => DB_ENTITY_ANNOTATIONS.some(name => name === a.name))
 }
 
-/** `def` is the `phantom` primitive (resolved). */
-function phantom(def?: SemanticNode): boolean {
-  return isPrimitive(def) && def.config.type === 'phantom'
+/**
+ * Whether a type path's resolution (`AtscriptDoc.unwindType`) is phantom: every field it names
+ * is the `phantom` primitive (through a union, several fields: all of them; a mix is a compile
+ * error).
+ */
+export function isPhantomPath(unwound?: TUnwound): boolean {
+  const fields = unwoundFields(unwound)
+  return fields.length > 0 && fields.every(f => isPhantomPrimitive(f.def))
 }
 
 /**
- * Whether `def` (a prop's type) is phantom: the `phantom` primitive, or a reference to it. A
- * type path naming several fields through a union is phantom when every field is (a mix is a
- * compile error).
+ * Whether `def` (a prop's type) is phantom: the `phantom` primitive, or a reference to it (a
+ * type path: see {@link isPhantomPath}).
  */
 export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
-  if (!def) {
-    return false
-  }
-  if (phantom(def)) {
-    return true
-  }
-  if (isRef(def)) {
-    const unwound = doc.unwindRef(def)
-    return unwound?.fields ? unwound.fields.every(f => phantom(f.def)) : phantom(unwound?.def)
-  }
-  return false
+  return isPhantomPrimitive(def) || (isRef(def) && isPhantomPath(doc.unwindRef(def)))
 }
 
 /** A definition written at a path of a type (see {@link flatDefinitions}). */

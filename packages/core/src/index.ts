@@ -23,6 +23,7 @@ export {
   getDeclaredValue,
   resolveQueryFieldRef,
   resolveFieldRefAt,
+  resolveFieldRefsAt,
   getQueryCompletionScope,
   getFieldPathCompletionScope,
   getFieldsForType,

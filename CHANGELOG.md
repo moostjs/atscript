@@ -7,6 +7,8 @@
 * **core:** a type path through a union (`v?: M.work.h` with `type M = Job | null`, or `work?: Job | null`) now resolves through the branches that have each property; a typo'd member there (`M.work.hh`) is a compile error (`Unknown member`) where it was silently accepted, and a path mixing `phantom` and data fields across branches is a compile error
 * **core (plugin API):** `doc.unwindType(name, chain)` / `doc.unwindRef(ref)` on a type path through a union return the field (`node` = its prop) instead of the union; a path reaching several fields returns `fields` (each `{ def, doc, node }`) with `def` a `|` group of their types and no `node`
 * **typescript:** `.d.ts` files write each step of a type path as `TAtscriptField<T, "k">` (new type-only export of `@atscript/typescript/utils`) instead of `T["k"]`
+* **core:** an interface extending a union of two or more non-`null` branches (`interface Post extends Content` with `type Content = Article | Video`) is a compile error ("An interface can't extend a union; use a merge"); it used to build a class without the parent's props. Write a merge instead: `type Post = Content & { … }`. Extending an alias of `X | null` still works as extending `X`
+* **core (plugin API):** `resolveFieldRefAt(token, doc)` returns `undefined` for a field path naming several fields through a union; the new `resolveFieldRefsAt(token, doc)` returns every field
 
 ## [0.1.110](https://github.com/moostjs/atscript/compare/v0.1.109...v0.1.110) (2026-10-19)
 

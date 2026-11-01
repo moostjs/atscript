@@ -8,13 +8,7 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type {
-  SemanticNode,
-  SemanticPropNode,
-  Token,
-  SemanticAnnotateNode,
-  TBacktickArgKind,
-} from '@atscript/core'
+import type { SemanticNode, Token, SemanticAnnotateNode, TBacktickArgKind } from '@atscript/core'
 import {
   AtscriptDoc,
   AtscriptRepo,
@@ -26,6 +20,7 @@ import {
   isAnnotationSpec,
   isInterface,
   isPhantomNode,
+  isPhantomPath,
   isPrimitive,
   isProp,
   isQueryFieldRef,
@@ -38,12 +33,13 @@ import {
   resolveConfigFile,
   getQueryScope,
   getDeclaredValue,
-  resolveFieldRefAt,
+  resolveFieldRefsAt,
   getQueryCompletionScope,
   getFieldPathCompletionScope,
   analyzeQueryCursorContext,
   isBacktickArgType,
   BACKTICK_ARG_VOCABULARY,
+  unwoundFields,
 } from '@atscript/core'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type {
@@ -79,11 +75,6 @@ const CHECKS_DELAY = 100
 
 const IGNORED_DIR_RE =
   /\/(?:node_modules|dist|build|out|cdk\.out|\.cdk\.staging|coverage|\.next|\.nuxt|\.turbo|\.cache)\//u
-
-/** `def` is the `phantom` primitive (resolved). */
-function isPhantom(def?: SemanticNode): boolean {
-  return isPrimitive(def) && def.config.type === 'phantom'
-}
 
 export class VscodeAtscriptRepo extends AtscriptRepo {
   private readonly changeQueue = [] as string[]
@@ -571,15 +562,17 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!token) {
         return
       }
-      // Field ref hover (query field refs, field-path string args)
-      const fieldRef = resolveFieldRefAt(token, atscript, position.character)
-      if (fieldRef) {
+      // Field ref hover (query field refs, field-path string args; through a union: each field)
+      const fieldRefs = resolveFieldRefsAt(token, atscript, position.character)
+      if (fieldRefs.length > 0) {
         return {
           contents: {
             kind: 'markdown',
-            value: fieldRef.prop.documentation || `Property of \`${fieldRef.typeName}\``,
+            value: fieldRefs
+              .map(f => f.prop.documentation || `Property of \`${f.typeName}\``)
+              .join('\n\n'),
           },
-          range: fieldRef.range,
+          range: fieldRefs[0].range,
         } as Hover
       }
       // Query type ref hover (`Customer` in `Customer.name`)
@@ -626,11 +619,11 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       if (!token.annotationRef && isRef(token.parentNode)) {
         const unwound = atscript.unwindRef(token.parentNode)
         const docs = [] as string[]
+        if (isPhantomPath(unwound)) {
+          docs.push('*(phantom — excluded from types, validation, and schema)*')
+        }
         // (a type path through a union naming several fields: each field's)
-        for (const { def, node } of unwound?.fields ?? (unwound ? [unwound] : [])) {
-          if (isPrimitive(def) && def.config.type === 'phantom') {
-            docs.push('*(phantom — excluded from types, validation, and schema)*')
-          }
+        for (const { def, node } of unwoundFields(unwound)) {
           if (isPrimitive(def) && def.config.isContainer) {
             docs.push('*(container — must use an extension)*')
           }
@@ -843,10 +836,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       } else if (isAnnotate(node)) {
         for (const entry of node.entries) {
           // (the entry's path: through a union, phantom when every field it names is)
-          const field = atscript.unwindType(node.targetName, entryParts(entry))
-          if (
-            !(field?.fields ? field.fields.every(f => isPhantom(f.def)) : isPhantom(field?.def))
-          ) {
+          if (!isPhantomPath(atscript.unwindType(node.targetName, entryParts(entry)))) {
             continue
           }
           const entryToken = entry.token('identifier')
@@ -1099,12 +1089,15 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     usages: Array<{ uri: string; range: Token['range'] }> | undefined
     definitions: Array<{ uri: string; range: Token['range'] }>
   } {
-    const fieldRef = resolveFieldRefAt(token, atscript, position.character)
-    const propToken = fieldRef?.prop.token('identifier')
-    if (fieldRef && propToken) {
+    // (a field ref through a union: every field it names)
+    const fields = resolveFieldRefsAt(token, atscript, position.character).flatMap(f => {
+      const propToken = f.prop.token('identifier')
+      return propToken ? [{ doc: f.doc, propToken }] : []
+    })
+    if (fields.length > 0) {
       return {
-        usages: fieldRef.doc.usageListFor(propToken),
-        definitions: [{ uri: fieldRef.doc.id, range: propToken.range }],
+        usages: fields.flatMap(f => f.doc.usageListFor(f.propToken) ?? []),
+        definitions: fields.map(f => ({ uri: f.doc.id, range: f.propToken.range })),
       }
     }
     const usages = atscript.usageListFor(token)
@@ -1406,15 +1399,6 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
   }
 
   // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  resolveAnnotateTarget(
-    atscript: AtscriptDoc,
-    targetName: string
-  ): (SemanticNode & { props: Map<string, SemanticPropNode> }) | undefined {
-    const targetDef = atscript.inlinedDefinition(atscript.unwindType(targetName))
-    return isStructure(targetDef) || isInterface(targetDef) ? targetDef : undefined
-  }
-
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
   propsToCompletionItems(
     props: SemanticNode[] | undefined,
     detail?: string
@@ -1427,17 +1411,6 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         ? ({ kind: 'markdown', value: t.documentation } as MarkupContent)
         : undefined,
     }))
-  }
-
-  // eslint-disable-next-line @typescript-eslint/class-methods-use-this
-  getPropsFromDef(def: SemanticNode): SemanticNode[] | undefined {
-    if (isInterface(def) || isStructure(def)) {
-      return Array.from(def.props.values())
-    }
-    if (isProp(def) && def.nestedProps) {
-      return Array.from(def.nestedProps.values())
-    }
-    return undefined
   }
 
   /**
