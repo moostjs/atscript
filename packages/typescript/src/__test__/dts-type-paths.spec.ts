@@ -201,4 +201,30 @@ export interface CH {
       .map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
     expect(messages).toEqual([])
   }, 60_000)
+
+  it('a merged field reached through several branches is one field (MODEL §15 POS-1b)', async () => {
+    const { text } = await dts(`
+interface A {
+  k: string
+}
+interface B {
+  k: string
+}
+interface C {
+  c: string
+}
+interface E {
+  e: string
+}
+export type DM = (C | E) & A & B
+export type D2 = (A & B) | (A & B)
+export interface CH {
+  a?: DM.k
+  b?: D2.k
+}
+`)
+    const line = (prop: string) => text.split('\n').find(l => l.startsWith(`  ${prop}?: `))
+    expect(line('a')).toBe('  a?: string /* k */')
+    expect(line('b')).toBe('  b?: string /* k */')
+  })
 })

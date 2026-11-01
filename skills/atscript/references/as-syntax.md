@@ -65,9 +65,9 @@ Both `interface` and `type` carry runtime metadata via their `.as.js` counterpar
 | # | Rule |
 |---|---|
 | P1 | No branch reaches the end → `Unknown member "…"` compile error (also when the path starts at `T \| null`). |
-| P2 | One branch → that field, exactly as without the union. Branches reaching the SAME declared prop with the same blocks on the way are one (`T \| T`, `Admin \| User` with `Admin extends User`, a field one merge operand declares in every branch; a block on the union itself applies on every branch). |
-| P3 | Several → the UNION of the fields, each keeping its own annotations; the referring prop gets no single field's annotations. A block on some branches only makes the same prop two fields (union; validates the same). |
-| P4 | Several fields are `phantom` only if all are (then the field is `phantom` at runtime too); a phantom/data mix is a compile error. |
+| P2 | One branch → that field, exactly as without the union. Branches reaching the SAME field (same declared prop, or a merged prop with the same contributors) with the same blocks AT OR BELOW it are one (`T \| T`, `Admin \| User` with `Admin extends User`, a field one merge operand declares in every branch, `k` of `(C \| E) & A & B` with `k` in A and B; a block on the union itself applies on every branch; a block only on an earlier step does not count). |
+| P3 | Several → the UNION of the fields, each keeping its own annotations; the referring prop gets no single field's annotations. A block at or below the field on some branches only makes the same prop two fields (union; validates the same). |
+| P4 | Several fields are `phantom` only if all are; then the field is ONE phantom prop at runtime, typed by the fields' common phantom primitive (all `ui.action` → `ui.action` + its tags) else plain `phantom`, with none of the fields' annotations; a phantom/data mix is a compile error. |
 | P5 | `.d.ts`: scalar field → its type; else each step is `TAtscriptField<T, "k">` (`@atscript/typescript/utils`): the union of the branches' fields, safe through optional props. |
 
 ## Unions / intersections

@@ -23,11 +23,14 @@ afterAll(() => {
 })
 
 /** Builds `source` (one module) and imports its generated module. */
-async function load(source: string): Promise<Record<string, any>> {
+async function load(
+  source: string,
+  config: Partial<Parameters<typeof build>[0]> = {}
+): Promise<Record<string, any>> {
   const dir = mkdtempSync(path.join(tmpdir(), 'atscript-type-paths-'))
   dirs.push(dir)
   writeFileSync(path.join(dir, 'm.as'), source)
-  const repo = await build({ rootDir: dir, entries: ['m.as'], plugins: [tsPlugin()] })
+  const repo = await build({ rootDir: dir, entries: ['m.as'], plugins: [tsPlugin()], ...config })
   const diagnostics = await repo.diagnostics()
   const errors = [...diagnostics.values()].flat().filter(m => m.severity === 1)
   expect(errors.map(m => m.message)).toEqual([])
@@ -231,5 +234,211 @@ export interface CH {
       expect(m.CH.validator().validate({ x: '1', [k]: 5 }, true)).toBe(false)
     }
     expect(Object.keys((buildJsonSchema(m.CH) as any).properties)).toEqual(['x'])
+  })
+})
+
+describe('generated type paths: POS-1a, POS-1b, POS-1c (MODEL §15)', () => {
+  it('POS-1a: a block on a step before the end field does not split it', async () => {
+    const m = await load(`${types}
+interface I9 {
+  work: I0
+}
+interface J2 {
+  work: I0
+}
+interface J9 {
+  work: I0
+}
+type U = I2 | I9
+type W = J2 | J9
+annotate I2 {
+  @meta.description 'blkI2'
+  work
+}
+annotate J2 {
+  @meta.description 'blkJ2'
+  work.h
+}
+export interface CH {
+  a?: U.work.h
+  b?: W.work
+}
+`)
+    const a = m.CH.type.props.get('a')
+    expect([a.type.kind, a.type.designType, label(a)]).toEqual(['', 'string', 'I0.h'])
+    expect(m.CH.type.props.get('b').type.kind).toBe('union')
+  })
+
+  it('POS-1b: a merged field reached through several branches is one field', async () => {
+    const m = await load(`
+interface A {
+  @meta.label 'A.k'
+  k: string
+}
+interface B {
+  @meta.description 'B.k'
+  k: string
+}
+interface C {
+  c: string
+}
+interface E {
+  e: string
+}
+type DM = (C | E) & A & B
+type D2 = (A & B) | (A & B)
+type X2 = C & A & B
+type Y2 = E & A & B
+type U2 = X2 | Y2
+annotate X2 {
+  @meta.label 'blkX2'
+  k
+}
+export interface CH {
+  a?: DM.k
+  b?: D2.k
+  c?: U2.k
+}
+`)
+    for (const k of ['a', 'b']) {
+      const v = m.CH.type.props.get(k)
+      expect([k, v.type.kind, v.type.designType, label(v), v.metadata.get('meta.description')]).toEqual(
+        [k, '', 'string', 'A.k', 'B.k']
+      )
+    }
+    // (a block on one of the merges: a union of the two fields)
+    expect(branches(m.CH.type.props.get('c'))).toEqual([
+      ['string', 'blkX2'],
+      ['string', 'A.k'],
+    ])
+  })
+
+  it('POS-1c: several phantom fields: their common phantom primitive, no field annotations', async () => {
+    const m = await load(
+      `
+interface P0 {
+  @meta.label 'P0.p'
+  p: ui.action
+  q: ui.action
+}
+interface P5 {
+  @meta.label 'P5.p'
+  p: ui.action
+  q: ui.paragraph
+}
+interface P2 {
+  work: P0
+}
+interface P3 {
+  work: P5
+}
+type U = P2 | P3
+export interface CH {
+  x: string
+  a?: U.work.p
+  b?: U.work.q
+}
+`,
+      {
+        primitives: {
+          ui: {
+            type: 'phantom',
+            isContainer: true,
+            extensions: { paragraph: {}, action: {} },
+          },
+        },
+      }
+    )
+    const [a, b] = ['a', 'b'].map(k => m.CH.type.props.get(k))
+    expect([isPhantomType(a), a.type.designType, [...a.type.tags], label(a)]).toEqual([
+      true,
+      'phantom',
+      ['action', 'ui'],
+      undefined,
+    ])
+    // (different phantom primitives: plain `phantom`)
+    expect([isPhantomType(b), [...b.type.tags]]).toEqual([true, ['phantom']])
+  })
+})
+
+describe('generated distributed merged fields: the branch items layer over each contributor at the branch', () => {
+  // (contributors whose type is the merge itself: their nodes at that branch — seeds 10116,
+  // 10161, 9916; it had no layers)
+  it('a contributor typed by the field merge itself (a named merge, extends)', async () => {
+    const m = await load(`
+export type P0 = I2
+export type CQ2 = I3.next.next.next & I3
+annotate P1 {
+  @meta.label 'L34'
+  next.home
+}
+export type P1 = I3
+export interface I0 {
+  k?: 'b'
+}
+@meta.label 'L2'
+export interface I1 {
+  work: I0
+}
+export interface I2 {
+  c?: string
+}
+export interface I3 {
+  home: (I1 | P0) & I0
+  next?: I0 & I3
+}
+@meta.description 'D0'
+export interface J1 {
+  next?: (J1 | J0) & J2
+}
+export interface J0 {
+  home: {
+    t?: [string, number]
+  }
+}
+export interface J2 {
+  list: J0[]
+}
+annotate M0 {
+  @meta.label 'L49'
+  next
+}
+export type M0 = J1 & {
+  b: string
+}
+export interface C0 extends M0, J1 {
+}
+`)
+    const home = m.CQ2.type.props.get('home')
+    expect(home.type.items.map((i: any) => label(i))).toEqual(['L2', undefined])
+    const next = m.C0.type.props.get('next')
+    expect(next.type.items.map((i: any) => i.metadata.get('meta.description'))).toEqual([
+      'D0',
+      undefined,
+    ])
+  })
+
+  it('a block on an extends child: no merged recursion, a raw write shows through the branches', async () => {
+    const m = await load(`
+export type P0 = (I3)
+export interface I1 {
+  next?: (I0 | P0) & I1
+}
+export interface I3 extends I1 {
+}
+annotate P0 {
+  @meta.label 'L39'
+  next
+}
+export interface I0 {
+  list?: {
+    b: string
+  }[]
+}
+`)
+    m.I1.metadata.set('meta.label', 'E0')
+    const next = m.I1.type.props.get('next')
+    const inner = next.type.items[1].type.props.get('next')
+    expect(inner.type.items.map((i: any) => i.metadata.get('meta.label'))).toEqual(['E0', 'E0'])
   })
 })

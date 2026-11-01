@@ -455,6 +455,99 @@ annotate J2 {
     const block = m.blocks.find(b => b.target.name === 'CH')
     expect(block?.entries[0].paths.map(p => p.join('.'))).toEqual(['a.|0.x', 'a.|1.x'])
   })
+
+  it('POS-1a: only blocks at or below the end field count, not one on a step before it', () => {
+    const doc = createDoc(`${types}
+interface I9 {
+  work: I0
+}
+interface J2 {
+  work: I0
+}
+interface J9 {
+  work: I0
+}
+type U = I2 | I9
+type W = J2 | J9
+annotate I2 {
+  @meta.description 'blkI2'
+  work
+}
+annotate J2 {
+  @meta.description 'blkJ2'
+  work.h
+}
+interface CH {
+  a?: U.work.h
+  b?: W.work
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'U.work.h')).toEqual({ core: ['I0.h'], model: ['|0.work.h'] })
+    expect(fieldsOf(doc, 'W.work')).toEqual({
+      core: ['J2.work', 'J9.work'],
+      model: ['|0.work', '|1.work'],
+    })
+  })
+
+  it('POS-1b: a merged field is identified by its contributors (and their blocks)', () => {
+    const doc = createDoc(`${types}
+interface A {
+  @meta.label 'A.k'
+  k: string
+}
+interface B {
+  @meta.description 'B.k'
+  k: string
+}
+interface C {
+  c: string
+}
+interface E {
+  e: string
+}
+type DM = (C | E) & A & B
+type D2 = (A & B) | (A & B)
+type X = C & A & B
+type Y = E & A & B
+type X2 = C & A & B
+type Y2 = E & A & B
+type U = X | Y
+type U2 = X2 | Y2
+annotate X2 {
+  @meta.description 'blkX2'
+  k
+}
+interface CH {
+  a?: DM.k
+  b?: D2.k
+  c?: U.k
+  d?: U2.k
+  e?: X.k
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'DM.k')).toEqual({ core: ['?.k'], model: ['|0.k'] })
+    expect(fieldsOf(doc, 'D2.k')).toEqual({ core: ['?.k'], model: ['|0.k'] })
+    expect(fieldsOf(doc, 'U.k')).toEqual({ core: ['?.k'], model: ['|0.k'] })
+    // (a block on one of them: two positions)
+    expect(fieldsOf(doc, 'U2.k')).toEqual({ core: ['?.k', '?.k'], model: ['|0.k', '|1.k'] })
+    // (one field: its annotations, as through the merge without the union)
+    const prop = (doc.nodes.find(n => n.id === 'CH') as any).getDefinition().props.get('a')
+    const anns = doc.evalAnnotationsForNode(prop, prop.annotations, true) ?? []
+    expect(anns.map(a => `${a.name}=${a.args[0]?.text}`).sort()).toEqual([
+      'meta.description=B.k',
+      'meta.label=A.k',
+    ])
+    // (go-to-definition: as for the field of the merge without the union)
+    const def = (text: string) => {
+      const line = doc.text.split('\n').findIndex(l => l.includes(text))
+      const ch = doc.text.split('\n')[line].indexOf(text) + text.length
+      return doc.getToDefinitionAt(line, ch)?.map(l => l.targetRange.start.line)
+    }
+    expect(def('DM.k')).toEqual(def('X.k'))
+    expect(def('DM.k')).toHaveLength(1)
+  })
 })
 
 /** The compile error of an interface extending union `name` (MODEL §15 EXT-U). */

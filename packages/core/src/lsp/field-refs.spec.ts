@@ -306,6 +306,45 @@ interface Report {
         expect(doc.getUsageListAt(def.line, def.character)?.map(u => u.range.start)).toEqual([arg])
       }
     })
+
+    it('a merged field reached through several branches is one field (MODEL §15 POS-1b)', () => {
+      const doc = createDoc(
+        `
+interface A {
+  k: string
+}
+interface B {
+  k: string
+}
+interface C {
+  c: string
+}
+interface E {
+  e: string
+}
+type DM = (C | E) & A & B
+interface Report {
+  @test.mfield 'k'
+  total: number
+}
+`,
+        {
+          test: {
+            mfield: new AnnotationSpec({
+              argument: {
+                name: 'field',
+                type: 'string',
+                fieldScope: () => ({ allowedTypes: [], unqualifiedTarget: 'DM' }),
+              },
+            }),
+          },
+        }
+      )
+      const arg = posOf(doc, `'k'`, 1)
+      const token = doc.tokensIndex.at(arg.line, arg.character)!
+      expect(resolveFieldRefsAt(token, doc)).toHaveLength(1)
+      expect(resolveFieldRefAt(token, doc)).toBeDefined()
+    })
   })
 
   describe('fieldScope on string arguments', () => {

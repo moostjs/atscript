@@ -269,6 +269,16 @@ interface TBranch {
   pick: Array<{ key: string; at: number[] }>
 }
 
+/** Slot `s` with its shells looked through (the node they shell). */
+function baseSlot(s: TStructSlot): TStructSlot {
+  let n = s
+  while (n.shell) {
+    n = n.shell
+  }
+  return n
+}
+const baseLoc = (s: TStructSlot) => baseSlot(s).loc
+
 /** A def with its shells looked through (the def they shell). */
 export function unshell(t: TStructDef): TStructDef {
   let d = t
@@ -659,8 +669,9 @@ export class StructureModel {
   /**
    * A chain ref through a union of objects: one chain per position the path reaches (see
    * {@link typePathPositions}); one: that field; none: the chain as written (core reports the
-   * unknown member). Several fields, every one phantom: the `phantom` type — a phantom field
-   * none of which is its target (MODEL §15 CHAIN-1 U4; a mix is a compile error).
+   * unknown member). Several fields, every one phantom: one phantom prop none of which is its
+   * target, typed by the fields' common phantom primitive (`ui.action`), else `phantom`
+   * (MODEL §15 CHAIN-1 U4, POS-1c; a mix is a compile error).
    */
   private chainThroughUnions(t: TStructExpr & { k: 'chain' }): TStructExpr {
     let paths = this.chainPaths.get(t.node)
@@ -677,26 +688,42 @@ export class StructureModel {
       return paths[0] === t.path ? t : { ...t, path: paths[0] }
     }
     const chains = paths.map(path => ({ ...t, path }))
-    const phantom = chains.every(c => this.phantomField(c))
-    const prim = phantom && t.decl.doc.getDeclarationOwnerNode('phantom')?.node
+    const prims = new Map<string, SemanticPrimitiveNode>()
+    const phantom = chains.every(c => this.phantomField(c, prims))
+    const prim =
+      phantom &&
+      (prims.size === 1
+        ? [...prims.values()][0]
+        : t.decl.doc.getDeclarationOwnerNode('phantom')?.node)
     return prim
       ? { k: 'scalar', node: prim, doc: t.decl.doc }
       : { k: 'uni', node: t.node, items: chains }
   }
 
-  /** Whether the field chain `c` names is phantom: every type written there is the `phantom` primitive (through aliases, chains). */
-  private phantomField(c: TStructExpr & { k: 'chain' }, seen = new Set<TStructExpr>()): boolean {
+  /**
+   * Whether the field chain `c` names is phantom: every type written there is a phantom
+   * primitive (through aliases, chains), each added to `prims` by its key.
+   */
+  private phantomField(
+    c: TStructExpr & { k: 'chain' },
+    prims: Map<string, SemanticPrimitiveNode>,
+    seen = new Set<TStructExpr>()
+  ): boolean {
     seen.add(c)
     const ends = this.slotAt(c.decl, c.path)?.ends ?? []
     return (
       ends.length > 0 &&
       ends.every(e => {
         const u = this.pastAliases(e)
-        return u.k === 'chain'
-          ? !seen.has(u) && this.phantomField(u, seen)
-          : u.k === 'scalar' &&
-              isPrimitive(u.node) &&
-              (u.node as SemanticPrimitiveNode).config.type === 'phantom'
+        if (u.k === 'chain') {
+          return !seen.has(u) && this.phantomField(u, prims, seen)
+        }
+        const prim = u.k === 'scalar' && isPrimitive(u.node) ? u.node : undefined
+        if (prim?.config.type !== 'phantom') {
+          return false
+        }
+        prims.set(prim.key, prims.get(prim.key) ?? prim)
+        return true
       })
     )
   }
@@ -757,30 +784,51 @@ export class StructureModel {
   }
 
   /**
-   * The identity of position (d, path) of a type path (MODEL §15 POS-1): the declared field its
-   * node is — shells looked through — and the blocks on the way: per shell (and the field itself),
-   * the entries its unit's layers have at or below it, relative to it. Equal keys: one position.
-   * `blocks` false: the field only.
+   * The identity of position (d, path) of a type path (MODEL §15 POS-1, POS-1a, POS-1b): the
+   * field its node is — shells looked through: a declared field, or a merged field's
+   * contributors (each counted once, in order) — and the blocks at or below it: per shell (and
+   * the field itself), the entries its unit's layers have at or below it, relative to it. Equal
+   * keys: one position. `blocks` false: the field only.
    */
   positionKey(d: TStructDecl, path: string[], blocks = true): string {
-    let s = this.slotAt(d, path)
+    const s = this.slotAt(d, path)
+    return s ? this.slotKey(s, blocks) : ''
+  }
+
+  /** {@link positionKey} of slot `s`. */
+  private slotKey(s: TStructSlot, blocks: boolean): string {
     const parts: string[] = []
-    while (s) {
-      if (blocks && s.owner) {
-        parts.push(this.entriesBelow(s.owner.unit, s.owner.path))
+    for (let c: TStructSlot | undefined = s; c; c = c.shell) {
+      if (blocks && c.owner) {
+        parts.push(this.entriesBelow(c.owner.unit, c.owner.path))
       }
-      if (!s.shell) {
-        parts.push(s.loc)
-        break
+      if (!c.shell) {
+        parts.push(
+          c.contributors
+            ? `(${[...new Set(c.contributors.map(x => this.slotKey(x, blocks)))].join('+')})`
+            : c.loc
+        )
       }
-      s = s.shell
     }
     return parts.join('>')
   }
 
-  /** The declared prop of the field at position (d, path) (shells looked through); none for a merged field. */
-  declaredProp(d: TStructDecl, path: string[]): SemanticPropNode | undefined {
-    return this.slotAt(d, path)?.prop
+  /**
+   * The declared props the field at position (d, path) is (shells looked through): a declared
+   * field its prop, a merged field its contributors' (each once, in order; MODEL §15 POS-1b).
+   */
+  declaredProps(d: TStructDecl, path: string[]): SemanticPropNode[] {
+    const s = this.slotAt(d, path)
+    return s ? [...new Set(this.slotProps(s))] : []
+  }
+
+  private slotProps(s: TStructSlot): SemanticPropNode[] {
+    const base = baseSlot(s)
+    return base.contributors
+      ? base.contributors.flatMap(c => this.slotProps(c))
+      : base.prop
+        ? [base.prop]
+        : []
   }
 
   private entryIds?: Map<TStructEntry, number>
@@ -1804,9 +1852,13 @@ export class StructureModel {
   /**
    * The item path, in union def `op` (a contributor's), of the member branch `i`
    * of distributed merge `def` takes from it (a branch item of a merged field layers over the
-   * contributors' nodes at that branch); undefined when `op` is not one of its union operands.
+   * contributors' nodes at that branch; `op` the merge itself — every contributor has that type
+   * —: its branch `i`); undefined when `op` is not one of its union operands.
    */
   branchItem(def: TStructDef, i: number, op: TStructDef | undefined): number[] | undefined {
+    if (op && structKey(op) === structKey(def)) {
+      return [i]
+    }
     return op?.uni ? def.bpick?.(i).find(p => p.key === structKey(op))?.at : undefined
   }
 
@@ -2767,10 +2819,11 @@ export class StructureModel {
         }
       } else {
         // (only the fields the merge writes out itself — several contributors; a
-        // single-contributor field is a reference to existing structure)
+        // single-contributor field is a reference to existing structure. A shell is the node it
+        // shells: a metadata-only block never makes a field merged here — MODEL §14 N3)
         for (const k of t.names?.() ?? []) {
           const r = t.slot(k)
-          if (r?.def && r.loc.startsWith('m:')) {
+          if (r?.def && r.loc.startsWith('m:') && new Set(r.contributors?.map(baseLoc)).size > 1) {
             out.push(r.def)
           }
         }
@@ -3027,11 +3080,8 @@ export class StructureModel {
           // (its own node, or a field a merge writes out; a reference to another
           // declaration's node is that declaration's: it reports its own)
           // (a shell is the node it shells)
-          let n = s
-          while (n.shell) {
-            n = n.shell
-          }
-          const own = n.loc.startsWith(`${d.id}:`) || n.loc.startsWith('m:')
+          const n = baseLoc(s)
+          const own = n.startsWith(`${d.id}:`) || n.startsWith('m:')
           // (a merge happens here: several contributors, or a type written here merging — a
           // reference / chain is the node it names, which reports itself)
           const here =

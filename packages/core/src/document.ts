@@ -290,6 +290,9 @@ function deepChangedAt(doc: AtscriptDoc): number {
 /** `X | null` of the definitions of optional props (see `AtscriptDoc.orNullFor`). */
 const nullableDefs = new WeakMap<SemanticNode, SemanticGroup>()
 
+/** A merged field's contributors (see `AtscriptDoc.propUnion`, `fieldContributors`). */
+const mergedFrom = new WeakMap<SemanticNode, SemanticNode[]>()
+
 /** `node` is a union (`A | B`). */
 function isUnion(node?: SemanticNode): node is SemanticGroup {
   return isGroup(node) && node.op === '|'
@@ -1288,9 +1291,10 @@ export class AtscriptDoc {
   }
 
   /**
-   * `fields` (a type path's through a union, one per prop) with each repeated once per position
-   * the structure model has for it: one declared field reached with different blocks on the way
-   * is that many positions (MODEL §15 POS-1; the blocks of the build of the path's head).
+   * `fields` (a type path's through a union, one per field: see {@link sameField}) with each
+   * repeated once per position the structure model has for it: one field reached with different
+   * blocks at or below it is that many positions (MODEL §15 POS-1, POS-1a; the blocks of the
+   * build of the path's head).
    */
   private positionsByBlocks(
     decl: { node?: SemanticNode; doc: AtscriptDoc },
@@ -1308,14 +1312,18 @@ export class AtscriptDoc {
     if (!d || !paths || paths.length <= fields.length) {
       return fields
     }
-    const count = new Map<SemanticNode, number>()
+    // (a field's identity: the declared props it stands for)
+    const ids = new Map<SemanticNode, number>()
+    const key = (props: SemanticNode[]) =>
+      props.map(n => ids.get(n) ?? (ids.set(n, ids.size), ids.size - 1)).join(',')
+    const count = new Map<string, number>()
     for (const p of paths) {
-      const prop = m.declaredProp(d, p)
-      if (prop) {
-        count.set(prop, (count.get(prop) ?? 0) + 1)
-      }
+      const k = key(m.declaredProps(d, p))
+      count.set(k, (count.get(k) ?? 0) + 1)
     }
-    return fields.flatMap(f => Array<TUnwoundField>((f.node && count.get(f.node)) || 1).fill(f))
+    return fields.flatMap(f =>
+      Array<TUnwoundField>((f.node && count.get(key(fieldContributors(f.node)))) || 1).fill(f)
+    )
   }
 
   /**
@@ -1409,7 +1417,7 @@ export class AtscriptDoc {
           const next: TPathPosition[] = []
           for (const o of walk.objects(positions)) {
             const prop = o.def.props.get(name)
-            if (prop && !next.some(n => n.def === prop)) {
+            if (prop && !next.some(n => n.def && sameField(n.def, prop))) {
               next.push({ def: prop, doc: o.doc })
             }
           }
@@ -3474,6 +3482,7 @@ export class AtscriptDoc {
       prop.annotations = this.mergeNodesAnnotations(l.annotations, r.annotations)
       keepOptional(prop, l, r)
       declaringDocs.set(prop, declaringDocs.get(l) ?? leftDoc)
+      mergedFrom.set(prop, [...new Set([...fieldContributors(l), ...fieldContributors(r)])])
       props.push(prop)
     }
     const merged = new SemanticStructureNode()
@@ -3712,6 +3721,24 @@ function withItems(group: SemanticGroup, items: SemanticNode[]): SemanticGroup {
 
 /** The document of each top-level node (a declaration, an `annotate` block). */
 const declaringDocs = new WeakMap<SemanticNode, AtscriptDoc>()
+
+/**
+ * The props field `prop` stands for: a merged field its contributors (each once, in order), else
+ * itself. Equal lists: one field (MODEL §15 POS-1b).
+ */
+function fieldContributors(prop: SemanticNode): SemanticNode[] {
+  return mergedFrom.get(prop) ?? [prop]
+}
+
+/** Whether props `a` and `b` are one field: the same node, or merged fields of the same contributors. */
+function sameField(a: SemanticNode, b: SemanticNode): boolean {
+  if (a === b) {
+    return true
+  }
+  const ca = mergedFrom.get(a)
+  const cb = mergedFrom.get(b)
+  return !!ca && !!cb && ca.length === cb.length && ca.every((c, i) => c === cb[i])
+}
 
 /** A declaration other types are built from: an interface, a type, an `annotate … as` alias. */
 function isDeclarationNode(node: SemanticNode): boolean {

@@ -314,6 +314,27 @@ export interface I1 {
     expect(m.structureErrors().map(e => e.message)).toEqual([UNION_IN_RECURSIVE_MERGE])
   })
 
+  it('a block never makes a recursive merge an error: a shell is the node it shells (§14 N3)', async () => {
+    // (`next` of `I3 & I1` is one contributor — the node I3 inherits —, the block's shell of it
+    // included: no merged field, no recursion through the union operand; seed 9916)
+    const source = `export type P0 = (I3)
+export interface I1 {
+  next?: (I0 | P0) & I1
+}
+export interface I3 extends I1 {
+}
+export interface I0 {
+  list?: {
+    b: string
+  }[]
+}
+`
+    for (const block of ['', "annotate P0 {\n  @meta.label 'L39'\n  next\n}\n"]) {
+      const { m } = await model({ 'a.as': source + block })
+      expect(m.structureErrors().map(e => e.message)).toEqual([])
+    }
+  })
+
   it('not a union in an ordinary merge nested inside a recursive merge, nor at its top', async () => {
     const { m } = await model({
       'a.as': `export interface A {

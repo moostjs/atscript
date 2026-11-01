@@ -203,7 +203,7 @@ A chain is a [type path](/packages/typescript/interfaces-types#reference-a-field
 | one                      | `{ def, doc, node }`: the field, also when the chain crossed a union (`type M = User \| null`, `M.address`)                            |
 | two or more              | `{ def, doc, fields }`: `fields` lists each field as `{ def, doc, node }`; `def` is a `\|` group of their types; `node` is `undefined` |
 
-Check `fields` before reading `node`: with several fields there is no single field to report. Branches reaching the same declared property with the same blocks on the way are one field; when a block applies on some of them only, that property appears in `fields` once per distinct set of blocks.
+Check `fields` before reading `node`: with several fields there is no single field to report. Branches reaching the same field (the same declared property, or a merged property with the same contributors) with the same blocks at or below it are one field. A block only on a step before the field does not count. When a block at or below the field applies on some branches only, that field appears in `fields` once per distinct set of blocks.
 
 ### `doc.evalAnnotationsForNode(node)`
 
