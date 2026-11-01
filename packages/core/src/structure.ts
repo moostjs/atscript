@@ -444,6 +444,20 @@ function webCycle(comp: string[], merges: string[], succ: (k: string) => string[
 }
 
 /** One structure model per set of documents (a build). */
+/**
+ * The written types of a merged field's contributors as one merge reads them: one written type
+ * reached through several operands (`I4 & (I4 | null)`, `I4 & I5` with `I5 extends I4`) counts
+ * once, at its last place (MODEL §15 DEDUP-1).
+ */
+function distinctEnds(ends: TStructExpr[]): TStructExpr[] {
+  return ends.filter((e, i) => !ends.includes(e, i + 1))
+}
+
+/** Whether a type path's step `s` at `def` fans out into its branches: a union (or a distributed merge without `s`). */
+function fansOut(def: TStructDef, s: string): boolean {
+  return !!def.branch && def.size !== undefined && (!!def.uni || def.slot(s) === undefined)
+}
+
 export class StructureModel {
   readonly docs: AtscriptDoc[]
   private readonly docIndex = new Map<AtscriptDoc, number>()
@@ -613,8 +627,8 @@ export class StructureModel {
 
   /**
    * A chain ref through a union of objects: a union of the fields, one chain per
-   * branch that has the prop (`|i` steps); one such branch: that field; none: the chain as
-   * written (core reports the unknown member).
+   * branch that has the path (`|i` steps; a branch that dead-ends deeper is skipped); one such
+   * branch: that field; none: the chain as written (core reports the unknown member).
    */
   private chainThroughUnions(t: TStructExpr & { k: 'chain' }): TStructExpr {
     let paths: string[][] = [[]]
@@ -623,14 +637,11 @@ export class StructureModel {
       const next: string[][] = []
       for (const p of paths) {
         const def = this.defAt(t.decl, p)
-        if (def?.branch && def.size !== undefined && (def.uni || def.slot(s) === undefined)) {
-          for (let i = 0; i < def.size; i++) {
-            if (def.branch(i)?.slot(s)) {
-              next.push([...p, `|${i}`, s])
-              crossed = true
-            }
-          }
-        } else {
+        if (def && fansOut(def, s)) {
+          const branches = this.branchPaths(def, p, s, new Set())
+          next.push(...branches)
+          crossed ||= branches.length > 0
+        } else if (!crossed || def?.slot(s)) {
           next.push([...p, s])
         }
       }
@@ -641,6 +652,21 @@ export class StructureModel {
     }
     const chains = paths.map(path => ({ ...t, path }))
     return chains.length === 1 ? chains[0] : { k: 'uni', node: t.node, items: chains }
+  }
+
+  /** The paths into the branches of union `def` (at `p`) that have prop `s`, nested unions flattened. */
+  private branchPaths(def: TStructDef, p: string[], s: string, seen: Set<string>): string[][] {
+    seen.add(def.key)
+    const out: string[][] = []
+    for (let i = 0; i < (def.size ?? 0); i++) {
+      const b = def.branch?.(i)
+      if (b?.slot(s)) {
+        out.push([...p, `|${i}`, s])
+      } else if (b && fansOut(b, s) && !seen.has(b.key)) {
+        out.push(...this.branchPaths(b, [...p, `|${i}`], s, seen))
+      }
+    }
+    return out
   }
 
   private exprOf0(doc: AtscriptDoc, node: SemanticNode): TStructExpr {
@@ -2317,7 +2343,8 @@ export class StructureModel {
    * The unmergeable shapes at a merged position: a written union of
    * objects, an array of unions / of arrays, a tuple of objects.
    */
-  private neverShape(ends: TStructExpr[], cs?: TStructSlot[]): string | undefined {
+  private neverShape(written: TStructExpr[], cs?: TStructSlot[]): string | undefined {
+    const ends = distinctEnds(written)
     if (ends.length < 2) {
       return undefined
     }

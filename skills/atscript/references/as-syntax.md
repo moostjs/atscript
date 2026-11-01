@@ -60,6 +60,16 @@ export type Response = { ok: true } | { ok: false; reason: string }
 
 Both `interface` and `type` carry runtime metadata via their `.as.js` counterpart.
 
+**Type paths** (`ownerId: User.id`, `city?: Account.address.city`) name another type's field (its type + annotations). Through unions (written, aliased, on a prop, a distributed merge) each step keeps the branches that have the prop; `null` / non-object branches have none; a branch dead-ending deeper is skipped:
+
+| # | Rule |
+|---|---|
+| P1 | No branch reaches the end → `Unknown member "…"` compile error (also when the path starts at `T \| null`). |
+| P2 | One branch → that field, exactly as without the union. |
+| P3 | Several → the UNION of the fields, each keeping its own annotations; the referring prop gets no single field's annotations. |
+| P4 | Several fields are `phantom` only if all are; a phantom/data mix is a compile error. |
+| P5 | `.d.ts`: scalar field → its type; else each step is `TAtscriptField<T, "k">` (`@atscript/typescript/utils`): the union of the branches' fields, safe through optional props. |
+
 ## Unions / intersections
 
 ```atscript

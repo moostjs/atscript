@@ -305,9 +305,9 @@ export const expectAnnotations: TAnnotationsTree = {
         let def: SemanticNode | undefined = definition
         let defDoc = doc
         if (isRef(definition)) {
-          const resolved = doc.refFieldType(definition)
-          def = resolved?.def
-          defDoc = resolved?.doc || doc
+          const unwound = doc.unwindRef(definition)
+          def = unwound?.def
+          defDoc = unwound?.doc || doc
         }
         // A nullable array (`T[] | null`) is accepted like `T[]`.
         const members = nonNullishMembers(def, defDoc)
@@ -371,7 +371,7 @@ export const expectAnnotations: TAnnotationsTree = {
         }
         let wrongType = false
         if (isRef(definition)) {
-          const def = doc.refFieldType(definition)?.def
+          const def = doc.unwindRef(definition)?.def
           if (isPrimitive(def) && !['string', 'number'].includes(def.config.type as string)) {
             wrongType = true
           }

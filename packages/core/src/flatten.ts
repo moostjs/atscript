@@ -28,16 +28,26 @@ export function isDbEntityNode(node: SemanticNode): boolean {
   return !!node.annotations?.some(a => DB_ENTITY_ANNOTATIONS.some(name => name === a.name))
 }
 
+/** `def` is the `phantom` primitive (resolved). */
+function phantom(def?: SemanticNode): boolean {
+  return isPrimitive(def) && def.config.type === 'phantom'
+}
+
+/**
+ * Whether `def` (a prop's type) is phantom: the `phantom` primitive, or a reference to it. A
+ * type path naming several fields through a union is phantom when every field is (a mix is a
+ * compile error).
+ */
 export function isPhantomNode(doc: AtscriptDoc, def?: SemanticNode): boolean {
   if (!def) {
     return false
   }
-  if (isPrimitive(def) && def.config.type === 'phantom') {
+  if (phantom(def)) {
     return true
   }
   if (isRef(def)) {
     const unwound = doc.unwindRef(def)
-    return !!(unwound?.def && isPrimitive(unwound.def) && unwound.def.config.type === 'phantom')
+    return unwound?.fields ? unwound.fields.every(f => phantom(f.def)) : phantom(unwound?.def)
   }
   return false
 }

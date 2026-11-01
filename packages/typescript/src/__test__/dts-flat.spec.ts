@@ -135,6 +135,25 @@ describe('.d.ts __flat / __ownProps', () => {
     ])
   })
 
+  it('a type path through a union types the paths below its field (MODEL §15 CHAIN-1)', async () => {
+    const text = await dts(`
+      interface I0 { h: string; n: number }
+      interface I2 { work: I0 }
+      type M0 = I2 | null
+      @db.table 'ch'
+      export interface CH {
+        id: string
+        v?: M0.work
+      }
+    `)
+    expect(block(text, 'CH')).toEqual([
+      'id: string',
+      'v?: never',
+      'v.h?: string | null',
+      'v.n?: number | null',
+    ])
+  })
+
   it('reads `extends` and merges, skips phantom and pattern props', async () => {
     const text = await dts(`
       export interface Base { id: string }

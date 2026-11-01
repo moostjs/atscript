@@ -57,7 +57,6 @@ import {
   StructureModel,
   UNION_IN_RECURSIVE_MERGE,
 } from './structure'
-import type { TStructSlot } from './structure'
 import { BlocksIndex } from './token-index/blocks-index'
 import { TokensIndex } from './token-index/tokens-index'
 import type { ITokensIndex } from './token-index/types'
@@ -349,6 +348,11 @@ function unparenthesized(node: SemanticNode): SemanticNode {
   return node
 }
 
+/** `node` is the `phantom` primitive (resolved). */
+function isPhantomPrimitive(node?: SemanticNode): boolean {
+  return isPrimitive(node) && node.config.type === 'phantom'
+}
+
 /** `node` is a primitive or a literal (resolved). */
 function isScalar(node?: SemanticNode): boolean {
   return isPrimitive(node) || isConst(node)
@@ -401,6 +405,30 @@ function extensionCovers(ext: SemanticPrimitiveNode, base: SemanticPrimitiveNode
       JSON.stringify(own[k as keyof typeof own]) ===
       JSON.stringify(inherited[k as keyof typeof inherited])
   )
+}
+
+/** A field a type path reaches (see `AtscriptDoc.unwindType`): its prop, its type, resolved. */
+export interface TUnwoundField {
+  /** The document `def` resolves in. */
+  doc: AtscriptDoc
+  /** The prop a path reaches (else the last node met before `def`). */
+  node?: SemanticNode
+  def: SemanticNode
+}
+
+/**
+ * What `AtscriptDoc.unwindType` resolves a type path to: one field (or a type), or — through a
+ * union, two or more fields — `fields`, with `def` the union of their types and no `node`.
+ */
+export interface TUnwound extends TUnwoundField {
+  fields?: TUnwoundField[]
+}
+
+/** A position of a type path being walked (see `AtscriptDoc.unwindType`). */
+interface TPathPosition {
+  def: SemanticNode | undefined
+  doc: AtscriptDoc
+  node?: SemanticNode
 }
 
 export interface TAtscriptDocConfig {
@@ -1117,29 +1145,25 @@ export class AtscriptDoc {
   }
 
   /**
-   * Recursively resolves a type reference (and any property chain) to find the final underlying definition.
+   * Resolves a type name and a type path (`T.a.b`) to the type it names.
    *
-   * This method performs a **multi-step** resolution:
-   *  1. Locates the declaration owner of the type (via `getDeclarationOwnerNode`).
-   *  2. Follows references, type aliases, or nested property chains:
-   *     - For “Ref” nodes, it uses the identifier to look up the next type.
-   *     - For “Type” nodes, it calls `getDefinition()` to move to the underlying structure.
-   *     - For property chains (`chain`), it navigates nested properties or nested types,
-   *       resolving each level until the final type is reached.
+   * The name resolves through references, aliases and `annotate … as` copies. Each step of the
+   * path keeps a set of positions (one rule for every reader, MODEL §15 CHAIN-1): a union —
+   * written, through an alias, or a distributed merge — fans out into its branches (nested
+   * unions flattened; branches that are not objects have no props), and the step keeps the
+   * positions that have the prop. Then:
+   *  - no position: `undefined` (an unknown member);
+   *  - one: that field — `node` is the prop, `def` its type, resolved;
+   *  - several: `fields` (each such a field) and `def`, the union of their types; no `node`.
    *
    * @param {string} name - The name of the type or identifier to resolve.
-   * @param {Array<string | Token>} [chain=[]] - An optional chain of properties or tokens, each of which
-   *  refines the path to the final type (e.g., for `SomeType.prop1.prop2`, `chain` might be `[ "prop1", "prop2" ]`).
-   * @returns {Object | undefined} An object containing:
-   *   - `doc`: The `AtscriptDoc` where the final definition is located.
-   *   - `node`: The last encountered `SemanticNode` before reaching the final underlying definition (often a `Prop` node).
-   *   - `def`: The final resolved `SemanticNode`.
+   * @param {Array<string | Token>} [chain=[]] - The path below it (`T.a.b`: `["a", "b"]`).
+   * @returns `doc` (where `def` resolves), `node` (the prop a path reaches; else the last node
+   *  met before `def`), `def`, and `fields` for several fields; `undefined` when nothing resolves.
    *
-   * If the type cannot be resolved or does not exist, returns `undefined`.
-   *
-   * `watchCb` gets each declaration and prop met on the way; `declaring` is true for those met
-   * on the way to a chain's field (its head, the props and types it goes through: what declares
-   * the field — not what the field is).
+   * `watchCb` gets each declaration and prop met on the way while the path has one position;
+   * `declaring` is true for those met on the way to a chain's field (its head, the props and
+   * types it goes through: what declares the field — not what the field is).
    */
   unwindType(
     name: string,
@@ -1147,13 +1171,7 @@ export class AtscriptDoc {
     watchCb?: (def: SemanticNode, declaring: boolean) => void,
     _tracked?: Set<SemanticNode>,
     _declaring = false
-  ):
-    | {
-        doc: AtscriptDoc
-        node?: SemanticNode
-        def: SemanticNode
-      }
-    | undefined {
+  ): TUnwound | undefined {
     const decl = this.getDeclarationOwnerNode(name)
     if (!decl) {
       return undefined
@@ -1179,137 +1197,217 @@ export class AtscriptDoc {
     }
   }
 
+  /**
+   * The props the next step of type path `name.chain` can name (completion): those of every
+   * object position the path reaches (see {@link unwindType}), the first position's first.
+   */
+  pathMembers(name: string, chain: string[] | Token[] = []): SemanticNode[] {
+    const decl = this.getDeclarationOwnerNode(name)
+    if (!decl) {
+      return []
+    }
+    const walk = this.pathWalk()
+    const out = new Map<string, SemanticNode>()
+    for (const o of walk.objects(walk.positions(decl, chain) ?? [])) {
+      for (const [key, prop] of o.def.props) {
+        if (!out.has(key)) {
+          out.set(key, prop)
+        }
+      }
+    }
+    return [...out.values()]
+  }
+
   private unwindDeclaration(
     decl: { node?: SemanticNode; doc: AtscriptDoc },
     chain: string[] | Token[],
     watchCb?: (def: SemanticNode, declaring: boolean) => void,
     _tracked?: Set<SemanticNode>,
     _declaring = false
-  ):
-    | {
-        doc: AtscriptDoc
-        node?: SemanticNode
-        def: SemanticNode
-      }
-    | undefined {
-    const tracked = _tracked || new Set()
-    // (on the way to a chain's field: what declares it, see `unwindType`)
-    let declaring = _declaring || chain.length > 0
-    const callCb = watchCb
-      ? () => {
-          if (
-            def &&
-            (declaring || !tracked.has(def)) &&
-            ['type', 'primitive', 'prop', 'interface'].includes(def.entity)
-          ) {
-            // tracking all the nodes while unwinding
-            // so we can gather annotations to merge
-            // (what declares a field is not tracked: the field's type may be met again)
-            if (!declaring) {
-              tracked.add(def)
-            }
-            watchCb(def, declaring)
-          }
-        }
-      : () => {}
-    let node: SemanticNode | undefined
-    let def: SemanticNode | undefined = decl.node
-    let doc = decl.doc
-    const resolveRef = () => {
-      if (isRef(def)) {
-        // (in the document it was written in: a prop an interface inherits from another document)
-        const d = doc
-          .refOrigin(def)
-          .unwindType(def.token('identifier')!.text, def.chain, watchCb, tracked, declaring)
-        doc = d?.doc || doc
-        def = d?.def
-      }
-    }
-    const resolveType = () => {
-      while (isType(def)) {
-        callCb() // collection type on our way
-        // (parentheses do not change a type: `type P = (Base)` is Base)
-        def = def.getDefinition()
-        def = def?.entity === 'group' && !(def as SemanticGroup).op ? unparenthesized(def) : def
-        node = def
-        resolveRef()
-      }
-    }
-    resolveType()
-    if (!def) {
+  ): TUnwound | undefined {
+    const walk = this.pathWalk(watchCb, _tracked, _declaring || chain.length > 0)
+    const positions = walk.positions(decl, chain)
+    if (!positions) {
       return undefined
     }
-    // A non-mutating annotate is an alias: the type it stands for is a copy of its target with
-    // its annotations (see `aliasDefinition`), wherever it is reused (`extends`, an intersection
-    // operand, a reference to one of its props).
-    if (isAnnotate(def)) {
-      const alias = def
-      node = alias
-      def = doc.aliasDefinition(alias)
-      if (!def) {
-        return undefined
+    // (the field reached: what it is from here on)
+    walk.declaring = _declaring
+    walk.cb = positions.length === 1 ? watchCb : undefined
+    const fields: TUnwoundField[] = []
+    for (const p of positions) {
+      if (_tracked) {
+        walk.report(p.def) // collecting one more item in chain
+      }
+      while (isProp(p.def)) {
+        p.node = p.def
+        p.def = p.def.getDefinition()
+        walk.resolveRef(p)
+        walk.resolveType(p)
+      }
+      if (p.def) {
+        fields.push({ def: p.def, doc: p.doc, node: p.node })
       }
     }
-    for (const item of chain) {
-      const itemText = typeof item === 'string' ? item : item.text
-      // const token = item instanceof Token ? item : undefined
-      if (!def) {
-        return undefined
-      }
-      // A type defined as an intersection (`type OX = O & { n?: string }`): its props are its
-      // merge's, like the props of a prop typed by one (below).
-      if (isIntersection(def)) {
-        const group = def
-        const groupDoc = doc
-        def = groupDoc.mergeIntersection(group)
-        resolveRef()
-        resolveType()
-        if (!def) {
+    if (fields.length < 2) {
+      return fields[0]
+    }
+    return {
+      def: new SemanticGroup(
+        fields.map(f => f.def),
+        '|'
+      ),
+      doc: this,
+      fields,
+    }
+  }
+
+  /**
+   * The walk of a type path (see {@link unwindType}): its positions, how a position resolves,
+   * and what it reports to `watchCb` (`cb`; `declaring`: on the way to a chain's field).
+   */
+  private pathWalk(
+    watchCb?: (def: SemanticNode, declaring: boolean) => void,
+    _tracked?: Set<SemanticNode>,
+    declaring = false
+  ) {
+    const tracked = _tracked || new Set()
+    const walk = {
+      cb: watchCb,
+      declaring,
+      report(def: SemanticNode | undefined) {
+        if (
+          walk.cb &&
+          def &&
+          (walk.declaring || !tracked.has(def)) &&
+          ['type', 'primitive', 'prop', 'interface'].includes(def.entity)
+        ) {
+          // tracking all the nodes while unwinding
+          // so we can gather annotations to merge
+          // (what declares a field is not tracked: the field's type may be met again)
+          if (!walk.declaring) {
+            tracked.add(def)
+          }
+          walk.cb(def, walk.declaring)
+        }
+      },
+      resolveRef(p: TPathPosition) {
+        if (isRef(p.def)) {
+          // (in the document it was written in: a prop an interface inherits from another document)
+          const d = p.doc
+            .refOrigin(p.def)
+            .unwindType(
+              p.def.token('identifier')!.text,
+              p.def.chain,
+              walk.cb,
+              tracked,
+              walk.declaring
+            )
+          p.doc = d?.doc || p.doc
+          p.def = d?.def
+        }
+      },
+      resolveType(p: TPathPosition) {
+        while (isType(p.def)) {
+          walk.report(p.def) // collection type on our way
+          // (parentheses do not change a type: `type P = (Base)` is Base)
+          let def = p.def.getDefinition()
+          def = def?.entity === 'group' && !(def as SemanticGroup).op ? unparenthesized(def) : def
+          p.def = def
+          p.node = def
+          walk.resolveRef(p)
+        }
+      },
+      /** The positions of declaration `decl` at path `chain`; `undefined`: none. */
+      positions: (
+        decl: { node?: SemanticNode; doc: AtscriptDoc },
+        chain: string[] | Token[]
+      ): TPathPosition[] | undefined => {
+        const head: TPathPosition = { def: decl.node, doc: decl.doc }
+        walk.resolveType(head)
+        if (!head.def) {
           return undefined
         }
-      }
-      if (isProp(def)) {
-        if (def.nestedProps?.get(itemText)) {
-          def = def.nestedProps.get(itemText)
-        } else {
-          // A prop typed by a reference, or by an intersection (its merge: `next?: Self & D`)
-          const inner: SemanticNode | undefined = def.getDefinition()
-          def = isIntersection(inner) ? inner : def.nestedType
-          resolveRef()
-          resolveType()
-          const reached = def
-          const reachedDoc = doc
-          def = reached && reachedDoc.mergeIntersection(reached)
-          // (an interface's props include those it inherits)
-          if (isInterface(def) && def.hasExtends) {
-            const resolved = doc.resolveInterfaceExtends(def)
-            def = isStructure(resolved) ? resolved : def
-          }
-          if (isStructure(def) || isInterface(def)) {
-            def = def.props.get(itemText)
+        // A non-mutating annotate is an alias: the type it stands for is a copy of its target
+        // with its annotations (see `aliasDefinition`), wherever it is reused (`extends`, an
+        // intersection operand, a reference to one of its props).
+        if (isAnnotate(head.def)) {
+          head.node = head.def
+          head.def = head.doc.aliasDefinition(head.def)
+          if (!head.def) {
+            return undefined
           }
         }
-      } else if (isInterface(def) && def.hasExtends) {
-        // (an interface's props include those it inherits)
-        const resolved = doc.resolveInterfaceExtends(def)
-        def = (isStructure(resolved) ? resolved : def).props.get(itemText)
-      } else if (isStructure(def) || isInterface(def) || isPrimitive(def)) {
-        def = def.props.get(itemText)
-      }
+        let positions = [head]
+        for (const item of chain) {
+          const name = typeof item === 'string' ? item : item.text
+          // (nodes met after the path fans out are no one field's: not reported)
+          walk.cb = positions.length === 1 ? watchCb : undefined
+          const next: TPathPosition[] = []
+          for (const o of walk.objects(positions)) {
+            const prop = o.def.props.get(name)
+            if (prop && !next.some(n => n.def === prop)) {
+              next.push({ def: prop, doc: o.doc })
+            }
+          }
+          if (next.length === 0) {
+            return undefined
+          }
+          positions = next
+        }
+        return positions
+      },
+      /**
+       * The objects `positions` stand for, whose props a next step names: a prop its type; a
+       * union its branches (flattened); a merge its merged type; an interface its props, with
+       * those it inherits. Nothing else has props, but a primitive named by the path itself — its
+       * head or an extension of it (`number.int.uint8`) —, not a prop's type or a union branch.
+       */
+      objects: (
+        positions: TPathPosition[]
+      ): Array<{
+        def: SemanticStructureNode | SemanticInterfaceNode | SemanticPrimitiveNode
+        doc: AtscriptDoc
+      }> => {
+        const out: Array<{
+          def: SemanticStructureNode | SemanticInterfaceNode | SemanticPrimitiveNode
+          doc: AtscriptDoc
+        }> = []
+        const seen = new Set<SemanticNode>()
+        const visit = (p: TPathPosition, top: boolean) => {
+          const def = p.def && unparenthesized(p.def)
+          if (!def || seen.has(def)) {
+            return
+          }
+          seen.add(def)
+          const inner = (d: SemanticNode | undefined) => {
+            const q: TPathPosition = { def: d, doc: p.doc }
+            walk.resolveRef(q)
+            walk.resolveType(q)
+            visit(q, false)
+          }
+          if (isProp(def)) {
+            inner(def.getDefinition())
+          } else if (isIntersection(def)) {
+            const merged = p.doc.mergeIntersection(def)
+            if (merged !== def) {
+              inner(merged)
+            }
+          } else if (isUnion(def)) {
+            def.unwrap().forEach(inner)
+          } else if (isInterface(def) && def.hasExtends) {
+            const resolved = p.doc.resolveInterfaceExtends(def)
+            out.push({ def: isStructure(resolved) ? resolved : def, doc: p.doc })
+          } else if (isStructure(def) || isInterface(def) || (top && isPrimitive(def))) {
+            out.push({ def, doc: p.doc })
+          }
+        }
+        for (const p of positions) {
+          visit(p, true)
+        }
+        return out
+      },
     }
-    // (the field reached: what it is from here on)
-    declaring = _declaring
-    if (_tracked) {
-      callCb() // collecting one more item in chain
-    }
-    while (isProp(def)) {
-      node = def
-      def = def.getDefinition()
-      resolveRef()
-      resolveType()
-    }
-
-    return def ? { def, doc, node } : undefined
+    return walk
   }
 
   getUsageListAt(line: number, character: number) {
@@ -1445,16 +1543,17 @@ export class AtscriptDoc {
 
   /**
    * The annotations the blocks of the build write at the field chain reference `ref` names
-   * (`T.a.b`: the structure model's layers of T at `a.b`), in block order, each
-   * applied over the earlier ones.
+   * (`T.a.b`: the structure model's layers of T at `a.b`, through a union at its `|i`
+   * path), in block order, each applied over the earlier ones. None for a chain naming several
+   * fields (no one field is its target).
    */
   private chainBlockAnnotations(ref: SemanticRefNode): TAnnotationTokens[] {
     const owner = this.resolveRefOwner(ref)
     const m = owner?.node && owner.doc.buildStructure()
-    const decl = m && m.declOfNode(owner.node!)
+    const t = m && m.exprOf(this.refOrigin(ref), ref)
     let out: TAnnotationTokens[] = []
-    if (m && decl) {
-      for (const l of m.orderedLayersAt(m.plainTarget(decl), entryParts(ref).slice(1))) {
+    if (m && t?.k === 'chain') {
+      for (const l of m.orderedLayersAt(m.plainTarget(t.decl), t.path)) {
         out = this.overlayAnnotations(out, l.entry.ref.annotations ?? [])
       }
     }
@@ -1565,20 +1664,7 @@ export class AtscriptDoc {
     if (typeof paths === 'string') {
       return null
     }
-    return this.slotType(m, m.slotAt(target, paths[0]), target.doc)
-  }
-
-  /**
-   * The type of structure-model node `slot`: the types written at it — one: that type; several
-   * (a merged field): the core algebra's merge of them —, resolved through a reference. `null`
-   * when nothing is written there. `doc`: the document of a type written in place whose node's
-   * unit the model does not name.
-   */
-  private slotType(
-    m: StructureModel,
-    slot: TStructSlot | undefined,
-    doc: AtscriptDoc
-  ): { def: SemanticNode; doc: AtscriptDoc } | null {
+    const slot = m.slotAt(target, paths[0])
     const ends = (slot?.ends ?? []).filter(e => e.node)
     if (ends.length === 0) {
       return null
@@ -1592,33 +1678,8 @@ export class AtscriptDoc {
     }
     // (a type written in place: in the document declaring the node holding it)
     const unit = slot?.owner?.unit
-    return { def, doc: (ends.length === 1 && unit && m.declById(unit)?.doc) || doc }
-  }
-
-  /**
-   * The type a reference written as a field's type resolves to, for the checks of what may apply
-   * to the field (a `defType` guard, an annotation's `validate` hook). A chain ref names a node of
-   * the structure model, as an annotate entry does: through a union, the union of the fields of
-   * the branches that have the prop (one such branch: that field). Otherwise, and when the model
-   * does not resolve the chain (an unknown member, reported elsewhere), {@link unwindRef}.
-   */
-  refFieldType(ref: SemanticRefNode): { def: SemanticNode; doc: AtscriptDoc } | undefined {
-    if (ref.hasChain) {
-      const m = this.structure()
-      const t = m.exprOf(this.refOrigin(ref), ref)
-      const types = (t.k === 'uni' ? t.items : [t]).map(c =>
-        c.k === 'chain' ? this.slotType(m, m.slotAt(c.decl, c.path), c.decl.doc) : null
-      )
-      if (types.length === 1 && types[0]) {
-        return types[0]
-      }
-      if (types.length > 1 && types.every(x => x !== null)) {
-        const fields = types.map(x => x.def)
-        return { def: new SemanticGroup(fields, '|'), doc: this }
-      }
-    }
-    const unwound = this.unwindRef(ref)
-    return unwound && { def: unwound.def, doc: unwound.doc }
+    const doc = (ends.length === 1 && unit && m.declById(unit)?.doc) || target.doc
+    return { def, doc }
   }
 
   /**
@@ -2027,6 +2088,19 @@ export class AtscriptDoc {
     ]
   }
 
+  /** Links to the field(s) a type path names: through a union, to each of its fields. */
+  private fieldLinks(token: Token, unwound: TUnwound | undefined) {
+    const links = (unwound?.fields ?? (unwound ? [unwound] : [])).flatMap(f =>
+      f.node
+        ? this.definitionLink(token, {
+            uri: this.declaringDoc(f.node, f.doc).id,
+            range: f.node.token('identifier')?.range,
+          })!
+        : []
+    )
+    return links.length > 0 ? links : undefined
+  }
+
   private toRangeTarget(def?: { uri: string; token?: Token }) {
     return def && { uri: def.uri, range: def.token?.range }
   }
@@ -2056,13 +2130,7 @@ export class AtscriptDoc {
           token.isChain && typeof token.index === 'number'
             ? [entryRef.id!, ...entryRef.chain.slice(0, token.index).map(c => c.text)]
             : [token.text]
-        const unwound = this.unwindType(targetName, chain)
-        return unwound?.node
-          ? this.definitionLink(token, {
-              uri: this.declaringDoc(unwound.node, unwound.doc).id,
-              range: unwound.node.token('identifier')?.range,
-            })
-          : undefined
+        return this.fieldLinks(token, this.unwindType(targetName, chain))
       }
       // Field refs (query field refs, field-path string args up to the segment under the cursor)
       const fieldRef = resolveFieldRefAt(token, this, character)
@@ -2101,13 +2169,10 @@ export class AtscriptDoc {
       }
       if (token.isChain && isRef(token.parentNode) && typeof token.index === 'number') {
         const id = token.parentNode.id!
-        const unwound = this.unwindType(id, token.parentNode.chain.slice(0, token.index))
-        if (unwound?.node) {
-          return this.definitionLink(token, {
-            uri: this.declaringDoc(unwound.node, unwound.doc).id,
-            range: unwound.node.token('identifier')?.range,
-          })
-        }
+        return this.fieldLinks(
+          token,
+          this.unwindType(id, token.parentNode.chain.slice(0, token.index))
+        )
       } else {
         return this.definitionLink(token)
       }
@@ -2432,7 +2497,8 @@ export class AtscriptDoc {
         }
         if (isRef(t.parentNode)) {
           circularAlias = false
-          const def = this.unwindRef(t.parentNode)?.def
+          const unwound = this.unwindRef(t.parentNode)
+          const def = unwound?.def
           if (!def && circularAlias && !t.parentNode.hasChain) {
             this._allMessages.push({
               severity: 1,
@@ -2479,6 +2545,16 @@ export class AtscriptDoc {
                   range: token.range,
                 })
               }
+            }
+            // (a path through a union naming several fields: all phantom, or none)
+            const phantom = unwound?.fields?.filter(f => isPhantomPrimitive(f.def)).length ?? 0
+            if (phantom > 0 && phantom < unwound!.fields!.length) {
+              const path = [t.parentNode.id!, ...t.parentNode.chain.map(c => c.text)].join('.')
+              this._allMessages.push({
+                severity: 1,
+                message: `"${path}" names phantom and non-phantom fields through a union: the fields of a type path must be all phantom or all data`,
+                range: t.parentNode.chain[t.parentNode.chain.length - 1].range,
+              })
             }
           }
         }
@@ -2593,15 +2669,14 @@ export class AtscriptDoc {
     if (!ref.hasChain || !ref.id) {
       return false
     }
+    // (through a union: every field it names)
     const m = this.structure()
-    const decl = m.declOf(this, ref.id)
-    const slot =
-      decl &&
-      m.slotAt(
-        decl,
-        ref.chain.map(c => c.text)
-      )
-    return !!slot && m.slotShape(slot).k === 'never'
+    const t = m.exprOf(this, ref)
+    const chains = t.k === 'uni' ? t.items : [t]
+    return chains.every(c => {
+      const slot = c.k === 'chain' ? m.slotAt(c.decl, c.path) : undefined
+      return !!slot && m.slotShape(slot).k === 'never'
+    })
   }
 
   /**

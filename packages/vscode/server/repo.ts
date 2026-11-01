@@ -32,6 +32,7 @@ import {
   isRef,
   isStructure,
   DEFAULT_FORMAT,
+  entryParts,
   PluginManager,
   resolveAtscriptFromPath,
   resolveConfigFile,
@@ -78,6 +79,11 @@ const CHECKS_DELAY = 100
 
 const IGNORED_DIR_RE =
   /\/(?:node_modules|dist|build|out|cdk\.out|\.cdk\.staging|coverage|\.next|\.nuxt|\.turbo|\.cache)\//u
+
+/** `def` is the `phantom` primitive (resolved). */
+function isPhantom(def?: SemanticNode): boolean {
+  return isPrimitive(def) && def.config.type === 'phantom'
+}
 
 export class VscodeAtscriptRepo extends AtscriptRepo {
   private readonly changeQueue = [] as string[]
@@ -403,27 +409,20 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       // property completions inside annotate blocks
       if (block?.blockType === 'annotate' && isAnnotate(block.parentNode)) {
         const annotateNode = block.parentNode as SemanticAnnotateNode
-        const targetDef = this.resolveAnnotateTarget(atscript, annotateNode.targetName)
-        if (!targetDef) {
-          return undefined
-        }
+        // (the props of every object the path reaches: through a union, each branch's)
+        let chain: string[] = []
         // chain completion (e.g., address.city)
         if (token?.parentNode && isRef(token.parentNode)) {
           const id = token.parentNode.token('identifier')
           if (id && (token.parentNode.hasChain || token.text === '.')) {
-            const chain =
+            chain =
               token.text === '.'
                 ? [id.text, ...token.parentNode.chain.map(c => c.text)]
                 : [id.text, ...token.parentNode.chain.slice(0, -1).map(c => c.text)]
-            const chainUnwound = atscript.unwindType(annotateNode.targetName, chain)
-            if (chainUnwound?.def) {
-              const chainDef = atscript.mergeIntersection(chainUnwound.def)
-              return this.propsToCompletionItems(this.getPropsFromDef(chainDef))
-            }
-            return undefined
           }
         }
-        return this.propsToCompletionItems(Array.from(targetDef.props.values()))
+        const members = atscript.pathMembers(annotateNode.targetName, chain)
+        return members.length > 0 ? this.propsToCompletionItems(members) : undefined
       }
 
       // declared (imported) types or exported from other documents
@@ -505,13 +504,10 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         }
         const chain =
           token.text === '.' ? token.parentNode.chain : token.parentNode.chain.slice(0, -1)
-        const unwound = atscript.unwindType(id.text, chain)
-        if (unwound?.def) {
-          const def = atscript.mergeIntersection(unwound.def)
-          const options =
-            this.getPropsFromDef(def) ??
-            (isPrimitive(def) ? Array.from(def.props.values()) : undefined)
-          return this.propsToCompletionItems(options)
+        // (the props of every object the path reaches: through a union, each branch's)
+        const members = atscript.pathMembers(id.text, chain)
+        if (members.length > 0) {
+          return this.propsToCompletionItems(members)
         }
       }
     })
@@ -629,20 +625,21 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       }
       if (!token.annotationRef && isRef(token.parentNode)) {
         const unwound = atscript.unwindRef(token.parentNode)
-        const def = unwound?.def
-        const node = unwound?.node
         const docs = [] as string[]
-        if (isPrimitive(def) && def.config.type === 'phantom') {
-          docs.push('*(phantom — excluded from types, validation, and schema)*')
-        }
-        if (isPrimitive(def) && def.config.isContainer) {
-          docs.push('*(container — must use an extension)*')
-        }
-        if (node && node.documentation) {
-          docs.push(node.documentation)
-        }
-        if (def?.documentation) {
-          docs.push(def.documentation)
+        // (a type path through a union naming several fields: each field's)
+        for (const { def, node } of unwound?.fields ?? (unwound ? [unwound] : [])) {
+          if (isPrimitive(def) && def.config.type === 'phantom') {
+            docs.push('*(phantom — excluded from types, validation, and schema)*')
+          }
+          if (isPrimitive(def) && def.config.isContainer) {
+            docs.push('*(container — must use an extension)*')
+          }
+          if (node && node.documentation) {
+            docs.push(node.documentation)
+          }
+          if (def?.documentation) {
+            docs.push(def.documentation)
+          }
         }
         if (docs.length > 0) {
           return {
@@ -844,13 +841,12 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           }
         }
       } else if (isAnnotate(node)) {
-        const targetDef = this.resolveAnnotateTarget(atscript, node.targetName)
-        if (!targetDef) {
-          continue
-        }
         for (const entry of node.entries) {
-          const prop = targetDef.props.get(entry.id!)
-          if (!prop || !isPhantomNode(atscript, prop.getDefinition())) {
+          // (the entry's path: through a union, phantom when every field it names is)
+          const field = atscript.unwindType(node.targetName, entryParts(entry))
+          if (
+            !(field?.fields ? field.fields.every(f => isPhantom(f.def)) : isPhantom(field?.def))
+          ) {
             continue
           }
           const entryToken = entry.token('identifier')

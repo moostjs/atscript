@@ -6,10 +6,8 @@ import type {
 } from '../annotations/annotation-spec'
 import type { AtscriptDoc } from '../document'
 import {
-  isInterface,
+  isProp,
   isQueryFieldRef,
-  isStructure,
-  type SemanticInterfaceNode,
   type SemanticNode,
   type SemanticPropNode,
   type SemanticQueryFieldRefNode,
@@ -122,17 +120,12 @@ function resolveFieldPath(
   typeName: string,
   segment: TFieldPathSegment
 ): TFieldRefTarget | undefined {
-  const chain = segment.path.split('.')
-  const [name] = chain.splice(-1)
-  // The type that declares the last segment, and the document it lives in
-  const parent = doc.unwindType(typeName, chain)
-  if (!parent || !(isStructure(parent.def) || isInterface(parent.def))) {
-    return undefined
-  }
-  const prop = parent.def.props.get(name)
-  return (
-    prop && { typeName, range: segment.range, prop, doc: parent.doc.declaringDoc(prop, parent.doc) }
-  )
+  // (the type path's rule: through a union, the first of the fields it names)
+  const field = doc.unwindType(typeName, segment.path.split('.'))
+  const { node: prop, doc: declaring } = field?.fields?.[0] ?? field ?? {}
+  return isProp(prop) && declaring
+    ? { typeName, range: segment.range, prop, doc: declaring.declaringDoc(prop, declaring) }
+    : undefined
 }
 
 /**
@@ -252,20 +245,8 @@ export function getFieldsForType(
   typeName: string,
   chain: string[] = []
 ): SemanticPropNode[] {
-  const unwound = doc.unwindType(typeName, chain)
-  if (!unwound?.def) {
-    return []
-  }
-  // Resolve in the document that declares the type (it may be imported)
-  let def: SemanticNode = unwound.doc.mergeIntersection(unwound.def)
-  if (isInterface(def)) {
-    const resolved = unwound.doc.resolveInterfaceExtends(def as SemanticInterfaceNode)
-    def = resolved || def.getDefinition() || def
-  }
-  if (isStructure(def) || isInterface(def)) {
-    return Array.from(def.props.values())
-  }
-  return []
+  // (the type path's rule: through a union, the props of every object it reaches)
+  return doc.pathMembers(typeName, chain).filter(isProp)
 }
 
 /**

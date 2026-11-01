@@ -101,6 +101,31 @@ A reference is the referenced type itself, not a copy: at runtime `User.address`
 
 A type alias without annotations is the type it names: `type Account = User`, `type Account = (User)` and aliases of aliases are `User` (the same runtime object), so a block on `Account` is a block on `User`. An alias with annotations of its own (`@meta.description 'Account' type Account = User`) is a type of its own whose annotations sit on top of `User`'s.
 
+### Reference A Field (Type Paths)
+
+A type path `T.a.b` names a field of another type, with that field's type and annotations:
+
+```atscript
+export interface Order {
+    customerId: User.id
+    city?: User.address.city
+}
+```
+
+A path goes through unions. Each step keeps the union branches that have the property; `null` and other non-object branches have none. The same applies to a union written on a property (`work?: Job | null`), behind an alias (`type MaybeUser = User | null`), or produced by a merge with a union operand.
+
+| Branches with the whole path | The path is                                                                               |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| none                         | a compile error: `Unknown member "…"`                                                     |
+| one                          | that field, as if the path had no union (`MaybeUser.address.city` is `User.address.city`) |
+| two or more                  | the union of those fields, each keeping its own annotations                               |
+
+A branch where the path stops deeper (`Contact = Email | Phone` with `Contact.info.label`, where only `Email.info` has `label`) is skipped; the path is an error only when no branch reaches its end.
+
+A path that names several fields is `phantom` only when every field is `phantom`. A mix of `phantom` and data fields is a compile error.
+
+In the generated `.d.ts`, each step of a path is `TAtscriptField<T, "a">` from `@atscript/typescript/utils`: the field of every object branch of `T` that has it. A path through a union therefore has the TypeScript type of the union of its fields, and a step through an optional property does not fail on `undefined`.
+
 ## Advanced Composition
 
 ### Interface Extends

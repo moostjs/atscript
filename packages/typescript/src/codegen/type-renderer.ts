@@ -19,6 +19,7 @@ import {
   isDbEntityNode,
   isGroup,
   isInterface,
+  isPhantomNode,
   isPrimitive,
   isRef,
   isStructure,
@@ -57,7 +58,7 @@ export class TypeRenderer extends BaseRenderer {
     this.writeln(' */')
     this.writeln()
     this.writeln(
-      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TAtscriptAnnotatedType, TMetadataMap, Validator, TValidatorOptions } from "@atscript/typescript/utils"'
+      'import type { TAtscriptTypeObject, TAtscriptTypeComplex, TAtscriptTypeFinal, TAtscriptTypeArray, TAtscriptAnnotatedType, TAtscriptField, TMetadataMap, Validator, TValidatorOptions } from "@atscript/typescript/utils"'
     )
   }
 
@@ -116,9 +117,10 @@ export class TypeRenderer extends BaseRenderer {
         }
         return
       }
+      // (a type path's step: the field of each object branch that has it, see `TAtscriptField`)
       let name = node.id!
       for (const c of node.chain) {
-        name += `["${escapeQuotes(c.text)}"]`
+        name = `TAtscriptField<${name}, "${escapeQuotes(c.text)}">`
       }
       return this.write(name)
     }
@@ -680,12 +682,9 @@ export class TypeRenderer extends BaseRenderer {
     if (isPrimitive(def) && def.config.type === 'phantom') {
       return def.id!
     }
-    if (isRef(def)) {
+    if (isRef(def) && isPhantomNode(this.doc, def)) {
       const ref = def as SemanticRefNode
-      const unwound = this.doc.unwindRef(ref)?.def
-      if (isPrimitive(unwound) && unwound.config.type === 'phantom') {
-        return ref.hasChain ? `${ref.id!}.${ref.chain.map(c => c.text).join('.')}` : ref.id!
-      }
+      return ref.hasChain ? `${ref.id!}.${ref.chain.map(c => c.text).join('.')}` : ref.id!
     }
     return undefined
   }

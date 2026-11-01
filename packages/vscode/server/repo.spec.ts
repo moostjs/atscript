@@ -2235,3 +2235,62 @@ describe('trailing comments after annotations', () => {
     expect(signature).toBeUndefined()
   })
 })
+
+// Type paths through unions (MODEL §15 CHAIN-1 U2): a path naming one field goes to it; one
+// naming several fields (a union of them) goes to each field and hovers each field's docs;
+// completions offer the props of every object the path reaches.
+describe('type paths through unions', () => {
+  const uri = 'file:///paths.as'
+  const source = [
+    'interface I0 {',
+    '  @meta.label "I0.h"',
+    '  h: string',
+    '}',
+    'interface I5 {',
+    '  @meta.label "I5.h"',
+    '  h: number',
+    '  k: string',
+    '}',
+    'interface I2 { work: I0 }',
+    'interface I3 { work: I5 }',
+    'type M0 = I2 | null',
+    'type U = I2 | I3',
+    'interface CH {',
+    '  a?: M0.work.h',
+    '  b?: U.work.h',
+    '  c?: U.work.',
+    '}',
+  ].join('\n')
+
+  it('go-to-definition: the field, or every field', () => {
+    const doc = createDoc(uri, source)
+    const lines = (line: number, ch: number) =>
+      doc.getToDefinitionAt(line, ch)?.map(l => l.targetRange.start.line)
+    // `h` of `M0.work.h` (line 14) and of `U.work.h` (line 15)
+    expect(lines(14, 14)).toEqual([2])
+    expect(lines(15, 13)).toEqual([2, 6])
+  })
+
+  it('hover shows the docs of the field, or of every field', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    const one = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 14, character: 14 },
+    })
+    expect(one.contents.value).toBe('**string**')
+    const many = await handlers.onHover!({
+      textDocument: { uri },
+      position: { line: 15, character: 13 },
+    })
+    expect(many.contents.value).toBe('**string**\n\n**number**')
+  })
+
+  it('completes the props of every branch', async () => {
+    const { handlers } = singleDocRepo(uri, source)
+    const result = await handlers.onCompletion!({
+      textDocument: { uri },
+      position: { line: 16, character: 13 },
+    })
+    expect(result.map((i: any) => i.label)).toEqual(['h', 'k'])
+  })
+})

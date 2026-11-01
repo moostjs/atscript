@@ -181,7 +181,7 @@ for (const node of doc.nodes) {
 
 ### `doc.unwindType(name, chain?)`
 
-Resolves a type reference to its terminal definition. Follows type aliases and chains:
+Resolves a type reference to its terminal definition. Follows type aliases and chains (`doc.unwindRef(ref)` does the same for a reference node, in the document it was written in):
 
 ```typescript
 // Given: type Email = string.email
@@ -189,10 +189,21 @@ Resolves a type reference to its terminal definition. Follows type aliases and c
 
 const resolved = doc.unwindType(ref.id, ref.chain)
 if (resolved?.def) {
-  // resolved.def is the terminal SemanticNode
-  // resolved.name is the resolved name
+  // resolved.def: the terminal SemanticNode
+  // resolved.node: the prop a chain reaches (the field)
+  // resolved.doc: the document resolved.def resolves in
 }
 ```
+
+A chain is a [type path](/packages/typescript/interfaces-types#reference-a-field-type-paths): it goes through unions and keeps the branches that have each property. The result has three shapes:
+
+| Fields the chain reaches | Result                                                                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| none                     | `undefined` (the document reports `Unknown member`)                                                                                    |
+| one                      | `{ def, doc, node }`: the field, also when the chain crossed a union (`type M = User \| null`, `M.address`)                            |
+| two or more              | `{ def, doc, fields }`: `fields` lists each field as `{ def, doc, node }`; `def` is a `\|` group of their types; `node` is `undefined` |
+
+Check `fields` before reading `node`: with several fields there is no single field to report.
 
 ### `doc.evalAnnotationsForNode(node)`
 

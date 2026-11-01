@@ -127,7 +127,7 @@ if (isRef(def)) {
 }
 ```
 
-`doc.unwindType(name, chain?)` recursively follows type aliases until it reaches either a primitive or a non-alias declaration. The optional `chain` handles property-access chains like `SomeType["nested"]["field"]`.
+`doc.unwindType(name, chain?)` recursively follows type aliases until it reaches either a primitive or a non-alias declaration. The optional `chain` resolves a type path such as `SomeType.nested.field`, through unions too: a path that reaches several fields (one per union branch) returns them in `fields`, with `def` the union of their types and no `node` (see [`doc.unwindType`](/plugin-development/architecture#doc-unwindtype-name-chain)).
 
 ## Handling All Definition Kinds
 

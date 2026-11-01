@@ -190,6 +190,8 @@ for (const node of doc.nodes) {
 
 Guards check the `entity` string field — stable across serialization boundaries.
 
+`doc.unwindType(name, chain)` / `doc.unwindRef(ref)` on a type path (`T.a.b`) through unions: no field → `undefined`; one → `{ def, doc, node }` (`node` = the field's prop); several → `{ def, doc, fields }`: `def` a `|` group of the field types, `node` `undefined`, each `fields[i]` a `{ def, doc, node }`. Check `fields` before using `node`.
+
 Nullable targets in a `validate` hook: `nonNullishMembers(def, doc)` (since 0.1.103) → resolved non-`null`/`undefined` members of a union (aliases + nested unions flattened), `undefined` when `def` is not a union. Pass the doc returned by `doc.unwindType(...)` so member refs resolve. `defType` guards already apply this rule.
 
 ## Testing a plugin

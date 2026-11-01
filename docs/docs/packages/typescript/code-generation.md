@@ -58,6 +58,17 @@ When an interface uses `extends`, the first parent becomes the TypeScript `exten
 
 For types (not interfaces), a companion `namespace` carries the same `__is_atscript_annotated_type`, `type`, `metadata`, `validator`, `toJsonSchema`, and `toExampleData` static members.
 
+### Type paths
+
+A [type path](/packages/typescript/interfaces-types#reference-a-field-type-paths) to a scalar field is written as that scalar (`customerId: string /* id */`). Any other path is a chain of `TAtscriptField` steps, a type-only export of `@atscript/typescript/utils`:
+
+```typescript
+// office?: Account.job.office   (type Account = User | null; office: Address)
+office?: TAtscriptField<TAtscriptField<Account, "job">, "office">
+```
+
+`TAtscriptField<T, K>` is `T[K]` for each object branch of `T` that has `K`, and nothing for the other branches (`null`, scalars, objects without `K`). So a path through a union is the union of its fields, and a step through an optional property (`work?: Job`) does not index `undefined`. Earlier versions wrote `Account["job"]["office"]`, which failed to type-check through a union or an optional property.
+
 ## JS Format
 
 Generates JavaScript files with full runtime metadata. Use this when you need validation, metadata access, or serialization.
