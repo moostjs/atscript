@@ -5,7 +5,7 @@ import path from 'path'
 import { setFlagsFromString } from 'v8'
 import { runInNewContext } from 'vm'
 
-import { AtscriptRepo, build } from '@atscript/core'
+import { AtscriptRepo, build, type BuildRepo } from '@atscript/core'
 import { build as bundle } from 'rolldown'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
@@ -381,7 +381,7 @@ const cycleModes = ['esm'] as const
  * JavaScript that reads `m` (both modules' exports) and evaluates to the value to compare.
  * Returns that value per mode and first module; asserts each run really used its mode.
  */
-async function loadCycleBothModes(dir: string, repo: AtscriptRepo, read: string) {
+async function loadCycleBothModes(dir: string, repo: BuildRepo, read: string) {
   const outs = await repo.generate({ format: 'js' })
   const root = path.resolve(__dirname, '../../../..')
   const results: Record<string, unknown> = {}
@@ -520,5 +520,57 @@ describe('a lazy alias read before it is bound', () => {
       "(() => { const at = (n, p) => p.split('.').reduce((x, k) => x.type.props.get(k), n); const pattern = n => JSON.stringify(n.metadata.get('expect.pattern') ?? '-'); const value = b => ({ work: { work: { b: 'a' }, c: 'a' }, next: { work: { work: { b } } } }); return [pattern(at(m.M0, 'next.work.work.b')), pattern(at(m.M0, 'work.work.b')), pattern(at(m.P0, 'work.b')), m.M0.validator().validate(value('ak'), true), m.M0.validator().validate(value('ab'), true)] })()"
     )
     expect(results).toEqual(inEveryLoad(['[{"pattern":"^[^k]*$"}]', '"-"', '"-"', false, true]))
+  }, 90_000)
+})
+
+// A block on an `as` copy of a declaration whose root is a union (`N0 = I2 | null`, `annotate N0
+// as X0 {}`, `annotate X0 { work.e }`): the copy has its target's structure, so the path goes
+// through the root's non-null item. Its step was dropped: the module threw "type not built yet"
+// at load, and in an import cycle the block was silently never applied (oracle seed 7517).
+describe('a block on an `as` copy of a union root', () => {
+  const types =
+    "export interface I1 {\n  @expect.pattern '^[^z]*$'\n  e: string\n}\nexport interface I2 {\n  c: string\n  work: I1\n}\n"
+  const block = "annotate X0 {\n  @expect.pattern '^[^q]*$'\n  work.e\n}\n"
+  const read = `(() => { const obj = n => n.type.kind === 'object' ? n : n.type.items.find(i => i.type.kind === 'object'); const e = n => obj(n).type.props.get('work').type.props.get('e'); const patterns = n => (e(n).metadata.get('expect.pattern') ?? []).map(p => p.pattern).join(' '); const ok = (n, s) => n.validator().validate({ c: 'a', work: { e: s } }, true); return [patterns(m.X0), patterns(m.I2), patterns(m.N0), ok(m.X0, 'q'), ok(m.X0, 'z'), ok(m.X0, 'a'), m.X0.validator().validate(null, true), ok(m.N0, 'q')] })()`
+  const expected = ['^[^z]*$ ^[^q]*$', '^[^z]*$', '^[^z]*$', false, false, true, true, true]
+
+  it.each([
+    ['the union itself', 'export type N0 = I2 | null\nexport annotate N0 as X0 {}\n'],
+    [
+      'an alias of it',
+      'export type N0 = I2 | null\nexport type M1 = N0\nexport annotate M1 as X0 {}\n',
+    ],
+    [
+      'a merge of it',
+      'export type N0 = I2 | null\nexport type M1 = N0 & N0\nexport annotate M1 as X0 {}\n',
+    ],
+  ])('copy of %s: the block applies at load', async (_, decls) => {
+    const { dir } = await generate({ 'm.as': `${types}${decls}${block}` })
+    const m = await import(path.join(dir, 'm.as.js'))
+    expect(runInNewContext(read, { m })).toEqual(expected)
+  })
+
+  it('a copy of a copy (`X0 as Y0`): the block on Y0 applies at load, X0 keeps its own', async () => {
+    const { dir } = await generate({
+      'm.as': `${types}export type N0 = I2 | null\nexport annotate N0 as W0 {}\nexport annotate W0 as X0 {}\n${block}`,
+    })
+    const m = await import(path.join(dir, 'm.as.js'))
+    expect(runInNewContext(read, { m })).toEqual(expected)
+    expect(runInNewContext(read, { m: { ...m, X0: m.W0 } })[0]).toBe('^[^z]*$')
+  })
+
+  it('the block of the other module of an import cycle applies in every load order', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-cycle-as-union-root-'))
+    dirs.push(dir)
+    writeFileSync(
+      path.join(dir, 'm0.as'),
+      `import { N0 } from './m1'\n${types}export type M1 = N0 & N0\nexport annotate M1 as X0 {\n  @meta.label 'L17'\n  c\n}\n`
+    )
+    writeFileSync(
+      path.join(dir, 'm1.as'),
+      `import { I2, X0 } from './m0'\nexport type N0 = I2 | null\n${block}`
+    )
+    const repo = await build({ rootDir: dir, entries: ['m0.as', 'm1.as'], plugins: [tsPlugin()] })
+    expect(await loadCycleBothModes(dir, repo, read)).toEqual(inEveryLoad(expected))
   }, 90_000)
 })

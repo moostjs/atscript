@@ -619,17 +619,22 @@ export class JsNextRenderer extends JsRenderer {
     return h.name
   }
 
+  /** The declaration whose structure `d` has: an `as` copy's (through copies of copies) target. */
+  private structureRoot(d: TStructDecl): TStructDecl | undefined {
+    let root: TStructDecl | undefined = d
+    while (root?.kind === 'as') {
+      root = this.model.asTarget(root)
+    }
+    return root
+  }
+
   /**
    * The runtime steps below `prefix` of declaration `d` for model `steps`: a `X | null` the model
    * passes through is a union node at runtime (`|i`: its non-null item).
    */
   private runtimePath(d: TStructDecl, prefix: string[], steps: string[]): string[] {
     const out: string[] = []
-    // (an `as` copy has its target's structure: a nullable root too)
-    let root: TStructDecl | undefined = d
-    while (root?.kind === 'as') {
-      root = this.model.asTarget(root)
-    }
+    const root = this.structureRoot(d)
     for (let i = 0; i < steps.length; i++) {
       // (the node reached so far: `X | null` written there is a union node at runtime)
       const at = [...prefix, ...steps.slice(0, i)]
@@ -2136,12 +2141,13 @@ export class JsNextRenderer extends JsRenderer {
     copy = false
   ): Array<[string, number]> {
     const out: Array<[string, number]> = []
-    if (d.kind === 'type' && steps.length > 0) {
+    // (an `as` copy has its target's structure: a nullable root too, never the copy's own)
+    const rd = this.structureRoot(d)
+    if (rd?.kind === 'type' && steps.length > 0) {
       // (a declaration that is a nullable union: its root is a union node — its own)
-      const root = this.model.declExpr(d)
-      this.nullItems(root).forEach((at, j) =>
-        out.push([`|${at}`, j === 0 && !copy && (root.k === 'nul' || root.k === 'and') ? 0 : 2])
-      )
+      const root = this.model.declExpr(rd)
+      const own = !copy && rd === d && (root.k === 'nul' || root.k === 'and')
+      this.nullItems(root).forEach((at, j) => out.push([`|${at}`, j === 0 && own ? 0 : 2]))
     }
     for (let i = 0; i < steps.length; i++) {
       out.push([steps[i], kinds[i]])
