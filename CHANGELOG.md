@@ -8,7 +8,8 @@
 * **core (plugin API):** `doc.unwindType(name, chain)` / `doc.unwindRef(ref)` on a type path through a union return the field (`node` = its prop) instead of the union; a path reaching several fields returns `fields` (each `{ def, doc, node }`) with `def` a `|` group of their types and no `node`. The same field (a declared property, or a merged property with the same contributors) reached through several branches with the same blocks at or below it is one field
 * **typescript:** `.d.ts` files write each step of a type path as `TAtscriptField<T, "k">` (new type-only export of `@atscript/typescript/utils`) instead of `T["k"]`
 * **core:** an interface extending a union of two or more non-`null` branches (`interface Post extends Content` with `type Content = Article | Video`) is a compile error ("An interface can't extend a union; use a merge"); it used to build a class without the parent's props. Write a merge instead: `type Post = Content & { … }`. Extending an alias of `X | null` still works as extending `X`
-* **core (plugin API):** `resolveFieldRefAt(token, doc)` returns `undefined` for a field path naming several fields through a union; the new `resolveFieldRefsAt(token, doc)` returns every field
+* **core (plugin API):** `resolveFieldRefAt(token, doc)` and `resolveQueryFieldRef(node, doc, scope)` return `undefined` for a field path naming several fields through a union; the new `resolveFieldRefsAt(token, doc)` returns every field
+* **core (plugin API):** the annotations a chain ref inherits from its field (`doc.evalAnnotationsForNode` with blocks) include the blocks every type on the way writes on that field — `v: Order.customer.name` with `annotate Customer { name }` too, not only blocks on `Order`
 
 ## [0.1.110](https://github.com/moostjs/atscript/compare/v0.1.109...v0.1.110) (2026-10-19)
 

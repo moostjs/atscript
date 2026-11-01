@@ -33,7 +33,7 @@ import {
   resolveConfigFile,
   getQueryScope,
   getDeclaredValue,
-  resolveFieldRefsAt,
+  fieldRefTokens,
   getQueryCompletionScope,
   getFieldPathCompletionScope,
   analyzeQueryCursorContext,
@@ -563,7 +563,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         return
       }
       // Field ref hover (query field refs, field-path string args; through a union: each field)
-      const fieldRefs = resolveFieldRefsAt(token, atscript, position.character)
+      const fieldRefs = fieldRefTokens(token, atscript, position.character)
       if (fieldRefs.length > 0) {
         return {
           contents: {
@@ -622,8 +622,13 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
         if (isPhantomPath(unwound)) {
           docs.push('*(phantom — excluded from types, validation, and schema)*')
         }
-        // (a type path through a union naming several fields: each field's)
+        // (a type path through a union naming several fields: each field's, once)
+        const fields = new Set<unknown>()
         for (const { def, node } of unwoundFields(unwound)) {
+          if (fields.has(node ?? def)) {
+            continue
+          }
+          fields.add(node ?? def)
           if (isPrimitive(def) && def.config.isContainer) {
             docs.push('*(container — must use an extension)*')
           }
@@ -1090,10 +1095,9 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     definitions: Array<{ uri: string; range: Token['range'] }>
   } {
     // (a field ref through a union: every field it names)
-    const fields = resolveFieldRefsAt(token, atscript, position.character).flatMap(f => {
-      const propToken = f.prop.token('identifier')
-      return propToken ? [{ doc: f.doc, propToken }] : []
-    })
+    const fields = fieldRefTokens(token, atscript, position.character).flatMap(f =>
+      f.propToken ? [{ doc: f.doc, propToken: f.propToken }] : []
+    )
     if (fields.length > 0) {
       return {
         usages: fields.flatMap(f => f.doc.usageListFor(f.propToken) ?? []),

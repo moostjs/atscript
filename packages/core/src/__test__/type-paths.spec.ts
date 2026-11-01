@@ -417,10 +417,10 @@ interface CH {
       core: ['I0.h', 'I0.h'],
       model: ['|0.work.h', '|1.work.h'],
     })
-    // (go-to-definition: each field)
+    // (go-to-definition: the two positions are one declared prop — one link)
     const line = doc.text.split('\n').findIndex(l => l.includes('U.work.h'))
     const ch = doc.text.split('\n')[line].indexOf('U.work.h') + 'U.work.'.length + 1
-    expect(doc.getToDefinitionAt(line, ch)?.length).toBe(2)
+    expect(doc.getToDefinitionAt(line, ch)?.length).toBe(1)
   })
 
   it('an entry through a prop typed by such a path follows its final positions', () => {
@@ -597,5 +597,198 @@ interface CH {
     expect(getFieldsForType(doc, 'C1').map(p => p.id)).toEqual(['f', 'g'])
     const m = doc.structure()
     expect(m.slotAt(m.declOf(doc, 'C1')!, ['g'])).toBeDefined()
+  })
+})
+
+describe('type paths: positions resolved with the blocks they depend on (review 29)', () => {
+  const fieldsOf = (doc: AtscriptDoc, text: string) => {
+    const ref = refAt(doc, text)
+    const u = doc.unwindRef(ref)
+    const t = doc.structure().exprOf(doc, ref)
+    return {
+      core: (u?.fields ?? (u ? [u] : [])).map(f => fieldName(doc, f.node)),
+      model: (t.k === 'uni' ? t.items : [t]).map(c => (c.k === 'chain' ? c.path.join('.') : c.k)),
+    }
+  }
+  const decls = [
+    'interface K {\n  k: string\n}',
+    'interface H {\n  x: K\n  y: string\n}',
+    'interface J0 {\n  h: H\n}',
+    'interface J2 {\n  work: J0\n}',
+    'interface J9 {\n  work: J0\n}',
+    'type U = J2 | J9',
+    "annotate J2 {\n  @meta.label 'a'\n  work.h.x.k\n}",
+    'interface Q {\n  x: K\n}',
+    'interface X {\n  v: U.work.h | Q\n}',
+    'interface Y {\n  p: X.v.x\n}',
+    "annotate Y {\n  @meta.label 'w'\n  p.k\n}",
+    'interface Z {\n  z: Y.p.k\n}',
+  ]
+
+  it('a type path through one split by a block: its positions in any declaration order', () => {
+    // (`U.work.h`: two positions, J2's block below `h`; `X.v.x` through them and `Q`: three —
+    // H.x twice, J2's block at `x.k` below it on one; `Y.p.k`: two — K.k via J2's block, and
+    // the rest)
+    for (const order of [decls, [...decls].reverse(), [...decls.slice(9), ...decls.slice(0, 9)]]) {
+      const doc = createDoc(order.join('\n'))
+      expect(errors(doc)).toEqual([])
+      expect(fieldsOf(doc, 'U.work.h')).toEqual({
+        core: ['J0.h', 'J0.h'],
+        model: ['|0.work.h', '|1.work.h'],
+      })
+      expect(fieldsOf(doc, 'X.v.x')).toEqual({
+        core: ['H.x', 'H.x', 'Q.x'],
+        model: ['v.|0.|0.x', 'v.|0.|1.x', 'v.|1.x'],
+      })
+      expect(fieldsOf(doc, 'Y.p.k')).toEqual({ core: ['K.k', 'K.k'], model: ['p.|0.k', 'p.|1.k'] })
+      const y = doc.structure().blocks.find(b => b.target.name === 'Y')
+      expect(y?.entries[0].paths.map(p => p.join('.'))).toEqual(['p.|0.k', 'p.|1.k', 'p.|2.k'])
+    }
+  })
+
+  it('a block whose own path crosses the type path it splits: the type path counts it (POS-1a)', () => {
+    // (`T`'s block is below `T.work.h` and crosses `H.x`, typed `U.work.h` itself: `U.work.h` is
+    // two positions, and the block lands through both)
+    const doc = createDoc(`
+interface H {
+  x?: U.work.h
+  y: string
+}
+interface W {
+  h: H
+}
+interface T {
+  work: W
+}
+interface I9 {
+  work: W
+}
+type U = T | I9
+annotate T {
+  @meta.label 'a'
+  work.h.x.y
+}
+interface X {
+  v: U.work.h
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(fieldsOf(doc, 'U.work.h')).toEqual({
+      core: ['W.h', 'W.h'],
+      model: ['|0.work.h', '|1.work.h'],
+    })
+    const t = doc.structure().blocks.find(b => b.target.name === 'T')
+    expect(t?.entries[0].paths.map(p => p.join('.'))).toEqual(['work.h.x.|0.y', 'work.h.x.|1.y'])
+  })
+
+  it('a block on a named distributed merge writes each branch', () => {
+    const doc = createDoc(`
+interface C0 {
+  e?: string
+}
+interface C1 {
+  f?: string
+}
+type U1 = (C0 | C1) & {
+  q?: string
+}
+annotate U1 {
+  @meta.label 'b'
+  q
+}
+annotate U1 as Cc0 {
+  @meta.description 'c'
+  q
+}
+`)
+    expect(errors(doc)).toEqual([])
+    expect(
+      doc.structure().blocks.map(b => b.entries.map(e => e.paths.map(p => p.join('.'))))
+    ).toEqual([[['|0.q', '|1.q']], [['|0.q', '|1.q']]])
+  })
+
+  it("a chain ref's annotations: the blocks every type on the way writes on its field", () => {
+    const doc = createDoc(`
+interface I0 {
+  g: string
+}
+interface C0 {
+  work: I0
+}
+annotate I0 {
+  @meta.label 'I0 block'
+  g
+}
+annotate C0 {
+  @meta.description 'C0 block'
+  work.g
+}
+interface X {
+  v: C0.work.g
+  w: I0.g
+}
+`)
+    expect(errors(doc)).toEqual([])
+    const props = (doc.nodes.find(n => n.id === 'X')!.getDefinition() as any).props
+    const anns = (k: string) =>
+      doc
+        .evalAnnotationsForNode(props.get(k), props.get(k).annotations, true)
+        ?.map(a => `${a.name}=${a.args[0]?.text}`)
+    expect(anns('v')).toEqual(['meta.label=I0 block', 'meta.description=C0 block'])
+    expect(anns('w')).toEqual(['meta.label=I0 block'])
+  })
+
+  it('a type path through an intersection with an unknown operand: diagnostics, no endless walk', () => {
+    // (what does not merge stays an intersection: merging it again is the same)
+    const doc = createDoc(`
+interface C1 {
+  f?: string
+}
+type U1 = C0 & C1
+type U2 = (C0 | C1) & {
+  q?: string
+}
+interface X {
+  v: U1.f
+  w: U2.q
+}
+`)
+    expect(errors(doc).some(e => e.includes('Unknown identifier "C0"'))).toBe(true)
+  })
+
+  it("a chain ref through an `as` copy: the target's blocks below the copy's", () => {
+    // (U1's branches are one merge: its block at `e` is on U1, not on a field's shell)
+    const doc = createDoc(`
+interface C1 {
+  e?: string
+  f?: string
+}
+type U1 = (C1 | C1) & {
+  q: string
+}
+annotate U1 {
+  @meta.label 'U1 block'
+  @meta.description 'U1 block'
+  e
+  @meta.label 'U1 block'
+  f
+}
+annotate U1 as Cc0 {
+  @meta.label 'copy'
+  e
+}
+interface X {
+  v: Cc0.e
+  w: Cc0.f
+}
+`)
+    expect(errors(doc)).toEqual([])
+    const props = (doc.nodes.find(n => n.id === 'X')!.getDefinition() as any).props
+    const anns = (k: string) =>
+      doc
+        .evalAnnotationsForNode(props.get(k), props.get(k).annotations, true)
+        ?.map(a => `${a.name}=${a.args[0]?.text}`)
+    expect(anns('v')?.sort()).toEqual(['meta.description=U1 block', 'meta.label=copy'])
+    expect(anns('w')).toEqual(['meta.label=U1 block'])
   })
 })

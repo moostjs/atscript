@@ -36,6 +36,7 @@ import {
   isConst,
   isGroup,
   isInterface,
+  isPhantomPrimitive,
   isPrimitive,
   isRef,
   isStructure,
@@ -128,7 +129,10 @@ export interface TStructDef {
   names?: () => string[]
   /** a hidden merge's operands */
   ops?: TStructDef[]
-  /** a shell def's base; an annotated-alias operand's (`a:<id>`) target def */
+  /**
+   * a shell def's base; a view's: the def it views (an `as` copy's target's, an annotated-alias
+   * operand's target's)
+   */
   base?: TStructDef
   /** the module a hidden merge class is written in */
   module?: AtscriptDoc
@@ -278,6 +282,20 @@ function baseSlot(s: TStructSlot): TStructSlot {
   return n
 }
 const baseLoc = (s: TStructSlot) => baseSlot(s).loc
+
+/**
+ * The node slot `s` is for structure (MODEL §14 N3, DEDUP-1): shells looked through, and a merged
+ * field whose contributors are one node (`I2 extends I1, I0`, I1's `next` a block's shell of
+ * I0's) is that node.
+ */
+function fieldLoc(s: TStructSlot): string {
+  const b = baseSlot(s)
+  const locs = b.contributors && new Set(b.contributors.map(fieldLoc))
+  return locs?.size === 1 ? [...locs][0] : b.loc
+}
+
+/** An `annotate T as X` copy's view of T's def (`d:<X>`). */
+const isAsView = (t: TStructDef) => t.kind === 'view' && t.key.startsWith('d:')
 
 /** A def with its shells looked through (the def they shell). */
 export function unshell(t: TStructDef): TStructDef {
@@ -472,11 +490,41 @@ function fansOut(def: TStructDef, s: string): boolean {
   return !!def.branch && def.size !== undefined && (!!def.uni || def.slot(s) === undefined)
 }
 
-/** A position of a type path being walked (see `StructureModel.typePathPositions`): its internal path and the def there. */
+/** A position of a type path being walked (see `StructureModel.typePathPositions`): its internal path, the node there, its def. */
 interface TPathAt {
   path: string[]
+  slot: TStructSlot | undefined
   def: TStructDef | undefined
 }
+
+/** A block entry (an `as` copy's: `collapse` false) and its block, normalized on demand. */
+interface TPendingEntry {
+  block: TStructBlock
+  entry: TStructEntry
+  collapse: boolean
+}
+
+/** A type path whose positions wait for blocks (see `StructureModel.typePathPositions`). */
+interface TKeysCtx {
+  /** the type path: `decl id \0 path` */
+  key: string
+  /** entries landed provisionally: their unit and paths */
+  landed: Map<TStructEntry, { unit: string; paths: string[][] }>
+  /** the model landing them */
+  child?: StructureModel
+}
+
+/** A walk restarted: blocks came in on the way, the defs it holds may lack their shells. */
+const RESTART = Symbol('restart')
+
+/**
+ * A block entry's path crossed a type path whose positions wait for that entry's unit's blocks
+ * (`cycleKey`: the type path, see {@link StructureModel.typePathPositions}).
+ */
+type TCycleAbort = Error & { cycleKey: string }
+const cycleAbort = (key: string): TCycleAbort =>
+  Object.assign(new Error(`atscript: a block's path crosses type path ${key}`), { cycleKey: key })
+const isCycleAbort = (e: unknown): e is TCycleAbort => e instanceof Error && 'cycleKey' in e
 
 /** One structure model per set of documents (a build). */
 export class StructureModel {
@@ -490,17 +538,44 @@ export class StructureModel {
   /** layers per unit: path key -> layers (blocks and `as` entries) */
   private readonly layers = new Map<string, Map<string, Layer[]>>()
   private readonly exprMemo = new Map<SemanticNode, TStructExpr>()
-  /** whether every block's layers are in (see {@link collectLayers}) */
-  private layersReady = false
-  /** a chain ref's positions (see {@link typePathPositions}), with every block's layers */
-  private readonly chainPaths = new Map<SemanticNode, string[][]>()
-  /** chain refs walked before every block's layers were in: by declared field only */
-  private readonly provisional = new Map<
-    SemanticNode,
-    { t: TStructExpr & { k: 'chain' }; paths: string[][] }
-  >()
+  /** chain refs whose plain chain stands in `exprMemo` while their positions are found */
+  private readonly placeholders = new Map<SemanticNode, string>()
+  /**
+   * The entries of the blocks (and `as` copies) writing into each unit, normalized on demand:
+   * a type path through a union reads the blocks at or below its fields (MODEL §15 POS-1a), and
+   * an entry's path may cross such a type path. See {@link ready}.
+   */
+  private readonly unitEntries = new Map<string, TPendingEntry[]>()
+  /** entries being normalized (on the stack) */
+  private readonly busyEntries = new Set<TStructEntry>()
+  /** entries normalized */
+  private readonly doneEntries = new Set<TStructEntry>()
+  /** a block entry's identity in the build (block order, then entry order) */
+  private readonly entryIds = new Map<TStructEntry, number>()
+  /** bumped by every layer added: defs built before may lack its shells */
+  private layerEpoch = 0
+  /** {@link layerEpoch} when the defs were last cleared */
+  private defsEpoch = 0
+  /** the type paths' positions (see {@link typePathPositions}): `decl id \0 path` */
+  private readonly positionsMemo = new Map<string, string[][] | undefined>()
+  /**
+   * The type paths being resolved, each with the number of block normalizations ({@link ready})
+   * open when it started: one met again from a normalization opened since — an entry whose path
+   * crosses it while its positions wait for that entry — is a cycle ({@link cycleAbort}); met
+   * again otherwise, a type path reaching itself (reported).
+   */
+  private readonly resolving = new Map<string, number>()
+  /** block normalizations open on behalf of type paths (see {@link resolving}) */
+  private readyDepth = 0
 
-  constructor(docs: Iterable<AtscriptDoc>) {
+  /**
+   * A model that lands one entry provisionally (see {@link landProvisionally}): the type paths
+   * `df` resolve by declared field only (no blocks), and no entry is normalized up front.
+   */
+  private readonly df?: ReadonlySet<string>
+
+  constructor(docs: Iterable<AtscriptDoc>, df?: ReadonlySet<string>) {
+    this.df = df
     const all: AtscriptDoc[] = []
     const add = (d: AtscriptDoc) => {
       if (this.docIndex.has(d)) {
@@ -538,7 +613,10 @@ export class StructureModel {
         }
       }
     }
-    this.collectLayers()
+    this.collectBlocks()
+    if (!df) {
+      this.normalizeAll()
+    }
   }
 
   // ------------------------------------------------------------ declarations and expressions
@@ -608,6 +686,9 @@ export class StructureModel {
 
   /** The declaration whose structure `d` has: an `as` copy's (through copies of copies) target. */
   structureRoot(d: TStructDecl): TStructDecl | undefined {
+    if (d.kind !== 'as') {
+      return d
+    }
     const seen = new Set<TStructDecl>()
     let root: TStructDecl | undefined = d
     while (root?.kind === 'as' && !seen.has(root)) {
@@ -638,12 +719,14 @@ export class StructureModel {
   private propsOf(doc: AtscriptDoc, struct: SemanticStructureNode): TStructProp[] {
     const out: TStructProp[] = []
     for (const [name, prop] of struct.props) {
-      out.push({
-        name,
-        optional: !!prop.token('optional'),
-        node: prop,
-        type: this.exprOf(doc, prop.def),
-      })
+      // (its type when read: an object's shape needs its props' names only — a type path written
+      // as a prop's type is not resolved by a walk that only passes the object)
+      out.push(
+        Object.defineProperty({ name, optional: !!prop.token('optional'), node: prop }, 'type', {
+          enumerable: true,
+          get: () => this.exprOf(doc, prop.def),
+        }) as TStructProp
+      )
     }
     return out
   }
@@ -654,15 +737,31 @@ export class StructureModel {
       return { k: 'unknown' }
     }
     let hit = this.exprMemo.get(node)
-    if (!hit) {
-      hit = this.exprOf0(doc, node)
-      this.exprMemo.set(node, hit)
-      if (hit.k === 'chain') {
-        // (set first: a chain whose path reads a chain again sees the plain one)
-        hit = this.chainThroughUnions(hit)
-        this.exprMemo.set(node, hit)
+    if (hit) {
+      const busy = this.placeholders.get(node)
+      if (busy !== undefined && (this.resolving.get(busy) ?? this.readyDepth) < this.readyDepth) {
+        throw cycleAbort(busy)
       }
+      return hit
     }
+    hit = this.exprOf0(doc, node)
+    if (hit.k !== 'chain') {
+      this.exprMemo.set(node, hit)
+      return hit
+    }
+    // (the plain chain first: a chain whose path reads it again — a cycle, reported — sees it)
+    const key = `${hit.decl.id}\0${pk(hit.path)}`
+    this.exprMemo.set(node, hit)
+    this.placeholders.set(node, key)
+    try {
+      hit = this.chainThroughUnions(hit)
+    } catch (error) {
+      this.exprMemo.delete(node)
+      throw error
+    } finally {
+      this.placeholders.delete(node)
+    }
+    this.exprMemo.set(node, hit)
     return hit
   }
 
@@ -674,18 +773,9 @@ export class StructureModel {
    * (MODEL §15 CHAIN-1 U4, POS-1c; a mix is a compile error).
    */
   private chainThroughUnions(t: TStructExpr & { k: 'chain' }): TStructExpr {
-    let paths = this.chainPaths.get(t.node)
-    if (!paths) {
-      const found = this.typePathPositions(t.decl, t.path, this.layersReady)
-      paths = found ?? [t.path]
-      if (this.layersReady) {
-        this.chainPaths.set(t.node, paths)
-      } else if (found) {
-        this.provisional.set(t.node, { t, paths })
-      }
-    }
+    const paths = this.typePathPositions(t.decl, t.path) ?? [t.path]
     if (paths.length === 1) {
-      return paths[0] === t.path ? t : { ...t, path: paths[0] }
+      return pk(paths[0]) === pk(t.path) ? t : { ...t, path: paths[0] }
     }
     const chains = paths.map(path => ({ ...t, path }))
     const prims = new Map<string, SemanticPrimitiveNode>()
@@ -718,11 +808,10 @@ export class StructureModel {
         if (u.k === 'chain') {
           return !seen.has(u) && this.phantomField(u, prims, seen)
         }
-        const prim = u.k === 'scalar' && isPrimitive(u.node) ? u.node : undefined
-        if (prim?.config.type !== 'phantom') {
+        if (u.k !== 'scalar' || !isPhantomPrimitive(u.node)) {
           return false
         }
-        prims.set(prim.key, prims.get(prim.key) ?? prim)
+        prims.set(u.node.key, prims.get(u.node.key) ?? u.node)
         return true
       })
     )
@@ -733,14 +822,57 @@ export class StructureModel {
    * internal paths (`|i` steps): a union — or a distributed merge without the prop — fans out
    * into its branches (nested unions flattened), each step keeps the positions that have the
    * prop (a branch that dead-ends deeper is skipped), and branches reaching one position
-   * ({@link positionKey}; `blocks` false: by the declared field only) are one, the first.
+   * ({@link slotKey}; `blocks` false: by the declared field only) are one, the first.
    * `undefined` when the path crosses no union or no position reaches its end.
+   *
+   * A field reached on several branches is one position only with the same blocks at or below it
+   * (POS-1a): before comparing them, every block is normalized ({@link onePerPosition}) — so a
+   * type path is resolved once, with the blocks it depends on. A block whose own path crosses
+   * the type path is landed provisionally ({@link landProvisionally}).
    *
    * (Core's `AtscriptDoc.pathWalk` is the same chain step on semantic nodes: the two must stay
    * in step.)
    */
   typePathPositions(d: TStructDecl, path: string[], blocks = true): string[][] | undefined {
-    let at: TPathAt[] = [{ path: [], def: this.refDef(d) }]
+    const key = `${d.id}\0${pk(path)}`
+    if (!blocks || this.df?.has(key)) {
+      return (this.positionsWalk(d, path, undefined) as TPathAt[] | undefined)?.map(p => p.path)
+    }
+    if (this.positionsMemo.has(key)) {
+      return this.positionsMemo.get(key)
+    }
+    const depth = this.resolving.get(key)
+    if (depth !== undefined && depth < this.readyDepth) {
+      throw cycleAbort(key)
+    }
+    const ctx: TKeysCtx = { key, landed: new Map() }
+    this.resolving.set(key, this.readyDepth)
+    try {
+      let at = this.positionsWalk(d, path, ctx)
+      while (at === RESTART) {
+        // (blocks came in on the way: the defs built before may lack their shells)
+        this.clearDefs()
+        at = this.positionsWalk(d, path, ctx)
+      }
+      const out = at?.map(p => p.path)
+      this.positionsMemo.set(key, out)
+      return out
+    } finally {
+      if (depth === undefined) {
+        this.resolving.delete(key)
+      }
+      this.unland(ctx)
+    }
+  }
+
+  /** {@link typePathPositions}'s walk: the positions with their nodes, or {@link RESTART}. */
+  private positionsWalk(
+    d: TStructDecl,
+    path: string[],
+    /** with blocks: the type path's own state (see {@link onePerPosition}); none: by declared field */
+    ctx: TKeysCtx | undefined
+  ): TPathAt[] | typeof RESTART | undefined {
+    let at: TPathAt[] = [{ path: [], slot: undefined, def: this.refDef(d) }]
     let crossed = false
     for (const s of path) {
       const next: TPathAt[] = []
@@ -749,13 +881,24 @@ export class StructureModel {
           const branches = this.branchesWith(p.def, p.path, s, new Set())
           next.push(...branches)
           crossed ||= branches.length > 0
-        } else if (!crossed || p.def?.slot(s)) {
-          next.push({ path: [...p.path, s], def: p.def?.slot(s)?.def })
+          continue
+        }
+        const slot = p.def?.slot(s)
+        if (!crossed || slot) {
+          next.push({ path: [...p.path, s], slot, def: slot?.def })
         }
       }
-      at = crossed && next.length > 1 ? this.onePerPosition(d, next, blocks) : next
+      if (crossed && next.length > 1) {
+        const one = this.onePerPosition(next, ctx)
+        if (one === RESTART) {
+          return RESTART
+        }
+        at = one
+      } else {
+        at = next
+      }
     }
-    return crossed && at.length > 0 ? at.map(p => p.path) : undefined
+    return crossed && at.length > 0 ? at : undefined
   }
 
   /** {@link typePathPositions}'s step into the branches of union `def` (at `p`) that have prop `s`, nested unions flattened. */
@@ -764,54 +907,84 @@ export class StructureModel {
     const out: TPathAt[] = []
     for (let i = 0; i < (def.size ?? 0); i++) {
       const b = def.branch?.(i)
+      if (b && fansOut(b, s)) {
+        // (a union branch — a named distributed merge too, whose class also lists its operands'
+        // fields — fans out in turn)
+        if (!seen.has(b.key)) {
+          out.push(...this.branchesWith(b, [...p, `|${i}`], s, seen))
+        }
+        continue
+      }
       const slot = b?.slot(s)
       if (slot) {
-        out.push({ path: [...p, `|${i}`, s], def: slot.def })
-      } else if (b && fansOut(b, s) && !seen.has(b.key)) {
-        out.push(...this.branchesWith(b, [...p, `|${i}`], s, seen))
+        out.push({ path: [...p, `|${i}`, s], slot, def: slot.def })
       }
     }
     return out
   }
 
-  /** Positions `at` of a type path of `d`, one per {@link positionKey} (the first). */
-  private onePerPosition(d: TStructDecl, at: TPathAt[], blocks: boolean): TPathAt[] {
+  /**
+   * Positions `at` of a type path of `d`, one per position (the first): by the declared field
+   * ({@link slotKey} without blocks); a field reached several times, by its blocks too, once
+   * every unit on the way has its blocks in ({@link RESTART} when that added layers).
+   */
+  private onePerPosition(at: TPathAt[], ctx: TKeysCtx | undefined): TPathAt[] | typeof RESTART {
+    const fields = at.map(p => (p.slot ? this.slotKey(p.slot, false) : ''))
+    const repeated = new Set(fields.filter((f, i) => fields.indexOf(f) !== i))
+    if (ctx && repeated.size > 0) {
+      // (a field reached on several branches: the blocks at or below it decide — every block in)
+      this.readyDepth++
+      try {
+        for (const U of this.unitEntries.keys()) {
+          this.ready(U, ctx)
+        }
+      } finally {
+        this.readyDepth--
+      }
+      if (this.layerEpoch !== this.defsEpoch) {
+        // (the nodes walked may lack the shells of layers added since the defs were built)
+        return RESTART
+      }
+    }
     const keys = new Set<string>()
-    return at.filter(p => {
-      const k = this.positionKey(d, p.path, blocks)
+    return at.filter((p, i) => {
+      const k =
+        ctx && repeated.has(fields[i]) && p.slot ? `b:${this.slotKey(p.slot, true)}` : fields[i]
       return !keys.has(k) && !!keys.add(k)
     })
   }
 
   /**
-   * The identity of position (d, path) of a type path (MODEL §15 POS-1, POS-1a, POS-1b): the
-   * field its node is — shells looked through: a declared field, or a merged field's
-   * contributors (each counted once, in order) — and the blocks at or below it: per shell (and
-   * the field itself), the entries its unit's layers have at or below it, relative to it. Equal
-   * keys: one position. `blocks` false: the field only.
+   * The identity of a position of a type path (MODEL §15 POS-1, POS-1a, POS-1b): the field its
+   * node `s` is — shells looked through: a declared field, or a merged field's contributors
+   * (each counted once, in order) — and the blocks at or below it: per shell (and the field
+   * itself), the entries its unit's layers have at or below it, relative to it. Equal keys: one
+   * position. `blocks` false: the field only.
    */
-  positionKey(d: TStructDecl, path: string[], blocks = true): string {
-    const s = this.slotAt(d, path)
-    return s ? this.slotKey(s, blocks) : ''
-  }
-
-  /** {@link positionKey} of slot `s`. */
   private slotKey(s: TStructSlot, blocks: boolean): string {
+    const memo = blocks ? this.blockKeys : this.fieldKeys
+    const hit = memo.get(s)
+    if (hit && (!blocks || hit.epoch === this.layerEpoch)) {
+      return hit.key
+    }
+    const base = baseSlot(s)
+    const field = base.contributors
+      ? `(${[...new Set(base.contributors.map(x => this.slotKey(x, blocks)))].join('+')})`
+      : base.loc
     const parts: string[] = []
-    for (let c: TStructSlot | undefined = s; c; c = c.shell) {
-      if (blocks && c.owner) {
+    for (let c: TStructSlot | undefined = blocks ? s : undefined; c; c = c.shell) {
+      if (c.owner) {
         parts.push(this.entriesBelow(c.owner.unit, c.owner.path))
       }
-      if (!c.shell) {
-        parts.push(
-          c.contributors
-            ? `(${[...new Set(c.contributors.map(x => this.slotKey(x, blocks)))].join('+')})`
-            : c.loc
-        )
-      }
     }
-    return parts.join('>')
+    const key = [...parts, field].join('>')
+    memo.set(s, { key, epoch: this.layerEpoch })
+    return key
   }
+
+  /** {@link slotKey}s by slot: the field's; with blocks, at a layer epoch */
+  private readonly fieldKeys = new WeakMap<TStructSlot, { key: string; epoch: number }>()
+  private readonly blockKeys = new WeakMap<TStructSlot, { key: string; epoch: number }>()
 
   /**
    * The declared props the field at position (d, path) is (shells looked through): a declared
@@ -831,26 +1004,32 @@ export class StructureModel {
         : []
   }
 
-  private entryIds?: Map<TStructEntry, number>
-
   /** The entries unit `U`'s layers have at or below `at`: `relative path=entry`, sorted. */
   private entriesBelow(U: string, at: string[]): string {
-    const ids = (this.entryIds ??= new Map())
     const pre = pk(at)
+    let memo = this.belowMemo.get(U)
+    if (!memo) {
+      this.belowMemo.set(U, (memo = new Map()))
+    }
+    const hit = memo.get(pre)
+    if (hit !== undefined) {
+      return hit
+    }
     const out: string[] = []
     for (const [k, ls] of this.layers.get(U) ?? []) {
       if (pre === '' || k === pre || k.startsWith(`${pre}.`)) {
         for (const l of ls) {
-          let id = ids.get(l.entry)
-          if (id === undefined) {
-            ids.set(l.entry, (id = ids.size))
-          }
-          out.push(`${k.slice(pre.length)}=${id}`)
+          out.push(`${k.slice(pre.length)}=${this.entryIds.get(l.entry)}`)
         }
       }
     }
-    return out.sort().join(',')
+    const key = out.sort().join(',')
+    memo.set(pre, key)
+    return key
   }
+
+  /** {@link entriesBelow} per unit, per path (cleared with the unit's layers) */
+  private readonly belowMemo = new Map<string, Map<string, string>>()
 
   private exprOf0(doc: AtscriptDoc, node: SemanticNode): TStructExpr {
     if (isRef(node)) {
@@ -909,36 +1088,28 @@ export class StructureModel {
 
   // ------------------------------------------------------------ blocks and layers
 
-  private collectLayers(): void {
-    // A chain ref through a union walked while the blocks are collected (an entry through a prop
-    // typed by a type path) has its positions by declared field only: POS-1 needs every block's
-    // layers. With every block in, they are found again (and kept); when blocks split one, the
-    // blocks are collected again over them (each round fixes more chains: it ends).
-    for (;;) {
-      this.collectBlocks()
-      // (defs computed while normalizing lack the later layers)
-      this.clearDefs()
-      this.layersReady = true
-      let split = false
-      for (const [node, { t, paths }] of this.provisional) {
-        const final = this.typePathPositions(t.decl, t.path) ?? [t.path]
-        this.chainPaths.set(node, final)
-        split ||= final.length !== paths.length
-      }
-      this.provisional.clear()
-      if (!split) {
-        break
-      }
-      this.layersReady = false
-      this.layers.clear()
-      this.blocks.length = 0
-      this.errors.length = 0
-      this.exprMemo.clear()
-      this.shapeMemo.clear()
-      this.distMemo.clear()
-      this.clearDefs()
+  /**
+   * Every entry normalized — those no type path needed yet, in block order — then the final
+   * model: defs rebuilt with every layer, the layers in block order, the shell kinds, the errors.
+   */
+  private normalizeAll(): void {
+    for (const b of this.blocks) {
+      this.ready(b.target.id)
     }
-    // kinds from the final model
+    this.clearDefs()
+    this.layers.clear()
+    this.belowMemo.clear()
+    for (const b of this.blocks) {
+      for (const e of b.entries) {
+        for (const p of e.paths) {
+          this.addLayer(b.target.id, p, { block: b, entry: e })
+        }
+        if (e.error) {
+          this.errors.push({ doc: b.doc, node: e.ref, message: e.error, entry: true })
+        }
+      }
+    }
+    // (kinds from the final model)
     for (const b of this.blocks) {
       for (const e of b.entries) {
         e.kinds = e.paths.map(p => this.shellSteps(b.target, p))
@@ -947,6 +1118,7 @@ export class StructureModel {
   }
 
   private clearDefs(): void {
+    this.defsEpoch = this.layerEpoch
     this.defMemo.clear()
     this.slotAtMemo.clear()
     this.declDefMemo.clear()
@@ -954,8 +1126,22 @@ export class StructureModel {
     this.locMemo.clear()
   }
 
-  /** Every block's (and `as` copy's) entries, normalized, as layers. */
+  /**
+   * Every block's (and `as` copy's) entries, as written: normalized on demand ({@link ready}),
+   * every one by the end of the constructor.
+   */
   private collectBlocks(): void {
+    const add = (block: TStructBlock, ref: SemanticRefNode, collapse: boolean) => {
+      const entry: TStructEntry = { ref, names: entryParts(ref), paths: [], kinds: [] }
+      block.entries.push(entry)
+      this.entryIds.set(entry, this.entryIds.size)
+      const U = block.target.id
+      let list = this.unitEntries.get(U)
+      if (!list) {
+        this.unitEntries.set(U, (list = []))
+      }
+      list.push({ block, entry, collapse })
+    }
     // (`annotate T as X { … }` entries: X's own layers, at their path only: no collapse)
     for (const d of this.decls) {
       if (d.kind !== 'as') {
@@ -964,14 +1150,7 @@ export class StructureModel {
       const node = d.node as SemanticAnnotateNode
       const block: TStructBlock = { doc: d.doc, node, target: d, index: 0, entries: [] }
       for (const ref of node.annotatedEntries) {
-        const entry = this.entryOf(d, ref, false)
-        block.entries.push(entry)
-        if (entry.error) {
-          this.errors.push({ doc: d.doc, node: ref, message: entry.error, entry: true })
-        }
-        for (const p of entry.paths) {
-          this.addLayer(d.id, p, { block, entry })
-        }
+        add(block, ref, false)
       }
       this.blocks.push(block)
     }
@@ -987,36 +1166,119 @@ export class StructureModel {
         if (!resolved) {
           continue
         }
-        const target = this.plainTarget(resolved)
         const block: TStructBlock = {
           doc,
           node,
-          target,
+          target: this.plainTarget(resolved),
           rank: ranks.get(doc),
           index: blockIndex,
           entries: [],
         }
         for (const ref of node.annotatedEntries) {
-          const entry = this.entryOf(target, ref, true)
-          block.entries.push(entry)
-          if (entry.error) {
-            this.errors.push({ doc, node: ref, message: entry.error, entry: true })
-          }
-          for (const p of entry.paths) {
-            this.addLayer(target.id, p, { block, entry })
-          }
+          add(block, ref, true)
         }
         this.blocks.push(block)
       }
     }
   }
 
-  private entryOf(target: TStructDecl, ref: SemanticRefNode, collapse: boolean): TStructEntry {
-    const names = entryParts(ref)
-    const r = this.normalize(target, names, collapse)
-    return typeof r === 'string'
-      ? { ref, names, paths: [], kinds: [], error: r }
-      : { ref, names, paths: r, kinds: [] }
+  /**
+   * Normalizes the pending entries writing into unit `U`. For a type path's blocks (`ctx`): an
+   * entry whose own path crosses that type path — on the stack, or found crossing it — is landed
+   * provisionally ({@link landProvisionally}).
+   */
+  private ready(U: string, ctx?: TKeysCtx): void {
+    for (const x of this.unitEntries.get(U) ?? []) {
+      if (this.doneEntries.has(x.entry) || ctx?.landed.has(x.entry)) {
+        continue
+      }
+      if (this.busyEntries.has(x.entry)) {
+        if (ctx) {
+          this.landProvisionally(x, ctx)
+        }
+        continue
+      }
+      try {
+        this.normalizeEntry(x)
+      } catch (error) {
+        if (!ctx || !isCycleAbort(error)) {
+          throw error
+        }
+        this.landProvisionally(x, ctx)
+      }
+    }
+  }
+
+  /**
+   * An entry whose path crosses type path `ctx.key` while its positions wait for the entry's
+   * unit's blocks: where it lands does not depend on how the type path splits (the positions of
+   * one field have one structure), so it is found with the type paths being resolved taken by
+   * declared field (a model of its own), and its layers stand in until they are found ({@link
+   * unland}); the entry itself is normalized once those type paths are resolved.
+   */
+  private landProvisionally(x: TPendingEntry, ctx: TKeysCtx): void {
+    ctx.child ??= new StructureModel(
+      this.docs,
+      new Set([...(this.df ?? []), ...this.resolving.keys()])
+    )
+    const paths = ctx.child.landing(this.entryIds.get(x.entry) ?? -1)
+    ctx.landed.set(x.entry, { unit: x.block.target.id, paths })
+    for (const p of paths) {
+      this.addLayer(x.block.target.id, p, { block: x.block, entry: x.entry })
+    }
+  }
+
+  /** The layers {@link landProvisionally} put in, removed. */
+  private unland(ctx: TKeysCtx): void {
+    for (const [entry, { unit: U, paths }] of ctx.landed) {
+      const m = this.layers.get(U)
+      for (const p of paths) {
+        const ls = m?.get(pk(p))
+        const i = ls?.findIndex(l => l.entry === entry) ?? -1
+        if (m && ls && i >= 0) {
+          ls.splice(i, 1)
+          if (ls.length === 0) {
+            m.delete(pk(p))
+          }
+        }
+      }
+      this.layerPathMemo.delete(U)
+      this.belowMemo.delete(U)
+      this.layerEpoch++
+    }
+  }
+
+  /** Where entry `id` lands (see {@link landProvisionally}): its paths, none for an error. */
+  private landing(id: number): string[][] {
+    for (const list of this.unitEntries.values()) {
+      const x = list.find(y => this.entryIds.get(y.entry) === id)
+      if (x) {
+        if (!this.doneEntries.has(x.entry)) {
+          this.normalizeEntry(x)
+        }
+        return x.entry.paths
+      }
+    }
+    return []
+  }
+
+  /** An entry's internal paths (or its error), and its layers. */
+  private normalizeEntry({ block, entry, collapse }: TPendingEntry): void {
+    this.busyEntries.add(entry)
+    try {
+      const r = this.normalize(block.target, entry.names, collapse)
+      if (typeof r === 'string') {
+        entry.error = r
+      } else {
+        entry.paths = r
+      }
+      for (const p of entry.paths) {
+        this.addLayer(block.target.id, p, { block, entry })
+      }
+      this.doneEntries.add(entry)
+    } finally {
+      this.busyEntries.delete(entry)
+    }
   }
 
   private addLayer(unit: string, path: string[], layer: Layer): void {
@@ -1031,6 +1293,8 @@ export class StructureModel {
     }
     ls.push(layer)
     this.layerPathMemo.delete(unit)
+    this.belowMemo.delete(unit)
+    this.layerEpoch++
   }
 
   /** The layers (blocks, `as` entries) of unit `d` at `steps`. */
@@ -1053,7 +1317,12 @@ export class StructureModel {
       let steps = start
       for (let i = from; i < names.length; i++) {
         const sh = this.shapeAt(T, steps)
-        if (sh?.k === 'uni' && !this.slotAt(T, [...steps, names[i]])) {
+        // (a union fans out — a named distributed merge too, whose class also lists its operands'
+        // fields: its node is a union at runtime)
+        if (
+          sh?.k === 'uni' &&
+          (!this.slotAt(T, [...steps, names[i]]) || !!this.defAt(T, steps)?.uni)
+        ) {
           // (every branch that has the prop and takes the rest of the
           // path; a branch without it — a scalar, an array, `null` — or failing deeper is skipped;
           // a branch that is a union itself: the same, through its branches; the branch steps
@@ -1146,7 +1415,12 @@ export class StructureModel {
     if (!t) {
       t = { key } as TStructDef
       this.defMemo.set(key, t)
-      Object.assign(t, build())
+      try {
+        Object.assign(t, build())
+      } catch (error) {
+        this.defMemo.delete(key)
+        throw error
+      }
     }
     return t
   }
@@ -1339,30 +1613,48 @@ export class StructureModel {
     if (fcs) {
       wcs ??= cs
     }
-    const ends = xs.flatMap(x => x.ends)
-    const merged: TStructSlot = {
-      loc: `${U}:${k}`,
-      owner: { unit: U, path: [k] },
-      // (unmergeable shapes are `never`: no merge of their types; contributors
-      // without a def — scalars — take part in a distribution's `never` test; arrays and
-      // tuples: a tuple of the item intersections, written by the core algebra)
-      def:
-        this.neverShape(ends, xs) || this.tupleShape(ends)
-          ? undefined
-          : this.mergeOf(
-              xs.map(x => x.def),
-              mod,
-              xs.filter(x => !x.def).flatMap(x => x.ends),
-              (wcs ?? xs).map(x => x?.def)
-            ),
-      ends,
-      optional: xs.every(x => x.optional),
-      contributors: xs,
-    }
+    const merged = this.mergedSlot(
+      { loc: `${U}:${k}`, owner: { unit: U, path: [k] } },
+      xs,
+      mod,
+      (wcs ?? xs).map(x => x?.def)
+    )
     if (shell) {
       merged.def = this.wrapDef(U, [k], merged.def)
     }
     return merged
+  }
+
+  /**
+   * A merged field: its own node (`at`: loc, owner) over contributors `cs` (several, in priority
+   * order), its def the merge of their types (`written`: the operands' defs as written, for the
+   * merged object's prop order).
+   */
+  private mergedSlot(
+    at: Pick<TStructSlot, 'loc' | 'owner'>,
+    cs: TStructSlot[],
+    mod: AtscriptDoc | undefined,
+    written: Array<TStructDef | undefined>
+  ): TStructSlot {
+    const ends = cs.flatMap(c => c.ends)
+    return {
+      ...at,
+      // (unmergeable shapes are `never`: no merge of their types; contributors without a def —
+      // scalars — take part in a distribution's `never` test; arrays and tuples: a tuple of the
+      // item intersections, written by the core algebra)
+      def:
+        this.neverShape(ends, cs) || this.tupleShape(ends)
+          ? undefined
+          : this.mergeOf(
+              cs.map(c => c.def),
+              mod,
+              cs.filter(c => !c.def).flatMap(c => c.ends),
+              written
+            ),
+      ends,
+      optional: cs.every(c => c.optional),
+      contributors: cs,
+    }
   }
 
   /** The def of a declaration: its class (interface, named merge), its written def, a view. */
@@ -1373,7 +1665,13 @@ export class StructureModel {
       return this.declDefMemo.get(d.id) ?? undefined
     }
     this.declDefMemo.set(d.id, null)
-    const r = this.declDef0(d)
+    let r: TStructDef | undefined
+    try {
+      r = this.declDef0(d)
+    } catch (error) {
+      this.declDefMemo.delete(d.id)
+      throw error
+    }
     this.declDefMemo.set(d.id, r)
     return r
   }
@@ -1403,6 +1701,7 @@ export class StructureModel {
         base &&
         this.mk(`d:${U}`, () => ({
           kind: 'view',
+          base,
           src: [{ k: 'ref', decl: d, node: d.node }],
           bsrc: base.bsrc && (i => base.bsrc?.(i) ?? []),
           slot: k => this.applyShell(U, [k], base.slot(k)),
@@ -1669,25 +1968,12 @@ export class StructureModel {
         if (cs.length === 1 || cs.every(c => c.loc === cs[0].loc)) {
           return cs[0]
         }
-        const ends = cs.flatMap(c => c.ends)
-        return {
-          loc: `m:${key}/${k}`,
-          owner: { unit: `m:${key}`, path: [k] },
-          // (unmergeable shapes are `never`: no merge of their types; arrays and
-          // tuples: a tuple of the item intersections, written by the core algebra)
-          def:
-            this.neverShape(ends, cs) || this.tupleShape(ends)
-              ? undefined
-              : this.mergeOf(
-                  cs.map(c => c.def),
-                  mod,
-                  cs.filter(c => !c.def).flatMap(c => c.ends),
-                  (wdefs ?? defs).map(t => t.slot(k)?.def)
-                ),
-          ends,
-          optional: cs.every(c => c.optional),
-          contributors: cs,
-        }
+        return this.mergedSlot(
+          { loc: `m:${key}/${k}`, owner: { unit: `m:${key}`, path: [k] } },
+          cs,
+          mod,
+          (wdefs ?? defs).map(t => t.slot(k)?.def)
+        )
       },
       names: () => [
         ...new Set(
@@ -1788,6 +2074,22 @@ export class StructureModel {
     }
     const out: TBranch[] = []
     this.distMemo.set(key, out)
+    try {
+      this.distribute0(out, defs, extra, mod)
+    } catch (error) {
+      this.distMemo.delete(key)
+      throw error
+    }
+    return out
+  }
+
+  /** {@link distribute} into `out`. */
+  private distribute0(
+    out: TBranch[],
+    defs: TStructDef[],
+    extra: TStructExpr[],
+    mod: AtscriptDoc | undefined
+  ): void {
     const choices = defs.map(t =>
       t.uni
         ? this.leaves(t)
@@ -1797,7 +2099,7 @@ export class StructureModel {
     if (total > PRODUCT_CAP) {
       // (too many branches — the module's error, no branch of it built)
       this.tooComplex.add(mod)
-      return out
+      return
     }
     for (let k = 0; k < total; k++) {
       const pick: Array<{ def?: TStructDef; src: TStructExpr[]; at: number[] }> = []
@@ -1819,7 +2121,6 @@ export class StructureModel {
         })
       }
     }
-    return out
   }
 
   /** A union def's branches as merge members: a union branch flattened, `null` / never left out. */
@@ -2820,10 +3121,12 @@ export class StructureModel {
       } else {
         // (only the fields the merge writes out itself — several contributors; a
         // single-contributor field is a reference to existing structure. A shell is the node it
-        // shells: a metadata-only block never makes a field merged here — MODEL §14 N3)
+        // shells, a merged field of one node that node ({@link fieldLoc}): a metadata-only block
+        // never makes a field merged here — MODEL §14 N3)
         for (const k of t.names?.() ?? []) {
           const r = t.slot(k)
-          if (r?.def && r.loc.startsWith('m:') && new Set(r.contributors?.map(baseLoc)).size > 1) {
+          const cs = r?.contributors
+          if (r?.def && r.loc.startsWith('m:') && cs?.some(c => fieldLoc(c) !== fieldLoc(cs[0]))) {
             out.push(r.def)
           }
         }
@@ -3161,7 +3464,11 @@ export class StructureModel {
   private extendsUnions(): TStructError[] {
     if (!this.extendsMemo) {
       this.extendsMemo = []
+      // (the first document's: a model's errors are read by the document it is built for)
       for (const d of this.decls) {
+        if (d.doc !== this.docs[0]) {
+          continue
+        }
         for (const t of isInterface(d.node) ? d.node.extendsTokens : []) {
           const p = this.declOf(d.doc, t.text)
           if (p && this.unionOfTwo(p)) {
@@ -3229,6 +3536,85 @@ export class StructureModel {
     }
     this.rankMemo = new Map(docs.map(d => [d, { depth: depthOf(scc.get(d)!), id: moduleId(d) }]))
     return this.rankMemo
+  }
+
+  /**
+   * The layers on the node at position (d, path), innermost first (a read of the node gets them,
+   * last wins): of every unit whose own node it is — the declaring unit's, then each unit's on
+   * the way out to `d`'s own (its plain target's) at `path`: a unit whose def (own, a shell, an
+   * `as` view; a merge's operands, lower priority first) holds a prefix of the path writes the
+   * node at the rest of it (MODEL §3).
+   */
+  fieldLayers(d: TStructDecl, path: string[]): Layer[] {
+    // (outermost first; a unit at a path once)
+    const levels: Array<[TStructDecl, string[]]> = []
+    const seen = new Set<string>()
+    const level = (unit: string | undefined, at: string[]) => {
+      const decl = unit === undefined ? undefined : this.declById(unit)
+      if (decl && !seen.has(`${unit}\0${pk(at)}`)) {
+        seen.add(`${unit}\0${pk(at)}`)
+        levels.push([decl, at])
+      }
+    }
+    // (a shell: the def it shells, inner; an `as` copy's view: the copy's, then its target's def —
+    // the copy of T's final definition, T's blocks below the copy's)
+    const defLevels = (t: TStructDef | undefined, rest: string[]) => {
+      for (let x = t; x; x = x.kind === 'shell' || isAsView(x) ? x.base : undefined) {
+        if (isAsView(x)) {
+          level(x.key.slice(2), rest)
+        } else if (x.unit) {
+          const at = x.kind === 'shell' ? x.at : defPosition(x)?.split('.').filter(Boolean)
+          if (at) {
+            level(x.unit, [...at, ...rest])
+          }
+        }
+        // (a merge's operands: the higher priority — later — outer)
+        ;[...(x.ops ?? [])].reverse().forEach(o => defLevels(o, rest))
+      }
+    }
+    // (a node written as a chain ref is its field's node over: that field's levels, inner)
+    const walk = (D: TStructDecl, p: string[], chains: Set<string>) => {
+      level(this.plainTarget(D).id, p)
+      for (let j = 0; j <= p.length; j++) {
+        const slot = j > 0 ? this.slotAt(D, p.slice(0, j)) : undefined
+        // (the units whose node — or shell of it — the node at the prefix is)
+        for (let c = slot; c; c = c.shell) {
+          if (c.owner) {
+            level(c.owner.unit, [...c.owner.path, ...p.slice(j)])
+          }
+        }
+        if (j < p.length) {
+          defLevels(this.defAt(D, p.slice(0, j)), p.slice(j))
+        }
+        const c = slot?.ends.length === 1 ? this.chainNode(slot.ends[0], j === p.length) : undefined
+        const key = c && `${c.decl.id}\0${pk(c.path)}`
+        if (c && key && !chains.has(key)) {
+          walk(c.decl, [...c.path, ...p.slice(j)], new Set(chains).add(key))
+        }
+      }
+    }
+    walk(d, path, new Set())
+    return levels.reverse().flatMap(([unit, at]) => this.orderedLayersAt(unit, at))
+  }
+
+  /**
+   * The chain ref a node written `e` is the field node of (a reference to an alias of it: a
+   * reference layer over that node); not `final` — a step below the node —: through `X | null`
+   * too, whose item it is.
+   */
+  private chainNode(e: TStructExpr, final: boolean): (TStructExpr & { k: 'chain' }) | undefined {
+    const seen = new Set<TStructDecl>()
+    let x = e
+    for (;;) {
+      if (x.k === 'nul' && !final) {
+        x = x.of
+      } else if (x.k === 'ref' && x.decl.kind === 'type' && !seen.has(x.decl)) {
+        seen.add(x.decl)
+        x = this.declExpr(x.decl)
+      } else {
+        return x.k === 'chain' ? x : undefined
+      }
+    }
   }
 
   /** {@link layersAt}, in block order (`as` entries first). */

@@ -24,6 +24,7 @@ export {
   resolveQueryFieldRef,
   resolveFieldRefAt,
   resolveFieldRefsAt,
+  fieldRefTokens,
   getQueryCompletionScope,
   getFieldPathCompletionScope,
   getFieldsForType,

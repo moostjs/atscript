@@ -45,12 +45,21 @@ export type FlatOf<T> = T extends { __flat: infer F }
 export type TAtscriptField<T, K extends PropertyKey> = T extends readonly unknown[]
   ? never
   : T extends object
-    ? K extends keyof {
-        [P in keyof T as string extends P ? never : number extends P ? never : P]: 0
-      }
-      ? T[K]
-      : never
+    ? string extends keyof T
+      ? TDeclaredField<T, K>
+      : number extends keyof T
+        ? TDeclaredField<T, K>
+        : K extends keyof T
+          ? T[K]
+          : never
     : never
+
+/** {@link TAtscriptField} of `T` with an index signature: its declared keys only. */
+type TDeclaredField<T, K extends PropertyKey> = K extends keyof {
+  [P in keyof T as string extends P ? never : number extends P ? never : P]: 0
+}
+  ? T[K & keyof T]
+  : never
 
 /**
  * Extracts the primary key type from an Atscript annotated type.

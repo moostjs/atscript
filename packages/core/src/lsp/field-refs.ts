@@ -5,7 +5,7 @@ import type {
   TValueCandidate,
 } from '../annotations/annotation-spec'
 import type { AtscriptDoc } from '../document'
-import { unwoundFields } from '../document'
+import { unwoundFields } from '../flatten'
 import {
   isProp,
   isQueryFieldRef,
@@ -202,6 +202,27 @@ export function resolveFieldRefsAt(
   }
   const typeName = getFieldPathTarget(token, doc)
   return typeName ? resolveFieldPath(doc, typeName, fieldPathSegmentAt(token, character)) : []
+}
+
+/**
+ * The fields a field ref at `token` names ({@link resolveFieldRefsAt}), each once (several
+ * positions may be one declared field, MODEL §15 POS-1), with the name token of its prop when it
+ * has one.
+ */
+export function fieldRefTokens(
+  token: Token,
+  doc: AtscriptDoc,
+  character?: number
+): Array<TFieldRefTarget & { propToken?: Token }> {
+  const seen = new Set<SemanticNode>()
+  const out: Array<TFieldRefTarget & { propToken?: Token }> = []
+  for (const f of resolveFieldRefsAt(token, doc, character)) {
+    if (!seen.has(f.prop)) {
+      seen.add(f.prop)
+      out.push({ ...f, propToken: f.prop.token('identifier') })
+    }
+  }
+  return out
 }
 
 /**

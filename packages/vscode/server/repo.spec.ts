@@ -835,6 +835,34 @@ describe('expr and order arguments', () => {
   })
 })
 
+describe('a type path naming one declared field at several positions (MODEL §15 POS-1)', () => {
+  // (`U.work.h`: two positions — I2's block at `work.h` — that are one declared prop, I0.h)
+  const uri = 'file:///test.as'
+  const source = [
+    'interface I0 {',
+    '  x: string',
+    '  h: string',
+    '}',
+    'interface I2 {\n  work: I0\n}',
+    'interface I9 {\n  work: I0\n}',
+    'type U = I2 | I9',
+    "annotate I2 {\n  @meta.label 'L2'\n  work.h\n}",
+    'interface X {\n  v?: U.work.h\n}',
+  ].join('\n')
+  // (`h` of `U.work.h`)
+  const at = { line: 16, character: 13 }
+
+  it('the API keeps both positions; go-to-definition and hover list the prop once', async () => {
+    const { handlers, doc } = singleDocRepo(uri, source)
+    const ref = doc.referred.find(t => t.text === 'U' && (t.parentNode as any)?.hasChain)!
+    expect(doc.unwindRef(ref.parentNode as any)?.fields?.length).toBe(2)
+    expect(doc.getToDefinitionAt(at.line, at.character)?.length).toBe(1)
+    const hover = await handlers.onHover!({ textDocument: { uri }, position: at })
+    // (the field's docs once, not once per position)
+    expect(hover.contents.value).toBe('**string**')
+  })
+})
+
 describe('hover', () => {
   it('shows phantom label on phantom type reference', async () => {
     const uri = 'file:///test.as'

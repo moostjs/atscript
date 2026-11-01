@@ -302,9 +302,13 @@ export interface CH {
 `)
     for (const k of ['a', 'b']) {
       const v = m.CH.type.props.get(k)
-      expect([k, v.type.kind, v.type.designType, label(v), v.metadata.get('meta.description')]).toEqual(
-        [k, '', 'string', 'A.k', 'B.k']
-      )
+      expect([
+        k,
+        v.type.kind,
+        v.type.designType,
+        label(v),
+        v.metadata.get('meta.description'),
+      ]).toEqual([k, '', 'string', 'A.k', 'B.k'])
     }
     // (a block on one of the merges: a union of the two fields)
     expect(branches(m.CH.type.props.get('c'))).toEqual([
@@ -440,5 +444,281 @@ export interface I0 {
     const next = m.I1.type.props.get('next')
     const inner = next.type.items[1].type.props.get('next')
     expect(inner.type.items.map((i: any) => i.metadata.get('meta.label'))).toEqual(['E0', 'E0'])
+  })
+})
+
+/** Builds `files` (several modules) and imports the generated modules in `order`. */
+async function loadFiles(
+  files: Record<string, string>,
+  order = Object.keys(files)
+): Promise<{ modules: Record<string, any>; repo: Awaited<ReturnType<typeof build>> }> {
+  const dir = mkdtempSync(path.join(tmpdir(), 'atscript-type-paths-'))
+  dirs.push(dir)
+  for (const [f, text] of Object.entries(files)) {
+    writeFileSync(path.join(dir, f), text)
+  }
+  const repo = await build({ rootDir: dir, entries: Object.keys(files), plugins: [tsPlugin()] })
+  const diagnostics = await repo.diagnostics()
+  const errors = [...diagnostics.values()].flat().filter(m => m.severity === 1)
+  expect(errors.map(m => m.message)).toEqual([])
+  for (const out of await repo.generate({ format: 'js' })) {
+    writeFileSync(path.join(dir, `${path.basename(out.source)}.js`), out.content)
+  }
+  vi.resetModules()
+  const modules: Record<string, any> = {}
+  for (const f of order) {
+    modules[f] = await import(path.join(dir, `${f}.js`))
+  }
+  return { modules, repo }
+}
+
+describe('generated type paths: positions resolved with the blocks they depend on (review 29)', () => {
+  const decls = [
+    'interface K {\n  k: string\n}',
+    'interface H {\n  x: K\n  y: string\n}',
+    'interface J0 {\n  h: H\n}',
+    'interface J2 {\n  work: J0\n}',
+    'interface J9 {\n  work: J0\n}',
+    'type U = J2 | J9',
+    "annotate J2 {\n  @meta.label 'a'\n  work.h.x.k\n}",
+    'interface Q {\n  x: K\n}',
+    'export interface X {\n  v: U.work.h | Q\n}',
+    'export interface Y {\n  p: X.v.x\n}',
+    "annotate Y {\n  @meta.label 'w'\n  p.k\n}",
+    'export interface Z {\n  z: Y.p.k\n}',
+  ]
+
+  it('a type path through one split by a block: the same module in any declaration order', async () => {
+    for (const order of [decls, [...decls.slice(9), ...decls.slice(0, 9)]]) {
+      const m = await load(order.join('\n'))
+      const p = m.Y.type.props.get('p')
+      // (three positions: H.x via J2, with J2's block below it; H.x via J9; Q.x)
+      expect(p.type.items.map((i: any) => label(i.type.props.get('k')))).toEqual(['w', 'w', 'w'])
+
+      // (two positions: K.k with J2's block, and K.k without it)
+      const z = m.Z.type.props.get('z')
+      expect(z.type.items.map((i: any) => label(i))).toEqual(['w', 'w'])
+      expect(m.Z.validator().validate({ z: 'a' }, true)).toBe(true)
+    }
+  })
+
+  it('a chain ref to a nullable field, and a block through the referrer', async () => {
+    const m = await load(`
+interface I0 {
+  h: string
+}
+interface I2 {
+  work: I0
+}
+interface I9 {
+  work: I0
+}
+type U = I2 | I9
+annotate I2 {
+  @meta.label 'a'
+  work.h
+}
+export interface X {
+  v?: U.work | null
+}
+export interface Y {
+  p: X.v
+}
+annotate Y {
+  @meta.label 'w'
+  p.h
+}
+interface Q {
+  h: string
+}
+export interface V {
+  q?: Q | null
+}
+export interface W {
+  r: V.q
+}
+annotate W {
+  @meta.label 'r'
+  r.h
+}
+`)
+    const p = m.Y.type.props.get('p')
+    // (`p` is X.v's node: a union of U.work's two positions and null)
+    expect(shape(p)).toEqual(['union', undefined, 2])
+    const items = p.type.items[0].type.items
+    expect(items.map((i: any) => label(i.type.props.get('h')))).toEqual(['w', 'w'])
+    expect(m.Y.validator().validate({ p: { h: '1' } }, true)).toBe(true)
+    expect(m.Y.validator().validate({ p: null }, true)).toBe(true)
+    const r = m.W.type.props.get('r')
+    expect(label(r.type.items[0].type.props.get('h'))).toBe('r')
+    expect(label(m.V.type.props.get('q').type.items[0].type.props.get('h'))).toBeUndefined()
+  })
+
+  it("blocks in a module the path's module does not import: counted as the generated code loads them", async () => {
+    const { modules, repo } = await loadFiles(
+      {
+        'a.as': `export interface I0 {
+  @meta.label 'I0.h'
+  h: string
+}
+export interface I2 {
+  work: I0
+}
+export interface I9 {
+  work: I0
+}
+`,
+        'b.as': `import { I2 } from './a'
+annotate I2 {
+  @meta.label 'B'
+  work.h
+}
+`,
+        'u.as': `import { I2, I9 } from './a'
+export type U = I2 | I9
+`,
+        'm.as': `import { U } from './u'
+export interface X {
+  v?: U.work.h
+}
+`,
+      },
+      ['a.as', 'b.as', 'u.as', 'm.as']
+    )
+    const v = modules['m.as'].X.type.props.get('v')
+    expect(v.type.items.map((i: any) => label(i))).toEqual(['B', 'I0.h'])
+    // (core: the same two fields)
+    const diagnostics = await repo.diagnostics()
+    const doc = repo.getDoc([...diagnostics.keys()].find(id => id.endsWith('m.as'))!)!
+    const ref = [...doc.referred].find(t => (t.parentNode as any)?.hasChain)?.parentNode as any
+    expect(doc.unwindRef(ref)?.fields?.length).toBe(2)
+  })
+
+  it('each branch of a split field validates with its own annotations', async () => {
+    const m = await load(`
+interface Address {
+  city: string
+}
+export interface User {
+  address: Address
+}
+export interface Admin extends User {
+  role: string
+}
+type Member = Admin | User
+annotate Admin {
+  @expect.maxLength 3
+  address.city
+}
+export interface X {
+  c?: Member.address.city
+}
+`)
+    const c = m.X.type.props.get('c')
+    expect(c.type.items.map((i: any) => i.metadata.get('expect.maxLength')?.length)).toEqual([
+      3,
+      undefined,
+    ])
+    // ('abcdef' is valid for the User branch)
+    expect(m.X.validator().validate({ c: 'abcdef' }, true)).toBe(true)
+    expect(m.Admin.validator().validate({ role: 'r', address: { city: 'abcdef' } }, true)).toBe(
+      false
+    )
+    expect(m.User.validator().validate({ address: { city: 'abcdef' } }, true)).toBe(true)
+  })
+
+  it('a block on a named distributed merge writes each branch; an `as` copy declared first', async () => {
+    const m = await load(`
+export annotate U1 as Cc0 {
+  @meta.description 'c'
+  q
+}
+export annotate U2 as Cc2 {
+}
+annotate Cc2 {
+  @meta.label 'L'
+  e
+}
+export type U1 = (C0 | C1) & {
+  q?: string
+}
+annotate U1 {
+  @meta.label 'b'
+  q
+}
+export type U2 = C0 | null
+export interface C0 {
+  e?: string
+}
+export interface C1 {
+  f?: string
+}
+`)
+    expect(m.U1.type.items.map((i: any) => label(i.type.props.get('q')))).toEqual(['b', 'b'])
+    expect(
+      m.Cc0.type.items.map((i: any) => i.type.props.get('q').metadata.get('meta.description'))
+    ).toEqual(['c', 'c'])
+    expect(label(m.Cc2.type.items[0].type.props.get('e'))).toBe('L')
+    expect(label(m.U2.type.items[0].type.props.get('e'))).toBeUndefined()
+  })
+
+  it('a chain into the items of a union of chains, read before they are filled in declaration order', async () => {
+    const m = await load(`
+export interface Y1 {
+  p: X2.v.g
+}
+export interface X2 {
+  v: X1.v
+}
+export interface X1 {
+  v?: U0.work
+}
+export type U0 = C1 | C0
+export interface C0 {
+  work: I0
+}
+export interface C1 {
+  work: I0
+}
+export interface I0 {
+  @meta.label 'g'
+  g: string
+}
+annotate C1 {
+  @meta.label 'C1'
+  work
+}
+`)
+    expect(label(m.Y1.type.props.get('p'))).toBe('g')
+    expect(m.Y1.validator().validate({ p: 'x' }, true)).toBe(true)
+  })
+
+  it('a chain through an `as` copy of a nullable type, declared before the types it walks', async () => {
+    const m = await load(`
+export interface X0 {
+  v?: Cc0.work.g
+  w?: Cc1.work.g
+}
+export annotate U2 as Cc0 {
+}
+export annotate U3 as Cc1 {
+}
+export type U2 = C0 | null
+export type U3 = U0 | null
+export type U0 = C1 | C0
+export interface C0 {
+  work?: I0
+}
+export interface C1 {
+  work: I0
+}
+export interface I0 {
+  @meta.label 'g'
+  g: string
+}
+`)
+    expect(label(m.X0.type.props.get('v'))).toBe('g')
+    expect(label(m.X0.type.props.get('w'))).toBe('g')
+    expect(m.X0.validator().validate({ v: 'x', w: 'y' }, true)).toBe(true)
   })
 })

@@ -11,6 +11,7 @@ import {
   getQueryScope,
   resolveFieldRefAt,
   resolveFieldRefsAt,
+  fieldRefTokens,
 } from './field-refs'
 
 const primitives = new Map<string, SemanticPrimitiveNode>()
@@ -344,6 +345,51 @@ interface Report {
       const token = doc.tokensIndex.at(arg.line, arg.character)!
       expect(resolveFieldRefsAt(token, doc)).toHaveLength(1)
       expect(resolveFieldRefAt(token, doc)).toBeDefined()
+    })
+
+    it('one declared field at several positions (a block on one branch): one link, one usage', () => {
+      const doc = createDoc(
+        `
+interface I0 {
+  h: string
+}
+interface I2 {
+  work: I0
+}
+interface I9 {
+  work: I0
+}
+type U = I2 | I9
+annotate I2 {
+  @meta.label 'L2'
+  work.h
+}
+interface Report {
+  @test.wfield 'work.h'
+  total: number
+}
+`,
+        {
+          test: {
+            wfield: new AnnotationSpec({
+              argument: {
+                name: 'field',
+                type: 'string',
+                fieldScope: () => ({ allowedTypes: [], unqualifiedTarget: 'U' }),
+              },
+            }),
+          },
+          meta: { label: new AnnotationSpec({ argument: { name: 'text', type: 'string' } }) },
+        }
+      )
+      const arg = posOf(doc, `'work.h'`, 6)
+      const token = doc.tokensIndex.at(arg.line, arg.character)!
+      // (two positions in the API; the prop once in the LSP)
+      expect(resolveFieldRefsAt(token, doc, arg.character)).toHaveLength(2)
+      expect(fieldRefTokens(token, doc, arg.character)).toHaveLength(1)
+      expect(doc.getToDefinitionAt(arg.line, arg.character)).toHaveLength(1)
+      const h = posOf(doc, 'h: string')
+      expect(doc.getUsageListAt(h.line, h.character)).toHaveLength(1)
     })
   })
 

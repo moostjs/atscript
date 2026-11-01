@@ -52,7 +52,7 @@ import {
 import { uniqueName } from '../runtime/unique-name'
 import { findImportCycle } from './import-cycles'
 import { accountedMarker, JsRenderer, schemaMarker } from './js-renderer'
-import { connected, type Realm, realmOf, type TRealmModule } from './realm'
+import { type Realm, realmOf, type TRealmModule } from './realm'
 import { escapeQuotes } from './utils'
 
 /** Builder chains longer than this are split into statements (see `chainOf`). */
@@ -66,26 +66,11 @@ function isExported(d: TStructDecl): boolean {
 }
 
 /**
- * One structure model per build component (the documents connected to a document by imports,
- * both ways: a block's module imports its target's), per documents' epoch: a module prints the
- * shells every block of the build needs in its types.
+ * The structure model of a module's build component (the documents connected to it by imports,
+ * both ways): a module prints the shells every block of the build needs in its types.
  */
-const models = { epoch: -1, byDoc: new Map<AtscriptDoc, StructureModel>() }
-
 function modelOf(doc: AtscriptDoc): StructureModel {
-  if (models.epoch !== documentsEpoch()) {
-    models.epoch = documentsEpoch()
-    models.byDoc.clear()
-  }
-  let model = models.byDoc.get(doc)
-  if (!model) {
-    const docs = connected(doc)
-    model = new StructureModel(docs)
-    for (const d of docs) {
-      models.byDoc.set(d, model)
-    }
-  }
-  return model
+  return doc.componentStructure()
 }
 
 /** A builder statement of the module: what it builds, and whose finished defs it reads. */
@@ -621,33 +606,33 @@ export class JsNextRenderer extends JsRenderer {
 
   /**
    * The runtime steps below `prefix` of declaration `d` for model `steps`: a `X | null` the model
-   * passes through is a union node at runtime (`|i`: its non-null item).
+   * passes through is a union node at runtime (`|i`: its non-null item). `defNode`: down to the
+   * node typed by the def at `steps` — the non-null item of `X | null` written there.
    */
-  private runtimePath(d: TStructDecl, prefix: string[], steps: string[]): string[] {
+  private runtimePath(
+    d: TStructDecl,
+    prefix: string[],
+    steps: string[],
+    defNode = false
+  ): string[] {
     const out: string[] = []
     const root = this.model.structureRoot(d)
+    const itemsAt = (at: string[], below: boolean) =>
+      at.length > 0
+        ? this.slotNullItems(this.model.slotAt(d, at), below)
+        : root?.kind === 'type'
+          ? this.nullItems(this.model.declExpr(root), below)
+          : []
     for (let i = 0; i < steps.length; i++) {
-      // (the node reached so far: `X | null` written there is a union node at runtime)
-      const at = [...prefix, ...steps.slice(0, i)]
-      const slot = at.length > 0 ? this.model.slotAt(d, at) : undefined
-      const e =
-        at.length === 0
-          ? root?.kind === 'type'
-            ? this.model.declExpr(root)
-            : undefined
-          : slot?.ends.length === 1
-            ? slot.ends[0]
-            : undefined
-      // (a merged node every contributor of which is nullable: its type is item 0, see `slotNode`)
-      const merged =
-        slot?.contributors && this.model.nullableSlot(slot) && !this.model.nullSlot(slot)
-          ? 0
-          : undefined
-      const items = e ? this.nullItems(e) : merged === undefined ? [] : [merged]
-      for (const item of items) {
+      for (const item of itemsAt([...prefix, ...steps.slice(0, i)], true)) {
         out.push(`|${item}`)
       }
       out.push(steps[i])
+    }
+    if (defNode) {
+      for (const item of itemsAt([...prefix, ...steps], false)) {
+        out.push(`|${item}`)
+      }
     }
     return out
   }
@@ -692,12 +677,14 @@ export class JsNextRenderer extends JsRenderer {
   /**
    * The runtime items a model step passes through at a node written `e`: `X | null` is a union
    * node (its non-null item), and so is an alias of one (`type N = X | null`; `N | null`: two).
+   * `below`: a step below the node — through a chain ref to a field typed so too (`p: T.v`: the
+   * node is T.v's, `$alias`), whose own node is not an item.
    */
-  private nullItems(e0: TStructExpr): number[] {
+  private nullItems(e0: TStructExpr, below = true): number[] {
     const out: number[] = []
     let e: TStructExpr | undefined = e0
-    // (each alias once: a cycle of aliases — reported — stops)
-    const seen = new Set<TStructDecl>()
+    // (each alias / chain once: a cycle — reported — stops)
+    const seen = new Set<unknown>()
     while (e) {
       if (e.k === 'nul') {
         const at = this.nonNullItem(e, this.doc)!
@@ -706,7 +693,22 @@ export class JsNextRenderer extends JsRenderer {
       } else if (e.k === 'ref' && e.decl.kind === 'type' && !seen.has(e.decl)) {
         seen.add(e.decl)
         const x = this.model.declExpr(e.decl)
-        e = x.k === 'nul' || x.k === 'ref' || x.k === 'and' ? x : undefined
+        if (x.k === 'nul' || x.k === 'ref' || x.k === 'and' || x.k === 'chain') {
+          // (the step goes through the alias's own union node: it is built first)
+          this.needStructure(e.decl)
+          e = x
+        } else {
+          e = undefined
+        }
+      } else if (below && e.k === 'chain' && !seen.has(e.node)) {
+        seen.add(e.node)
+        const slot = this.model.slotAt(e.decl, e.path)
+        if (slot?.ends.length === 1) {
+          e = slot.ends[0]
+        } else {
+          out.push(...this.mergedNullItem(slot))
+          e = undefined
+        }
       } else if (e.k === 'and' && this.model.nullableExpr(e)) {
         // (a merge every operand of which is nullable: its merged node is item 0, see `mergeAt`)
         out.push(0)
@@ -716,6 +718,18 @@ export class JsNextRenderer extends JsRenderer {
       }
     }
     return out
+  }
+
+  /** The runtime items a model step passes through at node `slot` (see {@link nullItems}). */
+  private slotNullItems(slot: TStructSlot | undefined, below = true): number[] {
+    return slot?.ends.length === 1 ? this.nullItems(slot.ends[0], below) : this.mergedNullItem(slot)
+  }
+
+  /** A merged node every contributor of which is nullable: its type is item 0 (see `slotNode`). */
+  private mergedNullItem(slot: TStructSlot | undefined): number[] {
+    return slot?.contributors && this.model.nullableSlot(slot) && !this.model.nullSlot(slot)
+      ? [0]
+      : []
   }
 
   /** The non-null item of a written `X | null` (the model passes through it), else undefined. */
@@ -743,11 +757,40 @@ export class JsNextRenderer extends JsRenderer {
   private needPath(d: TStructDecl, steps: string[]): void {
     for (let i = 0; i < steps.length; i++) {
       const at = this.model.defAt(d, steps.slice(0, i))
-      const def = at && unshell(at)
-      if (def?.kind === 'merge' || def?.kind === 'umerge') {
-        this.needs.add(def.key)
-      } else if (def?.unit && !def.unit.startsWith('m:')) {
-        this.needUnit(def.unit)
+      // (a view: the declaration whose node it is, then the def it views — an `as` copy of
+      // `T | null` is T's def, walked through the copy's node and T's)
+      for (let def = at && unshell(at); def; def = def.kind === 'view' ? def.base : undefined) {
+        def = unshell(def)
+        if (def.kind === 'merge' || def.kind === 'umerge') {
+          this.needs.add(def.key)
+        } else if (def.unit && !def.unit.startsWith('m:')) {
+          this.needUnit(def.unit)
+        } else if (def.kind === 'view' && def.src?.[0]?.k === 'ref') {
+          this.needStructure(def.src[0].decl)
+        }
+      }
+    }
+  }
+
+  /**
+   * The statement reads the nodes along `path` of `d`: a placeholder a chain statement fills there
+   * is filled first, see `expr` — the node a step reaches, whichever declaration owns it, and an
+   * item of a union of chains reached through a reference to it (`p: X.w`, `X { w: A.b | C.d }`).
+   */
+  private needFills(d: TStructDecl, path: string[]): void {
+    for (let i = 1; i <= path.length; i++) {
+      const at = path.slice(0, i)
+      this.needs.add(`chain:${d.id}:${at.join('.')}`)
+      const o = this.model.slotAt(d, at)?.owner
+      if (o) {
+        this.needs.add(`chain:${o.unit}:${o.path.join('.')}`)
+      }
+      const step = path[i - 1]
+      const def = step.startsWith('|') ? this.model.defAt(d, path.slice(0, i - 1)) : undefined
+      const u = def && unshell(def)
+      const pos = u && defPosition(u)
+      if (u?.unit && pos !== undefined) {
+        this.needs.add(`chain:${u.unit}:${pos ? `${pos}.` : ''}${step}`)
       }
     }
   }
@@ -755,17 +798,7 @@ export class JsNextRenderer extends JsRenderer {
   /** `Decl, [steps]` of a chain ref (`.ref`, `$alias`): its `$f` read is a guard too. */
   private chainArgs(d: TStructDecl, path: string[]): string {
     this.needPath(d, path)
-    if (d.doc === this.doc) {
-      // (a placeholder of this module along the path — the node a step reaches, whichever
-      // declaration owns it: filled first, see `expr`)
-      for (let i = 1; i <= path.length; i++) {
-        this.needs.add(`chain:${d.id}:${path.slice(0, i).join('.')}`)
-        const o = this.model.slotAt(d, path.slice(0, i))?.owner
-        if (o) {
-          this.needs.add(`chain:${o.unit}:${o.path.join('.')}`)
-        }
-      }
-    }
+    this.needFills(d, path)
     const name = this.nameOf(d)
     const steps = this.runtimePath(d, [], path)
     this.read(1, name, steps)
@@ -777,9 +810,7 @@ export class JsNextRenderer extends JsRenderer {
     this.needStructure(d)
     this.needPath(d, steps)
     // (`defNode`: the node typed by the def at `steps` — the non-null item of `X | null` there)
-    const path = defNode
-      ? this.runtimePath(d, [], [...steps, '']).slice(0, -1)
-      : this.runtimePath(d, [], steps)
+    const path = this.runtimePath(d, [], steps, defNode)
     if (path.length === 0) {
       return this.nameOf(d)
     }
@@ -837,11 +868,7 @@ export class JsNextRenderer extends JsRenderer {
     const root = this.unitName(owner.unit)
     const d = this.model.declById(owner.unit)
     // (`defNode`: the node typed by the slot's def — below `X | null` written there, its item)
-    const path = !d
-      ? owner.path
-      : defNode
-        ? this.runtimePath(d, [], [...owner.path, '']).slice(0, -1)
-        : this.runtimePath(d, [], owner.path)
+    const path = d ? this.runtimePath(d, [], owner.path, defNode) : owner.path
     if (path.length === 0) {
       return root
     }
@@ -1498,6 +1525,8 @@ export class JsNextRenderer extends JsRenderer {
       const node = d.node as SemanticAnnotateNode
       const target = this.model.asTarget(d)!
       this.replacing.add(d.id)
+      // (`$alias` reads the target's def: built first — declaration order is not semantics)
+      this.needStructure(target)
       text = `${this.util('$alias')}(${name}, ${this.refTarget(target)})${this.annotateCalls(name, node)}${this.asEntries(d)}`
     } else if (d.kind === 'interface' && this.model.extendsOf(d).length === 0) {
       const props = this.model.ownProps(d)
@@ -1525,6 +1554,7 @@ export class JsNextRenderer extends JsRenderer {
         // an annotated alias: a thin node over its target (a bare one is not printed: exported);
         // its layer is a reference layer — no `passedWhenReferred: false` keys
         this.replacing.add(d.id)
+        this.needStructure(e.decl)
         text = `${this.util('$alias')}(${name}, ${this.refTarget(e.decl)}, [])${this.annotateCalls(name, d.node)}`
       } else if (e.k === 'chain') {
         this.replacing.add(d.id)
@@ -1727,6 +1757,7 @@ export class JsNextRenderer extends JsRenderer {
       if (!building) {
         this.needStructure(reads)
       }
+      this.needFills(reads, p)
       for (let i = 1; i <= p.length; i++) {
         let slot = this.model.slotAt(reads, p.slice(0, i))
         // (a shell of its own: what it shells)
@@ -2143,12 +2174,7 @@ export class JsNextRenderer extends JsRenderer {
     for (let i = 0; i < steps.length; i++) {
       out.push([steps[i], kinds[i]])
       const slot = this.model.slotAt(d, steps.slice(0, i + 1))
-      const items =
-        slot?.ends.length === 1
-          ? this.nullItems(slot.ends[0])
-          : slot?.contributors && this.model.nullableSlot(slot) && !this.model.nullSlot(slot)
-            ? [0]
-            : []
+      const items = this.slotNullItems(slot)
       if (i < steps.length - 1) {
         // (the union written at the node is its own def when the node is; an alias's union —
         // `p?: N` with `type N = X | null` — never is)

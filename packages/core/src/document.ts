@@ -8,8 +8,9 @@
 import { isBacktickArgType, resolveAnnotation } from './annotations'
 import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
-import { isPhantomPath } from './flatten'
+import { isPhantomPath, unwoundFields } from './flatten'
 import {
+  fieldRefTokens,
   getQueryScope,
   getDeclaredValue,
   resolveFieldPathArgSegments,
@@ -138,6 +139,11 @@ let circularAlias = false
 const chainNodeIds = new WeakMap<object, number>()
 let nextChainNodeId = 0
 
+/** The names of type path steps `chain`. */
+function chainNames(chain: string[] | Token[]): string[] {
+  return chain.map(c => (typeof c === 'string' ? c : c.text))
+}
+
 /** A key of chain `chain` from declaration `node`. */
 function chainKey(node: SemanticNode | undefined, chain: string[] | Token[]): string {
   let id = node ? chainNodeIds.get(node) : -1
@@ -145,7 +151,7 @@ function chainKey(node: SemanticNode | undefined, chain: string[] | Token[]): st
     id = nextChainNodeId++
     chainNodeIds.set(node!, id)
   }
-  return `${id}\0${chain.map(c => (typeof c === 'string' ? c : c.text)).join('.')}`
+  return `${id}\0${chainNames(chain).join('.')}`
 }
 
 /** The active recordings of the documents read (see {@link recordDocumentReads}). */
@@ -208,6 +214,23 @@ const aliasSteps = new WeakMap<
 export function documentsEpoch(): number {
   return epoch
 }
+
+/** The documents connected to `doc` by imports (both ways, directly or not), `doc` first. */
+export function connectedDocuments(doc: AtscriptDoc): AtscriptDoc[] {
+  const out = new Set<AtscriptDoc>([doc])
+  for (const d of out) {
+    for (const next of d.dependencies) {
+      out.add(next)
+    }
+    for (const next of d.dependants) {
+      out.add(next)
+    }
+  }
+  return [...out]
+}
+
+/** One structure model per component (see `AtscriptDoc.componentStructure`), per documents' epoch. */
+const componentModels = { epoch: -1, byDoc: new Map<AtscriptDoc, StructureModel>() }
 
 /** The epoch {@link deepChanged} holds for, and the latest change of each document's imports. */
 let deepEpoch = -1
@@ -424,11 +447,6 @@ export interface TUnwoundField {
  */
 export interface TUnwound extends TUnwoundField {
   fields?: TUnwoundField[]
-}
-
-/** The fields `unwound` names: its `fields`, else itself (none for `undefined`). */
-export function unwoundFields(unwound?: TUnwound): TUnwoundField[] {
-  return unwound?.fields ?? (unwound ? [unwound] : [])
 }
 
 /** A position of a type path being walked (see `AtscriptDoc.unwindType`). */
@@ -1257,13 +1275,24 @@ export class AtscriptDoc {
     if (!positions) {
       return undefined
     }
+    // (one field reached with different blocks at or below it is that many positions)
+    const repeat =
+      walk.collapsed && chain.length > 0
+        ? this.positionsByBlocks(decl, chain, positions.length)
+        : undefined
+    const times = (p: TPathPosition) => (repeat && p.def && repeat(p.def)) || 1
+    if (positions.length === 1 && times(positions[0]) > 1) {
+      // (several fields: none is the target — nothing is reported as its)
+      walk.cb = undefined
+    }
     // (the field reached: what it is from here on)
     walk.declaring = _declaring
-    let fields: TUnwoundField[] = []
+    const fields: TUnwoundField[] = []
     for (const p of positions) {
       if (_tracked) {
         walk.report(p.def) // collecting one more item in chain
       }
+      const n = times(p)
       while (isProp(p.def)) {
         p.node = p.def
         p.def = p.def.getDefinition()
@@ -1271,11 +1300,10 @@ export class AtscriptDoc {
         walk.resolveType(p)
       }
       if (p.def) {
-        fields.push({ def: p.def, doc: p.doc, node: p.node })
+        for (let i = 0; i < n; i++) {
+          fields.push({ def: p.def, doc: p.doc, node: p.node })
+        }
       }
-    }
-    if (walk.fanned && chain.length > 0) {
-      fields = this.positionsByBlocks(decl, chain, fields)
     }
     if (fields.length < 2) {
       return fields[0]
@@ -1291,45 +1319,35 @@ export class AtscriptDoc {
   }
 
   /**
-   * `fields` (a type path's through a union, one per field: see {@link sameField}) with each
-   * repeated once per position the structure model has for it: one field reached with different
-   * blocks at or below it is that many positions (MODEL §15 POS-1, POS-1a; the blocks of the
-   * build of the path's head).
+   * How many positions each field of a type path (`found` of them, one per field: see {@link
+   * sameField}) is: one field reached with different blocks at or below it is that many (MODEL
+   * §15 POS-1, POS-1a; the blocks loading with the path's head, as generated code counts them:
+   * see {@link componentStructure}). Undefined when no field is several.
    */
   private positionsByBlocks(
     decl: { node?: SemanticNode; doc: AtscriptDoc },
     chain: string[] | Token[],
-    fields: TUnwoundField[]
-  ): TUnwoundField[] {
-    const m = decl.doc.buildStructure()
+    found: number
+  ): ((prop: SemanticNode) => number) | undefined {
+    const m = decl.doc.componentStructure()
     const d = decl.node && m.declOfNode(decl.node)
-    const paths =
-      d &&
-      m.typePathPositions(
-        d,
-        chain.map(c => (typeof c === 'string' ? c : c.text))
-      )
-    if (!d || !paths || paths.length <= fields.length) {
-      return fields
+    const paths = d && m.typePathPositions(d, chainNames(chain))
+    if (!d || !paths || paths.length <= found) {
+      return undefined
     }
     // (a field's identity: the declared props it stands for)
-    const ids = new Map<SemanticNode, number>()
-    const key = (props: SemanticNode[]) =>
-      props.map(n => ids.get(n) ?? (ids.set(n, ids.size), ids.size - 1)).join(',')
-    const count = new Map<string, number>()
-    for (const p of paths) {
-      const k = key(m.declaredProps(d, p))
-      count.set(k, (count.get(k) ?? 0) + 1)
+    const fields = paths.map(p => m.declaredProps(d, p))
+    return prop => {
+      const props = fieldContributors(prop)
+      return fields.filter(f => sameContributors(f, props)).length
     }
-    return fields.flatMap(f =>
-      Array<TUnwoundField>((f.node && count.get(key(fieldContributors(f.node)))) || 1).fill(f)
-    )
   }
 
   /**
    * The walk of a type path (see {@link unwindType}): its positions, how a position resolves,
-   * and what it reports to `watchCb` (`cb`; `declaring`: on the way to a chain's field). `fanned`:
-   * a union was met (the path's positions may be several).
+   * and what it reports to `watchCb` (`cb`; `declaring`: on the way to a chain's field).
+   * `collapsed`: branches reaching one field (or one object) were taken as one (blocks may make
+   * it several positions: POS-1).
    *
    * (The structure model's `StructureModel.typePathPositions` is the same chain step on the
    * model's defs — MODEL §15 CHAIN-1, POS-1: the two must stay in step.)
@@ -1344,7 +1362,7 @@ export class AtscriptDoc {
     const walk = {
       cb: watchCb,
       declaring,
-      fanned: false,
+      collapsed: false,
       /** the defs {@link objects} visited (made once a union or a merge is met: a cycle passes one) */
       seen: undefined as Set<SemanticNode> | undefined,
       report(def: SemanticNode | undefined) {
@@ -1412,12 +1430,13 @@ export class AtscriptDoc {
           }
         }
         let positions = [head]
-        for (const item of chain) {
-          const name = typeof item === 'string' ? item : item.text
+        for (const name of chainNames(chain)) {
           const next: TPathPosition[] = []
           for (const o of walk.objects(positions)) {
             const prop = o.def.props.get(name)
-            if (prop && !next.some(n => n.def && sameField(n.def, prop))) {
+            if (prop && next.some(n => n.def && sameField(n.def, prop))) {
+              walk.collapsed = true
+            } else if (prop) {
               next.push({ def: prop, doc: o.doc })
             }
           }
@@ -1446,7 +1465,11 @@ export class AtscriptDoc {
       },
       visit(p: TPathPosition, top: boolean, out: TPathObject[]) {
         const def = p.def && unparenthesized(p.def)
-        if (!def || walk.seen?.has(def)) {
+        if (!def) {
+          return
+        }
+        if (walk.seen?.has(def)) {
+          walk.collapsed = true
           return
         }
         walk.seen?.add(def)
@@ -1459,7 +1482,6 @@ export class AtscriptDoc {
             walk.inner(merged, p.doc, out)
           }
         } else if (isUnion(def)) {
-          walk.fanned = true
           walk.seen ??= new Set([def])
           for (const item of def.unwrap()) {
             walk.inner(item, p.doc, out)
@@ -1614,18 +1636,19 @@ export class AtscriptDoc {
   }
 
   /**
-   * The annotations the blocks of the build write at the field chain reference `ref` names
-   * (`T.a.b`: the structure model's layers of T at `a.b`, through a union at its `|i`
-   * path), in block order, each applied over the earlier ones. None for a chain naming several
-   * fields (no one field is its target).
+   * The annotations the blocks write at the field chain reference `ref` names (`T.a.b`: the
+   * structure model's layers on that field's node — T's at `a.b`, through a union at its `|i`
+   * path, and every other unit's on the way down to the field's own, MODEL §3), innermost first,
+   * each applied over the earlier ones. None for a chain naming several fields (no one field is
+   * its target).
    */
   private chainBlockAnnotations(ref: SemanticRefNode): TAnnotationTokens[] {
     const owner = this.resolveRefOwner(ref)
-    const m = owner?.node && owner.doc.buildStructure()
+    const m = owner?.node && owner.doc.componentStructure()
     const t = m && m.exprOf(this.refOrigin(ref), ref)
     let out: TAnnotationTokens[] = []
     if (m && t?.k === 'chain') {
-      for (const l of m.orderedLayersAt(m.plainTarget(t.decl), t.path)) {
+      for (const l of m.fieldLayers(t.decl, t.path)) {
         out = this.overlayAnnotations(out, l.entry.ref.annotations ?? [])
       }
     }
@@ -1978,10 +2001,9 @@ export class AtscriptDoc {
     }
     // Field refs (query field refs, field-path string args) stand for the property they name
     // (through a union: each field's)
-    const fieldUsages = resolveFieldRefsAt(token, this, character).flatMap(f => {
-      const t = f.prop.token('identifier')
-      return t ? [f.doc.usageListFor(t) ?? []] : []
-    })
+    const fieldUsages = fieldRefTokens(token, this, character).flatMap(f =>
+      f.propToken ? [f.doc.usageListFor(f.propToken) ?? []] : []
+    )
     if (fieldUsages.length > 0) {
       return fieldUsages.flat()
     }
@@ -2043,9 +2065,13 @@ export class AtscriptDoc {
           }
         }
         // Field-path string args, any segment: e.g. `'amount'`, `'address.city'`
+        // (a segment naming the property at several positions — through a union — once)
         for (const arg of doc.fieldPathArgs) {
+          const segments = new Set<string>()
           for (const target of resolveFieldPathArgSegments(arg, doc, propName)) {
-            if (target.prop === token.parentNode) {
+            const at = `${target.range.start.line}:${target.range.start.character}`
+            if (target.prop === token.parentNode && !segments.has(at)) {
+              segments.add(at)
               refs.push({ uri, range: target.range, token: arg })
             }
           }
@@ -2165,8 +2191,10 @@ export class AtscriptDoc {
 
   /** Links to the field(s) a type path names: through a union, to each of its fields. */
   private fieldLinks(token: Token, unwound: TUnwound | undefined) {
+    // (each field once: several positions may be one declared field, MODEL §15 POS-1)
+    const nodes = new Set<SemanticNode>()
     const links = unwoundFields(unwound).flatMap(f =>
-      f.node
+      f.node && !nodes.has(f.node) && nodes.add(f.node)
         ? this.definitionLink(token, {
             uri: this.declaringDoc(f.node, f.doc).id,
             range: f.node.token('identifier')?.range,
@@ -2209,10 +2237,10 @@ export class AtscriptDoc {
       }
       // Field refs (query field refs, field-path string args up to the segment under the cursor;
       // through a union: each field)
-      const fieldRefs = resolveFieldRefsAt(token, this, character)
+      const fieldRefs = fieldRefTokens(token, this, character)
       if (fieldRefs.length > 0) {
         return fieldRefs.map(f => {
-          const propRange = f.prop.token('identifier')?.range ?? zeroRange
+          const propRange = f.propToken?.range ?? zeroRange
           return {
             targetUri: f.doc.id,
             targetRange: propRange,
@@ -2736,6 +2764,28 @@ export class AtscriptDoc {
     return this._buildStructure.model
   }
 
+  /**
+   * The structure model of the documents connected to this one by imports, both ways (a block's
+   * module imports its target's), per documents' epoch: every block that loads with this
+   * document's types (MODEL §7) — what generated code is built from, and what a type path
+   * through a union counts its positions by (MODEL §15 POS-1).
+   */
+  componentStructure(): StructureModel {
+    if (componentModels.epoch !== epoch) {
+      componentModels.epoch = epoch
+      componentModels.byDoc.clear()
+    }
+    let model = componentModels.byDoc.get(this)
+    if (!model) {
+      const docs = connectedDocuments(this)
+      model = new StructureModel(docs)
+      for (const d of docs) {
+        componentModels.byDoc.set(d, model)
+      }
+    }
+    return model
+  }
+
   /** Whether chain ref `ref` names a field a merge makes `never` (the structure model's shape). */
   private chainToNever(ref: SemanticRefNode): boolean {
     if (!ref.hasChain || !ref.id) {
@@ -2895,6 +2945,10 @@ export class AtscriptDoc {
     try {
       const merged = this.mergeGroup(node)
       cache().merged.set(node, merged)
+      if (merged !== node && isIntersection(merged)) {
+        // (what does not merge — `X & A`, X unknown — stays: merging the rest again is the same)
+        cache().merged.set(merged, merged)
+      }
       return merged
     } finally {
       merging.delete(node)
@@ -3730,6 +3784,11 @@ function fieldContributors(prop: SemanticNode): SemanticNode[] {
   return mergedFrom.get(prop) ?? [prop]
 }
 
+/** Whether contributor lists `a` and `b` are one field's: the same props, in the same order. */
+function sameContributors(a: readonly SemanticNode[], b: readonly SemanticNode[]): boolean {
+  return a.length === b.length && a.every((c, i) => c === b[i])
+}
+
 /** Whether props `a` and `b` are one field: the same node, or merged fields of the same contributors. */
 function sameField(a: SemanticNode, b: SemanticNode): boolean {
   if (a === b) {
@@ -3737,7 +3796,7 @@ function sameField(a: SemanticNode, b: SemanticNode): boolean {
   }
   const ca = mergedFrom.get(a)
   const cb = mergedFrom.get(b)
-  return !!ca && !!cb && ca.length === cb.length && ca.every((c, i) => c === cb[i])
+  return !!ca && !!cb && sameContributors(ca, cb)
 }
 
 /** A declaration other types are built from: an interface, a type, an `annotate … as` alias. */

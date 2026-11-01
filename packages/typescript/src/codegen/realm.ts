@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 import type { AtscriptDoc } from '@atscript/core'
-import { documentsEpoch, moduleId } from '@atscript/core'
+import { connectedDocuments, documentsEpoch, moduleId } from '@atscript/core'
 
 import type * as TRealmRuntime from '../realm-runtime'
 
@@ -254,28 +254,14 @@ export class Realm {
   }
 }
 
-/** The documents connected to `doc` (imports and importers, directly or not), `doc` first. */
-export function connected(doc: AtscriptDoc): AtscriptDoc[] {
-  const out = new Set<AtscriptDoc>([doc])
-  for (const d of out) {
-    for (const next of d.dependencies) {
-      out.add(next)
-    }
-    for (const next of d.dependants) {
-      out.add(next)
-    }
-  }
-  return [...out]
-}
-
 /** The realms of the current documents' epoch, by render options and component. */
 const realms = new Map<string, Realm>()
-/** The component of each document (see {@link connected}) of the current documents' epoch. */
+/** The component of each document (see `connectedDocuments`) of the current documents' epoch. */
 const components = new Map<AtscriptDoc, { docs: AtscriptDoc[]; key: string }>()
 let realmsEpoch = -1
 
 /**
- * The realm of `doc`'s component (see {@link connected}) for the render options `key`, loaded:
+ * The realm of `doc`'s component (see `connectedDocuments`) for the render options `key`, loaded:
  * one per component and options until a document changes (see `documentsEpoch`).
  * `moduleOf` renders a document's phase-1 module (a module that failed to evaluate throws on
  * `classOf`).
@@ -292,7 +278,7 @@ export function realmOf(
   }
   let component = components.get(doc)
   if (!component) {
-    const all = connected(doc)
+    const all = connectedDocuments(doc)
     const first = all.reduce((a, b) => (b.id < a.id ? b : a))
     component = { docs: all, key: `${first.id}\n${all.length}` }
     for (const d of all) {

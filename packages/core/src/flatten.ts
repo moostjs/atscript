@@ -1,5 +1,4 @@
-import type { AtscriptDoc, TUnwound } from './document'
-import { unwoundFields } from './document'
+import type { AtscriptDoc, TUnwound, TUnwoundField } from './document'
 import {
   isArray,
   isGroup,
@@ -34,6 +33,11 @@ export const DB_ENTITY_ANNOTATIONS = ['db.table', 'db.view', 'db.view.for'] as c
 /** AST side of {@link DB_ENTITY_ANNOTATIONS}: whether a node carries a DB-entity annotation. */
 export function isDbEntityNode(node: SemanticNode): boolean {
   return !!node.annotations?.some(a => DB_ENTITY_ANNOTATIONS.some(name => name === a.name))
+}
+
+/** The fields `unwound` (a type path's resolution, `AtscriptDoc.unwindType`) names: its `fields`, else itself (none for `undefined`). */
+export function unwoundFields(unwound?: TUnwound): TUnwoundField[] {
+  return unwound?.fields ?? (unwound ? [unwound] : [])
 }
 
 /**
