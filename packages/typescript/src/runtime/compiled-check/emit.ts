@@ -47,6 +47,7 @@ import {
   INTERP,
   keySlots,
   NUMBER_BITS,
+  OBJECT_BITS,
   STRING_BITS,
   type TDef,
   type TKeySlots,
@@ -148,6 +149,7 @@ class CheckEmitter {
     const rootDef = root[2] >= 0 ? this.defs[root[2]][0] : -1
     if (
       root[0] === 0 &&
+      (root[1] & OBJECT_BITS) === 0 &&
       this.fn[root[2]] &&
       (rootDef === D_OBJECT ||
         rootDef === D_OBJECT_PATTERNS ||
@@ -573,6 +575,12 @@ class CheckEmitter {
     const def = this.defs[d]
     const kind = def[0]
     if (this.fn[d] && kind !== D_ARRAY && kind !== D_UNION) {
+      if (kind === D_OBJECT && (mask & OBJECT_BITS) !== 0) {
+        // The key counts after the props (the walk reports them and still checks the props).
+        const ks = keySlots(mask, shape, at)
+        return [...this.call(`d${d}`, x, ctx), ...this.keyCountChecks(ks, x, ctx.fail, def)]
+      }
+      // (D_OBJECT_PATTERNS checks return 2 for any object: the walk counts its keys)
       return this.call(`d${d}`, x, ctx)
     }
     switch (kind) {
@@ -740,6 +748,48 @@ class CheckEmitter {
     return lines
   }
 
+  /**
+   * `@expect.minKeys` / `maxKeys` of object `x` matched as object def `def`: the keys the result
+   * keeps (with `unknownProps: 'strip'` the declared ones, else every own key: with 'error' the
+   * def already failed an object with an unknown key).
+   */
+  private keyCountChecks(ks: TKeySlots, x: string, fail: string, def: TDef): string[] {
+    if (ks.minKeys < 0 && ks.maxKeys < 0) {
+      return []
+    }
+    const n = this.next('n')
+    const conds: string[] = []
+    if (ks.minKeys >= 0) {
+      conds.push(`${n} < k${ks.minKeys}`)
+    }
+    if (ks.maxKeys >= 0) {
+      conds.push(`${n} > k${ks.maxKeys}`)
+    }
+    const known = this.objectProps(def).map(p => p.key)
+    const scan =
+      known.length === 0
+        ? []
+        : [
+            `  for (const k in ${x}) {`,
+            `    if (!ho.call(${x}, k)) continue`,
+            '    switch (k) {',
+            ...known.map(key => `      case ${literalSource(key)}:`),
+            `        ${n}++`,
+            '    }',
+            '  }',
+          ]
+    return [
+      `let ${n}`,
+      `if ((f & ${F_STRIP}) === 0) {`,
+      `  ${n} = Object.keys(${x}).length`,
+      '} else {',
+      `  ${n} = 0`,
+      ...scan,
+      '}',
+      `if (${conds.join(' || ')}) ${fail}`,
+    ]
+  }
+
   /** Mirrors `fastCheckUnionConstraints` (the caller skips literal branches). */
   private unionConstraints(
     mask: number,
@@ -761,6 +811,10 @@ class CheckEmitter {
     }
     if (mask & ARRAY_BITS) {
       branches.push([`Array.isArray(${x})`, this.arrayConstraints(mask, ks, x, fail)])
+    }
+    if (mask & OBJECT_BITS) {
+      // (the counted keys depend on the matched branch: see `branchConstraints`)
+      branches.push([`!(${notObject(x)})`, ['return 2']])
     }
     const lines: string[] = []
     branches.forEach(([cond, body], i) => {
@@ -791,6 +845,9 @@ class CheckEmitter {
     const ks = keySlots(mask, shape, at)
     if (def[0] === D_ARRAY) {
       return this.arrayConstraints(mask, ks, x, fail)
+    }
+    if (def[0] === D_OBJECT) {
+      return this.keyCountChecks(ks, x, fail, def)
     }
     if (def[0] !== D_FINAL) {
       return constraints

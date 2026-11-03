@@ -67,6 +67,8 @@ Annotations from `.as` files are translated into JSON Schema constraints:
 | `@expect.exclusiveMax`      | `exclusiveMaximum`                                | Since 0.1.109                                                                                                |
 | `@expect.int`               | `type: 'integer'`                                 | Changes `number` to `integer`                                                                                |
 | `@expect.pattern`           | `pattern` / `allOf`                               | Single pattern uses `pattern`, multiple become `allOf` entries; flags are applied to the pattern (see below) |
+| `@expect.minKeys`           | `minProperties`                                   | On a union, beside `anyOf` / `oneOf` (applies to its objects); on a named object, `allOf: [{ $ref }]` beside it |
+| `@expect.maxKeys`           | `maxProperties`                                   | As `@expect.minKeys`                                                                                         |
 | `@expect.array.uniqueItems` | `uniqueItems: true`                               | Not with `@expect.array.key` props on the items (see [Differences](#differences-from-the-validator))         |
 
 On a nullable field (`@expect.max 10` on `number | null`), the constraint goes onto the matching non-null `anyOf` member: `{ anyOf: [{ type: 'number', maximum: 10 }, { type: 'null' }] }` (since 0.1.103). When the member has its own bound, the stricter one is kept.
@@ -276,7 +278,7 @@ const roundTripped = buildJsonSchema(type)
 - Primitives (`string`, `number`, `integer`, `boolean`, `null`)
 - Literals (`const`)
 - Enums (`enum` — converted to union of literals)
-- Constraints: `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`
+- Constraints: `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`, `minProperties`, `maxProperties`
 - `$ref` / `$defs` — references are resolved automatically from `$defs` or `definitions`
 
 ::: tip Use case: external schemas

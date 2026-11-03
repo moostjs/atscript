@@ -122,16 +122,21 @@ Global opts cascade to every validated param; override per-handler with `@UseVal
 
 ## Error shape
 
-Wire-level JSON = raw `ValidatorError.errors` array:
+The `HttpError(400)` body carries the raw `ValidatorError.errors` array under `_body`:
 
 ```json
-[
-  { "path": "email", "message": "Must match pattern /^.+@.+$/" },
-  { "path": "age", "message": "Must be >= 0" }
-]
+{
+  "statusCode": 400,
+  "message": "email: Invalid email format.",
+  "error": "Bad Request",
+  "_body": [
+    { "path": "email", "message": "Invalid email format.", "code": "EMAIL", "params": {} },
+    { "path": "age", "message": "Too young", "code": "MIN", "params": { "min": 18, "actual": 3 }, "custom": true }
+  ]
+}
 ```
 
-`statusCode` / `message` live on the `HttpError` itself (used by Moost for the status line + default text), not in the JSON payload. Want `{ errors: [...] }` wrapping? Write a thin post-interceptor.
+Clients branch on `code` / `params`, never on `message` (custom or translated text). Codes table + `localizeErrors`: [validation.md](validation.md#error-codes--translation). Want `{ errors: [...] }` wrapping? Write a thin post-interceptor.
 
 Interceptor does **not** swallow other errors — only `ValidatorError` is converted; everything else propagates.
 

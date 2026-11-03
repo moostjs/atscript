@@ -18,7 +18,7 @@ declare global {
     "meta.documentation": (string)[]
     "meta.sensitive": boolean
     "meta.readonly": boolean
-    "meta.required": { message?: string }
+    "meta.required": { message?: string } | true
     "meta.default": string
     "meta.example": string
     "expect.minLength": { length: number, message?: string }
@@ -27,10 +27,13 @@ declare global {
     "expect.max": { maxValue: number, message?: string }
     "expect.exclusiveMin": { exclusiveMinValue: number, message?: string }
     "expect.exclusiveMax": { exclusiveMaxValue: number, message?: string }
-    "expect.int": boolean
+    "expect.int": { message?: string } | true
+    "expect.minKeys": { count: number, message?: string }
+    "expect.maxKeys": { count: number, message?: string }
+    "expect.message": string
     "expect.pattern": ({ pattern: string, flags?: string, message?: string })[]
-    "expect.array.uniqueItems": { message?: string }
-    "expect.array.key": { message?: string }
+    "expect.array.uniqueItems": { message?: string } | true
+    "expect.array.key": { message?: string } | true
     "emit.jsonSchema": boolean
     "emit.compiledValidator": boolean
   }

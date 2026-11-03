@@ -156,11 +156,12 @@ See [Custom Primitives — Phantom Primitives](/plugin-development/primitives-ty
 ### Objects
 
 1. **Type check**: value must be a non-null, non-array object
-2. **Iterate declared properties**: for each property in the type definition:
+2. **Key counts**: `@expect.minKeys` / `@expect.maxKeys` (see [Object Constraints](#object-constraints)); a failure is reported and the properties are still validated
+3. **Iterate declared properties**: for each property in the type definition:
    - Skip phantom-typed properties
    - If the value is `undefined` and [partial mode](#partial-validation) applies → skip
    - Otherwise, validate recursively (push the property name onto the error path)
-3. **Handle unknown keys**: for each key present in the data but not declared in the type → apply the [unknown properties policy](#unknown-properties-policy)
+4. **Handle unknown keys**: for each key present in the data but not declared in the type → apply the [unknown properties policy](#unknown-properties-policy)
 
 Error on type mismatch: `"Expected object"`
 
@@ -182,6 +183,8 @@ A union (`A | B | C`) passes if the value matches **any one** branch:
 3. If no branch passes → emit an aggregate error with details from all branches
 
 Error: `"Value does not match any of the allowed types: [string(0)], [number(1)]"` with a `details` array containing the errors from each branch attempt.
+
+**Discriminated unions.** When every object branch has a required literal-typed property of the same name with distinct values (the other branches cannot hold an object: scalars, arrays, tuples) and the value is an object, report through the discriminator instead: the errors of the branch whose literal the value holds, at their own paths; or, when no branch has the value's literal, one error at the discriminator property (code `UNION_DISCRIMINATOR`, the allowed values as a param). Two such properties, an optional one, or a branch that may hold any object, make the union a plain one. Under partial validation at the union's depth, a value without the discriminator gets the plain union error.
 
 ::: tip Branch error isolation
 Each branch attempt should be evaluated in its own error scope. If a branch fails, its errors are captured but not committed to the main error list. Only if _all_ branches fail are the captured errors included as `details` in the aggregate error.
@@ -251,6 +254,17 @@ Applied when the value is a valid boolean:
 | ---------------- | ---------------- | ------------------- |
 | `@meta.required` | `value !== true` | `"Must be checked"` |
 
+### Object Constraints
+
+Applied when the value is an object, before its properties:
+
+| Annotation          | Condition       | Default error                             |
+| ------------------- | --------------- | ----------------------------------------- |
+| `@expect.minKeys N` | kept keys `< N` | `"Expected at least N properties, got M"` |
+| `@expect.maxKeys N` | kept keys `> N` | `"Expected at most N properties, got M"`  |
+
+The kept keys are the keys the result keeps: every own key with `unknownProps: 'ignore'`; with `'strip'` and `'error'`, the declared props and the keys pattern props match. A failed count is reported and the properties are still validated.
+
 ### Array Constraints
 
 Applied at the array level (before element validation):
@@ -307,6 +321,8 @@ All constraint annotations support an optional trailing `message` argument in `.
 
 When a custom message is provided, use it instead of the default error text.
 
+`@expect.message "text"` on a field or a type replaces the message of a type mismatch at that node (wrong type, not the literal, no union branch, an unknown discriminator, a tuple of the wrong length); constraint failures keep their own messages.
+
 How your code generator stores annotation arguments at runtime is entirely up to your plugin — there is no prescribed metadata shape. The spec only requires that the constraint value and the optional custom message are both accessible to the validator at runtime.
 
 ## Error Reporting
@@ -319,9 +335,14 @@ Each validation error has:
 {
   path: string       // dot-separated location (e.g., "address.city")
   message: string    // human-readable error description
+  code: string       // stable UPPER_SNAKE code (e.g., "MIN_LENGTH")
+  params: object     // the values the message needs (e.g., { min: 3, actual: 1 })
+  custom?: true      // the message is the app's text (an annotation's message argument)
   details?: Error[]  // nested errors (used for union branch failures)
 }
 ```
+
+Use the codes, params and default templates of the reference validator ([Error Codes](/packages/typescript/validation-reference#error-codes)), so translations and clients work across implementations. A default message is the code's template filled with the params.
 
 ### Path Tracking
 

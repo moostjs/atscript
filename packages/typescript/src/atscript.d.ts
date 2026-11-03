@@ -17,8 +17,11 @@ declare global {
     'expect.exclusiveMax': { exclusiveMaxValue: number; message?: string }
     'meta.required': { message?: string } | true
     'expect.int': { message?: string } | true
-    'expect.array.uniqueItems': { message?: string }
-    'expect.array.key': { message?: string }
+    'expect.minKeys': { count: number; message?: string }
+    'expect.maxKeys': { count: number; message?: string }
+    'expect.message': string
+    'expect.array.uniqueItems': { message?: string } | true
+    'expect.array.key': { message?: string } | true
     'expect.pattern': Array<{ pattern: string; flags?: string; message?: string }>
     'mongo.collection': string
     'mongo.index.plain': Array<string | true>

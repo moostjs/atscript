@@ -5,7 +5,7 @@ description: >-
   source of truth for types, metadata, and validation constraints. Covers `.as`
   syntax, `@meta.*` / `@expect.*` / custom annotations, primitives, the `asc`
   CLI + `atscript.config.*`, generated `.as.d.ts` / `.as.js` / `atscript.d.ts`,
-  runtime helpers (`Validator`, `coerceForType`, JSON Schema, serialize,
+  runtime helpers (`Validator`, error codes + `localizeErrors`, `coerceForType`, JSON Schema, serialize,
   metadata layers / `metadata.set`), intersection / `extends` merges and
   their compile errors, `annotate` path rules and block order,
   compiled validators (`compileValidators`, `invalidateCompiledValidators`),
@@ -123,7 +123,7 @@ npx skills add moostjs/atscript-ui   # UI layer
 | `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, `--skipDiag`, scripts, "Nothing emitted" / errors block the emit, atomic writes, `db sync` flags (`--check`, `--format`), complete-inventory rule ("Could not load N compiled model module(s)", `ERR_MODULE_NOT_FOUND`, nested `.as` imports) + pointer |
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType` (`.ref()`; `refTo`/`cloneRefProp` removed → rebuild 0.1.110 packages), `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth, metadata layers and runtime writes (`metadata.set` / `delete` / append arrays, what a write reaches) |
-| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, `coerceForType`, JSON Schema helpers, plugins, compiled validators (`compileValidators`, which options/types stay interpreted, `invalidateCompiledValidators` after raw type mutations) |
+| Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, error codes / translating errors (`localizeErrors`), `coerceForType`, JSON Schema helpers, plugins, compiled validators (`compileValidators`, which options/types stay interpreted, `invalidateCompiledValidators` after raw type mutations) |
 | Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, `root`, `compileValidators` override (`ssr` = compile the Vite server build only) (config discovered from the wrong cwd, `pnpm -C`, unknown `@db.*`/`@ui.*` annotations), `optimizeDeps` prebundling of `@atscript/typescript/utils` ("optimized dependencies changed. reloading"), stale `.as` import after moving/retyping a model (dev server keeps the old field type, "requires string" on reload while `asc`/`tsc` pass, `watchChange` cache invalidation), dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
 | Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform                            |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |

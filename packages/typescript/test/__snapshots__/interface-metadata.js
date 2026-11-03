@@ -30,7 +30,7 @@ $("object", WithMetadata).annotate("id", "interface-with-metadata").annotate("lo
   .prop("prop1", $().designType("string")
     .tags("string").annotate("label", "Prop1").$type)
   .prop("prop-2", $().designType("number")
-    .tags("int", "number").annotate("mul", 1, true).annotate("mul", 2, true).annotate("mul", 3, true).annotate("long.nested.name", "Prop-2").annotate("long.nested.name2", "Prop-2-2").annotate("expect.int", true).$type)
+    .tags("int", "number").annotate("mul", 1, true).annotate("mul", 2, true).annotate("mul", 3, true).annotate("long.nested.name", "Prop-2").annotate("long.nested.name2", "Prop-2-2").annotate("expect.int", { }).$type)
   .prop("obj", $("object")
     .prop("prop3", $().designType("string")
       .tags("string").annotate("label", "Prop3").$type)

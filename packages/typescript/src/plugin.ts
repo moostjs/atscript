@@ -150,12 +150,15 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
           const typeLine = Array.from(val!.types)
             .map(t => {
               if (t.type === 'object' && 'props' in t) {
-                return `{ ${Object.entries(t.props)
-                  .map(
-                    ([k, v]) =>
-                      `${wrapProp(k)}${(v as { optional?: boolean }).optional ? '?' : ''}: ${(v as { type: string }).type}`
-                  )
+                const props = Object.entries(t.props) as Array<
+                  [string, { optional?: boolean; type: string }]
+                >
+                const object = `{ ${props
+                  .map(([k, v]) => `${wrapProp(k)}${v.optional ? '?' : ''}: ${v.type}`)
                   .join(', ')} }`
+                // (one optional argument, e.g. a message: a bare annotation may also be stored
+                // as `true` — by modules of earlier versions, `fromJsonSchema`, `annotate()`)
+                return props.length === 1 && props[0][1].optional ? `${object} | true` : object
               } else {
                 return 'optional' in t && t.optional ? `${t.type} | true` : t.type
               }

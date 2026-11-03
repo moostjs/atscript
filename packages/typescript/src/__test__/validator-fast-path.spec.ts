@@ -881,7 +881,7 @@ describe('Validator fast path — equivalence with the full walk', { timeout: 30
     bad.age = 200
     expect(v.validate(bad, true)).toBe(false)
     expect(spy).toHaveBeenCalled()
-    expect(v.errors).toEqual([{ path: 'age', message: 'Expected maximum 150, got 200' }])
+    expect(v.errors).toMatchObject([{ path: 'age', message: 'Expected maximum 150, got 200' }])
   })
 
   it('resets errors on a fast pass after a failed call', () => {
@@ -1206,7 +1206,7 @@ describe('Validator fast path — metadata / structure mutated after first valid
       ;(n.metadata.get('expect.min') as any).minValue = 6
       afterRawWrite()
       expect(v.validate([{ n: 5 }, { n: 6 }], true)).toBe(false)
-      expect(v.errors).toEqual([{ path: '0.n', message: 'Expected minimum 6, got 5' }])
+      expect(v.errors).toMatchObject([{ path: '0.n', message: 'Expected minimum 6, got 5' }])
     })
     it('prop added / replaced / removed / turned phantom / optional toggled', () => {
       check(t => item(t).type.props.set('extra', str().$type), validOrder(), false)
@@ -1308,7 +1308,7 @@ describe('Validator literal-union shortcut', () => {
     const v = new Validator(t3)
     const spy = vi.spyOn(v as any, 'validatePrimitive')
     expect(v.validate({ s: 'archived', n: 'x' }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'n', message: 'Expected number, got string' }])
+    expect(v.errors).toMatchObject([{ path: 'n', message: 'Expected number, got string' }])
     // one call for `n` only — the union matched without trying the literal branches
     expect(spy).toHaveBeenCalledTimes(1)
   })

@@ -229,7 +229,9 @@ describe("unknownProps 'strip': deletes on success only", () => {
       expect(passed).toBe(false)
       expect(value).toEqual(make())
       expect(keyOrder(value)).toEqual(keyOrder(make()))
-      expect(errors).toEqual([{ path: 'items.1.qty', message: 'Expected number, got string' }])
+      expect(errors).toMatchObject([
+        { path: 'items.1.qty', message: 'Expected number, got string' },
+      ])
     }
   })
 

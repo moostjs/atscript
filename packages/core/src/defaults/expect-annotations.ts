@@ -1,4 +1,9 @@
-import { AnnotationSpec, annotationExample, nonNullishMembers } from '../annotations'
+import {
+  AnnotationSpec,
+  annotationExample,
+  nonNullishMembers,
+  type TAnnotationArgument,
+} from '../annotations'
 import type { TAnnotationsTree } from '../config'
 import { isArray, isPrimitive, isRef, type SemanticNode } from '../parser/nodes'
 import type { TMessages } from '../parser/types'
@@ -7,6 +12,14 @@ import { statefulRegexFlagsMessage } from '../parser/utils'
 const NULLABLE_NOTE =
   'Also allowed on a nullable field (`T | null`, `T | undefined`): `null` passes, ' +
   'any other value must satisfy the constraint.'
+
+/** The optional message argument of a constraint annotation. */
+const MESSAGE_ARG: TAnnotationArgument = {
+  name: 'message',
+  optional: true,
+  type: 'string',
+  description: 'Optional error message to display if the validation fails.',
+}
 
 /** Whether `flags` are flags of a JS regular expression. */
 function validFlags(flags: string): boolean {
@@ -50,13 +63,68 @@ function numberBoundSpec(
         type: 'number',
         description: argDescription,
       },
-      {
-        name: 'message',
-        optional: true,
-        type: 'string',
-        description: 'Optional error message to display if the validation fails.',
-      },
+      MESSAGE_ARG,
     ],
+  })
+}
+
+/** Whether `text` (a number argument) is a non-negative integer. */
+function isCount(text: string): boolean {
+  return /^\d+$/.test(text)
+}
+
+/**
+ * `@expect.minKeys` / `maxKeys`: a key count (a non-negative integer) plus an optional message.
+ * `@expect.maxKeys` also checks it is not below the node's `@expect.minKeys`.
+ */
+function keyCountSpec(
+  bound: 'at least' | 'at most',
+  example: string[],
+  argDescription: string,
+  min?: string
+): AnnotationSpec {
+  const summary =
+    `Validates that an object has ${bound} this many keys: the keys it keeps (with unknown ` +
+    'properties ignored, every own key; else the declared and pattern-matched ones).'
+  return new AnnotationSpec({
+    description: annotationExample(`${summary} ${NULLABLE_NOTE}`, ...example),
+    defType: ['object'],
+    argument: [
+      {
+        name: 'count',
+        type: 'number',
+        description: argDescription,
+      },
+      MESSAGE_ARG,
+    ],
+    validate(mainToken, args) {
+      const count = args[0]
+      if (!count || count.type !== 'number') {
+        return []
+      }
+      if (!isCount(count.text)) {
+        return [
+          {
+            message: `${mainToken.text} expects a non-negative integer`,
+            range: count.range,
+            severity: 1,
+          },
+        ]
+      }
+      const lower = min
+        ? mainToken.parentNode?.annotations?.find(a => a.name === min)?.args[0]
+        : undefined
+      if (lower && isCount(lower.text) && Number(lower.text) > Number(count.text)) {
+        return [
+          {
+            message: `${mainToken.text} is below @${min} (${lower.text})`,
+            range: count.range,
+            severity: 1,
+          },
+        ]
+      }
+      return []
+    },
   })
 }
 
@@ -74,12 +142,7 @@ export const expectAnnotations: TAnnotationsTree = {
         type: 'number',
         description: 'The minimum length of the string or array.',
       },
-      {
-        name: 'message',
-        optional: true,
-        type: 'string',
-        description: 'Optional error message to display if the validation fails.',
-      },
+      MESSAGE_ARG,
     ],
   }),
 
@@ -96,12 +159,7 @@ export const expectAnnotations: TAnnotationsTree = {
         type: 'number',
         description: 'The maximum length of the string or array.',
       },
-      {
-        name: 'message',
-        optional: true,
-        type: 'string',
-        description: 'Optional error message to display if the validation fails.',
-      },
+      MESSAGE_ARG,
     ],
   }),
 
@@ -140,6 +198,37 @@ export const expectAnnotations: TAnnotationsTree = {
       'age: number'
     ),
     defType: ['number'],
+    argument: [MESSAGE_ARG],
+  }),
+
+  minKeys: keyCountSpec(
+    'at least',
+    ['@expect.minKeys 1', 'labels: { [*]: string }'],
+    'The minimum number of keys.'
+  ),
+
+  maxKeys: keyCountSpec(
+    'at most',
+    ['@expect.maxKeys 20', 'labels: { [*]: string }'],
+    'The maximum number of keys.',
+    'expect.minKeys'
+  ),
+
+  message: new AnnotationSpec({
+    description: annotationExample(
+      'Custom error message for a type mismatch: wrong type (a non-finite number, a malformed ' +
+        "decimal), not the literal (or not one of a literal union's values), no union branch, " +
+        'unknown discriminator, wrong tuple length. Constraint failures keep their own messages ' +
+        '(`@expect.minLength` …, `@meta.required`).',
+      "@expect.message 'Choose a valid status'",
+      "status: 'active' | 'blocked'"
+    ),
+    nodeType: ['prop', 'type'],
+    argument: {
+      name: 'message',
+      type: 'string',
+      description: 'The error message.',
+    },
   }),
 
   pattern: new AnnotationSpec({
@@ -230,12 +319,7 @@ export const expectAnnotations: TAnnotationsTree = {
         ],
         description: 'Optional flags for the regular expression.',
       },
-      {
-        name: 'message',
-        optional: true,
-        type: 'string',
-        description: 'Optional error message to display if the validation fails.',
-      },
+      MESSAGE_ARG,
     ],
     validate(mainToken, args) {
       if (args[0]) {

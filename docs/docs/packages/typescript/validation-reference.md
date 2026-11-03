@@ -45,7 +45,7 @@ The compiler merges every intersection of object types in `.as` into one object 
 
 ### `errorLimit`
 
-Maximum number of errors to collect before stopping. Default: `10`.
+Maximum number of errors to collect before stopping. Default: `10`. `validator.errors` never holds more.
 
 ### `skipList`
 
@@ -75,19 +75,22 @@ Product.validator({
 
 Annotations from `.as` files are enforced automatically:
 
-| Annotation                  | Applies to               | Validates                                                              |
-| --------------------------- | ------------------------ | ---------------------------------------------------------------------- |
-| `@meta.required`            | string, boolean          | String: at least one non-whitespace character. Boolean: must be `true` |
-| `@expect.minLength`         | string, array            | Minimum length                                                         |
-| `@expect.maxLength`         | string, array            | Maximum length                                                         |
-| `@expect.min`               | number                   | Minimum value                                                          |
-| `@expect.max`               | number                   | Maximum value                                                          |
-| `@expect.exclusiveMin`      | number                   | Strictly greater than the value (since 0.1.109)                        |
-| `@expect.exclusiveMax`      | number                   | Strictly less than the value (since 0.1.109)                           |
-| `@expect.int`               | number                   | Must be integer                                                        |
-| `@expect.pattern`           | string                   | Regex match                                                            |
-| `@expect.array.uniqueItems` | array                    | No duplicate items                                                     |
-| `@expect.array.key`         | array element properties | Marks identity fields for uniqueness and patch operations              |
+| Annotation                  | Applies to               | Validates                                                                                     |
+| --------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
+| `@meta.required`            | string, boolean          | String: at least one non-whitespace character. Boolean: must be `true`                        |
+| `@expect.minLength`         | string, array            | Minimum length                                                                                |
+| `@expect.maxLength`         | string, array            | Maximum length                                                                                |
+| `@expect.min`               | number                   | Minimum value                                                                                 |
+| `@expect.max`               | number                   | Maximum value                                                                                 |
+| `@expect.exclusiveMin`      | number                   | Strictly greater than the value (since 0.1.109)                                               |
+| `@expect.exclusiveMax`      | number                   | Strictly less than the value (since 0.1.109)                                                  |
+| `@expect.int`               | number                   | Must be integer                                                                               |
+| `@expect.pattern`           | string                   | Regex match                                                                                   |
+| `@expect.minKeys`           | object                   | At least this many keys (records, objects with optional props; see [Key counts](#key-counts)) |
+| `@expect.maxKeys`           | object                   | At most this many keys                                                                        |
+| `@expect.array.uniqueItems` | array                    | No duplicate items                                                                            |
+| `@expect.array.key`         | array element properties | Marks identity fields for uniqueness and patch operations                                     |
+| `@expect.message`           | prop, type               | Custom message for a value of the wrong type (see [below](#custom-message-for-a-wrong-type))  |
 
 Semantic types like `string.email`, `string.required`, and `number.positive` add validation behavior through their built-in annotation definitions.
 
@@ -150,6 +153,17 @@ interface OrderItem {
 
 For primitive arrays like `string[]`, uniqueness falls back to deep equality.
 
+## Key Counts
+
+`@expect.minKeys` / `@expect.maxKeys` count the keys the validated object keeps, which depends on [`unknownProps`](#unknownprops):
+
+| `unknownProps`        | Counted keys                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `'ignore'`            | every own key                                                                                                                     |
+| `'strip'` / `'error'` | the declared props and the keys pattern props match (any other key is removed with `'strip'`, an error of its own with `'error'`) |
+
+A failed count is reported (`MIN_KEYS` / `MAX_KEYS`) and the props are still checked, so their errors are reported too.
+
 ## Error Handling
 
 `ValidatorError` extends `Error` and includes structured details:
@@ -162,15 +176,126 @@ try {
 } catch (e) {
   if (e instanceof ValidatorError) {
     for (const err of e.errors) {
-      console.log(err.path)
-      console.log(err.message)
-      console.log(err.details)
+      console.log(err.path) // 'address.city'
+      console.log(err.code) // 'MIN_LENGTH'
+      console.log(err.params) // { min: 3, actual: 1 }
+      console.log(err.message) // 'Expected minimum length of 3 characters, got 1 characters'
     }
   }
 }
 ```
 
-After safe validation, errors are available on `validator.errors`.
+After safe validation, errors are available on `validator.errors`. Each error (`TError`) has:
+
+| Field     | Meaning                                                                                                                                   |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `path`    | Dot path of the value (`''` for the root)                                                                                                 |
+| `message` | The default English message, or the app's own message from an annotation                                                                  |
+| `code`    | Stable UPPER_SNAKE code (see [Error Codes](#error-codes)); `CUSTOM` for a plugin error reported without a code                            |
+| `params`  | The values the message needs: limits, expected type, pattern, allowed values (JSON-safe; input copied into them is cut at 100 characters) |
+| `custom`  | `true` when `message` is app text (an annotation's message argument, `@expect.message`, a plugin's own message)                           |
+| `details` | The errors of each branch, for a union error                                                                                              |
+
+## Error Codes
+
+The validator is locale-agnostic: it reports codes and params, and its default messages are English. Translate errors after validation with `localizeErrors()`, or per validator with the `translate` option. The compiled checks are not affected (they only decide pass / fail; errors always come from the same walk).
+
+Every default message is its code's template from `VALIDATOR_MESSAGES`, with `{name}` replaced by `params.name`:
+
+| Code                                                                      | Default template                                                       | Params                                  |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------------------------------------- |
+| `REQUIRED`                                                                | `Must not be empty`                                                    |                                         |
+| `REQUIRED_CHECKED`                                                        | `Must be checked`                                                      |                                         |
+| `TYPE`                                                                    | `Expected {expected}, got {actual}`                                    | `expected`, `actual` (type names)       |
+| `TYPE_ARRAY`                                                              | `Expected array`                                                       | `actual`                                |
+| `TYPE_OBJECT`                                                             | `Expected object`                                                      | `actual`                                |
+| `TYPE_DECIMAL`                                                            | `Expected string (decimal), got {actual}`                              | `actual`                                |
+| `NOT_FINITE`                                                              | `Expected finite number, got {actual}`                                 | `actual` (`'NaN'`, `'Infinity'`, …)     |
+| `DECIMAL_FORMAT`                                                          | `Invalid decimal format: "{value}"`                                    | `value`                                 |
+| `NEVER`                                                                   | `This type is impossible, must be an internal problem`                 |                                         |
+| `LITERAL`                                                                 | `Expected {expected}, got {actual}`                                    | `expected` (the literal), `actual`      |
+| `UNION`                                                                   | `Value does not match any of the allowed types: {expected}`            | `expected`                              |
+| `UNION_DISCRIMINATOR`                                                     | `Expected one of {allowed}, got {actual}`                              | `property`, `allowed` (array), `actual` |
+| `UNEXPECTED_PROPERTY`                                                     | `Unexpected property`                                                  | `property`                              |
+| `TUPLE_LENGTH`                                                            | `Expected array of length {length}`                                    | `length`                                |
+| `MIN_LENGTH`                                                              | `Expected minimum length of {min} characters, got {actual} characters` | `min`, `actual`                         |
+| `MAX_LENGTH`                                                              | `Expected maximum length of {max} characters, got {actual} characters` | `max`, `actual`                         |
+| `MIN_ITEMS`                                                               | `Expected minimum length of {min} items, got {actual} items`           | `min`, `actual`                         |
+| `MAX_ITEMS`                                                               | `Expected maximum length of {max} items, got {actual} items`           | `max`, `actual`                         |
+| `UNIQUE_ITEMS`                                                            | `Duplicate items are not allowed`                                      | (path: the duplicate's index)           |
+| `MIN_KEYS`                                                                | `Expected at least {min} properties, got {actual}`                     | `min`, `actual`                         |
+| `MAX_KEYS`                                                                | `Expected at most {max} properties, got {actual}`                      | `max`, `actual`                         |
+| `PATTERN`                                                                 | `Value is expected to match pattern "{pattern}"`                       | `pattern`, `flags` (when set)           |
+| `INT`                                                                     | `Expected integer, got {actual}`                                       | `actual`                                |
+| `MIN` / `MAX`                                                             | `Expected minimum {min}, got {actual}` / `Expected maximum {max}, …`   | `min` / `max`, `actual`                 |
+| `EXCLUSIVE_MIN`                                                           | `Expected greater than {min}, got {actual}`                            | `min`, `actual`                         |
+| `EXCLUSIVE_MAX`                                                           | `Expected less than {max}, got {actual}`                               | `max`, `actual`                         |
+| `EMAIL`, `PHONE`, `DATE`, `ISO_DATE`, `UUID`, `URL`, `IPV4`, `IPV6`, `IP` | the `string.*` primitive's format message (`Invalid email format.`, …) |                                         |
+
+Import the table and the code names from `@atscript/typescript/utils`: `VALIDATOR_MESSAGES` (code → English template), `VALIDATOR_ERROR_CODES` (code → code) and the `TValidatorErrorCode` type. Serve the table per locale (translated templates keyed by code) to let clients localise without their own catalog.
+
+### Translating errors
+
+`localizeErrors(errors, translate)` returns new errors with translated messages (details included). `translate(id, params, error)` gets:
+
+- the **code** for a default message (`'MIN_LENGTH'`),
+- the **message text** for app text (`custom: true`, or an error without a code) — the text is the message id (gettext style),
+
+and returns the translated message, or `undefined` to keep the current one.
+
+```typescript
+import { localizeErrors, messagesTranslator } from '@atscript/typescript/utils'
+
+const de = {
+  MIN_LENGTH: 'Mindestens {min} Zeichen',
+  'Choose a valid status': 'Bitte einen gültigen Status wählen',
+}
+
+if (!validator.validate(data, true)) {
+  const errors = localizeErrors(validator.errors, messagesTranslator(de))
+}
+```
+
+`messagesTranslator(map)` looks the id up in a map of templates and fills `{name}` placeholders from the params (`formatValidatorMessage(template, params)` does the filling on its own). Bring your own i18n library with a function instead:
+
+```typescript
+localizeErrors(errors, (id, params) => (i18n.exists(id) ? i18n.t(id, params) : undefined))
+```
+
+To get translated errors from one validator directly, pass `translate`:
+
+```typescript
+const validator = Product.validator({ translate: messagesTranslator(de) })
+validator.validate(data) // the thrown ValidatorError and validator.errors carry translated messages
+```
+
+- **DO translate per request with `localizeErrors()`** and keep one validator per type: a `translate` option per locale means one validator per locale.
+- **DON'T match on `message`.** It changes with custom messages and translation; branch on `code` and read `params`.
+
+### Custom message for a wrong type
+
+Constraint annotations take a message argument (`@expect.minLength 3, "Too short"`, `@expect.int "Whole numbers only"`). For a value of the wrong type, use `@expect.message` on the field or the type:
+
+```atscript
+export interface Account {
+    @expect.message "Choose a valid status"
+    status: 'active' | 'blocked'
+
+    @expect.message "Age must be a number"
+    age?: number.int
+}
+```
+
+It replaces the message of `TYPE`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_DECIMAL`, `NOT_FINITE`, `DECIMAL_FORMAT`, `LITERAL`, `UNION`, `UNION_DISCRIMINATOR` and `TUPLE_LENGTH` errors at that node. The error keeps its `code` and `params` with `custom: true`. Constraint failures keep their own messages.
+
+### Discriminated unions
+
+When every object branch of a union has a required literal-typed property of the same name with a distinct value (`{ kind: 'cat', … } | { kind: 'dog', … }`, optionally `| null`), an object that fails the union is reported through its discriminator:
+
+- the discriminator picks a branch → that branch's errors, at their own paths (`pet.lives: Expected maximum 9, got 10`), instead of one union error with every branch's errors;
+- the discriminator matches no branch (or is missing) → one `UNION_DISCRIMINATOR` error at the discriminator (`pet.kind`), `params.allowed` listing the values.
+
+With partial validation at the union's depth (`partial: 'deep'`, or `true` at the top), an object without the discriminator gets the `UNION` error, with every branch's errors in `details`. Other unions (no shared literal property, two such properties, an optional discriminator in a branch, a branch that may hold any object) report the `UNION` error with `details` as before. The same detection drives the JSON Schema `discriminator`.
 
 ## Plugins
 
@@ -226,13 +351,14 @@ const serverFilled: TValidatorPlugin = (ctx, def, value) => {
 
 ### Reporting Custom Errors from a Plugin
 
-Plugins may push their own structured errors into the active validator via `ctx.error(message, path?, details?)`:
+Plugins may push their own structured errors into the active validator via `ctx.error(message, path?, details?, info?)`:
 
-| Argument  | Type        | Notes                                                                              |
-| --------- | ----------- | ---------------------------------------------------------------------------------- |
-| `message` | `string`    | Required. Becomes the `message` of a `TError` entry.                               |
-| `path`    | `string?`   | Optional. Defaults to the current dot-separated path being validated.              |
-| `details` | `TError[]?` | Optional. Nested error breakdown — useful when an alternative-tested branch fails. |
+| Argument  | Type          | Notes                                                                                                                              |
+| --------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `message` | `string`      | Required. Becomes the `message` of a `TError` entry.                                                                               |
+| `path`    | `string?`     | Optional. Defaults to the current dot-separated path being validated.                                                              |
+| `details` | `TError[]?`   | Optional. Nested error breakdown — useful when an alternative-tested branch fails.                                                 |
+| `info`    | `TErrorInfo?` | Optional `{ code, params, custom }`. Without it the error has code `CUSTOM` and `custom: true` (its message is the translation id) |
 
 ```typescript
 const requirePositiveAmount: TValidatorPlugin = (ctx, def, value) => {
@@ -242,6 +368,15 @@ const requirePositiveAmount: TValidatorPlugin = (ctx, def, value) => {
   }
   return undefined
 }
+```
+
+Give the error a code so apps can translate it by code:
+
+```typescript
+ctx.error(`Amount must be positive`, undefined, undefined, {
+  code: 'AMOUNT_NOT_POSITIVE',
+  params: { actual: value },
+})
 ```
 
 ## Manual Validator Construction

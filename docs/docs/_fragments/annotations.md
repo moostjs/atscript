@@ -173,6 +173,9 @@ Atscript provides common-purpose annotations:
 - `@expect.exclusiveMax 1, "Custom error message"` - Number must be strictly less than the value (optional message, since 0.1.109)
 - `@expect.int "Custom error message"` - Must be integer (optional message)
 - `@expect.pattern "regex", "flags", "message"` - Pattern validation (repeatable, optional message). Every check of a value gives the same result: the `g` flag has no effect, and `y` matches at the start of the value only (like `^`); the compiler warns about both
+- `@expect.minKeys 1, "Custom error message"` - Object must have at least this many keys (records `{ [*]: T }`, objects with optional props; counts the keys the result keeps, see [Key counts](/packages/typescript/validation-reference#key-counts); optional message)
+- `@expect.maxKeys 20, "Custom error message"` - Object must have at most this many keys (optional message)
+- `@expect.message "Custom error message"` - Message for a type mismatch: wrong type, not the literal, no union branch, unknown discriminator, wrong tuple length (on a prop or a type; constraint failures keep their own messages). See [Error Codes](/packages/typescript/validation-reference#custom-message-for-a-wrong-type)
 - `@expect.array.uniqueItems "Custom error message"` - Enforce unique items in an array (by key fields if defined, otherwise by deep equality; optional message)
 - `@expect.array.key "Custom error message"` - Mark a field as a key inside an array of objects (used for uniqueness checks, lookups, and patch operations; does not enforce uniqueness by itself; optional message)
 

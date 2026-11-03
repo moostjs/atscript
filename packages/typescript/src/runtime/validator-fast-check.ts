@@ -11,7 +11,14 @@ import { compiledCheckFor, optionFlags, type TCompiledEnv } from './compiled-che
 import { filledMeta, readable } from './layers'
 import { statelessRegExp } from './stateless-regex'
 import type { TValidatorOptions } from './validator'
-import { ARRAY_KEYS, BOOLEAN_KEYS, DECIMAL_RE, NUMBER_KEYS, STRING_KEYS } from './validator-keys'
+import {
+  ARRAY_KEYS,
+  BOOLEAN_KEYS,
+  DECIMAL_RE,
+  NUMBER_KEYS,
+  OBJECT_KEYS,
+  STRING_KEYS,
+} from './validator-keys'
 
 export { DECIMAL_RE } from './validator-keys'
 
@@ -330,7 +337,7 @@ function fastCheckUnion(
     const failures = COMPILED_ENV.n
     const result = fastCheck(item, value, branchFlags, opts)
     if (result !== FAIL) {
-      return unionMatchResult(result, item, def.metadata, value)
+      return unionMatchResult(result, item, def.metadata, value, opts)
     }
     if (COMPILED_ENV.n !== failures) {
       unionWaste()
@@ -369,7 +376,7 @@ function checkPlanUnion(plan: Plan, value: any, flags: number, opts: TValidatorO
     const failures = COMPILED_ENV.n
     const result = checkPlan(child, value, branchFlags, opts)
     if (result !== FAIL) {
-      return unionMatchResult(result, child.def, plan.metadata!, value)
+      return unionMatchResult(result, child.def, plan.metadata!, value, opts)
     }
     if (COMPILED_ENV.n !== failures) {
       unionWaste()
@@ -398,7 +405,7 @@ function unionBranches(
     const failures = COMPILED_ENV.n
     const result = fastCheck(item, value, branchFlags, opts)
     if (result !== FAIL) {
-      return unionMatchResult(result, item, def.metadata, value)
+      return unionMatchResult(result, item, def.metadata, value, opts)
     }
     if (COMPILED_ENV.n !== failures) {
       unionWaste()
@@ -427,7 +434,7 @@ function planUnionBranches(
     const failures = COMPILED_ENV.n
     const result = checkPlan(child, value, branchFlags, opts)
     if (result !== FAIL) {
-      return unionMatchResult(result, child.def, plan.metadata!, value)
+      return unionMatchResult(result, child.def, plan.metadata!, value, opts)
     }
     if (COMPILED_ENV.n !== failures) {
       unionWaste()
@@ -567,11 +574,12 @@ function unionMatchResult(
   result: number,
   item: TAtscriptAnnotatedType,
   metadata: TMetadata,
-  value: any
+  value: any,
+  opts: TValidatorOptions
 ): number {
   // Literal branches skip the union-level constraints.
   return result === PASS && (item.type as TAtscriptTypeFinal).value === undefined
-    ? fastCheckUnionConstraints(metadata, value)
+    ? fastCheckUnionConstraints(metadata, value, item, opts)
     : result
 }
 
@@ -579,7 +587,12 @@ function unionMatchResult(
  * Mirrors Validator.validateUnionConstraints: union-level constraints on the matched value
  * (`null` / objects pass; the caller skips literal branches).
  */
-function fastCheckUnionConstraints(meta: TMetadata, value: any): number {
+function fastCheckUnionConstraints(
+  meta: TMetadata,
+  value: any,
+  branch: TAtscriptAnnotatedType,
+  opts: TValidatorOptions
+): number {
   const metadata = filledMeta(meta)
   if (metadata === undefined) {
     return PASS
@@ -595,7 +608,10 @@ function fastCheckUnionConstraints(meta: TMetadata, value: any): number {
       return fastCheckBoolean(metadata, value)
     }
     case 'object': {
-      return Array.isArray(value) ? fastCheckArrayConstraints(metadata, value) : PASS
+      if (Array.isArray(value)) {
+        return fastCheckArrayConstraints(metadata, value)
+      }
+      return value === null ? PASS : objectKeyCounts(metadata, value, branch, opts)
     }
     default: {
       return PASS
@@ -713,6 +729,68 @@ function lengthFails(
   )
 }
 
+/** `@expect.minKeys` / `@expect.maxKeys` of an object keeping `count` keys. */
+function countFails(
+  count: number,
+  minKeys: AtscriptMetadata['expect.minKeys'] | undefined,
+  maxKeys: AtscriptMetadata['expect.maxKeys'] | undefined
+): boolean {
+  return (
+    (minKeys !== undefined && count < (typeof minKeys === 'number' ? minKeys : minKeys.count)) ||
+    (maxKeys !== undefined && count > (typeof maxKeys === 'number' ? maxKeys : maxKeys.count))
+  )
+}
+
+/**
+ * The keys of object `value` the walk's result keeps (`Validator.keptKeyCount`): with
+ * `unknownProps: 'strip'`, the keys `props` declares (not phantom); else every own key (with
+ * 'error' an object with an unknown key fails anyway, whatever its count).
+ */
+function keptKeys(
+  props: Map<string, TAtscriptAnnotatedType>,
+  value: object,
+  opts: TValidatorOptions
+): number {
+  const keys = Object.keys(value)
+  if (opts.unknownProps !== 'strip') {
+    return keys.length
+  }
+  let count = 0
+  for (const key of keys) {
+    if (!isUnknownKey(props, key)) {
+      count++
+    }
+  }
+  return count
+}
+
+/**
+ * `@expect.minKeys` / `maxKeys` in `metadata` (an object's or a union's) of object `value`,
+ * matched as `branch` (pattern props: the walk).
+ */
+function objectKeyCounts(
+  metadata: TMetadata,
+  value: object,
+  branch: TAtscriptAnnotatedType,
+  opts: TValidatorOptions
+): number {
+  const minKeys = metadata.get('expect.minKeys')
+  const maxKeys = metadata.get('expect.maxKeys')
+  if (minKeys === undefined && maxKeys === undefined) {
+    return PASS
+  }
+  const type = branch.type as TAtscriptTypeObject
+  let count: number
+  if (type.kind !== 'object') {
+    count = Object.keys(value).length
+  } else if (type.propsPatterns.length > 0 && opts.unknownProps !== 'ignore') {
+    return BAIL
+  } else {
+    count = keptKeys(type.props, value, opts)
+  }
+  return countFails(count, minKeys, maxKeys) ? FAIL : PASS
+}
+
 /**
  * {@link fastCheck} of an intersection (a function of its own: `fastCheck` stays small, so the
  * engine inlines it in the hot object and prop checks).
@@ -791,6 +869,11 @@ function fastCheckObject(
   if (result !== PASS) {
     // The walk never strips a failing object; the unknown-key scan can't change the outcome.
     return result
+  }
+  // Key counts after the props: the walk reports them and still checks the props.
+  const metadata = filledMeta(def.metadata)
+  if (metadata !== undefined && objectKeyCounts(metadata, value, def, opts) === FAIL) {
+    return FAIL
   }
   if (unknownProps === 'strip') {
     pendStrips(type.props, value)
@@ -933,7 +1016,8 @@ class Plan {
   /**
    * Annotation keys the node's check reads, and their values (`undefined` when absent):
    * string `meta.required, expect.minLength, maxLength, pattern`; number `expect.int, min,
-   * max, exclusiveMin, exclusiveMax`; boolean `meta.required`; array `expect.minLength, maxLength, array.uniqueItems`.
+   * max, exclusiveMin, exclusiveMax`; boolean `meta.required`; array `expect.minLength, maxLength, array.uniqueItems`;
+   * object `expect.minKeys, maxKeys`.
    */
   k0: string | undefined = undefined
   k1: string | undefined = undefined
@@ -1163,6 +1247,7 @@ function build(plan: Plan): void {
       plan.byKey = byKey
       plan.props = type.props
       plan.propsPatterns = type.propsPatterns
+      setMetaKeys(plan, ...OBJECT_KEYS)
       plan.op = OP_OBJECT
       break
     }
@@ -1349,9 +1434,19 @@ function checkObject(plan: Plan, value: any, flags: number, opts: TValidatorOpti
   // Unlike fastCheckObject, the unknown-key scan deliberately stays after the props even for
   // 'error' outside unions: `byKey` and the child `op`s are only verified by the loop above.
   const unknownProps = opts.unknownProps
+  // Every prop and child plan was verified in the loop above, so `byKey` and `op` are current.
+  const byKey = plan.byKey!
+  // Key counts after the props (the walk reports them and still checks the props).
+  if (plan.metaStamp !== stamp) {
+    refreshMeta(plan)
+  }
+  if (
+    (plan.m0 !== undefined || plan.m1 !== undefined) &&
+    planKeyCountFails(plan, byKey, value, opts)
+  ) {
+    return FAIL
+  }
   if (unknownProps === 'error' || unknownProps === 'strip') {
-    // Every prop and child plan was verified in the loop above, so `byKey` and `op` are current.
-    const byKey = plan.byKey!
     for (const key of Object.keys(value)) {
       const known = byKey.get(key)
       if (known !== undefined && known.op !== OP_PHANTOM) {
@@ -1364,6 +1459,27 @@ function checkObject(plan: Plan, value: any, flags: number, opts: TValidatorOpti
     }
   }
   return PASS
+}
+
+/** The key counts of an object plan (see `keptKeys`; `byKey` verified). */
+function planKeyCountFails(
+  plan: Plan,
+  byKey: Map<string, Plan>,
+  value: object,
+  opts: TValidatorOptions
+): boolean {
+  const keys = Object.keys(value)
+  let count = keys.length
+  if (opts.unknownProps === 'strip') {
+    count = 0
+    for (const key of keys) {
+      const known = byKey.get(key)
+      if (known !== undefined && known.op !== OP_PHANTOM) {
+        count++
+      }
+    }
+  }
+  return countFails(count, plan.m0, plan.m1)
 }
 
 /** Plan counterpart of {@link fastCheckArray}. */

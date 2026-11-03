@@ -34,6 +34,9 @@ export const ARRAY_KEYS = [
   'expect.array.uniqueItems',
 ] as const
 
+/** Annotations of an object node, in check order (before its props). */
+export const OBJECT_KEYS = ['expect.minKeys', 'expect.maxKeys'] as const
+
 /**
  * Every annotation key the validator pre-check reads. The order is the bit order of
  * compiled-check layouts: changing it changes the layout format.
@@ -49,6 +52,8 @@ export const VALIDATOR_KEYS = [
   'expect.exclusiveMin',
   'expect.exclusiveMax',
   'expect.array.uniqueItems',
+  'expect.minKeys',
+  'expect.maxKeys',
 ] as const
 
 /**

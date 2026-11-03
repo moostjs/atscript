@@ -135,9 +135,9 @@ describe('validatorPipe', () => {
       expect(callPipe(pipe, { n: 1 }, { type })).toEqual({ n: 1 })
       const third = fail({ n: 1, extra: 1 })
 
-      expect(first.errors).toEqual([{ path: 'n', message: 'Expected maximum 5, got 10' }])
-      expect(second.errors).toEqual([{ path: 'n', message: 'Expected number, got string' }])
-      expect(third.errors).toEqual([{ path: 'extra', message: 'Unexpected property' }])
+      expect(first.errors).toMatchObject([{ path: 'n', message: 'Expected maximum 5, got 10' }])
+      expect(second.errors).toMatchObject([{ path: 'n', message: 'Expected number, got string' }])
+      expect(third.errors).toMatchObject([{ path: 'extra', message: 'Unexpected property' }])
     })
   })
 })

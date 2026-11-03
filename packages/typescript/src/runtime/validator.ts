@@ -10,6 +10,7 @@ import type {
   TMetadataMap,
 } from './annotated-type'
 import { isPhantomType } from './annotated-type'
+import { detectDiscriminator } from './discriminator'
 import { filledMeta, metaEmpty, readable } from './layers'
 import {
   DECIMAL_RE,
@@ -21,7 +22,15 @@ import {
   stripAgain,
   stripsSince,
 } from './validator-fast-check'
-import { arrayKeyProps } from './validator-keys'
+import { arrayKeyProps, boundOf } from './validator-keys'
+import {
+  formatCodeOf,
+  formatValidatorMessage,
+  localizeErrors,
+  VALIDATOR_MESSAGES,
+  type TError,
+  type TValidatorTranslate,
+} from './validator-messages'
 
 /**
  * The outcome of a union over an object value at a path, recorded once the walk backtracks (see
@@ -32,15 +41,25 @@ interface TUnionOutcome {
   path: string
   unknownProps: TValidatorOptions['unknownProps']
   item?: TAtscriptAnnotatedType
-  error?: TError
+  /** The errors reported (one union error, or the errors of the branch its discriminator picks). */
+  errors?: TError[]
   /** The strips the union recorded (`Validator.strips` entries), recorded again on a reuse. */
   strips?: unknown[]
 }
 
-interface TError {
-  path: string
-  message: string
-  details?: TError[]
+/** A built-in error code with a default template (every `TValidatorErrorCode` but `CUSTOM`). */
+type TBuiltinCode = keyof typeof VALIDATOR_MESSAGES
+
+/**
+ * What an error reports besides its message (see {@link Validator.error}): its code (`CUSTOM`
+ * when omitted), params and `custom` flag.
+ */
+export interface TErrorInfo extends Pick<TError, 'code' | 'params'> {
+  /**
+   * The message is app text (a translator gets it as the id) rather than the code's own
+   * message. Default: `true` without a `code`, `false` with one.
+   */
+  custom?: boolean
 }
 
 /**
@@ -66,6 +85,11 @@ export interface TValidatorOptions {
   unknownProps: 'strip' | 'ignore' | 'error'
   errorLimit: number
   skipList?: Set<string>
+  /**
+   * Translates the errors of a failed call (see {@link localizeErrors}) before they are
+   * reported (`errors`, the thrown {@link ValidatorError}).
+   */
+  translate?: TValidatorTranslate
 }
 
 /** Context exposed to {@link TValidatorPlugin} functions. */
@@ -188,10 +212,8 @@ export class Validator<
   protected pop(saveErrors: boolean) {
     this.depth--
     const popped = this.stackErrors.pop()
-    if (saveErrors && popped !== null && popped !== undefined && popped.length > 0) {
-      for (const err of popped) {
-        this.error(err.message, err.path, err.details)
-      }
+    if (saveErrors && popped) {
+      this.reportAll(popped)
     }
     return popped
   }
@@ -203,32 +225,77 @@ export class Validator<
     }
   }
 
-  protected error(message: string, path?: string, details?: TError[]): TError {
-    let errors = this.stackErrors[this.stackErrors.length - 1]
-    if (!errors) {
-      if (this.stackErrors.length > 0) {
-        errors = []
-        this.stackErrors[this.stackErrors.length - 1] = errors
-      } else {
-        errors = this.errors
-      }
-    }
+  /**
+   * Reports an error at `path` (default: the current path). `info` gives its code and params;
+   * without it the error is app text with code `CUSTOM` (a plugin's own message).
+   */
+  protected error(message: string, path?: string, details?: TError[], info?: TErrorInfo): TError {
     const error: TError = {
       path: path || this.buildPath(),
       message,
+      code: info?.code ?? 'CUSTOM',
+      params: info?.params ?? {},
+    }
+    if (info?.custom ?? info?.code === undefined) {
+      error.custom = true
     }
     if (details?.length) {
       error.details = details
     }
-    errors.push(error)
-    if (errors.length >= this.opts.errorLimit) {
-      this.limitExceeded = true
-    }
+    this.report(error)
     return error
   }
 
-  /** Adds `error`, already made, to the errors of the current level (as {@link error} does). */
-  private report(error: TError) {
+  /**
+   * Reports built-in error `code`: `custom` (the app's message from an annotation) when given,
+   * else the code's template filled with `params`.
+   */
+  private fail(code: TBuiltinCode, params: Record<string, unknown>, custom?: string): false {
+    this.builtin(code, params, custom)
+    return false
+  }
+
+  /** Reports built-in error `code` at `path` (see {@link fail}), with `details` (a union's). */
+  private builtin(
+    code: TBuiltinCode,
+    params: Record<string, unknown>,
+    custom: string | undefined,
+    path?: string,
+    details?: TError[]
+  ): TError {
+    return custom
+      ? this.error(custom, path, details, { code, params, custom: true })
+      : this.error(formatValidatorMessage(VALIDATOR_MESSAGES[code], params), path, details, {
+          code,
+          params,
+        })
+  }
+
+  /** {@link fail} of a type mismatch of `def`: its `@expect.message` replaces the message. */
+  private mismatch(
+    def: TAtscriptAnnotatedType,
+    code: TBuiltinCode,
+    params: Record<string, unknown>
+  ): false {
+    return this.fail(code, params, expectMessage(def))
+  }
+
+  /** The `@meta.required` error of `def` (custom message or the type's default). */
+  private required(def: TAtscriptAnnotatedType): false {
+    const isBoolean =
+      def.type.kind === '' && (def.type as TAtscriptTypeFinal).designType === 'boolean'
+    return this.fail(
+      isBoolean ? 'REQUIRED_CHECKED' : 'REQUIRED',
+      {},
+      messageOf(def.metadata.get('meta.required'))
+    )
+  }
+
+  /**
+   * Adds `error`, already made, to the errors of the current level (as {@link error} does);
+   * `true` once the level holds as many errors as the limit.
+   */
+  private report(error: TError): boolean {
     let errors = this.stackErrors[this.stackErrors.length - 1]
     if (!errors) {
       if (this.stackErrors.length > 0) {
@@ -241,7 +308,9 @@ export class Validator<
     errors.push(error)
     if (errors.length >= this.opts.errorLimit) {
       this.limitExceeded = true
+      return true
     }
+    return false
   }
 
   protected throw() {
@@ -294,6 +363,9 @@ export class Validator<
       performStrips(this.strips, passed)
     }
     if (!passed) {
+      if (this.opts.translate) {
+        this.errors = localizeErrors(this.errors, this.opts.translate)
+      }
       if (safe) {
         return false
       }
@@ -325,8 +397,7 @@ export class Validator<
       // `@meta.required` on an optional field: omitting it is fine, `null` is not
       // (unless the type itself accepts null, e.g. `string | null`).
       if (value === null && rejectsNullAsRequired(def)) {
-        this.error(requiredMessage(def))
-        return false
+        return this.required(def)
       }
       return true
     }
@@ -348,8 +419,7 @@ export class Validator<
       // `@meta.required` on an optional field: omitting it is fine, `null` is not
       // (unless the type itself accepts null, e.g. `string | null`).
       if (value === null && rejectsNullAsRequired(def)) {
-        this.error(requiredMessage(def))
-        return false
+        return this.required(def)
       }
       return true
     }
@@ -382,8 +452,8 @@ export class Validator<
         }
         return passed
       },
-      error: (message: string, path?: string, details?: TError[]) =>
-        this.error(message, path, details),
+      error: (message: string, path?: string, details?: TError[], info?: TErrorInfo) =>
+        this.error(message, path, details, info),
     } as TValidatorPluginContext
     return Object.defineProperties(ctx, {
       opts: { get: () => this.opts, enumerable: true },
@@ -480,11 +550,11 @@ export class Validator<
           path = this.buildPath()
           const known = this.decided(def, value, path)
           if (known !== undefined) {
-            if (known.error === undefined) {
+            if (known.errors === undefined) {
               stripAgain(this.strips, known.strips)
               return this.validateUnionConstraints(def, known.item!, value)
             }
-            this.report(known.error)
+            this.reportAll(known.errors)
             return false
           }
         }
@@ -497,6 +567,12 @@ export class Validator<
     // (a rejected branch strips nothing: what it recorded is dropped)
     const kept = this.strips.length
     let details: TError[] | undefined
+    /**
+     * Where each failed branch's errors start in `details` (by branch index): plain object
+     * values only, the ones a discriminator can report (see `discriminatedErrors`).
+     */
+    let starts: number[] | undefined
+    const plainObject = typeof value === 'object' && value !== null && !Array.isArray(value)
 
     for (const item of items) {
       // Use stackErrors for error isolation only — no depth/path tracking.
@@ -531,6 +607,9 @@ export class Validator<
       if (nested) {
         this.nestedFailures++
       }
+      if (plainObject) {
+        ;(starts ??= []).push(details?.length ?? 0)
+      }
       if (branchErrors) {
         if (details) {
           for (const err of branchErrors) {
@@ -544,18 +623,84 @@ export class Validator<
 
     // (all of them: an outcome decided once — see `unionMemo` — is one error object wherever it
     // is reported, so details of unions nested in their own branches share their errors)
-    const expected = items
-      .map((item, i) => `[${item.type.kind || (item.type as TAtscriptTypeFinal).designType}(${i})]`)
-      .join(', ')
-    const error = this.error(
-      `Value does not match any of the allowed types: ${expected}`,
-      undefined,
-      details
-    )
+    const errors =
+      this.discriminatedErrors(def, value, details, starts ?? []) ?? this.unionError(def, details)
     if (path !== undefined) {
-      this.decide(def, value, path, kept, undefined, error)
+      this.decide(def, value, path, kept, undefined, errors)
     }
     return false
+  }
+
+  /** Reports the error of union `def` no branch matched (`details`: the branches' errors). */
+  private unionError(
+    def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+    details: TError[] | undefined
+  ): TError[] {
+    const expected = def.type.items
+      .map((item, i) => `[${item.type.kind || (item.type as TAtscriptTypeFinal).designType}(${i})]`)
+      .join(', ')
+    return [this.builtin('UNION', { expected }, expectMessage(def), undefined, details)]
+  }
+
+  /**
+   * The errors of an object union over object `value` with a shared literal discriminator (see
+   * {@link unionDiscriminator}), reported in place of the union error: the errors of the branch
+   * the value's discriminator picks, or one `UNION_DISCRIMINATOR` error at the discriminator
+   * when it picks none. `undefined` (nothing reported) for other unions and values.
+   */
+  private discriminatedErrors(
+    def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+    value: unknown,
+    details: TError[] | undefined,
+    starts: number[]
+  ): TError[] | undefined {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return undefined
+    }
+    const disc = unionDiscriminator(def.type.items)
+    if (disc === undefined) {
+      return undefined
+    }
+    const tag = (value as Record<string, unknown>)[disc.property]
+    if (tag === undefined && this.partialHere()) {
+      // (a missing discriminator is allowed here: the union error, with every branch's errors)
+      return undefined
+    }
+    const picked = disc.branches.findIndex(([, literal]) => literal === tag)
+    if (picked < 0) {
+      const params = {
+        property: disc.property,
+        allowed: disc.branches.map(([, literal]) => literal),
+        actual: clip(printValue(tag)),
+      }
+      const at = this.depth > 0 ? `${this.buildPath()}.${disc.property}` : disc.property
+      return [this.builtin('UNION_DISCRIMINATOR', params, expectMessage(def), at)]
+    }
+    const index = disc.branches[picked][0]
+    const errors = details?.slice(starts[index], starts[index + 1] ?? details.length)
+    if (errors === undefined || errors.length === 0) {
+      // (a branch that failed without errors, a plugin's verdict: the plain union error)
+      return undefined
+    }
+    this.reportAll(errors)
+    return errors
+  }
+
+  /** Reports `errors`, made already, until the error limit is reached. */
+  private reportAll(errors: TError[]) {
+    for (const error of errors) {
+      if (this.report(error)) {
+        break
+      }
+    }
+  }
+
+  /** Whether missing props are allowed at the current depth (the `partial` option). */
+  private partialHere(): boolean {
+    const partial = this.opts.partial
+    return (
+      partial === 'deep' || (partial === true && this.depth === 0) || typeof partial === 'function'
+    )
   }
 
   /** A union branch failed after branches of nested unions over objects did (see `unionMemo`). */
@@ -593,14 +738,14 @@ export class Validator<
     path: string,
     kept: number,
     item: TAtscriptAnnotatedType | undefined,
-    error: TError | undefined
+    errors: TError[] | undefined
   ) {
     const outcome: TUnionOutcome = {
       def,
       path,
       unknownProps: this.opts.unknownProps,
       item,
-      error,
+      errors,
       strips: stripsSince(this.strips, kept),
     }
     const outcomes = this.unionMemo!.get(value)
@@ -639,7 +784,10 @@ export class Validator<
         if (Array.isArray(value)) {
           return this.validateArrayConstraints(metadata, value, arrayElementType(branch))
         }
-        return true
+        return (
+          value === null ||
+          this.validateObjectConstraints(metadata, value, branch, this.skipListHere())
+        )
       }
       default: {
         return true
@@ -667,7 +815,7 @@ export class Validator<
   private unknownKey(key: string, keysToStrip: string[] | undefined): string[] | undefined {
     if (this.opts.unknownProps === 'error') {
       this.push(key)
-      this.error(`Unexpected property`)
+      this.fail('UNEXPECTED_PROPERTY', { property: clip(key) })
       this.pop(true)
     } else if (this.opts.unknownProps === 'strip') {
       ;(keysToStrip ??= []).push(key)
@@ -692,8 +840,7 @@ export class Validator<
 
   protected validateTuple(def: TAtscriptAnnotatedType<TAtscriptTypeComplex>, value: any): boolean {
     if (!Array.isArray(value) || value.length !== def.type.items.length) {
-      this.error(`Expected array of length ${def.type.items.length}`)
-      return false
+      return this.mismatch(def, 'TUPLE_LENGTH', { length: def.type.items.length })
     }
     let i = 0
     for (const item of def.type.items) {
@@ -710,8 +857,7 @@ export class Validator<
 
   protected validateArray(def: TAtscriptAnnotatedType<TAtscriptTypeArray>, value: any): boolean {
     if (!Array.isArray(value)) {
-      this.error('Expected array')
-      return false
+      return this.mismatch(def, 'TYPE_ARRAY', { actual: typeOf(value) })
     }
     if (
       !metaEmpty(def.metadata) &&
@@ -746,29 +892,19 @@ export class Validator<
     const metadata = readable(meta)
     const minLength = metadata.get('expect.minLength')
     if (minLength !== undefined) {
-      const length = typeof minLength === 'number' ? minLength : minLength.length
+      const length = boundOf(minLength, 'length')
       if (value.length < length) {
-        const message =
-          typeof minLength === 'object' && minLength.message
-            ? minLength.message
-            : `Expected minimum length of ${length} items, got ${value.length} items`
-        this.error(message)
-        return false
+        return this.fail('MIN_ITEMS', { min: length, actual: value.length }, messageOf(minLength))
       }
     }
     const maxLength = metadata.get('expect.maxLength')
     if (maxLength !== undefined) {
-      const length = typeof maxLength === 'number' ? maxLength : maxLength.length
+      const length = boundOf(maxLength, 'length')
       if (value.length > length) {
-        const message =
-          typeof maxLength === 'object' && maxLength.message
-            ? maxLength.message
-            : `Expected maximum length of ${length} items, got ${value.length} items`
-        this.error(message)
-        return false
+        return this.fail('MAX_ITEMS', { max: length, actual: value.length }, messageOf(maxLength))
       }
     }
-    const uniqueItems = metadata.get('expect.array.uniqueItems') as { message?: string } | undefined
+    const uniqueItems = metadata.get('expect.array.uniqueItems')
     if (uniqueItems) {
       const separator = '▼↩'
       const seen = new Set<string>()
@@ -786,7 +922,7 @@ export class Validator<
         }
         if (seen.has(key)) {
           this.push(String(idx))
-          this.error(uniqueItems.message || 'Duplicate items are not allowed')
+          this.fail('UNIQUE_ITEMS', {}, messageOf(uniqueItems))
           this.pop(true)
           return false
         }
@@ -798,14 +934,19 @@ export class Validator<
 
   protected validateObject(def: TAtscriptAnnotatedType<TAtscriptTypeObject>, value: any): boolean {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-      this.error('Expected object')
-      return false
+      return this.mismatch(def, 'TYPE_OBJECT', { actual: typeOf(value) })
     }
-    let passed = true
-    let keysToStrip: string[] | undefined
-
     // prepare skipList for this object (rare)
     const skipList = this.opts.skipList ? this.skipListHere() : undefined
+    let passed = true
+    if (!this.validateObjectConstraints(def.metadata, value, def, skipList)) {
+      // (the props are still checked: their errors are reported too)
+      if (this.limitExceeded) {
+        return false
+      }
+      passed = false
+    }
+    let keysToStrip: string[] | undefined
 
     let partialFunctionMatched = false
     if (typeof this.opts.partial === 'function') {
@@ -907,72 +1048,66 @@ export class Validator<
   ): boolean {
     if (def.type.value !== undefined) {
       if (value !== def.type.value) {
-        this.error(`Expected ${def.type.value}, got ${printValue(value)}`)
-        return false
+        return this.mismatch(def, 'LITERAL', {
+          expected: def.type.value,
+          actual: clip(printValue(value)),
+        })
       }
       return true
     }
-    const typeOfValue = Array.isArray(value) ? 'array' : typeof value
-    switch (def.type.designType) {
+    const typeOfValue = typeOf(value)
+    const designType = def.type.designType
+    switch (designType) {
       case 'never': {
-        this.error(`This type is impossible, must be an internal problem`)
-        return false
+        return this.fail('NEVER', {})
       }
       case 'any': {
         return true
       }
       case 'string': {
-        if (typeOfValue !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
-          return false
+        if (typeOfValue !== designType) {
+          return this.mismatch(def, 'TYPE', { expected: designType, actual: typeOfValue })
         }
         return this.validateString(def, value)
       }
       case 'number': {
-        if (typeOfValue !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
-          return false
+        if (typeOfValue !== designType) {
+          return this.mismatch(def, 'TYPE', { expected: designType, actual: typeOfValue })
         }
         if (!Number.isFinite(value)) {
-          this.error(`Expected finite number, got ${value}`)
-          return false
+          return this.mismatch(def, 'NOT_FINITE', { actual: String(value) })
         }
         return this.validateNumber(def, value)
       }
       case 'boolean': {
-        if (typeOfValue !== def.type.designType) {
-          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
-          return false
+        if (typeOfValue !== designType) {
+          return this.mismatch(def, 'TYPE', { expected: designType, actual: typeOfValue })
         }
         return this.validateBoolean(def, value)
       }
       case 'undefined': {
         if (value !== undefined) {
-          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
-          return false
+          return this.mismatch(def, 'TYPE', { expected: designType, actual: typeOfValue })
         }
         return true
       }
       case 'null': {
         if (value !== null) {
-          this.error(`Expected ${def.type.designType}, got ${typeOfValue}`)
-          return false
+          return this.mismatch(def, 'TYPE', { expected: designType, actual: typeOfValue })
         }
         return true
       }
       case 'decimal': {
         if (typeOfValue !== 'string') {
-          this.error(`Expected string (decimal), got ${typeOfValue}`)
-          return false
+          return this.mismatch(def, 'TYPE_DECIMAL', { actual: typeOfValue })
         }
         if (!DECIMAL_RE.test(value as string)) {
-          this.error(`Invalid decimal format: ${JSON.stringify(value)}`)
-          return false
+          return this.mismatch(def, 'DECIMAL_FORMAT', { value: clip(value as string) })
         }
         return true
       }
       default: {
-        throw new Error(`Unknown type "${def.type.designType}"`)
+        throw new Error(`Unknown type "${designType}"`)
       }
     }
   }
@@ -996,34 +1131,21 @@ export class Validator<
     const filled = metadata.get('meta.required')
     if (filled) {
       if (value.trim().length === 0) {
-        const message =
-          typeof filled === 'object' && filled.message ? filled.message : `Must not be empty`
-        this.error(message)
-        return false
+        return this.fail('REQUIRED', {}, messageOf(filled))
       }
     }
     const minLength = metadata.get('expect.minLength')
     if (minLength !== undefined) {
-      const length = typeof minLength === 'number' ? minLength : minLength.length
+      const length = boundOf(minLength, 'length')
       if (value.length < length) {
-        const message =
-          typeof minLength === 'object' && minLength.message
-            ? minLength.message
-            : `Expected minimum length of ${length} characters, got ${value.length} characters`
-        this.error(message)
-        return false
+        return this.fail('MIN_LENGTH', { min: length, actual: value.length }, messageOf(minLength))
       }
     }
     const maxLength = metadata.get('expect.maxLength')
     if (maxLength !== undefined) {
-      const length = typeof maxLength === 'number' ? maxLength : maxLength.length
+      const length = boundOf(maxLength, 'length')
       if (value.length > length) {
-        const message =
-          typeof maxLength === 'object' && maxLength.message
-            ? maxLength.message
-            : `Expected maximum length of ${length} characters, got ${value.length} characters`
-        this.error(message)
-        return false
+        return this.fail('MAX_LENGTH', { max: length, actual: value.length }, messageOf(maxLength))
       }
     }
     const patterns = metadata.get('expect.pattern')
@@ -1032,8 +1154,12 @@ export class Validator<
         continue
       }
       if (!getRegex(pattern, flags).test(value)) {
-        this.error(message || `Value is expected to match pattern "${pattern}"`)
-        return false
+        // (a primitive's built-in format message — `string.email`'s — has a code of its own,
+        // its params none: the regex is the primitive's)
+        const format = message ? formatCodeOf(message) : undefined
+        return format === undefined
+          ? this.fail('PATTERN', flags ? { pattern, flags } : { pattern }, message)
+          : this.fail(format, {})
       }
     }
 
@@ -1058,55 +1184,37 @@ export class Validator<
     }
     const int = metadata.get('expect.int') as boolean | { message?: string }
     if (int && value % 1 !== 0) {
-      const message =
-        typeof int === 'object' && int.message ? int.message : `Expected integer, got ${value}`
-      this.error(message)
-      return false
+      return this.fail('INT', { actual: value }, messageOf(int))
     }
     const min = metadata.get('expect.min')
     if (min !== undefined) {
-      const minValue = typeof min === 'number' ? min : min.minValue
-      if (value < minValue) {
-        return this.numberBoundFailed(min, 'minimum', minValue, value)
+      const bound = boundOf(min, 'minValue')
+      if (value < bound) {
+        return this.fail('MIN', { min: bound, actual: value }, messageOf(min))
       }
     }
     const max = metadata.get('expect.max')
     if (max !== undefined) {
-      const maxValue = typeof max === 'number' ? max : max.maxValue
-      if (value > maxValue) {
-        return this.numberBoundFailed(max, 'maximum', maxValue, value)
+      const bound = boundOf(max, 'maxValue')
+      if (value > bound) {
+        return this.fail('MAX', { max: bound, actual: value }, messageOf(max))
       }
     }
     const exMin = metadata.get('expect.exclusiveMin')
     if (exMin !== undefined) {
-      const bound = typeof exMin === 'number' ? exMin : exMin.exclusiveMinValue
+      const bound = boundOf(exMin, 'exclusiveMinValue')
       if (value <= bound) {
-        return this.numberBoundFailed(exMin, 'greater than', bound, value)
+        return this.fail('EXCLUSIVE_MIN', { min: bound, actual: value }, messageOf(exMin))
       }
     }
     const exMax = metadata.get('expect.exclusiveMax')
     if (exMax !== undefined) {
-      const bound = typeof exMax === 'number' ? exMax : exMax.exclusiveMaxValue
+      const bound = boundOf(exMax, 'exclusiveMaxValue')
       if (value >= bound) {
-        return this.numberBoundFailed(exMax, 'less than', bound, value)
+        return this.fail('EXCLUSIVE_MAX', { max: bound, actual: value }, messageOf(exMax))
       }
     }
     return true
-  }
-
-  /** Reports a failed number bound: its custom message, else `Expected <label> <bound>, got <value>`. */
-  private numberBoundFailed(
-    annotation: number | { message?: string },
-    label: string,
-    bound: number,
-    value: number
-  ): false {
-    const message =
-      typeof annotation === 'object' && annotation.message
-        ? annotation.message
-        : `Expected ${label} ${bound}, got ${value}`
-    this.error(message)
-    return false
   }
 
   protected validateBoolean(
@@ -1128,25 +1236,211 @@ export class Validator<
     const filled = metadata.get('meta.required')
     if (filled) {
       if (value !== true) {
-        const message =
-          typeof filled === 'object' && filled.message ? filled.message : `Must be checked`
-        this.error(message)
-        return false
+        return this.fail('REQUIRED_CHECKED', {}, messageOf(filled))
       }
     }
     return true
   }
+
+  /**
+   * `@expect.minKeys` / `maxKeys` checks for an object value, matched as `shape`: the keys the
+   * result keeps are counted (see {@link keptKeyCount}; `skipList`: the skip list keys here).
+   */
+  protected validateObjectConstraints(
+    meta: TMetadataMap<AtscriptMetadata>,
+    value: object,
+    shape: TAtscriptAnnotatedType,
+    skipList: Set<string> | undefined
+  ): boolean {
+    const metadata = filledMeta(meta)
+    if (metadata === undefined) {
+      return true
+    }
+    const minKeys = metadata.get('expect.minKeys')
+    const maxKeys = metadata.get('expect.maxKeys')
+    if (minKeys === undefined && maxKeys === undefined) {
+      return true
+    }
+    const count = this.keptKeyCount(shape, value, skipList)
+    if (minKeys !== undefined) {
+      const bound = boundOf(minKeys, 'count')
+      if (count < bound) {
+        return this.fail('MIN_KEYS', { min: bound, actual: count }, messageOf(minKeys))
+      }
+    }
+    if (maxKeys !== undefined) {
+      const bound = boundOf(maxKeys, 'count')
+      if (count > bound) {
+        return this.fail('MAX_KEYS', { max: bound, actual: count }, messageOf(maxKeys))
+      }
+    }
+    return true
+  }
+
+  /**
+   * The keys of object `value` (matched as `shape`) the result keeps: every own key with
+   * `unknownProps: 'ignore'`; else (and with 'strip', and 'error', where the others are errors
+   * of their own) the keys `shape` declares, its pattern props match or the skip list names.
+   * Matched as anything other than an object type, every own key.
+   */
+  private keptKeyCount(
+    shape: TAtscriptAnnotatedType,
+    value: object,
+    skipList: Set<string> | undefined
+  ): number {
+    const keys = Object.keys(value)
+    if (this.opts.unknownProps === 'ignore' || shape.type.kind !== 'object') {
+      return keys.length
+    }
+    const type = shape.type as TAtscriptTypeObject
+    let count = 0
+    for (const key of keys) {
+      const prop = type.props.get(key)
+      if ((prop !== undefined && !isPhantomType(prop)) || skipList?.has(key)) {
+        count++
+        continue
+      }
+      for (const { pattern } of type.propsPatterns) {
+        if (pattern.test(key)) {
+          count++
+          break
+        }
+      }
+    }
+    return count
+  }
 }
 
-/** The `@meta.required` error message for `def` (custom message or the type's default). */
-function requiredMessage(def: TAtscriptAnnotatedType): string {
-  const filled = def.metadata.get('meta.required')
-  if (typeof filled === 'object' && filled.message) {
-    return filled.message
+/** The message argument of a constraint annotation (`{ message }`), if any. */
+function messageOf(annotation: unknown): string | undefined {
+  return typeof annotation === 'object' && annotation !== null
+    ? (annotation as { message?: string }).message || undefined
+    : undefined
+}
+
+/** A union's discriminator, as the validator reports it (see {@link unionDiscriminator}). */
+interface TValidatorDiscriminator {
+  property: string
+  /** Per object branch: its index in the union's items, its literal. */
+  branches: Array<[index: number, literal: unknown]>
+}
+
+/** {@link unionDiscriminator} by union items, with what it was decided from (see `discCache`). */
+interface TDiscEntry {
+  nodes: TAtscriptAnnotatedType[]
+  types: unknown[]
+  /** Per object branch: its discriminator prop node (verified on a reuse). */
+  props: Array<TAtscriptAnnotatedType | undefined>
+  disc: TValidatorDiscriminator | undefined
+}
+
+/**
+ * Decided discriminators, by union `items` (reported errors only: a union's discriminator is
+ * looked for once its value failed). An entry is reused while the items, their type defs and the
+ * discriminator props are the same objects.
+ */
+const discCache = new WeakMap<TAtscriptAnnotatedType[], TDiscEntry>()
+
+/**
+ * The discriminator of a union over objects (see {@link detectDiscriminator}), required in every
+ * object branch: the property and, per object branch, its index in `items` and its literal. The
+ * other branches must reject any object (scalars, arrays, tuples), so only the object branches
+ * can match an object value.
+ */
+function unionDiscriminator(items: TAtscriptAnnotatedType[]): TValidatorDiscriminator | undefined {
+  const cached = discCache.get(items)
+  if (cached !== undefined && sameDiscSource(cached, items)) {
+    return cached.disc
   }
-  return def.type.kind === '' && (def.type as TAtscriptTypeFinal).designType === 'boolean'
-    ? 'Must be checked'
-    : 'Must not be empty'
+  const entry: TDiscEntry = {
+    nodes: [...items],
+    types: items.map(item => item.type),
+    props: [],
+    disc: findDiscriminator(items),
+  }
+  if (entry.disc !== undefined) {
+    const property = entry.disc.property
+    entry.props = entry.disc.branches.map(([i]) =>
+      (items[i].type as TAtscriptTypeObject).props.get(property)
+    )
+  }
+  discCache.set(items, entry)
+  return entry.disc
+}
+
+/** Whether `entry` was decided from `items` as they are. */
+function sameDiscSource(entry: TDiscEntry, items: TAtscriptAnnotatedType[]): boolean {
+  if (entry.nodes.length !== items.length) {
+    return false
+  }
+  for (let i = 0; i < items.length; i++) {
+    if (entry.nodes[i] !== items[i] || entry.types[i] !== items[i].type) {
+      return false
+    }
+  }
+  const disc = entry.disc
+  if (disc !== undefined) {
+    const branches = disc.branches
+    for (let j = 0; j < branches.length; j++) {
+      const type = items[branches[j][0]].type as TAtscriptTypeObject
+      if (type.props.get(disc.property) !== entry.props[j]) {
+        return false
+      }
+    }
+  }
+  return true
+}
+
+/** {@link unionDiscriminator}, decided anew. */
+function findDiscriminator(items: TAtscriptAnnotatedType[]): TValidatorDiscriminator | undefined {
+  const objects: TAtscriptAnnotatedType[] = []
+  const indexes: number[] = []
+  for (const [i, item] of items.entries()) {
+    const type = item.type
+    if (type.kind === 'object') {
+      objects.push(item)
+      indexes.push(i)
+    } else if (
+      type.kind !== 'array' &&
+      type.kind !== 'tuple' &&
+      (type.kind !== '' || (type as TAtscriptTypeFinal).designType === 'any' || isPhantomType(item))
+    ) {
+      return undefined
+    }
+  }
+  const disc = detectDiscriminator(objects)
+  if (!disc) {
+    return undefined
+  }
+  const property = disc.propertyName
+  const branches: TValidatorDiscriminator['branches'] = []
+  for (const [j, item] of objects.entries()) {
+    const prop = (item.type as TAtscriptTypeObject).props.get(property)
+    if (prop === undefined || prop.optional) {
+      // (an optional discriminator does not tell the branch of a value without it)
+      return undefined
+    }
+    branches.push([indexes[j], (prop.type as TAtscriptTypeFinal).value])
+  }
+  return { property, branches }
+}
+
+/** The most characters of input copied into params (see {@link clip}). */
+const CLIP = 100
+
+/** Input copied into params: at most {@link CLIP} characters (then an ellipsis). */
+function clip(text: string): string {
+  return text.length > CLIP ? `${text.slice(0, CLIP)}…` : text
+}
+
+/** `def`'s `@expect.message` (the message of its type mismatches), if any. */
+function expectMessage(def: TAtscriptAnnotatedType): string | undefined {
+  return (def.metadata.get('expect.message') as string | undefined) || undefined
+}
+
+/** The type name an error reports for `value` (`array` for arrays, else `typeof`). */
+function typeOf(value: unknown): string {
+  return Array.isArray(value) ? 'array' : typeof value
 }
 
 /**

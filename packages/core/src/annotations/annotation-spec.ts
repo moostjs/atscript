@@ -543,6 +543,11 @@ function describeNode(def: SemanticNode | undefined): string {
   return def?.entity || 'unknown'
 }
 
+/** A `|` group (not a tuple, an inline object `{ … }` or a `&` group). */
+function isUnionGroup(node: SemanticNode | undefined): node is SemanticGroup {
+  return node?.entity === 'group' && (node as SemanticGroup).op !== '&'
+}
+
 /** Walks a `|` union (flattening nested unions and union aliases), resolving member refs. */
 function walkUnionMembers(
   def: SemanticNode,
@@ -562,7 +567,8 @@ function walkUnionMembers(
       member = unwound?.def
       memberDoc = unwound?.doc || doc
     }
-    if (isGroup(member) && member.entity !== 'tuple' && member.op !== '&') {
+    // (an inline object `{ … }` is a member: its props are not)
+    if (isUnionGroup(member)) {
       walkUnionMembers(member, memberDoc, cb, seen)
     } else {
       cb(member)
@@ -600,7 +606,7 @@ export function nonNullishMembers(
   def: SemanticNode | undefined,
   doc: AtscriptDoc
 ): SemanticNode[] | undefined {
-  if (!isGroup(def) || def.entity === 'tuple' || def.op === '&') {
+  if (!isUnionGroup(def)) {
     return undefined
   }
   const members: SemanticNode[] = []

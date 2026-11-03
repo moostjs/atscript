@@ -10,6 +10,7 @@ import {
   type TAtscriptTypeFinal,
   type TAtscriptTypeObject,
 } from './annotated-type'
+import { detectDiscriminator } from './discriminator'
 import { metaEmpty } from './layers'
 import { jsonSchemaPattern } from './stateless-regex'
 import { forAnnotatedType, runWalk, type TWalk } from './traverse'
@@ -18,85 +19,6 @@ import { arrayKeyProps, boundOf, DECIMAL_RE, VALIDATOR_KEYS } from './validator-
 
 /** A JSON Schema object (draft-compatible). */
 export type TJsonSchema = Record<string, any>
-
-/**
- * Describes a discriminator property shared by all variants of a union.
- *
- * Returned by {@link detectDiscriminator} when a union qualifies as a
- * discriminated (a.k.a. tagged) union — every variant is an object that
- * carries the same literal-valued property with a distinct value.
- */
-export type TUnionDiscriminator = {
-  /** Name of the discriminator property shared by all variants. */
-  propertyName: string
-  /** Maps the literal value of `propertyName` → variant index in `items`. */
-  indexMapping: Record<string, number>
-}
-
-/**
- * Detects a discriminator property across union items.
- *
- * Scans all items for object-typed members that share a common property
- * with distinct const/literal values. If exactly one such property exists,
- * it is returned as the discriminator. Returns `null` when no qualifying
- * property exists, or when more than one does (ambiguous).
- */
-export function detectDiscriminator(items: TAtscriptAnnotatedType[]): TUnionDiscriminator | null {
-  if (items.length < 2) {
-    return null
-  }
-
-  // All items must be objects
-  for (const item of items) {
-    if (item.type.kind !== 'object') {
-      return null
-    }
-  }
-
-  // Collect candidate prop names: props that have a const value in the first item
-  const firstObj = items[0].type as TAtscriptTypeObject<string>
-  const candidates: string[] = []
-  for (const [propName, propType] of firstObj.props.entries()) {
-    if (propType.type.kind === '' && (propType.type as TAtscriptTypeFinal).value !== undefined) {
-      candidates.push(propName)
-    }
-  }
-
-  // Filter candidates: must exist with a const value in ALL items, all values must be distinct
-  let result: TUnionDiscriminator | null = null
-
-  for (const candidate of candidates) {
-    const values = new Set<string | number | boolean>()
-    const indexMapping: Record<string, number> = {}
-    let valid = true
-
-    for (let i = 0; i < items.length; i++) {
-      const obj = items[i].type as TAtscriptTypeObject<string>
-      const prop = obj.props.get(candidate)
-      if (!prop || prop.type.kind !== '' || (prop.type as TAtscriptTypeFinal).value === undefined) {
-        valid = false
-        break
-      }
-      const val = (prop.type as TAtscriptTypeFinal).value!
-      if (values.has(val)) {
-        valid = false
-        break
-      }
-      values.add(val)
-      indexMapping[String(val)] = i
-    }
-
-    if (valid) {
-      // More than one qualifying prop → ambiguous, no discriminator
-      if (result) {
-        return null
-      }
-      result = { propertyName: candidate, indexMapping }
-    }
-  }
-
-  return result
-}
 
 /**
  * Builds a JSON Schema from an {@link TAtscriptAnnotatedType}.
@@ -250,7 +172,8 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         defs.get(typeDef)!.schema = (yield buildObject(def)) as TJsonSchema
         building = outer
       }
-      return ref(typeDef)
+      // (the named entry is the type's own: this use's key counts go next to the reference)
+      return withKeyCounts(ref(typeDef), def.metadata)
     }
     if (defs.has(typeDef)) {
       return (yield refTo(typeDef, def, shared.get(typeDef)?.first ?? ownOf(def))) as TJsonSchema
@@ -318,7 +241,9 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     }
     const kind = def.type.kind
     if (kind === 'object') {
-      return (yield buildObject(def)) as TJsonSchema
+      const schema = (yield buildObject(def)) as TJsonSchema
+      applyKeyCounts(schema, meta)
+      return schema
     }
     if (kind === 'array') {
       const d = def as TAtscriptAnnotatedType<TAtscriptTypeArray>
@@ -343,6 +268,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
         }
       }
       const disc = detectDiscriminator(items)
+      let schema: TJsonSchema
       if (disc) {
         const mapping: Record<string, string> = {}
         for (const [val, idx] of Object.entries(disc.indexMapping)) {
@@ -353,20 +279,24 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
             mapping[val] = `#/oneOf/${idx}`
           }
         }
-        return {
+        schema = {
           oneOf: built,
           discriminator: {
             propertyName: disc.propertyName,
             mapping,
           },
         }
+      } else {
+        if (!metaEmpty(meta)) {
+          // Constraints annotated on the union itself (`@expect.min 0` on `number | null`)
+          // go onto the members they apply to.
+          applyUnionConstraints(built, meta, items)
+        }
+        schema = { anyOf: built }
       }
-      if (!metaEmpty(meta)) {
-        // Constraints annotated on the union itself (`@expect.min 0` on `number | null`)
-        // go onto the members they apply to.
-        applyUnionConstraints(built, meta, items)
-      }
-      return { anyOf: built }
+      // (key counts apply to the object members only, as the JSON Schema keywords do)
+      applyKeyCounts(schema, meta)
+      return schema
     }
     return forAnnotatedType(def, {
       phantom() {
@@ -482,7 +412,7 @@ function sameDefs(
   })
   const signature = (i: number) =>
     `${classes[i]}:${shapes[i]}:${targets[i].map(j => classes[j]).join(',')}`
-  for (let count = new Set(classes).size; ; ) {
+  for (let count = new Set(classes).size; ;) {
     const signatures = new Map<string, number>()
     const next = entries.map((_, i) => {
       const s = signature(i)
@@ -540,10 +470,7 @@ function ownDef(
     return def
   }
   let own = def
-  for (
-    const seen = new Set<TAtscriptAnnotatedType>();
-    own !== root && own.ref && !seen.has(own);
-  ) {
+  for (const seen = new Set<TAtscriptAnnotatedType>(); own !== root && own.ref && !seen.has(own);) {
     seen.add(own)
     const ref = own.ref.type()
     const target = isAnnotatedType(ref)
@@ -724,6 +651,28 @@ function applyArrayConstraints(
   if (maxLength !== undefined) {
     schema.maxItems = boundOf(maxLength, 'length')
   }
+}
+
+/**
+ * `@expect.minKeys` / `maxKeys` → `minProperties` / `maxProperties` (they constrain objects
+ * only, so they also sit on a union's schema as they are).
+ */
+function applyKeyCounts(schema: TJsonSchema, meta: TMetadata): void {
+  const minKeys = meta.get('expect.minKeys')
+  if (minKeys !== undefined) {
+    schema.minProperties = boundOf(minKeys, 'count')
+  }
+  const maxKeys = meta.get('expect.maxKeys')
+  if (maxKeys !== undefined) {
+    schema.maxProperties = boundOf(maxKeys, 'count')
+  }
+}
+
+/** `schema` (a `$ref`) with the key counts of `meta`, if any (beside it, in an `allOf`). */
+function withKeyCounts(schema: TJsonSchema, meta: TMetadata): TJsonSchema {
+  const counts: TJsonSchema = {}
+  applyKeyCounts(counts, meta)
+  return Object.keys(counts).length > 0 ? { allOf: [schema], ...counts } : schema
 }
 
 /** String / number constraints on a scalar schema whose `type` is already set. */
@@ -958,6 +907,12 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
       }
       for (const [pattern, propSchema] of Object.entries(s.patternProperties ?? {})) {
         handle.propPattern(compilePattern(pattern), convert(propSchema as TJsonSchema))
+      }
+      if (typeof s.minProperties === 'number') {
+        handle.annotate('expect.minKeys', { count: s.minProperties })
+      }
+      if (typeof s.maxProperties === 'number') {
+        handle.annotate('expect.maxKeys', { count: s.maxProperties })
       }
       return handle.$type
     }

@@ -548,12 +548,12 @@ describe('Validator zero bounds', () => {
         const top = new Validator(t)
         expect(top.validate(ok, true)).toBe(true)
         expect(top.validate(bad, true)).toBe(false)
-        expect(top.errors).toEqual([{ path: '', message }])
+        expect(top.errors).toMatchObject([{ path: '', message }])
 
         const nested = new Validator(defineAnnotatedType('object').prop('v', t).$type)
         expect(nested.validate({ v: ok }, true)).toBe(true)
         expect(nested.validate({ v: bad }, true)).toBe(false)
-        expect(nested.errors).toEqual([{ path: 'v', message }])
+        expect(nested.errors).toMatchObject([{ path: 'v', message }])
       })
     }
   }
@@ -586,9 +586,9 @@ describe('Validator exclusive number bounds', () => {
     const v = new Validator(t)
     expect(v.validate({ p: 0.5 }, true)).toBe(true)
     expect(v.validate({ p: 0 }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'p', message: 'above zero' }])
+    expect(v.errors).toMatchObject([{ path: 'p', message: 'above zero' }])
     expect(v.validate({ p: 1 }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'p', message: 'below one' }])
+    expect(v.errors).toMatchObject([{ path: 'p', message: 'below one' }])
   })
 
   it('combines with inclusive bounds (both enforced)', () => {
@@ -620,9 +620,9 @@ describe('Validator union-level constraints', () => {
     expect(v.validate({ a: null }, true)).toBe(true)
     expect(v.validate({ a: 5 }, true)).toBe(true)
     expect(v.validate({ a: -5 }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'a', message: 'Expected minimum 0, got -5' }])
+    expect(v.errors).toMatchObject([{ path: 'a', message: 'Expected minimum 0, got -5' }])
     expect(v.validate({ a: 50 }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'a', message: 'too big' }])
+    expect(v.errors).toMatchObject([{ path: 'a', message: 'too big' }])
   })
 
   it('does not apply them to literal (enum) members', () => {
@@ -646,13 +646,13 @@ describe('Validator @meta.required on optional fields', () => {
     expect(v.validate({}, true)).toBe(true)
     expect(v.validate({ name: undefined }, true)).toBe(true)
     expect(v.validate({ name: null }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'name', message: 'Must not be empty' }])
+    expect(v.errors).toMatchObject([{ path: 'name', message: 'Must not be empty' }])
   })
 
   it('uses the custom message', () => {
     const v = new Validator(make({ message: 'Name please' }))
     expect(v.validate({ name: null }, true)).toBe(false)
-    expect(v.errors).toEqual([{ path: 'name', message: 'Name please' }])
+    expect(v.errors).toMatchObject([{ path: 'name', message: 'Name please' }])
   })
 
   it('accepts null when the optional type is nullable', () => {

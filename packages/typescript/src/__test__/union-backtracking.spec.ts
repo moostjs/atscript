@@ -16,25 +16,38 @@ import { Validator, type TValidatorOptions } from '../runtime/validator'
 
 const lit = (v: string) => $().designType('string').value(v).$type
 
-/** `U = {d: U, k: 'k0'} | … | {d: U, k: 'k<n-1>'} | 'end'`: `d` checked before `k`. */
-function chainUnion(branches: number): TAtscriptAnnotatedType {
+/**
+ * `U = {d: U, k: 'k0', j: 'j0'} | … | {d: U, k: 'k<n-1>', j: 'j<n-1>'} | 'end'`: `d` checked
+ * before `k`. Two literal props (`k`, `j`): no discriminator (ambiguous), every branch is tried
+ * and a failed union reports all of them (see the discriminated chain at the end).
+ */
+function chainUnion(branches: number, discriminated = false): TAtscriptAnnotatedType {
   const u = $('union')
   for (let i = 0; i < branches; i++) {
-    u.item(
-      $('object')
-        .prop('d', u.$type)
-        .prop('k', lit(`k${i}`)).$type
-    )
+    const branch = $('object')
+      .prop('d', u.$type)
+      .prop('k', lit(`k${i}`))
+    if (!discriminated) {
+      branch.prop('j', lit(`j${i}`))
+    }
+    u.item(branch.$type)
   }
   u.item(lit('end'))
   return u.$type
 }
 
-/** `{d: {d: … {d: 'end', k: last}, k}, k}`, `depth` objects deep; the deepest `k` is `deepest`. */
-function chainValue(depth: number, k: string, deepest: string): any {
+/** The `j` of a chain object whose `k` is `k` (`k3` → `j3`; anything else as it is). */
+const jOf = (k: string) => k.replace(/^k(\d+)$/, 'j$1')
+
+/**
+ * `{d: {d: … {d: 'end', k: last}, k}, k}` (and `j` of each `k`, unless for a `discriminated`
+ * chain), `depth` objects deep; the deepest `k` is `deepest`.
+ */
+function chainValue(depth: number, k: string, deepest: string, discriminated = false): any {
   let v: any = 'end'
   for (let i = 0; i < depth; i++) {
-    v = { d: v, k: i === 0 ? deepest : k }
+    const key = i === 0 ? deepest : k
+    v = discriminated ? { d: v, k: key } : { d: v, k: key, j: jOf(key) }
   }
   return v
 }
@@ -44,7 +57,8 @@ function countedChain(depth: number, k: string, deepest: string, reads: { n: num
   let v: any = 'end'
   for (let i = 0; i < depth; i++) {
     const d = v
-    v = { k: i === 0 ? deepest : k }
+    const key = i === 0 ? deepest : k
+    v = { k: key, j: jOf(key) }
     Object.defineProperty(v, 'd', {
       enumerable: true,
       get: () => {
@@ -204,57 +218,171 @@ describe('union backtracking (round 24 part 3)', () => {
     expect(w.errors).toMatchInlineSnapshot(`
       [
         {
+          "code": "UNION",
           "details": [
             {
+              "code": "UNION",
               "details": [
                 {
+                  "code": "LITERAL",
                   "message": "Expected k0, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "k0",
+                  },
                   "path": "d.k",
                 },
                 {
+                  "code": "LITERAL",
+                  "message": "Expected j0, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "j0",
+                  },
+                  "path": "d.j",
+                },
+                {
+                  "code": "LITERAL",
                   "message": "Expected k1, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "k1",
+                  },
                   "path": "d.k",
                 },
                 {
+                  "code": "LITERAL",
+                  "message": "Expected j1, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "j1",
+                  },
+                  "path": "d.j",
+                },
+                {
+                  "code": "LITERAL",
                   "message": "Expected end, got [object Object]",
+                  "params": {
+                    "actual": "[object Object]",
+                    "expected": "end",
+                  },
                   "path": "d",
                 },
               ],
               "message": "Value does not match any of the allowed types: [object(0)], [object(1)], [string(2)]",
+              "params": {
+                "expected": "[object(0)], [object(1)], [string(2)]",
+              },
               "path": "d",
             },
             {
+              "code": "LITERAL",
               "message": "Expected k0, got k1",
+              "params": {
+                "actual": "k1",
+                "expected": "k0",
+              },
               "path": "k",
             },
             {
+              "code": "LITERAL",
+              "message": "Expected j0, got j1",
+              "params": {
+                "actual": "j1",
+                "expected": "j0",
+              },
+              "path": "j",
+            },
+            {
+              "code": "UNION",
               "details": [
                 {
+                  "code": "LITERAL",
                   "message": "Expected k0, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "k0",
+                  },
                   "path": "d.k",
                 },
                 {
+                  "code": "LITERAL",
+                  "message": "Expected j0, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "j0",
+                  },
+                  "path": "d.j",
+                },
+                {
+                  "code": "LITERAL",
                   "message": "Expected k1, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "k1",
+                  },
                   "path": "d.k",
                 },
                 {
+                  "code": "LITERAL",
+                  "message": "Expected j1, got bad",
+                  "params": {
+                    "actual": "bad",
+                    "expected": "j1",
+                  },
+                  "path": "d.j",
+                },
+                {
+                  "code": "LITERAL",
                   "message": "Expected end, got [object Object]",
+                  "params": {
+                    "actual": "[object Object]",
+                    "expected": "end",
+                  },
                   "path": "d",
                 },
               ],
               "message": "Value does not match any of the allowed types: [object(0)], [object(1)], [string(2)]",
+              "params": {
+                "expected": "[object(0)], [object(1)], [string(2)]",
+              },
               "path": "d",
             },
             {
+              "code": "LITERAL",
               "message": "Expected end, got [object Object]",
+              "params": {
+                "actual": "[object Object]",
+                "expected": "end",
+              },
               "path": "",
             },
           ],
           "message": "Value does not match any of the allowed types: [object(0)], [object(1)], [string(2)]",
+          "params": {
+            "expected": "[object(0)], [object(1)], [string(2)]",
+          },
           "path": "",
         },
       ]
     `)
+  })
+
+  it('a discriminated chain: the branch each tag picks, down to the unknown tag', () => {
+    const u = chainUnion(6, true)
+    for (const opts of OPTS) {
+      const w = new CountingWalk(u, opts)
+      expect(w.validate(chainValue(7, 'k5', 'bad', true), true)).toBe(false)
+      expect(w.objects).toBeLessThan(1000)
+      expect(w.errors).toEqual([
+        {
+          path: 'd.d.d.d.d.d.k',
+          message: 'Expected one of k0, k1, k2, k3, k4, k5, got bad',
+          code: 'UNION_DISCRIMINATOR',
+          params: { property: 'k', allowed: ['k0', 'k1', 'k2', 'k3', 'k4', 'k5'], actual: 'bad' },
+        },
+      ])
+    }
   })
 
   for (const engine of ['interpreted', 'compiled']) {

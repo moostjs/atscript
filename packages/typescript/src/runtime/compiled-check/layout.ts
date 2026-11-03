@@ -33,6 +33,7 @@ import {
   BOOLEAN_KEYS,
   boundOf,
   NUMBER_KEYS,
+  OBJECT_KEYS,
   STRING_KEYS,
   VALIDATOR_KEYS,
 } from '../validator-keys'
@@ -105,15 +106,19 @@ const B_MAX = bit('expect.max')
 const B_EX_MIN = bit('expect.exclusiveMin')
 const B_EX_MAX = bit('expect.exclusiveMax')
 export const B_UNIQUE = bit('expect.array.uniqueItems')
+const B_MIN_KEYS = bit('expect.minKeys')
+const B_MAX_KEYS = bit('expect.maxKeys')
 
 /** Annotations the pre-check reads per kind of value (see validator-keys.ts). */
 export const STRING_BITS = bitsOf(STRING_KEYS)
 export const NUMBER_BITS = bitsOf(NUMBER_KEYS)
 export const ARRAY_BITS = bitsOf(ARRAY_KEYS)
+export const OBJECT_BITS = bitsOf(OBJECT_KEYS)
 const BOOLEAN_BITS = bitsOf(BOOLEAN_KEYS)
 
 /** Keys whose value the compiled code reads (one K slot each). */
-const VALUE_BITS = B_MIN_LENGTH | B_MAX_LENGTH | B_MIN | B_MAX | B_EX_MIN | B_EX_MAX
+const VALUE_BITS =
+  B_MIN_LENGTH | B_MAX_LENGTH | B_MIN | B_MAX | B_EX_MIN | B_EX_MAX | B_MIN_KEYS | B_MAX_KEYS
 const FLAG_BITS = B_REQUIRED | B_INT | B_UNIQUE
 const ALL_BITS = (1 << VALIDATOR_KEYS.length) - 1
 
@@ -125,6 +130,8 @@ const BOUND_FIELDS: Record<number, string> = {
   [B_MAX]: 'maxValue',
   [B_EX_MIN]: 'exclusiveMinValue',
   [B_EX_MAX]: 'exclusiveMaxValue',
+  [B_MIN_KEYS]: 'count',
+  [B_MAX_KEYS]: 'count',
 }
 
 /**
@@ -154,6 +161,9 @@ function relevantBits(type: { kind?: unknown; designType?: unknown; value?: unkn
     }
     case 'array': {
       return ARRAY_BITS
+    }
+    case 'object': {
+      return OBJECT_BITS
     }
     case 'union': {
       return ALL_BITS
@@ -216,6 +226,8 @@ export interface TKeySlots {
   max: number
   exMin: number
   exMax: number
+  minKeys: number
+  maxKeys: number
 }
 
 /** The K slot of each annotation value of a site whose values start at slot `at`. */
@@ -234,7 +246,9 @@ export function keySlots(mask: number, shape: string, at: number): TKeySlots {
   const max = next(B_MAX)
   const exMin = next(B_EX_MIN)
   const exMax = next(B_EX_MAX)
-  return { minLength, maxLength, patterns, min, max, exMin, exMax }
+  const minKeys = next(B_MIN_KEYS)
+  const maxKeys = next(B_MAX_KEYS)
+  return { minLength, maxLength, patterns, min, max, exMin, exMax, minKeys, maxKeys }
 }
 
 /** The child sites of a def. */

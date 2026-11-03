@@ -89,16 +89,21 @@ export type NavPropsOf<T> = T extends { __navProps: infer N extends Record<strin
   : Record<string, never>
 
 export * from './runtime/validator'
+export {
+  formatValidatorMessage,
+  localizeErrors,
+  messagesTranslator,
+  VALIDATOR_ERROR_CODES,
+  VALIDATOR_MESSAGES,
+} from './runtime/validator-messages'
+export type { TError, TValidatorErrorCode, TValidatorTranslate } from './runtime/validator-messages'
 
 export { coerceForType, coerceScalar } from './runtime/coerce'
 
-export {
-  buildJsonSchema,
-  detectDiscriminator,
-  fromJsonSchema,
-  mergeJsonSchemas,
-} from './runtime/json-schema'
-export type { TJsonSchema, TUnionDiscriminator } from './runtime/json-schema'
+export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
+export type { TJsonSchema } from './runtime/json-schema'
+export { detectDiscriminator } from './runtime/discriminator'
+export type { TUnionDiscriminator } from './runtime/discriminator'
 
 export { forAnnotatedType } from './runtime/traverse'
 

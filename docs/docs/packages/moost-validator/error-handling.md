@@ -27,7 +27,7 @@ When it catches `ValidatorError`, it creates:
 - `HttpError(400)`
 - `message` from `ValidatorError.message`
 - `statusCode: 400`
-- `_body` containing the full `error.errors` array
+- `_body` containing the full `error.errors` array — each entry with `path`, `message`, `code`, `params` (and `custom: true` for app text), see [Error Codes](/packages/typescript/validation-reference#error-codes)
 
 That is the contract implemented by the package today.
 

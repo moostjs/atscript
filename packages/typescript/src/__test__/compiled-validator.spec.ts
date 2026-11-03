@@ -286,7 +286,7 @@ describe('compiled validator checks — generated modules', { timeout: 30_000 },
     bad.lines[0].qty = 0
     expect(v.validate(bad, true)).toBe(false)
     expect(walk).toHaveBeenCalled()
-    expect(v.errors).toEqual([{ path: 'lines.0.qty', message: 'Expected minimum 1, got 0' }])
+    expect(v.errors).toMatchObject([{ path: 'lines.0.qty', message: 'Expected minimum 1, got 0' }])
     // The bound check holds the bind-time constraint values: an in-place edit (a raw write)
     // is not seen until invalidated — so the decision above was the compiled check's.
     const min = (OrderLine as TObj).type.props.get('qty')!.metadata.get('expect.min') as any
@@ -481,7 +481,9 @@ describe('compiled validator checks — @emit.compiledValidator', { timeout: 30_
       expect(v.validate(validValue(), true)).toBe(true)
       invalidateCompiledValidators()
       expect(v.validate(validValue(), true)).toBe(false)
-      expect(v.errors).toEqual([{ path: 'lines.0.qty', message: 'Expected minimum 5, got 1' }])
+      expect(v.errors).toMatchObject([
+        { path: 'lines.0.qty', message: 'Expected minimum 5, got 1' },
+      ])
     } finally {
       Object.assign(qty, original)
       invalidateCompiledValidators()
@@ -500,7 +502,7 @@ describe('compiled validator checks — @emit.compiledValidator', { timeout: 30_
       expect(interp).toHaveBeenCalled()
       expect(interp.mock.calls.every(([def]) => def.type === ext.Address.type)).toBe(true)
       expect(v.validate({ ...validValue(), billing: { street: 'x'.repeat(11) } }, true)).toBe(false)
-      expect(v.errors).toEqual([
+      expect(v.errors).toMatchObject([
         {
           path: 'billing.street',
           message: 'Expected maximum length of 10 characters, got 11 characters',

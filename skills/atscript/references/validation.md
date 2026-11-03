@@ -80,19 +80,35 @@ try {
   validator.validate(data)
 } catch (e) {
   if (e instanceof ValidatorError) {
-    e.errors // TError[]
+    e.errors // TError[]: { path, message, code, params, custom?, details? }
     e.message // summary
   }
-}
-
-interface TError {
-  path: string // 'user.email', 'cart.items[3].sku'
-  message: string
-  details?: TError[] // nested errors for structured constraints
 }
 ```
 
 Paths: dots for object props, `[n]` for array indices, `["key"]` for pattern-property matches.
+
+## Error codes + translation
+
+Key imports (`@atscript/typescript/utils`): `localizeErrors`, `messagesTranslator`, `formatValidatorMessage`, `VALIDATOR_MESSAGES`, `VALIDATOR_ERROR_CODES`, types `TError`, `TValidatorErrorCode`, `TValidatorTranslate`, `TErrorInfo`.
+
+```ts
+const de = { 'MIN_LENGTH': 'Mindestens {min} Zeichen', 'Choose a valid status': 'Status wählen' }
+const errors = localizeErrors(validator.errors, messagesTranslator(de)) // per request
+Product.validator({ translate: messagesTranslator(de) }) // or one validator per locale
+```
+
+| #   | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Every validator error has `code` (UPPER_SNAKE) + `params` (JSON-safe). Default `message` = `VALIDATOR_MESSAGES[code]` with `{name}` filled from `params` (English). Full code/params table: docs → `validation-reference.md` → "Error Codes".                                                                                                                                                                                                            |
+| 2   | App text (annotation message arg, `@expect.message`, plugin `ctx.error(msg)` without info) → `custom: true`; `code`/`params` still set. Translator gets the **text** as id (gettext style); defaults → the **code**.                                                                                                                                                                                                                                     |
+| 3   | `translate(id, params, error)` returning `undefined` keeps the message. `localizeErrors` returns new objects (details too); originals untouched.                                                                                                                                                                                                                                                                                                         |
+| 4   | Branch on `code`, never on `message`. `string.email` & co. report `EMAIL`, `PHONE`, `DATE`, `ISO_DATE`, `UUID`, `URL`, `IPV4`, `IPV6`, `IP` (message stays the primitive's).                                                                                                                                                                                                                                                                             |
+| 5   | Plugin errors with a code: `ctx.error(msg, path?, details?, { code, params })`; without `info` → code `CUSTOM`.                                                                                                                                                                                                                                                                                                                                          |
+| 6   | Discriminated object unions (all object branches share one literal prop, distinct values; other branches scalars/arrays only, `\| null` ok): a failing object reports the picked branch's errors at their paths, or one `UNION_DISCRIMINATOR` (`params.allowed`) at the discriminator. Two literal props / an optional discriminator / an `any` branch → plain `UNION` with `details`. `partial` at the union's depth + missing tag → plain `UNION` too. |
+| 7   | `@expect.minKeys`/`maxKeys` count kept keys: all own keys under `unknownProps: 'ignore'`, declared + pattern-matched under `'strip'`/`'error'`. A failed count is reported AND props still validated.                                                                                                                                                                                                                                                    |
+| 8   | `errorLimit` is a hard cap on `validator.errors`. Raw input in params (`LITERAL.actual`, `DECIMAL_FORMAT.value`, `UNION_DISCRIMINATOR.actual`, `UNEXPECTED_PROPERTY.property`) is cut at 100 chars + `…`. Format codes (`EMAIL`…) have empty params.                                                                                                                                                                                                     |
+| 9   | Compiled checks stay boolean; errors always come from the interpreted walk — same codes either engine.                                                                                                                                                                                                                                                                                                                                                   |
 
 ## Assertion narrowing
 

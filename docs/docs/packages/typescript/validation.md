@@ -133,7 +133,16 @@ export interface SignupForm {
 }
 ```
 
-When validation fails, the custom message is used instead of the default one.
+When validation fails, the custom message is used instead of the default one. For a value of the wrong type (not one of the allowed values of `'active' | 'blocked'`, a string where a number belongs), use `@expect.message`:
+
+```atscript
+export interface Account {
+  @expect.message "Choose a valid status"
+  status: 'active' | 'blocked'
+}
+```
+
+Every error also carries a stable `code` and its `params` (`MIN_LENGTH`, `{ min: 3, actual: 1 }`), so you can translate messages or react to a specific failure without parsing text. See [Error Codes](/packages/typescript/validation-reference#error-codes).
 
 ## 7. Know The Common Built-Ins
 
@@ -162,7 +171,7 @@ Use the reference page when you need:
 
 - every validator option in one place
 - the exact `validate()` signature
-- `ValidatorError`
+- `ValidatorError`, error codes and translating errors (`localizeErrors`)
 - array uniqueness rules
 - plugin hooks and external context
 - manual `Validator` construction from runtime types

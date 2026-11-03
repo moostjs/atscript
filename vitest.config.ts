@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config'
 // `compiled` project compiles every validated type at runtime (test-only hook).
 const VALIDATOR_SPECS = [
   'packages/typescript/src/validator.spec.ts',
+  'packages/typescript/src/validator-codes.spec.ts',
   'packages/typescript/src/nullable-constraints.spec.ts',
   'packages/typescript/src/serialize.spec.ts',
   'packages/typescript/src/json-schema.spec.ts',
