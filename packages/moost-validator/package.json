@@ -40,14 +40,14 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@moostjs/event-http": "^0.6.53",
-    "moost": "^0.6.53",
+    "@moostjs/event-http": "^0.7.0",
+    "moost": "^0.7.0",
     "vitest": "3.2.7"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
     "@atscript/typescript": "workspace:^",
-    "@moostjs/event-http": "^0.6.53",
-    "moost": "^0.6.53"
+    "@moostjs/event-http": "^0.7.0",
+    "moost": "^0.7.0"
   }
 }
