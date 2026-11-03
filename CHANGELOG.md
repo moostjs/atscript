@@ -1,3 +1,24 @@
+# [0.2.0](https://github.com/moostjs/atscript/compare/v0.1.110...v0.2.0) (2026-11-03)
+
+
+### Bug Fixes
+
+* **core,typescript:** blocks never change structure (STRUCT-N3), self-splitting blocks and circular chain refs are compile errors, build-time load check replaces the runtime cycle guard, on-demand component model, generated statements no longer wait on each other ([6e87e20](https://github.com/moostjs/atscript/commit/6e87e20475c30eafb8d08a0d66ed1727b6878710))
+* **core:** a merged field is identified by its contributors (POS-1b), multi-field phantom paths keep the common phantom primitive (POS-1c), blocks never make U5, distributed branch items layer over contributors typed by the merge ([cd322b0](https://github.com/moostjs/atscript/commit/cd322b02bd0b5600e5b144c792252421482ab479))
+* **core:** annotation type checks resolve chain refs through unions ([e8c7e28](https://github.com/moostjs/atscript/commit/e8c7e284c9a306841b347ae020cbfaf696b3ea76))
+* **core:** type paths through unions resolve once with the blocks they depend on (split chains), readers count splits like generated JS, LSP lists a field once; as-copy views, idempotent unmergeable intersections, merged fields of one node never make U5 ([73106dc](https://github.com/moostjs/atscript/commit/73106dc282eb398fb0546530a0d00cb6240475b3))
+* diamond layer reads, plugin sub-validation strips (STRIP-2), shared strip helpers, 0.2.0 upgrade notes ([5a33bc9](https://github.com/moostjs/atscript/commit/5a33bc931beafc4c5a4db7fd146dcd012dc17e94))
+* **typescript:** blocks on an annotate-as copy of a union root walk the root's union item (seed 7517) ([e030af6](https://github.com/moostjs/atscript/commit/e030af6f6bb4adb51ef9fc752cbcfd02fd5ad0ef))
+
+
+### Features
+
+* **core)!: one type-path rule through unions (CHAIN-1:** unwindType fields, LSP, .d.ts TAtscriptField, phantom rule; merged-field never check counts a contributor once (DEDUP-1) ([7e1d744](https://github.com/moostjs/atscript/commit/7e1d7445b39b667ed438b8e885aa4d8ced54242f))
+
+
+### Performance Improvements
+
+* cache flattened layered metadata reads, one write rule for both engines ([95c3447](https://github.com/moostjs/atscript/commit/95c34478d339e4151415b2ea568e738389dd254d))
 ### Upgrade notes (0.2.0)
 
 * **typescript:** strip now deletes unknown keys only when validation passes; a rejected union branch or failed validation no longer strips (`unknownProps: 'strip'`)
