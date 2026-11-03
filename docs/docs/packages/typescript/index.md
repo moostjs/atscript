@@ -47,6 +47,7 @@ If you are evaluating Atscript for the first time, read these in order:
 - [Installation](/packages/typescript/installation) — packages, prerequisites, and optional tooling
 - [Configuration](/packages/typescript/configuration) — plugin options and config file settings
 - [CLI](/packages/typescript/cli) — generate files from the command line
+- [Upgrading to 0.2](/packages/typescript/upgrading) — regenerate modules, new compile errors, and behaviour changes since 0.1.x
 
 ### 5. Go Deeper When You Need To
 

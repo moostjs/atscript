@@ -236,7 +236,7 @@ for (const ann of prop.annotations) {
 
 ### Merged Annotations (With Inheritance)
 
-`doc.evalAnnotationsForNode(node)` returns the complete annotation set including annotations inherited through type references and annotate blocks. The return value is `TAnnotationTokens[] | undefined`:
+`doc.evalAnnotationsForNode(node)` returns the complete annotation set including annotations inherited through type references and annotate blocks. For a type path (`v: Order.customer.name`) that includes the blocks every type on the way writes on that field: `annotate Customer { name }` as well as `annotate Order { customer.name }`. The return value is `TAnnotationTokens[] | undefined`:
 
 ```typescript
 const merged = doc.evalAnnotationsForNode(prop) // TAnnotationTokens[] | undefined

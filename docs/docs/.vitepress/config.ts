@@ -369,6 +369,7 @@ export default defineConfig({
             { text: 'Configuration', link: '/packages/typescript/configuration' },
             { text: 'CLI', link: '/packages/typescript/cli' },
             { text: 'Testing Fixtures', link: '/packages/typescript/testing-fixtures' },
+            { text: 'Upgrading to 0.2', link: '/packages/typescript/upgrading' },
           ],
         },
         {

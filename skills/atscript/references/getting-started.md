@@ -102,6 +102,17 @@ forAnnotatedType(User, {
 - `atscript.d.ts` stale / `AtscriptMetadata` missing keys — rerun `npx asc -f dts`.
 - TS errors don't match source — ensure `.as.d.ts` / `atscript.d.ts` are up to date; rerun `asc` or your bundler.
 
+## Upgrading 0.1.x → 0.2
+
+| #   | Change | Action |
+| --- | ------ | ------ |
+| 1   | Generated `.as.js` from ≤ 0.1.110 calls removed `refTo` / `cloneRefProp` → fails to load | Regenerate own output + rebuild every dependency shipping generated `.as` code; hand-built types use `.ref(Target)` ([runtime.md](runtime.md)) |
+| 2   | New compile errors: `Unknown member` on a type path through a union (typo was silently accepted), phantom/data mix across branches, interface extending a union, `Circular chain reference`, block crossing the type path it splits | Fix per [as-syntax.md](as-syntax.md) |
+| 3   | `'strip'` deletes only when the whole value passes | [validation.md](validation.md) |
+| 4   | Raw writes (`node.metadata = X`, in-place edits) need `invalidateCompiledValidators()` for both engines | [runtime.md](runtime.md#metadata-layers--runtime-writes) |
+| 5   | `.d.ts` type paths use `TAtscriptField<T, "k">`; build fails if a generated module throws on load (`loadCheck`) | [as-syntax.md](as-syntax.md) (type paths), [unplugin.md](unplugin.md#options) |
+| 6   | Plugin API: `unwindType` returns `fields` for multi-field paths; `resolveFieldRefsAt`; `render(doc, format, options)` passes options on | [plugin-development.md](plugin-development.md) |
+
 ## Next
 
 - Authoring → [as-syntax.md](as-syntax.md), [annotations.md](annotations.md), [primitives.md](primitives.md)

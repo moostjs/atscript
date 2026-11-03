@@ -205,6 +205,8 @@ A chain is a [type path](/packages/typescript/interfaces-types#reference-a-field
 
 Check `fields` before reading `node`: with several fields there is no single field to report. Branches reaching the same field (the same declared property, or a merged property with the same contributors) with the same blocks at or below it are one field. A block only on a step before the field does not count. When a block at or below the field applies on some branches only, that field appears in `fields` once per distinct set of blocks.
 
+The field-reference helpers exported from `@atscript/core` for editor features follow the same rule: `resolveFieldRefsAt(token, doc)` returns every field a path names, while `resolveFieldRefAt(token, doc)` and `resolveQueryFieldRef(node, doc, scope)` return `undefined` when there is more than one.
+
 ### `doc.evalAnnotationsForNode(node)`
 
 Returns the complete set of annotations for a node, including inherited annotations from parent types:

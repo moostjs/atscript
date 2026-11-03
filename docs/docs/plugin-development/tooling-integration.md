@@ -192,10 +192,10 @@ my-atscript-plugin/
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "peerDependencies": {
-    "@atscript/core": ">=0.1.0"
+    "@atscript/core": "^0.2.0"
   },
   "devDependencies": {
-    "@atscript/core": "^0.1.0",
+    "@atscript/core": "^0.2.0",
     "vitest": "^3.0.0"
   }
 }

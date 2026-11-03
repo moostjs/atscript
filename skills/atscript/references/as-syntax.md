@@ -18,6 +18,7 @@ type Helper = string   // file-local, not exported
 
 - Only `export`ed declarations are visible to other `.as` files.
 - Comments are source-only — they are **not** carried into generated `.as.d.ts`/`.as.js` (the JSDoc seen in `.d.ts` is generated entity headers, not your comments).
+- Comments are allowed anywhere around annotations: after the annotation / last arg (`@meta.id // pk`), between args (`@x 1 /* c */, 2`), on lines between annotations and the prop. `//` inside a quoted arg is text. A multi-line `/* … */` ends the annotation like a line break (what follows is not its argument).
 - Import paths resolve relative; **omit the `.as` extension** — the resolver always appends `.as`. Writing `'./x.as'` resolves to `./x.as.as`.
 
 ## `interface`

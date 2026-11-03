@@ -131,6 +131,19 @@ String arguments (single or double quoted) are **raw**: Atscript does not decode
 @expect.pattern "^[^\"]+$", "u"   // pattern: ^[^\"]+$
 ```
 
+### Comments
+
+Line (`//`) and block (`/* */`) comments can go anywhere in an annotation line: after the annotation or its last argument, between arguments, and on their own lines between annotations and the property. They never change the annotation's value.
+
+```atscript
+@meta.id                              // primary key
+@expect.minLength 3 /* min */, "Too short"
+@meta.description 'See https://x.io' // `//` inside quotes is part of the string
+id: string
+```
+
+A block comment that spans several lines ends the annotation like a line break, so what follows it is not an argument of that annotation.
+
 ## Core Annotations
 
 Atscript provides common-purpose annotations:
