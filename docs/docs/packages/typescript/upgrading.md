@@ -10,6 +10,8 @@ Code that builds types by hand uses `defineAnnotatedType().ref(Target)` (or `.re
 
 ## 2. Fix the new compile errors
 
+0.1.x still generated JavaScript for a file that had error diagnostics. 0.2 refuses: any error in a file, including a plugin annotation error such as an argument outside its allowed values, fails code generation for that file. Fix every error your editor or build reports.
+
 Schemas that compiled on 0.1.x can fail on 0.2 in these cases:
 
 | Error                                                      | What to do                                                                                                                                                                        |
