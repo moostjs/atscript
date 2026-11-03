@@ -67,7 +67,19 @@ A [type path](/packages/typescript/interfaces-types#reference-a-field-type-paths
 office?: TAtscriptField<TAtscriptField<Account, "job">, "office">
 ```
 
-`TAtscriptField<T, K>` is `T[K]` for each object branch of `T` that declares `K`, and nothing for the other branches (`null`, scalars, arrays, objects without `K`; a key that only pattern properties match is not a declared property). So a path through a union is the union of its fields, and a step through an optional property (`work?: Job`) does not index `undefined`. Earlier versions wrote `Account["job"]["office"]`, which failed to type-check through a union or an optional property.
+`TAtscriptField<T, K>` is `T[K]` for each object branch of `T` that declares `K`, and nothing for the other branches (`null`, scalars, arrays, objects without `K`; a key that only pattern properties match is not a declared property). So a path through a union is the union of its fields, and a step through an optional property (`work?: Job`) does not index `undefined`. Versions before 0.2.0 wrote `Account["job"]["office"]`, which failed to type-check through a union or an optional property.
+
+The data type and the runtime descriptor of a type alias of a path can differ. Fields of one type are one TypeScript type (`extends` and merges work on it), but the runtime keeps one item per field, so the descriptor (`Z.type`) is typed as the union the runtime holds:
+
+```typescript
+// type Z = Place.address   (type Place = Office | Home, both `address: Address`)
+export type Z = TAtscriptField<Place, 'address'> // Address
+declare namespace Z {
+  const type: TAtscriptTypeComplex<Z> // a union: one item per field
+}
+```
+
+A path naming several `phantom` fields is one phantom node at runtime, and its descriptor is typed as that node (`TAtscriptTypeFinal`).
 
 ## JS Format
 

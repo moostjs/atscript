@@ -126,13 +126,52 @@ Branches that reach the same field count once, when the same blocks apply at or 
 
 Blocks only change metadata, never structure. For structure — `extends`, merges (`&`) and when a merge is `never`, how a merge distributes over a union, the merge checks, and the type in the generated `.d.ts` — the positions that differ only by blocks are one type. With `type Z = Member.address`, `annotate Admin { address }` and `interface Home extends Z { … }`, `Home` gets the address's props whether or not the block exists, and `Z & Address` is `Address`. The same holds whether the block is in the same file or in another one.
 
+Fields of the same type are one type for structure too, whichever properties they are. The runtime still keeps one item per field, each with its own annotations:
+
+```atscript
+interface Address {
+    city?: string
+}
+
+interface Office {
+    @meta.label 'Office address'
+    address: Address
+}
+
+interface Home {
+    address?: Address
+}
+
+type Place = Office | Home
+type Z = Place.address // structure: Address; runtime: Office.address | Home.address
+type ZE = Z & { zip?: string } // Address's props and annotations, plus zip
+```
+
+A merge or an `extends` built from such a path gets the type alone: `Address`'s props and its own annotations, never a field's (`'Office address'` above), nor those of an annotated alias a field is typed with (`@meta.label 'P' type P = Address`). When the positions are one declared field that blocks split, it gets that field without the blocks: a block belongs to the path it was written on. The field annotations stay on the runtime items of `Z` itself. The result is the same in any union order.
+
+A field can't reach itself through a type path. When a merged or inherited field is typed by a path back to that same field, the compiler reports `Circular chain reference "M.c": it resolves to itself`:
+
+```atscript
+interface A {
+    c?: M.c
+}
+
+interface B {
+    c?: string
+}
+
+type M = A & B // Error: Circular chain reference "M.c": it resolves to itself
+```
+
+The same holds through `| null` (`c?: M.c | null`), through `extends` (`interface J extends A, B` with `c?: J.c`) and through an `annotate M as X` copy (`c?: X.c`). Type the field directly instead (`c?: string`).
+
 The blocks that count are those of every file connected to the path's file by imports, in either direction: the files it imports, the files importing them, and so on — the same files the generated code loads together. That includes a block in a sibling file that never imports the path's file, the one the compiler warns about with "this annotate applies only in builds including this file".
 
 A block whose own path goes through a type path that it splits is a compile error: "A block's path can't cross the type path it splits." For example, with `type U = T | Other`, both `work: W`, and `interface H { x?: U.work.h }`, the block `annotate T { work.h.x.y }` is below `T.work.h` on one branch only, so it would split `U.work.h` into two fields, and it also lands through `H.x`, which is `U.work.h`. Where it lands would depend on the split it causes. The path counts as going through `U.work.h` by any route: a type alias of it, an array of it, `U.work.h | null`, another type path that names it (`x?: Z.k` with `Z.k?: U.work.h`), or an intersection that includes it (`x?: U.work.h & E`). Blocks that depend on each other count too: a block is an error when where it lands depends on a split that it causes, directly or through other blocks. To annotate the field on every branch, put the block on the union instead (`annotate U { work.h.x.y }`): it does not split `U.work.h`, so it builds. Annotating each branch with its own block (`annotate T { ... }` and `annotate I9 { ... }`) still gives an error for each block.
 
 A path that names several fields is `phantom` only when every field is `phantom`. It is then one `phantom` field like any other (excluded from validation, JSON Schema and the `.d.ts` data type). At runtime its type is the fields' common phantom primitive (all `ui.action` gives `ui.action`, with its tags), or plain `phantom` when they differ; it carries none of the fields' annotations. A mix of `phantom` and data fields is a compile error.
 
-In the generated `.d.ts`, each step of a path is `TAtscriptField<T, "a">` from `@atscript/typescript/utils`: the field of every object branch of `T` that has it. A path through a union therefore has the TypeScript type of the union of its fields, and a step through an optional property does not fail on `undefined`.
+In the generated `.d.ts`, each step of a path is `TAtscriptField<T, "a">` from `@atscript/typescript/utils`: the field of every object branch of `T` that has it. A path through a union therefore has the TypeScript type of the union of its fields, and a step through an optional property does not fail on `undefined`. The path's runtime descriptor is typed as what the runtime holds (see [Type paths in the `.d.ts`](/packages/typescript/code-generation#type-paths)).
 
 ## Advanced Composition
 
@@ -195,7 +234,7 @@ The compiler writes the merged type as its final structure; nothing is merged at
 - **Merges flatten:** `(A & B) & C` is the merge of `A`, `B` and `C`.
 - **A union operand is distributed:** `(A | B) & C` is `A & C | B & C`, and `(A | B) & (C | D)` is the product `A & C | A & D | B & C | B & D`. Branches that cannot merge (they would be `never`) are dropped. This also applies to a union of scalars and arrays: `{ c?: string | X[] } & { c?: Y[] }` gives `c?: (X & Y)[]`, because the `string` branch cannot merge with an array.
 - **A type picked from a union keeps its checks:** when distributing leaves a single member of a union, the merged property is that member's type, with its built-in and annotated checks. `{ a: string } & { a: string.email | number }` gives `a: string.email`, which still checks the email format. With `@expect.pattern '^x' type X = string`, `{ a: string } & { a: X | number }` gives `a: X` with its pattern. The same applies to each scalar branch of a distributed property.
-- **A nullable operand at the top is the type it holds:** `(X | null) & Z` and `XN & Z` with `type XN = X | null` are `X & Z`.
+- **A nullable operand at the top is the type it holds:** `(X | null) & Z` and `XN & Z` with `type XN = X | null` are `X & Z`. When every operand allows `null`, the merge keeps it: `(X | null) & (Z | null)` is `X & Z | null`.
 
 ```atscript
 interface A {
@@ -231,12 +270,12 @@ export type AB = A & B
 
 In detail:
 
-- A property declared by several members gets the intersection of their types: `{ x: A[] } & { x: B[] }` gives `x: (A & B)[]`, and `{ y: A | null } & { y: B }` gives `y: A & B`.
+- A property declared by several members gets the intersection of their types: `{ x: A[] } & { x: B[] }` gives `x: (A & B)[]`, `{ y: A | null } & { y: B }` gives `y: A & B`, and `{ y: A | null } & { y: B | null }` gives `y: A & B | null`.
 - A recursive merge is a recursive type: with `A.next?: A` and `B.next?: B`, `(A & B).next` is `A & B` again.
 - An intersection carries its members' type-level annotations (of the interfaces, types and `annotate … as` aliases it intersects), below its own, the later member winning. An operand is a reference: type-level annotations whose spec declares `passedWhenReferred: false` (`@meta.readonly`, `@meta.required`, `@meta.id`, `@meta.default`) are not carried. For example, `@expect.minLength 2 type L1 = X[]` makes `L1 & X[]` reject a single element.
 - Tuples of scalars intersect item by item: `[string, number] & [string, number]` gives `[string, number]`, and an array intersecting such a tuple gives a tuple of the items' intersections. Tuples of different lengths give `never`.
 - Primitives of different types (`string & number`) give `never`. A literal narrows a primitive of its type (`'x' & string` is `'x'`, `{ p: 'a' | 'b' } & { p: 'a' }` gives `p: 'a'`; `'x' & 'y'` is `never`), and a primitive extension its base (`string & string.email` is `string.email`, in either order). A literal and an extension (`1 & number.int`), or two extensions (`string.email & string.uuid`), stay an intersection checking both. A side is dropped only when it checks nothing the other does not, so no constraint is lost: with `@expect.minLength 3 type S3 = string`, `S3 & string` and `string & S3` are `S3`, while `'x' & S3`, `S3 & L4` (another annotated alias) and `'x' & decimal` stay intersections checking both.
-- A type repeated (`X & Y & X`) counts once, where it last occurs: `X & Y & X` is `Y & X`. Parentheses around a single type (`({ a: string })[]`) change nothing.
+- A type repeated (`X & Y & X`) counts once, where it last occurs: `X & Y & X` is `Y & X`. This holds however it is spelled, directly or inside named merges: with `type XX = X & X` and `type XY = XX & Y`, `X & XY & XX` is `Y & X`, so on the same annotation `X` wins. Parentheses around a single type (`({ a: string })[]`) change nothing.
 - An optional property passes `null` (as it passes `undefined`): intersected with a required one that may be `null`, it may be `null` too (`{ a?: X } & { a: null }` gives `a: null`). Otherwise `null` is a scalar like any other: an object or array merged with a bare `null` (`{ a: X } & { a: null }`, `{ a?: X[] } & { a?: null }`) resolves to `never`, with a warning. When every member's type may be `null` (`{ a: X | null } & { a?: null }`), the merge is `null`.
 
 ### Merges that resolve to `never`
