@@ -1,7 +1,7 @@
 import path from 'path'
 import { URL } from 'url'
 
-import { isBareSpecifier } from '../resolve-bare'
+import { isBareSpecifier, withoutAsExtension } from '../resolve-bare'
 
 export type TVsCodeRange = {
   start: { line: number; character: number }
@@ -11,18 +11,20 @@ export type TVsCodeRange = {
 /** {@link resolveAtscriptFromPath} by document id and import path (a pure function of both). */
 const resolvedFromPaths = new Map<string, Map<string, string>>()
 
-export function resolveAtscriptFromPath(from: string, id: string) {
+export function resolveAtscriptFromPath(written: string, id: string) {
   let byFrom = resolvedFromPaths.get(id)
   if (!byFrom) {
     byFrom = new Map()
     resolvedFromPaths.set(id, byFrom)
   }
-  let resolved = byFrom.get(from)
+  let resolved = byFrom.get(written)
   if (resolved === undefined) {
+    // (`./user.as` is `./user`: one module identity for both spellings)
+    const from = withoutAsExtension(written)
     resolved = isBareSpecifier(from)
       ? `bare:${from}.as`
       : `file://${path.join(fileUriToPath(id).split('/').slice(0, -1).join('/'), from)}.as`
-    byFrom.set(from, resolved)
+    byFrom.set(written, resolved)
   }
   return resolved
 }

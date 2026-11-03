@@ -24,12 +24,12 @@ interface InternalConfig {
 
 ## Importing in .as Files
 
-In `.as` files, omit the file extension:
+In `.as` files, the file extension is optional: `'./user'` and `'./user.as'` name the same file, which is loaded once.
 
 ```atscript
 // app.as
 import { User, UserID, Status } from './user'
-import { Product } from '../models/product'
+import { Product } from '../models/product.as'
 
 export interface Order {
     user: User
@@ -92,7 +92,7 @@ import { User } from 'my-lib/user'
 import { Product } from '@my-org/models/product'
 ```
 
-Like relative imports, the `.as` extension is omitted. The resolver automatically appends it.
+Like relative imports, the `.as` extension is optional (`'my-lib/models'` or `'my-lib/models.as'`). The resolver appends it when it's missing.
 
 ### How Resolution Works
 

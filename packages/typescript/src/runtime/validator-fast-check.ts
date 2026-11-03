@@ -543,7 +543,7 @@ function fastCheckFinal(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>, value: 
       return typeof value === 'boolean' ? fastCheckBoolean(def.metadata, value) : FAIL
     }
     case 'any': {
-      return PASS
+      return value === undefined ? FAIL : PASS
     }
     case 'never': {
       return FAIL

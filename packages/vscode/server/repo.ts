@@ -283,8 +283,16 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
             }
           }
           const parent = token.parentNode
+          // (`@annotate.*`: directives of `annotate` blocks, offered only there — an entry, or the
+          // top of a block)
+          const inAnnotate =
+            (!!parent && isAnnotate(parent)) ||
+            atscript.annotateBlockAt(position.line, position.character) !== undefined
+          if (prev[0] === 'annotate' && !inAnnotate) {
+            return []
+          }
           return Object.keys(a)
-            .filter(k => k !== '$self')
+            .filter(k => k !== '$self' && (inAnnotate || prev.length > 0 || k !== 'annotate'))
             .flatMap(key => {
               const options = [
                 {

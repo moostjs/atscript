@@ -5,7 +5,7 @@
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { isBacktickArgType, resolveAnnotation } from './annotations'
+import { ANNOTATE_RESET, isBacktickArgType, resolveAnnotation } from './annotations'
 import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
 import { isPhantomPath, unwoundFields } from './flatten'
@@ -60,6 +60,7 @@ import {
   baseSlot,
   MERGE_TOO_COMPLEX,
   NOTHING_IN_COMMON,
+  OPAQUE_MERGE,
   StructureModel,
   UNION_IN_RECURSIVE_MERGE,
 } from './structure'
@@ -1052,14 +1053,20 @@ export class AtscriptDoc {
     base: TAnnotationTokens[] | undefined,
     overlay: TAnnotationTokens[]
   ): TAnnotationTokens[] {
-    const replaced = new Set<string>()
+    // (`@annotate.reset 'x'`: drops x — appended values too —; the block's own x applies over it.
+    // The reset itself stays, for the layers below the node: see `mergeNodesAnnotations`)
+    const replaced = resetNames(overlay) ?? new Set<string>()
     for (const a of overlay) {
       const spec = this.resolveAnnotation(a.name)
       if (!(spec?.config.multiple && spec.config.mergeStrategy === 'append')) {
         replaced.add(a.name)
       }
     }
-    return [...(base ?? []).filter(a => !replaced.has(a.name)), ...overlay]
+    // (a reset in `replaced` — the block's own, or `@annotate.reset 'annotate.reset'` — is kept)
+    return [
+      ...(base ?? []).filter(a => a.name === ANNOTATE_RESET || !replaced.has(a.name)),
+      ...overlay,
+    ]
   }
 
   /**
@@ -1603,15 +1610,18 @@ export class AtscriptDoc {
       // An `annotate … as` alias: its target's type-level annotations, its own over them (like
       // its class, and a hand-written copy).
       const target = this.getDeclarationOwnerNode(givenNode.targetName)
-      return this.mergeNodesAnnotations(
-        target?.node && target.node !== givenNode
-          ? target.doc.evalAnnotationsForNode(
-              target.node,
-              annotationsOf(target.node, blocks),
-              blocks
-            )
-          : undefined,
-        own
+      return stripResets(
+        this.mergeNodesAnnotations(
+          target?.node && target.node !== givenNode
+            ? target.doc.evalAnnotationsForNode(
+                target.node,
+                annotationsOf(target.node, blocks),
+                blocks
+              )
+            : undefined,
+          own,
+          true
+        )
       )
     }
     return this.evalAnnotationsForDefinition(givenNode.getDefinition(), own, givenNode, blocks)
@@ -1684,14 +1694,18 @@ export class AtscriptDoc {
           }
           const anns =
             chainNode === unwound?.node && fieldAnns ? fieldAnns : annotationsOf(chainNode, blocks)
-          right = this.mergeNodesAnnotations(this.filterPassedWhenReferred(anns, viaProp), right)
+          right = this.mergeNodesAnnotations(
+            this.filterPassedWhenReferred(anns, viaProp),
+            right,
+            true
+          )
         }
         def = unwound?.def || def
       }
       if (def) {
         const merged = this.mergeIntersection(def)
         if (merged !== def && isRef(merged)) {
-          right = this.mergeNodesAnnotations(merged.annotations, right)
+          right = this.mergeNodesAnnotations(merged.annotations, right, true)
           def = merged
           continue
         }
@@ -1704,12 +1718,14 @@ export class AtscriptDoc {
             : merged.annotations
         right = this.mergeNodesAnnotations(
           refDef ? this.filterPassedWhenReferred(own, viaProp) : own,
-          right
+          right,
+          true
         )
       }
       break
     }
-    return right
+    // (the resets applied: what the node has)
+    return stripResets(right)
   }
 
   /**
@@ -2042,10 +2058,11 @@ export class AtscriptDoc {
       if (newDef) {
         cloned.define(newDef)
       }
+      // (the copy's entries over the prop: their resets go on applying to the prop's type)
       cloned.annotations =
         group.own.length === 0
           ? prop.annotations
-          : this.mergeNodesAnnotations(prop.annotations, group.own)
+          : this.mergeNodesAnnotations(prop.annotations, group.own, true)
       const optionalToken = prop.token('optional')
       if (optionalToken) {
         cloned.saveToken(optionalToken, 'optional')
@@ -2934,6 +2951,12 @@ export class AtscriptDoc {
       if (token && reason === MERGE_TOO_COMPLEX) {
         // (a merge distributing past the bound is the "merge too complex" error at the type)
         messages.push({ severity: TSeverity.Error, message: MERGE_TOO_COMPLEX, range: token.range })
+      } else if (token && reason === OPAQUE_MERGE) {
+        messages.push({
+          severity: TSeverity.Error,
+          message: `${OPAQUE_MERGE}${path.length > 0 ? ` at "${decl.name}.${path.join('.')}"` : ` in "${decl.name}"`}: write the other type alone`,
+          range: token.range,
+        })
       } else if (token) {
         messages.push({
           severity: TSeverity.Warning,
@@ -3857,18 +3880,40 @@ export class AtscriptDoc {
     return out
   }
 
-  mergeNodesAnnotations(left?: TAnnotationTokens[], right?: TAnnotationTokens[]) {
+  /**
+   * Annotations `right` over `left`: right's win, `append` ones of both kept (left's after).
+   *
+   * `layered`: `right` is a node's and `left` what the node is layered over (the type it
+   * references, an `as` copy's target) — right's `@annotate.reset 'x'` drop left's x, and the
+   * resets of both stay, for the layers further below (see {@link stripResets}). Else they are
+   * siblings (the members of a merge): a reset applies within its member's own layers only, and
+   * is left out.
+   */
+  mergeNodesAnnotations(left?: TAnnotationTokens[], right?: TAnnotationTokens[], layered = false) {
     const annotations = [] as TAnnotationTokens[]
     const savedAnnotations = new Set<string>()
+    const hidden = layered ? resetNames(right) : undefined
 
     // Add annotations from the right array first (higher priority)
     for (const a of right || []) {
+      if (a.name === ANNOTATE_RESET && !layered) {
+        continue
+      }
       annotations.push(a)
       savedAnnotations.add(a.name)
     }
 
     // Add annotations from the left array only if they are not already in the set
     for (const a of left || []) {
+      if (a.name === ANNOTATE_RESET) {
+        if (layered) {
+          annotations.push(a)
+        }
+        continue
+      }
+      if (hidden?.has(a.name)) {
+        continue
+      }
       const spec = this.resolveAnnotation(a.name)
       const append = spec && spec.config.multiple && spec.config.mergeStrategy === 'append'
       if (append || !savedAnnotations.has(a.name)) {
@@ -4035,4 +4080,25 @@ function declarationTokens(decl: SemanticNode): Set<Token> {
     out.add(t)
   }
   return out
+}
+
+/** The annotation names `@annotate.reset` entries of `anns` reset; `undefined`: none. */
+function resetNames(anns: TAnnotationTokens[] | undefined): Set<string> | undefined {
+  let out: Set<string> | undefined
+  for (const a of anns ?? []) {
+    if (a.name === ANNOTATE_RESET && a.args[0]?.type === 'text') {
+      ;(out ??= new Set()).add(a.args[0].text)
+    }
+  }
+  return out
+}
+
+/**
+ * `anns` without their `@annotate.reset` entries: a node's annotations once the resets applied to
+ * the layers below it (see `AtscriptDoc.mergeNodesAnnotations`).
+ */
+function stripResets(anns: TAnnotationTokens[] | undefined): TAnnotationTokens[] | undefined {
+  return anns?.some(a => a.name === ANNOTATE_RESET)
+    ? anns.filter(a => a.name !== ANNOTATE_RESET)
+    : anns
 }

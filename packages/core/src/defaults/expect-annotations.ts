@@ -19,6 +19,7 @@ const MESSAGE_ARG: TAnnotationArgument = {
   optional: true,
   type: 'string',
   description: 'Optional error message to display if the validation fails.',
+  userText: true,
 }
 
 /** Whether `flags` are flags of a JS regular expression. */
@@ -228,6 +229,7 @@ export const expectAnnotations: TAnnotationsTree = {
       name: 'message',
       type: 'string',
       description: 'The error message.',
+      userText: true,
     },
   }),
 
@@ -377,6 +379,7 @@ export const expectAnnotations: TAnnotationsTree = {
           optional: true,
           type: 'string',
           description: 'Optional custom error message when duplicate items are found.',
+          userText: true,
         },
       ],
       validate(token, args, doc) {
@@ -436,6 +439,7 @@ export const expectAnnotations: TAnnotationsTree = {
           type: 'string',
           description:
             'Optional custom error message (used by @expect.array.uniqueItems when checking key-based uniqueness).',
+          userText: true,
         },
       ],
       validate(token, args, doc) {

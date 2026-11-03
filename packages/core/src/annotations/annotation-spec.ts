@@ -32,6 +32,12 @@ export interface TQueryScope {
   unqualifiedTarget: string | null
 }
 
+/**
+ * The built-in annotation of `annotate` blocks that removes another annotation from the node
+ * (`@annotate.reset 'expect.pattern'`): a directive, never written as metadata.
+ */
+export const ANNOTATE_RESET = 'annotate.reset'
+
 /** Annotation argument types written in backticks, each parsed by its own grammar. */
 export type TBacktickArgKind = 'query' | 'expr' | 'order'
 
@@ -67,8 +73,12 @@ export interface TAnnotationArgument {
    * - `expr`: backtick arithmetic over field refs (`openCount * 10 + coalesce(overdue, 0)`):
    *   `+ - * /`, unary `-`, parentheses, numeric literals, `coalesce(a, b, …)`
    * - `order`: backtick ordering (`raisedAt desc, id`): field refs with optional `asc` / `desc`
+   * - `value`: a scalar literal — a string (`'active'`), a number (`0`, `-1.5`) or a boolean
+   *   (`true`). A number or boolean must fit the annotated field's type (a number for a number
+   *   field, …); a string is accepted for any field (read as text for a string field, else as
+   *   JSON by convention). The value is stored as written: a string, a number or a boolean.
    */
-  type: 'string' | 'number' | 'boolean' | 'ref' | TBacktickArgKind
+  type: 'string' | 'number' | 'boolean' | 'ref' | 'value' | TBacktickArgKind
   description?: string
   values?: string[]
   /**
@@ -96,6 +106,13 @@ export interface TAnnotationArgument {
    * return `false` to hide the candidate. All declarations are offered when absent.
    */
   refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean
+  /**
+   * The argument is user-facing text (a label, a description, an error message): i18n tooling
+   * and translators read the annotations holding such text through {@link userTextAnnotations}
+   * (build time) and `userTextOf` / `userTextKeys` of `@atscript/typescript/utils` (runtime).
+   * A `string` argument only.
+   */
+  userText?: boolean
 }
 
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
@@ -141,7 +158,12 @@ export class AnnotationSpec {
       .map((arg, index) => {
         const placeholderIndex = index + 1 // Snippet placeholders are 1-based
         const defaultValue = this.getDefaultValueForType(arg.name, arg.type)
-        const quote = arg.type === 'string' ? `'` : isBacktickArgType(arg.type) ? '`' : ''
+        const quote =
+          arg.type === 'string' || arg.type === 'value'
+            ? `'`
+            : isBacktickArgType(arg.type)
+              ? '`'
+              : ''
         return `${quote}\${${placeholderIndex}:${defaultValue}}${quote}`
       })
       .join(', ')
@@ -168,6 +190,11 @@ export class AnnotationSpec {
       }
       case 'ref': {
         return tokenType === 'identifier' ? undefined : 'type reference expected.'
+      }
+      case 'value': {
+        return tokenType === 'text' || tokenType === 'number' || tokenType === 'identifier'
+          ? undefined
+          : 'string, number or boolean expected.'
       }
       case 'query':
       case 'expr':
@@ -278,7 +305,10 @@ export class AnnotationSpec {
       }
 
       // 3b. If the spec has an allowed values list, verify membership
-      const values = argSpec.type === 'boolean' ? ['true', 'false'] : argSpec.values
+      const values =
+        argSpec.type === 'boolean' || (argSpec.type === 'value' && tokenType === 'identifier')
+          ? ['true', 'false']
+          : argSpec.values
       if (values && !values.includes(valueText)) {
         messages.push({
           severity: 1,
@@ -357,11 +387,47 @@ export class AnnotationSpec {
       }
     }
 
+    messages.push(...this.validateValueArgs(mainToken, args, doc))
+
     if (this.config.validate) {
       messages.push(...(this.config.validate(mainToken, args, doc) || []))
     }
 
     return messages.length > 0 ? messages : undefined
+  }
+
+  /**
+   * `value` arguments written as a number or a boolean must fit the annotated field's type: a
+   * number literal a field that holds numbers, a boolean literal one that holds booleans (a
+   * union: one of its members; `unknown`: any). A string is accepted for any field.
+   */
+  private validateValueArgs(mainToken: Token, args: Token[], doc: AtscriptDoc): TMessages {
+    const messages: TMessages = []
+    const specArgs = this.arguments
+    // (`null`: not looked up yet; `undefined`: the field does not resolve)
+    let kinds: Set<string> | undefined | null = null
+    for (let i = 0; i < args.length && i < specArgs.length; i++) {
+      const token = args[i]
+      const kind =
+        token.type === 'number' ? 'number' : token.type === 'identifier' ? 'boolean' : undefined
+      if (specArgs[i].type !== 'value' || !kind) {
+        continue
+      }
+      if (kinds === null) {
+        kinds = annotatedValueKinds(mainToken, doc)
+      }
+      if (!kinds) {
+        return messages
+      }
+      if (!literalFits(kind, kinds)) {
+        messages.push({
+          severity: 1,
+          message: `${mainToken.text} at argument #${i + 1} ("${specArgs[i].name}"): a ${kind} does not fit the field's type (${[...kinds].join(' | ') || 'unknown'}).`,
+          range: token.range,
+        })
+      }
+    }
+    return messages
   }
 
   /**
@@ -413,12 +479,12 @@ export class AnnotationSpec {
       const a = this.arguments[index]
       if (a) {
         const values = a.values ? `\n\nValues:\n${a.values.join(', ')}` : ''
-        return `### \`${a.name}${a.optional ? '?' : ''}: ${a.type}\`\n\n${a.description}${values}`
+        return `### \`${a.name}${a.optional ? '?' : ''}: ${argTypeLabel(a)}\`\n\n${a.description}${values}`
       }
     } else {
       const args = this.arguments
       return `### ${index} ${args
-        .map(a => `\`${a.name}${a.optional ? '?' : ''}: ${a.type}\``)
+        .map(a => `\`${a.name}${a.optional ? '?' : ''}: ${argTypeLabel(a)}\``)
         .join(', ')}\n\n${this.config.description}`
     }
   }
@@ -447,11 +513,19 @@ export class AnnotationSpec {
       case 'order': {
         return 'field asc'
       }
+      case 'value': {
+        return name
+      }
       default: {
         return ''
       }
     }
   }
+}
+
+/** An argument's type as the docs show it (`value`: the literals it takes). */
+function argTypeLabel(a: TAnnotationArgument): string {
+  return a.type === 'value' ? 'string | number | boolean' : a.type
 }
 
 export function isAnnotationSpec(a?: TAnnotationsTree | AnnotationSpec): a is AnnotationSpec {
@@ -490,6 +564,39 @@ export function forEachAnnotationSpec(
     above.delete(node)
   }
   walk(tree)
+}
+
+/**
+ * Where annotation `spec` holds user-facing text (arguments flagged `userText`): `true` — its
+ * value itself (a spec with one argument, not a list: the value is the string; for a `multiple`
+ * annotation, each value); a list — those fields of its value object (a spec with an argument
+ * list). `undefined`: no user-facing text.
+ */
+export function userTextFields(spec: AnnotationSpec): true | string[] | undefined {
+  const arg = spec.config.argument
+  if (!arg) {
+    return undefined
+  }
+  if (!Array.isArray(arg)) {
+    return arg.userText ? true : undefined
+  }
+  const fields = arg.filter(a => a.userText).map(a => a.name)
+  return fields.length > 0 ? fields : undefined
+}
+
+/**
+ * Every annotation of `tree` (core and plugins) holding user-facing text, by full name (see
+ * {@link userTextFields}): what i18n tooling extracts and a translator translates.
+ */
+export function userTextAnnotations(tree: TAnnotationsTree): Map<string, true | string[]> {
+  const out = new Map<string, true | string[]>()
+  forEachAnnotationSpec(tree, (name, spec) => {
+    const fields = userTextFields(spec)
+    if (fields) {
+      out.set(name, fields)
+    }
+  })
+  return out
 }
 
 export function resolveAnnotation(
@@ -532,7 +639,8 @@ function matchesDefType(
 /** The `defType` vocabulary name of a resolved node (`string`, `object`, `union`, `array`, …). */
 function describeNode(def: SemanticNode | undefined): string {
   if (isPrimitive(def)) {
-    return def.type || 'unknown'
+    // (the `unknown` primitive: final type `any`)
+    return def.type === 'any' ? 'unknown' : def.type || 'unknown'
   }
   if (isInterface(def) || isStructure(def)) {
     return 'object'
@@ -616,6 +724,101 @@ export function nonNullishMembers(
     }
   })
   return members
+}
+
+/**
+ * The resolved type of the field (or type) an annotation is written on: an inline prop's, the
+ * prop an `annotate` block entry names, an `annotate` block's target. `undefined` when it does
+ * not resolve (reported elsewhere).
+ */
+function annotatedFieldType(
+  mainToken: Token,
+  doc: AtscriptDoc
+): { def: SemanticNode; doc: AtscriptDoc } | undefined {
+  const parent = mainToken.parentNode
+  if (!parent) {
+    return undefined
+  }
+  const at =
+    parent.entity === 'annotate'
+      ? doc.unwindType((parent as SemanticAnnotateNode).targetName)
+      : doc.annotatedDefinition(parent)
+  if (!at?.def) {
+    return undefined
+  }
+  if (isRef(at.def)) {
+    const unwound = at.doc.unwindRef(at.def)
+    return unwound?.def ? { def: unwound.def, doc: unwound.doc } : undefined
+  }
+  return { def: at.def, doc: at.doc }
+}
+
+/**
+ * The scalar kinds a resolved type holds (`string`, `number`, `boolean`, `decimal`; `unknown`:
+ * any value), through references and aliases: a union's members' (not `null` / `undefined`), a
+ * scalar merge's kinds every member has (`unknown` takes no part: `unknown & number` is a
+ * number), a literal's.
+ */
+function valueKinds(
+  def: SemanticNode,
+  doc: AtscriptDoc,
+  seen = new Set<SemanticNode>()
+): Set<string> {
+  let node: SemanticNode | undefined = def
+  let at = doc
+  while (node && isGroup(node) && !node.op && node.unwrap().length === 1) {
+    node = node.unwrap()[0]
+  }
+  if (isRef(node)) {
+    const unwound = at.unwindRef(node)
+    node = unwound?.def
+    at = unwound?.doc ?? at
+  }
+  if (!node || seen.has(node)) {
+    return new Set()
+  }
+  seen.add(node)
+  if (node.entity === 'const') {
+    return new Set([node.token('identifier')?.type === 'number' ? 'number' : 'string'])
+  }
+  if (isGroup(node) && node.entity !== 'tuple' && node.op === '&') {
+    let out: Set<string> | undefined
+    for (const m of node.unwrap()) {
+      const ks = valueKinds(m, at, seen)
+      if (ks.size === 1 && ks.has('unknown')) {
+        continue
+      }
+      out = out ? new Set([...out].filter(k => ks.has(k))) : ks
+    }
+    return out ?? new Set(['unknown'])
+  }
+  const members = nonNullishMembers(node, at)
+  if (members) {
+    const out = new Set<string>()
+    for (const m of members) {
+      for (const k of valueKinds(m, at, seen)) {
+        out.add(k)
+      }
+    }
+    return out
+  }
+  return new Set([describeNode(node)])
+}
+
+/**
+ * The scalar kinds the field (or type) annotation `mainToken` is written on holds (see
+ * `valueKinds`): `string`, `number`, `boolean`, `decimal`, `unknown` (any value), or another
+ * kind name (`object`, `array`, …). `undefined` when the field does not resolve. Code generators
+ * use it for `value` arguments: a number literal on a `decimal` field is written as its string.
+ */
+export function annotatedValueKinds(mainToken: Token, doc: AtscriptDoc): Set<string> | undefined {
+  const target = annotatedFieldType(mainToken, doc)
+  return target ? valueKinds(target.def, target.doc) : undefined
+}
+
+/** Whether a literal of `kind` (`number`, `boolean`) fits a field of `kinds` (see `valueKinds`). */
+function literalFits(kind: string, kinds: Set<string>): boolean {
+  return kinds.has('unknown') || kinds.has(kind) || (kind === 'number' && kinds.has('decimal'))
 }
 
 /**

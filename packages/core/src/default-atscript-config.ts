@@ -1,4 +1,5 @@
 import type { TAtscriptConfig } from './config'
+import { annotateAnnotations } from './defaults/annotate-annotations'
 import { emitAnnotations } from './defaults/emit-annotations'
 import { expectAnnotations } from './defaults/expect-annotations'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
@@ -12,6 +13,7 @@ export function getDefaultAtscriptConfig(): TAtscriptConfig {
       meta: { ...metaAnnotations },
       expect: { ...expectAnnotations },
       emit: { ...emitAnnotations },
+      annotate: { ...annotateAnnotations },
     },
   }
 

@@ -32,6 +32,7 @@ import type {
   TStructSlot,
 } from '@atscript/core'
 import {
+  ANNOTATE_RESET,
   andExprs,
   components,
   defPosition,
@@ -50,6 +51,7 @@ import {
   SemanticGroup,
   StructureModel,
   unshell,
+  userTextFields,
 } from '@atscript/core'
 
 import {
@@ -59,6 +61,7 @@ import {
 } from '../plugin'
 import { stageEnds, type TStep } from '../runtime/blocks'
 import { uniqueName } from '../runtime/unique-name'
+import { CORE_USER_TEXT } from '../runtime/user-text'
 import { findImportCycle, sccOf } from './import-cycles'
 import { accountedMarker, JsRenderer, schemaMarker } from './js-renderer'
 import { Realm, realmOf, type TRealmModule } from './realm'
@@ -464,7 +467,17 @@ export class JsNextRenderer extends JsRenderer {
   /** `$a(P.metadata, …)` writes of a class's own annotations (after its `$alias`). */
   private annotateCalls(name: string, node: SemanticNode): string {
     let out = ''
+    // (an `as` copy's top-level `@annotate.reset`: before its own values, which apply over it —
+    // the copy reads the key as if its target had none)
+    const resets = (node.annotations ?? []).filter(an => an.name === ANNOTATE_RESET)
+    if (resets.length > 0) {
+      const data = this.blockAnnotationsData(node, resets)
+      out += `\n${this.util('$blk')}(null, -1, ${name}, [[[${data.join(', ')}], []]])`
+    }
     for (const an of node.annotations ?? []) {
+      if (an.name === ANNOTATE_RESET) {
+        continue
+      }
       const { value, multiple } = this.computeAnnotationValue(node, an)
       out += `\n${this.util('annotate')}(${name}.metadata, ${str(an.name)}, ${value}${multiple ? ', true' : ''})`
     }
@@ -2034,13 +2047,8 @@ export class JsNextRenderer extends JsRenderer {
    */
   private entriesData(b: TStructBlock, reads: TStructDecl): string {
     const entries: string[] = []
-    const annotationsOf = (node: SemanticNode) =>
-      (node.annotations ?? []).map(an => {
-        const { value, multiple } = this.computeAnnotationValue(node, an)
-        return `[${str(an.name)}, ${value}${multiple ? ', 1' : ''}]`
-      })
     if (b.rank && b.node.annotations?.length) {
-      entries.push(`[[${annotationsOf(b.node).join(', ')}], []]`)
+      entries.push(`[[${this.blockAnnotationsData(b.node).join(', ')}], []]`)
     }
     for (const en of b.entries) {
       if (en.error || en.paths.length === 0) {
@@ -2051,9 +2059,20 @@ export class JsNextRenderer extends JsRenderer {
       const paths = en.paths.map(
         (p, i) => `[${stepsText(this.stepsData(reads, p, en.kinds[i], false, copy))}]`
       )
-      entries.push(`[[${annotationsOf(en.ref).join(', ')}], ${paths.join(', ')}]`)
+      entries.push(`[[${this.blockAnnotationsData(en.ref).join(', ')}], ${paths.join(', ')}]`)
     }
     return entries.length > 0 ? `[\n  ${entries.join(',\n  ')},\n]` : ''
+  }
+
+  /** Annotations `anns` of `node` as `$blk` entry data: `[name, value]`, `, 1` for a `multiple`. */
+  private blockAnnotationsData(
+    node: SemanticNode,
+    anns: TAnnotationTokens[] = node.annotations ?? []
+  ): string[] {
+    return anns.map(an => {
+      const { value, multiple } = this.computeAnnotationValue(node, an)
+      return `[${str(an.name)}, ${value}${multiple ? ', 1' : ''}]`
+    })
   }
 
   /**
@@ -2754,7 +2773,10 @@ export class JsNextRenderer extends JsRenderer {
     return `const ${R} = [${rank.depth}, ${str(rank.id)}]`
   }
 
-  /** The layer registries (`$ak`, `$nr`: how layers read those keys), before any statement. */
+  /**
+   * The registries (`$ak`, `$nr`: how layers read those keys; `$ut`: the keys holding user-facing
+   * text), before any statement.
+   */
   private registries(): string[] {
     const { append, notReferred } = flagKeys(this.doc.config.annotations)
     const out: string[] = []
@@ -2764,7 +2786,34 @@ export class JsNextRenderer extends JsRenderer {
     if (notReferred.length > 0) {
       out.push(`${this.util('$nr')}(${notReferred.map(str).join(', ')})`)
     }
+    const userText = this.moduleUserText()
+    if (userText.length > 0) {
+      out.push(`${this.util('$ut')}(${userText.map(str).join(', ')})`)
+    }
     return out
+  }
+
+  /**
+   * The plugin annotations holding user-facing text this module writes (`$ut` entries: `key`, or
+   * `key:field`); core's are known to the runtime from the start (`CORE_USER_TEXT`).
+   */
+  private moduleUserText(): string[] {
+    const out = new Set<string>()
+    for (const name of new Set(this.doc.annotations.map(a => a.name))) {
+      if (CORE_USER_TEXT.has(name)) {
+        continue
+      }
+      const spec = this.doc.resolveAnnotation(name)
+      const fields = spec && userTextFields(spec)
+      if (fields === true) {
+        out.add(name)
+      } else if (fields) {
+        for (const f of fields) {
+          out.add(`${name}:${f}`)
+        }
+      }
+    }
+    return [...out].sort()
   }
 
   /**

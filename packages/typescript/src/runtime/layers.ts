@@ -19,6 +19,7 @@ import {
   appendOwn,
   metadataReplaced,
   metadataWriteCount,
+  touched,
   watch,
 } from './compiled-check/tracking'
 
@@ -86,6 +87,45 @@ export function moveIntrinsic(from: object, to: object): void {
   const s = INTRINSIC.get(from)
   if (s) {
     INTRINSIC.set(to, s)
+  }
+  // (and the keys it hides from its bases, see `hideKey`)
+  moveHidden(from, to)
+}
+
+/**
+ * Keys a map hides from its bases (`@annotate.reset`): read as if no base had them. Kept per map
+ * (as `INTRINSIC`), moved with it when a node's map is replaced; `hiding`: some map hides a key
+ * (until then the reads skip the lookup).
+ */
+const HIDDEN = new WeakMap<object, Set<unknown>>()
+let hiding = false
+
+/** Whether map `m` hides `key` from its bases (see {@link HIDDEN}). */
+function hides(m: object, key: unknown): boolean {
+  return hiding && HIDDEN.get(m)?.has(key) === true
+}
+
+/**
+ * Hides `key` of map `m`'s bases (`@annotate.reset`): `m` reads as if no base had it — its own
+ * value, if any, is what it has. A metadata write (layered views and compiled checks re-read).
+ * `metadata.delete(key)` on a layered map ends it: the bases show through again.
+ */
+export function hideKey(m: Map<unknown, unknown>, key: unknown): void {
+  let s = HIDDEN.get(m)
+  if (!s) {
+    HIDDEN.set(m, (s = new Set()))
+  }
+  s.add(key)
+  hiding = true
+  touched(m)
+  metadataReplaced()
+}
+
+/** The keys map `m` hides from its bases (see {@link hideKey}), for a map replacing it. */
+function moveHidden(from: object, to: object): void {
+  const s = HIDDEN.get(from)
+  if (s) {
+    HIDDEN.set(to, s)
   }
 }
 
@@ -157,6 +197,9 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
         return v
       }
     }
+    if (hiding && hides(this, key)) {
+      return MISS
+    }
     if (nr && this.r) {
       // (a `passedWhenReferred: false` key through a reference layer: only an intrinsic entry)
       for (const n of this.b) {
@@ -203,12 +246,20 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
 
   override has(key: K): boolean {
     const view = this.view()
-    return view === undefined ? this.lookup(key, notReferred(key)) !== MISS : mapHas.call(view, key)
+    return view === undefined ? this.liveHas(key) : mapHas.call(view, key)
+  }
+
+  /** `has` read through the layers (see the file comment). */
+  private liveHas(key: K): boolean {
+    return this.lookup(key, notReferred(key)) !== MISS
   }
 
   /** An append key: the bases' values (lowest priority first), then the own ones. */
   private append(key: K): unknown {
     const own = mapGet.call(this, key)
+    if (hiding && hides(this, key)) {
+      return own
+    }
     if (this.r && notReferred(key)) {
       // (through a reference layer: only intrinsic entries)
       const parts: unknown[] = []
@@ -264,8 +315,26 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
 
   private liveKeys(): K[] {
     const out = new Set<K>()
-    keysOf(this, false, out, new Map())
-    return [...out]
+    // (a key some layer hides from its bases may have no effective value: left out)
+    return keysOf(this, false, out, new Map()) ? [...out].filter(k => this.liveHas(k)) : [...out]
+  }
+
+  /** Deletes the own value of `key`; a key hidden from the bases (`hideKey`) shows them again. */
+  override delete(key: K): boolean {
+    const deleted = super.delete(key)
+    const h = hiding ? HIDDEN.get(this) : undefined
+    if (h?.delete(key)) {
+      touched(this)
+      metadataReplaced()
+      return true
+    }
+    return deleted
+  }
+
+  /** Deletes the own values; the keys hidden from the bases (`hideKey`) show them again. */
+  override clear(): void {
+    super.clear()
+    HIDDEN.delete(this)
   }
 
   override keys(): MapIterator<K> {
@@ -344,7 +413,7 @@ function intrinsicLookup(m: Map<unknown, unknown>, key: unknown): unknown {
     }
   }
   const b = (m as LayerMap).b
-  if (b !== undefined) {
+  if (b !== undefined && !hides(m, key)) {
     for (const n of b) {
       const x = intrinsicLookup(n.metadata, key)
       if (x !== MISS) {
@@ -387,7 +456,7 @@ function collect(
     return
   }
   const layer = m instanceof LayerMap ? m : undefined
-  if (layer) {
+  if (layer && !hides(layer, key)) {
     const below = filtered || (layer.r && notReferred(key))
     for (let i = layer.b.length - 1; i >= 0; i--) {
       collect(layer.b[i].metadata, key, acc, below)
@@ -404,17 +473,18 @@ function collect(
 
 /**
  * The keys of `m` (own first, then its bases'), each map once (see {@link visit}). `filtered`:
- * reached through a reference layer.
+ * reached through a reference layer. Returns whether a map visited hides keys from its bases.
  */
 function keysOf(
   m: Map<unknown, unknown>,
   filtered: boolean,
   out: Set<unknown>,
   seen: Map<object, boolean>
-): void {
+): boolean {
   if (!visit(m, filtered, seen)) {
-    return
+    return false
   }
+  let hid = hiding && (HIDDEN.get(m)?.size ?? 0) > 0
   const layer = m instanceof LayerMap ? m : undefined
   const own = layer ? (Map.prototype.keys.call(m) as Iterable<unknown>) : m.keys()
   const intrinsic = INTRINSIC.get(m)
@@ -425,9 +495,10 @@ function keysOf(
   }
   if (layer) {
     for (const n of layer.b) {
-      keysOf(n.metadata, filtered || layer.r, out, seen)
+      hid = keysOf(n.metadata, filtered || layer.r, out, seen) || hid
     }
   }
+  return hid
 }
 
 /**

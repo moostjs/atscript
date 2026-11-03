@@ -11,6 +11,7 @@ Atscript supports the following primitive types:
 - **`null`** - Null value
 - **`undefined`** - Undefined value
 - **`void`** - No value
+- **`unknown`** - Any value (see [`unknown`](#unknown) below)
 
 ```atscript
 export interface BasicTypes {
@@ -153,6 +154,27 @@ Atscript provides timestamp-oriented numeric tags: `number.timestamp`, `number.t
 Timestamps are stored as `number` and constrained to integers — the unit (seconds, milliseconds, microseconds) is project-decided. The primitive itself does not enforce a unit. Storing timestamps as numbers is a deliberate choice — numbers are JSON-native, so timestamps pass through HTTP boundaries (client ↔ server) without any serialization or hydration step. Using `Date` objects would require walking every response to convert strings back to `Date` instances on both sides of the transport layer.
 
 These are advanced because they matter more for DB integrations than for basic TypeScript usage.
+
+### `unknown`
+
+`unknown` is a field that holds any value: JSON data of any shape you don't model (a settings blob, a provider's raw payload).
+
+```atscript
+export interface Event {
+    name: string
+    payload: unknown
+    meta?: unknown
+}
+```
+
+- **TypeScript:** `unknown`.
+- **Validation:** any value passes, `null` and nested objects included; nothing inside it is checked. `undefined` is never a value: a required `unknown` field must be present, and an `unknown[]` element can't be `undefined`. An optional `unknown` field may be omitted.
+- **Default data:** `createDataFromAnnotatedType` gives a required `unknown` field `null`.
+- **JSON Schema:** `{}`.
+
+`unknown` merges with a scalar like any scalar: `{ v: unknown } & { v: string }` gives `v: string`. Merging it with an object, an array or `null` (`unknown & { x: string }`) is a compile error: write the other type alone.
+
+`unknown` is data. `phantom`, below, is the opposite: it is not part of the data at all.
 
 ### `phantom`
 

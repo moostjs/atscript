@@ -149,6 +149,9 @@ export type {
 // The generated structure (`runtime/blocks.ts`, `runtime/layers.ts`): metadata layers, shells,
 // blocks with static ranks, the import-cycle queue.
 export { LayerMap, metaEmpty, watchLayer, $ak, $nr } from './runtime/layers'
+// User-facing text of annotations (`userText` spec arguments), registered by generated modules.
+export { $ut, registerUserText, userTextOf, userTextKeys } from './runtime/user-text'
+export type { TUserTextFields } from './runtime/user-text'
 export {
   $f,
   $ft,

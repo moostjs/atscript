@@ -11,6 +11,27 @@ export function isBareSpecifier(specifier: string): boolean {
 }
 
 /**
+ * The import path of an `.as` import as atscript resolves it: without a trailing `.as` extension.
+ * `.as` imports may name a file with or without its extension (`'./user'`, `'./user.as'`,
+ * `'my-lib/models.as'`); both spellings resolve to the same module. A bare package name
+ * (`'my-lib'`, no subpath) is kept as written.
+ */
+export function withoutAsExtension(specifier: string): string {
+  if (!specifier.endsWith('.as')) {
+    return specifier
+  }
+  const slash = specifier.lastIndexOf('/')
+  const base = specifier.slice(slash + 1)
+  if (
+    base === '.as' ||
+    (isBareSpecifier(specifier) && parseBareSpecifier(specifier).subpath === '.')
+  ) {
+    return specifier
+  }
+  return specifier.slice(0, -'.as'.length)
+}
+
+/**
  * Returns true if the document ID is a bare specifier placeholder.
  */
 export function isBareId(id: string): boolean {
@@ -171,6 +192,7 @@ export async function resolveBareSpecifier(
   specifier: string,
   fromDir: string
 ): Promise<string | undefined> {
+  specifier = withoutAsExtension(specifier)
   const cacheKey = `${fromDir}\0${specifier}`
   if (resolveCache.has(cacheKey)) {
     return resolveCache.get(cacheKey)

@@ -119,6 +119,8 @@ export interface Cart {
 | `@emit.jsonSchema`        | _none_ | Pre-compute and embed JSON Schema at build time for this interface/type/annotate, regardless of the global `jsonSchema` plugin option.                                           |
 | `@emit.compiledValidator` | _none_ | Emit a build-time compiled validator check for this interface/type/annotate even with `compileValidators` off. Rules: [validation.md](validation.md#compiled-validators-opt-in). |
 
+`@annotate.reset 'name'` (only inside `annotate` blocks): removes annotation `name` from the entry's node (or, at the block's top, the type), including inherited and appended values; the block's own value applies over it. Rules: [as-syntax.md](as-syntax.md) A10.
+
 ## Merge
 
 Property types resolve through aliases; annotations merge along the chain. Default = `replace` (child overrides parent same-name). Specs can opt into `mergeStrategy: 'append'` for repeatable annotations (e.g. `@expect.pattern`).
@@ -160,7 +162,9 @@ Plugins register `AnnotationSpec` via `config()`. See [plugin-development.md](pl
 
 `AnnotationSpec` fields:
 
-- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values?, fieldScope?, refFilter? }` where `type ∈ 'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'`. Omit for no-arg annotations. Backtick arg types → [table below](#backtick-argument-types).
+- `argument` — `TAnnotationArgument` or array. Each: `{ name, type, optional?, description?, values?, fieldScope?, refFilter?, valueScope?, userText? }` where `type ∈ 'string' | 'number' | 'boolean' | 'value' | 'ref' | 'query' | 'expr' | 'order'`. Omit for no-arg annotations. Backtick arg types → [table below](#backtick-argument-types).
+  - `'value'`: a string, number or boolean literal, stored as written (`@x.default 0` → `0`, `true` → `true`, `'a'` → `'a'`). A number / boolean must fit the annotated field's type (number field / boolean field; a union: one member; a scalar merge `number & number.int`: every member; `unknown`: any) — else a compile error; a number on a `decimal` field is stored as its string (`12.50` → `'12.50'`); a string fits any field (JSON by convention on non-string fields). Readers get `string | number | boolean`.
+  - `userText: true` (on a `'string'` arg): user-facing text (labels, hints, messages). `userTextAnnotations(tree)` (`@atscript/core`) lists flagged annotations (`true` = the value is the text; `string[]` = those fields of the value object). At runtime: `userTextOf(key)` / `userTextKeys()` from `@atscript/typescript/utils` — core keys known from the start; a plugin's registered by each generated module that writes them; a plugin writing such metadata at runtime calls `registerUserText(key, fields?)`. Core flags `meta.label`, `meta.description`, `meta.required` (message), `expect.message`, every `expect.*` `message`.
 - `nodeType` — `TNodeEntity[]` (e.g. `['prop', 'interface', 'type', 'primitive']`). Validated at parse time.
 - `defType` — restrict to specific primitive bases / kinds (e.g. `['string']`, `['number']`, `['array', 'string']`). On a top-level annotation of an `annotate` block it checks the type the block's target resolves to (through aliases), like the annotation written on the target.
 - `multiple` — repeatable on same node.

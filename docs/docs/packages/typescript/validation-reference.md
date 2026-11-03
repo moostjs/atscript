@@ -98,6 +98,8 @@ Default error messages and the order in which constraints are checked are listed
 
 Every rule above also applies to a **nullable** field — the target type in a union with `null` / `undefined` (`number | null`, `string[] | null`, or an alias of such a union): `null` passes and any other value is checked. Constraints on a literal member of a union (`'a' | 'b'`) are not checked — its value is fixed.
 
+`unknown` accepts any value and checks nothing inside it. `undefined` is never a value, though: a required `unknown` field must be present (a missing one fails with `Expected unknown, got undefined`, code `TYPE`), and an `unknown[]` element can't be `undefined`. An optional `unknown` field may be omitted.
+
 ::: tip Decimal format
 Values typed as `decimal` are stored as strings to preserve precision. The validator enforces the regex `/^[+-]?\d+(\.\d+)?$/` — anything else (NaN, scientific notation, leading/trailing whitespace) is rejected with `Invalid decimal format`.
 :::

@@ -55,6 +55,12 @@ export const UNION_IN_RECURSIVE_MERGE =
 export const MERGE_TOO_COMPLEX = 'merge too complex: split it with named types'
 /** Why scalars (or an object and a scalar) merge to `never`. */
 export const NOTHING_IN_COMMON = 'values with nothing in common'
+/**
+ * Why a merge of `unknown` (any value) with an object, an array or `null` is refused: TypeScript
+ * reads `unknown & X` as `X`, a merge of values would be `never` (a compile error, not a
+ * validator rejecting what the `.d.ts` accepts).
+ */
+export const OPAQUE_MERGE = '"unknown" cannot be merged with an object, an array or null'
 /** A type written as an operand of its own merge (`type X = A & X`). */
 export const SELF_OPERAND =
   'a type cannot be an operand of its own merge; recurse through a field instead'
@@ -212,7 +218,8 @@ export type TStructShape =
   | { k: 'arr' }
   /** a union holding objects: `items` = its branches' shapes */
   | { k: 'uni'; n: number; items: TStructShape[] }
-  | { k: 'scalar' }
+  /** `any`: the `unknown` primitive (any value), or a union holding it */
+  | { k: 'scalar'; any?: true }
   | { k: 'never'; reason: string }
   | { k: 'mixed' }
 
@@ -276,6 +283,10 @@ export interface TStructLayer {
 type Layer = TStructLayer
 
 const isBranch = (s: string) => s.startsWith('|')
+/** A shape of the `unknown` primitive (any value). */
+const isAnyShape = (s: TStructShape) => s.k === 'scalar' && s.any === true
+/** Merge refusals reported as errors, never dropped as a `never` branch. */
+const refused = (reason: string) => reason === MERGE_TOO_COMPLEX || reason === OPAQUE_MERGE
 /** A step that is a prop's name (not a union branch, an in-place merge operand or an element). */
 const isNameStep = (s: string) => !s.startsWith('|') && !s.startsWith('&') && s !== '[]'
 /** A written `null`. */
@@ -3556,9 +3567,14 @@ export class StructureModel {
   private shape0(t: TStructExpr): TStructShape {
     switch (t.k) {
       case 'scalar': {
-        return isPrimitive(t.node) && (t.node as SemanticPrimitiveNode).key === 'null'
+        if (!isPrimitive(t.node)) {
+          return { k: 'scalar' }
+        }
+        return t.node.key === 'null'
           ? { k: 'mixed' }
-          : { k: 'scalar' }
+          : t.node.type === 'any'
+            ? { k: 'scalar', any: true }
+            : { k: 'scalar' }
       }
       case 'tup': {
         const items = t.items.map(i => this.shape(i))
@@ -3574,6 +3590,10 @@ export class StructureModel {
           return this.shape(structExpr(t))
         }
         const ss = t.items.map(i => this.shape(i))
+        if (ss.some(isAnyShape)) {
+          // (`X | unknown` is `unknown`)
+          return { k: 'scalar', any: true }
+        }
         if (ss.every(s => s.k === 'scalar' || s.k === 'never')) {
           return ss.every(s => s.k === 'never') ? { k: 'never', reason: 'union' } : { k: 'scalar' }
         }
@@ -3657,6 +3677,9 @@ export class StructureModel {
     if (ss.length === 1) {
       return ss[0]
     }
+    if (ss.some(isAnyShape) && !ss.every(s => s.k === 'scalar' || s.k === 'never')) {
+      return { k: 'never', reason: OPAQUE_MERGE }
+    }
     const tuple = ends.length === ss.length ? this.tupleShape(ends) : undefined
     if (tuple) {
       return tuple
@@ -3675,7 +3698,7 @@ export class StructureModel {
       // distributes — every branch unmergeable is `never`; else a position no object can be)
       const leaves = ends.length === ss.length ? this.mixedLeaves(ss, ends) : undefined
       const product = leaves && this.productShape(leaves.ss, leaves.ends)
-      if (product?.k === 'never' && product.reason === MERGE_TOO_COMPLEX) {
+      if (product?.k === 'never' && refused(product.reason)) {
         return product
       }
       return product?.k === 'never' ? { k: 'never', reason: NOTHING_IN_COMMON } : { k: 'mixed' }
@@ -3763,6 +3786,10 @@ export class StructureModel {
         pick.map(p => p.s),
         es.every(Boolean) ? (es as TStructExpr[]) : []
       )
+      if (c.k === 'never' && c.reason === OPAQUE_MERGE) {
+        // (a branch merging `unknown` with an object: refused, never dropped)
+        return c
+      }
       if (c.k !== 'never' && c.k !== 'mixed') {
         out.push(c)
       }

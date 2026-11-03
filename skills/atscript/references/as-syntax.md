@@ -19,7 +19,7 @@ type Helper = string   // file-local, not exported
 - Only `export`ed declarations are visible to other `.as` files.
 - Comments are source-only — they are **not** carried into generated `.as.d.ts`/`.as.js` (the JSDoc seen in `.d.ts` is generated entity headers, not your comments).
 - Comments are allowed anywhere around annotations: after the annotation / last arg (`@meta.id // pk`), between args (`@x 1 /* c */, 2`), on lines between annotations and the prop. `//` inside a quoted arg is text. A multi-line `/* … */` ends the annotation like a line break (what follows is not its argument).
-- Import paths resolve relative; **omit the `.as` extension** — the resolver always appends `.as`. Writing `'./x.as'` resolves to `./x.as.as`.
+- Import paths resolve relative; the `.as` extension is optional: `'./x'` and `'./x.as'` (also bare `'pkg/x.as'`) are the same module, loaded once.
 
 ## `interface`
 
@@ -154,7 +154,7 @@ Full list → [primitives.md](primitives.md).
 
 ## Imports / exports
 
-Extension MUST be omitted — the resolver always appends `.as`.
+The `.as` extension is optional (`'./models'` = `'./models.as'`: one module, same diagnostics and go-to-definition).
 
 ```atscript
 import { User, Project } from './models'
@@ -213,6 +213,7 @@ export annotate MyInterface as AnnotatedInterface {
 | A7 | Load annotate modules BEFORE their types are first used: a path override loaded later (lazy `import()`) is not seen by merges/readers that already read the type. A prebuilt library's merges don't see an app's path override on props several members declare — annotate the merged type or the member prop itself. |
 | A8 | Unreachable block warning (`"T" (declared in ./t.as) is used by ./p.as without importing this file (directly or not): this annotate applies only in builds including this file …`): import the block's file from `T`'s file or every file using `T`. A never-imported block never applies. |
 | A9 | Invalid entry (unknown path, path into `never`, no union branch) = compile error; the module is NOT generated. |
+| A10 | `@annotate.reset 'name'` (only in `annotate` blocks, mutating or `as`; on an entry or at the block's top) removes annotation `name` at that node: its own value, what it inherits from its type (`login: Login`, `string.email`), from an `as` copy's target, and lower-ranked blocks' values (A5). The block's own value of that key, and higher-ranked blocks', apply over it. Scope = the block's (A1/A2; `as` = copy only). Both validator engines and JSON Schema follow it. It applies to the node itself, not to union branches / array elements below it (`e: Email | null` keeps Email's pattern: annotate `Email` instead; no warning). Repeat for several names; unknown names follow `unknownAnnotation`; runtime `metadata.delete(key)` ends a reset. |
 | A10 | Dev (Vite): editing a module with mutating blocks = FULL PAGE RELOAD; ordinary edits hot-update. |
 | A11 | `.as` import cycles need native ESM (generated code is ESM); CommonJS rewrites work only for non-cyclic `.as` modules. |
 

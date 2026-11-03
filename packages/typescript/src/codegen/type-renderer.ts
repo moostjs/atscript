@@ -856,18 +856,23 @@ function flatTypeDef(defs: TFlatDefinition[]): SemanticNode | undefined {
   return written && !(isGroup(only.def) && only.def !== written) ? written : only?.def
 }
 
+/** The TypeScript type of a final primitive type (`any`, the `unknown` primitive: `unknown`). */
+function finalTsType(t: string): string {
+  return t === 'void' ? 'undefined' : t === 'any' ? 'unknown' : t
+}
+
 function renderPrimitiveTypeDef(def?: TPrimitiveTypeDef): string {
   if (!def) {
     return 'unknown'
   }
   // If it's a direct final type, return it
   if (typeof def === 'string') {
-    return def === 'void' ? 'undefined' : def
+    return finalTsType(def)
   }
 
   switch (def.kind) {
     case 'final': {
-      return def.value === 'void' ? 'undefined' : def.value
+      return finalTsType(def.value)
     }
     case 'union': {
       return def.items.map(renderPrimitiveTypeDef).join(' | ')

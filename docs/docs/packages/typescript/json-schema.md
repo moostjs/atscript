@@ -83,6 +83,7 @@ A schema accepts exactly the JSON values the validator accepts with `unknownProp
 | Tuple `[A, B]`            | `items: [A, B]`, `additionalItems: false`, `minItems: 2`, `maxItems: 2`                                                                                                                                       |
 | `decimal`                 | `{ "type": "string", "pattern": "^[+-]?\\d+(\\.\\d+)?$" }`                                                                                                                                                    |
 | `never`                   | `{ "not": {} }` (no value)                                                                                                                                                                                    |
+| `unknown`                 | `{}` (any value)                                                                                                                                                                                              |
 | Pattern props `[/^k/]: T` | `patternProperties`, each pattern excluding the declared prop names (the validator checks only keys the object does not declare)                                                                              |
 
 `fromJsonSchema()` reads them back: an optional prop's `type: [T, "null"]` as `p?: T`, `patternProperties` as pattern props.

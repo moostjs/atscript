@@ -6,6 +6,7 @@ import path from 'node:path'
 
 import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
+import { isAnnotateDirective } from './defaults/annotate-annotations'
 import { AtscriptDoc } from './document'
 import { isAnnotate } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes'
@@ -133,6 +134,7 @@ export class AtscriptRepo {
       query: 'import("@atscript/typescript/utils").AtscriptQueryNode',
       expr: 'import("@atscript/typescript/utils").AtscriptExprNode',
       order: 'import("@atscript/typescript/utils").AtscriptOrderItem[]',
+      value: 'string | number | boolean',
     }
     const mapArgType = (t: string) => ANNOTATION_TYPE_MAP[t] || t
     type TAnnotationValue = {
@@ -151,6 +153,9 @@ export class AtscriptRepo {
 
     if (manager) {
       await manager.loopInAnnotationsSpec((name, spec) => {
+        if (isAnnotateDirective(name)) {
+          return
+        }
         const types = [] as TUsedAnnotation['types']
         const multiple = !!spec.config.multiple
         if (Array.isArray(spec.config.argument)) {
@@ -186,7 +191,7 @@ export class AtscriptRepo {
     for (const doc of Array.from(this.atscripts.values())) {
       const awaited = await doc
       for (const { name, token, args } of awaited.annotations) {
-        if (annotations[name]?.fromSpec) {
+        if (annotations[name]?.fromSpec || isAnnotateDirective(name)) {
           continue
         }
         if (!annotations[name]) {

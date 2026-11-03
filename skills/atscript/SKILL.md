@@ -68,6 +68,8 @@ import {
   isAnnotatedType, isAnnotatedTypeOfPrimitive,
   invalidateCompiledValidators,    // after raw writes to a type tree (either validator engine)
   annotate,                        // low-level runtime write to a metadata map (append: annotate(map, key, v, true))
+  userTextOf, userTextKeys,        // metadata keys holding user-facing text (`userText` spec args), for translators
+  registerUserText,                // a plugin writing user-text metadata at runtime registers its keys
 } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescript/utils'
 
@@ -85,7 +87,7 @@ import atscript from 'unplugin-atscript/vite'      // or /rollup /rolldown /webp
 
 1. `@meta.id` takes no arguments. Multiple `@meta.id` on different props = composite PK. Never `@meta.id(...)`.
 2. Generated files (`*.as.d.ts`, `*.as.js`, `atscript.d.ts`) are never hand-edited. Fix the `.as` source or plugin. Regenerate with `npx asc -f dts`.
-3. Core ships `@meta.*`, `@expect.*`, `@emit.*` only. All other namespaces come from plugins.
+3. Core ships `@meta.*`, `@expect.*`, `@emit.*` (plus the `annotate`-block directive `@annotate.reset`) only. All other namespaces come from plugins.
 4. `asc` without `-f` runs every plugin's default output (TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js` (or let `unplugin-atscript` produce it at bundle time).
 5. `@atscript/typescript/utils` is the runtime entry; `@atscript/typescript` default export is `tsPlugin()` (build-time factory).
 6. **Never `import type` a compiled `.as` artifact.** `.as` exports are classes — value AND type in one name — consumed at runtime (`.validator()`, `.metadata`, decorators, DI by param type via `design:paramtypes`). A type-only import elides the value: decorator metadata emits `Object` and validation/DI/form binding break silently. Keep lint rules that force type-only imports (`typescript/consistent-type-imports` and equivalents) **off** in projects importing `.as` files — the create-moost preset and ecosystem repos already disable it.
@@ -118,7 +120,7 @@ npx skills add moostjs/atscript-ui   # UI layer
 | First contact     | [getting-started.md](references/getting-started.md)       | Install, first `.as`, first codegen run, consume snippet, troubleshooting, upgrading 0.1.x → 0.2 |
 | `.as` syntax      | [as-syntax.md](references/as-syntax.md)                   | interface/type, unions, type paths (`T.a.b` through unions, "Circular chain reference", "can't cross the type path it splits"), intersections / `extends` merges (which prop wins, named merges, distribution), merge compile errors ("operand of its own merge", "union members are not supported in recursive merges", "merge too complex", "mutually recursive merges"), tuples, arrays, imports, pattern properties, `annotate` blocks (exact paths, self-collapse, same-key order, load timing, unreachable-block warning, full reload in dev, ESM-only import cycles) |
 | Annotations       | [annotations.md](references/annotations.md)               | `@meta.*`, `@expect.*`, merge, custom `AnnotationSpec`, `query` / `expr` / `order` args (backtick expressions, arithmetic, orderings, operators inside parentheses, "Expected operator after field reference"), editor hooks on args (`fieldScope`, `refFilter` — completion/hover/F12 inside args) |
-| Primitives        | [primitives.md](references/primitives.md)                 | Built-ins, semantic extensions, decimal, phantom, extending via config                      |
+| Primitives        | [primitives.md](references/primitives.md)                 | Built-ins, semantic extensions, decimal, unknown, phantom, extending via config             |
 | Config            | [config.md](references/config.md)                         | `atscript.config.*`, `defineConfig`, entries/globs, plugin wiring, output, `models` (packaged models for `db sync`, `models: () => import(...)`) |
 | `asc` CLI         | [asc-cli.md](references/asc-cli.md)                       | `asc`, `-f`, `-c`, `--noEmit`, `--skipDiag`, scripts, "Nothing emitted" / errors block the emit, atomic writes, `db sync` flags (`--check`, `--format`), complete-inventory rule ("Could not load N compiled model module(s)", `ERR_MODULE_NOT_FOUND`, nested `.as` imports) + pointer |
 | Codegen           | [codegen.md](references/codegen.md)                       | `.as` → `.d.ts`/`.js`, `atscript.d.ts` global `AtscriptMetadata`                            |

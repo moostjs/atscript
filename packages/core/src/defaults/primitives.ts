@@ -263,6 +263,13 @@ export const primitives: Record<string, TPrimitiveConfig> = {
     documentation: 'Represents no value.',
   },
 
+  unknown: {
+    type: 'any',
+    documentation:
+      'Any value (an opaque value: JSON data of any shape). Not checked by the validator; ' +
+      'JSON Schema `{}`; TypeScript `unknown`.',
+  },
+
   phantom: {
     type: 'phantom',
     documentation:

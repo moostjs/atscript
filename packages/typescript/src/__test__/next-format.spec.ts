@@ -43,7 +43,10 @@ async function load(files: Record<string, string>) {
   const model = new StructureModel(docs).complete()
   const rt = realm.rt as unknown as { pendingStatements(): number }
   const cls = (name: string, file = names[0]) =>
-    realm.classOf(docs.find(d => d.id.endsWith(`/${file}`))!, name) as any
+    realm.classOf(
+      docs.find(d => d.id.endsWith(`/${file}`))!,
+      name
+    ) as any
   return { realm, model, docs, cls, pending: rt.pendingStatements(), modules }
 }
 

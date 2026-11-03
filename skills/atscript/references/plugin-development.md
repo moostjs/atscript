@@ -162,7 +162,7 @@ A language extension = plugin whose `render()` emits another language. Pattern:
 
 ## `AnnotationSpec` and primitive annotations
 
-`AnnotationSpec` shape, arg types (`'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'`), full example → [annotations.md](annotations.md#custom-annotations).
+`AnnotationSpec` shape, arg types (`'string' | 'number' | 'boolean' | 'value' | 'ref' | 'query' | 'expr' | 'order'`), `userText` flag, full example → [annotations.md](annotations.md#custom-annotations).
 
 Hover examples: `annotationExample(description, ...lines)` (since 0.1.109) → `description` + an **Example:** `atscript` code block, one arg per line (`''` = blank line), same format as the built-in hovers.
 

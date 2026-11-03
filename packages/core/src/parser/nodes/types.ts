@@ -79,6 +79,11 @@ export interface TPrimitiveTypeObject {
   optional?: boolean
 }
 
+/**
+ * A final (scalar) primitive type. `'any'`: any value, not checked (the `unknown` primitive —
+ * TypeScript `unknown`, JSON Schema `{}`); `'phantom'`: no value at all (not in the data type,
+ * validation or schema).
+ */
 export type TPrimitiveTypeFinal =
   | 'string'
   | 'number'
@@ -87,6 +92,7 @@ export type TPrimitiveTypeFinal =
   | 'null'
   | 'phantom'
   | 'decimal'
+  | 'any'
 export interface TPrimitiveTypeFinalOptional {
   kind: 'final'
   value: TPrimitiveTypeFinal

@@ -12,6 +12,7 @@ export const metaAnnotations: TAnnotationsTree = {
       name: 'text',
       type: 'string',
       description: 'The label to be used for this field or entity.',
+      userText: true,
     },
   }),
 
@@ -36,6 +37,7 @@ export const metaAnnotations: TAnnotationsTree = {
       name: 'text',
       type: 'string',
       description: 'Detailed description for this field or entity.',
+      userText: true,
     },
   }),
 
@@ -99,6 +101,7 @@ export const metaAnnotations: TAnnotationsTree = {
         optional: true,
         type: 'string',
         description: 'Optional error message to display if the validation fails.',
+        userText: true,
       },
     ],
     passedWhenReferred: false,

@@ -52,16 +52,9 @@ function resolveValue(
 
   if (mode === 'db') {
     // Try @db.default first (static value, parsed like meta.default)
-    const dbValue = prop.metadata.get('db.default') as string | undefined
+    const dbValue = prop.metadata.get('db.default') as string | number | boolean | undefined
     if (dbValue !== undefined) {
-      const parsed = parseRawValue(dbValue, prop)
-      if (
-        parsed !== undefined &&
-        prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)
-      ) {
-        return { value: parsed }
-      }
-      return undefined
+      return validRawValue(dbValue, prop)
     }
     // Fall back to @db.default.increment/uuid/now (return function name as-is)
     if (prop.metadata.has('db.default.increment')) {
@@ -78,27 +71,41 @@ function resolveValue(
 
   // 'default' or 'example'
   const metaKey = mode === 'default' ? 'meta.default' : 'meta.example'
-  const rawStr = prop.metadata.get(metaKey) as string | undefined
-  if (rawStr === undefined) {
+  const metaValue = prop.metadata.get(metaKey) as string | undefined
+  if (metaValue === undefined) {
     return undefined
   }
 
-  const parsed = parseRawValue(rawStr, prop)
-  if (parsed === undefined) {
-    return undefined
-  }
+  return validRawValue(metaValue, prop)
+}
 
-  if (prop.validator({ unknownProps: 'ignore' }).validate(parsed, true)) {
+/**
+ * An annotation's raw value as a valid value of `prop` (see {@link parseRawValue}); a string the
+ * JSON reading does not fit is tried as the string itself (a `decimal` field, `decimal | null`).
+ */
+function validRawValue(
+  raw: string | number | boolean,
+  prop: TAtscriptAnnotatedType
+): { value: unknown } | undefined {
+  const validator = prop.validator({ unknownProps: 'ignore' })
+  const parsed = parseRawValue(raw, prop)
+  if (parsed !== undefined && validator.validate(parsed, true)) {
     return { value: parsed }
+  }
+  if (typeof raw === 'string' && parsed !== raw && validator.validate(raw, true)) {
+    return { value: raw }
   }
   return undefined
 }
 
 /**
- * Parses a raw annotation string into a JS value.
- * Strings are returned as-is for string types; everything else goes through JSON.parse.
+ * Parses a raw annotation value into a JS value: a number / boolean literal (a `value`
+ * argument) as it is; a string as-is for string types, else through JSON.parse.
  */
-function parseRawValue(raw: string, prop: TAtscriptAnnotatedType): unknown {
+function parseRawValue(raw: string | number | boolean, prop: TAtscriptAnnotatedType): unknown {
+  if (typeof raw !== 'string') {
+    return raw
+  }
   if (prop.type.kind === '' && prop.type.designType === 'string') {
     return raw
   }
@@ -127,7 +134,9 @@ function finalDefault(def: TAtscriptAnnotatedType<TAtscriptTypeFinal>): unknown 
     case 'undefined': {
       return undefined
     }
-    case 'null': {
+    case 'null':
+    case 'any': {
+      // (`unknown`: any value — `null`, as `undefined` is never a value)
       return null
     }
     default: {
@@ -289,7 +298,14 @@ function* buildStructure(
       if (items.some(stops)) {
         return STOPPED
       }
-      const values = items.filter(item => item !== STOPPED)
+      // (an `unknown` member — any value — takes no part: the other members' value; only
+      // `unknown` members: its `null`)
+      const isAny = (i: number) => {
+        const t = type.items[i].type
+        return t.kind === '' && (t as TAtscriptTypeFinal).designType === 'any'
+      }
+      const kept = items.filter((item, i) => item !== STOPPED && !isAny(i))
+      const values = kept.length > 0 ? kept : items.filter(item => item !== STOPPED)
       return values.length > 0 && values.every(isPlainObject)
         ? Object.assign({}, ...values)
         : values[0]

@@ -7,7 +7,7 @@ import type {
   SemanticRefNode,
   SemanticTypeNode,
 } from '@atscript/core'
-import { isGroup, isRef } from '@atscript/core'
+import { isGroup, isRef, withoutAsExtension } from '@atscript/core'
 
 import { CodePrinter } from './code-printer'
 
@@ -42,7 +42,7 @@ export class BaseRenderer extends CodePrinter {
   renderAnnotate(node: SemanticAnnotateNode) {}
 
   transformFromPath(path: string): string {
-    return `${path}.as`
+    return `${withoutAsExtension(path)}.as`
   }
 
   renderImport(node: SemanticImportNode) {

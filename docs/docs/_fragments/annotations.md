@@ -269,6 +269,10 @@ Use `string.required` or `@meta.required` to ensure required string fields are n
 - `@emit.jsonSchema` — Pre-compute and embed the JSON Schema for an interface at build time, regardless of the global `jsonSchema` plugin setting
 - `@emit.compiledValidator` — Emit a build-time compiled validator check for this type even when the global `compileValidators` option is off. See [Compiled Validators](/packages/typescript/compiled-validators#per-type-opt-in-emit-compiledvalidator)
 
+### Annotate Block Directives (@annotate.\*)
+
+- `@annotate.reset 'name'` — Only inside `annotate` blocks: removes annotation `name` (full name, no `@`) from the entry's field or, at the top of the block, from the type: its own value, the one it inherits from the type it references, from an `as` copy's target or from lower-ranked blocks. The block's own value of that annotation applies over the reset. See [Removing an Annotation](/packages/typescript/ad-hoc-annotations#removing-an-annotation-annotate-reset).
+
 ### Database Annotations (@db.\*)
 
 Database annotations (tables, columns, indexes, relations, views, schema sync) are provided by a separate package, `@atscript/db/plugin`, and are documented at [https://db.atscript.dev](https://db.atscript.dev). Install the DB plugin from that ecosystem to register `@db.*` annotations in your project.
@@ -279,4 +283,5 @@ Some annotations accept special argument types beyond strings and numbers:
 
 - **Ref arguments** — Type references using dot-notation chains (e.g., `User.id`). Custom annotations can declare `type: 'ref'` arguments.
 - **Query arguments** — SQL-like expressions in backticks (e.g., `` `Task.status != 'done'` ``). Custom annotations can declare `type: 'query'` arguments. Comparison operators (`=`, `!=`, `>`, `>=`, `<`, `<=`) work at any nesting level, including inside parentheses — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` `` (since 0.1.90).
+- **Literal value arguments** — custom annotations can declare `type: 'value'`: a string, number or boolean literal stored as written (`@x.default 0` is the number `0`); a number or boolean must fit the field's type. See [Literal Values](/plugin-development/annotation-system#literal-values-value).
 - **Expression and order arguments** (since 0.1.99) — custom annotations can declare `type: 'expr'` (arithmetic: `` `openCount * 10 + coalesce(rank, 0)` ``) or `type: 'order'` (`` `raisedAt desc, id` ``) backtick arguments. Inside backticks `/` is division; a regexp literal is recognized only after `matches`. See [Expression and Order Arguments](/plugin-development/annotation-system#expression-and-order-arguments).

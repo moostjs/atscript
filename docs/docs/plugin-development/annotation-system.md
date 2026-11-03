@@ -125,10 +125,11 @@ Each argument is defined with `TAnnotationArgument`:
 ```typescript
 interface TAnnotationArgument {
   name: string
-  type: 'string' | 'number' | 'boolean' | 'ref' | 'query' | 'expr' | 'order'
+  type: 'string' | 'number' | 'boolean' | 'value' | 'ref' | 'query' | 'expr' | 'order'
   optional?: boolean
   description?: string
   values?: string[] // Enum — restrict to specific values
+  userText?: boolean // the argument is user-facing text (see "User-facing Text" below)
   // Editor (LSP) hooks — see "Editor Support for Arguments" below
   fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // backtick / 'string' args
   refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean // 'ref' args
@@ -143,12 +144,58 @@ The argument types correspond to the tokens accepted in `.as` source:
 | `'string'`  | Quoted string literal (`"text"`)                                                    |
 | `'number'`  | Numeric literal (`42`, `-1.5`)                                                      |
 | `'boolean'` | Identifier `true` / `false`                                                         |
+| `'value'`   | A string, number or boolean literal (`'active'`, `0`, `true`), see below            |
 | `'ref'`     | Bare identifier referencing another type (e.g. `User`)                              |
 | `'query'`   | Backtick-delimited query expression — used by DB plugins for SQL-like filter syntax |
 | `'expr'`    | Backtick-delimited arithmetic expression (since 0.1.99)                             |
 | `'order'`   | Backtick-delimited ordering — field refs with `asc` / `desc` (since 0.1.99)         |
 
 Query expressions accept the comparison operators `=`, `!=`, `>`, `>=`, `<`, `<=` at any nesting level, including inside parentheses (since 0.1.90) — e.g. `` `A.at >= B.start and (B.end = null or A.at <= B.end)` ``.
+
+### Literal Values (`'value'`)
+
+A `'value'` argument takes a string, a number or a boolean literal and stores it as written: `@x.default 0` gives the number `0`, `@x.default true` the boolean `true`, `@x.default 'open'` the string `'open'`. Use it for default or example values, where the field's type decides which literal makes sense.
+
+A number or a boolean must fit the annotated field's type: a number literal needs a field that holds numbers, and a boolean literal needs one that holds booleans. A union fits when one of its members does, a scalar merge (`number & number.int`) when every member does, and `unknown` takes any literal. A number on a `decimal` field is accepted and stored as its string (`@x.default 12.50` gives `'12.50'`), the field's runtime type. A field of the wrong type gets an error such as `a number does not fit the field's type (string)`. A string is accepted for any field: by convention, a string on a non-string field is read as JSON (`'[1,2]'`). Readers of the metadata must therefore accept `string | number | boolean`, and `atscript.d.ts` types the key that way.
+
+```typescript
+default: new AnnotationSpec({
+  nodeType: ['prop'],
+  argument: { name: 'value', type: 'value', description: 'The default value.' },
+}),
+```
+
+### User-facing Text (`userText`)
+
+Set `userText: true` on a `'string'` argument that holds text an end user reads, such as a label, a hint or an error message. i18n tooling and translators find such text through this flag:
+
+- **Build time:** `userTextAnnotations(config.annotations)` from `@atscript/core` returns every flagged annotation (core and plugins) by full name. The value `true` means the annotation's value is the text, because the spec has one argument. A list of field names means those fields of the value object hold the text, because the spec has an argument list.
+- **Runtime:** `userTextOf(key)` and `userTextKeys()` from `@atscript/typescript/utils` answer the same question without the specs. Use them in a server that translates metadata before sending it. Core's keys are known from the start. A plugin's keys are registered by each generated module that writes them, so they are known once such a module has loaded. A plugin that writes such metadata at runtime registers its keys itself with `registerUserText(key, fields?)`: `fields` is `true` (the default, the value is the text) or the list of fields.
+
+Core flags `@meta.label`, `@meta.description`, `@meta.required` (message), `@expect.message` and the `message` argument of every `@expect.*` constraint. Flag your plugin's text arguments the same way:
+
+```typescript
+hint: new AnnotationSpec({
+  argument: { name: 'text', type: 'string', userText: true },
+}),
+action: new AnnotationSpec({
+  argument: [
+    { name: 'name', type: 'string' }, // an identifier, not text
+    { name: 'label', type: 'string', userText: true },
+  ],
+}),
+```
+
+```typescript
+import { userTextOf } from '@atscript/typescript/utils'
+
+userTextOf('meta.label') // true: the value is the text
+userTextOf('expect.minLength') // ['message']: value.message is the text
+userTextOf('x.action') // ['label']
+userTextOf('meta.id') // undefined: no text
+```
+
+For a `multiple` annotation, the rule applies to each item of the value list.
 
 ### Expression and Order Arguments
 

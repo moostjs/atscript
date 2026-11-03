@@ -659,7 +659,8 @@ class CheckEmitter {
         return [`if (${conds.join(' || ')}) ${fail}`]
       }
       case 'any': {
-        return []
+        // (any value: a required field still needs one)
+        return [`if (${x} === undefined) ${fail}`]
       }
       case 'never': {
         return [fail]

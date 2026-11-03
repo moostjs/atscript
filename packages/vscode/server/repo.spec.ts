@@ -504,6 +504,36 @@ describe('rename', () => {
 })
 
 describe('completions', () => {
+  it('offers @annotate.* only in annotate blocks', async () => {
+    const config = await new PluginManager({}).getDocConfig()
+    const uri = 'file:///test.as'
+    const source = [
+      'interface A {',
+      '  @a',
+      '  x: string',
+      '  @annotate.r',
+      '  y: string',
+      '}',
+      'annotate A {',
+      '  @a',
+      '  x',
+      '  @annotate.r',
+      '  y',
+      '}',
+    ].join('\n')
+    const { handlers } = singleDocRepo(uri, source, config)
+    const labels = async (line: number, character: number) =>
+      (
+        (await handlers.onCompletion!({ textDocument: { uri }, position: { line, character } })) ??
+        []
+      ).map((i: any) => i.label)
+    expect(await labels(1, 4)).not.toContain('annotate')
+    expect(await labels(1, 4)).toContain('meta')
+    expect(await labels(3, 13)).toEqual([])
+    expect(await labels(7, 4)).toContain('annotate')
+    expect(await labels(9, 13)).toContain('reset')
+  })
+
   it('completes and diagnoses a recursive intersection', async () => {
     const uri = 'file:///test.as'
     const source = [

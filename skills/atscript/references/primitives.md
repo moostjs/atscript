@@ -12,6 +12,7 @@
 | `undefined` | `void`      |                                                                                   |
 | `void`      | `void`      |                                                                                   |
 | `never`     | `never`     |                                                                                   |
+| `unknown`   | `unknown`   | Any value (opaque JSON); nothing inside is checked; `undefined` is never a value (a required field must be present, no `undefined` in `unknown[]`); default data `null`. JSON Schema `{}`. In a merge with a scalar = that scalar; with an object / array / `null` = compile error. |
 | `phantom`   | (none)      | Type-system only; not validated/serialized; discoverable via runtime traversal.   |
 
 ## Semantic extensions

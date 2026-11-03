@@ -299,6 +299,50 @@ export annotate User as AdminUser {
 // User is unchanged. AdminUser has merged annotations.
 ```
 
+### Removing an Annotation: `@annotate.reset`
+
+Annotations merge: a block can replace a single-value annotation or append to a list, but it can't take one away. `@annotate.reset '<name>'` does that. It removes the annotation named by its argument (the full name, without `@`) from the node it's written on:
+
+```atscript
+type Login = string.email
+
+export interface Account {
+    @expect.pattern '^[A-Z]'
+    name: string
+    login: Login
+    @meta.sensitive
+    token: string
+}
+
+annotate Account {
+    // the declared pattern is dropped; the block's own applies
+    @annotate.reset 'expect.pattern'
+    @expect.pattern '^[a-z]'
+    name
+
+    // the email pattern inherited from Login is dropped (Login keeps it)
+    @annotate.reset 'expect.pattern'
+    login
+}
+
+export annotate Account as PublicAccount {
+    // only PublicAccount.token loses it; Account.token keeps it
+    @annotate.reset 'meta.sensitive'
+    token
+}
+```
+
+What it removes, at that node: the value written on the field itself, the value the field gets from the type it references (`login: Login`, a primitive such as `string.email`), the value of the target in an `annotate … as` copy, and the values of lower-ranked blocks (see [Two Blocks Setting the Same Annotation](#two-blocks-setting-the-same-annotation)). For append annotations such as `@expect.pattern`, it removes every value collected so far.
+
+- **Where it can be written:** only inside `annotate` blocks, mutating or `annotate … as`. It can go on an entry, which is a property or a property path such as `billing.city`, or at the top of the block, which targets the type itself. Anywhere else is a compile error.
+- **The block's own value:** a value the same block writes for that annotation applies over the reset. A value from a higher-ranked block also applies.
+- **Scope:** the reset follows the same rules as any other annotation in the block. In a mutating block it changes the target type, and everything that references the type sees the change. On a path through a referrer (`annotate Client { … billing.city }`), only `Client.billing.city` changes, and `Address.city` keeps its value. In an `annotate … as` copy, only the copy changes.
+- **Validation and JSON Schema:** a reset `@expect.*` constraint is no longer checked by either validator engine, compiled or interpreted, and is left out of JSON Schema.
+- **The node itself:** the reset applies to the node the entry names, not to what is inside it. On a field typed `Email | null` or `Email[]`, the pattern sits on the union branch or the array element, so resetting it on the field changes nothing: name the type itself instead (`annotate Email { … }` or an `as` copy). No warning is given for such a reset.
+- **Several resets:** repeat the annotation, one name per line (`@annotate.reset 'meta.label'` and `@annotate.reset 'meta.description'`).
+- **Unknown names** are reported like unknown annotations, following the `unknownAnnotation` setting. The editor completes annotation names inside the quotes.
+- **Runtime `metadata.delete(key)`** on a node that resets `key` brings back the inherited value.
+
 ## Annotating Types
 
 The examples above use `interface` targets, but ad-hoc annotations work equally well with `type` definitions.

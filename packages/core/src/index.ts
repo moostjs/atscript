@@ -11,6 +11,7 @@ export {
   parseBareSpecifier,
   resolveBareSpecifier,
   clearResolveBareCache,
+  withoutAsExtension,
 } from './resolve-bare'
 export * from './repo'
 export * from './plugin'

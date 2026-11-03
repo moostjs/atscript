@@ -1062,6 +1062,11 @@ export class Validator<
         return this.fail('NEVER', {})
       }
       case 'any': {
+        // (any value — a required field still needs one, as its TypeScript type and JSON Schema
+        // `required` do)
+        if (value === undefined) {
+          return this.mismatch(def, 'TYPE', { expected: 'unknown', actual: typeOfValue })
+        }
         return true
       }
       case 'string': {

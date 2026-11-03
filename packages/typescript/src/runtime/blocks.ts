@@ -7,7 +7,7 @@ import { metadataReplaced, PropsMap, touched } from './compiled-check/tracking'
  * generated code prints their final structure (hidden classes, `.over` layers).
  */
 import { cutAs } from './cut'
-import { isAppendKey, LayerMap, moveIntrinsic, ownEntries, ownValue } from './layers'
+import { hideKey, isAppendKey, LayerMap, moveIntrinsic, ownEntries, ownValue } from './layers'
 
 type TNode = TAtscriptAnnotatedType
 type TDef = Record<string, any>
@@ -377,12 +377,17 @@ interface TRecord {
   rank: TRank
   value: unknown
 }
-/** An append key's block writes: the elements before them, the parts by rank, the list left. */
+/**
+ * An append key's block writes: the elements before them, the parts by rank, the list left
+ * (`undefined`: none, the key deleted). `reset`: the highest-ranked block resetting the key
+ * (`@annotate.reset`): the elements before it and the parts ranked below it are dropped.
+ */
 interface TAppendRecord {
   before: unknown[]
   parts: Array<{ rank: TRank; values: unknown[] }>
-  value: unknown[]
+  value: unknown[] | undefined
   length: number
+  reset?: TRank
 }
 
 const records = new WeakMap<object, Map<unknown, TRecord | TAppendRecord>>()
@@ -414,13 +419,7 @@ function writeKey(m: Map<unknown, unknown>, key: unknown, value: unknown, rank: 
  * the builder, or a raw write since), then every block's part by rank.
  */
 function appendKey(m: Map<unknown, unknown>, key: unknown, values: unknown[], rank: TRank): void {
-  const recs = recordsOf(m)
-  let r = recs.get(key) as TAppendRecord | undefined
-  const own = ownValue(m, key)
-  if (!r || own !== r.value || r.value.length !== r.length) {
-    const before = own === undefined ? [] : Array.isArray(own) ? [...own] : [own]
-    r = { before, parts: [], value: before, length: 0 }
-  }
+  const r = appendRecord(m, key)
   const { parts } = r
   let at = 0
   while (at < parts.length && compare(parts[at].rank, rank) < 0) {
@@ -431,14 +430,73 @@ function appendKey(m: Map<unknown, unknown>, key: unknown, values: unknown[], ra
   } else {
     parts.splice(at, 0, { rank, values })
   }
-  const value = [...r.before]
-  for (const p of parts) {
-    value.push(...p.values)
+  writeAppend(m, key, r)
+}
+
+/**
+ * The block record of append key `key` of `m`: a new one when a raw write since changed the own
+ * list (the elements written before any block: the builder's, or that raw write).
+ */
+function appendRecord(m: Map<unknown, unknown>, key: unknown): TAppendRecord {
+  const recs = recordsOf(m)
+  let r = recs.get(key) as TAppendRecord | undefined
+  const own = ownValue(m, key)
+  if (!r || own !== r.value || (r.value !== undefined && r.value.length !== r.length)) {
+    const before = own === undefined ? [] : Array.isArray(own) ? [...own] : [own]
+    r = { before, parts: [], value: before, length: 0 }
+    recs.set(key, r)
   }
-  m.set(key, value)
-  r.value = value
+  return r
+}
+
+/** Writes append key `key`'s own list from its record: the elements, then the parts by rank. */
+function writeAppend(m: Map<unknown, unknown>, key: unknown, r: TAppendRecord): void {
+  const reset = r.reset
+  const value = reset ? [] : [...r.before]
+  for (const p of r.parts) {
+    if (!reset || compare(p.rank, reset) >= 0) {
+      value.push(...p.values)
+    }
+  }
+  if (value.length > 0) {
+    m.set(key, value)
+    r.value = value
+  } else {
+    m.delete(key)
+    r.value = undefined
+  }
   r.length = value.length
-  recs.set(key, r)
+  if (reset) {
+    // (a reset keeps hiding the bases: `delete` above, on a layered map, showed them again)
+    hideKey(m, key)
+  }
+}
+
+/**
+ * `@annotate.reset 'key'` by a block of rank `rank` at the node of map `m`: the node reads as if
+ * the key had no value below that block — none from its bases (the types it references, the
+ * target of an `as` copy: hidden, see `hideKey`), none written on the node itself (its
+ * declaration, lower-ranked blocks). A block ranked at or above it (the resetting block's own
+ * values included) writes as usual; one ranked below is ignored, whatever the load order.
+ */
+function resetKey(m: Map<unknown, unknown>, key: unknown, rank: TRank): void {
+  if (isAppendKey(key)) {
+    const r = appendRecord(m, key)
+    if (!r.reset || compare(r.reset, rank) < 0) {
+      r.reset = rank
+    }
+    // (hides the key from the bases too)
+    writeAppend(m, key, r)
+    return
+  }
+  const recs = recordsOf(m)
+  const r = recs.get(key) as TRecord | undefined
+  // (a higher-ranked block's value stands)
+  if (!(r && ownValue(m, key) === r.value && compare(r.rank, rank) > 0)) {
+    m.delete(key)
+    recs.set(key, { rank, value: undefined })
+  }
+  hideKey(m, key)
 }
 
 /**
@@ -449,9 +507,21 @@ type TAnnotation = [string, unknown] | [string, unknown, 1]
 /** A block entry: its annotations, then the paths it writes (several: a union's branches). */
 type TEntry = [TAnnotation[], ...TStep[][]]
 
+/** The block annotation resetting the annotation it names at its node (`@annotate.reset`). */
+const RESET = 'annotate.reset'
+
 function writeEntry(m: Map<unknown, unknown>, anns: TAnnotation[], rank: TRank): void {
+  // (resets first: the entry's own values of a key it resets apply over the reset)
+  for (const [key, value] of anns) {
+    if (key === RESET) {
+      resetKey(m, value, rank)
+    }
+  }
   const values = new Map<string, unknown>()
   for (const [key, value, list] of anns) {
+    if (key === RESET) {
+      continue
+    }
     if (list) {
       const xs = values.get(key) as unknown[] | undefined
       values.set(key, xs ? [...xs, value] : [value])

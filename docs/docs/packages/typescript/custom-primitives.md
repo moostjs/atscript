@@ -72,7 +72,7 @@ Each primitive extension supports:
 
 | Field           | Description                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------- |
-| `type`          | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, etc.) — **inherited** from parent if omitted |
+| `type`          | The base type (`'string'`, `'number'`, `'boolean'`, `'phantom'`, `'any'` (any value, like `unknown`), etc.) — **inherited** from parent if omitted |
 | `documentation` | Description shown in IntelliSense — inherited from parent if omitted                                          |
 | `extensions`    | Nested sub-extensions (e.g., `number.int.positive`)                                                           |
 | `isContainer`   | If `true`, the primitive cannot be used directly — one of its extensions must be chosen                       |

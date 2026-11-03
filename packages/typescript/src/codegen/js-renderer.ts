@@ -26,6 +26,7 @@ import type {
   TPrimitiveTypeDef,
 } from '@atscript/core'
 import {
+  annotatedValueKinds,
   getRelPath,
   isBareId,
   isBareSpecifier,
@@ -35,6 +36,7 @@ import {
   isQueryLogical,
   isStructure,
   resolveAtscriptFromPath,
+  withoutAsExtension,
 } from '@atscript/core'
 import type { TStructDecl } from '@atscript/core'
 
@@ -111,6 +113,7 @@ const UTILS = {
   $ps: '$ps',
   $ak: '$ak',
   $nr: '$nk',
+  $ut: '$ut',
 } as const
 
 type TUtil = keyof typeof UTILS
@@ -242,7 +245,8 @@ export abstract class JsRenderer extends BaseRenderer {
    * Relative imports get the configured `moduleExtension`; bare specifiers
    * always keep `.as` — they resolve through the package's `exports` map.
    */
-  override transformFromPath(path: string): string {
+  override transformFromPath(written: string): string {
+    const path = withoutAsExtension(written)
     return isBareSpecifier(path) ? `${path}.as` : `${path}${this.opts?.moduleExtension ?? '.as'}`
   }
 
@@ -850,7 +854,9 @@ export abstract class JsRenderer extends BaseRenderer {
   private emitArgValue(
     aSpec: { type: string },
     argToken: Token,
-    origin: AtscriptDoc | undefined
+    origin: AtscriptDoc | undefined,
+    /** the annotation's main token (a `value` argument reads the field it is written on) */
+    mainToken: Token
   ): string {
     if (aSpec.type === 'ref') {
       return this.emitRefValue(argToken.text, origin)
@@ -868,7 +874,20 @@ export abstract class JsRenderer extends BaseRenderer {
       )
       return `[${items.join(', ')}]`
     }
-    return aSpec.type === 'string' ? `"${escapeQuotes(argToken.text)}"` : argToken.text
+    // (a `value` argument keeps the literal's kind: a string quoted, a number / boolean as is —
+    // a number on a `decimal` field is its string, the field's runtime type)
+    const quoted =
+      aSpec.type === 'string' ||
+      (aSpec.type === 'value' &&
+        (argToken.type === 'text' ||
+          (argToken.type === 'number' && this.decimalField(mainToken, origin))))
+    return quoted ? `"${escapeQuotes(argToken.text)}"` : argToken.text
+  }
+
+  /** Whether annotation `mainToken` is written on a `decimal` field (not one that holds numbers). */
+  private decimalField(mainToken: Token, origin: AtscriptDoc | undefined): boolean {
+    const kinds = annotatedValueKinds(mainToken, origin ?? this.doc)
+    return !!kinds?.has('decimal') && !kinds.has('number') && !kinds.has('unknown')
   }
 
   private emitExprNode(node: SemanticExprItemNode, origin: AtscriptDoc | undefined): string {
@@ -1006,14 +1025,14 @@ export abstract class JsRenderer extends BaseRenderer {
           let i = 0
           for (const aSpec of spec.arguments) {
             if (an.args[i]) {
-              targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i], origin)}${i === length - 1 ? '' : ', '} `
+              targetValue += `${wrapProp(aSpec.name)}: ${this.emitArgValue(aSpec, an.args[i], origin, an.token)}${i === length - 1 ? '' : ', '} `
             }
             i++
           }
           targetValue += '}'
         } else if (an.args[0]) {
           const aSpec = spec.arguments[0]
-          targetValue = this.emitArgValue(aSpec, an.args[0], origin)
+          targetValue = this.emitArgValue(aSpec, an.args[0], origin, an.token)
         }
       }
     } else {
