@@ -1,7 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
 
-import { engines, environment, generated, modes, results, scenarios } from './validatorBenchData'
+import {
+  engines,
+  environment,
+  generated,
+  modes,
+  results,
+  scenarios,
+  settings,
+} from './validatorBenchData'
 
 const props = defineProps({
   initialMode: { type: String, default: 'passthrough' },
@@ -105,11 +113,11 @@ function ratioText(v, atscript) {
   }
   const r = v / atscript
   if (Math.abs(r - 1) < 0.005) {
-    return 'same as atscript'
+    return 'same as interpreted atscript'
   }
   return r > 1
-    ? `${r.toFixed(2)}x faster than atscript`
-    : `${(1 / r).toFixed(2)}x slower than atscript`
+    ? `${r.toFixed(2)}x faster than interpreted atscript`
+    : `${(1 / r).toFixed(2)}x slower than interpreted atscript`
 }
 
 const rows = computed(() => {
@@ -253,9 +261,10 @@ const generatedDate = generated.slice(0, 10)
     </div>
 
     <p class="vbc-foot">
-      Median ops/s, higher is better, <strong>log scale</strong>. Indicative estimate: 1 round × 10
-      samples per job, {{ environment.cpu }} laptop, Node.js {{ environment.node }},
-      {{ generatedDate }}.
+      Median ops/s, higher is better, <strong>log scale</strong>. Ratios are against interpreted
+      atscript. Indicative estimate: {{ settings.rounds }} rounds × {{ settings.samples }} samples
+      per job, {{ environment.cpu }} laptop with other workloads running, Node.js
+      {{ environment.node }}, {{ generatedDate }}.
     </p>
   </div>
 </template>

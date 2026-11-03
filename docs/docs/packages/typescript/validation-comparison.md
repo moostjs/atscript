@@ -391,7 +391,7 @@ Zod achieves custom validation through `.refine()` and `.superRefine()` — meth
 
 ## Performance
 
-An [open benchmark](https://github.com/prostojs/router-benchmark/tree/main/packages/validator-benchmark) validates the same `Order` model (nested objects, arrays, string/number constraints, a two-branch payment union) with the Atscript validator and the equivalent schema in 12 other engines: Zod 4 (`safeParse()`, `z.compile()` + `safeParse()`, `z.compile()` + `validate()`), Valibot, Yup, Joi, Ajv, ArkType (`T(input)`, `T.allows()`), class-validator and TypeBox (`Compile()`, `Value`). A pre-flight check makes sure every engine does the same work: they all accept and reject the same inputs, and on invalid input they detect the same violations. Each scenario runs in three unknown-property modes: `strip` removes undeclared properties, `passthrough` keeps them, `strict` rejects them. See the [benchmark README](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/README.md) for the methodology, the equivalence pre-flight and the fairness notes (copy vs in-place validation, how each library reports a failed union, emulated unions in Yup and class-validator).
+An [open benchmark](https://github.com/prostojs/router-benchmark/tree/main/packages/validator-benchmark) validates the same `Order` model (nested objects, arrays, string/number constraints, a two-branch payment union) with the Atscript validator and the equivalent schema in 12 other engines. Atscript runs three times: 0.2.1 interpreted, 0.2.1 with [compiled validators](/packages/typescript/compiled-validators), and 0.1.109 (the last release before compiled validators) as a baseline. The other engines are Zod 4 (`safeParse()`, `z.compile()` + `safeParse()`, `z.compile()` + `validate()`), Valibot, Yup, Joi, Ajv, ArkType (`T(input)`, `T.allows()`), class-validator and TypeBox (`Compile()`, `Value`). A pre-flight check makes sure every engine does the same work: they all accept and reject the same inputs, and on invalid input they detect the same violations. Each scenario runs in three unknown-property modes: `strip` removes undeclared properties, `passthrough` keeps them, `strict` rejects them. See the [benchmark README](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/README.md) for the methodology, the equivalence pre-flight and the fairness notes (copy vs in-place validation, how each library reports a failed union, emulated unions in Yup and class-validator).
 
 Pick a mode and a scenario; hover a bar for the exact numbers:
 
@@ -403,39 +403,41 @@ Passthrough mode, the only mode where every engine runs, median ops/s (higher is
 
 | Engine | Valid order | 50 items | Invalid, all errors | Invalid, first error | Union, 1st branch | Union, no match |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| TypeBox `Compile()` + `Check()` | 4.63M | 1.22M | 58.6k | 169k | 24.4M | 402k |
-| ArkType `T.allows()` ¹ | 3.78M | 672k | — | 52.9M | 24.5M | — |
-| ArkType `T(input)` | 3.60M | 678k | 32.4k | — | 18.2M | 310k |
-| Zod `z.compile()` + `validate()` ¹ | 2.39M | 251k | — | 101.9M | 17.4M | — |
-| Ajv (compiled) | 2.33M | 372k | 1.90M | 52.5M | 18.7M | 31.7M |
-| Zod `z.compile()` + `safeParse()` | 1.84M | 242k | 129k | — | 16.9M | 584k |
-| **Atscript `validate()`** | **466k** | **95.1k** | **361k** | **5.17M** | **4.68M** | **1.73M** |
-| Zod `safeParse()` | 398k | 43.3k | 130k | — | 7.40M | 593k |
-| Valibot `safeParse()` | 318k | 33.4k | 394k | 14.4M | 5.11M | 2.76M |
-| Joi `validate()` | 54.8k | 4.5k | 49.4k | 761k | 1.25M | 320k |
-| TypeBox `Value.Check()` | 27.1k | 2.3k | 54.0k | 136k | 400k | 310k |
-| Yup `validateSync()` | 19.5k | 1.9k | 5.1k | 23.9k | 239k | 32.0k |
-| class-validator `validateSync()` | 17.3k | 1.9k | 25.8k | — | 224k | 118k |
+| TypeBox `Compile()` + `Check()` | 4.79M | 1.29M | 53.3k | 158k | 24.3M | 358k |
+| **Atscript `validate()`, compiled** ² | **4.41M** | **1.08M** | **391k** | **6.36M** | **14.4M** | **1.79M** |
+| Zod `z.compile()` + `validate()` ¹ | 2.34M | 248k | — | 100.3M | 16.7M | — |
+| Ajv (compiled) | 2.27M | 395k | 1.76M | 53.0M | 19.2M | 30.0M |
+| Zod `z.compile()` + `safeParse()` | 1.76M | 249k | 107k | — | 18.5M | 556k |
+| ArkType `T.allows()` ¹ | 988k | 102k | — | 17.3M | 23.5M | — |
+| ArkType `T(input)` | 941k | 106k | 32.8k | — | 17.1M | 278k |
+| **Atscript `validate()`** | **525k** | **93.5k** | **394k** | **5.49M** | **4.82M** | **1.44M** |
+| Atscript 0.1.109 `validate()` ³ | 473k | 91.3k | 367k | 5.15M | 4.81M | 1.57M |
+| Zod `safeParse()` | 342k | 40.8k | 105k | — | 6.98M | 513k |
+| Valibot `safeParse()` | 305k | 30.7k | 359k | 13.6M | 4.55M | 2.41M |
+| Joi `validate()` | 51.4k | 4.3k | 46.7k | 765k | 1.18M | 261k |
+| TypeBox `Value.Check()` | 26.5k | 2.2k | 51.8k | 158k | 353k | 286k |
+| Yup `validateSync()` | 18.4k | 1.9k | 9.3k | 34.0k | 220k | 52.1k |
+| class-validator `validateSync()` | 16.2k | 1.6k | 23.8k | — | 196k | 112k |
 
-¹ Boolean only: returns `true` / `false` without error details. — = not run.
+¹ Boolean only: returns `true` / `false` without error details. ² Built with `compileValidators: true`. ³ The last release before compiled validators, as a baseline. — = not run.
 
 **Where Atscript is slower:**
 
-- **Compiled validators are much faster on valid input.** TypeBox `Compile()`, ArkType, Ajv and Zod `z.compile()` generate specialized code for the schema. On a valid order they are 4–10x faster than Atscript in passthrough mode and 2–7x in strict mode (Zod `z.compile()` is about 9x faster in strip mode too). On a 50-item order compiled TypeBox is about 13x faster.
-- **Ajv is far ahead on invalid input**: about 5x faster than Atscript with a full error report and 4–10x on first-error.
-- **Valibot is faster on early exits**: on first-error (2.8–3.8x) and on a union where no branch matches (1.4–1.8x), and 1.1–1.3x faster with a full error report.
-- **Stripping unknown properties** costs Atscript more than Zod: with undeclared properties on every object, Zod `safeParse()` is 2.4x faster in strip mode.
-- **The standalone union's first branch**: Zod `safeParse()` is 1.6–2.3x faster there, and the fastest compiled validators about 5–6x.
+- **TypeBox `Compile()` in passthrough mode.** On valid input it is 1.09–1.2x faster than compiled Atscript (4.79M vs 4.41M ops/s on a valid order). In strict mode compiled Atscript is 2.9–4.8x faster than it.
+- **Stripping unknown properties.** In strip mode Zod `z.compile()` is 1.04–1.08x faster than compiled Atscript on valid input, and 4.1x faster (2.55M vs 614k) when every object carries an undeclared property that has to be removed. Interpreted Atscript is 1.4x behind Zod `safeParse()` there.
+- **Unions.** On the standalone payment union compiled Atscript is 1.3–3.1x behind Zod `z.compile()` across the three modes, and TypeBox `Compile()` is 1.7–2.5x faster than it in passthrough and strict mode. Interpreted Atscript is 1.4–2.0x behind Zod `safeParse()` when the first branch matches.
+- **Invalid input.** The compiled check is a fast path for valid input: with a full error report, compiled and interpreted Atscript run at the same speed. Ajv is 4.5–4.8x faster than Atscript there, 13–17x faster on a union where no branch matches, and 2.4–8.3x faster on first-error.
+- **Valibot on early exits**: 2.1–2.5x faster than compiled Atscript on first-error and 1.2–1.4x on a union where no branch matches. With a full error report Valibot is 1.1–1.3x faster in strip and strict mode; in passthrough mode Atscript is 1.1x ahead.
 
 **Where Atscript is faster:**
 
-- **Among the validators that don't compile code**, Atscript is the fastest on valid input in passthrough and strict mode: 1.05–1.3x ahead of Zod `safeParse()` on a valid order (slightly behind it in strip mode) and 1.6–2.2x on the 50-item order, ahead of Valibot, and 8–50x ahead of Joi, Yup, class-validator and TypeBox `Value`.
-- **Invalid input with a full error report**: Atscript is 2.2–2.8x faster than Zod (both `safeParse()` and `z.compile()`, which does not speed up the error path), about 6–11x faster than compiled TypeBox and ArkType, and far ahead of Joi, class-validator and Yup.
+- **Compiled Atscript on valid input.** In strict mode it is the fastest engine on every valid input: 1.3x faster than Zod `z.compile()` + `safeParse()` on a valid order and 2.0x on the 50-item order, 2.0–2.2x faster than Ajv and 2.9–4.8x faster than TypeBox `Compile()`. In passthrough mode it is second to TypeBox `Compile()`: 2.4–4.3x faster than `z.compile()`, 1.9–2.7x faster than Ajv, 4.7–10x faster than ArkType `T(input)`, and the fastest engine on the order with unknown properties.
+- **0.2.1 against 0.1.109.** Compiled Atscript is 7.8–11.8x faster than 0.1.109 on valid input and 2.6–3.2x on the standalone union. The interpreted validator is faster too: up to 1.2x on valid input and 1.6x when stripping unknown properties; unions and invalid input are about the same.
+- **Interpreted, without compiled validators**, Atscript is 1.4–2.3x faster than Zod `safeParse()` on valid input in passthrough and strict mode (1.05–1.7x in strip mode, except with unknown properties), faster than Valibot, and 10–58x faster than Joi, Yup, class-validator and TypeBox `Value`.
+- **Invalid input with a full error report**: Atscript, compiled or not, is 2.9–3.7x faster than Zod (both `safeParse()` and `z.compile()`, which does not speed up the error path), 2.8–3.9x faster on a union where no branch matches, about 7–12x faster than compiled TypeBox and ArkType, and far ahead of Joi, class-validator and Yup.
 - Atscript validates in place and returns a boolean plus an error list; `safeParse()`-style APIs build a new output object.
 
-These numbers are for the interpreted validator. Atscript now has opt-in [compiled validators](/packages/typescript/compiled-validators) (`ts({ compileValidators: true })`), which are roughly 8–10× faster on valid input on this benchmark and unchanged on invalid input. Refreshed numbers that include them are pending.
-
-These numbers are an indicative estimate from a single round on a laptop (Apple M4 MacBook Air, Node.js 24.22, Atscript 0.1.109, Zod 4.6.7, Valibot 1.5.0, Yup 1.7.1, Joi 18.3.0, Ajv 8.20.0, ArkType 2.2.8, class-validator 0.15.1, TypeBox 1.4.2). The full results, including the strip and strict tables and ns/op, are in [RESULTS.md](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/RESULTS.md).
+These numbers are an indicative estimate from 3 rounds × 25 samples per job on a laptop (Apple M4, Node.js 26.13.0, Atscript 0.2.1 and 0.1.109 as the baseline, Zod 4.6.7, Valibot 1.5.0, Yup 1.7.1, Joi 18.3.0, Ajv 8.20.0, ArkType 2.2.8, class-validator 0.15.1, TypeBox 1.4.2). Other workloads on the laptop could not be fully stopped during the run (load average about 3), so treat gaps under about 10% as noise. The full results, including the strip and strict tables and ns/op, are in [RESULTS.md](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/RESULTS.md).
 
 ## Summary
 
