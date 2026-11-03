@@ -14,6 +14,7 @@ import type {
 import {
   entryParts,
   flatDefinitions,
+  isAnnotate,
   hasNavPropAnnotation,
   isArray,
   isConst,
@@ -318,7 +319,7 @@ export class TypeRenderer extends BaseRenderer {
       this.write(`type ${node.id!} = ${targetName}`)
       this.writeln()
       const unwound = this.doc.unwindType(targetName)
-      this.renderTypeNamespaceFor(node.id!, unwound?.def)
+      this.renderTypeNamespaceFor(node.id!, unwound?.def, this.namesFields(node, this.doc))
     } else {
       // Target is an interface — render as class extends
       this.write(exported ? 'export declare ' : 'declare ')
@@ -327,10 +328,53 @@ export class TypeRenderer extends BaseRenderer {
   }
 
   renderTypeNamespace(node: SemanticTypeNode) {
-    this.renderTypeNamespaceFor(node.id!, node.getDefinition())
+    this.renderTypeNamespaceFor(node.id!, node.getDefinition(), this.namesFields(node, this.doc))
   }
 
-  private renderTypeNamespaceFor(name: string, inputDef?: SemanticNode) {
+  /**
+   * Whether declaration `node` (of `doc`) is a type path naming several fields — written there,
+   * through plain aliases and `annotate … as` copies, or as the type of the one field a type path
+   * names —: a union of them at runtime, whatever its structure (MODEL §15 STRUCT-N3-DTS).
+   */
+  private namesFields(
+    node: SemanticNode | undefined,
+    doc: AtscriptDoc,
+    seen = new Set<SemanticNode>()
+  ): boolean {
+    if (!node || seen.has(node)) {
+      return false
+    }
+    seen.add(node)
+    if (isAnnotate(node)) {
+      const target = doc.getDeclarationOwnerNode(node.targetName)
+      return this.namesFields(target?.node, target?.doc ?? doc, seen)
+    }
+    let def = node.entity === 'type' || node.entity === 'prop' ? node.getDefinition() : undefined
+    while (isGroup(def) && !def.op && def.unwrap().length === 1) {
+      def = def.unwrap()[0]
+    }
+    if (!isRef(def)) {
+      return false
+    }
+    if (def.hasChain) {
+      // (as the structure model has it: several fields a union — several phantom fields are one
+      // phantom prop, POS-1c)
+      const e = doc.componentStructure().complete().exprOf(doc, def)
+      if (e.k === 'uni' || e.k === 'scalar') {
+        return e.k === 'uni'
+      }
+      const unwound = doc.unwindRef(def)
+      return this.namesFields(unwound?.node, unwound?.doc ?? doc, seen)
+    }
+    const owner = doc.resolveRefOwner(def)
+    return this.namesFields(owner?.node, owner?.doc ?? doc, seen)
+  }
+
+  /**
+   * `fields`: the type is a type path naming several fields (see {@link namesFields}): its
+   * descriptor is typed as the runtime holds it, a union (MODEL §15 STRUCT-N3-DTS).
+   */
+  private renderTypeNamespaceFor(name: string, inputDef?: SemanticNode, fields = false) {
     this.write(`declare namespace ${name} `)
     this.blockln('{}')
     let typeDef = 'TAtscriptTypeDef'
@@ -340,7 +384,9 @@ export class TypeRenderer extends BaseRenderer {
         realDef = this.doc.unwindRef(inputDef)?.def || realDef
       }
       realDef = this.doc.mergeIntersection(realDef)
-      if (isStructure(realDef) || isInterface(realDef)) {
+      if (fields) {
+        typeDef = `TAtscriptTypeComplex<${name}>`
+      } else if (isStructure(realDef) || isInterface(realDef)) {
         typeDef = `TAtscriptTypeObject<keyof ${name}, ${name}>`
       } else if (isGroup(realDef)) {
         typeDef = `TAtscriptTypeComplex<${name}>`

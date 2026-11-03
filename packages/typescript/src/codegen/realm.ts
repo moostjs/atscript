@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 
 import type { AtscriptDoc } from '@atscript/core'
-import { connectedDocuments, documentsEpoch, moduleId } from '@atscript/core'
+import { componentOf, moduleId, type TComponent } from '@atscript/core'
 
 import type * as TRealmRuntime from '../realm-runtime'
 
@@ -99,6 +99,10 @@ function freshRuntime(): typeof TRealmRuntime {
   return runtimeFactory()
 }
 
+/** `error`'s message, quoted. */
+const errorText = (error: unknown) =>
+  JSON.stringify(String((error as Error | undefined)?.message ?? error).split('\n')[0])
+
 /** Getters of `names` (`[name, local]`) reading `read(name)`, on a null-prototype object. */
 function getters(names: Array<[string, string]>, read: (name: string) => unknown): object {
   const out = Object.create(null) as object
@@ -147,7 +151,47 @@ export class Realm {
     { exports?: TNamespace; classes?: TNamespace; error?: unknown }
   >()
 
-  constructor(private readonly modules: Map<AtscriptDoc, TRealmModule>) {}
+  /**
+   * The statements the modules queued (`$q`), each with its module (the build's load check,
+   * MODEL CYCLE-GUARD-8): `done` once it ran; `error`: the error it failed with (not a wait).
+   */
+  readonly statements: Array<{
+    doc: AtscriptDoc
+    fn: () => unknown
+    done: boolean
+    error?: unknown
+  }> = []
+
+  /** The modules whose own body threw (not an import's failure), with the error. */
+  readonly failures = new Map<AtscriptDoc, unknown>()
+
+  constructor(
+    /** the phase-1 modules it evaluates */
+    readonly modules: Map<AtscriptDoc, TRealmModule>,
+    /** compiled module functions shared by realms of the same modules */
+    readonly compiled = new Map<TRealmModule, unknown>()
+  ) {}
+
+  /** Module `doc`'s `$q`: the runtime's, recording each statement with its module. */
+  private queueOf(doc: AtscriptDoc) {
+    const rt = this.rt
+    return (fn: () => unknown, own?: Array<() => unknown>) => {
+      const rec: Realm['statements'][number] = { doc, fn, done: false }
+      this.statements.push(rec)
+      rt.$q(() => {
+        try {
+          const out = fn()
+          rec.done = true
+          return out
+        } catch (error) {
+          if (!rt.isWait(error)) {
+            rec.error = error
+          }
+          throw error
+        }
+      }, own)
+    }
+  }
 
   /**
    * Evaluates every module (roots by module id; see the file comment). A module that throws
@@ -165,6 +209,50 @@ export class Realm {
       }
     }
     return this
+  }
+
+  /**
+   * Evaluates `doc`'s module as the entry (with what it imports, as a loader would); what failed
+   * is recorded (see {@link statements}, {@link failures}).
+   */
+  loadFrom(doc: AtscriptDoc): this {
+    try {
+      this.evaluate(doc)
+    } catch {
+      // (recorded on the failed module)
+    }
+    return this
+  }
+
+  /**
+   * What failed to load, by module (MODEL CYCLE-GUARD-8): its statements that never ran or threw,
+   * and its own body's throw (one of its statements' error thrown on: theirs only).
+   */
+  loadErrors(): Map<AtscriptDoc, string[]> {
+    const out = new Map<AtscriptDoc, string[]>()
+    const add = (doc: AtscriptDoc, text: string) => {
+      const xs = out.get(doc) ?? []
+      out.set(doc, xs)
+      xs.push(text.replace(/\s+/g, ' ').slice(0, 160))
+    }
+    const errors = new Set<unknown>()
+    for (const st of this.statements) {
+      if (st.done) {
+        continue
+      }
+      if (st.error === undefined) {
+        add(st.doc, `never ran: ${String(st.fn)}`)
+      } else {
+        errors.add(st.error)
+        add(st.doc, `threw ${errorText(st.error)}: ${String(st.fn)}`)
+      }
+    }
+    for (const [doc, error] of this.failures) {
+      if (!errors.has(error)) {
+        add(doc, `threw ${errorText(error)}`)
+      }
+    }
+    return out
   }
 
   /** Class `name` of `doc`'s module (evaluated). */
@@ -230,6 +318,7 @@ export class Realm {
       }
     }
     const scope = Object.create(null) as object
+    const q = this.queueOf(doc)
     for (const { doc: from, names } of m.imports) {
       const read = from
         ? (name: string) => {
@@ -239,29 +328,33 @@ export class Realm {
             }
             return exported[name]
           }
-        : (name: string) => (this.rt as unknown as TNamespace)[name]
+        : (name: string) => (name === '$q' ? q : (this.rt as unknown as TNamespace)[name])
       Object.defineProperties(scope, Object.getOwnPropertyDescriptors(getters(names, read)))
     }
     try {
-      moduleFunction(m)(scope, (exported: TNamespace, classes: TNamespace) => {
+      let fn = this.compiled.get(m) as TModuleFunction | undefined
+      if (!fn) {
+        fn = moduleFunction(m)
+        this.compiled.set(m, fn)
+      }
+      fn(scope, (exported: TNamespace, classes: TNamespace) => {
         state.exports = exported
         state.classes = classes
       })
     } catch (error) {
       state.error = error
+      // (its own body threw: not an import's failure)
+      this.failures.set(doc, error)
       throw error
     }
   }
 }
 
-/** The realms of the current documents' epoch, by render options and component. */
-const realms = new Map<string, Realm>()
-/** The component of each document (see `connectedDocuments`) of the current documents' epoch. */
-const components = new Map<AtscriptDoc, { docs: AtscriptDoc[]; key: string }>()
-let realmsEpoch = -1
+/** The realms of each component (a component is the documents' epoch's), by render options. */
+const realms = new WeakMap<TComponent, Map<string, Realm>>()
 
 /**
- * The realm of `doc`'s component (see `connectedDocuments`) for the render options `key`, loaded:
+ * The realm of `doc`'s import component (see `componentOf`) for the render options `key`, loaded:
  * one per component and options until a document changes (see `documentsEpoch`).
  * `moduleOf` renders a document's phase-1 module (a module that failed to evaluate throws on
  * `classOf`).
@@ -271,23 +364,13 @@ export function realmOf(
   key: string,
   moduleOf: (doc: AtscriptDoc) => TRealmModule
 ): Realm {
-  if (realmsEpoch !== documentsEpoch()) {
-    realmsEpoch = documentsEpoch()
-    realms.clear()
-    components.clear()
-  }
-  let component = components.get(doc)
-  if (!component) {
-    const all = connectedDocuments(doc)
-    const first = all.reduce((a, b) => (b.id < a.id ? b : a))
-    component = { docs: all, key: `${first.id}\n${all.length}` }
-    for (const d of all) {
-      components.set(d, component)
-    }
+  const component = componentOf(doc)
+  let byKey = realms.get(component)
+  if (!byKey) {
+    realms.set(component, (byKey = new Map()))
   }
   const docs = component.docs
-  const id = `${key}\n${component.key}`
-  let realm = realms.get(id)
+  let realm = byKey.get(key)
   if (!realm) {
     const modules = new Map<AtscriptDoc, TRealmModule>()
     for (const d of docs) {
@@ -298,7 +381,7 @@ export function realmOf(
       }
     }
     realm = new Realm(modules).load()
-    realms.set(id, realm)
+    byKey.set(key, realm)
   }
   return realm
 }

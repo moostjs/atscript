@@ -40,8 +40,17 @@ export function moduleId(doc: AtscriptDoc): string {
     packages.set(root, pkg)
   }
   pkg.checked = epoch
-  return `${pkg.scope}:${path.relative(pkg.dir, file).replaceAll('\\', '/')}`
+  const known = ids.get(doc)
+  if (known?.uri === doc.id && known.root === root && known.pkg === pkg) {
+    return known.id
+  }
+  const id = `${pkg.scope}:${path.relative(pkg.dir, file).replaceAll('\\', '/')}`
+  ids.set(doc, { uri: doc.id, root, pkg, id })
+  return id
 }
+
+/** {@link moduleId} by document: valid for its URI, root and package entry. */
+const ids = new WeakMap<AtscriptDoc, { uri: string; root: string; pkg: object; id: string }>()
 
 /** The package of project root `root` (see {@link moduleId}). */
 function packageOf(root: string) {

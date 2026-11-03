@@ -4,6 +4,7 @@ import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 
+import { withLoadCheck } from '../codegen/js-next'
 import { getConfig } from './config'
 import { collectDiagnostics } from './diagnostics'
 import { NOTHING_EMITTED_MESSAGE, emitDecision } from './emit-policy'
@@ -58,7 +59,9 @@ export class Commands {
 
     const decision = emitDecision({ noEmit, skipDiag, errorCount })
     if (decision === 'emit') {
-      const out = await builder.write(config as TAtscriptConfigOutput)
+      // (a real build: its generated modules' loads are checked — one state per process, whichever
+      // copy of the plugin the config loads)
+      const out = await withLoadCheck(() => builder.write(config as TAtscriptConfigOutput))
       for (const { target } of out) {
         this.logger.log(`✅ created ${__DYE_GREEN__}${target}${__DYE_COLOR_OFF__}`)
       }

@@ -3,3 +3,5 @@
 // every realm has its own runtime instance (registries, WeakMaps, epochs).
 export * from './utils'
 export { compiledCheckRegistrations } from './codegen/validation-model'
+// (the build's load check tells a statement waiting from one failing, see `Realm`)
+export { isWait } from './runtime/blocks'

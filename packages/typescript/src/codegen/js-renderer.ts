@@ -455,11 +455,11 @@ export abstract class JsRenderer extends BaseRenderer {
    * schema, and the compiled validator checks (see `compiledCheckRegistrations`).
    */
   override render(): string {
-    const module = this.renderModule()
+    const module = this.phase1()
     if (this.bundledSchemas.length === 0 && !this.compiles) {
       return module.text
     }
-    const realm = this.realm(module)
+    const realm = this.realm()
     const text = this.compiles ? this.spliceCompiledChecks(module.text, realm) : module.text
     if (this.bundledSchemas.length === 0) {
       return text
@@ -491,8 +491,8 @@ export abstract class JsRenderer extends BaseRenderer {
   /** What a bundled schema built in `realm` for `type` accounts (see `bundledSchemaOf`). */
   protected abstract accountedFor(realm: Realm, type: TAtscriptAnnotatedType): string[]
 
-  /** The realm phase 2 builds the view payloads in, `module` being this module's phase 1. */
-  protected abstract realm(module: TRealmModule): Realm
+  /** The realm phase 2 builds the view payloads in (this module's phase 1 known to it). */
+  protected abstract realm(): Realm
 
   /** `text` (phase 1) with the compiled checks' registrations, built in `realm`. */
   private spliceCompiledChecks(text: string, realm: Realm): string {
@@ -514,6 +514,26 @@ export abstract class JsRenderer extends BaseRenderer {
         checks ? `// Compiled validator checks\n${checks}\n` : ''
       )
   }
+
+  /**
+   * {@link renderModule}, once: phase 2 (see {@link render}) reads what it recorded; a module that
+   * fails to render fails every time with its error.
+   */
+  phase1(): TRealmModule {
+    if (!this.phase1Out) {
+      try {
+        this.phase1Out = { module: this.renderModule() }
+      } catch (error) {
+        this.phase1Out = { error }
+      }
+    }
+    if ('error' in this.phase1Out) {
+      throw this.phase1Out.error
+    }
+    return this.phase1Out.module
+  }
+
+  private phase1Out?: { module: TRealmModule } | { error: unknown }
 
   /**
    * Phase 1: the generated module without view payloads (a bundled JSON schema is a placeholder,

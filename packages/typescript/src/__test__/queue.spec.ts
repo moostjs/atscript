@@ -142,4 +142,37 @@ describe('the queue', () => {
       })
     ).toThrow('boom')
   })
+
+  it('a module in no import cycle throws when one of its own statements never runs', () => {
+    const before = pendingStatements()
+    // (one of its own runs once another of its own did)
+    const Y = cls('Y')
+    const own: Array<() => unknown> = []
+    $q(() => $f(Y, 'p'), own)
+    $q(() => $('object', Y).prop('p', $().designType('string').tags('string').$type), own)
+    expect(() => $end(own)).not.toThrow()
+    expect(pendingStatements()).toBe(before)
+    // (one that never can: thrown, and not left queued)
+    const own2: Array<() => unknown> = []
+    $q(() => $f(cls('W'), 'p'), own2)
+    expect(() => $end(own2)).toThrow('never ran')
+    expect(pendingStatements()).toBe(before)
+    // (a module of an import cycle leaves it queued: the build checks the cycle, see `realm.ts`)
+    $q(() => $f(cls('C'), 'p'))
+    expect(() => $end()).not.toThrow()
+    expect(pendingStatements()).toBe(before + 1)
+  })
+
+  it("a module that throws after queueing statements: another module's end counts only its own (review 34 since1)", () => {
+    const before = pendingStatements()
+    // (a cycle module's statement queued, then its body throws: its end never runs)
+    $q(() => $f(cls('P0'), 'p'))
+    // (a valid module in no cycle: its own statements run, the failed module's are not its own)
+    const own: Array<() => unknown> = []
+    const built: number[] = []
+    $q(() => built.push(1), own)
+    expect(() => $end(own)).not.toThrow()
+    expect(built).toEqual([1])
+    expect(pendingStatements()).toBe(before + 1)
+  })
 })

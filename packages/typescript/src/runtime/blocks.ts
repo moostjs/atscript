@@ -256,7 +256,7 @@ function put(d: TDef, s: string, node: TNode): void {
 }
 
 /** A step of a shell path: the step and its kind (from the build's structure model). */
-type TStep = [string, 0 | 1 | 2]
+export type TStep = [string, 0 | 1 | 2]
 
 /**
  * The node of `T` at `path`, with T's own shells along it (idempotent). Step kinds:
@@ -292,7 +292,8 @@ export function $sh(T: unknown, paths: TStep[][]): void {
   }
   const pending = pendingShells.get(target)
   if (pending) {
-    const done = new Set(paths.map(p => JSON.stringify(p)))
+    // (a path's every stage is made: its prefixes that shell are done too)
+    const done = new Set(paths.flatMap(stagesOf).map(p => JSON.stringify(p)))
     const rest = pending.filter(p => !done.has(JSON.stringify(p)))
     if (rest.length > 0) {
       pendingShells.set(target, rest)
@@ -310,7 +311,30 @@ const pendingShells = new WeakMap<object, TStep[][]>()
 
 /** Registers class `T`'s shells as pending (see {@link $sh}): first statement of its module. */
 export function $ps(T: unknown, paths: TStep[][]): void {
-  pendingShells.set(T as object, paths)
+  // (each stage on its own — a step on the way that shells, an `X | null` item no path of its
+  // own ends at, replaces a node too: the build's stage index, `js-next.ts` `shellPathsOf`)
+  const seen = new Set<string>()
+  pendingShells.set(
+    T as object,
+    paths.flatMap(stagesOf).filter(p => {
+      const k = JSON.stringify(p)
+      return !seen.has(k) && !!seen.add(k)
+    })
+  )
+}
+
+/**
+ * The last step index of each stage of shell path `path` (see {@link stagesOf}): every step that
+ * shells, and the path's last (the build's stage index walks them too, `js-next.ts`
+ * `shellPathsOf`).
+ */
+export function stageEnds(path: TStep[]): number[] {
+  return path.flatMap(([, kind], j) => (kind !== 0 || j === path.length - 1 ? [j] : []))
+}
+
+/** The stages of shell path `path`: each prefix ending at a step that shells, and the path. */
+export function stagesOf(path: TStep[]): TStep[][] {
+  return stageEnds(path).map(j => path.slice(0, j + 1))
 }
 
 /**
@@ -480,34 +504,44 @@ export function $blk(
 
 const queue: Array<() => unknown> = []
 
-const retryable = (e: unknown) => e === NOT_READY || e instanceof ReferenceError
+/**
+ * Whether `e` is a statement's wait — a class not built yet (`NOT_READY`), a binding in its
+ * temporal dead zone — rather than its failure.
+ */
+export const isWait = (e: unknown) => e === NOT_READY || e instanceof ReferenceError
 
 /**
  * Runs `fn` (a statement reading a class of another module of its import cycle), or queues it
- * when that class is not built yet (ESM: its temporal dead zone; CommonJS: `undefined`).
+ * when that class is not built yet (ESM: its temporal dead zone; CommonJS: `undefined`). `own`:
+ * the module's own list of queued statements (a module in no import cycle, see {@link $end}).
  */
-export function $q(fn: () => unknown): void {
+export function $q(fn: () => unknown, own?: Array<() => unknown>): void {
   try {
     fn()
   } catch (error) {
-    if (!retryable(error)) {
+    if (!isWait(error)) {
       throw error
     }
     queue.push(fn)
+    own?.push(fn)
   }
 }
 
-/** The last statement of a module: runs the queued statements that can run now, in order. */
-export function $end(): void {
+/**
+ * The last statement of a module: runs the queued statements that can run now, in order. A module
+ * in no import cycle passes its own queued statements (`own`, see {@link $q}) and throws when one
+ * of them still waits: nothing it waits for can come later. (A module of an import cycle is
+ * checked when the build loads the cycle from each of its modules.)
+ */
+export function $end(own?: Array<() => unknown>): void {
   let progress = true
   while (progress && queue.length > 0) {
     progress = false
     for (let i = 0; i < queue.length; ) {
-      const fn = queue[i]
       try {
-        fn()
+        queue[i]()
       } catch (error) {
-        if (retryable(error)) {
+        if (isWait(error)) {
           i++
           continue
         }
@@ -517,6 +551,15 @@ export function $end(): void {
       queue.splice(i, 1)
       progress = true
     }
+  }
+  const left = own?.filter(fn => queue.includes(fn)) ?? []
+  if (left.length > 0) {
+    for (const fn of left) {
+      queue.splice(queue.indexOf(fn), 1)
+    }
+    throw new Error(
+      `atscript: ${left.length} statement(s) of this module never ran: they wait for each other (an internal code generation error: please report it)`
+    )
   }
 }
 

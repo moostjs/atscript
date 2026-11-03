@@ -39,7 +39,7 @@ import {
   analyzeQueryCursorContext,
   isBacktickArgType,
   BACKTICK_ARG_VOCABULARY,
-  unwoundFields,
+  distinctFields,
 } from '@atscript/core'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import type {
@@ -623,12 +623,7 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
           docs.push('*(phantom — excluded from types, validation, and schema)*')
         }
         // (a type path through a union naming several fields: each field's, once)
-        const fields = new Set<unknown>()
-        for (const { def, node } of unwoundFields(unwound)) {
-          if (fields.has(node ?? def)) {
-            continue
-          }
-          fields.add(node ?? def)
+        for (const { def, node } of distinctFields(unwound)) {
           if (isPrimitive(def) && def.config.isContainer) {
             docs.push('*(container — must use an extension)*')
           }
@@ -1099,8 +1094,12 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       f.propToken ? [{ doc: f.doc, propToken: f.propToken }] : []
     )
     if (fields.length > 0) {
+      // (a usage of several of the fields once: by its location; `range` is a new object per read)
+      const usages = fields.flatMap(f => f.doc.usageListFor(f.propToken) ?? [])
+      const at = (u: (typeof usages)[number]) =>
+        `${u.uri}\0${u.range.start.line}:${u.range.start.character}`
       return {
-        usages: fields.flatMap(f => f.doc.usageListFor(f.propToken) ?? []),
+        usages: [...new Map(usages.map(u => [at(u), u])).values()],
         definitions: fields.map(f => ({ uri: f.doc.id, range: f.propToken.range })),
       }
     }

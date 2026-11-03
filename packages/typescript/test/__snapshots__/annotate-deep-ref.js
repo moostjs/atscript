@@ -71,6 +71,13 @@ $sh(Deep, [[["address", 0], ["contact", 2], ["phone", 2]]])
 
 $al(AliasedDeep, Deep)
 $a(AliasedDeep.metadata, "meta.description", "Aliased Deep")
+
+$sh(AliasedDeep, [[["address", 2]]])
+
+$sh(AliasedDeep, [[["address", 2], ["contact", 2]]])
+
+$sh(AliasedDeep, [[["address", 2], ["contact", 2], ["phone", 2]]])
+
 $blk(null, 0, AliasedDeep, [
   [[["label", "Work Phone"]], [["address", 2], ["contact", 2], ["phone", 2]]],
 ])

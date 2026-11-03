@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $ft as $ft, $fc as $fc, $alias as $al, $blk as $blk, $sh as $sh, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class TString {
   static __is_atscript_annotated_type = true
@@ -74,6 +74,15 @@ $("union", TO)
         .value("def").$type).$type).$type)
 
 $al(TO2, TO)
+
+$sh(TO2, [[["|0", 2]]])
+
+$sh(TO2, [[["|0", 2], ["age", 2]]])
+
+$sh(TO2, [[["|1", 2]]])
+
+$sh(TO2, [[["|1", 2], ["kind", 2]]])
+
 $blk(null, 0, TO2, [
   [[["meta.label", "Age"]], [["|0", 2], ["age", 2]]],
   [[["meta.label", "Kind"]], [["|1", 2], ["kind", 2]]],

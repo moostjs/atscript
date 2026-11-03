@@ -861,6 +861,30 @@ describe('a type path naming one declared field at several positions (MODEL §15
     // (the field's docs once, not once per position)
     expect(hover.contents.value).toBe('**string**')
   })
+
+  it('through an `annotate … as` copy: go-to-definition and hover list the prop once', async () => {
+    // (`V.work.h`: I2's and the copy I9c's — the copy's prop stands for I0.h, MODEL §8)
+    const src = [
+      'interface I0 {',
+      '  h: string',
+      '}',
+      'interface I2 {\n  work: I0\n}',
+      'interface I9 {\n  work: I0\n}',
+      "annotate I9 as I9c {\n  @meta.label 'C'\n  work.h\n}",
+      'type V = I2 | I9c',
+      'interface Y {\n  v?: V.work.h\n}',
+    ].join('\n')
+    // (`h` of `V.work.h`)
+    const pos = { line: 15, character: 13 }
+    const { handlers, doc } = singleDocRepo(uri, src)
+    const ref = doc.referred.find(t => t.text === 'V' && (t.parentNode as any)?.hasChain)!
+    expect(doc.unwindRef(ref.parentNode as any)?.fields?.length).toBe(2)
+    expect(
+      doc.getToDefinitionAt(pos.line, pos.character)?.map(l => l.targetRange.start.line)
+    ).toEqual([1])
+    const hover = await handlers.onHover!({ textDocument: { uri }, position: pos })
+    expect(hover.contents.value).toBe('**string**')
+  })
 })
 
 describe('hover', () => {
@@ -2243,6 +2267,35 @@ describe('type paths through unions', () => {
       position: { line: 15, character: 13 },
     })
     expect(many.contents.value).toBe('**string**\n\n**number**')
+  })
+
+  it('find references: a usage of several of the fields is listed once', async () => {
+    // `'work.h'` scoped to `U` names both `I0.h` and `I5.h`: its segment is a usage of each
+    const config: TAtscriptDocConfig = {
+      primitives,
+      annotations: {
+        ...annotations,
+        x: {
+          path: new AnnotationSpec({
+            argument: {
+              name: 'path',
+              type: 'string',
+              fieldScope: () => ({ allowedTypes: [], unqualifiedTarget: 'U' }),
+            },
+          }),
+        },
+      },
+    }
+    const src = `${source}\ninterface Q {\n  @x.path 'work.h'\n  q: string\n}`
+    const { handlers } = singleDocRepo(uri, src, config)
+    const refs = await handlers.onReferences!({
+      textDocument: { uri },
+      position: { line: 19, character: 16 },
+      context: { includeDeclaration: false },
+    })
+    const at = refs.map((r: any) => `${r.range.start.line}:${r.range.start.character}`)
+    expect(at.length).toBeGreaterThan(0)
+    expect(new Set(at).size).toBe(at.length)
   })
 
   it('completes the props of every branch', async () => {

@@ -129,11 +129,13 @@ The plugin takes the same options on every bundler entry:
 | `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
 | `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
 | `compileValidators` | `boolean \| 'ssr'` | from `atscript.config` | Overrides [`compileValidators`](/packages/typescript/configuration#compilevalidators) for the modules this plugin compiles. `'ssr'` compiles only Vite's server (SSR) build. See [Compiled Validators](/packages/typescript/compiled-validators#per-build-override-in-unplugin-atscript). |
+| `loadCheck` | `boolean` | auto | The build's load check (see [Import cycles](#import-cycles-need-native-es-modules)): `true` checks every build of this plugin, `false` none. Unset: one-shot Vite, Rollup and Rolldown builds check; watch builds (`vite build --watch`, `rollup -w`, `rolldown --watch`), the dev server and HMR do not; esbuild, webpack, Rspack and Farm do not (they do not report a build apart from a watch). |
 
 ```javascript
 atscript({ strict: false }) // warn-only — useful mid-refactor or in CI pre-flight
 atscript({ root: __dirname }) // non-Vite bundler started from another directory
 atscript({ compileValidators: 'ssr' }) // Vite SSR app: compiled checks on the server only
+atscript({ loadCheck: true }) // esbuild / webpack / Rspack / Farm production build: check the loads too
 ```
 
 Vite fills `root` in itself (from `configResolved`), so you only need it on the other bundlers — and only when the working directory is not the project root. A wrong root means the config is never found: plugin-provided annotations (`@db.*`, `@ui.*`, …) then show up as "Unknown annotation" errors.
@@ -156,6 +158,24 @@ In development the plugin compiles on demand with hot module replacement (native
 ### Import cycles need native ES modules
 
 The generated `.as.js` modules are ES modules. `.as` files that import each other (an import cycle) work under native ESM — Vite, Rollup, Rolldown, Node.js `import`. A bundler or test runner that rewrites the generated code to CommonJS (`require`) handles `.as` modules without import cycles only; for a cycle, keep the generated modules ESM. `@atscript/typescript/utils` itself ships both ESM and CommonJS builds.
+
+A module of an import cycle builds its types once the modules it reads are evaluated. A production build checks this before it emits: it loads every generated module once, and every import cycle from each of its modules, and fails with "the generated code fails to load … — an internal code generation error, please report it" when any load throws (a statement that could never run, one that throws, a module that throws). That is a bug in atscript's code generation, not in your schema: please report it with the files.
+
+Where the check runs:
+
+- one-shot `vite build`, Rollup and Rolldown builds, and the `asc` CLI build (with or without a config file);
+- esbuild, webpack, Rspack and Farm builds only with the plugin option `loadCheck: true` (these bundlers do not report a build apart from a watch); `loadCheck` forces the check on or off on any bundler;
+- not in watch builds (`vite build --watch`, `rollup -w`, `rolldown --watch`), on the dev server or in hot updates, unless the plugin option `loadCheck: true` forces it; never in the editor.
+
+In the programmatic API, `build(…).generate()` and `.write()` do not check. Wrap them in `withLoadCheck` from `@atscript/typescript` to check:
+
+```ts
+import { build } from '@atscript/core'
+import { tsPlugin, withLoadCheck } from '@atscript/typescript'
+
+const repo = await build({ rootDir: 'src', plugins: [tsPlugin()] })
+await withLoadCheck(() => repo.write({ format: 'js' })) // throws when a generated module fails to load
+```
 
 ::: warning Type artifacts are not written by the bundler plugin
 `unplugin-atscript` never writes `.as.d.ts` or the project-level `atscript.d.ts` to disk. For type checking and IDE support, generate types with the [CLI](/packages/typescript/cli): `asc -f dts` (e.g. as a `postinstall` and pre-build step), or let the [VSCode extension](/packages/vscode/) regenerate them on save. (Declaration *bundling* in library builds is a separate concern — see [below](#library-builds-with-declaration-bundling).)

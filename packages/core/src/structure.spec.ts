@@ -14,7 +14,7 @@ async function model(files: Record<string, string>) {
   }
   const repo = await build({ rootDir: dir, entries: Object.keys(files) })
   const docs = Object.keys(files).map(f => repo.getDoc(`file://${path.join(dir, f)}`)!)
-  const m = new StructureModel(docs)
+  const m = new StructureModel(docs).complete()
   const T = (name: string) => m.decls.find(d => d.name === name)!
   const steps = (p: string) => (p ? p.split('.') : [])
   const loc = (name: string, p = '') => m.locAt(T(name), steps(p))
@@ -311,7 +311,9 @@ export interface I1 {
 }
 `,
     })
-    expect(m.structureErrors().map(e => e.message)).toEqual([UNION_IN_RECURSIVE_MERGE])
+    expect(m.docs.flatMap(d => m.structuralErrors(d)).map(e => e.message)).toEqual([
+      UNION_IN_RECURSIVE_MERGE,
+    ])
   })
 
   it('a block never makes a recursive merge an error: a shell is the node it shells (§14 N3)', async () => {
@@ -331,7 +333,7 @@ export interface I0 {
 `
     for (const block of ['', "annotate P0 {\n  @meta.label 'L39'\n  next\n}\n"]) {
       const { m } = await model({ 'a.as': source + block })
-      expect(m.structureErrors().map(e => e.message)).toEqual([])
+      expect(m.docs.flatMap(d => m.structuralErrors(d)).map(e => e.message)).toEqual([])
     }
   })
 
@@ -351,7 +353,7 @@ export interface I2 extends I1, I0 {
 `
     for (const block of ['', "annotate I1 {\n  @meta.label 'L6'\n  next\n}\n"]) {
       const { m } = await model({ 'a.as': source + block })
-      expect(m.structureErrors().map(e => e.message)).toEqual([])
+      expect(m.docs.flatMap(d => m.structuralErrors(d)).map(e => e.message)).toEqual([])
     }
   })
 
@@ -383,7 +385,7 @@ export interface H {
 }
 `,
     })
-    expect(m.structureErrors()).toEqual([])
+    expect(m.docs.flatMap(d => m.structuralErrors(d))).toEqual([])
   })
 })
 
@@ -540,11 +542,9 @@ export type OK = A & B
 export type R = A & { next?: R }
 `,
     })
-    expect(m.structureErrors().map(e => `${e.node?.id}: ${e.message}`)).toEqual([
-      `X: ${SELF_OPERAND}`,
-      `Y: ${SELF_OPERAND}`,
-      `Z: ${SELF_OPERAND}`,
-    ])
+    expect(
+      m.docs.flatMap(d => m.structuralErrors(d)).map(e => `${e.node?.id}: ${e.message}`)
+    ).toEqual([`X: ${SELF_OPERAND}`, `Y: ${SELF_OPERAND}`, `Z: ${SELF_OPERAND}`])
   })
 })
 
@@ -552,9 +552,9 @@ describe('StructureModel: flattening webs of recursive merges (MODEL §14 P5-1)'
   /** The db entities of `source` whose flattening reaches a web (a cycle through ≥ 2 merges). */
   async function webs(files: Record<string, string>): Promise<string[]> {
     const { m } = await model(files)
-    expect(m.structureErrors().filter(e => e.message === FLATTEN_WEB)).toHaveLength(
-      m.flatWebs().length
-    )
+    expect(
+      m.docs.flatMap(d => m.structuralErrors(d)).filter(e => e.message === FLATTEN_WEB)
+    ).toHaveLength(m.flatWebs().length)
     return m.flatWebs().map(d => d.name)
   }
 

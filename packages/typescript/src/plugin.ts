@@ -1,10 +1,10 @@
 import path from 'path'
 
 // oxlint-disable arrow-body-style
-import type { TAtscriptPlugin } from '@atscript/core'
+import type { AtscriptDoc, TAtscriptPlugin } from '@atscript/core'
 import { DEFAULT_FORMAT } from '@atscript/core'
 
-import { JsNextRenderer, TypeRenderer } from './codegen'
+import { assertLoads, rendererOf, TypeRenderer } from './codegen'
 import { escapeQuotes, wrapProp } from './codegen/utils'
 
 export interface TTsPluginOptions {
@@ -104,11 +104,23 @@ export function resolveJsonSchemaMode(opts?: TTsPluginOptions): false | 'lazy' |
   return false
 }
 
+/** A generated JS module of `doc`, checked to load in a build (see `assertLoads`). */
+function renderJs(
+  doc: AtscriptDoc,
+  opts: TTsPluginOptions | undefined,
+  mode: TCompileValidatorsMode,
+  loadCheck?: boolean
+): string {
+  const content = rendererOf(doc, opts, mode).render()
+  assertLoads(doc, opts, mode, loadCheck)
+  return content
+}
+
 export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
   return {
     name: 'typescript',
 
-    render(doc, format) {
+    render(doc, format, options) {
       if (format === 'dts' || format === DEFAULT_FORMAT) {
         return [
           {
@@ -121,7 +133,7 @@ export const tsPlugin: (opts?: TTsPluginOptions) => TAtscriptPlugin = opts => {
         return [
           {
             fileName: `${doc.name}.js`,
-            content: new JsNextRenderer(doc, opts, compileValidatorsMode(format, opts)).render(),
+            content: renderJs(doc, opts, compileValidatorsMode(format, opts), options?.loadCheck),
           },
         ]
       }

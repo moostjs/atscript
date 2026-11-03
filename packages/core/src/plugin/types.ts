@@ -30,6 +30,16 @@ export type TAtscriptRenderFormat = string
  */
 export const DEFAULT_FORMAT: TAtscriptRenderFormat = '__default__'
 
+/** What the caller says about one render (see `TAtscriptPlugin.render`). */
+export interface TAtscriptRenderOptions {
+  /**
+   * Whether the render is checked as a real build's: the TypeScript plugin loads the generated
+   * modules and fails when one does not load (a one-shot bundler build, the CLI build). `true`:
+   * checked, `false`: not; unset: the plugin's default (`withLoadCheck` of `@atscript/typescript`).
+   */
+  loadCheck?: boolean
+}
+
 export interface TAtscriptPlugin {
   name: string
 
@@ -45,7 +55,8 @@ export interface TAtscriptPlugin {
 
   render?: (
     doc: AtscriptDoc,
-    format: TAtscriptRenderFormat
+    format: TAtscriptRenderFormat,
+    options?: TAtscriptRenderOptions
   ) => Promise<TPluginOutput[]> | TPluginOutput[]
 
   buildEnd?: (

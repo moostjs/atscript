@@ -112,4 +112,6 @@ const result = await build({
 })
 ```
 
+`asc` checks its build's loads (every generated module loaded, each import cycle from each module; a load error fails the build — a codegen bug to report). `result.generate()` / `result.write()` do not; opt in with `withLoadCheck` from `@atscript/typescript`: `await withLoadCheck(() => result.write({ format: 'js' }))`.
+
 See [config.md](config.md) for the config shape and [plugin-development.md](plugin-development.md) for plugin hooks.

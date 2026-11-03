@@ -83,6 +83,7 @@ interface TPluginOutput {
 `TPluginOutput` has **only** `fileName` + `content`. The `source` + `target` fields appear later (added by `BuildRepo` when materializing files into `TOutput`).
 
 - `format` is the CLI `-f` value, or the `DEFAULT_FORMAT` sentinel (`'__default__'`) when `-f` is omitted.
+- A third argument `options?: TAtscriptRenderOptions` says what the caller knows about the render: `loadCheck` is `true` in the bundler plugin's checked builds (one-shot Vite / Rollup / Rolldown, or its `loadCheck: true`), `false` in dev / watch / `loadCheck: false`, unset otherwise (then `withLoadCheck` decides — the `asc` build uses it; it does not set the option). The TypeScript plugin then loads its generated modules; other plugins may ignore it. A plugin wrapping the TypeScript plugin's `render` must forward the third argument.
 - Plugins should accept `format === DEFAULT_FORMAT` for their primary output (the editor sends this on save):
 
 ```ts

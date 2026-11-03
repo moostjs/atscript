@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $ft as $ft, $fc as $fc, $alias as $al, $blk as $blk, $sh as $sh, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class User {
   static __is_atscript_annotated_type = true
@@ -33,6 +33,9 @@ $("object", User).annotate("mulAppend", "top-original", true)
 
 $al(User2, User)
 $a(User2.metadata, "mulAppend", "top-aliased", true)
+
+$sh(User2, [[["name", 2]]])
+
 $blk(null, 0, User2, [
   [[["label", "Aliased Name"], ["mulAppend", "prop-aliased", 1], ["mul", 77, 1]], [["name", 2]]],
 ])

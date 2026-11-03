@@ -1,7 +1,7 @@
 // prettier-ignore-start
 /* eslint-disable */
 /* oxlint-disable */
-import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $fc as $fc, $alias as $al, $blk as $blk, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
+import { defineAnnotatedType as $, annotate as $a, throwFeatureDisabled as $d, $f as $f, $ft as $ft, $fc as $fc, $alias as $al, $blk as $blk, $sh as $sh, $ak as $ak, $nr as $nk } from "@atscript/typescript/utils"
 
 export class MyInterface {
   static __is_atscript_annotated_type = true
@@ -41,6 +41,15 @@ $("object", MyInterface).annotate("meta.description", "Original")
 
 $al(AnnotatedInterface, MyInterface)
 $a(AnnotatedInterface.metadata, "meta.description", "Annotated")
+
+$sh(AnnotatedInterface, [[["name", 2]]])
+
+$sh(AnnotatedInterface, [[["age", 2]]])
+
+$sh(AnnotatedInterface, [[["address", 2]]])
+
+$sh(AnnotatedInterface, [[["address", 2], ["city", 2]]])
+
 $blk(null, 0, AnnotatedInterface, [
   [[["label", "Custom Name"]], [["name", 2]]],
   [[["label", "Custom Age"]], [["age", 2]]],

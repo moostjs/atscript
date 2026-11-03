@@ -28,7 +28,7 @@ export function findImportCycle(
   // The `.as` cycle (the modules it imports, directly or not, that import it): the generated
   // modules import a subset of what the `.as` files do (directly or not), so their cycle is
   // within it.
-  const candidates = componentOf(doc)
+  const candidates = sccOf(doc)
   if (candidates.size > 1 && componentHasBlocks(candidates)) {
     const docs = generatedCycle(doc, candidates, imports)
     if (docs.length > 1 && docs.some(hasMutatingAnnotates)) {
@@ -42,7 +42,7 @@ export function findImportCycle(
   return cycle
 }
 
-/** The strongly connected component of each document's imports (see {@link componentOf}). */
+/** The strongly connected component of each document's imports (see {@link sccOf}). */
 const componentMemo = new WeakMap<AtscriptDoc, { epoch: number; docs: Set<AtscriptDoc> }>()
 
 /**
@@ -51,7 +51,7 @@ const componentMemo = new WeakMap<AtscriptDoc, { epoch: number; docs: Set<Atscri
  * memoized until a document changes (components found already are not entered again: a build
  * checking each module of a large graph is linear, not quadratic).
  */
-function componentOf(doc: AtscriptDoc): Set<AtscriptDoc> {
+export function sccOf(doc: AtscriptDoc): Set<AtscriptDoc> {
   const epoch = documentsEpoch()
   const known = componentMemo.get(doc)
   if (known?.epoch === epoch) {
@@ -71,7 +71,7 @@ function componentOf(doc: AtscriptDoc): Set<AtscriptDoc> {
   return componentMemo.get(doc)!.docs
 }
 
-/** Whether a component (see {@link componentOf}) has mutating annotates, found once. */
+/** Whether a component (see {@link sccOf}) has mutating annotates, found once. */
 const componentBlocks = new WeakMap<Set<AtscriptDoc>, boolean>()
 function componentHasBlocks(docs: Set<AtscriptDoc>): boolean {
   let has = componentBlocks.get(docs)

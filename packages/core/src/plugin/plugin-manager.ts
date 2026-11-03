@@ -12,7 +12,7 @@ import type { AtscriptDoc, TAtscriptDocConfig } from '../document'
 import { SemanticPrimitiveNode } from '../parser/nodes'
 import { fileUriToPath } from '../parser/utils'
 import type { AtscriptRepo } from '../repo'
-import type { TAtscriptRenderFormat, TPluginOutput } from './types'
+import type { TAtscriptRenderFormat, TAtscriptRenderOptions, TPluginOutput } from './types'
 
 export interface TOutputWithSource extends TPluginOutput {
   source: string
@@ -105,12 +105,12 @@ export class PluginManager {
     }
   }
 
-  async render(doc: AtscriptDoc, format: TAtscriptRenderFormat) {
+  async render(doc: AtscriptDoc, format: TAtscriptRenderFormat, options?: TAtscriptRenderOptions) {
     const source = fileUriToPath(doc.id)
     const files: TOutputWithSource[] = []
     for (const plugin of this.plugins) {
       if (plugin.render) {
-        const newFiles = await plugin.render(doc, format)
+        const newFiles = await plugin.render(doc, format, options)
         if (newFiles?.length > 0) {
           files.push(...newFiles.map(f => ({ ...f, source })))
         }

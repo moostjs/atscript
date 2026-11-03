@@ -56,6 +56,19 @@ export interface atscriptPluginOptions {
    * Unset: the atscript config decides (default: only `@emit.compiledValidator` types).
    */
   compileValidators?: boolean | 'ssr'
+
+  /**
+   * The build's load check: a production build loads every generated module (each import cycle
+   * from each of its modules) and fails when one does not load — an internal code generation
+   * error, never a half-built module at runtime.
+   * - `true` — checked in every build of this plugin (also in watch mode and on the dev server).
+   * - `false` — never checked.
+   *
+   * Unset: checked in one-shot Vite, Rollup and Rolldown builds; not in watch builds
+   * (`vite build --watch`, `rollup -w`, `rolldown --watch`), on the dev server or in HMR; not in
+   * other bundlers (esbuild, webpack, Rspack, Farm: they do not tell a build from a watch).
+   */
+  loadCheck?: boolean
 }
 
 /** The `load` hook options Vite passes (absent for other bundlers). */
@@ -91,6 +104,10 @@ interface TViteUserConfig {
 
 interface TViteResolvedConfig {
   root: string
+  /** `'build'` for `vite build`, `'serve'` for the dev server */
+  command?: string
+  /** `build.watch`: set by `vite build --watch` */
+  build?: { watch?: unknown }
 }
 
 /**
@@ -218,12 +235,19 @@ function annotatedModules(doc: AtscriptDoc | undefined): Set<string> {
   return out
 }
 
-export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = opts => {
+export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined> = (opts, meta) => {
   // An explicit option always wins over whatever the bundler reports.
   const explicitRoot = opts?.root ? path.resolve(opts.root) : undefined
   // Mutable and read lazily (never at factory time): a bundler hook — Vite's
   // `configResolved` — may fill it in before the first `load`.
   let detectedRoot: string | undefined
+  /**
+   * A one-shot build (Vite's `build` command without `--watch`; Rollup / Rolldown not watching):
+   * its renders check the generated modules' loads (`loadCheck`). `undefined` until the bundler
+   * says, and for the bundlers that do not.
+   */
+  let building: boolean | undefined
+  const detects = ['vite', 'rollup', 'rolldown'].includes(meta?.framework ?? '')
   const getRoot = () => explicitRoot ?? detectedRoot ?? process.cwd()
   const strict = opts?.strict ?? true
   let repo: AtscriptRepo
@@ -314,10 +338,13 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     if (error) {
       return { error, code: `error:${error}` }
     }
-    let out = await doc.render(format as never)
+    // (a one-shot build checks its generated modules' loads; dev / HMR / watch do not — a render
+    // option: the same whichever copy of the TypeScript plugin the config loads)
+    const options = { loadCheck: opts?.loadCheck ?? building }
+    let out = await doc.render(format as never, options)
     if (!out?.[0]?.content && (format === JS_COMPILED_FORMAT || format === JS_INTERPRETED_FORMAT)) {
       // A config plugin that does not know the override formats.
-      out = await doc.render('js')
+      out = await doc.render('js', options)
     }
     return { code: out?.[0]?.content || '' }
   }
@@ -540,6 +567,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
        */
       configResolved(config: TViteResolvedConfig) {
         detectedRoot = config.root
+        building = config.command === 'build' && !config.build?.watch
       },
 
       configureServer(server: TViteDevServer) {
@@ -598,6 +626,14 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
           return `${resolved}.d.ts`
         }
         return resolved
+      }
+    },
+
+    buildStart(this: { meta?: { watchMode?: boolean } }) {
+      // (Vite reports its command in `configResolved`; Rollup / Rolldown: not watching = a build;
+      // the other bundlers do not say — see `loadCheck`)
+      if (detects) {
+        building ??= this.meta?.watchMode === false
       }
     },
 

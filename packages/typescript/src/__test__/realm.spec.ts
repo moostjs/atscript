@@ -216,3 +216,61 @@ describe('build-time realm', () => {
     )
   })
 })
+
+describe('the build load check: any load error, on the module it is of (CYCLE-GUARD-8)', () => {
+  async function realmOfFiles(
+    files: Record<string, string>,
+    edit: (name: string | undefined, text: string) => string
+  ) {
+    const dir = mkdtempSync(path.join(tmpdir(), 'atscript-realm-'))
+    dirs.push(dir)
+    for (const [name, content] of Object.entries(files)) {
+      writeFileSync(path.join(dir, name), content)
+    }
+    const repo = await build({ rootDir: dir, entries: Object.keys(files), plugins: [tsPlugin()] })
+    const { JsNextRenderer } = await import('../codegen/js-next')
+    const { Realm } = await import('../codegen/realm')
+    const docs = Object.keys(files).map(f => repo.getDoc(`file://${path.join(dir, f)}`)!)
+    const modules = new Map(
+      docs.map(d => {
+        const m = new JsNextRenderer(d, {}, 'none').renderModule()
+        return [d, { ...m, text: edit(d.name, m.text) }]
+      })
+    )
+    const names = (errors: Map<{ name: string | undefined }, string[]>) =>
+      Object.fromEntries([...errors].map(([d, xs]) => [d.name!, xs.map(x => x.split(':')[0])]))
+    return { docs, modules, Realm, names }
+  }
+
+  const cycle = {
+    'a.as': `import { B } from './b'\nexport interface A {\n  b?: B\n  x: string\n}\n`,
+    'b.as': `import { A } from './a'\nexport interface B {\n  a?: A\n  y: string\n}\n`,
+  }
+
+  it("a module's body throwing: its error, not its importers'", async () => {
+    const { modules, Realm, names } = await realmOfFiles(cycle, (name, text) =>
+      name === 'b.as' ? text.replace(/\$end\(\)/, () => `throw new Error("boom")`) : text
+    )
+    const realm = new Realm(modules).load()
+    // (b threw while its builder waited for A — A's module never ran: a fails on its import)
+    expect(names(realm.loadErrors())).toEqual({ 'b.as': ['never ran', 'threw "boom"'] })
+  })
+
+  it('a statement that never runs or throws: on the module that queued it', async () => {
+    const { modules, Realm, names } = await realmOfFiles(cycle, (name, text) =>
+      name === 'a.as'
+        ? text.replace(
+            /\$end\(\)/,
+            () =>
+              `$q(() => { throw new ReferenceError("wait") })\n$q(() => { throw new TypeError("bad") })\n$end()`
+          )
+        : text
+    )
+    const realm = new Realm(modules).load()
+    // (a's body threw on its own statement's error: that statement's only; b's builder waited for A)
+    expect(names(realm.loadErrors())).toEqual({
+      'a.as': ['never ran', 'threw "bad"'],
+      'b.as': ['never ran'],
+    })
+  })
+})

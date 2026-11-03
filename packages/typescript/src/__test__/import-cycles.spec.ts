@@ -300,8 +300,8 @@ describe('a merged prop sharing a node of a class an import cycle has not built 
       msgs.filter(m => m.severity === 1).map(m => `${path.basename(id)}: ${m.message}`)
     )
     expect(errors).toEqual([])
-    // (the nodes left untyped: none)
-    const read = `(() => { const out = []; const seen = new Set(); const walk = (n, p) => { if (!n || seen.has(n)) return; seen.add(n); const t = n.type; if (!t || (t.kind === '' && t.designType === 'any')) out.push(p); else if (t.kind === 'object') for (const [k, v] of t.props) walk(v, p + '.' + k); else if (t.kind === 'array') walk(t.of, p + '[]'); else if (t.items) t.items.forEach((v, i) => walk(v, p + '<' + i + '>')) }; for (const [n, t] of Object.entries(m)) walk(t, n); return out })()`
+    // (the nodes left untyped: none — `$`-prefixed exports are the runtime's, not types)
+    const read = `(() => { const out = []; const seen = new Set(); const walk = (n, p) => { if (!n || seen.has(n)) return; seen.add(n); const t = n.type; if (!t || (t.kind === '' && t.designType === 'any')) out.push(p); else if (t.kind === 'object') for (const [k, v] of t.props) walk(v, p + '.' + k); else if (t.kind === 'array') walk(t.of, p + '[]'); else if (t.items) t.items.forEach((v, i) => walk(v, p + '<' + i + '>')) }; for (const [n, t] of Object.entries(m)) if (n[0] !== '$') walk(t, n); return out })()`
     expect(await loadCycleBothModes(dir, repo, read)).toEqual(inEveryLoad([]))
   })
 })

@@ -40,7 +40,7 @@ async function load(files: Record<string, string>) {
     modules.set(d, new JsNextRenderer(d, OPTS, 'none').renderModule())
   }
   const realm = new Realm(modules).load()
-  const model = new StructureModel(docs)
+  const model = new StructureModel(docs).complete()
   const rt = realm.rt as unknown as { pendingStatements(): number }
   const cls = (name: string, file = names[0]) =>
     realm.classOf(docs.find(d => d.id.endsWith(`/${file}`))!, name) as any

@@ -166,11 +166,14 @@ onDocument(doc) {
 ```typescript
 render?(
   doc: AtscriptDoc,
-  format: TAtscriptRenderFormat
+  format: TAtscriptRenderFormat,
+  options?: TAtscriptRenderOptions
 ): Promise<TPluginOutput[] | undefined> | TPluginOutput[] | undefined
 ```
 
 Called once per document per format during the build phase. This is the primary code generation hook.
+
+**Options**: what the caller says about the render. `options.loadCheck` is `true` in the bundler plugin's checked builds (one-shot Vite, Rollup and Rolldown builds, or any build with its `loadCheck: true` option), `false` where it must not check (dev server, watch builds, `loadCheck: false`), and unset otherwise — then the TypeScript plugin checks when the render runs inside `withLoadCheck` (the `asc` CLI build, or your own code), which does not set `options.loadCheck`. The TypeScript plugin loads its generated modules when the check is on; other plugins may ignore the option. A plugin that wraps the TypeScript plugin's `render` must pass the third argument on.
 
 **Execution**: All plugins are called. Their outputs are concatenated — multiple plugins can produce output for the same document and format.
 
