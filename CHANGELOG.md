@@ -1,6 +1,25 @@
 ## [0.2.3](https://github.com/moostjs/atscript/compare/v0.2.2...v0.2.3) (2026-11-03)
+
+### Notes
+
+* Same code as 0.2.2. The npm registry withheld `@atscript/typescript@0.2.2` (it never became installable), so 0.2.3 republishes all four packages together. Use 0.2.3.
+
 ## [0.2.2](https://github.com/moostjs/atscript/compare/v0.2.1...v0.2.2) (2026-11-03)
+
+### Dependencies
+
+* **core:** `glob` ^14.0.3, which clears the glob / minimatch / brace-expansion advisories reported against 0.2.1. Remove any `@atscript/core>glob` override you added.
+
+### Notes
+
+* `@atscript/typescript@0.2.2` is not installable (withheld by the registry); use 0.2.3.
+
 ## [0.2.1](https://github.com/moostjs/atscript/compare/v0.2.0...v0.2.1) (2026-11-03)
+
+### Dependencies
+
+* **moost-validator, typescript:** moost ^0.7.0 and wooks ^0.8.0.
+
 # [0.2.0](https://github.com/moostjs/atscript/compare/v0.1.110...v0.2.0) (2026-11-03)
 
 
