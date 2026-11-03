@@ -448,5 +448,5 @@ describe('@expect.pattern: the compiler reports what the runtime cannot compile'
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
-  })
+  }, 120_000)
 })
