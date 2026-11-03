@@ -74,7 +74,7 @@
     "@atscript/db": "^0.1.166",
     "@uniqu/core": "^0.1.15",
     "ajv": "8.20.0",
-    "vitest": "3.2.7"
+    "vitest": "4.1.12"
   },
   "peerDependencies": {
     "@atscript/core": "workspace:^",
