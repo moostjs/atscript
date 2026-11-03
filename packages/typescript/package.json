@@ -67,8 +67,8 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.7.1",
-    "moost": "^0.7.1"
+    "@moostjs/event-cli": "^0.7.2",
+    "moost": "^0.7.2"
   },
   "devDependencies": {
     "@atscript/db": "^0.1.167",
