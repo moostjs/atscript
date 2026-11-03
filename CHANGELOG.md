@@ -1,3 +1,10 @@
+## [0.2.4](https://github.com/moostjs/atscript/compare/v0.2.3...v0.2.4) (2026-11-03)
+
+
+### Features
+
+* [@annotate](https://github.com/annotate).reset, unknown primitive, .as import suffix, value annotation arguments and user-text annotation flag ([4a2684d](https://github.com/moostjs/atscript/commit/4a2684d094dae0dc85809cf2eeba8a08b3b668ea))
+* **typescript:** validator error codes and params with localizeErrors, discriminated-union errors, [@expect](https://github.com/expect).message, [@expect](https://github.com/expect).minKeys/maxKeys, [@expect](https://github.com/expect).int message ([03a605b](https://github.com/moostjs/atscript/commit/03a605bbcce303b21c3d73d9672cee3eb1966d8b))
 ## [0.2.3](https://github.com/moostjs/atscript/compare/v0.2.2...v0.2.3) (2026-11-03)
 
 ### Notes
