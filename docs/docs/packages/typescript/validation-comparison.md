@@ -391,7 +391,7 @@ Zod achieves custom validation through `.refine()` and `.superRefine()` — meth
 
 ## Performance
 
-An [open benchmark](https://github.com/prostojs/router-benchmark/tree/main/packages/validator-benchmark) validates the same `Order` model (nested objects, arrays, string/number constraints, a two-branch payment union) with the Atscript validator and the equivalent schema in 12 other engines. Atscript runs three times: 0.2.1 interpreted, 0.2.1 with [compiled validators](/packages/typescript/compiled-validators), and 0.1.109 (the last release before compiled validators) as a baseline. The other engines are Zod 4 (`safeParse()`, `z.compile()` + `safeParse()`, `z.compile()` + `validate()`), Valibot, Yup, Joi, Ajv, ArkType (`T(input)`, `T.allows()`), class-validator and TypeBox (`Compile()`, `Value`). A pre-flight check makes sure every engine does the same work: they all accept and reject the same inputs, and on invalid input they detect the same violations. Each scenario runs in three unknown-property modes: `strip` removes undeclared properties, `passthrough` keeps them, `strict` rejects them. See the [benchmark README](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/README.md) for the methodology, the equivalence pre-flight and the fairness notes (copy vs in-place validation, how each library reports a failed union, emulated unions in Yup and class-validator).
+An [open benchmark](https://github.com/prostojs/router-benchmark/tree/main/packages/validator-benchmark) validates the same `Order` model (nested objects, arrays, string/number constraints, a two-branch payment union) with the Atscript validator and the equivalent schema in 12 other engines. Atscript runs twice: interpreted, and with [compiled validators](/packages/typescript/compiled-validators). The other engines are Zod 4 (`safeParse()`, `z.compile()` + `safeParse()`, `z.compile()` + `validate()`), Valibot, Yup, Joi, Ajv, ArkType (`T(input)`, `T.allows()`), class-validator and TypeBox (`Compile()`, `Value`). A pre-flight check makes sure every engine does the same work: they all accept and reject the same inputs, and on invalid input they detect the same violations. Each scenario runs in three unknown-property modes: `strip` removes undeclared properties, `passthrough` keeps them, `strict` rejects them. See the [benchmark README](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/README.md) for the methodology, the equivalence pre-flight and the fairness notes (copy vs in-place validation, how each library reports a failed union, emulated unions in Yup and class-validator).
 
 Pick a mode and a scenario; hover a bar for the exact numbers:
 
@@ -411,7 +411,6 @@ Passthrough mode, the only mode where every engine runs, median ops/s (higher is
 | ArkType `T.allows()` ¹ | 988k | 102k | — | 17.3M | 23.5M | — |
 | ArkType `T(input)` | 941k | 106k | 32.8k | — | 17.1M | 278k |
 | **Atscript `validate()`** | **525k** | **93.5k** | **394k** | **5.49M** | **4.82M** | **1.44M** |
-| Atscript 0.1.109 `validate()` ³ | 473k | 91.3k | 367k | 5.15M | 4.81M | 1.57M |
 | Zod `safeParse()` | 342k | 40.8k | 105k | — | 6.98M | 513k |
 | Valibot `safeParse()` | 305k | 30.7k | 359k | 13.6M | 4.55M | 2.41M |
 | Joi `validate()` | 51.4k | 4.3k | 46.7k | 765k | 1.18M | 261k |
@@ -419,7 +418,7 @@ Passthrough mode, the only mode where every engine runs, median ops/s (higher is
 | Yup `validateSync()` | 18.4k | 1.9k | 9.3k | 34.0k | 220k | 52.1k |
 | class-validator `validateSync()` | 16.2k | 1.6k | 23.8k | — | 196k | 112k |
 
-¹ Boolean only: returns `true` / `false` without error details. ² Built with `compileValidators: true`. ³ The last release before compiled validators, as a baseline. — = not run.
+¹ Boolean only: returns `true` / `false` without error details. ² Built with `compileValidators: true`. — = not run.
 
 **Where Atscript is slower:**
 
@@ -432,12 +431,11 @@ Passthrough mode, the only mode where every engine runs, median ops/s (higher is
 **Where Atscript is faster:**
 
 - **Compiled Atscript on valid input.** In strict mode it is the fastest engine on every valid input: 1.3x faster than Zod `z.compile()` + `safeParse()` on a valid order and 2.0x on the 50-item order, 2.0–2.2x faster than Ajv and 2.9–4.8x faster than TypeBox `Compile()`. In passthrough mode it is second to TypeBox `Compile()`: 2.4–4.3x faster than `z.compile()`, 1.9–2.7x faster than Ajv, 4.7–10x faster than ArkType `T(input)`, and the fastest engine on the order with unknown properties.
-- **0.2.1 against 0.1.109.** Compiled Atscript is 7.8–11.8x faster than 0.1.109 on valid input and 2.6–3.2x on the standalone union. The interpreted validator is faster too: up to 1.2x on valid input and 1.6x when stripping unknown properties; unions and invalid input are about the same.
 - **Interpreted, without compiled validators**, Atscript is 1.4–2.3x faster than Zod `safeParse()` on valid input in passthrough and strict mode (1.05–1.7x in strip mode, except with unknown properties), faster than Valibot, and 10–58x faster than Joi, Yup, class-validator and TypeBox `Value`.
 - **Invalid input with a full error report**: Atscript, compiled or not, is 2.9–3.7x faster than Zod (both `safeParse()` and `z.compile()`, which does not speed up the error path), 2.8–3.9x faster on a union where no branch matches, about 7–12x faster than compiled TypeBox and ArkType, and far ahead of Joi, class-validator and Yup.
 - Atscript validates in place and returns a boolean plus an error list; `safeParse()`-style APIs build a new output object.
 
-These numbers are an indicative estimate from 3 rounds × 25 samples per job on a laptop (Apple M4, Node.js 26.13.0, Atscript 0.2.1 and 0.1.109 as the baseline, Zod 4.6.7, Valibot 1.5.0, Yup 1.7.1, Joi 18.3.0, Ajv 8.20.0, ArkType 2.2.8, class-validator 0.15.1, TypeBox 1.4.2). Other workloads on the laptop could not be fully stopped during the run (load average about 3), so treat gaps under about 10% as noise. The full results, including the strip and strict tables and ns/op, are in [RESULTS.md](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/RESULTS.md).
+These numbers are an indicative estimate from 3 rounds × 25 samples per job on a laptop (Apple M4, Node.js 26.13.0, Atscript 0.2.1, Zod 4.6.7, Valibot 1.5.0, Yup 1.7.1, Joi 18.3.0, Ajv 8.20.0, ArkType 2.2.8, class-validator 0.15.1, TypeBox 1.4.2). Other workloads on the laptop could not be fully stopped during the run (load average about 3), so treat gaps under about 10% as noise. The full results, including the strip and strict tables and ns/op, are in [RESULTS.md](https://github.com/prostojs/router-benchmark/blob/main/packages/validator-benchmark/RESULTS.md).
 
 ## Summary
 
