@@ -1,3 +1,9 @@
+## [0.2.6](https://github.com/moostjs/atscript/compare/v0.2.5...v0.2.6) (2026-11-05)
+
+
+### Bug Fixes
+
+* coerceForType picks the union member the validator accepts (discriminator, shape, literals after normalizers) in linear time; normalizeForType judges branches with the pipe's options; parallel builds no longer report Unknown member id ([b746dfb](https://github.com/moostjs/atscript/commit/b746dfbebaa1f912931b4665ef06dc7d9acb0e8a))
 ## [0.2.5](https://github.com/moostjs/atscript/compare/v0.2.4...v0.2.5) (2026-11-05)
 
 
