@@ -90,7 +90,7 @@ Project root (or config-specified location):
 
 - `0` — success or warnings only.
 - `1` — errors (unless `--skipDiag`, where errors are reported but exit code is unchanged). Nothing is written on `1`.
-- `db sync`: `1` also covers error diagnostics, unloadable model modules, a throwing `config.models`, and a refused run or plan (since 0.1.93); `--check` adds `2` for destructive changes.
+- `db sync`: `1` also covers error diagnostics, unloadable model modules, a throwing `config.models`, a refused run or plan (since 0.1.93), and an applied run that left entries with errors (`status: "failed"` in `@atscript/db` ≥ 0.1.170; the schema hash is not stored) (since 0.2.7); `--check` adds `2` for destructive changes.
 
 ## Troubleshooting
 

@@ -68,4 +68,25 @@ describe('DbSyncController.runSync', () => {
       'Schema sync refused — nothing was applied. Fix the issues above and re-run.',
     ])
   })
+
+  it('exits 1 after an applied run that left entries with errors', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('exit')
+    })
+    const controller = new DbSyncController(logger as never) as unknown as {
+      failOnErrors: (r: TSyncResult) => void
+    }
+    const ok = makeResult('synced', [new SyncEntry({ name: 'users', status: 'create' })])
+    expect(() => controller.failOnErrors(ok)).not.toThrow()
+
+    const failed = makeResult('synced', [
+      new SyncEntry({ name: 'orders', status: 'create' }),
+      new SyncEntry({ name: 'users', status: 'alter', errors: ['column type change refused'] }),
+    ])
+    expect(() => controller.failOnErrors(failed)).toThrow('exit')
+    expect(exit).toHaveBeenCalledWith(1)
+    expect(errors).toEqual([
+      'Schema sync failed for 1 entry — see above; the schema hash was not stored.',
+    ])
+  })
 })

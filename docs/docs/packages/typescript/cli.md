@@ -157,6 +157,10 @@ Since 0.1.93 (with `@atscript/db` 0.1.128 or later) a sync can come back **refus
 
 The plan already shows the same refusals before anything runs: `--dry-run`, `--check` and `--format` list them as `✖ refused: <name>` entries (`"refused": true` on the entry and on the document in `--format json`) and exit `1` with `Schema sync would be refused — nothing would be applied. Fix the issues above.` See [Pre-flight refusals](https://db.atscript.dev/sync/#pre-flight-refusals) for every message.
 
+### Failed runs
+
+Since 0.2.7, a run that was applied but left entries with errors — a statement the database rejected, for example — prints the result with those errors and exits `1` with `Schema sync failed for N entries — see above; the schema hash was not stored.` With `@atscript/db` 0.1.170 or later such a run reports `status: "failed"`. The hash is withheld, so the next run plans the remaining changes again.
+
 See the [Schema Sync guide](https://db.atscript.dev/sync/) for full documentation.
 
 ## Next Steps

@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import path from 'path'
 
 import type { TAtscriptConfig, TDbConfigDeclarative } from '@atscript/core'
-import type { SchemaSync } from '@atscript/db/sync'
+import type { SchemaSync, TSyncResult } from '@atscript/db/sync'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
@@ -176,7 +176,11 @@ export class DbSyncController {
 
     if (!hasChanges) {
       if (!dryRun) {
-        await this.runSync(sync, dbTypes, safe)
+        const result = await this.runSync(sync, dbTypes, safe)
+        if (result.entries.some(e => e.hasErrors)) {
+          this.printer.result(result)
+          this.failOnErrors(result)
+        }
       }
       return
     }
@@ -202,6 +206,7 @@ export class DbSyncController {
 
     const result = await this.runSync(sync, dbTypes, safe)
     this.printer.result(result)
+    this.failOnErrors(result)
   }
 
   // ── Private helpers ────────────────────────────────────────────────
@@ -218,6 +223,19 @@ export class DbSyncController {
       this.fail('Schema sync refused — nothing was applied. Fix the issues above and re-run.')
     }
     return result
+  }
+
+  /**
+   * An applied run that left entries with errors (`status: 'failed'` since
+   * @atscript/db 0.1.170) withheld the schema hash — exit 1 after printing.
+   */
+  private failOnErrors(result: TSyncResult) {
+    const errored = result.entries.filter(e => e.hasErrors).length
+    if (errored > 0) {
+      this.fail(
+        `Schema sync failed for ${errored} ${errored === 1 ? 'entry' : 'entries'} — see above; the schema hash was not stored.`
+      )
+    }
   }
 
   /**
