@@ -5,6 +5,10 @@
 
 * [@normalize](https://github.com/normalize).* annotations with normalizeForType applied by the validator pipe, and buildJsonSchema options (titles, descriptions, enums, closed objects) ([86607a7](https://github.com/moostjs/atscript/commit/86607a7ce803de54419f2b5143c8352ce0158762))
 * expression user texts, translateServed and $i18n for served types; moost-validator lists errors under errors ([0944744](https://github.com/moostjs/atscript/commit/09447444fd966c472f539c3302a0b432d5bfc4d1))
+### ⚠ Breaking changes
+
+* **moost-validator:** the 400 body lists errors under `errors` (the same envelope as `@atscript/moost-db`); `_body` is gone. Read `body.errors` instead of `body._body`. Entries are unchanged (`path`, `message`, `code`, `params`).
+
 ## [0.2.4](https://github.com/moostjs/atscript/compare/v0.2.3...v0.2.4) (2026-11-03)
 
 
