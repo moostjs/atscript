@@ -113,12 +113,7 @@ export function normalizeForType<T = unknown>(
   value: T,
   opts?: Partial<TValidatorOptions>
 ): T {
-  const writes = typeWriteCount()
-  if (writes !== stampWrites) {
-    stampWrites = writes
-    reach = new WeakMap()
-  }
-  if (!hasNormalizers(def)) {
+  if (!typeHasNormalizers(def)) {
     return value
   }
   const result = normalize(def, value, 0, { memo: new Map(), root: value, opts })
@@ -165,6 +160,20 @@ function childrenOf(def: TAtscriptAnnotatedType): TAtscriptAnnotatedType[] {
       return []
     }
   }
+}
+
+/**
+ * Whether {@link normalizeForType} can change a value of type `def`: `def` or a type its walk
+ * reaches (props, pattern props, items, union and intersection members) carries `@normalize.*`.
+ * Cached per type and kept current across type writes, so callers can skip their own walks.
+ */
+export function typeHasNormalizers(def: TAtscriptAnnotatedType): boolean {
+  const writes = typeWriteCount()
+  if (writes !== stampWrites) {
+    stampWrites = writes
+    reach = new WeakMap()
+  }
+  return hasNormalizers(def)
 }
 
 /**

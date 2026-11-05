@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 
 import { lazyJsonSchema } from '../runtime/bundled-schema'
 import { detectDiscriminator } from '../runtime/discriminator'
-import { normalizeForType } from '../runtime/normalize'
+import { normalizeForType, typeHasNormalizers } from '../runtime/normalize'
 import { deserializeAnnotatedType, serializeAnnotatedType } from '../runtime/serialize'
 import { Validator } from '../runtime/validator'
 import { prepareFixtures } from '../test-utils'
@@ -295,6 +295,18 @@ describe('normalizeForType', () => {
         m.Plain.type.props.delete('extra')
       }
       expect(normalizeForType(m.Plain, value)).toBe(value)
+    })
+
+    it('typeHasNormalizers follows props added and removed at runtime', () => {
+      expect(typeHasNormalizers(m.User)).toBe(true)
+      expect(typeHasNormalizers(m.Plain)).toBe(false)
+      m.Plain.type.props.set('extra', m.Holder.type.props.get('s'))
+      try {
+        expect(typeHasNormalizers(m.Plain)).toBe(true)
+      } finally {
+        m.Plain.type.props.delete('extra')
+      }
+      expect(typeHasNormalizers(m.Plain)).toBe(false)
     })
 
     it('a lazy JSON schema sees props added and removed at runtime', () => {

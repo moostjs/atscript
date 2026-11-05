@@ -143,10 +143,11 @@ In Moost apps use `coercionPipe` from `@atscript/moost-validator` instead of cal
 ## `normalizeForType` — input normalizers
 
 ```ts
-import { normalizeForType } from '@atscript/typescript/utils'
+import { normalizeForType, typeHasNormalizers } from '@atscript/typescript/utils'
 
 const input = normalizeForType(Signup, body) // @normalize.trim / lowercase / uppercase applied
 Signup.validator().validate(input) // order: coerceForType → normalizeForType → validate
+typeHasNormalizers(Signup) // true when normalizeForType can change a value of this type (cached, current across annotate())
 // validated with options? pass the same ones: union branches are judged with them
 const patch = normalizeForType(Patch, body, { partial: true })
 Patch.validator({ partial: true }).validate(patch)
