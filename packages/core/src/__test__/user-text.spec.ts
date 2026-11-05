@@ -69,4 +69,23 @@ describe('user-text annotations', () => {
       )
     ).toBe(true)
   })
+
+  it("reads an expression argument: 'expression', or a field name ending in ()", () => {
+    expect(
+      userTextFields(
+        new AnnotationSpec({ argument: { name: 'fn', type: 'string', userText: 'expression' } })
+      )
+    ).toBe('expression')
+    expect(
+      userTextFields(
+        new AnnotationSpec({
+          argument: [
+            { name: 'name', type: 'string' },
+            { name: 'label', type: 'string', userText: true },
+            { name: 'fn', type: 'string', userText: 'expression' },
+          ],
+        })
+      )
+    ).toEqual(['label', 'fn()'])
+  })
 })

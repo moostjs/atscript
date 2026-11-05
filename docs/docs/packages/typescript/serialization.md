@@ -52,6 +52,8 @@ import { SERIALIZE_VERSION } from '@atscript/typescript/utils'
 // SERIALIZE_VERSION === 2
 ```
 
+A server may add an `$i18n` map of translated texts to the payload for the client; `deserializeAnnotatedType()` ignores it. See [Translating Texts](/packages/typescript/i18n#serving-a-translated-type).
+
 ## FK References
 
 FK references (`.ref`) are stripped from serialized output by default. Pass `refDepth: 1` to include immediate refs when the client needs to discover the target table (e.g., for value-help dropdowns on FK fields). Integer values expand `N` full levels; a fractional `.5` part (e.g. `refDepth: 0.5` or `refDepth: 1.5`) emits a shallow `{ id, metadata }` target at the tail level instead of the full body — handy for keeping payloads small when the client only needs the target's identity. Plain references (nav props such as `customer: Customer`) carry `ref` too, not only chain refs — see [The Annotated Type](/packages/typescript/type-definitions#the-annotated-type). For the full ref-control semantics, see the [`@atscript/db` docs](https://db.atscript.dev).
@@ -184,3 +186,4 @@ The field list, labels, and placeholders are all driven by annotations defined i
 - [Type Definitions](/packages/typescript/type-definitions) — the annotated type system
 - [Validation](/packages/typescript/validation) — validate data against types
 - [Metadata](/packages/typescript/metadata-export) — access annotations at runtime
+- [Translating Texts](/packages/typescript/i18n) — translate a serialized type per locale with `translateServed()`

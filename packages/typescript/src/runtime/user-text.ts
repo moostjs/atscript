@@ -5,8 +5,12 @@
  * ({@link registerUserText}), so a translator finds them at runtime without the specs.
  */
 
-/** `true`: the value itself is the text; a list: those fields of the value object are. */
-export type TUserTextFields = true | readonly string[]
+/**
+ * `true`: the value itself is the text; `'expression'`: the value is the source of a function the
+ * client evaluates, its string literals the texts; a list: those fields of the value object are
+ * (a name ending in `()`: that field is an expression).
+ */
+export type TUserTextFields = true | 'expression' | readonly string[]
 
 /**
  * The user-facing text of `@atscript/core`'s annotations (its specs' `userText` arguments; a test
@@ -37,42 +41,49 @@ export const CORE_USER_TEXT: ReadonlyMap<string, TUserTextFields> = new Map<
 const USER_TEXT = new Map<string, TUserTextFields>(CORE_USER_TEXT)
 
 /**
- * Registers metadata key `key` as holding user-facing text: `true` (default) — its value is the
- * text; a list of field names — those fields of its value object are. Fields add up across calls.
+ * Registers metadata key `key` as holding user-facing text (see {@link TUserTextFields}; `true` by
+ * default). Fields add up across calls; a whole-value kind replaces a field list, and an
+ * expression wins over text (`name()` over `name`), whatever the order of the calls.
  * For plugins that write such metadata at runtime; generated modules register what they write.
  */
 export function registerUserText(key: string, fields: TUserTextFields = true): void {
   const known = USER_TEXT.get(key)
-  if (known === true || fields === true) {
-    USER_TEXT.set(key, true)
+  if (known === 'expression' || (known === true && typeof fields === 'object')) {
     return
   }
-  const added = fields.filter(f => !known?.includes(f))
-  if (added.length > 0 || !known) {
-    USER_TEXT.set(key, [...(known ?? []), ...added])
+  if (typeof fields !== 'object') {
+    USER_TEXT.set(key, fields)
+    return
   }
+  const all = new Set([...(typeof known === 'object' ? known : []), ...fields])
+  USER_TEXT.set(
+    key,
+    [...all].filter(f => !all.has(`${f}()`))
+  )
 }
 
 /**
  * Registers user-text keys written by a generated module (see {@link registerUserText}): `key` —
- * the value itself; `key:field` — that field of the value object.
+ * the value itself; `key()` — the value is an expression; `key:field` — that field of the value
+ * object; `key:field()` — that field is an expression.
  */
 export function $ut(...entries: string[]): void {
   for (const entry of entries) {
     const at = entry.indexOf(':')
-    if (at === -1) {
-      registerUserText(entry)
-    } else {
+    if (at !== -1) {
       registerUserText(entry.slice(0, at), [entry.slice(at + 1)])
+    } else if (entry.endsWith('()')) {
+      registerUserText(entry.slice(0, -2), 'expression')
+    } else {
+      registerUserText(entry)
     }
   }
 }
 
 /**
- * Where metadata key `key` holds user-facing text: `true` — its value is the text (a string; for
- * a `multiple` annotation, each item of the list); a list of field names — those fields of its
- * value object (each item's, for a list); `undefined` — no user-facing text. Core keys are known
- * from the start; a plugin's once a module writing them is loaded (or the plugin registered them).
+ * Where metadata key `key` holds user-facing text (see {@link TUserTextFields}; for a `multiple`
+ * annotation, each item of its list), `undefined` when it holds none. Core keys are known from the
+ * start; a plugin's once a module writing them is loaded (or the plugin registered them).
  */
 export function userTextOf(key: string): TUserTextFields | undefined {
   return USER_TEXT.get(key)

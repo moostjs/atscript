@@ -48,6 +48,7 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 - `forAnnotatedType(def, handlers)` -- type-kind dispatcher
 - `serializeAnnotatedType(type, options?)` / `deserializeAnnotatedType(data)` -- JSON round-trip
 - `SERIALIZE_VERSION` -- current serialization format version
+- `translateServed(json, t)` -- translates the user-text metadata of serialized types (any JSON carrying them) per locale; expression literals collected into `texts`; structural sharing, never mutates
 
 ## Codegen pipeline
 

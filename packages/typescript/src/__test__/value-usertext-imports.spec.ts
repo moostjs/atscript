@@ -3,7 +3,13 @@ import { describe, expect, it } from 'vitest'
 
 import type { TAtscriptAnnotatedType, TAtscriptTypeObject } from '../runtime/annotated-type'
 import { createDataFromAnnotatedType } from '../runtime/default-value'
-import { CORE_USER_TEXT, registerUserText, userTextKeys, userTextOf } from '../runtime/user-text'
+import {
+  $ut,
+  CORE_USER_TEXT,
+  registerUserText,
+  userTextKeys,
+  userTextOf,
+} from '../runtime/user-text'
 import { tmpBuilder } from './tmp-build'
 
 const load = tmpBuilder('atscript-codegen-')
@@ -29,6 +35,16 @@ const plugin = {
             argument: [
               { name: 'name', type: 'string' },
               { name: 'label', type: 'string', userText: true },
+            ],
+          }),
+          fn: new AnnotationSpec({
+            argument: { name: 'fn', type: 'string', userText: 'expression' },
+          }),
+          attr: new AnnotationSpec({
+            multiple: true,
+            argument: [
+              { name: 'name', type: 'string' },
+              { name: 'fn', type: 'string', userText: 'expression' },
             ],
           }),
         },
@@ -106,6 +122,43 @@ describe('user-text registry', () => {
     expect(userTextKeys().get('expect.message')).toBe(true)
     // (not written by any module loaded)
     expect(userTextOf('x.action')).toBeUndefined()
+  })
+
+  it('a module registers the expression keys it writes as expressions', async () => {
+    const { js, load: imp } = await load(
+      {
+        'e.as': `export interface E {
+  @x.fn '(v) => v ? "Yes" : "No"'
+  @x.attr 'title', '(v) => "Tip"'
+  @x.action 'go', 'Go'
+  a: string
+}`,
+      },
+      [plugin]
+    )
+    expect(js['e.as']).toContain('$ut("x.action:label", "x.attr:fn()", "x.fn()")')
+    expect(userTextOf('x.fn')).toBeUndefined()
+    await imp('e.as')
+    expect(userTextOf('x.fn')).toBe('expression')
+    expect(userTextOf('x.attr')).toEqual(['fn()'])
+    expect(userTextOf('x.action')).toEqual(['label'])
+    const config = await new PluginManager({ plugins: [plugin] }).getDocConfig()
+    const specs = userTextAnnotations(config.annotations!)
+    expect(specs.get('x.fn')).toBe('expression')
+    expect(specs.get('x.attr')).toEqual(['fn()'])
+  })
+
+  it('`$ut` and `registerUserText` take expression keys and fields', () => {
+    $ut('y.fn()', 'y.attr:fn()', 'y.attr:label')
+    expect(userTextOf('y.fn')).toBe('expression')
+    expect(userTextOf('y.attr')).toEqual(['fn()', 'label'])
+    registerUserText('y.calc', 'expression')
+    expect(userTextOf('y.calc')).toBe('expression')
+    // (a whole-value kind replaces a field list; a field list leaves a whole-value kind)
+    registerUserText('y.attr', 'expression')
+    expect(userTextOf('y.attr')).toBe('expression')
+    registerUserText('y.attr', ['label'])
+    expect(userTextOf('y.attr')).toBe('expression')
   })
 
   it('a plugin registers its keys at runtime', () => {

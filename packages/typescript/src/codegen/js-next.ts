@@ -2794,8 +2794,9 @@ export class JsNextRenderer extends JsRenderer {
   }
 
   /**
-   * The plugin annotations holding user-facing text this module writes (`$ut` entries: `key`, or
-   * `key:field`); core's are known to the runtime from the start (`CORE_USER_TEXT`).
+   * The plugin annotations holding user-facing text this module writes (`$ut` entries: `key`,
+   * `key()` for an expression, `key:field`, `key:field()`); core's are known to the runtime from
+   * the start (`CORE_USER_TEXT`).
    */
   private moduleUserText(): string[] {
     const out = new Set<string>()
@@ -2807,6 +2808,8 @@ export class JsNextRenderer extends JsRenderer {
       const fields = spec && userTextFields(spec)
       if (fields === true) {
         out.add(name)
+      } else if (fields === 'expression') {
+        out.add(`${name}()`)
       } else if (fields) {
         for (const f of fields) {
           out.add(`${name}:${f}`)

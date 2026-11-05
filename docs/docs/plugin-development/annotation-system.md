@@ -130,7 +130,7 @@ interface TAnnotationArgument {
   optional?: boolean
   description?: string
   values?: string[] // Enum — restrict to specific values
-  userText?: boolean // the argument is user-facing text (see "User-facing Text" below)
+  userText?: boolean | 'expression' // user-facing text, or function source holding it (see "User-facing Text" below)
   // Editor (LSP) hooks — see "Editor Support for Arguments" below
   fieldScope?: (argToken: Token, doc: AtscriptDoc) => TQueryScope | undefined // backtick / 'string' args
   refFilter?: (decl: SemanticNode, doc: AtscriptDoc) => boolean // 'ref' args
@@ -171,7 +171,7 @@ default: new AnnotationSpec({
 Set `userText: true` on a `'string'` argument that holds text an end user reads, such as a label, a hint or an error message. i18n tooling and translators find such text through this flag:
 
 - **Build time:** `userTextAnnotations(config.annotations)` from `@atscript/core` returns every flagged annotation (core and plugins) by full name. The value `true` means the annotation's value is the text, because the spec has one argument. A list of field names means those fields of the value object hold the text, because the spec has an argument list.
-- **Runtime:** `userTextOf(key)` and `userTextKeys()` from `@atscript/typescript/utils` answer the same question without the specs. Use them in a server that translates metadata before sending it. Core's keys are known from the start. A plugin's keys are registered by each generated module that writes them, so they are known once such a module has loaded. A plugin that writes such metadata at runtime registers its keys itself with `registerUserText(key, fields?)`: `fields` is `true` (the default, the value is the text) or the list of fields.
+- **Runtime:** `userTextOf(key)` and `userTextKeys()` from `@atscript/typescript/utils` answer the same question without the specs; `translateServed()` uses them to [translate a serialized type](/packages/typescript/i18n#serving-a-translated-type). Core's keys are known from the start. A plugin's keys are registered by each generated module that writes them, so they are known once such a module has loaded. A plugin that writes such metadata at runtime registers its keys itself with `registerUserText(key, fields?)`: `fields` is `true` (the default, the value is the text), `'expression'`, or the list of fields.
 
 Core flags `@meta.label`, `@meta.description`, `@meta.required` (message), `@expect.message` and the `message` argument of every `@expect.*` constraint. Flag your plugin's text arguments the same way:
 
@@ -197,6 +197,30 @@ userTextOf('meta.id') // undefined: no text
 ```
 
 For a `multiple` annotation, the rule applies to each item of the value list.
+
+#### Expressions (`userText: 'expression'`)
+
+An argument holding the **source of a function the client evaluates** (a computed label, a custom validator returning its message) is flagged `userText: 'expression'`. Its texts are the string literals in the source: a server leaves the source as written and serves the translations of those literals next to it, and the client translates the function's result by exact match (see [Expressions](/packages/typescript/i18n#expressions-texts-computed-on-the-client)).
+
+```typescript
+computedHint: new AnnotationSpec({
+  argument: { name: 'fn', type: 'string', userText: 'expression' },
+}),
+attr: new AnnotationSpec({
+  multiple: true,
+  argument: [
+    { name: 'name', type: 'string' },
+    { name: 'fn', type: 'string', userText: 'expression' },
+  ],
+}),
+```
+
+```typescript
+userTextOf('x.computedHint') // 'expression': the value is function source
+userTextOf('x.attr') // ['fn()']: value.fn is function source (a field name ending in "()")
+```
+
+`userTextAnnotations()` reports them the same way. Flag only arguments that are evaluated as code; a plain text argument stays `userText: true`.
 
 ### Expression and Order Arguments
 

@@ -22,26 +22,35 @@ This is the best default for HTTP apps.
 
 ## What The Built-In Transform Does
 
-When it catches `ValidatorError`, it creates:
+When it catches `ValidatorError`, it creates `HttpError(400)` with the body:
 
-- `HttpError(400)`
-- `message` from `ValidatorError.message`
+- `message` — the first error as `path: message` (just `message` for an error at the root), the same text as `ValidatorError.message`
 - `statusCode: 400`
-- `_body` containing the full `error.errors` array — each entry with `path`, `message`, `code`, `params` (and `custom: true` for app text), see [Error Codes](/packages/typescript/validation-reference#error-codes)
+- `errors` — the full `error.errors` array: each entry with `path`, `message`, `code`, `params`, and `custom: true` for app text (`details` for a union error), see [Error Codes](/packages/typescript/validation-reference#error-codes)
 
-That is the contract implemented by the package today.
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "name: Expected minimum length of 3 characters, got 1 characters",
+  "errors": [
+    {
+      "path": "name",
+      "message": "Expected minimum length of 3 characters, got 1 characters",
+      "code": "MIN_LENGTH",
+      "params": { "min": 3, "actual": 1 }
+    }
+  ]
+}
+```
 
-## Why The Docs Do Not Promise One Exact JSON Shape
+This is the same envelope `@atscript/moost-db` answers with, so a client parses one format. With a translator registered in `moost` (`setTranslator()`), the messages are translated into the request's locale; `code` and `params` stay as they are. See [Translating Texts](/packages/typescript/i18n).
 
-The transform produces an `HttpError`. The final serialized HTTP body depends on how your HTTP layer renders that error.
+::: warning Upgrading from 0.2.4 or earlier
+The error list was under `_body` before. It is now `errors`; `_body` is gone. Update clients that read `body._body` to read `body.errors` — the entries are unchanged.
+:::
 
-So the stable guarantee is:
-
-- failed validation becomes HTTP 400
-- the top-level message comes from the first validation error
-- the full validator error list is attached to the HTTP error payload
-
-If your API needs a very specific error envelope, write your own interceptor.
+If your API needs a different error envelope, write your own interceptor (see [Write A Custom Error Shape](#write-a-custom-error-shape)).
 
 ## Apply The Transform Per Controller Or Handler
 

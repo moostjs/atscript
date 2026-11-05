@@ -45,9 +45,9 @@ export class UsersController {
 
     if (!validator.validate(body, true)) {
       throw new HttpError(400, {
-        message: validator.errors[0]?.message || 'Validation failed',
+        message: validator.errors[0]?.message || 'Validation failed'
         statusCode: 400,
-        _body: validator.errors,
+        errors: validator.errors,
       })
     }
 

@@ -6,6 +6,7 @@ description: >-
   syntax, `@meta.*` / `@expect.*` / custom annotations, primitives, the `asc`
   CLI + `atscript.config.*`, generated `.as.d.ts` / `.as.js` / `atscript.d.ts`,
   runtime helpers (`Validator`, error codes + `localizeErrors`, `coerceForType`, `normalizeForType`, JSON Schema, serialize,
+  i18n (`translateServed`, `$i18n`, `userText`),
   metadata layers / `metadata.set`), intersection / `extends` merges and
   their compile errors, `annotate` path rules and block order,
   compiled validators (`compileValidators`, `invalidateCompiledValidators`),
@@ -71,6 +72,7 @@ import {
   annotate,                        // low-level runtime write to a metadata map (append: annotate(map, key, v, true))
   userTextOf, userTextKeys,        // metadata keys holding user-facing text (`userText` spec args), for translators
   registerUserText,                // a plugin writing user-text metadata at runtime registers its keys
+  translateServed,                 // translate a serialized type per locale → { value, texts } (i18n)
 } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescript/utils'
 
@@ -128,7 +130,8 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Runtime           | [runtime.md](references/runtime.md)                       | `defineAnnotatedType` (`.ref()`; `refTo`/`cloneRefProp` removed → rebuild 0.1.110 packages), `TAtscriptAnnotatedType`, `forAnnotatedType`, serialize, refDepth, metadata layers and runtime writes (`metadata.set` / `delete` / append arrays, what a write reaches) |
 | Validation        | [validation.md](references/validation.md)                 | `Validator`, `ValidatorError`, error codes / translating errors (`localizeErrors`), `coerceForType`, `normalizeForType`, JSON Schema helpers (options `closed` / `annotations` / `enums`), plugins, compiled validators (`compileValidators`, which options/types stay interpreted, `invalidateCompiledValidators` after raw type mutations) |
 | Build integration | [unplugin.md](references/unplugin.md)                     | Vite/Rollup/Rolldown/Webpack/esbuild/Rspack/Farm, HMR, strict, `root`, `compileValidators` override (`ssr` = compile the Vite server build only) (config discovered from the wrong cwd, `pnpm -C`, unknown `@db.*`/`@ui.*` annotations), `optimizeDeps` prebundling of `@atscript/typescript/utils` ("optimized dependencies changed. reloading"), stale `.as` import after moving/retyping a model (dev server keeps the old field type, "requires string" on reload while `asc`/`tsc` pass, `watchChange` cache invalidation), dts bundling of `.as` re-exports (tsdown/rolldown-plugin-dts) |
-| Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform                            |
+| Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform (`errors` body, was `_body`) |
+| i18n              | [i18n.md](references/i18n.md)                             | Translating `.as` texts per locale: message ids, `translateServed`, `$i18n` on served types, `messagesTranslator` on the client, `userText: 'expression'` literals |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |
 | Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd                                        |
 

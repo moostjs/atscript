@@ -4,8 +4,21 @@ import { describe, expect, it } from 'vitest'
 
 import { validationErrorTransform } from './error-transform'
 
+/** The body `validationErrorTransform` replies with for `error`. */
+function replyBody(error: ValidatorError) {
+  let replied: HttpError | undefined
+  validationErrorTransform().error!(
+    error,
+    (response: unknown) => {
+      replied = response as HttpError
+    },
+    undefined as never
+  )
+  return replied!.body as unknown as Record<string, unknown>
+}
+
 describe('validationErrorTransform', () => {
-  it('replies 400 whose body carries each error with its code and params', () => {
+  it('replies 400 whose `errors` carry each error with its code and params', () => {
     const type = defineAnnotatedType('object')
       .prop(
         'name',
@@ -38,7 +51,7 @@ describe('validationErrorTransform', () => {
       statusCode: 400,
       message: 'name: Expected minimum length of 3 characters, got 1 characters',
       error: 'Bad Request',
-      _body: [
+      errors: [
         {
           path: 'name',
           message: 'Expected minimum length of 3 characters, got 1 characters',
@@ -54,6 +67,20 @@ describe('validationErrorTransform', () => {
         },
       ],
     })
+  })
+
+  it('tops the body with the first error as `path: message` (none for the root)', () => {
+    const field = replyBody(
+      new ValidatorError([
+        { path: 'a.b', message: 'Bad', code: 'CUSTOM' },
+        { path: 'c', message: 'Worse' },
+      ])
+    )
+    expect(field.message).toBe('a.b: Bad')
+    expect(field).not.toHaveProperty('_body')
+    const root = replyBody(new ValidatorError([{ path: '', message: 'Must be an object' }]))
+    expect(root.message).toBe('Must be an object')
+    expect(root.errors).toEqual([{ path: '', message: 'Must be an object' }])
   })
 
   it('passes other errors and results through', () => {

@@ -62,18 +62,42 @@ export function mapItems<C>(
   step: TStep<C>,
   ctx: C
 ): unknown[] {
+  return mapList(value, (input, i) => step(Array.isArray(of) ? of[i] : of, input, ctx))
+}
+
+/** Maps the items of `list` with `step`. Copy-on-first-change: `list` itself when none changed. */
+export function mapList(list: unknown[], step: (item: unknown, i: number) => unknown): unknown[] {
   let out: unknown[] | undefined
-  for (let i = 0; i < value.length; i++) {
-    const input = value[i]
-    const mapped = step(Array.isArray(of) ? of[i] : of, input, ctx)
+  for (let i = 0; i < list.length; i++) {
+    const mapped = step(list[i], i)
     if (out) {
       out.push(mapped)
-    } else if (mapped !== input) {
-      out = value.slice(0, i)
+    } else if (mapped !== list[i]) {
+      out = list.slice(0, i)
       out.push(mapped)
     }
   }
-  return out ?? value
+  return out ?? list
+}
+
+/**
+ * Maps the own values of JSON object `obj` with `step`. Copy-on-first-change: `obj` itself when
+ * none changed; an own `__proto__` key stays an own key.
+ */
+export function mapEntries(
+  obj: Record<string, unknown>,
+  step: (key: string, value: unknown) => unknown
+): Record<string, unknown> {
+  let out: Record<string, unknown> | undefined
+  for (const key of Object.keys(obj)) {
+    const mapped = step(key, obj[key])
+    if (mapped !== obj[key]) {
+      // (spread copies an own `__proto__` as an own key)
+      out ??= { ...obj }
+      setOwn(out, key, mapped)
+    }
+  }
+  return out ?? obj
 }
 
 /** Whether `value` is a plain object (`{}` or prototype-less): class instances are not. */

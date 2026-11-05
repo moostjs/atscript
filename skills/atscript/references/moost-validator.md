@@ -122,21 +122,23 @@ Global opts cascade to every validated param; override per-handler with `@UseVal
 
 ## Error shape
 
-The `HttpError(400)` body carries the raw `ValidatorError.errors` array under `_body`:
+The `HttpError(400)` body carries the raw `ValidatorError.errors` array under `errors` (same envelope as `@atscript/moost-db`); `message` = first error as `path: message` (root error: just `message`) = `ValidatorError.message`:
 
 ```json
 {
   "statusCode": 400,
   "message": "email: Invalid email format.",
   "error": "Bad Request",
-  "_body": [
+  "errors": [
     { "path": "email", "message": "Invalid email format.", "code": "EMAIL", "params": {} },
     { "path": "age", "message": "Too young", "code": "MIN", "params": { "min": 18, "actual": 3 }, "custom": true }
   ]
 }
 ```
 
-Clients branch on `code` / `params`, never on `message` (custom or translated text). Codes table + `localizeErrors`: [validation.md](validation.md#error-codes--translation). Want `{ errors: [...] }` wrapping? Write a thin post-interceptor.
+Clients branch on `code` / `params`, never on `message` (custom or translated text). Codes table + `localizeErrors`: [validation.md](validation.md#error-codes--translation). A `moost` translator (`setTranslator()`) translates the body per request: [i18n.md](i18n.md). Want another shape? Write a thin post-interceptor.
+
+**BREAKING after 0.2.4:** the list was `_body` before; it is `errors` now (entries unchanged). Clients reading `body._body` must read `body.errors`.
 
 Interceptor does **not** swallow other errors — only `ValidatorError` is converted; everything else propagates.
 

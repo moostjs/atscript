@@ -25,6 +25,13 @@ export const SERIALIZE_VERSION = 2
 export interface TSerializedAnnotatedType extends TSerializedAnnotatedTypeInner {
   /** Format version for forward compatibility */
   $v: number
+  /**
+   * Texts a server serves with the type for the client, in the locale it was translated to
+   * (see `translateServed`): message templates by code (`{name}` placeholders) and translated
+   * texts by their source text — what `messagesTranslator()` takes. Never written by
+   * `serializeAnnotatedType`; `deserializeAnnotatedType` ignores it.
+   */
+  $i18n?: Record<string, string>
 }
 
 /** Serialized annotated type node (used for nested types within the top-level). */

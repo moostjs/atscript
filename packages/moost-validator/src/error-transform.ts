@@ -27,7 +27,8 @@ export const validationErrorTransform = () =>
 
 /**
  * Internal helper that performs the actual conversion: wraps a
- * `ValidatorError` into {@link HttpError} and passes it to Moost's `reply`.
+ * `ValidatorError` into {@link HttpError} — `{ message, statusCode, errors }`, the envelope
+ * `@atscript/moost-db` answers with too — and passes it to Moost's `reply`.
  */
 function transformValidationError(error: any, reply: (response: any) => void) {
   if (error instanceof ValidatorError) {
@@ -35,7 +36,7 @@ function transformValidationError(error: any, reply: (response: any) => void) {
       new HttpError(400, {
         message: error.message,
         statusCode: 400,
-        _body: error.errors,
+        errors: error.errors,
       })
     )
   }

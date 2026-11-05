@@ -135,6 +135,7 @@ export {
   deserializeAnnotatedType,
   SERIALIZE_VERSION,
 } from './runtime/serialize'
+export { translateServed } from './runtime/translate-served'
 export type {
   TSerializedAnnotatedType,
   TSerializedAnnotatedTypeInner,

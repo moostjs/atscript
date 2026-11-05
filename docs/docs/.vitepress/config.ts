@@ -360,6 +360,7 @@ export default defineConfig({
             { text: 'Metadata', link: '/packages/typescript/metadata-export' },
             { text: 'JSON Schema', link: '/packages/typescript/json-schema' },
             { text: 'Serialization', link: '/packages/typescript/serialization' },
+            { text: 'Translating Texts (i18n)', link: '/packages/typescript/i18n' },
           ],
         },
         {

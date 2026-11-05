@@ -111,9 +111,11 @@ export interface TAnnotationArgument {
    * The argument is user-facing text (a label, a description, an error message): i18n tooling
    * and translators read the annotations holding such text through {@link userTextAnnotations}
    * (build time) and `userTextOf` / `userTextKeys` of `@atscript/typescript/utils` (runtime).
-   * A `string` argument only.
+   * `'expression'`: the argument is the source of a function the client evaluates (a computed
+   * label, a custom validator returning its message); the texts it writes are the string literals
+   * in that source, which a translator extracts and serves next to it. A `string` argument only.
    */
-  userText?: boolean
+  userText?: boolean | 'expression'
 }
 
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
@@ -576,18 +578,21 @@ export function forEachAnnotationSpec(
 /**
  * Where annotation `spec` holds user-facing text (arguments flagged `userText`): `true` — its
  * value itself (a spec with one argument, not a list: the value is the string; for a `multiple`
- * annotation, each value); a list — those fields of its value object (a spec with an argument
- * list). `undefined`: no user-facing text.
+ * annotation, each value); `'expression'` — likewise, but the value is function source whose string
+ * literals are the texts; a list — those fields of its value object (a spec with an argument
+ * list), an expression field's name ending in `()`. `undefined`: no user-facing text.
  */
-export function userTextFields(spec: AnnotationSpec): true | string[] | undefined {
+export function userTextFields(spec: AnnotationSpec): true | 'expression' | string[] | undefined {
   const arg = spec.config.argument
   if (!arg) {
     return undefined
   }
   if (!Array.isArray(arg)) {
-    return arg.userText ? true : undefined
+    return arg.userText || undefined
   }
-  const fields = arg.filter(a => a.userText).map(a => a.name)
+  const fields = arg
+    .filter(a => a.userText)
+    .map(a => (a.userText === 'expression' ? `${a.name}()` : a.name))
   return fields.length > 0 ? fields : undefined
 }
 
@@ -595,8 +600,10 @@ export function userTextFields(spec: AnnotationSpec): true | string[] | undefine
  * Every annotation of `tree` (core and plugins) holding user-facing text, by full name (see
  * {@link userTextFields}): what i18n tooling extracts and a translator translates.
  */
-export function userTextAnnotations(tree: TAnnotationsTree): Map<string, true | string[]> {
-  const out = new Map<string, true | string[]>()
+export function userTextAnnotations(
+  tree: TAnnotationsTree
+): Map<string, true | 'expression' | string[]> {
+  const out = new Map<string, true | 'expression' | string[]>()
   forEachAnnotationSpec(tree, (name, spec) => {
     const fields = userTextFields(spec)
     if (fields) {
