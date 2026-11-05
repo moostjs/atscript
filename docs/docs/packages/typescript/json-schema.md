@@ -52,6 +52,60 @@ export interface ApiResponse {
 
 `ApiResponse.toJsonSchema()` will return the pre-computed schema even if `jsonSchema: false` is set in the plugin config. The annotation can only be applied to interfaces (top-level).
 
+## Options
+
+`buildJsonSchema(type, options?)` takes three options. The generated `toJsonSchema()` uses the [`jsonSchemaOptions`](/packages/typescript/configuration#jsonschemaoptions) plugin option and returns the same schema.
+
+| Option        | Default | Effect                                                                                                                                              |
+| ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `annotations` | `true`  | `@meta.description` becomes `description`, `@meta.label` becomes `title`, on the schema of the type or field that carries them                       |
+| `enums`       | `true`  | A union of literals (`'a' \| 'b'`, also with `null`) becomes `{ "type": "string", "enum": ["a", "b"] }` instead of an `anyOf` of `const` schemas |
+| `closed`      | `false` | Every object schema gets `additionalProperties: false`                                                                                              |
+
+```typescript
+import { buildJsonSchema } from '@atscript/typescript/utils'
+
+buildJsonSchema(Order) // annotations and enums on, objects open
+buildJsonSchema(Order, { closed: true }) // also rejects undeclared keys
+buildJsonSchema(Order, { annotations: false, enums: false }) // the output of 0.2.4 and earlier
+```
+
+### Titles and descriptions
+
+A field that refers to a named type keeps the type's own `title` / `description` on its `$defs` entry. When the field carries a description of its own, it goes beside the reference:
+
+```json
+{
+  "shipTo": { "allOf": [{ "$ref": "#/$defs/Address" }], "description": "Delivery address" }
+}
+```
+
+An optional field keeps its `title` / `description` beside the `anyOf` that adds `null`. `fromJsonSchema()` reads `title` and `description` back as `@meta.label` and `@meta.description`.
+
+### Enums
+
+A union whose members are all literals (and `null`) is written as one `enum`:
+
+```atscript
+export interface Order {
+    status: 'active' | 'blocked'
+    reason: 'late' | 'damaged' | null
+}
+```
+
+```json
+{
+  "status": { "type": "string", "enum": ["active", "blocked"] },
+  "reason": { "type": ["string", "null"], "enum": ["late", "damaged", null] }
+}
+```
+
+A union with any other member (a `string`, an object) keeps `anyOf`; a union of objects with a discriminator keeps `oneOf`.
+
+### Closed objects
+
+With `closed: true` a schema accepts exactly the values the validator accepts with its default `unknownProps: 'error'` (except for the [differences](#differences-from-the-validator) below). It stays off by default because it changes the schemas of existing APIs (Swagger / OpenAPI output included).
+
 ## Annotation Constraints
 
 Annotations from `.as` files are translated into JSON Schema constraints:
@@ -75,7 +129,7 @@ On a nullable field (`@expect.max 10` on `number | null`), the constraint goes o
 
 ## What the Validator Accepts
 
-A schema accepts exactly the JSON values the validator accepts with `unknownProps: 'ignore'` (a schema allows keys it does not list), except for the [differences](#differences-from-the-validator) below — checked with ajv 8 over the test generators' types and values:
+A schema accepts exactly the JSON values the validator accepts with `unknownProps: 'ignore'` (a schema allows keys it does not list; with [`closed: true`](#closed-objects), `unknownProps: 'error'`), except for the [differences](#differences-from-the-validator) below — checked with ajv 8 over the test generators' types and values:
 
 | Type                      | JSON Schema                                                                                                                                                                                                   |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -279,6 +333,7 @@ const roundTripped = buildJsonSchema(type)
 - Primitives (`string`, `number`, `integer`, `boolean`, `null`)
 - Literals (`const`)
 - Enums (`enum` — converted to union of literals)
+- `title` / `description` (as `@meta.label` / `@meta.description`)
 - Constraints: `minLength`, `maxLength`, `minimum`, `maximum`, `pattern`, `minProperties`, `maxProperties`
 - `$ref` / `$defs` — references are resolved automatically from `$defs` or `definitions`
 
@@ -300,6 +355,7 @@ import { CatOrDog } from './pets.as'
 import { Order } from './orders.as'
 
 const merged = mergeJsonSchemas([CatOrDog, Order])
+// with options, the same as buildJsonSchema's: mergeJsonSchemas([CatOrDog, Order], { closed: true })
 
 // merged.schemas.CatOrDog — the CatOrDog schema (oneOf with $ref)
 // merged.schemas.Order    — the Order schema

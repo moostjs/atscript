@@ -264,6 +264,36 @@ interface Product {
 Use `string.required` or `@meta.required` to ensure required string fields are not empty or whitespace-only. A plain `string` type accepts `''` as valid — `@meta.required` catches this common form validation gap. For checkboxes, `@meta.required` on a `boolean` field ensures the value is `true` (e.g., "accept terms").
 :::
 
+### Normalize Annotations (@normalize.\*)
+
+Normalizers change string input before it is validated:
+
+- `@normalize.trim` - Removes leading and trailing whitespace (also the `string.trimmed` primitive)
+- `@normalize.lowercase` - Converts to lower case
+- `@normalize.uppercase` - Converts to upper case
+
+They apply in that order (trim, then lowercase, then uppercase) and only to strings: a `string` field, a nullable string (`string | null`), a union of string literals, or a type alias of one, whose fields and array items inherit them. Any other type is a compile error.
+
+```atscript
+@normalize.trim
+@normalize.lowercase
+export type Email = string.email
+
+export interface Signup {
+    email: Email              // '  Ann@Example.COM ' → 'ann@example.com'
+    backupEmails: Email[]     // each item normalized
+
+    @normalize.trim
+    @expect.minLength 2
+    name: string              // checked after trimming: ' A ' fails
+
+    @normalize.lowercase
+    plan: 'free' | 'pro'      // 'PRO' → 'pro'
+}
+```
+
+The validator never applies them. They run where input is prepared for validation: `normalizeForType()` (see [Input Normalization](/packages/typescript/validation-reference#input-normalization-normalizefortype)) and the Moost [validation pipe](/packages/moost-validator/validation-pipe#normalized-input), which normalizes before it validates.
+
 ### Emit Annotations (@emit.\*)
 
 - `@emit.jsonSchema` — Pre-compute and embed the JSON Schema for an interface at build time, regardless of the global `jsonSchema` plugin setting

@@ -159,7 +159,7 @@ When fixing bugs, always investigate and fix the root cause first. Do not implem
 - Plugins extend the core by adding annotations, primitives, and metadata — they don't modify the parser
 - The core provides AST + utilities (annotation merging, type unwinding) that language extensions and LSPs consume
 - `@atscript/moost-validator` demonstrates how `.as` types flow into a real framework (the DB-side `moost-db` lives in the `atscript-db` repo)
-- **Core ships only `@meta.*`, `@expect.*`, `@emit.*`.** All other namespaces (`@db.*`, `@ui.*`) come from plugins in their own repos. TypeScript codegen detects annotations by string-key presence — it has **no dependency on annotation specs**, so it emits `@db.*`/`@ui.*` metadata correctly without those plugins being installed here
+- **Core ships only `@meta.*`, `@expect.*`, `@normalize.*`, `@emit.*`.** All other namespaces (`@db.*`, `@ui.*`) come from plugins in their own repos. TypeScript codegen detects annotations by string-key presence — it has **no dependency on annotation specs**, so it emits `@db.*`/`@ui.*` metadata correctly without those plugins being installed here
 - **Primitive `annotations` map** — primitives use a generic `annotations: Record<string, TPrimitiveAnnotationValue>` to apply any annotation (the old hardcoded `expect` property was removed). The `applyAnnotations()` method is spec-aware: it resolves annotation specs, respects `multiple` flags, and maps object values by spec argument names
 - **`@meta.isKey` was renamed to `@expect.array.key`** — it's a validation constraint, not semantic metadata
 - **`@meta.id` takes no arguments** — multiple fields annotated with `@meta.id` form a composite primary key

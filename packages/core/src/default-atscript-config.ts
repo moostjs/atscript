@@ -4,6 +4,7 @@ import { emitAnnotations } from './defaults/emit-annotations'
 import { expectAnnotations } from './defaults/expect-annotations'
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { metaAnnotations } from './defaults/meta-annotations'
+import { normalizeAnnotations } from './defaults/normalize-annotations'
 import { primitives } from './defaults/primitives'
 
 export function getDefaultAtscriptConfig(): TAtscriptConfig {
@@ -12,6 +13,7 @@ export function getDefaultAtscriptConfig(): TAtscriptConfig {
     annotations: {
       meta: { ...metaAnnotations },
       expect: { ...expectAnnotations },
+      normalize: { ...normalizeAnnotations },
       emit: { ...emitAnnotations },
       annotate: { ...annotateAnnotations },
     },

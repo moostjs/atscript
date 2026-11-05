@@ -34,6 +34,7 @@ Chained via dots. Each narrows the parent with annotation-based constraints; TS 
 | `string.ipv6`     | `expect.pattern` IPv6 only.                                                       |
 | `string.char`     | `expect.minLength 1` + `expect.maxLength 1`.                                      |
 | `string.required` | `meta.required` — validator rejects whitespace-only strings (`value.trim().length === 0`). NOT `minLength: 1`. |
+| `string.trimmed`  | `normalize.trim` — `normalizeForType` (and `validatorPipe`) strip surrounding whitespace before validation. Not a check: the validator itself accepts `' a '`. |
 
 ### `number.*`
 

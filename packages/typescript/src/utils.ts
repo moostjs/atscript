@@ -99,9 +99,10 @@ export {
 export type { TError, TValidatorErrorCode, TValidatorTranslate } from './runtime/validator-messages'
 
 export { coerceForType, coerceScalar } from './runtime/coerce'
+export { normalizeForType } from './runtime/normalize'
 
 export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
-export type { TJsonSchema } from './runtime/json-schema'
+export type { TJsonSchema, TJsonSchemaOptions } from './runtime/json-schema'
 export { detectDiscriminator } from './runtime/discriminator'
 export type { TUnionDiscriminator } from './runtime/discriminator'
 

@@ -423,6 +423,38 @@ Coercion rules:
 
 Coercion converts representation only — constraint checks (`@expect.int`, `@expect.min`, patterns) remain the validator's job, so the intended flow is always `coerceForType` → `validate`. In Moost apps, prefer the ready-made [Coercion Pipe](/packages/moost-validator/coercion-pipe) over calling this directly.
 
+## Input Normalization: `normalizeForType()`
+
+```typescript
+import { normalizeForType } from '@atscript/typescript/utils'
+
+normalizeForType<T>(def: TAtscriptAnnotatedType, value: T): T
+```
+
+Applies the type's [`@normalize.*`](/packages/typescript/annotations-reference#normalize-annotations-normalize) annotations (`trim`, `lowercase`, `uppercase`). The validator never normalizes, so call it on input before validating it:
+
+```typescript
+import { normalizeForType } from '@atscript/typescript/utils'
+import { Signup } from './signup.as'
+
+const input = normalizeForType(Signup, body) // { email: '  Ann@Example.COM ' } → { email: 'ann@example.com' }
+Signup.validator().validate(input)
+```
+
+With coercion as well, the order is `coerceForType` → `normalizeForType` → `validate`. In Moost apps the [validation pipe](/packages/moost-validator/validation-pipe#normalized-input) does it for you.
+
+Rules:
+
+- **pure** — returns a normalized copy and never mutates the input; when nothing changes it returns the input itself, and unchanged nested objects are shared
+- **strings only** — trim, then lowercase, then uppercase; other values, and strings without normalizers, are returned as they are; unknown properties are kept
+- **walks** object properties (pattern properties too), arrays, tuples, intersections and unions; normalizers on a union apply to its string members (`@normalize.trim` on `nickname?: string | null`)
+- **unions** — a value is normalized only when the result does not depend on the member that takes it. A union of objects with a [discriminator](/packages/typescript/json-schema#discriminated-unions) uses the member the discriminator names. Otherwise every member that can take the value must give the same result (a literal member takes a string only when the normalized string is its literal); if they differ, the members whose own validator (default options: every required property present, no unknown ones) accepts their result decide, and their result is used when they agree; otherwise the value is returned untouched for the validator to judge. So `contact: Email | Digits` normalizes `' A@B.CO '` to `'a@b.co'` (only the `Email` result is valid), while two members whose different results are both valid leave the value as it is. Give a union of objects a discriminator when its members normalize a field differently
+- **non-plain objects** (`Date`, `Buffer`, class instances) are returned as they are; an object whose literal property (`kind: 'cat'`) holds another value is left as it is
+- **never validates** — run the validator on the result. It does not throw on ordinary input; a cyclic value overflows the stack, as it does in the validator
+- **cost** — a type without normalizers returns the input at once; otherwise each object of the value is normalized once per type, recursive unions included
+
+Normalizers are kept by `serializeAnnotatedType()`, so a client can normalize with a deserialized type too.
+
 ## Next Steps
 
 - [Validation Guide](/packages/typescript/validation) — the practical application flow

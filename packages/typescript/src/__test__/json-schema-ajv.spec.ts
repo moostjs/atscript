@@ -209,6 +209,32 @@ describe('JSON schemas of annotated types, checked by ajv', () => {
       )
     }
     expect(disagreements.slice(0, 30)).toEqual([])
+    // `{ closed: true }` (`additionalProperties: false`) accepts exactly what the validator
+    // accepts with its default `unknownProps: 'error'`
+    const closedStats: { checks: number; allowed?: Record<string, number> } = { checks: 0 }
+    const closedDisagreements: string[] = []
+    for (const name of keptNames) {
+      const type = module[name]
+      const fixed =
+        name.endsWith('P') || name.endsWith('O')
+          ? FIXED.map(v => ({ p: v }))
+          : name.endsWith('R')
+            ? FIXED.map(wrap)
+            : FIXED
+      closedDisagreements.push(
+        ...schemaDisagreements(
+          name,
+          type,
+          valuesFor(type, fixed, 10, name.length + 1),
+          false,
+          closedStats,
+          false,
+          true
+        )
+      )
+    }
+    expect(closedDisagreements.slice(0, 30)).toEqual([])
+    expect(closedStats.checks).toBeGreaterThan(10_000)
     expect(keptNames.size).toBeGreaterThan(250)
     // (each deliberate difference shows up: the allow-list holds nothing more)
     expect(Object.keys(stats.allowed ?? {}).sort()).toEqual(

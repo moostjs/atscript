@@ -5,12 +5,7 @@ import type {
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
-
-/**
- * Internal sentinel returned when a value cannot be coerced to a type node.
- * Drives union branch selection without allocating per-node result objects.
- */
-const NO_MATCH = Symbol('atscript.coerce.no-match')
+import { isPlainObject, mapItems, mapProps, NO_MATCH } from './copy-on-change'
 
 /**
  * Coerces string-transport input (route params, query strings) toward the
@@ -81,15 +76,17 @@ function coerce(def: TAtscriptAnnotatedType, value: unknown): unknown {
       if (!isPlainObject(value)) {
         return NO_MATCH
       }
-      return coerceProps(def as TAtscriptAnnotatedType<TAtscriptTypeObject<string>>, value)
+      return mapProps(type as TAtscriptTypeObject<string>, value, coerceChild, undefined)
     }
     case 'array': {
-      return Array.isArray(value) ? coerceItems(value, (type as TAtscriptTypeArray).of) : NO_MATCH
+      return Array.isArray(value)
+        ? mapItems(value, (type as TAtscriptTypeArray).of, coerceChild, undefined)
+        : NO_MATCH
     }
     case 'tuple': {
       const items = (type as TAtscriptTypeComplex).items
       return Array.isArray(value) && value.length === items.length
-        ? coerceItems(value, undefined, items)
+        ? mapItems(value, items, coerceChild, undefined)
         : NO_MATCH
     }
     case 'union': {
@@ -165,76 +162,8 @@ function scalar(designType: TAtscriptTypeFinal['designType'], value: unknown): u
   }
 }
 
-/**
- * Coerces the props of a plain object. Copy-on-first-change: allocates the
- * output object only when some prop actually coerced, else returns the input.
- */
-function coerceProps(
-  def: TAtscriptAnnotatedType<TAtscriptTypeObject<string>>,
-  value: Record<string, unknown>
-): unknown {
-  const keys = Object.keys(value)
-  let out: Record<string, unknown> | undefined
-  for (let i = 0; i < keys.length; i++) {
-    const key = keys[i]
-    const input = value[key]
-    let propDef = def.type.props.get(key)
-    if (!propDef) {
-      for (const { pattern, def: patternDef } of def.type.propsPatterns) {
-        if (pattern.test(key)) {
-          propDef = patternDef
-          break
-        }
-      }
-    }
-    let coerced = input
-    if (propDef) {
-      const result = coerce(propDef, input)
-      if (result !== NO_MATCH) {
-        coerced = result
-      }
-    }
-    if (out) {
-      out[key] = coerced
-    } else if (coerced !== input) {
-      out = {}
-      for (let j = 0; j < i; j++) {
-        out[keys[j]] = value[keys[j]]
-      }
-      out[key] = coerced
-    }
-  }
-  return out ?? value
-}
-
-/**
- * Coerces array/tuple items against `of` (arrays) or `items[i]` (tuples).
- * Copy-on-first-change, same as {@link coerceProps}.
- */
-function coerceItems(
-  value: unknown[],
-  of: TAtscriptAnnotatedType | undefined,
-  items?: TAtscriptAnnotatedType[]
-): unknown {
-  let out: unknown[] | undefined
-  for (let i = 0; i < value.length; i++) {
-    const input = value[i]
-    const result = coerce(of ?? items![i], input)
-    const coerced = result === NO_MATCH ? input : result
-    if (out) {
-      out.push(coerced)
-    } else if (coerced !== input) {
-      out = value.slice(0, i)
-      out.push(coerced)
-    }
-  }
-  return out ?? value
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false
-  }
-  const proto = Object.getPrototypeOf(value) as object | null
-  return proto === Object.prototype || proto === null
+/** A prop / item: its coerced value, else the value as it is (copy-on-change, see `mapProps`). */
+function coerceChild(def: TAtscriptAnnotatedType, input: unknown): unknown {
+  const result = coerce(def, input)
+  return result === NO_MATCH ? input : result
 }

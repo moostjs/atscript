@@ -28,3 +28,15 @@ export interface SearchQuery {
         depth: number
     }
 }
+
+export interface CNodeA {
+    a: number
+    children: CTree[]
+}
+
+export interface CNodeB {
+    b: boolean
+    children: CTree[]
+}
+
+export type CTree = CNodeA | CNodeB

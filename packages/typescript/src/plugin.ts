@@ -6,6 +6,7 @@ import { DEFAULT_FORMAT } from '@atscript/core'
 
 import { assertLoads, rendererOf, TypeRenderer } from './codegen'
 import { escapeQuotes, wrapProp } from './codegen/utils'
+import type { TJsonSchemaOptions } from './runtime/json-schema'
 
 export interface TTsPluginOptions {
   /**
@@ -18,6 +19,15 @@ export interface TTsPluginOptions {
    * to force build-time embedding regardless of this setting.
    */
   jsonSchema?: false | 'lazy' | 'bundle'
+
+  /**
+   * Options of the generated `toJsonSchema()` (`'lazy'`, `'bundle'` and `@emit.jsonSchema`
+   * alike): the same schema `buildJsonSchema(type, jsonSchemaOptions)` builds at runtime.
+   * `closed` (`additionalProperties: false`, default `false`), `annotations` (`description` /
+   * `title` from `@meta.description` / `@meta.label`, default `true`), `enums` (a union of
+   * literals as `enum`, default `true`).
+   */
+  jsonSchemaOptions?: TJsonSchemaOptions
 
   /**
    * Example data support:
@@ -102,6 +112,25 @@ export function resolveJsonSchemaMode(opts?: TTsPluginOptions): false | 'lazy' |
     return opts.jsonSchema
   }
   return false
+}
+
+/**
+ * The `jsonSchemaOptions` argument the generated `toJsonSchema()` passes to the runtime: a JS
+ * literal of the options that differ from the defaults, `undefined` when none do.
+ */
+export function jsonSchemaOptionsArg(opts?: TTsPluginOptions): string | undefined {
+  const o = opts?.jsonSchemaOptions
+  const set: TJsonSchemaOptions = {}
+  if (o?.closed === true) {
+    set.closed = true
+  }
+  if (o?.annotations === false) {
+    set.annotations = false
+  }
+  if (o?.enums === false) {
+    set.enums = false
+  }
+  return Object.keys(set).length > 0 ? JSON.stringify(set) : undefined
 }
 
 /** A generated JS module of `doc`, checked to load in a build (see `assertLoads`). */

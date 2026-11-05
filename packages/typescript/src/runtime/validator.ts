@@ -1324,7 +1324,7 @@ function messageOf(annotation: unknown): string | undefined {
 }
 
 /** A union's discriminator, as the validator reports it (see {@link unionDiscriminator}). */
-interface TValidatorDiscriminator {
+export interface TValidatorDiscriminator {
   property: string
   /** Per object branch: its index in the union's items, its literal. */
   branches: Array<[index: number, literal: unknown]>
@@ -1340,8 +1340,8 @@ interface TDiscEntry {
 }
 
 /**
- * Decided discriminators, by union `items` (reported errors only: a union's discriminator is
- * looked for once its value failed). An entry is reused while the items, their type defs and the
+ * Decided discriminators, by union `items` (the validator's reported errors, the branch
+ * `normalizeForType` takes). An entry is reused while the items, their type defs and the
  * discriminator props are the same objects.
  */
 const discCache = new WeakMap<TAtscriptAnnotatedType[], TDiscEntry>()
@@ -1352,7 +1352,9 @@ const discCache = new WeakMap<TAtscriptAnnotatedType[], TDiscEntry>()
  * other branches must reject any object (scalars, arrays, tuples), so only the object branches
  * can match an object value.
  */
-function unionDiscriminator(items: TAtscriptAnnotatedType[]): TValidatorDiscriminator | undefined {
+export function unionDiscriminator(
+  items: TAtscriptAnnotatedType[]
+): TValidatorDiscriminator | undefined {
   const cached = discCache.get(items)
   if (cached !== undefined && sameDiscSource(cached, items)) {
     return cached.disc

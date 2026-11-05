@@ -7,6 +7,8 @@ function makeAnnotatedType(validate: (value: unknown) => void) {
   const validator = { validate }
   return {
     __is_atscript_annotated_type: true,
+    type: { kind: '', designType: 'any', tags: new Set() },
+    metadata: new Map(),
     validator: () => validator,
   }
 }

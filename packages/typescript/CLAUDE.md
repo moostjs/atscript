@@ -41,7 +41,8 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 - `isAnnotatedType(type)` / `isAnnotatedTypeOfPrimitive(type)` -- type guards
 - `Validator` class + `ValidatorError`
 - `coerceForType(def, value)` -- pure string-transport coercion (route params/query strings → scalar shapes); never throws or validates, returns input untouched when unparsable
-- `buildJsonSchema(type)` -- JSON Schema generation with `$defs`/`$ref` for named types
+- `normalizeForType(def, value)` -- pure `@normalize.*` application (trim/lowercase/uppercase) before validation; copy-on-change, never mutates, ambiguous unions settled by per-branch validation or left untouched
+- `buildJsonSchema(type, opts?)` -- JSON Schema generation with `$defs`/`$ref` for named types; `opts`: `closed` (off), `annotations` (on), `enums` (on); plugin option `jsonSchemaOptions` for generated `toJsonSchema()`
 - `fromJsonSchema(schema)` -- converts JSON Schema back to annotated types (resolves `$ref`/`$defs`)
 - `mergeJsonSchemas(types)` -- combines multiple schemas with shared `$defs` (for OpenAPI)
 - `forAnnotatedType(def, handlers)` -- type-kind dispatcher

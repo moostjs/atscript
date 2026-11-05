@@ -37,6 +37,7 @@ new AnnotationSpec({
 | `mergeStrategy`      | `'replace' \| 'append'` | `'replace'` | How values combine during annotation inheritance                                                                                 |
 | `passedWhenReferred` | `boolean`               | `true`      | Whether references to the annotated node read this annotation. See [Ref boundaries](#ref-boundaries-passedwhenreferred).         |
 | `defType`            | `string[]`              | —           | Restrict to specific value types. See [Available `defType` values](#simple-alternative-deftype).                                 |
+| `defTypeLiterals`    | `boolean`               | `false`     | With `defType`: a string or number literal of an accepted type passes too (`'a'` for `string`, `1` for `number`), alone or in a union (`'a' \| 'b' \| null`). |
 | `validate`           | `function`              | —           | Custom validation at parse time                                                                                                  |
 | `modify`             | `function`              | —           | AST mutation after validation                                                                                                    |
 
@@ -607,6 +608,8 @@ Available `defType` values:
 On a top-level annotation of an `annotate` block (written before the keyword), `defType` checks the type the block's target resolves to — through type aliases and `annotate … as` aliases — exactly like the annotation written on the target's declaration: with `type Name = string`, a `defType: ['string']` annotation is valid on `annotate Name {}` and `annotate Name as Short {}`.
 
 A nullable union also passes the `defType` check when every member other than `null` / `undefined` matches (since 0.1.103): `defType: ['number']` accepts `number | null`, `number.int | undefined` and an alias `type N = number | null`. Mixed unions (`number | string`) are still rejected.
+
+Literals (`'a'`, `1`) do not match `defType` by default. Set `defTypeLiterals: true` to accept a literal of an accepted type, alone or as a union member: with `defType: ['string']`, `'active' | 'blocked'` and `'a' | null` pass, `1 | 2` does not. The core `@normalize.*` annotations use it.
 
 To give a custom `validate` hook the same behavior, use `nonNullishMembers(def, doc)` from `@atscript/core`. It returns the resolved non-null members of a union (nested unions and aliases flattened), or `undefined` when `def` is not a union:
 

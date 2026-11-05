@@ -39,6 +39,31 @@ export class UsersController {
 
 If validation fails, the pipe throws `ValidatorError`. For HTTP apps, pair it with [Error Handling](/packages/moost-validator/error-handling).
 
+## Normalized Input
+
+When the parameter's type declares [`@normalize.*`](/packages/typescript/annotations-reference#normalize-annotations-normalize) normalizers, the pipe applies them first (with `normalizeForType()`), validates the normalized value and passes it to your handler:
+
+```atscript
+export interface CreateUserDto {
+    @normalize.trim
+    @normalize.lowercase
+    email: string.email
+
+    @normalize.trim
+    name: string.required
+}
+```
+
+```typescript
+@Post()
+async create(@Body() dto: CreateUserDto) {
+  // a body of { email: ' Ann@Example.COM ', name: ' Ann ' } arrives as
+  // { email: 'ann@example.com', name: 'Ann' }
+}
+```
+
+This applies to every parameter source, request bodies included. The request's original object is not changed: the handler gets a normalized copy (or the same object when nothing needed normalizing). Together with the [Coercion Pipe](/packages/moost-validator/coercion-pipe), the order is coerce → normalize → validate.
+
 ## Validate PATCH Payloads
 
 For partial updates, pass Atscript validator options to the pipe:

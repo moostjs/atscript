@@ -80,6 +80,21 @@ A schema embedded at build time does not see changes made at runtime with `metad
 
 Individual interfaces can also opt into build-time embedding via the `@emit.jsonSchema` annotation, regardless of the global setting. See [JSON Schema](/packages/typescript/json-schema) for full usage details, annotation constraints, and examples.
 
+### `jsonSchemaOptions`
+
+The [`buildJsonSchema` options](/packages/typescript/json-schema#options) the generated `toJsonSchema()` uses, in every mode (`'lazy'`, `'bundle'` and `@emit.jsonSchema`). `toJsonSchema()` returns the same schema as `buildJsonSchema(type, jsonSchemaOptions)`.
+
+```javascript
+// Strict schemas: reject keys the type does not declare
+plugins: [ts({ jsonSchema: 'bundle', jsonSchemaOptions: { closed: true } })]
+```
+
+| Option        | Default | Effect                                                        |
+| ------------- | ------- | ------------------------------------------------------------- |
+| `closed`      | `false` | `additionalProperties: false` on every object                 |
+| `annotations` | `true`  | `@meta.description` → `description`, `@meta.label` → `title` |
+| `enums`       | `true`  | A union of literals → `enum`                                  |
+
 ### `exampleData`
 
 Controls whether generated types include a `toExampleData()` static method. When enabled, each generated class gets a method that creates example data using `@meta.example` annotations.

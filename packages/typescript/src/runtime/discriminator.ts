@@ -14,7 +14,11 @@ import type {
 export type TUnionDiscriminator = {
   /** Name of the discriminator property shared by all variants. */
   propertyName: string
-  /** Maps the literal value of `propertyName` → variant index in `items`. */
+  /**
+   * Maps the literal value of `propertyName` (as a string) → variant index in `items`. An object
+   * without a prototype: look a value up directly (`indexMapping[String(tag)]`), a key such as
+   * `constructor` finds nothing.
+   */
   indexMapping: Record<string, number>
 }
 
@@ -52,7 +56,8 @@ export function detectDiscriminator(items: TAtscriptAnnotatedType[]): TUnionDisc
 
   for (const candidate of candidates) {
     const values = new Set<string | number | boolean>()
-    const indexMapping: Record<string, number> = {}
+    // (no prototype: a value such as `constructor` or `__proto__` names no variant)
+    const indexMapping: Record<string, number> = Object.create(null)
     let valid = true
 
     for (let i = 0; i < items.length; i++) {

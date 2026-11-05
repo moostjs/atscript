@@ -13,6 +13,7 @@ const VALIDATOR_SPECS = [
   'packages/typescript/src/__test__/validator-fast-path.spec.ts',
   'packages/typescript/src/__test__/strip-on-success.spec.ts',
   'packages/typescript/src/__test__/coerce.spec.ts',
+  'packages/typescript/src/__test__/normalize.spec.ts',
   'packages/typescript/src/__test__/date-primitives.spec.ts',
   'packages/typescript/src/__test__/annotate-reset.spec.ts',
   'packages/typescript/src/__test__/unknown-type.spec.ts',

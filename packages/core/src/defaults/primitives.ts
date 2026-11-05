@@ -127,6 +127,11 @@ export const primitives: Record<string, TPrimitiveConfig> = {
         documentation: 'Non-empty string that contains at least one non-whitespace character.',
         annotations: { 'meta.required': true },
       },
+      trimmed: {
+        documentation:
+          'String with leading and trailing whitespace removed before validation (`@normalize.trim`).',
+        annotations: { 'normalize.trim': true },
+      },
     },
   },
 

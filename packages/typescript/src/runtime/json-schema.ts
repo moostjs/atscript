@@ -1,4 +1,5 @@
 import {
+  annotate,
   defineAnnotatedType,
   isAnnotatedType,
   isPhantomType,
@@ -20,6 +21,32 @@ import { arrayKeyProps, boundOf, DECIMAL_RE, VALIDATOR_KEYS } from './validator-
 /** A JSON Schema object (draft-compatible). */
 export type TJsonSchema = Record<string, any>
 
+/** Options of {@link buildJsonSchema} (and of the `jsonSchemaOptions` plugin option). */
+export interface TJsonSchemaOptions {
+  /**
+   * `additionalProperties: false` on every object schema: the schema rejects keys the type does
+   * not declare, as the validator does with its default `unknownProps: 'error'`.
+   * *(default: `false`)*
+   */
+  closed?: boolean
+  /**
+   * `@meta.description` → `description` and `@meta.label` → `title`, on the schema of the
+   * type or field that carries them. *(default: `true`)*
+   */
+  annotations?: boolean
+  /**
+   * A union of literals (`'a' | 'b'`, also with `null`) → `{ type, enum }` instead of an
+   * `anyOf` of `const` schemas. *(default: `true`)*
+   */
+  enums?: boolean
+}
+
+/** Annotations written as JSON Schema annotation keywords (`annotations` option). */
+const ANNOTATION_KEYWORDS = [
+  ['meta.label', 'title'],
+  ['meta.description', 'description'],
+] as const
+
 /**
  * Builds a JSON Schema from an {@link TAtscriptAnnotatedType}.
  *
@@ -35,9 +62,16 @@ export type TJsonSchema = Record<string, any>
  * ```
  *
  * @param type - The annotated type to convert.
+ * @param opts - {@link TJsonSchemaOptions}.
  * @returns A JSON Schema object.
  */
-export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
+export function buildJsonSchema(
+  type: TAtscriptAnnotatedType,
+  opts?: TJsonSchemaOptions
+): TJsonSchema {
+  const closed = opts?.closed === true
+  const annotations = opts?.annotations !== false
+  const enums = opts?.enums !== false
   /**
    * `$defs` entries by type def (identity): named objects (always extracted) and types found
    * recursive (`type Json = string | Json[]`), with the name each asks for (its id). Names are
@@ -67,10 +101,47 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     if (typeof schema.type === 'string' && !('const' in schema) && !schema.enum) {
       return { ...schema, type: [schema.type, 'null'] }
     }
-    if (Object.keys(schema).length === 1 && Array.isArray(schema.anyOf)) {
-      return { anyOf: [...schema.anyOf, { type: 'null' }] }
+    // (the field's annotation keywords — title, description — stay on the field: beside `anyOf`)
+    const notes: TJsonSchema = {}
+    let body = schema
+    for (const [, keyword] of ANNOTATION_KEYWORDS) {
+      if (body[keyword] !== undefined) {
+        if (body === schema) {
+          body = { ...schema }
+        }
+        notes[keyword] = body[keyword]
+        delete body[keyword]
+      }
     }
-    return { anyOf: [schema, { type: 'null' }] }
+    // (a use's notes beside a `$ref` sat in an `allOf` of the reference alone: now beside the
+    // `anyOf`, the reference stands by itself)
+    if (body !== schema && Object.keys(body).length === 1 && body.allOf?.length === 1) {
+      body = body.allOf[0]
+    }
+    if (Object.keys(body).length === 1 && Array.isArray(body.anyOf)) {
+      return { anyOf: [...body.anyOf, { type: 'null' }], ...notes }
+    }
+    return { anyOf: [body, { type: 'null' }], ...notes }
+  }
+  /**
+   * A use of a `$defs` entry: `schema` (its `$ref`) with what the use adds to the entry (built
+   * from `own`, see `ownDef`): its key counts, and its title / description when they differ
+   * from the entry's — beside the reference, in an `allOf`.
+   */
+  const useOf = (
+    schema: TJsonSchema,
+    def: TAtscriptAnnotatedType,
+    own: TAtscriptAnnotatedType | undefined,
+    keyCounts = false
+  ): TJsonSchema => {
+    const extra: TJsonSchema = {}
+    if (annotations) {
+      applyAnnotationKeywords(extra, def.metadata, own?.metadata)
+    }
+    if (keyCounts) {
+      applyKeyCounts(extra, def.metadata)
+    }
+    return Object.keys(extra).length > 0 ? { allOf: [schema], ...extra } : schema
   }
   /**
    * Non-primitive type defs being built: `true` once re-entered (recursive). A named object
@@ -112,7 +183,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     own: TAtscriptAnnotatedType
   ): TWalk<TJsonSchema> {
     if (def === own || inlining.has(def) || sameConstraints(def, own)) {
-      return ref(typeDef)
+      return useOf(ref(typeDef), def, own)
     }
     inlining.add(def)
     const schema = (yield buildDef(def)) as TJsonSchema
@@ -148,6 +219,9 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
       }
       schema.patternProperties = patternProperties(built, Object.keys(properties))
     }
+    if (closed) {
+      schema.additionalProperties = false
+    }
     return schema
   }
 
@@ -165,15 +239,22 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     rootEntered = true
     // Extract named object types into $defs (unless root level)
     if (def.id && typeDef.kind === 'object' && !atRoot) {
+      // (a use without a known declaration — no `ref` — is the declaration as far as known)
+      const own = annotations ? (ownDef(def, type) ?? def) : undefined
       if (!defs.has(typeDef)) {
         reserve(typeDef, def.id, true)
         const outer = building
         building = new Map()
-        defs.get(typeDef)!.schema = (yield buildObject(def)) as TJsonSchema
+        const entry = (yield buildObject(def)) as TJsonSchema
+        if (own) {
+          applyAnnotationKeywords(entry, own.metadata)
+        }
+        defs.get(typeDef)!.schema = entry
         building = outer
       }
-      // (the named entry is the type's own: this use's key counts go next to the reference)
-      return withKeyCounts(ref(typeDef), def.metadata)
+      // (the named entry is the type's own: this use's key counts and notes go next to the
+      // reference)
+      return useOf(ref(typeDef), def, own, true)
     }
     if (defs.has(typeDef)) {
       return (yield refTo(typeDef, def, shared.get(typeDef)?.first ?? ownOf(def))) as TJsonSchema
@@ -215,7 +296,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     const own = ownOf(def)
     const same = def === own || sameConstraints(def, own)
     defs.get(typeDef)!.schema = same ? schema : ((yield buildDef(own)) as TJsonSchema)
-    return def === type || !same ? schema : ref(typeDef)
+    return def === type || !same ? schema : useOf(ref(typeDef), def, own)
   }
 
   /** The node carrying `def`'s type's own metadata (see `ownDef`), memoized per node. */
@@ -229,8 +310,17 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
     return own
   }
 
-  /** The schema of `def`'s own type (see {@link build}). */
+  /** The schema of `def`'s own type (see {@link build}), with its title / description. */
   function* buildDef(def: TAtscriptAnnotatedType): TWalk<TJsonSchema> {
+    const schema = (yield buildBody(def)) as TJsonSchema
+    if (annotations) {
+      applyAnnotationKeywords(schema, def.metadata)
+    }
+    return schema
+  }
+
+  /** The schema of `def`'s own type, without its title / description (see {@link buildDef}). */
+  function* buildBody(def: TAtscriptAnnotatedType): TWalk<TJsonSchema> {
     const meta = def.metadata
     const all = function* (items: TAtscriptAnnotatedType[]): TWalk<TJsonSchema[]> {
       const out: TJsonSchema[] = []
@@ -292,7 +382,7 @@ export function buildJsonSchema(type: TAtscriptAnnotatedType): TJsonSchema {
           // go onto the members they apply to.
           applyUnionConstraints(built, meta, items)
         }
-        schema = { anyOf: built }
+        schema = (enums && enumOf(built, refSchemas)) || { anyOf: built }
       }
       // (key counts apply to the object members only, as the JSON Schema keywords do)
       applyKeyCounts(schema, meta)
@@ -668,11 +758,65 @@ function applyKeyCounts(schema: TJsonSchema, meta: TMetadata): void {
   }
 }
 
-/** `schema` (a `$ref`) with the key counts of `meta`, if any (beside it, in an `allOf`). */
-function withKeyCounts(schema: TJsonSchema, meta: TMetadata): TJsonSchema {
-  const counts: TJsonSchema = {}
-  applyKeyCounts(counts, meta)
-  return Object.keys(counts).length > 0 ? { allOf: [schema], ...counts } : schema
+/** `@meta.label` → `title`, `@meta.description` → `description` (see `annotations`). */
+function applyAnnotationKeywords(schema: TJsonSchema, meta: TMetadata, except?: TMetadata): void {
+  if (metaEmpty(meta)) {
+    return
+  }
+  for (const [key, keyword] of ANNOTATION_KEYWORDS) {
+    const value = meta.get(key)
+    if (value !== undefined && value !== except?.get(key)) {
+      schema[keyword] = value
+    }
+  }
+}
+
+/**
+ * The `{ type, enum }` schema of a union whose members are all literals (`const`, a nested
+ * union of literals' `enum`, or `null`), at least one of them not `null`; `undefined` for any
+ * other union (a member with other keywords — a title, a constraint — keeps the `anyOf`).
+ */
+function enumOf(members: TJsonSchema[], refs: WeakSet<TJsonSchema>): TJsonSchema | undefined {
+  const values: unknown[] = []
+  const types: string[] = []
+  let literal = false
+  for (const member of members) {
+    if (refs.has(member)) {
+      return undefined
+    }
+    const keys = Object.keys(member)
+    let memberValues: unknown[]
+    if ('const' in member && keys.every(k => k === 'const' || k === 'type')) {
+      memberValues = [member.const]
+      literal = true
+    } else if (Array.isArray(member.enum) && keys.every(k => k === 'enum' || k === 'type')) {
+      memberValues = member.enum
+      literal = true
+    } else if (member.type === 'null' && keys.length === 1) {
+      memberValues = [null]
+    } else {
+      return undefined
+    }
+    for (const value of memberValues) {
+      if (!values.includes(value)) {
+        values.push(value)
+      }
+    }
+    for (const t of [member.type ?? []].flat() as string[]) {
+      if (!types.includes(t)) {
+        types.push(t)
+      }
+    }
+  }
+  if (!literal) {
+    return undefined
+  }
+  const schema: TJsonSchema = {}
+  if (types.length > 0) {
+    schema.type = types.length === 1 ? types[0] : types
+  }
+  schema.enum = values
+  return schema
 }
 
 /** String / number constraints on a scalar schema whose `type` is already set. */
@@ -758,8 +902,9 @@ function applyUnionConstraints(
       )
       continue
     }
-    // A literal member is exempt, as in the validator: its value is fixed.
-    if (member.const !== undefined) {
+    // A literal member is exempt, as in the validator: its value is fixed (a union of
+    // literals, `enums`, too).
+    if (member.const !== undefined || member.enum !== undefined) {
       continue
     }
     const type = member.type
@@ -822,7 +967,20 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
   const defsSource = schema.$defs || schema.definitions || {}
   const resolved = new Map<string, TAtscriptAnnotatedType>()
 
+  /** `title` → `@meta.label`, `description` → `@meta.description` (not on a shared `$ref`). */
   const convert = (s: TJsonSchema): TAtscriptAnnotatedType => {
+    const type = convertNode(s)
+    if (s && !s.$ref) {
+      for (const [key, keyword] of ANNOTATION_KEYWORDS) {
+        if (typeof s[keyword] === 'string') {
+          annotate(type.metadata, key, s[keyword])
+        }
+      }
+    }
+    return type
+  }
+
+  const convertNode = (s: TJsonSchema): TAtscriptAnnotatedType => {
     if (!s || Object.keys(s).length === 0) {
       return defineAnnotatedType().designType('any').$type
     }
@@ -885,7 +1043,7 @@ export function fromJsonSchema(schema: TJsonSchema): TAtscriptAnnotatedType {
     if (Array.isArray(s.type)) {
       const handle = defineAnnotatedType('union')
       for (const t of s.type) {
-        handle.item(convert({ ...s, type: t }))
+        handle.item(convert({ ...s, type: t, title: undefined, description: undefined }))
       }
       return handle.$type
     }
@@ -1044,9 +1202,13 @@ function annotateNumberBounds(handle: TAnnotatedTypeHandle, s: TJsonSchema): voi
  * to it are renamed.
  *
  * @param types - Array of annotated types, each with an `id`.
+ * @param opts - {@link TJsonSchemaOptions}, for every schema.
  * @returns An object with `schemas` (keyed by id) and shared `$defs`.
  */
-export function mergeJsonSchemas(types: TAtscriptAnnotatedType[]): {
+export function mergeJsonSchemas(
+  types: TAtscriptAnnotatedType[],
+  opts?: TJsonSchemaOptions
+): {
   schemas: Record<string, TJsonSchema>
   $defs: Record<string, TJsonSchema>
 } {
@@ -1058,7 +1220,7 @@ export function mergeJsonSchemas(types: TAtscriptAnnotatedType[]): {
     if (!name) {
       throw new Error('mergeJsonSchemas: all types must have an id')
     }
-    const { $defs: defs, ...schema } = buildJsonSchema(type)
+    const { $defs: defs, ...schema } = buildJsonSchema(type, opts)
     if (!defs) {
       schemas[name] = schema
       continue

@@ -3,6 +3,7 @@
 import type { TAnnotationsTree } from '../config'
 import type { AtscriptDoc } from '../document'
 import {
+  isConst,
   isGroup,
   isInterface,
   isPrimitive,
@@ -132,6 +133,11 @@ export interface TAnnotationSpecConfig {
   description?: string
   nodeType?: TNodeEntity[]
   defType?: Array<SemanticPrimitiveNode['type']>
+  /**
+   * With `defType`: a literal of an accepted type matches too (`'a'` for `string`, `1` for
+   * `number`), alone or as a union member (`'a' | 'b' | null`).
+   */
+  defTypeLiterals?: boolean
   argument?: TAnnotationArgument[] | TAnnotationArgument
   validate?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => TMessages | undefined
   modify?: (mainToken: Token, args: Token[], doc: AtscriptDoc) => void
@@ -452,13 +458,14 @@ export class AnnotationSpec {
     if (!defType?.length) {
       return undefined
     }
-    if (matchesDefType(def, defType)) {
+    const literals = this.config.defTypeLiterals
+    if (matchesDefType(def, defType, literals)) {
       return undefined
     }
     let got: string
     if (isGroup(def) && describeNode(def) === 'union') {
       const members = doc ? nonNullishMembers(def, doc) : undefined
-      if (members?.length && members.every(m => matchesDefType(m, defType))) {
+      if (members?.length && members.every(m => matchesDefType(m, defType, literals))) {
         return undefined
       }
       got = `union (${describeUnionMembers(def, doc)})`
@@ -628,12 +635,27 @@ function isNullishPrimitive(node: SemanticNode | undefined): boolean {
   return isPrimitive(node) && (node.type === 'null' || node.type === 'void')
 }
 
-/** Whether a resolved node satisfies a `defType` guard (a union as a whole, not its members). */
+/**
+ * Whether a resolved node satisfies a `defType` guard (a union as a whole, not its members);
+ * `literals`: a literal of an accepted type does too (see `defTypeLiterals`).
+ */
 function matchesDefType(
   def: SemanticNode | undefined,
-  defType: Array<SemanticPrimitiveNode['type']>
+  defType: Array<SemanticPrimitiveNode['type']>,
+  literals?: boolean
 ): boolean {
-  return defType.includes(describeNode(def) as SemanticPrimitiveNode['type'])
+  if (defType.includes(describeNode(def) as SemanticPrimitiveNode['type'])) {
+    return true
+  }
+  return !!literals && isConst(def) && defType.includes(literalType(def))
+}
+
+/**
+ * The `defType` vocabulary name of a literal's value (`'a'` → `string`, `1` → `number`; atscript
+ * literals are strings and numbers).
+ */
+function literalType(def: SemanticNode): SemanticPrimitiveNode['type'] {
+  return def.token('identifier')?.type === 'number' ? 'number' : 'string'
 }
 
 /** The `defType` vocabulary name of a resolved node (`string`, `object`, `union`, `array`, …). */
@@ -779,7 +801,7 @@ function valueKinds(
   }
   seen.add(node)
   if (node.entity === 'const') {
-    return new Set([node.token('identifier')?.type === 'number' ? 'number' : 'string'])
+    return new Set([literalType(node)])
   }
   if (isGroup(node) && node.entity !== 'tuple' && node.op === '&') {
     let out: Set<string> | undefined

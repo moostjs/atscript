@@ -13,10 +13,11 @@ describe('coerceForType', () => {
   let Level: any
   let MaybeNumber: any
   let SearchQuery: any
+  let CTree: any
 
   beforeAll(async () => {
     await prepareFixtures({ rootDir, entries: ['coerce.as'] })
-    ;({ KafkaOffset, Flag, Level, MaybeNumber, SearchQuery } = await import(
+    ;({ KafkaOffset, Flag, Level, MaybeNumber, SearchQuery, CTree } = await import(
       path.join(rootDir, 'coerce.as.js')
     ))
   })
@@ -150,6 +151,27 @@ describe('coerceForType', () => {
     it('returns non-array input untouched', () => {
       const arr = SearchQuery.type.props.get('ids')
       expect(coerceForType(arr, '1,2')).toBe('1,2')
+    })
+  })
+
+  describe('hardening', () => {
+    it('an own `__proto__` key stays an own key (never the output’s prototype)', () => {
+      const input = JSON.parse('{"__proto__": {"role": "admin"}, "offset": "5"}')
+      const out = coerceForType(SearchQuery, input) as any
+      expect(out.offset).toBe(5)
+      expect(Object.getPrototypeOf(out)).toBe(Object.prototype)
+      expect(out.role).toBeUndefined()
+      expect(Object.keys(out)).toContain('__proto__')
+    })
+
+    it('a recursive union is linear (first matching branch, no backtracking)', () => {
+      const mk = (d: number): any =>
+        d === 0 ? { a: '1', children: [] } : { a: '1', children: [mk(d - 1), mk(0)] }
+      const start = performance.now()
+      const out = coerceForType(CTree, mk(400)) as any
+      expect(out.a).toBe(1)
+      expect(out.children[0].children[1].a).toBe(1)
+      expect(performance.now() - start).toBeLessThan(1000)
     })
   })
 })

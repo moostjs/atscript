@@ -23,6 +23,9 @@ declare global {
     'expect.array.uniqueItems': { message?: string } | true
     'expect.array.key': { message?: string } | true
     'expect.pattern': Array<{ pattern: string; flags?: string; message?: string }>
+    'normalize.trim': boolean
+    'normalize.lowercase': boolean
+    'normalize.uppercase': boolean
     'mongo.collection': string
     'mongo.index.plain': Array<string | true>
     'mongo.index.unique': Array<string | true>

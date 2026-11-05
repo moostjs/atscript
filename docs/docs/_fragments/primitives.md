@@ -61,7 +61,7 @@ export interface User {
 
 Use them when the field has a real meaning that is stronger than plain `string`.
 
-Other string extensions include `string.ipv4` and `string.ipv6` for protocol-specific IP address validation.
+Other string extensions include `string.ipv4` and `string.ipv6` for protocol-specific IP address validation, and `string.trimmed`: a string whose surrounding whitespace is removed before validation (the [`@normalize.trim`](/packages/typescript/annotations-reference#normalize-annotations-normalize) normalizer).
 
 ### Number Extensions
 

@@ -8,6 +8,7 @@ First-class in `.as`. Attach metadata + validation to types, properties, primiti
 - [Built-in namespaces](#built-in-namespaces)
 - [`@meta.*`](#meta) — id, label, description, documentation, sensitive, readonly, required, default, example
 - [`@expect.*`](#expect) — min, max, int, pattern, minLength, maxLength, array.uniqueItems, array.key
+- [`@normalize.*`](#normalize) — trim, lowercase, uppercase
 - [`@emit.*`](#emit) — jsonSchema, compiledValidator
 - [Merge](#merge) — replace (default) vs append
 - [Pattern-property annotations](#pattern-property-annotations)
@@ -40,7 +41,7 @@ export interface User {
 
 ## Built-in namespaces
 
-Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints checked by `Validator`), and `@emit.*` (codegen flags). All other namespaces come from plugins.
+Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints checked by `Validator`), `@normalize.*` (input normalizers applied before validation), and `@emit.*` (codegen flags). All other namespaces come from plugins.
 
 ## `@meta.*`
 
@@ -109,6 +110,29 @@ export interface CartItem {
 export interface Cart {
   @expect.array.uniqueItems
   items: CartItem[]      // uniqueness by sku
+}
+```
+
+## `@normalize.*`
+
+Flag annotations (no args) on a `string` host: a prop, a type alias (its fields, array items and `T.field` refs inherit it), a nullable or literal union (`string | null`, `'a' | 'b'`). Non-string host → `Expected type is (string), …` error. `prop` / `type` only (not an interface).
+
+| Annotation             | Effect                                                               |
+| ---------------------- | -------------------------------------------------------------------- |
+| `@normalize.trim`      | Strip leading/trailing whitespace. Also `string.trimmed`.            |
+| `@normalize.lowercase` | `toLowerCase()`.                                                     |
+| `@normalize.uppercase` | `toUpperCase()`. Beside `lowercase` → warning (uppercase runs last). |
+
+Order: trim → lowercase → uppercase. `Validator` NEVER applies them (interpreted and compiled alike): call `normalizeForType(type, value)` before `validate()` ([validation.md](validation.md#normalizefortype--input-normalizers)); `validatorPipe` of `@atscript/moost-validator` does it for you.
+
+```atscript
+@normalize.trim
+@normalize.lowercase
+export type Email = string.email   // every `email: Email` field / `Email[]` item is normalized
+
+interface Signup {
+  @normalize.lowercase
+  plan: 'free' | 'pro'             // 'PRO' → 'pro', then matches the literal
 }
 ```
 

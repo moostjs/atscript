@@ -140,6 +140,25 @@ Converts string input (route params, query strings) toward the annotated type's 
 
 In Moost apps use `coercionPipe` from `@atscript/moost-validator` instead of calling this directly — see [moost-validator.md](moost-validator.md#coercion-rules-coercionpipe).
 
+## `normalizeForType` — input normalizers
+
+```ts
+import { normalizeForType } from '@atscript/typescript/utils'
+
+const input = normalizeForType(Signup, body) // @normalize.trim / lowercase / uppercase applied
+Signup.validator().validate(input) // order: coerceForType → normalizeForType → validate
+```
+
+Applies `@normalize.*` ([annotations.md](annotations.md#normalize)). The validator never normalizes — every write path (HTTP pipe, DB write, form submit) must call this before `validate()`.
+
+| #   | Rule                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Pure: returns a normalized copy, never mutates input. Copy-on-change: nothing to change → the same object back; untouched sub-objects are shared; a type without normalizers returns the input at once. Never validates. Does not throw on ordinary input (a cyclic value overflows the stack, as in `Validator`).                                                                                                                                                                                                                                                                          |
+| 2   | Only strings change (trim → lowercase → uppercase). Non-strings, wrong-kind values, non-plain objects (`Date`, `Buffer`, class instances) and strings without normalizers are returned as they are. Unknown props kept (an own `__proto__` key stays an own key). An object whose literal prop holds another value is left as it is.                                                                                                                                                                                                                                                                                          |
+| 3   | Walks object props + pattern props, arrays, tuples, intersections, unions. A union's own normalizers apply to its string branches (`@normalize.trim x?: string \| null`).                                                                                                                                                                                                                                                                                 |
+| 4   | Unions normalize only when unambiguous: an object union with a discriminator uses the branch it names; otherwise every branch that can take the value must give the same result (a literal branch takes a string only if the normalized string equals the literal), if they differ, the branches whose own validator (default options) accepts their result decide: one agreed result is used, else the value is returned untouched. `contact: Email \| Digits` with `' A@B.CO '` → `'a@b.co'` (only the `Email` result validates); `Email \| Code` where both results validate → untouched. Linear in the value's size (each object is normalized once per type, recursive unions included). |
+| 5   | Works on deserialized types (`normalize.*` metadata survives `serializeAnnotatedType`).                                                                                                                                                                                                                                                                                                                                                                   |
+
 ## `decimal` format
 
 `decimal` values are **strings** at runtime, validated against a strict canonical shape — `^[+-]?\d+(\.\d+)?$` — never JS number coercion:
@@ -153,7 +172,9 @@ Rationale + full sample table: docs → `plugin-development/validation-spec.md` 
 
 ## JSON Schema
 
-### `buildJsonSchema(annotatedType)`
+### `buildJsonSchema(annotatedType, opts?)`
+
+Options (`TJsonSchemaOptions`): `annotations` (default `true`: `@meta.description` → `description`, `@meta.label` → `title`; a field's own description beside a `$ref` goes into `{ allOf: [{ $ref }], description }`, an inherited one stays on the `$defs` entry; an optional field keeps them beside its `anyOf: [T, null]`), `enums` (default `true`: a union of literals, also with `null` → `{ type, enum }`, e.g. `{ type: ['string','null'], enum: ['x','y',null] }`; a member with other keywords keeps `anyOf`), `closed` (default `false`: `additionalProperties: false` on every object — then the schema accepts exactly what the validator accepts with its default `unknownProps: 'error'`). `annotations: false, enums: false` = the output of 0.2.4 and earlier. The generated `toJsonSchema()` uses the plugin option `ts({ jsonSchemaOptions })` (lazy, bundle and `@emit.jsonSchema` alike, identical to `buildJsonSchema(type, jsonSchemaOptions)`).
 
 Runtime type → JSON Schema. Accepts exactly what the validator accepts with `unknownProps: 'ignore'`: optional props also accept `null` (`type: [T, 'null']` / `anyOf: [T, {type:'null'}]`, not with `@meta.required`), tuples get `minItems`/`maxItems`, `decimal` a pattern, `never` is `{ not: {} }`, `@meta.required` strings `pattern: '\\S'` (booleans `const: true`), `@expect.array.uniqueItems` → `uniqueItems: true`, pattern props → `patternProperties` (excluding declared names). Documented differences: uniqueness by `@expect.array.key` props (no `uniqueItems`), key order of unique object items, a key matching several pattern props (validator: any; schema: all). Named nested object types (with an `id`) are extracted into `$defs` + `$ref`; types without an `id` held in several places or recursive go to `$defs` too, one entry per distinct schema (a recursive merge used at several places: one entry). The root is **not** extracted — the returned object is the schema itself (e.g. `{ type: 'object', properties, $defs? }`). No `$schema` field. Discriminated unions detected when members share a literal-valued property.
 
@@ -166,15 +187,15 @@ const schema = buildJsonSchema(User)
 
 ### `fromJsonSchema(schema)`
 
-Reverse. For OpenAPI / JSON-Schema-first interop.
+Reverse. For OpenAPI / JSON-Schema-first interop. `description` / `title` → `@meta.description` / `@meta.label`; `enum` → union of literals; `additionalProperties` ignored.
 
 ```ts
 const annotatedType = fromJsonSchema(mySchema)
 ```
 
-### `mergeJsonSchemas(types)`
+### `mergeJsonSchemas(types, opts?)`
 
-Combines types into `{ schemas: Record<id, schema>, $defs: Record<id, schema> }` — every type must have an `id`. Useful for a single OpenAPI doc covering many models. Equal definitions (references compared too) are shared; a different one asking for a taken name (two `Address` types from different files) becomes `Address_1`, references renamed.
+`opts`: the `buildJsonSchema` options, for every schema. Combines types into `{ schemas: Record<id, schema>, $defs: Record<id, schema> }` — every type must have an `id`. Useful for a single OpenAPI doc covering many models. Equal definitions (references compared too) are shared; a different one asking for a taken name (two `Address` types from different files) becomes `Address_1`, references renamed.
 
 ```ts
 const { schemas, $defs } = mergeJsonSchemas([User, Project, Team])

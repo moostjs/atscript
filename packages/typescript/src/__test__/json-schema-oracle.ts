@@ -72,6 +72,8 @@ interface TCase {
   schemaOk: boolean
   validatorOk: boolean
   nonUnicode: boolean
+  /** the validator's `unknownProps` (`'error'` for a closed schema) */
+  unknownProps: 'ignore' | 'error'
 }
 
 /**
@@ -86,7 +88,7 @@ export const ALLOWED: Array<{ reason: string; match: (c: TCase) => boolean }> = 
     match: c =>
       !c.validatorOk &&
       c.schemaOk &&
-      new NoUniqueValidator(c.type, { unknownProps: 'ignore' }).validate(
+      new NoUniqueValidator(c.type, { unknownProps: c.unknownProps }).validate(
         structuredClone(c.value),
         true
       ),
@@ -220,7 +222,8 @@ function compile(schema: object, nonUnicode: boolean): (value: unknown) => boole
 /**
  * The disagreements of `type`'s JSON schemas (runtime, and bundled when `bundled`) with the
  * validator (`unknownProps: 'ignore'`) on `values` (as JSON: `undefined` props dropped, a
- * top-level `undefined` skipped). `checks` counts the comparisons.
+ * top-level `undefined` skipped). `checks` counts the comparisons. `closed`: the runtime schema
+ * built with `{ closed: true }` against the validator's `unknownProps: 'error'`.
  */
 export function schemaDisagreements(
   label: string,
@@ -228,15 +231,18 @@ export function schemaDisagreements(
   values: unknown[],
   bundled: boolean,
   stats?: { checks: number; allowed?: Record<string, number> },
-  nonUnicode = false
+  nonUnicode = false,
+  closed = false
 ): string[] {
   stats ??= { checks: 0 }
   const out: string[] = []
-  const schemas: Array<[string, object]> = [['runtime', buildJsonSchema(type)]]
+  const schemas: Array<[string, object]> = [
+    [closed ? 'runtime closed' : 'runtime', buildJsonSchema(type, { closed })],
+  ]
   if (bundled) {
     schemas.push(['bundled', (type as any).toJsonSchema()])
   }
-  const validator = new Validator(type, { unknownProps: 'ignore' })
+  const validator = new Validator(type, { unknownProps: closed ? 'error' : 'ignore' })
   for (const [kind, schema] of schemas) {
     let check: (value: unknown) => boolean
     try {
@@ -253,7 +259,15 @@ export function schemaDisagreements(
       const expected = validator.validate(structuredClone(value), true)
       const got = check(structuredClone(value))
       stats.checks++
-      const c: TCase = { type, schema, value, schemaOk: got, validatorOk: expected, nonUnicode }
+      const c: TCase = {
+        type,
+        schema,
+        value,
+        schemaOk: got,
+        validatorOk: expected,
+        nonUnicode,
+        unknownProps: closed ? 'error' : 'ignore',
+      }
       const allowed = got === expected ? undefined : ALLOWED.find(a => a.match(c))
       if (allowed) {
         stats.allowed ??= {}

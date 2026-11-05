@@ -43,6 +43,7 @@ import type { TStructDecl } from '@atscript/core'
 import {
   type TCompileValidatorsMode,
   type TTsPluginOptions,
+  jsonSchemaOptionsArg,
   resolveJsonSchemaMode,
 } from '../plugin'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
@@ -469,6 +470,8 @@ export abstract class JsRenderer extends BaseRenderer {
       return text
     }
     const views = new Map<string, { schema: string; accounted: string }>()
+    // (the options argument follows the modules: written whenever options are)
+    const options = jsonSchemaOptionsArg(this.opts)
     const viewOf = (id: string) => {
       let view = views.get(id)
       if (!view) {
@@ -476,12 +479,18 @@ export abstract class JsRenderer extends BaseRenderer {
         let accounted = [REALM_FAILED]
         try {
           const type = realm.classOf(this.doc, id) as TAtscriptAnnotatedType
-          schema = JSON.stringify(realm.rt.buildJsonSchema(type))
+          schema = JSON.stringify(realm.rt.buildJsonSchema(type, this.opts?.jsonSchemaOptions))
           accounted = this.accountedFor(realm, type)
         } catch {
           // (the module throws when loaded: the runtime's schema, see `bundledJsonSchema`)
         }
-        view = { schema, accounted: accounted.length > 0 ? `, ${JSON.stringify(accounted)}` : '' }
+        view = {
+          schema,
+          accounted:
+            accounted.length > 0 || options
+              ? `, ${JSON.stringify(accounted)}${options ? `, ${options}` : ''}`
+              : '',
+        }
         views.set(id, view)
       }
       return view
@@ -640,7 +649,10 @@ export abstract class JsRenderer extends BaseRenderer {
     if (mode === 'lazy') {
       this.writeln('static toJsonSchema() {')
       // (built once, again after a block of another module's type or a runtime edit)
-      this.indent().writeln(`return ${this.util('lazyJsonSchema')}(this)`)
+      const options = jsonSchemaOptionsArg(this.opts)
+      this.indent().writeln(
+        `return ${this.util('lazyJsonSchema')}(this${options ? `, ${options}` : ''})`
+      )
       this.unindent()
       this.writeln('}')
     } else {
