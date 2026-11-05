@@ -1,3 +1,14 @@
+## [0.2.7](https://github.com/moostjs/atscript/compare/v0.2.6...v0.2.7) (2026-11-05)
+
+
+### Bug Fixes
+
+* **cli:** db sync exits 1 when an applied run leaves entries with errors ([3b0ffcc](https://github.com/moostjs/atscript/commit/3b0ffcc007d05d16710e069bfc3edb60ee32e580))
+
+
+### Features
+
+* **typescript:** export typeHasNormalizers (cached, current across runtime type writes) ([96e9574](https://github.com/moostjs/atscript/commit/96e95744cd526d4befdd875a902b1794987b89ed))
 ## [0.2.6](https://github.com/moostjs/atscript/compare/v0.2.5...v0.2.6) (2026-11-05)
 
 
