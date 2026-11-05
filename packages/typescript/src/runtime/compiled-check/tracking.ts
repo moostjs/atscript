@@ -21,11 +21,12 @@ const mapSet = Map.prototype.set
 let epoch = 0
 
 /**
- * Writes of metadata maps so far (any map, any key: `annotate()`, the `Map` methods, a node's map
- * replaced, a layer flag or intrinsic mark registered): a lazy JSON schema or a layered map's
- * flattened view built before the last one is built again (see `lazyJsonSchema`, `LayerMap`).
+ * Writes of type trees so far, watched or not: of metadata (any map, any key: `annotate()`, the
+ * `Map` methods, a node's map replaced, a layer flag or intrinsic mark registered) and of shape
+ * (every {@link touched} mutation, `invalidateCompiledValidators()`). What is derived from a type
+ * tree before the last write is derived again (`lazyJsonSchema`, `LayerMap`, `normalizeForType`).
  */
-let metadataWrites = 0
+let typeWrites = 0
 
 /** Some bind has watched an object (until then no mutation can affect a compiled check). */
 let tracking = false
@@ -44,8 +45,12 @@ export function watch(obj: object): void {
   watched.add(obj)
 }
 
-/** Records a tracked mutation of `obj` (a no-op unless some bind has read it). */
+/**
+ * Records a tracked mutation of `obj`: a type tree write (see `typeWrites`); compiled checks
+ * re-bind when some bind has read it.
+ */
 export function touched(obj: object): void {
+  typeWrites++
   if (tracking && watched.has(obj)) {
     epoch++
   }
@@ -76,17 +81,17 @@ export function touched(obj: object): void {
 export function invalidateCompiledValidators(): void {
   epoch++
   // (a raw write it announces may be a node's metadata replaced: layered reads re-flatten)
-  metadataWrites++
+  typeWrites++
 }
 
-/** The number of metadata writes so far (see `metadataWrites`). */
-export function metadataWriteCount(): number {
-  return metadataWrites
+/** The number of type tree writes so far (see `typeWrites`). */
+export function typeWriteCount(): number {
+  return typeWrites
 }
 
 /** Records a write of a node's metadata the maps do not see: the node's map replaced. */
 export function metadataReplaced(): void {
-  metadataWrites++
+  typeWrites++
 }
 
 /**
@@ -103,8 +108,9 @@ export function appendOwn(
     own.push(value)
     if (VALIDATOR_KEY_SET.has(key)) {
       touched(m)
+    } else {
+      typeWrites++
     }
-    metadataWrites++
   } else {
     m.set(key, [own, value])
   }
@@ -129,8 +135,9 @@ export class AnnotationMap<K = unknown, V = unknown> extends Map<K, V> {
     super.set(key, value)
     if (tracking && VALIDATOR_KEY_SET.has(key)) {
       touched(this)
+    } else {
+      typeWrites++
     }
-    metadataWrites++
     return this
   }
 
@@ -139,8 +146,9 @@ export class AnnotationMap<K = unknown, V = unknown> extends Map<K, V> {
     if (deleted) {
       if (tracking && VALIDATOR_KEY_SET.has(key)) {
         touched(this)
+      } else {
+        typeWrites++
       }
-      metadataWrites++
     }
     return deleted
   }
@@ -148,7 +156,6 @@ export class AnnotationMap<K = unknown, V = unknown> extends Map<K, V> {
   override clear(): void {
     super.clear()
     touched(this)
-    metadataWrites++
   }
 }
 

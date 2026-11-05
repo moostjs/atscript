@@ -49,7 +49,7 @@ Coercion converts representation only — constraints (`@expect.int`, `@expect.m
 
 - **number** — trimmed, non-empty strings parsed with `Number()`; only finite results are accepted
 - **boolean** — `"true"`/`"1"` → `true`, `"false"`/`"0"` → `false`
-- **unions** — each scalar branch tried in declared order; the first successful parse wins
+- **unions** — one member is chosen and the value is coerced against it only. A member whose literal property (`kind: 'cat'`) holds a value that does not coerce to it is ruled out; for an object, the member its discriminator names comes first, then the first whose shape it has, then the first that takes it (see the [coercion rules](/packages/typescript/validation-reference#input-coercion-coercefortype))
 - **objects** — recurses into props when the input is a plain object, which covers `@Query()` DTOs where every field arrives as a string
 - **arrays** — items are coerced individually
 - **string / decimal** — never changed

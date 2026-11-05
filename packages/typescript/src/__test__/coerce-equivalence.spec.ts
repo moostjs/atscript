@@ -11,6 +11,28 @@ import { coerceForType } from '../runtime/coerce'
 import { forAnnotatedType } from '../runtime/traverse'
 import { prepareFixtures, rng } from '../test-utils'
 
+/** Whether `def` reaches a union with an object, tuple or array branch (see `randomized inputs`). */
+function reachesBranchChoice(def: TAtscriptAnnotatedType, seen = new Set<object>()): boolean {
+  if (seen.has(def)) {
+    return false
+  }
+  seen.add(def)
+  const type = def.type as any
+  const kids: TAtscriptAnnotatedType[] =
+    type.kind === 'object'
+      ? [...type.props.values(), ...type.propsPatterns.map((p: any) => p.def)]
+      : type.kind === 'array'
+        ? [type.of]
+        : (type.items ?? [])
+  if (
+    type.kind === 'union' &&
+    kids.some(k => ['object', 'tuple', 'array', 'union', 'intersection'].includes(k.type.kind))
+  ) {
+    return true
+  }
+  return kids.some(k => reachesBranchChoice(k, seen))
+}
+
 // ── reference: the previous handler-object implementation, verbatim ─────────
 
 const NO_MATCH = Symbol('ref.no-match')
@@ -314,7 +336,12 @@ describe('coerceForType — switch dispatch matches the previous implementation'
 
     it('randomized inputs', () => {
       const r = rng(12)
-      const types = Object.values(gen).filter(t => t && (t as any).__is_atscript_annotated_type)
+      // (the branch a union picks for an object or an array — by literal props, discriminators and
+      // shape — differs from the reference by design, which takes the first object branch: the
+      // types reaching such a union are left out here; coerce.spec.ts covers union branch choice)
+      const types = Object.values(gen).filter(
+        t => t && (t as any).__is_atscript_annotated_type && !reachesBranchChoice(t)
+      )
       expect(types.length).toBeGreaterThan(4)
       for (let i = 0; i < 2000; i++) {
         const input = randomInput(r)

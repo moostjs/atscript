@@ -62,7 +62,7 @@ async create(@Body() dto: CreateUserDto) {
 }
 ```
 
-This applies to every parameter source, request bodies included. The request's original object is not changed: the handler gets a normalized copy (or the same object when nothing needed normalizing). Together with the [Coercion Pipe](/packages/moost-validator/coercion-pipe), the order is coerce → normalize → validate.
+This applies to every parameter source, request bodies included. When union members normalize a value differently, the pipe settles it with its own validator options (`partial`, `unknownProps`, …), so a partial update is normalized as the member it validates as. The request's original object is not changed: the handler gets a normalized copy (or the same object when nothing needed normalizing). Together with the [Coercion Pipe](/packages/moost-validator/coercion-pipe), the order is coerce → normalize → validate.
 
 ## Validate PATCH Payloads
 

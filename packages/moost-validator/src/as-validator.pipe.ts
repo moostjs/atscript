@@ -14,8 +14,9 @@ import { definePipeFn, Pipe, TPipePriority } from 'moost'
  * The pipe inspects the runtime metadata supplied by Moost; when the target
  * parameter type is an atscript‑annotated class or interface it first applies the
  * type's normalizers (`@normalize.trim` / `lowercase` / `uppercase`, see
- * `normalizeForType`), then calls `type.validator(opts).validate(value)` on the
- * normalized value, and hands the normalized value to the handler. Input without
+ * `normalizeForType`, judging union branches with the same `opts`), then calls
+ * `type.validator(opts).validate(value)` on the normalized value, and hands the
+ * normalized value to the handler. Input without
  * normalizers is passed on as it is (the same object).
  *
  * The pipe is registered at {@link TPipePriority.VALIDATE}, ensuring it fires
@@ -52,7 +53,7 @@ export const validatorPipe = (opts?: Partial<TValidatorOptions>) => {
         validator = type.validator(opts)
         validators.set(type, validator)
       }
-      const normalized = normalizeForType(type, value)
+      const normalized = normalizeForType(type, value, opts)
       validator.validate(normalized)
       return normalized
     }

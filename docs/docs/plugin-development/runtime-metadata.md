@@ -80,12 +80,15 @@ annotate(homeCity.metadata, 'expect.pattern', { pattern: '^[A-Z]' }, true)
 
 ## What sees a write
 
+A prop added or removed (`type.props.set` / `delete`, the `defineAnnotatedType()` handle methods) counts as a write too.
+
 | Reader                                                                                | After `metadata.set` / `delete` / `clear` / `annotate()`                                                                              |
 | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `Validator` (interpreted)                                                             | Sees it. A direct edit (`node.metadata = …`) needs `invalidateCompiledValidators()`, as for compiled checks                           |
 | [Compiled checks](/packages/typescript/compiled-validators#changing-types-at-runtime) | Re-bind on their next use: see it. Direct property writes (`node.optional = …`) need `invalidateCompiledValidators()`                 |
 | `toJsonSchema()` with `jsonSchema: 'lazy'`                                            | Rebuilt after a write: sees it                                                                                                        |
 | `toJsonSchema()` with `jsonSchema: 'bundle'`                                          | The schema embedded at build time does **not** see runtime writes. Call `buildJsonSchema(type)` for a schema of the type as it is now |
+| `normalizeForType`, `coerceForType`                                                   | See it                                                                                                                                |
 | `serializeAnnotatedType`, `flattenAnnotatedType`                                      | Read the maps when called: see it                                                                                                     |
 
 ## DOs and DON'Ts

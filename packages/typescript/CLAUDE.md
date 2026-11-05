@@ -40,8 +40,8 @@ TypeScript language extension for Atscript. Three parts: codegen (.d.ts + .js fr
 - `annotate(metadata, key, value, asArray?)` -- set/append metadata on annotated types
 - `isAnnotatedType(type)` / `isAnnotatedTypeOfPrimitive(type)` -- type guards
 - `Validator` class + `ValidatorError`
-- `coerceForType(def, value)` -- pure string-transport coercion (route params/query strings → scalar shapes); never throws or validates, returns input untouched when unparsable
-- `normalizeForType(def, value)` -- pure `@normalize.*` application (trim/lowercase/uppercase) before validation; copy-on-change, never mutates, ambiguous unions settled by per-branch validation or left untouched
+- `coerceForType(def, value)` -- pure string-transport coercion (route params/query strings → scalar shapes); never throws or validates, returns input untouched when unparsable; a union picks one branch that can take the value (object/tuple branches ruled out by literal props/items; for an object: the discriminator's branch, else the first whose shape it has, else the first taker) and coerces against it only — linear
+- `normalizeForType(def, value, opts?)` -- pure `@normalize.*` application (trim/lowercase/uppercase) before validation; copy-on-change, never mutates, ambiguous unions settled by per-branch validation (with `opts`, the validator options the result is validated with) or left untouched
 - `buildJsonSchema(type, opts?)` -- JSON Schema generation with `$defs`/`$ref` for named types; `opts`: `closed` (off), `annotations` (on), `enums` (on); plugin option `jsonSchemaOptions` for generated `toJsonSchema()`
 - `fromJsonSchema(schema)` -- converts JSON Schema back to annotated types (resolves `$ref`/`$defs`)
 - `mergeJsonSchemas(types)` -- combines multiple schemas with shared `$defs` (for OpenAPI)

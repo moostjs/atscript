@@ -293,7 +293,7 @@ export function defineAnnotatedType(_kind?: TKind, base?: any): TAnnotatedTypeHa
     Omit<TAtscriptTypeFinal, 'kind'> &
     Omit<TAtscriptTypeArray, 'kind'> &
     Omit<TAtscriptTypeObject, 'kind'>
-  // Re-initialising a base's type def in place is a structural change (a no-op for new defs).
+  // Re-initialising a base's type def in place is a structural change.
   touched(type)
   // (kind and tags first, whatever the kind: the shape of every def)
   type.kind = kind

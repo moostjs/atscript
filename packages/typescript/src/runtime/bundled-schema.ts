@@ -1,6 +1,6 @@
 import type { TAtscriptAnnotatedType } from './annotated-type'
 import { appliedBlockModules } from './blocks'
-import { metadataWriteCount } from './compiled-check/tracking'
+import { typeWriteCount } from './compiled-check/tracking'
 import { buildJsonSchema } from './json-schema'
 import type { TJsonSchema, TJsonSchemaOptions } from './json-schema'
 
@@ -9,16 +9,16 @@ const lazy = new WeakMap<object, { writes: number; schema: TJsonSchema }>()
 
 /**
  * The JSON schema of `type` built by the runtime (`jsonSchema: 'lazy'`): built once, again after
- * a metadata write (a block, a runtime edit: see `metadataWrites`). Called by generated code
- * (`static toJsonSchema()`), with the `jsonSchemaOptions` of the build (the same for every call
- * of a type).
+ * a type tree write (a block, a runtime edit of metadata or shape: see `typeWrites`). Called by
+ * generated code (`static toJsonSchema()`), with the `jsonSchemaOptions` of the build (the same
+ * for every call of a type).
  */
 export function lazyJsonSchema(
   type: TAtscriptAnnotatedType,
   opts?: TJsonSchemaOptions
 ): TJsonSchema {
   const known = lazy.get(type)
-  const writes = metadataWriteCount()
+  const writes = typeWriteCount()
   if (known?.writes === writes) {
     return known.schema
   }

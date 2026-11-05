@@ -1961,7 +1961,7 @@ export class AtscriptDoc {
       let parentDoc = unwound.doc
       // (a nullable parent — `type N = I | null`, an all-nullable merge: its one item that is
       // not `null`, whose props the child's class has; each definition looked at once)
-      for (const seen = new Set<SemanticNode>(); !seen.has(parentDef); ) {
+      for (const seen = new Set<SemanticNode>(); !seen.has(parentDef);) {
         seen.add(parentDef)
         // If parent is also an interface with extends, resolve recursively
         if (isInterface(parentDef) && (parentDef as SemanticInterfaceNode).hasExtends) {
@@ -2537,6 +2537,12 @@ export class AtscriptDoc {
   }
 
   private _allMessages = undefined as TMessages | undefined
+  /**
+   * The documents' epoch {@link _allMessages} were computed at: they derive from other documents
+   * (its imports, its import component), possibly read before their imports were wired, so they
+   * hold only until any document changes.
+   */
+  private _messagesAt = -1
 
   clearMessages() {
     this._allMessages = undefined
@@ -2614,7 +2620,8 @@ export class AtscriptDoc {
   }
 
   getDiagMessages() {
-    if (!this._allMessages) {
+    if (!this._allMessages || this._messagesAt !== epoch) {
+      this._messagesAt = epoch
       this._allMessages = [
         ...this.registry.getErrors(),
         ...this.semanticMessages,

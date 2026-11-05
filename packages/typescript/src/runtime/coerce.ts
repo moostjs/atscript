@@ -6,6 +6,9 @@ import type {
   TAtscriptTypeObject,
 } from './annotated-type'
 import { isPlainObject, mapItems, mapProps, NO_MATCH } from './copy-on-change'
+import { applyFlags, literalNodes } from './normalize'
+import type { TLiteral } from './normalize'
+import { unionDiscriminator } from './validator'
 
 /**
  * Coerces string-transport input (route params, query strings) toward the
@@ -20,9 +23,19 @@ import { isPlainObject, mapItems, mapProps, NO_MATCH } from './copy-on-change'
  * - Strings targeting `number` are trimmed and parsed via `Number()`; only
  *   finite results are accepted.
  * - Strings targeting `boolean` accept `"true"/"1"` and `"false"/"0"`.
- * - Unions try each branch in declared order; the first successful parse wins.
+ * - Unions pick one branch and coerce the value against it only (linear, no
+ *   backtracking). A scalar branch takes what it parses; an object (tuple)
+ *   branch takes a plain object (an array of its length) unless a literal
+ *   property (item) — `kind: 'cat'`, `kind: 'cat' | null` — holds a value that
+ *   does not coerce to it, a string compared after the normalizers of the
+ *   literal and of the unions it is in. An object takes the branch its
+ *   discriminator names (as the validator does: the literal itself first, else
+ *   `"2"` names a `2` literal), else the first whose shape it has (required
+ *   props present, no undeclared key), else the first that takes it. When no
+ *   branch takes the value, it is returned untouched.
  * - Objects recurse into props when the input is a plain object (covers
- *   `@Query()` DTOs where every field arrives as a string).
+ *   `@Query()` DTOs where every field arrives as a string), whatever their
+ *   literal props hold unless tried as a union branch.
  * - Arrays and tuples coerce items; intersections apply each member in order.
  * - `string` / `decimal` targets never change string input.
  *
@@ -90,13 +103,8 @@ function coerce(def: TAtscriptAnnotatedType, value: unknown): unknown {
         : NO_MATCH
     }
     case 'union': {
-      for (const item of (type as TAtscriptTypeComplex).items) {
-        const result = coerce(item, value)
-        if (result !== NO_MATCH) {
-          return result
-        }
-      }
-      return NO_MATCH
+      const branch = branchOf((type as TAtscriptTypeComplex).items, value)
+      return branch ? coerce(branch, value) : NO_MATCH
     }
     case 'intersection': {
       let current: unknown = value
@@ -160,6 +168,174 @@ function scalar(designType: TAtscriptTypeFinal['designType'], value: unknown): u
       return NO_MATCH
     }
   }
+}
+
+/**
+ * The branch of union `items` that takes `value` (see {@link takes}): the one an object's
+ * discriminator names; else, for an object, the first that takes it and whose shape it has (see
+ * {@link fits}); else the first that takes it, in declared order (a partial patch); `undefined`
+ * when none does.
+ */
+function branchOf(
+  items: TAtscriptAnnotatedType[],
+  value: unknown
+): TAtscriptAnnotatedType | undefined {
+  let first: TAtscriptAnnotatedType | undefined
+  if (isPlainObject(value)) {
+    const named = discriminatedBranch(items, value)
+    if (named && takes(named, value)) {
+      return named
+    }
+    for (const item of items) {
+      if (takes(item, value)) {
+        if (fits(item, value)) {
+          return item
+        }
+        first ??= item
+      }
+    }
+    return first
+  }
+  return items.find(item => takes(item, value))
+}
+
+/**
+ * Whether object `value` has the shape of branch `def`, by its own keys alone: every required
+ * prop is one of them, and each of them is a prop (or matches a prop pattern) of the branch. A
+ * union: one of its branches; a branch that is not an object (nor an intersection of objects)
+ * has any shape.
+ */
+function fits(def: TAtscriptAnnotatedType, value: Record<string, unknown>): boolean {
+  if (def.type.kind === 'union') {
+    return (def.type as TAtscriptTypeComplex).items.some(item => fits(item, value))
+  }
+  const objects: Array<TAtscriptTypeObject<string>> = []
+  if (!objectsOf(def, objects)) {
+    return true
+  }
+  for (const o of objects) {
+    for (const [key, prop] of o.props) {
+      if (!prop.optional && !Object.hasOwn(value, key)) {
+        return false
+      }
+    }
+  }
+  return Object.keys(value).every(key =>
+    objects.some(o => o.props.has(key) || o.propsPatterns.some(p => p.pattern.test(key)))
+  )
+}
+
+/** Collects the objects `def` is (an object, an intersection of objects); `false` for others. */
+function objectsOf(def: TAtscriptAnnotatedType, out: Array<TAtscriptTypeObject<string>>): boolean {
+  const type = def.type
+  if (type.kind === 'object') {
+    out.push(type as TAtscriptTypeObject<string>)
+    return true
+  }
+  return (
+    type.kind === 'intersection' &&
+    (type as TAtscriptTypeComplex).items.every(item => objectsOf(item, out))
+  )
+}
+
+/**
+ * Whether union branch `def` takes `value`: exactly when coercing `value` against it does not
+ * fail (a branch taken never fails after it), decided from `value` itself — its kind, its length,
+ * its direct literal props and items — never from what it holds deeper. A union takes one branch
+ * once, so coercion is linear in the value.
+ */
+function takes(def: TAtscriptAnnotatedType, value: unknown): boolean {
+  if (value === undefined || value === null) {
+    return def.optional === true
+  }
+  const type = def.type
+  switch (type.kind) {
+    case '': {
+      return coerce(def, value) !== NO_MATCH
+    }
+    case 'object': {
+      if (!isPlainObject(value)) {
+        return false
+      }
+      for (const [key, prop] of (type as TAtscriptTypeObject<string>).props) {
+        if (Object.hasOwn(value, key) && !holdsLiteral(prop, value[key])) {
+          return false
+        }
+      }
+      return true
+    }
+    case 'array': {
+      return Array.isArray(value)
+    }
+    case 'tuple': {
+      const items = (type as TAtscriptTypeComplex).items
+      return (
+        Array.isArray(value) &&
+        value.length === items.length &&
+        items.every((item, i) => holdsLiteral(item, value[i]))
+      )
+    }
+    case 'union': {
+      return (type as TAtscriptTypeComplex).items.some(item => takes(item, value))
+    }
+    case 'intersection': {
+      return (type as TAtscriptTypeComplex).items.every(item => takes(item, value))
+    }
+    default: {
+      return false
+    }
+  }
+}
+
+/**
+ * Whether prop (item) `def` of a union branch can hold `input`: anything, but a literal prop
+ * (see `literalNodes`: `kind: 'cat'`, `kind: 'cat' | null`) only a value that coerces to one of
+ * its literals — a string after the normalizers on the literal's way (`' Cat '` to `'cat'` with
+ * `@normalize.trim @normalize.lowercase`). `null` / `undefined` are left to the validator.
+ */
+function holdsLiteral(def: TAtscriptAnnotatedType, input: unknown): boolean {
+  if (input === undefined || input === null) {
+    return true
+  }
+  const literals = literalNodes(def)
+  return !literals || literals.some(literal => coercesTo(literal, input))
+}
+
+/** Whether `input` coerces to the value of `literal` (see `holdsLiteral`). */
+function coercesTo(literal: TLiteral, input: unknown): boolean {
+  const value = typeof input === 'string' ? applyFlags(input, literal.flags) : input
+  return coerce(literal.node, value) !== NO_MATCH
+}
+
+/**
+ * The branch of union `items` the discriminator of object `value` names: its literal itself,
+ * else the one its value coerces to (`"2"` names `2`, see {@link coercesTo}); `undefined` when the
+ * union has no discriminator or the value names no branch.
+ */
+function discriminatedBranch(
+  items: TAtscriptAnnotatedType[],
+  value: Record<string, unknown>
+): TAtscriptAnnotatedType | undefined {
+  const disc = unionDiscriminator(items)
+  if (disc === undefined) {
+    return undefined
+  }
+  const tag = Object.hasOwn(value, disc.property) ? value[disc.property] : undefined
+  if (tag === undefined || tag === null) {
+    return undefined
+  }
+  for (const [index, literal] of disc.branches) {
+    if (literal === tag) {
+      return items[index]
+    }
+  }
+  for (const [index] of disc.branches) {
+    const prop = (items[index].type as TAtscriptTypeObject<string>).props.get(disc.property)
+    if (prop && holdsLiteral(prop, tag)) {
+      return items[index]
+    }
+  }
+  return undefined
 }
 
 /** A prop / item: its coerced value, else the value as it is (copy-on-change, see `mapProps`). */

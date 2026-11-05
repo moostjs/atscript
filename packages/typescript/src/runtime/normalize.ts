@@ -5,22 +5,72 @@ import type {
   TAtscriptTypeFinal,
   TAtscriptTypeObject,
 } from './annotated-type'
-import { currentEpoch, metadataWriteCount } from './compiled-check/tracking'
+import { typeWriteCount } from './compiled-check/tracking'
 import { isPlainObject, mapItems, mapProps, NO_MATCH } from './copy-on-change'
 import { metaEmpty } from './layers'
 import { unionDiscriminator, Validator } from './validator'
+import type { TValidatorOptions } from './validator'
 
 const TRIM = 1
 const LOWERCASE = 2
 const UPPERCASE = 4
 
 /**
- * Whether each node's subtree has normalizers: valid until the next metadata write or
- * `invalidateCompiledValidators()` (checked by {@link normalizeForType}).
+ * Whether each node's subtree has normalizers: valid until the next type tree write (metadata or
+ * shape) or `invalidateCompiledValidators()` (checked by {@link normalizeForType}).
  */
 let reach = new WeakMap<TAtscriptAnnotatedType, boolean>()
 let stampWrites = -1
-let stampEpoch = -1
+
+/** Union branch validators for one set of validator options, by branch. */
+interface TJudge {
+  opts: Partial<TValidatorOptions>
+  validators: WeakMap<TAtscriptAnnotatedType, Validator>
+}
+
+/**
+ * How union branches judge their normalized results for one set of validator options: a union
+ * that is the value's own type (`root`), one below it (`nested`: `partial: true` applies to the
+ * value's own props only, as in the validator; the same judge without it).
+ */
+interface TJudges {
+  root: TJudge
+  nested: TJudge
+}
+
+function newJudges(opts: Partial<TValidatorOptions>): TJudges {
+  // (one error is enough to reject a result; a branch result is judged, never stripped — its
+  // untouched parts are the input's own objects)
+  const root: Partial<TValidatorOptions> = { ...opts, errorLimit: 1 }
+  delete root.translate
+  if (root.unknownProps === 'strip') {
+    root.unknownProps = 'ignore'
+  }
+  const judge = { opts: root, validators: new WeakMap() }
+  return {
+    root: judge,
+    nested:
+      root.partial === true
+        ? { opts: { ...root, partial: false }, validators: new WeakMap() }
+        : judge,
+  }
+}
+
+const DEFAULT_JUDGES = newJudges({})
+/** The judges by the options object passed (the same options: the same validators). */
+const judgesByOpts = new WeakMap<Partial<TValidatorOptions>, TJudges>()
+
+function judgesFor(opts: Partial<TValidatorOptions> | undefined): TJudges {
+  if (!opts) {
+    return DEFAULT_JUDGES
+  }
+  let found = judgesByOpts.get(opts)
+  if (!found) {
+    found = newJudges(opts)
+    judgesByOpts.set(opts, found)
+  }
+  return found
+}
 
 /**
  * Normalizes input toward the string forms an annotated type declares with `@normalize.trim`,
@@ -42,9 +92,11 @@ let stampEpoch = -1
  *   `detectDiscriminator`) uses the branch the value's discriminator names;
  * - otherwise every branch that can take the value is tried (a literal branch can take a string
  *   only when the normalized string equals its literal): when they all give the same result it
- *   is used; when they differ, the branches whose result their own validator accepts (default
- *   options) are kept, and the result is used when they agree; else the value is returned
- *   untouched (ambiguous).
+ *   is used; when they differ, the branches whose result their own validator accepts are kept,
+ *   and the result is used when they agree; else the value is returned untouched (ambiguous).
+ *   The branch validators take `opts` — pass the options the result will be validated with
+ *   (`partial`, `unknownProps`, …) so a branch is judged as the validator will judge it; default
+ *   options when omitted. (`unknownProps: 'strip'` judges as `'ignore'`: nothing is stripped.)
  *
  * The intended flow is `coerceForType` → `normalizeForType` → `validate`.
  *
@@ -52,28 +104,39 @@ let stampEpoch = -1
  * ```ts
  * // @normalize.trim @normalize.lowercase email: string.email
  * normalizeForType(User, { email: '  Ann@Example.COM ' }) // → { email: 'ann@example.com' }
+ * // judged as a partial update will be validated
+ * normalizeForType(Patch, body, { partial: true })
  * ```
  */
-export function normalizeForType<T = unknown>(def: TAtscriptAnnotatedType, value: T): T {
-  const writes = metadataWriteCount()
-  const epoch = currentEpoch()
-  if (writes !== stampWrites || epoch !== stampEpoch) {
+export function normalizeForType<T = unknown>(
+  def: TAtscriptAnnotatedType,
+  value: T,
+  opts?: Partial<TValidatorOptions>
+): T {
+  const writes = typeWriteCount()
+  if (writes !== stampWrites) {
     stampWrites = writes
-    stampEpoch = epoch
     reach = new WeakMap()
   }
   if (!hasNormalizers(def)) {
     return value
   }
-  const result = normalize(def, value, 0, new Map())
+  const result = normalize(def, value, 0, { memo: new Map(), root: value, opts })
   return (result === NO_MATCH ? value : result) as T
 }
 
-/**
- * Per-call results of objects and unions by input object, type def and union flags (see
- * {@link normalize}).
- */
-type TMemo = Map<object, TMemoEntry[]>
+/** One {@link normalizeForType} call. */
+interface TWalk {
+  /** Results of objects and unions by input object, type def and union flags (see `normalize`). */
+  memo: Map<object, TMemoEntry[]>
+  /**
+   * The value: a union holding it is the value's own type (no position below the value holds the
+   * value itself, but in a cyclic value).
+   */
+  root: unknown
+  /** The options union branches are judged with (see {@link TJudges}). */
+  opts: Partial<TValidatorOptions> | undefined
+}
 type TMemoEntry = [type: object, flags: number, result: unknown]
 
 // ── Which types have normalizers ────────────────────────────────────────────────────────────
@@ -172,7 +235,8 @@ function flagsOf(def: TAtscriptAnnotatedType, inherited: number): number {
   return flags
 }
 
-function applyFlags(value: string, flags: number): string {
+/** `value` with normalizer `flags` applied, in their fixed order (see {@link flagsOf}). */
+export function applyFlags(value: string, flags: number): string {
   let out = value
   if (flags & TRIM) {
     out = out.trim()
@@ -198,7 +262,7 @@ function normalize(
   def: TAtscriptAnnotatedType,
   value: unknown,
   inherited: number,
-  memo: TMemo
+  walk: TWalk
 ): unknown {
   if (value === undefined || value === null) {
     return value
@@ -221,45 +285,45 @@ function normalize(
       if (!isPlainObject(value)) {
         return NO_MATCH
       }
-      const entries = entriesOf(memo, value)
+      const entries = entriesOf(walk.memo, value)
       return (
         recall(entries, type, 0) ??
         remember(
           entries,
           type,
           0,
-          mapProps(type as TAtscriptTypeObject<string>, value, normalizeProp, memo)
+          mapProps(type as TAtscriptTypeObject<string>, value, normalizeProp, walk)
         )
       )
     }
     case 'array': {
       return Array.isArray(value)
-        ? mapItems(value, (type as TAtscriptTypeArray).of, normalizeItem, memo)
+        ? mapItems(value, (type as TAtscriptTypeArray).of, normalizeItem, walk)
         : NO_MATCH
     }
     case 'tuple': {
       const items = (type as TAtscriptTypeComplex).items
       return Array.isArray(value) && value.length === items.length
-        ? mapItems(value, items, normalizeItem, memo)
+        ? mapItems(value, items, normalizeItem, walk)
         : NO_MATCH
     }
     case 'union': {
       const flags = flagsOf(def, inherited)
       const items = (type as TAtscriptTypeComplex).items
       if (typeof value !== 'object') {
-        return normalizeUnion(items, value, flags, memo)
+        return normalizeUnion(items, value, flags, walk)
       }
-      const entries = entriesOf(memo, value)
+      const entries = entriesOf(walk.memo, value)
       return (
         recall(entries, type, flags) ??
-        remember(entries, type, flags, normalizeUnion(items, value, flags, memo))
+        remember(entries, type, flags, normalizeUnion(items, value, flags, walk))
       )
     }
     case 'intersection': {
       const flags = flagsOf(def, inherited)
       let current: unknown = value
       for (const item of (type as TAtscriptTypeComplex).items) {
-        const result = normalize(item, current, flags, memo)
+        const result = normalize(item, current, flags, walk)
         if (result === NO_MATCH) {
           return NO_MATCH
         }
@@ -274,7 +338,7 @@ function normalize(
 }
 
 /** The memoized results for input object `value` (see {@link normalize}). */
-function entriesOf(memo: TMemo, value: object): TMemoEntry[] {
+function entriesOf(memo: TWalk['memo'], value: object): TMemoEntry[] {
   let entries = memo.get(value)
   if (!entries) {
     entries = []
@@ -300,31 +364,67 @@ function remember(entries: TMemoEntry[], type: object, flags: number, result: un
 }
 
 /** An array / tuple item: its normalized value, else the value as it is. */
-function normalizeItem(def: TAtscriptAnnotatedType, input: unknown, memo: TMemo): unknown {
+function normalizeItem(def: TAtscriptAnnotatedType, input: unknown, walk: TWalk): unknown {
   if (!hasNormalizers(def)) {
     return input
   }
-  const result = normalize(def, input, 0, memo)
+  const result = normalize(def, input, 0, walk)
   return result === NO_MATCH ? input : result
 }
 
 /**
  * A prop: as {@link normalizeItem}, but NO_MATCH (the object is not this type) when a literal prop
- * (`kind: 'cat'`) holds another value.
+ * (`kind: 'cat'`, `kind: 'cat' | null`, see {@link literalNodes}) holds another value.
  */
-function normalizeProp(def: TAtscriptAnnotatedType, input: unknown, memo: TMemo): unknown {
-  const out = normalizeItem(def, input, memo)
-  if (
-    out === input &&
-    def.type.kind === '' &&
-    (def.type as TAtscriptTypeFinal).value !== undefined &&
-    input !== (def.type as TAtscriptTypeFinal).value &&
-    input !== undefined &&
-    input !== null
-  ) {
-    return NO_MATCH
+function normalizeProp(def: TAtscriptAnnotatedType, input: unknown, walk: TWalk): unknown {
+  const out = normalizeItem(def, input, walk)
+  if (out === input && input !== undefined && input !== null) {
+    const literals = literalNodes(def)
+    if (literals && !literals.some(l => (l.node.type as TAtscriptTypeFinal).value === input)) {
+      return NO_MATCH
+    }
   }
   return out
+}
+
+/** A literal a literal prop can hold, with the normalizer flags of the nodes on its way. */
+export interface TLiteral {
+  node: TAtscriptAnnotatedType
+  /** the `@normalize.*` flags of `node` and of the unions it is in (see `applyFlags`) */
+  flags: number
+}
+
+/**
+ * The literals a literal prop can hold: `def` itself when it is a literal (`kind: 'cat'`), the
+ * literals of a union of literals, `null` and `undefined` (`kind: 'cat' | null`, nested unions and
+ * aliases too); `undefined` for any other type. Each with the normalizers of the nodes on its way
+ * (a union's apply to its members). A literal prop holding another value tells that an object is
+ * not of its type, for normalization and coercion alike (see `coerce.ts`).
+ */
+export function literalNodes(def: TAtscriptAnnotatedType, inherited = 0): TLiteral[] | undefined {
+  const type = def.type
+  if (type.kind === '') {
+    return (type as TAtscriptTypeFinal).value === undefined
+      ? undefined
+      : [{ node: def, flags: flagsOf(def, inherited) }]
+  }
+  if (type.kind !== 'union') {
+    return undefined
+  }
+  const flags = flagsOf(def, inherited)
+  const out: TLiteral[] = []
+  for (const item of (type as TAtscriptTypeComplex).items) {
+    const designType = (item.type as TAtscriptTypeFinal).designType
+    if (item.type.kind === '' && (designType === 'null' || designType === 'undefined')) {
+      continue
+    }
+    const inner = literalNodes(item, flags)
+    if (!inner) {
+      return undefined
+    }
+    out.push(...inner)
+  }
+  return out.length > 0 ? out : undefined
 }
 
 /** Whether `def` can take `value` by its kind alone (see {@link normalize}). */
@@ -387,7 +487,7 @@ function normalizeUnion(
   items: TAtscriptAnnotatedType[],
   value: unknown,
   flags: number,
-  memo: TMemo
+  walk: TWalk
 ): unknown {
   if (isPlainObject(value)) {
     const disc = unionDiscriminator(items)
@@ -395,7 +495,7 @@ function normalizeUnion(
       const tag = value[disc.property]
       for (const [index, literal] of disc.branches) {
         if (literal === tag) {
-          return normalize(items[index], value, flags, memo)
+          return normalize(items[index], value, flags, walk)
         }
       }
     }
@@ -404,7 +504,7 @@ function normalizeUnion(
   let firstItem: TAtscriptAnnotatedType | undefined
   let rest: Array<[TAtscriptAnnotatedType, unknown]> | undefined
   for (const item of items) {
-    const out = normalize(item, value, flags, memo)
+    const out = normalize(item, value, flags, walk)
     if (out === NO_MATCH) {
       continue
     }
@@ -420,9 +520,12 @@ function normalizeUnion(
   }
   // The branches disagree: those whose own validator accepts their result decide.
   rest.unshift([firstItem!, first])
+  const judges = judgesFor(walk.opts)
+  // (`partial: true` applies to the value's own type, not to a prop's or an item's)
+  const judge = value === walk.root ? judges.root : judges.nested
   let accepted: unknown = NO_MATCH
   for (const [item, out] of rest) {
-    if (!branchValidator(item).validate(out, true)) {
+    if (!branchValidator(judge, item).validate(out, true)) {
       continue
     }
     if (accepted === NO_MATCH) {
@@ -434,17 +537,12 @@ function normalizeUnion(
   return accepted
 }
 
-/**
- * Each union branch's validator (default options; one error is enough to reject a result),
- * judging its own normalized result.
- */
-const branchValidators = new WeakMap<TAtscriptAnnotatedType, Validator<TAtscriptAnnotatedType>>()
-
-function branchValidator(def: TAtscriptAnnotatedType): Validator<TAtscriptAnnotatedType> {
-  let validator = branchValidators.get(def)
+/** Union branch `def`'s validator, judging its own normalized result (see {@link TJudges}). */
+function branchValidator(judge: TJudge, def: TAtscriptAnnotatedType): Validator {
+  let validator = judge.validators.get(def)
   if (!validator) {
-    validator = new Validator(def, { errorLimit: 1 })
-    branchValidators.set(def, validator)
+    validator = new Validator(def, judge.opts)
+    judge.validators.set(def, validator)
   }
   return validator
 }

@@ -127,3 +127,39 @@ export interface Holder {
     s: string
     when?: unknown
 }
+
+export interface ByName {
+    @normalize.lowercase
+    handle: string
+    name: string
+    info?: {
+        a?: string
+    }
+}
+
+export interface ByCode {
+    @normalize.uppercase
+    @expect.maxLength 2
+    handle: string
+}
+
+export type Lookup = ByName | ByCode
+
+export interface LookupHolder {
+    lookup: Lookup
+}
+
+export interface NLitA {
+    kind: 'a' | null
+    @normalize.lowercase
+    name: string
+}
+
+export interface NLitB {
+    kind: 'b'
+    @normalize.uppercase
+    @expect.maxLength 1
+    name: string
+}
+
+export type NLit = NLitA | NLitB

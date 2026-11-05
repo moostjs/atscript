@@ -164,6 +164,49 @@ describe('AtscriptRepo.openDocument with text', () => {
   })
 })
 
+describe('diagnostics read before the imports are wired', () => {
+  // Concurrent loads (a bundler) read a document another load is still checking — one an import
+  // cycle or a diamond links in before its own imports are wired: what is derived from it then
+  // must not outlive the wiring, whichever load reads it first.
+  const errors = (doc: AtscriptDoc) =>
+    doc
+      .getDiagMessages()
+      .filter(m => m.severity === 1)
+      .map(m => m.message)
+
+  it('are computed again once its imports are wired', async () => {
+    const root = makeProject({
+      'tenant.as': 'export interface Tenant {\n  id: string\n}\n',
+      'department.as':
+        "import { Tenant } from './tenant'\nexport interface Department {\n  id: string\n  tenantId: Tenant.id\n}\n",
+    })
+    const repo = makeRepo(root)
+    const department = await repo.openDocument(uri(root, 'department.as'))
+    // (read mid-check: its import is not wired yet)
+    expect(errors(department)).toEqual(['Unknown member "id"'])
+    await repo.checkDoc(department)
+    expect(errors(department)).toEqual([])
+  })
+
+  it('of a document reading through another one: once that one is wired', async () => {
+    const root = makeProject({
+      'tenant.as': 'export interface Tenant {\n  id: string\n}\n',
+      'task.as':
+        "import { Tenant } from './tenant'\nexport interface Task {\n  id: string\n  tenantId: Tenant.id\n}\n",
+      'task-dict.as':
+        "import { Task } from './task'\nexport interface TaskDict {\n  tenantId: Task.tenantId\n}\n",
+    })
+    const repo = makeRepo(root)
+    const task = await repo.openDocument(uri(root, 'task.as'))
+    const dict = await repo.openDocument(uri(root, 'task-dict.as'))
+    // (the dict wired to the task; the task's own import not yet)
+    dict.updateDependencies([task])
+    expect(errors(dict)).not.toEqual([])
+    await repo.checkDoc(task)
+    expect(errors(dict)).toEqual([])
+  })
+})
+
 describe('blockTargetDocuments / blockDependencies', () => {
   it('resolve a block through plain aliases, in any file', async () => {
     const root = makeProject({

@@ -18,3 +18,17 @@ export interface SignUp {
 
     role?: string
 }
+
+export interface ByName {
+    @normalize.lowercase
+    handle: string
+    name: string
+}
+
+export interface ByCode {
+    @normalize.uppercase
+    @expect.maxLength 2
+    handle: string
+}
+
+export type Lookup = ByName | ByCode

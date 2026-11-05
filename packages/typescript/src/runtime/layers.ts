@@ -8,7 +8,7 @@
  * a base shows through every layer over it.
  *
  * Reads go through a flattened view of the effective entries, rebuilt on the first read after any
- * metadata write (one global write counter: `metadataWriteCount`). The view is used only while
+ * type tree write (one global write counter: `typeWriteCount`). The view is used only while
  * every map below is tracked (an `AnnotationMap` or a `LayerMap`, whose writes the counter
  * sees); otherwise the reads are live. A raw write the counter does not see (a node's map swapped,
  * `node.metadata = X`, or edited in place) must be followed by `invalidateCompiledValidators()`,
@@ -18,7 +18,7 @@ import {
   AnnotationMap,
   appendOwn,
   metadataReplaced,
-  metadataWriteCount,
+  typeWriteCount,
   touched,
   watch,
 } from './compiled-check/tracking'
@@ -118,7 +118,6 @@ export function hideKey(m: Map<unknown, unknown>, key: unknown): void {
   s.add(key)
   hiding = true
   touched(m)
-  metadataReplaced()
 }
 
 /** The keys map `m` hides from its bases (see {@link hideKey}), for a map replacing it. */
@@ -147,11 +146,11 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   r: boolean
   /**
    * The flattened view: every effective entry (as the layered reads give it, in their order),
-   * built on the first read after a metadata write (`w` ≠ `metadataWrites`); `undefined` while a
+   * built on the first read after a type tree write (`w` ≠ `typeWrites`); `undefined` while a
    * map below is not tracked (a plain `Map` or a subclass: its writes are not counted, read live).
    */
   private f: Map<K, V> | undefined
-  /** `metadataWrites` when {@link f} was built (`-1`: not built). */
+  /** `typeWrites` when {@link f} was built (`-1`: not built). */
   private w: number
 
   constructor(bases: TLayerNode[], reference = false, own?: Iterable<readonly [K, V]> | null) {
@@ -167,7 +166,7 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
    * this module's readers and the validators read it (`readable`, `filledMeta`), never write.
    */
   private view(): Map<K, V> | undefined {
-    return this.w === metadataWriteCount() ? this.f : this.flatten()
+    return this.w === typeWriteCount() ? this.f : this.flatten()
   }
 
   private flatten(): Map<K, V> | undefined {
@@ -184,7 +183,7 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
           : new AnnotationMap<K, V>(keys.map(k => [k, this.liveGet(k) as V] as const))
     }
     this.f = f
-    this.w = metadataWriteCount()
+    this.w = typeWriteCount()
     return f
   }
 
@@ -230,7 +229,7 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
   }
 
   override get(key: K): V | undefined {
-    const view = this.w === metadataWriteCount() ? this.f : this.flatten()
+    const view = this.w === typeWriteCount() ? this.f : this.flatten()
     return view === undefined ? this.liveGet(key) : (mapGet.call(view, key) as V | undefined)
   }
 
@@ -325,7 +324,6 @@ export class LayerMap<K = unknown, V = unknown> extends AnnotationMap<K, V> {
     const h = hiding ? HIDDEN.get(this) : undefined
     if (h?.delete(key)) {
       touched(this)
-      metadataReplaced()
       return true
     }
     return deleted
@@ -385,7 +383,7 @@ Object.defineProperty(LayerMap.prototype, 'size', {
 
 /**
  * Every map of `m`'s layers is tracked (an `AnnotationMap` or a `LayerMap`, whose writes count in
- * `metadataWrites`), so a flattened view of `m` stays right until the next write.
+ * `typeWrites`), so a flattened view of `m` stays right until the next write.
  */
 function tracked(m: Map<unknown, unknown>, seen: Set<object>): boolean {
   const p = Object.getPrototypeOf(m)

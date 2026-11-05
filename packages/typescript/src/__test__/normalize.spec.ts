@@ -2,6 +2,7 @@ import path from 'path'
 
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import { lazyJsonSchema } from '../runtime/bundled-schema'
 import { detectDiscriminator } from '../runtime/discriminator'
 import { normalizeForType } from '../runtime/normalize'
 import { deserializeAnnotatedType, serializeAnnotatedType } from '../runtime/serialize'
@@ -215,6 +216,40 @@ describe('normalizeForType', () => {
       expect(normalizeForType(m.ContactForm, { contact: '123' })).toEqual({ contact: '123' })
     })
 
+    it('disagreeing branches are judged with the options the result is validated with', () => {
+      // `Lookup = ByName | ByCode`: ByName's result lacks `name` (valid only as a partial
+      // update), ByCode's result is too long
+      const patch = { handle: 'Abc' }
+      expect(normalizeForType(m.Lookup, patch)).toBe(patch)
+      expect(normalizeForType(m.Lookup, patch, { partial: true })).toEqual({ handle: 'abc' })
+      expect(normalizeForType(m.Lookup, patch, { partial: 'deep' })).toEqual({ handle: 'abc' })
+      expect(normalizeForType(m.Lookup, patch, { partial: () => true })).toEqual({ handle: 'abc' })
+      // (`partial: true` is the value's own props only: a union below it is judged in full)
+      const holder = { lookup: { handle: 'Abc' } }
+      expect(normalizeForType(m.LookupHolder, holder, { partial: true })).toBe(holder)
+      expect(normalizeForType(m.LookupHolder, holder, { partial: 'deep' })).toEqual({
+        lookup: { handle: 'abc' },
+      })
+      // (`unknownProps: 'strip'` judges as 'ignore': nothing is stripped from the input)
+      const info = { a: 'x', junk: 1 }
+      const full = { handle: 'Abc', name: 'Ann', info }
+      expect(normalizeForType(m.Lookup, full)).toBe(full)
+      const out = normalizeForType(m.Lookup, full, { unknownProps: 'strip' }) as any
+      expect(out).toEqual({ handle: 'abc', name: 'Ann', info: { a: 'x', junk: 1 } })
+      expect(out.info).toBe(info)
+      expect(info).toEqual({ a: 'x', junk: 1 })
+    })
+
+    it('a prop holding a union of literals and null rules out a branch', () => {
+      // `NLit = NLitA { kind: 'a' | null } | NLitB { kind: 'b' }`: only NLitB takes `kind: 'b'`
+      // (its result is too long for the validator, which reports it)
+      expect(normalizeForType(m.NLit, { kind: 'b', name: 'Xy' })).toEqual({ kind: 'b', name: 'XY' })
+      expect(normalizeForType(m.NLit, { kind: null, name: 'Xy' })).toEqual({
+        kind: null,
+        name: 'xy',
+      })
+    })
+
     it('non-plain objects are left as they are', () => {
       const date = new Date()
       expect(normalizeForType(m.Holder, date)).toBe(date)
@@ -247,6 +282,31 @@ describe('normalizeForType', () => {
         prop.metadata.delete('normalize.trim')
       }
       expect(normalizeForType(m.Untrimmed, value)).toBe(value)
+    })
+
+    it('sees props added and removed at runtime (a shape write drops the cached answer)', () => {
+      // (`Plain` has no normalizers; `Holder.s` is trimmed)
+      const value = { extra: ' x ' }
+      expect(normalizeForType(m.Plain, value)).toBe(value)
+      m.Plain.type.props.set('extra', m.Holder.type.props.get('s'))
+      try {
+        expect(normalizeForType(m.Plain, value)).toEqual({ extra: 'x' })
+      } finally {
+        m.Plain.type.props.delete('extra')
+      }
+      expect(normalizeForType(m.Plain, value)).toBe(value)
+    })
+
+    it('a lazy JSON schema sees props added and removed at runtime', () => {
+      const schema = () => JSON.stringify(lazyJsonSchema(m.Plain))
+      expect(schema()).not.toContain('"extra"')
+      m.Plain.type.props.set('extra', m.Holder.type.props.get('s'))
+      try {
+        expect(schema()).toContain('"extra"')
+      } finally {
+        m.Plain.type.props.delete('extra')
+      }
+      expect(schema()).not.toContain('"extra"')
     })
   })
 })

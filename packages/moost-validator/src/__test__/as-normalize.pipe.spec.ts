@@ -16,10 +16,11 @@ function callPipe(pipe: any, value: unknown, targetMeta: any) {
 describe('validatorPipe normalizes before validating', () => {
   let SignUp: any
   let Email: any
+  let Lookup: any
 
   beforeAll(async () => {
     await prepareFixtures({ rootDir, entries: ['normalize-pipe.as'] })
-    ;({ SignUp, Email } = await import(path.join(rootDir, 'normalize-pipe.as.js')))
+    ;({ SignUp, Email, Lookup } = await import(path.join(rootDir, 'normalize-pipe.as.js')))
   })
 
   it('returns the normalized body, validated in its normalized form', () => {
@@ -52,6 +53,14 @@ describe('validatorPipe normalizes before validating', () => {
         { type: SignUp }
       )
     ).toThrow(ValidatorError)
+  })
+
+  it('judges union branches that normalize differently with the pipe options', () => {
+    // `Lookup = ByName | ByCode`: as a partial update, `{ handle }` is a ByName
+    const pipe = validatorPipe({ partial: true })
+    expect(callPipe(pipe, { handle: 'Abc' }, { type: Lookup, paramSource: 'BODY' })).toEqual({
+      handle: 'abc',
+    })
   })
 
   it('normalizes a scalar alias param', () => {
