@@ -241,3 +241,64 @@ export interface SRight {
 }
 
 export type SameObjects = SLeft | SRight
+
+export type ArrU = number[] | boolean[]
+
+export interface PxA {
+    v: '1'
+    n: boolean
+    req: string
+}
+
+export interface PxB {
+    v: 1
+    n: number
+}
+
+export type Px = PxA | PxB
+
+export interface WbA {
+    a: boolean
+}
+
+export interface WbB {
+    a: number
+    b: string
+}
+
+export type Wb = WbA | WbB
+
+export interface WzA {
+    a: boolean
+    z?: number
+}
+
+export interface WzB {
+    a: number
+}
+
+export type Wz = WzA | WzB
+
+export interface PetCat {
+    kind: 'cat'
+    lives: number
+    indoor?: boolean
+}
+
+export interface PetDog {
+    kind: 'dog'
+    good: boolean
+}
+
+export type Pet = PetCat | PetDog
+
+export interface X1 {
+    v: 3
+    n: string
+}
+
+export type MixNested = (N1 | X1) | S1
+
+export type MixFlat = N1 | X1 | S1
+
+export type MixLast = S1 | (N1 | X1)

@@ -26,15 +26,7 @@ export function mapProps<C>(
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i]
     const input = value[key]
-    let def = type.props.get(key)
-    if (!def) {
-      for (const { pattern, def: patternDef } of type.propsPatterns) {
-        if (pattern.test(key)) {
-          def = patternDef
-          break
-        }
-      }
-    }
+    const def = propOf(type, key)
     const mapped = def ? step(def, input, ctx) : input
     if (mapped === NO_MATCH) {
       return NO_MATCH
@@ -50,6 +42,23 @@ export function mapProps<C>(
     }
   }
   return out ?? value
+}
+
+/** The def of prop `key` of object `type`: its declared prop, else the first pattern `key` matches. */
+export function propOf(
+  type: TAtscriptTypeObject<string>,
+  key: string
+): TAtscriptAnnotatedType | undefined {
+  const def = type.props.get(key)
+  if (def) {
+    return def
+  }
+  for (const p of type.propsPatterns) {
+    if (p.pattern.test(key)) {
+      return p.def
+    }
+  }
+  return undefined
 }
 
 /**

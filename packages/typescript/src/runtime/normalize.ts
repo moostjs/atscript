@@ -226,7 +226,7 @@ function hasNormalizers(def: TAtscriptAnnotatedType): boolean {
 // ── The walk ───────────────────────────────────────────────────────────────────────────────
 
 /** The normalizer flags of `def`, on top of `inherited` (a union's, for its branches). */
-function flagsOf(def: TAtscriptAnnotatedType, inherited: number): number {
+export function flagsOf(def: TAtscriptAnnotatedType, inherited: number): number {
   const meta = def.metadata
   if (metaEmpty(meta)) {
     return inherited

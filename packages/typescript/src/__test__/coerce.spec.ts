@@ -2,8 +2,10 @@ import path from 'path'
 
 import { beforeAll, describe, expect, it } from 'vitest'
 
+import { defineAnnotatedType as $, type TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { coerceForType } from '../runtime/coerce'
 import { normalizeForType } from '../runtime/normalize'
+import { Validator, type TValidatorOptions } from '../runtime/validator'
 import { prepareFixtures } from '../test-utils'
 
 const rootDir = path.join(__dirname, 'fixtures')
@@ -33,11 +35,40 @@ function chain(depth: number, kind: string): unknown {
   return depth === 0 ? { kind } : { child: chain(depth - 1, kind), kind }
 }
 
-/** `value` coerced against `type`; asserts that normalizing and validating the result passes. */
-function roundTrip(type: any, value: unknown): unknown {
+/**
+ * `value` coerced against `type`; asserts that normalizing and validating the result passes (with
+ * validator options `opts`).
+ */
+function roundTrip(type: any, value: unknown, opts?: Partial<TValidatorOptions>): unknown {
   const out = coerceForType(type, value)
-  expect(type.validator().validate(normalizeForType(type, out), true)).toBe(true)
+  // (a copy: `unknownProps: 'strip'` strips the value it validates)
+  const normalized = normalizeForType(type, structuredClone(out), opts)
+  expect(new Validator(type, opts).validate(normalized, true)).toBe(true)
   return out
+}
+
+// Hand-built types (as deserialized ones): a boolean literal, which `.as` files cannot declare.
+const lit = (v: string | number | boolean) =>
+  $()
+    .designType(typeof v as 'string')
+    .value(v as string).$type
+const num = () => $().designType('number').$type
+const bool = () => $().designType('boolean').$type
+/** `{ [key]: def, … }` */
+function obj(props: Record<string, TAtscriptAnnotatedType>): TAtscriptAnnotatedType {
+  const o = $('object')
+  for (const [key, def] of Object.entries(props)) {
+    o.prop(key, def)
+  }
+  return o.$type
+}
+/** `a | b | …` */
+function union(...items: TAtscriptAnnotatedType[]): TAtscriptAnnotatedType {
+  const u = $('union')
+  for (const item of items) {
+    u.item(item)
+  }
+  return u.$type
 }
 
 describe('coerceForType', () => {
@@ -63,13 +94,22 @@ describe('coerceForType', () => {
   let RU: any
   let IN2: any
   let SameObjects: any
+  let ArrU: any
+  let Px: any
+  let Wb: any
+  let Wz: any
+  let Pet: any
+  let MixNested: any
+  let MixFlat: any
+  let MixLast: any
 
   beforeAll(async () => {
     await prepareFixtures({ rootDir, entries: ['coerce.as'] })
     const m = await import(path.join(rootDir, 'coerce.as.js'))
     ;({ KafkaOffset, Flag, Level, MaybeNumber, SearchQuery, CTree, RangeFilter, Versioned } = m)
     ;({ NestedU, Opt, Mixed, PU, DU, Q, RN, LitNull, TupU } = m)
-    ;({ AnU, AzU, RU, IN2, SameObjects } = m)
+    ;({ AnU, AzU, RU, IN2, SameObjects, ArrU, Px, Wb, Wz, Pet } = m)
+    ;({ MixNested, MixFlat, MixLast } = m)
   })
 
   describe('number targets', () => {
@@ -213,14 +253,83 @@ describe('coerceForType', () => {
 
     it('a tuple branch is ruled out by a literal item', () => {
       // `TupU = ['a', number] | ['b', boolean]`
-      expect(coerceForType(TupU, ['b', '1'])).toEqual(['b', true])
-      expect(coerceForType(TupU, ['a', '1'])).toEqual(['a', 1])
+      expect(roundTrip(TupU, ['b', '1'])).toEqual(['b', true])
+      expect(roundTrip(TupU, ['a', '1'])).toEqual(['a', 1])
     })
 
     it('a discriminator value equal to a literal names that branch first', () => {
-      // `Mixed = N1 { v: 1 } | S1 { v: '1' }`: "1" is S1's literal
-      expect(coerceForType(Mixed, { v: '1', n: '1' })).toEqual({ v: '1', n: true })
-      expect(coerceForType(Mixed, { v: 1, n: '1' })).toEqual({ v: 1, n: 1 })
+      // `Mixed = N1 { v: 1; n: number } | S1 { v: '1'; n: boolean }`: "1" is S1's literal
+      expect(roundTrip(Mixed, { v: '1', n: '1' })).toEqual({ v: '1', n: true })
+      expect(roundTrip(Mixed, { v: 1, n: '1' })).toEqual({ v: 1, n: 1 })
+    })
+
+    it('a union picks the same branch however it is spelled (nested or flat)', () => {
+      // `(N1 | X1) | S1`, `N1 | X1 | S1`, `S1 | (N1 | X1)`: one discriminator over the leaves
+      for (const type of [MixNested, MixFlat, MixLast]) {
+        expect(roundTrip(type, { v: '1', n: '1' })).toEqual({ v: '1', n: true })
+        expect(roundTrip(type, { v: '1', n: '3' })).toEqual({ v: 1, n: 3 })
+        expect(roundTrip(type, { v: '3', n: 'x' })).toEqual({ v: 3, n: 'x' })
+      }
+    })
+
+    it('a tag taken by several branches: the one whose props hold their kinds', () => {
+      // `Mixed`: "1" is S1's literal, but `n: '3'` is no boolean; "1" also coerces to N1's `1`
+      expect(roundTrip(Mixed, { v: '1', n: '3' })).toEqual({ v: 1, n: 3 })
+      // a hand-built `{ v: 1; n: number } | { v: true; n: boolean }`: "1" coerces to both tags
+      const NB = union(obj({ v: lit(1), n: num() }), obj({ v: lit(true), n: bool() }))
+      expect(roundTrip(NB, { v: '1', n: 'true' })).toEqual({ v: true, n: true })
+      expect(roundTrip(NB, { v: '1', n: '2' })).toEqual({ v: 1, n: 2 })
+      expect(roundTrip(NB, { v: '1', n: '0' })).toEqual({ v: 1, n: 0 })
+      // the first branch "1" names ruled out by another literal: the next one is tried
+      const NBk = union(
+        obj({ v: lit(1), k: union(lit('x'), lit('z')), n: num() }),
+        obj({ v: lit(true), k: union(lit('y'), lit('w')), n: bool() })
+      )
+      expect(roundTrip(NBk, { v: '1', k: 'y', n: '0' })).toEqual({ v: true, k: 'y', n: false })
+      expect(roundTrip(NBk, { v: '1', k: 'z', n: '0' })).toEqual({ v: 1, k: 'z', n: 0 })
+      // a tuple: `[1, number] | [true, boolean]`
+      const TB = union(
+        $('tuple').item(lit(1)).item(num()).$type,
+        $('tuple').item(lit(true)).item(bool()).$type
+      )
+      expect(roundTrip(TB, ['1', 'true'])).toEqual([true, true])
+      expect(roundTrip(TB, ['1', '7'])).toEqual([1, 7])
+    })
+
+    it('a null tag taken by several nullable branches: the one whose props hold their kinds', () => {
+      // `AnU = AnA { kind: KindAX | null; n: number } | AnB { kind: 'b' | null; n: boolean }`
+      expect(roundTrip(AnU, { kind: null, n: 'true' })).toEqual({ kind: null, n: true })
+      expect(roundTrip(AnU, { kind: null, n: '1' })).toEqual({ kind: null, n: 1 })
+      // (`null` held by a prop that takes no null does not count: LitNullB's `kind: 'b'`)
+      const NL = union(
+        obj({ kind: lit('b'), n: bool() }),
+        obj({ kind: union(lit('a'), $().designType('null').$type), n: num() })
+      )
+      expect(roundTrip(NL, { kind: null, n: '1' })).toEqual({ kind: null, n: 1 })
+    })
+
+    it('props holding their kinds outrank the shape (which partial / strip validation waives)', () => {
+      const partial = { partial: true } as const
+      // `Px = PxA { v: '1'; n: boolean; req: string } | PxB { v: 1; n: number }`
+      expect(roundTrip(Px, { v: '1', n: 'true' }, partial)).toEqual({ v: '1', n: true })
+      // `Wb = WbA { a: boolean } | WbB { a: number; b: string }`
+      expect(roundTrip(Wb, { a: '5' }, partial)).toEqual({ a: 5 })
+      expect(roundTrip(Wb, { a: 'true' })).toEqual({ a: true })
+      // `Wz = WzA { a: boolean; z?: number } | WzB { a: number }`
+      const strip = { unknownProps: 'strip' } as const
+      expect(roundTrip(Wz, { a: '5', z: 1 }, strip)).toEqual({ a: 5, z: 1 })
+      expect(roundTrip(Wz, { a: '5', z: 1 }, { unknownProps: 'ignore' })).toEqual({ a: 5, z: 1 })
+      // `Pet = PetCat { kind: 'cat'; lives: number; indoor?: boolean } | PetDog { kind: 'dog'; good: boolean }`:
+      // a patch takes the branch declaring its keys
+      expect(roundTrip(Pet, { good: 'true' }, partial)).toEqual({ good: true })
+      expect(roundTrip(Pet, { lives: '9' }, partial)).toEqual({ lives: 9 })
+      expect(roundTrip(Pet, { kind: 'dog', good: '1' })).toEqual({ kind: 'dog', good: true })
+    })
+
+    it('an array takes the array branch its items hold the kind of', () => {
+      // `ArrU = number[] | boolean[]`
+      expect(roundTrip(ArrU, ['1', '2'])).toEqual([1, 2])
+      expect(roundTrip(ArrU, ['1', 'true'])).toEqual([true, true])
     })
   })
 
@@ -324,6 +433,40 @@ describe('coerceForType', () => {
       const zValue = counted(chain(20, 'z'), zReads)
       expect(coerceForType(DU, zValue)).toBe(zValue)
       expect(zReads.n).toBeLessThan(12)
+    })
+
+    it('a wide recursive union of ambiguous branches is linear', { timeout: 10_000 }, () => {
+      // `U = { d: U; k: 'a'; x: number } × 39 | { d: U; k: 'a'; x: boolean } | 'end'`: every
+      // branch takes every node (one shared tag, no discriminator), only the last one holds
+      // `x: 'true'`, the nested `d` comes first. Choosing anew below every discarded branch
+      // would be 40^depth.
+      const width = 40
+      const u = $('union')
+      for (let i = 0; i < width; i++) {
+        u.item(
+          $('object')
+            .prop('d', u.$type)
+            .prop('k', lit('a'))
+            .prop('x', i < width - 1 ? num() : bool()).$type
+        )
+      }
+      u.item(lit('end'))
+      const U = u.$type
+      const depth = 200
+      let value: any = { d: 'end', k: 'a', x: 'true' }
+      for (let i = 0; i < depth; i++) {
+        value = { d: value, k: 'a', x: 'true' }
+      }
+      const reads = { n: 0 }
+      const out = coerceForType(U, counted(value, reads)) as any
+      expect(new Validator(U).validate(out, true)).toBe(true)
+      let node = out
+      for (let i = 0; i < depth; i++) {
+        expect(node.x).toBe(true)
+        node = node.d
+      }
+      // (each node read a bounded number of times per branch: rank them once, coerce once)
+      expect(reads.n).toBeLessThan((depth + 1) * width * 8)
     })
   })
 })

@@ -220,7 +220,7 @@ export function rejectsNullAsRequired(def: TAtscriptAnnotatedType): boolean {
   return metadata !== undefined && !!metadata.get('meta.required') && !acceptsNull(def)
 }
 
-function acceptsNull(def: TAtscriptAnnotatedType): boolean {
+export function acceptsNull(def: TAtscriptAnnotatedType): boolean {
   const type = def.type
   if (type.kind === '') {
     const designType = (type as TAtscriptTypeFinal).designType
