@@ -1,3 +1,9 @@
+## [0.2.9](https://github.com/moostjs/atscript/compare/v0.2.8...v0.2.9) (2026-11-06)
+
+
+### Bug Fixes
+
+* **typescript:** coercion picks the same union branch however the union is spelled — ranked branches, flattened leaves, discriminator over leaves ([d454145](https://github.com/moostjs/atscript/commit/d454145b93566fb9ad21e5238ff1f34a9936730a))
 ## [0.2.8](https://github.com/moostjs/atscript/compare/v0.2.7...v0.2.8) (2026-11-06)
 
 
