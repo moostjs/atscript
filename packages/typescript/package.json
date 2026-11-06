@@ -67,11 +67,11 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@moostjs/event-cli": "^0.7.3",
-    "moost": "^0.7.3"
+    "@moostjs/event-cli": "^0.7.4",
+    "moost": "^0.7.4"
   },
   "devDependencies": {
-    "@atscript/db": "^0.1.171",
+    "@atscript/db": "^0.1.172",
     "@uniqu/core": "^0.2.1",
     "ajv": "8.20.0",
     "vitest": "4.1.12"
