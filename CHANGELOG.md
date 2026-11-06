@@ -1,3 +1,9 @@
+## [0.2.8](https://github.com/moostjs/atscript/compare/v0.2.7...v0.2.8) (2026-11-06)
+
+
+### Bug Fixes
+
+* **cli:** db sync headings follow the run — failure or safe-mode pending never claims success or a stored hash ([da9b093](https://github.com/moostjs/atscript/commit/da9b093c8b163de303d5240d71bf1ba7d3c72263))
 ## [0.2.7](https://github.com/moostjs/atscript/compare/v0.2.6...v0.2.7) (2026-11-05)
 
 
