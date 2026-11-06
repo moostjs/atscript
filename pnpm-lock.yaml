@@ -156,11 +156,11 @@ importers:
         version: 0.7.3
     devDependencies:
       '@atscript/db':
-        specifier: ^0.1.167
-        version: 0.1.167(@atscript/core@packages+core)(@atscript/typescript@0.2.4)(@uniqu/core@0.1.15)
+        specifier: ^0.1.170
+        version: 0.1.170(@atscript/core@packages+core)(@atscript/typescript@0.2.7)(@uniqu/core@0.2.1)
       '@uniqu/core':
-        specifier: ^0.1.15
-        version: 0.1.15
+        specifier: ^0.2.1
+        version: 0.2.1
       ajv:
         specifier: 8.20.0
         version: 8.20.0
@@ -217,18 +217,18 @@ importers:
 
 packages:
 
-  '@atscript/db@0.1.167':
-    resolution: {integrity: sha512-6NiPpiKrK835Zh6lbG7t9y0rRJfFbqFAAQAOxPW3aheJSDrCoYUlxMZazQHldmH/VWM5GmazketuhbyhwerOhw==}
+  '@atscript/db@0.1.170':
+    resolution: {integrity: sha512-ZwewUnO9EZEY0U7aUCGwiN8bGzNpLij4Nld4m66UqfTApCTrnyCA1Ed0NW4j5wO/cdx4qGYUdLJ5fZ2VAbtiaw==}
     peerDependencies:
-      '@atscript/core': ^0.2.3
-      '@atscript/typescript': ^0.2.3
-      '@uniqu/core': ^0.1.15
+      '@atscript/core': ^0.2.7
+      '@atscript/typescript': ^0.2.7
+      '@uniqu/core': ^0.2.1
 
-  '@atscript/typescript@0.2.4':
-    resolution: {integrity: sha512-0dYQq0ICJbrMnAM4KDWrJauWNzdNPZjdediavZw6pE6aXQUM+5Y8PfTL8kZRKEJhdXcAt7DX4Rzs/3ELLWQp7w==}
+  '@atscript/typescript@0.2.7':
+    resolution: {integrity: sha512-H/gU/kvsgYkIe6DeEo6dpMdzxbhjIlUYXfLuu/RVb+kNf4feXRAU/yMUouLD0eqkUJ30uEGNDepd7UvLjZODSQ==}
     hasBin: true
     peerDependencies:
-      '@atscript/core': ^0.2.4
+      '@atscript/core': ^0.2.7
       '@atscript/db': ^0.1.159
     peerDependenciesMeta:
       '@atscript/db':
@@ -1854,8 +1854,8 @@ packages:
   '@ungap/structured-clone@1.3.3':
     resolution: {integrity: sha512-60YRaenCQcVjYEKOcG824+DRGGIQ3VKErcBoAEDJZz5bKIs2ZG+X/H9Nk+Q6EVkwJk5QNApxbrc5QtBSwtrXAg==}
 
-  '@uniqu/core@0.1.15':
-    resolution: {integrity: sha512-b3Z57lDVZvAh+AWfn3HeJj4aX6Vj+HvLO9eMWegWs/GRplwJTb+7QKJydIsNMSjh4wPZP9FZoSIj7fpSWip1hg==}
+  '@uniqu/core@0.2.1':
+    resolution: {integrity: sha512-Mn6V4Mat5bR0WSu2PjlC17KUP6fQw+gcL4ZTfay0FTH9n+gNSBeeXHFFwNl3Ghooqkq19rNnzO2SJAsHFxQ50A==}
 
   '@vitejs/plugin-vue@6.0.8':
     resolution: {integrity: sha512-0ZjgOg7oO6farnNGup7yvoM/YXZV84OZxHAwtflItNa/6zzQyVb5LNxyea3FEKEX2XlagIKzrlH7wwxkKgtiew==}
@@ -3587,19 +3587,19 @@ packages:
 
 snapshots:
 
-  '@atscript/db@0.1.167(@atscript/core@packages+core)(@atscript/typescript@0.2.4)(@uniqu/core@0.1.15)':
+  '@atscript/db@0.1.170(@atscript/core@packages+core)(@atscript/typescript@0.2.7)(@uniqu/core@0.2.1)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@atscript/typescript': 0.2.4(@atscript/core@packages+core)(@atscript/db@0.1.167)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.1)(wooks@0.8.1)
-      '@uniqu/core': 0.1.15
+      '@atscript/typescript': 0.2.7(@atscript/core@packages+core)(@atscript/db@0.1.170)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.1)(wooks@0.8.1)
+      '@uniqu/core': 0.2.1
 
-  '@atscript/typescript@0.2.4(@atscript/core@packages+core)(@atscript/db@0.1.167)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.1)(wooks@0.8.1)':
+  '@atscript/typescript@0.2.7(@atscript/core@packages+core)(@atscript/db@0.1.170)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.1)(wooks@0.8.1)':
     dependencies:
       '@atscript/core': link:packages/core
       '@moostjs/event-cli': 0.7.3(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.1)(moost@0.7.3)(wooks@0.8.1)
       moost: 0.7.3
     optionalDependencies:
-      '@atscript/db': 0.1.167(@atscript/core@packages+core)(@atscript/typescript@0.2.4)(@uniqu/core@0.1.15)
+      '@atscript/db': 0.1.170(@atscript/core@packages+core)(@atscript/typescript@0.2.7)(@uniqu/core@0.2.1)
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
@@ -4817,7 +4817,7 @@ snapshots:
 
   '@ungap/structured-clone@1.3.3': {}
 
-  '@uniqu/core@0.1.15': {}
+  '@uniqu/core@0.2.1': {}
 
   '@vitejs/plugin-vue@6.0.8(vite@7.3.7(@types/node@22.20.1)(jiti@2.6.1)(lightningcss@1.33.0)(tsx@4.21.0)(yaml@2.8.2))(vue@3.5.44(typescript@5.9.3))':
     dependencies:
