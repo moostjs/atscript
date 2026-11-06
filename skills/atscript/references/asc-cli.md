@@ -63,6 +63,10 @@ CI-grade plan output (all plan-only — never apply):
 
 **Refused runs** (since 0.1.93, `@atscript/db` ≥ 0.1.128). `SchemaSync.run()` may return `status: "refused"`: pre-flight found a change that cannot be applied safely, so nothing ran (no DDL, tracking/hash untouched). The CLI prints `Schema sync refused — nothing was applied.` followed by the refused entries (`✖ refused: <name>` + reasons — the same lines `--dry-run`/`--check`/`--format` show; `"refused": true` in `--format json`), never `Schema synced successfully.`, then `Schema sync refused — nothing was applied. Fix the issues above and re-run.` → exit `1`. A plan that contains a refusal exits `1` with `Schema sync would be refused — nothing would be applied. Fix the issues above.`
 
+**Failed runs** (since 0.2.7). A run that was applied but left entries with errors (a statement the database rejected; `status: "failed"` with `@atscript/db` ≥ 0.1.170) prints every entry, the failed ones as `✗ <name> — error` + errors, under `Schema sync failed for N entries — the schema hash was not stored.` (since 0.2.8; never `Schema synced successfully.` or a hash), then `Schema sync failed for N entries — see above; the schema hash was not stored.` → exit `1`. The next run plans the remaining changes again. Exception: an errored external view alone is advisory — hash stored, both messages end at `N entries.` / `see above.`, still exit `1`.
+
+**Safe-mode pending work** (since 0.2.8). `--safe` skips some changes (`— skipped (safe mode)`); they stay pending and the hash is withheld, so the run prints `Schema synced — work skipped in safe mode is still pending; the schema hash was not stored.` instead of the success line and hash → exit `0`. The next run plans them again; apply them without `--safe`.
+
 Full sync semantics → https://db.atscript.dev/sync/. Don't document DB-schema behavior here — it lives in the `atscript-db` skill/docs.
 
 ## Outputs
@@ -90,7 +94,7 @@ Project root (or config-specified location):
 
 - `0` — success or warnings only.
 - `1` — errors (unless `--skipDiag`, where errors are reported but exit code is unchanged). Nothing is written on `1`.
-- `db sync`: `1` also covers error diagnostics, unloadable model modules, a throwing `config.models`, a refused run or plan (since 0.1.93), and an applied run that left entries with errors (`status: "failed"` in `@atscript/db` ≥ 0.1.170; the schema hash is not stored) (since 0.2.7); `--check` adds `2` for destructive changes.
+- `db sync`: `1` also covers error diagnostics, unloadable model modules, a throwing `config.models`, a refused run or plan (since 0.1.93), and an applied run that left entries with errors (since 0.2.7; `status: "failed"` with `@atscript/db` ≥ 0.1.170; the schema hash is not stored); `--check` adds `2` for destructive changes.
 
 ## Troubleshooting
 

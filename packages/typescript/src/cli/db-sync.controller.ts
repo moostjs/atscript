@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url'
 import path from 'path'
 
 import type { TAtscriptConfig, TDbConfigDeclarative } from '@atscript/core'
-import type { SchemaSync, TSyncResult } from '@atscript/db/sync'
+import type { SchemaSync } from '@atscript/db/sync'
 import { Cli, CliOption, CliExample } from '@moostjs/event-cli'
 import type { TConsoleBase } from 'moost'
 import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
@@ -14,7 +14,7 @@ import { Controller, Description, InjectMoostLogger, Optional } from 'moost'
 import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { getConfig } from './config'
 import { errorMessage, loadDbModels } from './db-sync-models'
-import { DbSyncPrinter, planFlags } from './db-sync-printer'
+import { DbSyncPrinter, failedMessage, planFlags, resultFlags } from './db-sync-printer'
 
 @Controller()
 export class DbSyncController {
@@ -176,11 +176,7 @@ export class DbSyncController {
 
     if (!hasChanges) {
       if (!dryRun) {
-        const result = await this.runSync(sync, dbTypes, safe)
-        if (result.entries.some(e => e.hasErrors)) {
-          this.printer.result(result)
-          this.failOnErrors(result)
-        }
+        await this.runSync(sync, dbTypes, safe)
       }
       return
     }
@@ -204,17 +200,17 @@ export class DbSyncController {
       this.logger.log(`No destructive changes, proceeding to sync...`)
     }
 
-    const result = await this.runSync(sync, dbTypes, safe)
-    this.printer.result(result)
-    this.failOnErrors(result)
+    this.printer.result(await this.runSync(sync, dbTypes, safe))
   }
 
   // ── Private helpers ────────────────────────────────────────────────
 
   /**
-   * Applies the sync. A refused run (`status: 'refused'`) issued no DDL and
-   * left tracking untouched — its refusal entries are printed and the command
-   * exits 1 instead of reporting a successful sync.
+   * Applies the sync and returns a successful result. A refused run (`status: 'refused'`)
+   * issued no DDL and left tracking untouched — its refusal entries are printed and the
+   * command exits 1. An applied run that left entries with errors (`status: 'failed'` since
+   * @atscript/db 0.1.170; earlier versions report `'synced'`, hence the entry check) is
+   * printed and the command exits 1.
    */
   private async runSync(sync: SchemaSync, dbTypes: TAtscriptAnnotatedType[], safe?: boolean) {
     const result = await sync.run(dbTypes, { force: true, safe })
@@ -222,20 +218,11 @@ export class DbSyncController {
       this.printer.refused(result)
       this.fail('Schema sync refused — nothing was applied. Fix the issues above and re-run.')
     }
-    return result
-  }
-
-  /**
-   * An applied run that left entries with errors (`status: 'failed'` since
-   * @atscript/db 0.1.170) withheld the schema hash — exit 1 after printing.
-   */
-  private failOnErrors(result: TSyncResult) {
-    const errored = result.entries.filter(e => e.hasErrors).length
-    if (errored > 0) {
-      this.fail(
-        `Schema sync failed for ${errored} ${errored === 1 ? 'entry' : 'entries'} — see above; the schema hash was not stored.`
-      )
+    if (resultFlags(result).errored > 0) {
+      this.printer.result(result)
+      this.fail(failedMessage(result, true))
     }
+    return result
   }
 
   /**

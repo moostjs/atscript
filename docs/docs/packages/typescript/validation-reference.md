@@ -454,7 +454,7 @@ Rules:
 - **never validates** — run the validator on the result. It does not throw on ordinary input; a cyclic value overflows the stack, as it does in the validator
 - **cost** — a type without normalizers returns the input at once; otherwise each object of the value is normalized once per type, recursive unions included
 
-`typeHasNormalizers(def)` (same import) answers whether `normalizeForType` can change a value of `def` at all — `@normalize.*` on `def` or on any type it reaches. It is cached and stays current across runtime `annotate()` writes; use it to skip your own walks (a field-by-field patch, say) when nothing is to normalize.
+`typeHasNormalizers(def)` (same import) answers whether `normalizeForType` can change a value of `def` at all — `@normalize.*` on `def` or on any type it reaches. It is cached and stays current across runtime `annotate()` writes; use it to skip your own walks (a field-by-field patch, say) when there is nothing to normalize.
 
 Normalizers are kept by `serializeAnnotatedType()`, so a client can normalize with a deserialized type too.
 

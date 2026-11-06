@@ -32,6 +32,9 @@ const BANNER = DYE_COLORS.cyan(`
 
 `)
 
+const PENDING_HEADING =
+  'Schema synced — work skipped in safe mode is still pending; the schema hash was not stored.'
+
 const PLAN_HEADER = [
   '',
   DYE_COLORS.bold('╔══════════════════════════════════════╗'),
@@ -56,6 +59,32 @@ export function planFlags(plan: TSyncPlan): {
     hasErrors: plan.entries.some(e => e.hasErrors),
     refused: plan.entries.some(e => e.refused),
   }
+}
+
+/** Run-level aggregates over the per-entry SyncEntry getters. */
+export function resultFlags(result: TSyncResult): {
+  /** Entries the run left with errors. */
+  errored: number
+  /** Work is still pending (errored or skipped in safe mode) — the run withheld the schema hash. */
+  hashWithheld: boolean
+} {
+  return {
+    errored: result.entries.filter(e => e.hasErrors).length,
+    hashWithheld: result.entries.some(e => e.pending),
+  }
+}
+
+/**
+ * `Schema sync failed for N entries`, optionally pointing `see above`, and — only when a
+ * pending entry withheld it — that the schema hash was not stored.
+ */
+export function failedMessage(result: TSyncResult, seeAbove = false): string {
+  const { errored, hashWithheld } = resultFlags(result)
+  const notes = [seeAbove && 'see above', hashWithheld && 'the schema hash was not stored']
+    .filter(Boolean)
+    .join('; ')
+  const count = `${errored} ${errored === 1 ? 'entry' : 'entries'}`
+  return `Schema sync failed for ${count}${notes && ` — ${notes}`}.`
 }
 
 export class DbSyncPrinter {
@@ -92,11 +121,18 @@ export class DbSyncPrinter {
     this.log('')
   }
 
+  /** An applied run: every entry, under a failed, safe-mode pending or success heading. */
   result(result: TSyncResult) {
+    const { errored, hashWithheld } = resultFlags(result)
+    const c = this.colors
     this.log('')
-    this.log(
-      `${this.colors.green(this.colors.bold('Schema synced successfully.'))} Hash: ${result.schemaHash}`
-    )
+    if (errored > 0) {
+      this.log(c.red(c.bold(failedMessage(result))))
+    } else if (hashWithheld) {
+      this.log(c.yellow(c.bold(PENDING_HEADING)))
+    } else {
+      this.log(`${c.green(c.bold('Schema synced successfully.'))} Hash: ${result.schemaHash}`)
+    }
     this.log('')
     this.printGrouped(result.entries, 'result')
     this.log('')

@@ -17,7 +17,7 @@ const UPPERCASE = 4
 
 /**
  * Whether each node's subtree has normalizers: valid until the next type tree write (metadata or
- * shape) or `invalidateCompiledValidators()` (checked by {@link normalizeForType}).
+ * shape) or `invalidateCompiledValidators()` (checked by {@link typeHasNormalizers}).
  */
 let reach = new WeakMap<TAtscriptAnnotatedType, boolean>()
 let stampWrites = -1

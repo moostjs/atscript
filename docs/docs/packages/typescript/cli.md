@@ -159,7 +159,16 @@ The plan already shows the same refusals before anything runs: `--dry-run`, `--c
 
 ### Failed runs
 
-Since 0.2.7, a run that was applied but left entries with errors — a statement the database rejected, for example — prints the result with those errors and exits `1` with `Schema sync failed for N entries — see above; the schema hash was not stored.` With `@atscript/db` 0.1.170 or later such a run reports `status: "failed"`. The hash is withheld, so the next run plans the remaining changes again.
+Since 0.2.7, when a run is applied but leaves entries with errors — a statement the database rejected, for example — the CLI:
+
+- prints every entry, the failed ones as `✗ <name> — error` with their errors, under the heading `Schema sync failed for N entries — the schema hash was not stored.` — since 0.2.8 the `Schema synced successfully.` line and the hash are never printed for a failed run;
+- exits `1` with `Schema sync failed for N entries — see above; the schema hash was not stored.`
+
+`@atscript/db` 0.1.170 or later reports such a run as `status: "failed"`. Because the hash is not stored, the next run plans the remaining changes again. The one exception is an external view that failed its check: it is advisory, so when it is the only failure the hash is stored and both messages end at `N entries.` / `see above.` — the exit code is still `1`.
+
+### Pending work in safe mode
+
+With `--safe`, changes safe mode skips (a column type change that needs a table rebuild, for example) stay pending. Since 0.2.8 such a run prints `Schema synced — work skipped in safe mode is still pending; the schema hash was not stored.` instead of the success line, lists the skipped changes as `— skipped (safe mode)`, and exits `0`. Without the stored hash, the next run plans the skipped changes again; run without `--safe` to apply them.
 
 See the [Schema Sync guide](https://db.atscript.dev/sync/) for full documentation.
 

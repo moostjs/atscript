@@ -2,7 +2,7 @@ import { SyncEntry } from '@atscript/db/sync'
 import type { TSyncPlan, TSyncResult } from '@atscript/db/sync'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { DbSyncPrinter, planFlags } from './db-sync-printer'
+import { DbSyncPrinter, failedMessage, planFlags } from './db-sync-printer'
 
 function makePlan(): TSyncPlan {
   return {
@@ -58,6 +58,11 @@ function makeRefused(): TSyncResult {
   }
 }
 
+/** An applied run over `entries`. */
+function makeResult(status: TSyncResult['status'], entries: SyncEntry[]): TSyncResult {
+  return { status, schemaHash: 'abc123', entries }
+}
+
 /** Collects everything the printer logs to the console. */
 function capture(): string[] {
   const lines: string[] = []
@@ -103,6 +108,103 @@ describe('DbSyncPrinter refused run', () => {
     const md = new DbSyncPrinter().renderMarkdown(plan)
     expect(md).toContain('- **Status:** changes-needed (refused)')
     expect(md).toContain('✖ refused: users')
+  })
+})
+
+describe('DbSyncPrinter applied run', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('prints the success line with the stored hash for a clean run', () => {
+    const lines = capture()
+    new DbSyncPrinter().result(
+      makeResult('synced', [new SyncEntry({ name: 'users', status: 'create' })])
+    )
+    const out = lines.join('\n')
+    expect(out).toContain('Schema synced successfully.')
+    expect(out).toContain('Hash: abc123')
+    expect(out).toContain('users')
+  })
+
+  it('prints a failure heading without the success line or hash when entries errored', () => {
+    const lines = capture()
+    new DbSyncPrinter().result(
+      makeResult('failed', [
+        new SyncEntry({ name: 'orders', status: 'create' }),
+        new SyncEntry({
+          name: 'users',
+          status: 'error',
+          errors: ['ALTER failed on users: type change rejected'],
+        }),
+      ])
+    )
+    const out = lines.join('\n')
+    expect(out).toContain('Schema sync failed for 1 entry — the schema hash was not stored.')
+    expect(out).not.toContain('successfully')
+    expect(out).not.toContain('abc123')
+    // every entry is still listed, the errored one with its errors
+    expect(out).toContain('orders')
+    expect(out).toContain('ALTER failed on users: type change rejected')
+  })
+
+  it('makes no hash claim when the errored entries left nothing pending', () => {
+    // an errored external view is advisory: not pending, so the run stored the hash
+    const lines = capture()
+    new DbSyncPrinter().result(
+      makeResult('failed', [
+        new SyncEntry({ name: 'users', status: 'create' }),
+        new SyncEntry({
+          name: 'legacy_report',
+          viewType: 'E',
+          status: 'error',
+          errors: ['External view "legacy_report" not found in the database'],
+        }),
+      ])
+    )
+    const out = lines.join('\n')
+    expect(out).toContain('Schema sync failed for 1 entry.')
+    expect(out).not.toContain('not stored')
+    expect(out).not.toContain('successfully')
+    expect(out).toContain('External view "legacy_report" not found in the database')
+  })
+
+  it('prints a pending heading without the hash when safe mode skipped work', () => {
+    const lines = capture()
+    new DbSyncPrinter().result(
+      makeResult('synced', [
+        new SyncEntry({
+          name: 'users',
+          status: 'alter',
+          typeChanges: [{ column: 'score', fromType: 'int4', toType: 'int8' }],
+          skipped: ['recreate'],
+        }),
+      ])
+    )
+    const out = lines.join('\n')
+    expect(out).toContain(
+      'Schema synced — work skipped in safe mode is still pending; the schema hash was not stored.'
+    )
+    expect(out).not.toContain('successfully')
+    expect(out).not.toContain('abc123')
+    expect(out).toContain('users')
+  })
+})
+
+describe('failedMessage', () => {
+  const errored = new SyncEntry({ name: 'users', status: 'error', errors: ['boom'] })
+  const external = new SyncEntry({ name: 'v', viewType: 'E', status: 'error', errors: ['gone'] })
+
+  it('names the withheld hash only when an entry is pending', () => {
+    expect(failedMessage(makeResult('failed', [errored]), true)).toBe(
+      'Schema sync failed for 1 entry — see above; the schema hash was not stored.'
+    )
+    expect(failedMessage(makeResult('failed', [external]), true)).toBe(
+      'Schema sync failed for 1 entry — see above.'
+    )
+    expect(failedMessage(makeResult('failed', [errored, external]))).toBe(
+      'Schema sync failed for 2 entries — the schema hash was not stored.'
+    )
   })
 })
 
