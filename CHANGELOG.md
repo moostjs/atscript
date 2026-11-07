@@ -1,5 +1,20 @@
 ## [0.2.11](https://github.com/moostjs/atscript/compare/v0.2.10...v0.2.11) (2026-11-07)
+
+### Dependencies
+
+* **moost-validator, typescript:** moost ^0.7.6.
+
 ## [0.2.10](https://github.com/moostjs/atscript/compare/v0.2.9...v0.2.10) (2026-11-07)
+
+
+### Features
+
+* **typescript:** strict LLM tool schemas: `buildJsonSchema(type, { strict: OPENAI_STRICT | ANTHROPIC_STRICT })` (or a `TStrictProfile` of your own), and `dropOptionalNulls` for the model's output; `translateUserText` translates one metadata key of a compiled type with the `translateServed` rules ([6beabcb](https://github.com/moostjs/atscript/commit/6beabcb57f07d1ad37f688133e498e0c959ad643))
+
+### ⚠ Breaking changes
+
+* **typescript:** a non-optional `@meta.required` field that is missing, or `null` where its type does not accept `null`, fails with code `REQUIRED` (`REQUIRED_CHECKED` for booleans) and the `@meta.required` message instead of `TYPE` (or `UNION`). Whether a value passes is unchanged. Update translation catalogs and code that matched `TYPE` for these fields.
+
 ## [0.2.9](https://github.com/moostjs/atscript/compare/v0.2.8...v0.2.9) (2026-11-06)
 
 

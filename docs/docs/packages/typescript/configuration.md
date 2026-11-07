@@ -85,7 +85,7 @@ Individual interfaces can also opt into build-time embedding via the `@emit.json
 The [`buildJsonSchema` options](/packages/typescript/json-schema#options) the generated `toJsonSchema()` uses, in every mode (`'lazy'`, `'bundle'` and `@emit.jsonSchema`). `toJsonSchema()` returns the same schema as `buildJsonSchema(type, jsonSchemaOptions)`.
 
 ```javascript
-// Strict schemas: reject keys the type does not declare
+// Closed schemas: reject keys the type does not declare
 plugins: [ts({ jsonSchema: 'bundle', jsonSchemaOptions: { closed: true } })]
 ```
 
@@ -94,6 +94,8 @@ plugins: [ts({ jsonSchema: 'bundle', jsonSchemaOptions: { closed: true } })]
 | `closed`      | `false` | `additionalProperties: false` on every object                 |
 | `annotations` | `true`  | `@meta.description` → `description`, `@meta.label` → `title` |
 | `enums`       | `true`  | A union of literals → `enum`                                  |
+
+The `strict` option (LLM tool schemas) is not a plugin option: pass it to `buildJsonSchema()` at runtime. See [Strict LLM tool schemas](/packages/typescript/json-schema#strict-llm-tool-schemas).
 
 ### `exampleData`
 

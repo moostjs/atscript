@@ -38,7 +38,7 @@ import { buildJsonSchema } from '@atscript/typescript/utils'
 import { User } from './schema/user.as'
 
 User.validator().validate(inputData) // throws on failure
-const schema = buildJsonSchema(User.annotatedType)
+const schema = buildJsonSchema(User)
 ```
 
 ## Features

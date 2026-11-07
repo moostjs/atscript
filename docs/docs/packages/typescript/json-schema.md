@@ -143,7 +143,7 @@ What each preset does:
 
 A dropped constraint is added to the field's `description` in plain words, so the model can still follow it: `@expect.min 0` becomes `"Minimum 0."`, a dropped `@meta.required` check `"Must not be blank."`.
 
-These shapes have no strict schema and throw an error that names the field: a record or pattern properties (`{ [*]: string }`: closed, it could only be `{}`; use an array of key/value objects), a tuple, an `unknown` field, an intersection, a non-object root and, for `ANTHROPIC_STRICT`, a recursive type.
+These shapes have no strict schema and throw an error that names the field: a record or pattern properties (`{ [*]: string }`: closed, it could only be `{}`; use an array of key/value objects), a tuple, an `unknown` field, a `never` field, an intersection, a non-object root and, for `ANTHROPIC_STRICT`, a recursive type.
 
 Under `OPENAI_STRICT` every optional field is nullable, `@meta.required` ones included, so the model sends `null` for a field it leaves out. The validator rejects `null` on an optional `@meta.required` field, so call `dropOptionalNulls(type, value)` on the model's output first. It returns the value without those `null`s:
 
