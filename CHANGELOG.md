@@ -1,3 +1,9 @@
+## [0.2.12](https://github.com/moostjs/atscript/compare/v0.2.11...v0.2.12) (2026-11-07)
+
+
+### Bug Fixes
+
+* **typescript:** an intersection has no strict schema under ANTHROPIC_STRICT either ([5e43eab](https://github.com/moostjs/atscript/commit/5e43eab6f2e6c354f9ad73ae83b5f32cbddd705b))
 ## [0.2.11](https://github.com/moostjs/atscript/compare/v0.2.10...v0.2.11) (2026-11-07)
 
 ### Dependencies
