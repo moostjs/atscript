@@ -1,6 +1,6 @@
 {
   "name": "unplugin-atscript",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Atscript: Configuration and build plugins.",
   "keywords": [
     "annotations",
