@@ -32,6 +32,10 @@ This check happens **before** type dispatch and before any constraint annotation
 - **For strings**: the value must contain at least one non-whitespace character. Empty strings and whitespace-only strings fail.
 - **For booleans**: the value must be `true`. `false` fails.
 
+Presence still comes from the `?` marker, but the error for a missing value comes from `@meta.required`: when a value is `undefined`, or `null` on a type that does not accept `null`, and the node carries `@meta.required`, run the type check as usual; if it fails, report the `@meta.required` error (`REQUIRED`, `REQUIRED_CHECKED` for booleans, with the annotation's message, or the node's `@expect.message` when the annotation has none) instead of the type error. The verdict is the same; only the error differs. This applies to a union-level annotation too (`REQUIRED` instead of `UNION`).
+
+In the TypeScript validator this happens in the walk's per-node step. A plugin that checks a value itself with `ctx.validateAnnotatedType(def, value)` skips that step (as it skips the `optional` check and the plugins): for a missing value it gets the type's own error (`TYPE`), not `REQUIRED`.
+
 `@meta.required` only applies to `string` and `boolean` types.
 
 ### The Shorthand: string.required / boolean.required
@@ -50,7 +54,7 @@ These two dimensions compose independently:
 | `.as` syntax             | Absent (`undefined`) | Empty string `""` | Non-empty string |
 | ------------------------ | -------------------- | ----------------- | ---------------- |
 | `name: string`           | Fail                 | Pass              | Pass             |
-| `name: string.required`  | Fail                 | Fail              | Pass             |
+| `name: string.required`  | Fail (`REQUIRED`)    | Fail              | Pass             |
 | `name?: string`          | Pass                 | Pass              | Pass             |
 | `name?: string.required` | Pass                 | Fail              | Pass             |
 

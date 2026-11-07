@@ -133,7 +133,7 @@ export interface SignupForm {
 }
 ```
 
-When validation fails, the custom message is used instead of the default one. For a value of the wrong type (not one of the allowed values of `'active' | 'blocked'`, a string where a number belongs), use `@expect.message`:
+When validation fails, the custom message is used instead of the default one. The `@meta.required` message also covers a missing `username` (since 0.2.10). For a value of the wrong type (not one of the allowed values of `'active' | 'blocked'`, a string where a number belongs), use `@expect.message`:
 
 ```atscript
 export interface Account {

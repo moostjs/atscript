@@ -27,7 +27,7 @@ export interface TTsPluginOptions {
    * `title` from `@meta.description` / `@meta.label`, default `true`), `enums` (a union of
    * literals as `enum`, default `true`).
    */
-  jsonSchemaOptions?: TJsonSchemaOptions
+  jsonSchemaOptions?: Omit<TJsonSchemaOptions, 'strict'>
 
   /**
    * Example data support:

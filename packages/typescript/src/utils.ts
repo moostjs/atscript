@@ -103,6 +103,9 @@ export { normalizeForType, typeHasNormalizers } from './runtime/normalize'
 
 export { buildJsonSchema, fromJsonSchema, mergeJsonSchemas } from './runtime/json-schema'
 export type { TJsonSchema, TJsonSchemaOptions } from './runtime/json-schema'
+export { dropOptionalNulls } from './runtime/drop-optional-nulls'
+export { ANTHROPIC_STRICT, OPENAI_STRICT } from './runtime/json-schema-strict'
+export type { TStrictProfile } from './runtime/json-schema-strict'
 export { detectDiscriminator } from './runtime/discriminator'
 export type { TUnionDiscriminator } from './runtime/discriminator'
 
@@ -135,7 +138,7 @@ export {
   deserializeAnnotatedType,
   SERIALIZE_VERSION,
 } from './runtime/serialize'
-export { translateServed } from './runtime/translate-served'
+export { translateServed, translateUserText } from './runtime/translate-served'
 export type {
   TSerializedAnnotatedType,
   TSerializedAnnotatedTypeInner,

@@ -11,6 +11,7 @@ import type { TAtscriptAnnotatedType } from '../runtime/annotated-type'
 import { buildJsonSchema } from '../runtime/json-schema'
 import { Validator } from '../runtime/validator'
 import { VALIDATOR_MESSAGES } from '../runtime/validator-messages'
+import { WalkValidator } from '../test-utils'
 
 /*
  * The validator error codes from `.as` sources: the annotations behind them (`@expect.message`,
@@ -249,5 +250,216 @@ describe('the format messages of the string primitives have codes', () => {
       ])
       expect(v.errors[0].custom, name).toBeUndefined()
     }
+  })
+})
+
+const REQUIRED_SRC = `export interface Form {
+  @meta.required 'Enter a name'
+  name: string
+
+  @meta.required 'Accept the terms'
+  agreed: boolean
+
+  @meta.required
+  bare: string
+
+  @meta.required 'Enter a nick'
+  @expect.message 'Nick is text'
+  nick: string
+
+  @meta.required
+  @expect.message 'Code expected'
+  code: string
+
+  @meta.required 'Pick one'
+  choice: string | boolean
+
+  @meta.required 'Title or nothing'
+  title: string | null
+
+  @meta.required 'Note or nothing'
+  note: string | undefined
+
+  @expect.message 'Text expected'
+  plain: string
+
+  count: number
+}
+`
+
+const REQUIRED_VALID = {
+  name: 'a',
+  agreed: true,
+  bare: 'b',
+  nick: 'n',
+  code: 'c',
+  choice: 'x',
+  title: 't',
+  note: 'n',
+  plain: 'p',
+  count: 1,
+}
+
+const OPTIONAL_SRC = `export interface Opt {
+  @meta.required
+  @expect.message 'Code expected'
+  code: string
+
+  @meta.required
+  @expect.message 'Code expected'
+  maybe?: string
+
+  @meta.required 'Name it'
+  @expect.message 'Code expected'
+  named?: string
+}
+`
+
+describe('@meta.required covers a missing value', () => {
+  /** `[path, code, message, custom]` of `value`'s errors; the walk agrees (verdict, errors). */
+  function codes(Form: TAtscriptAnnotatedType, value: object, partial?: boolean) {
+    const v = new Validator(Form, { partial, errorLimit: 100 })
+    const walk = new WalkValidator(Form, { partial, errorLimit: 100 })
+    const ok = v.validate(value, true)
+    expect(walk.validate(value, true)).toBe(ok)
+    expect(walk.errors).toEqual(v.errors)
+    return v.errors.map(e => [e.path, e.code, e.message, !!e.custom])
+  }
+
+  const ALL = Object.keys(REQUIRED_VALID)
+  const without = (keys: string[]) =>
+    Object.fromEntries(Object.entries(REQUIRED_VALID).filter(([k]) => !keys.includes(k)))
+  const set = (patch: object) => ({ ...REQUIRED_VALID, ...patch })
+
+  for (const compileValidators of [false, true]) {
+    const engine = compileValidators ? ' (compiled checks)' : ''
+
+    it(`missing: REQUIRED with the annotation's message, TYPE without one${engine}`, async () => {
+      const { Form } = await load(REQUIRED_SRC, compileValidators)
+      if (compileValidators) {
+        expect(boundCheck(Form)).not.toBeNull()
+      }
+      expect(codes(Form, REQUIRED_VALID)).toEqual([])
+      expect(codes(Form, {})).toEqual([
+        ['name', 'REQUIRED', 'Enter a name', true],
+        ['agreed', 'REQUIRED_CHECKED', 'Accept the terms', true],
+        ['bare', 'REQUIRED', 'Must not be empty', false],
+        // (`@expect.message` stays for type mismatches)
+        ['nick', 'REQUIRED', 'Enter a nick', true],
+        // (a bare `@meta.required`: the `@expect.message` text)
+        ['code', 'REQUIRED', 'Code expected', true],
+        // (a union-level annotation: not `UNION`)
+        ['choice', 'REQUIRED', 'Pick one', true],
+        ['title', 'REQUIRED', 'Title or nothing', true],
+        // (`note` accepts `undefined`: it passes)
+        ['plain', 'TYPE', 'Text expected', true],
+        ['count', 'TYPE', 'Expected number, got undefined', false],
+      ])
+    })
+
+    it(`null: REQUIRED on a non-nullable def, passes on a nullable one${engine}`, async () => {
+      const { Form } = await load(REQUIRED_SRC, compileValidators)
+      const nulls = Object.fromEntries(ALL.map(k => [k, null]))
+      expect(codes(Form, nulls)).toEqual([
+        ['name', 'REQUIRED', 'Enter a name', true],
+        ['agreed', 'REQUIRED_CHECKED', 'Accept the terms', true],
+        ['bare', 'REQUIRED', 'Must not be empty', false],
+        ['nick', 'REQUIRED', 'Enter a nick', true],
+        ['code', 'REQUIRED', 'Code expected', true],
+        ['choice', 'REQUIRED', 'Pick one', true],
+        // (`title` accepts `null`)
+        ['note', 'REQUIRED', 'Note or nothing', true],
+        ['plain', 'TYPE', 'Text expected', true],
+        ['count', 'TYPE', 'Expected number, got object', false],
+      ])
+    })
+
+    it(`null on a required and an optional bare @meta.required: the same fallback${engine}`, async () => {
+      const { Opt } = await load(OPTIONAL_SRC, compileValidators)
+      if (compileValidators) {
+        expect(boundCheck(Opt)).not.toBeNull()
+      }
+      // (the `@expect.message` text on both, `null` or missing)
+      expect(codes(Opt, { code: null, maybe: null })).toEqual([
+        ['code', 'REQUIRED', 'Code expected', true],
+        ['maybe', 'REQUIRED', 'Code expected', true],
+      ])
+      expect(codes(Opt, { code: 'a' })).toEqual([])
+      // (an empty string keeps the default message, as specified)
+      expect(codes(Opt, { code: '', maybe: '' })).toEqual([
+        ['code', 'REQUIRED', 'Must not be empty', false],
+        ['maybe', 'REQUIRED', 'Must not be empty', false],
+      ])
+      // (the annotation's own message wins on both)
+      expect(codes(Opt, { code: 'a', maybe: 'a', named: null })).toEqual([
+        ['named', 'REQUIRED', 'Name it', true],
+      ])
+    })
+
+    it(`empty / false and wrong types keep their codes${engine}`, async () => {
+      const { Form } = await load(REQUIRED_SRC, compileValidators)
+      expect(
+        codes(
+          Form,
+          set({ name: ' ', agreed: false, bare: '', code: '', choice: '', title: '', note: '' })
+        )
+      ).toEqual([
+        ['name', 'REQUIRED', 'Enter a name', true],
+        ['agreed', 'REQUIRED_CHECKED', 'Accept the terms', true],
+        ['bare', 'REQUIRED', 'Must not be empty', false],
+        // (an empty value: the `@meta.required` default, as before)
+        ['code', 'REQUIRED', 'Must not be empty', false],
+        // (a union-level `@meta.required` checks the matched string)
+        ['choice', 'REQUIRED', 'Pick one', true],
+        ['title', 'REQUIRED', 'Title or nothing', true],
+        ['note', 'REQUIRED', 'Note or nothing', true],
+      ])
+      expect(
+        codes(Form, set({ name: 1, agreed: 'yes', nick: 5, code: 5, choice: 3, count: 'x' }))
+      ).toEqual([
+        ['name', 'TYPE', 'Expected string, got number', false],
+        ['agreed', 'TYPE', 'Expected boolean, got string', false],
+        ['nick', 'TYPE', 'Nick is text', true],
+        ['code', 'TYPE', 'Code expected', true],
+        [
+          'choice',
+          'UNION',
+          'Value does not match any of the allowed types: [string(0)], [boolean(1)]',
+          false,
+        ],
+        ['count', 'TYPE', 'Expected number, got string', false],
+      ])
+    })
+
+    it(`partial mode accepts a missing field, not null${engine}`, async () => {
+      const { Form } = await load(REQUIRED_SRC, compileValidators)
+      expect(codes(Form, {}, true)).toEqual([])
+      expect(codes(Form, without(['name', 'agreed', 'choice']), true)).toEqual([])
+      expect(codes(Form, { name: null, agreed: null }, true)).toEqual([
+        ['name', 'REQUIRED', 'Enter a name', true],
+        ['agreed', 'REQUIRED_CHECKED', 'Accept the terms', true],
+      ])
+    })
+  }
+
+  it('the error carries no params; translators get the code', async () => {
+    const { Form } = await load(REQUIRED_SRC)
+    const v = new Validator(Form, {
+      translate: id => (id === 'REQUIRED' ? 'Pflichtfeld' : undefined),
+    })
+    expect(v.validate(without(['bare']), true)).toBe(false)
+    expect(v.errors).toEqual([
+      { path: 'bare', message: 'Pflichtfeld', code: 'REQUIRED', params: {} },
+    ])
+  })
+
+  it('@meta.required stays limited to strings and booleans', async () => {
+    expect(
+      await diagnose(`export interface A {
+  @meta.required
+  n: number
+}
+`)
+    ).toEqual(['Expected type is (string | boolean), got "number"'])
   })
 })

@@ -73,6 +73,7 @@ import {
   userTextOf, userTextKeys,        // metadata keys holding user-facing text (`userText` spec args), for translators
   registerUserText,                // a plugin writing user-text metadata at runtime registers its keys
   translateServed,                 // translate a serialized type per locale → { value, texts } (i18n)
+  translateUserText,               // translate one live metadata key's value, same rules (client i18n)
 } from '@atscript/typescript/utils'
 import type { TAtscriptAnnotatedType, TValidatorPlugin } from '@atscript/typescript/utils'
 

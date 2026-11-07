@@ -1,0 +1,658 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildJsonSchema strict profiles > ANTHROPIC_STRICT 1`] = `
+{
+  "$defs": {
+    "Address": {
+      "additionalProperties": false,
+      "description": "Where an order goes",
+      "properties": {
+        "city": {
+          "type": "string",
+        },
+        "zip": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "city",
+      ],
+      "title": "Shipping address",
+      "type": "object",
+    },
+    "Cat": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "cat",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+      ],
+      "type": "object",
+    },
+    "Dog": {
+      "additionalProperties": false,
+      "properties": {
+        "bark": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "dog",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "bark",
+      ],
+      "type": "object",
+    },
+  },
+  "additionalProperties": false,
+  "description": "Creates a ticket",
+  "properties": {
+    "billTo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Address",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "choice": {
+      "anyOf": [
+        {
+          "type": "string",
+        },
+        {
+          "type": "number",
+        },
+      ],
+    },
+    "either": {
+      "anyOf": [
+        {
+          "pattern": "\\S",
+          "type": "string",
+        },
+        {
+          "type": "boolean",
+        },
+      ],
+    },
+    "lookbehind": {
+      "description": "Must match the pattern "(?<!x)y".",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "meta": {
+      "additionalProperties": false,
+      "description": "At least 1 property.",
+      "properties": {
+        "a": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "b": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "b",
+      ],
+      "type": [
+        "object",
+        "null",
+      ],
+    },
+    "name": {
+      "allOf": [
+        {
+          "pattern": "^[a-z]",
+        },
+        {
+          "pattern": "\\S",
+        },
+      ],
+      "description": "At least 2 characters. At most 40 characters.",
+      "type": "string",
+    },
+    "named": {
+      "description": "Must match the pattern "^(?<first>[a-z])[\\\\b]\\\\d{1,500}$".",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "nickname": {
+      "description": "What to call it",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "ok": {
+      "const": true,
+      "type": "boolean",
+    },
+    "pair": {
+      "description": "At least 2 items.",
+      "items": {
+        "type": "string",
+      },
+      "type": "array",
+    },
+    "pet": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Cat",
+        },
+        {
+          "$ref": "#/$defs/Dog",
+        },
+      ],
+    },
+    "score": {
+      "description": "Minimum 0. Maximum 10.",
+      "type": "integer",
+    },
+    "shipTo": {
+      "additionalProperties": false,
+      "description": "Delivery address",
+      "properties": {
+        "city": {
+          "type": "string",
+        },
+        "zip": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "city",
+      ],
+      "title": "Ship to",
+      "type": "object",
+    },
+    "tags": {
+      "description": "Items must be unique. At most 5 items.",
+      "items": {
+        "type": "string",
+      },
+      "minItems": 1,
+      "type": "array",
+    },
+    "title": {
+      "pattern": "\\S",
+      "type": "string",
+    },
+  },
+  "required": [
+    "name",
+    "score",
+    "tags",
+    "pair",
+    "choice",
+    "pet",
+    "shipTo",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`buildJsonSchema strict profiles > OPENAI_STRICT 1`] = `
+{
+  "$defs": {
+    "Address": {
+      "additionalProperties": false,
+      "description": "Where an order goes",
+      "properties": {
+        "city": {
+          "type": "string",
+        },
+        "zip": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "city",
+        "zip",
+      ],
+      "title": "Shipping address",
+      "type": "object",
+    },
+    "Cat": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "cat",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+      ],
+      "type": "object",
+    },
+    "Dog": {
+      "additionalProperties": false,
+      "properties": {
+        "bark": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "dog",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "bark",
+      ],
+      "type": "object",
+    },
+  },
+  "additionalProperties": false,
+  "description": "Creates a ticket",
+  "properties": {
+    "billTo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Address",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "choice": {
+      "anyOf": [
+        {
+          "type": "string",
+        },
+        {
+          "type": "number",
+        },
+      ],
+    },
+    "either": {
+      "anyOf": [
+        {
+          "pattern": "\\S",
+          "type": "string",
+        },
+        {
+          "type": "boolean",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "lookbehind": {
+      "description": "Must match the pattern "(?<!x)y".",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "meta": {
+      "additionalProperties": false,
+      "description": "At least 1 property.",
+      "properties": {
+        "a": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "b": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "a",
+        "b",
+      ],
+      "type": [
+        "object",
+        "null",
+      ],
+    },
+    "name": {
+      "description": "Must not be blank. At least 2 characters. At most 40 characters.",
+      "pattern": "^[a-z]",
+      "type": "string",
+    },
+    "named": {
+      "pattern": "^(?<first>[a-z])[\\b]\\d{1,500}$",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "nickname": {
+      "description": "What to call it",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "ok": {
+      "anyOf": [
+        {
+          "const": true,
+          "type": "boolean",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "pair": {
+      "items": {
+        "type": "string",
+      },
+      "minItems": 2,
+      "type": "array",
+    },
+    "pet": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Cat",
+        },
+        {
+          "$ref": "#/$defs/Dog",
+        },
+      ],
+    },
+    "score": {
+      "maximum": 10,
+      "minimum": 0,
+      "type": "integer",
+    },
+    "shipTo": {
+      "additionalProperties": false,
+      "description": "Delivery address",
+      "properties": {
+        "city": {
+          "type": "string",
+        },
+        "zip": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "city",
+        "zip",
+      ],
+      "title": "Ship to",
+      "type": "object",
+    },
+    "tags": {
+      "description": "Items must be unique.",
+      "items": {
+        "type": "string",
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "type": "array",
+    },
+    "title": {
+      "pattern": "\\S",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+  },
+  "required": [
+    "name",
+    "nickname",
+    "title",
+    "score",
+    "tags",
+    "pair",
+    "meta",
+    "ok",
+    "either",
+    "choice",
+    "lookbehind",
+    "named",
+    "pet",
+    "shipTo",
+    "billTo",
+  ],
+  "type": "object",
+}
+`;
+
+exports[`buildJsonSchema strict profiles > without \`strict\`: the default schema (allOf, bounds, optional props left out) 1`] = `
+{
+  "$defs": {
+    "Address": {
+      "description": "Where an order goes",
+      "properties": {
+        "city": {
+          "type": "string",
+        },
+        "zip": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "city",
+      ],
+      "title": "Shipping address",
+      "type": "object",
+    },
+    "Cat": {
+      "properties": {
+        "kind": {
+          "const": "cat",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+      ],
+      "type": "object",
+    },
+    "Dog": {
+      "properties": {
+        "bark": {
+          "type": "boolean",
+        },
+        "kind": {
+          "const": "dog",
+          "type": "string",
+        },
+      },
+      "required": [
+        "kind",
+        "bark",
+      ],
+      "type": "object",
+    },
+  },
+  "description": "Creates a ticket",
+  "properties": {
+    "billTo": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Address",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "choice": {
+      "anyOf": [
+        {
+          "type": "string",
+        },
+        {
+          "type": "number",
+        },
+      ],
+    },
+    "either": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "pattern": "\\S",
+          "type": "string",
+        },
+        {
+          "type": "boolean",
+        },
+      ],
+    },
+    "lookbehind": {
+      "pattern": "(?<!x)y",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "meta": {
+      "minProperties": 1,
+      "properties": {
+        "a": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "b": {
+          "type": "number",
+        },
+      },
+      "required": [
+        "b",
+      ],
+      "type": [
+        "object",
+        "null",
+      ],
+    },
+    "name": {
+      "allOf": [
+        {
+          "pattern": "^[a-z]",
+        },
+        {
+          "pattern": "\\S",
+        },
+      ],
+      "maxLength": 40,
+      "minLength": 2,
+      "type": "string",
+    },
+    "named": {
+      "pattern": "^(?<first>[a-z])[\\b]\\d{1,500}$",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "nickname": {
+      "description": "What to call it",
+      "type": [
+        "string",
+        "null",
+      ],
+    },
+    "ok": {
+      "const": true,
+      "type": "boolean",
+    },
+    "pair": {
+      "items": {
+        "type": "string",
+      },
+      "minItems": 2,
+      "type": "array",
+    },
+    "pet": {
+      "discriminator": {
+        "mapping": {
+          "cat": "#/$defs/Cat",
+          "dog": "#/$defs/Dog",
+        },
+        "propertyName": "kind",
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Cat",
+        },
+        {
+          "$ref": "#/$defs/Dog",
+        },
+      ],
+    },
+    "score": {
+      "maximum": 10,
+      "minimum": 0,
+      "type": "integer",
+    },
+    "shipTo": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/Address",
+        },
+      ],
+      "description": "Delivery address",
+      "title": "Ship to",
+    },
+    "tags": {
+      "items": {
+        "type": "string",
+      },
+      "maxItems": 5,
+      "minItems": 1,
+      "type": "array",
+      "uniqueItems": true,
+    },
+    "title": {
+      "minLength": 1,
+      "pattern": "\\S",
+      "type": "string",
+    },
+  },
+  "required": [
+    "name",
+    "score",
+    "tags",
+    "pair",
+    "choice",
+    "pet",
+    "shipTo",
+  ],
+  "type": "object",
+}
+`;

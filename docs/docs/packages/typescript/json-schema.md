@@ -11,8 +11,9 @@ By default, JSON Schema support is disabled (`jsonSchema: false`) to keep genera
 Two ways to get a JSON Schema from an Atscript type:
 
 ```typescript
-import { Product } from './product.as'
 import { buildJsonSchema } from '@atscript/typescript/utils'
+
+import { Product } from './product.as'
 
 // Option 1: from the generated type directly (requires jsonSchema: 'lazy' or 'bundle')
 const schema = Product.toJsonSchema()
@@ -30,6 +31,7 @@ Even with `jsonSchema: false`, you can import `buildJsonSchema` from `@atscript/
 
 ```typescript
 import { buildJsonSchema } from '@atscript/typescript/utils'
+
 import { Product } from './product.as'
 
 const schema = buildJsonSchema(Product) // works regardless of config
@@ -54,13 +56,14 @@ export interface ApiResponse {
 
 ## Options
 
-`buildJsonSchema(type, options?)` takes three options. The generated `toJsonSchema()` uses the [`jsonSchemaOptions`](/packages/typescript/configuration#jsonschemaoptions) plugin option and returns the same schema.
+`buildJsonSchema(type, options?)` takes four options. The generated `toJsonSchema()` uses the [`jsonSchemaOptions`](/packages/typescript/configuration#jsonschemaoptions) plugin option and returns the same schema (`strict` is a runtime option only).
 
-| Option        | Default | Effect                                                                                                                                              |
-| ------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `annotations` | `true`  | `@meta.description` becomes `description`, `@meta.label` becomes `title`, on the schema of the type or field that carries them                       |
+| Option        | Default | Effect                                                                                                                                           |
+| ------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `annotations` | `true`  | `@meta.description` becomes `description`, `@meta.label` becomes `title`, on the schema of the type or field that carries them                   |
 | `enums`       | `true`  | A union of literals (`'a' \| 'b'`, also with `null`) becomes `{ "type": "string", "enum": ["a", "b"] }` instead of an `anyOf` of `const` schemas |
-| `closed`      | `false` | Every object schema gets `additionalProperties: false`                                                                                              |
+| `closed`      | `false` | Every object schema gets `additionalProperties: false`                                                                                           |
+| `strict`      | none    | A strict LLM tool schema: `OPENAI_STRICT`, `ANTHROPIC_STRICT` or a profile of your own (see [Strict LLM tool schemas](#strict-llm-tool-schemas)) |
 
 ```typescript
 import { buildJsonSchema } from '@atscript/typescript/utils'
@@ -106,24 +109,79 @@ A union with any other member (a `string`, an object) keeps `anyOf`; a union of 
 
 With `closed: true` a schema accepts exactly the values the validator accepts with its default `unknownProps: 'error'` (except for the [differences](#differences-from-the-validator) below). It stays off by default because it changes the schemas of existing APIs (Swagger / OpenAPI output included).
 
+### Strict LLM tool schemas
+
+Since 0.2.10. LLM providers accept only a subset of JSON Schema for strict tool use and structured outputs. The `strict` option builds the schema closed, then rewrites it to the provider's subset:
+
+```typescript
+import { ANTHROPIC_STRICT, buildJsonSchema, OPENAI_STRICT } from '@atscript/typescript/utils'
+
+const tool = {
+  name: 'create_ticket',
+  description: 'Creates a ticket',
+  strict: true,
+  parameters: buildJsonSchema(Ticket, { strict: OPENAI_STRICT }),
+}
+// Anthropic: input_schema: buildJsonSchema(Ticket, { strict: ANTHROPIC_STRICT })
+```
+
+What each preset does:
+
+|                                                                         | `OPENAI_STRICT`                                            | `ANTHROPIC_STRICT`                                          |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------- |
+| Objects                                                                 | `additionalProperties: false`                              | `additionalProperties: false`                               |
+| Optional fields                                                         | required, and nullable                                     | stay optional                                               |
+| `pattern`                                                               | kept unless it uses lookaround, backreferences or `(?i:…)` | kept when simple (also no `\b`, `\p{…}`, `{n,m}` above 100) |
+| Numeric bounds                                                          | kept                                                       | dropped                                                     |
+| `minItems` / `maxItems`                                                 | kept                                                       | `minItems` 0 or 1 kept, the rest dropped                    |
+| `minLength` / `maxLength`, `uniqueItems`, `@expect.minKeys` / `maxKeys` | dropped                                                    | dropped                                                     |
+| Several patterns on one string                                          | the first kept, the rest dropped                           | kept in `allOf`                                             |
+| A field's title / description beside a `$ref`                           | the named type inlined with them                           | the named type inlined with them                            |
+| Discriminated unions (`oneOf`)                                          | `anyOf`                                                    | `anyOf`                                                     |
+| Recursive types                                                         | allowed (`$ref`)                                           | throw                                                       |
+| Root                                                                    | must be an object type, else throws                        | must be an object type, else throws                         |
+
+A dropped constraint is added to the field's `description` in plain words, so the model can still follow it: `@expect.min 0` becomes `"Minimum 0."`, a dropped `@meta.required` check `"Must not be blank."`.
+
+These shapes have no strict schema and throw an error that names the field: a record or pattern properties (`{ [*]: string }`: closed, it could only be `{}`; use an array of key/value objects), a tuple, an `unknown` field, an intersection, a non-object root and, for `ANTHROPIC_STRICT`, a recursive type.
+
+Under `OPENAI_STRICT` every optional field is nullable, `@meta.required` ones included, so the model sends `null` for a field it leaves out. The validator rejects `null` on an optional `@meta.required` field, so call `dropOptionalNulls(type, value)` on the model's output first. It returns the value without those `null`s:
+
+- A `null` is dropped only from an optional field whose type does not accept `null`. For `x?: string | null` it stays, because `null` and a missing field mean different things there (for example "clear" and "keep" in a patch).
+- In a union the branch its discriminator picks applies; without a discriminator every branch does, and a key is dropped only when every branch that declares it has it optional and not accepting `null`. An intersection follows the same rule across its parts.
+- It never mutates: the input can be frozen, and the same reference comes back when nothing is dropped, else a copy with the changed objects and arrays rebuilt.
+
+::: warning Validate the model's output
+The provider does not enforce what was dropped. Validate what the model sends with the type's validator before using it:
+
+```typescript
+import { dropOptionalNulls } from '@atscript/typescript/utils'
+
+const args = dropOptionalNulls(Ticket, JSON.parse(toolCall.arguments))
+Ticket.validator().validate(args) // throws ValidatorError on a bad value
+```
+:::
+
+A profile of your own is a `TStrictProfile`: `name` (used in errors), `keywords` (the allow-list: keyword → `true`, or a check of its value), `requireAll`, `collapseAllOf`, `describeDropped`, `allowRecursion` and `objectRoot`. Start from a preset: `{ ...OPENAI_STRICT, keywords: { ...OPENAI_STRICT.keywords, uniqueItems: true } }`. The presets follow the providers' published limits as of November 2026. Schema size limits (OpenAI: properties and nesting depth; Anthropic: optional and union-typed parameters across all strict tools) are not checked.
+
 ## Annotation Constraints
 
 Annotations from `.as` files are translated into JSON Schema constraints:
 
-| Annotation                  | JSON Schema                                       | Notes                                                                                                        |
-| --------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `@meta.required`            | `minLength: 1` + `pattern: "\\S"` / `const: true` | For string fields: at least one non-whitespace character; for booleans: `true`                               |
-| `@expect.minLength`         | `minLength` / `minItems`                          | `minLength` for strings, `minItems` for arrays                                                               |
-| `@expect.maxLength`         | `maxLength` / `maxItems`                          | `maxLength` for strings, `maxItems` for arrays                                                               |
-| `@expect.min`               | `minimum`                                         |                                                                                                              |
-| `@expect.max`               | `maximum`                                         |                                                                                                              |
-| `@expect.exclusiveMin`      | `exclusiveMinimum`                                | Since 0.1.109                                                                                                |
-| `@expect.exclusiveMax`      | `exclusiveMaximum`                                | Since 0.1.109                                                                                                |
-| `@expect.int`               | `type: 'integer'`                                 | Changes `number` to `integer`                                                                                |
-| `@expect.pattern`           | `pattern` / `allOf`                               | Single pattern uses `pattern`, multiple become `allOf` entries; flags are applied to the pattern (see below) |
+| Annotation                  | JSON Schema                                       | Notes                                                                                                           |
+| --------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `@meta.required`            | `minLength: 1` + `pattern: "\\S"` / `const: true` | For string fields: at least one non-whitespace character; for booleans: `true`                                  |
+| `@expect.minLength`         | `minLength` / `minItems`                          | `minLength` for strings, `minItems` for arrays                                                                  |
+| `@expect.maxLength`         | `maxLength` / `maxItems`                          | `maxLength` for strings, `maxItems` for arrays                                                                  |
+| `@expect.min`               | `minimum`                                         |                                                                                                                 |
+| `@expect.max`               | `maximum`                                         |                                                                                                                 |
+| `@expect.exclusiveMin`      | `exclusiveMinimum`                                | Since 0.1.109                                                                                                   |
+| `@expect.exclusiveMax`      | `exclusiveMaximum`                                | Since 0.1.109                                                                                                   |
+| `@expect.int`               | `type: 'integer'`                                 | Changes `number` to `integer`                                                                                   |
+| `@expect.pattern`           | `pattern` / `allOf`                               | Single pattern uses `pattern`, multiple become `allOf` entries; flags are applied to the pattern (see below)    |
 | `@expect.minKeys`           | `minProperties`                                   | On a union, beside `anyOf` / `oneOf` (applies to its objects); on a named object, `allOf: [{ $ref }]` beside it |
-| `@expect.maxKeys`           | `maxProperties`                                   | As `@expect.minKeys`                                                                                         |
-| `@expect.array.uniqueItems` | `uniqueItems: true`                               | Not with `@expect.array.key` props on the items (see [Differences](#differences-from-the-validator))         |
+| `@expect.maxKeys`           | `maxProperties`                                   | As `@expect.minKeys`                                                                                            |
+| `@expect.array.uniqueItems` | `uniqueItems: true`                               | Not with `@expect.array.key` props on the items (see [Differences](#differences-from-the-validator))            |
 
 On a nullable field (`@expect.max 10` on `number | null`), the constraint goes onto the matching non-null `anyOf` member: `{ anyOf: [{ type: 'number', maximum: 10 }, { type: 'null' }] }` (since 0.1.103). When the member has its own bound, the stricter one is kept.
 
@@ -351,8 +409,9 @@ Features like `not`, `if/then/else` and `additionalProperties` have no Atscript 
 
 ```typescript
 import { mergeJsonSchemas } from '@atscript/typescript/utils'
-import { CatOrDog } from './pets.as'
+
 import { Order } from './orders.as'
+import { CatOrDog } from './pets.as'
 
 const merged = mergeJsonSchemas([CatOrDog, Order])
 // with options, the same as buildJsonSchema's: mergeJsonSchemas([CatOrDog, Order], { closed: true })

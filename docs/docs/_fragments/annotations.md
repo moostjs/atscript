@@ -257,6 +257,7 @@ interface Product {
 ### Form Validation (@meta.required)
 
 - `@meta.required` or `@meta.required "Custom error message"` - For strings: must contain at least one non-whitespace character. For booleans: must be `true` (optional message)
+- On a non-optional field, a missing value (or `null` where the type does not accept it) fails with the `@meta.required` error and message too (code `REQUIRED`, `REQUIRED_CHECKED` for booleans), not a type error.
 - On an **optional** field (`name?: string`) the field may be omitted, but `null` is rejected with the `@meta.required` message.
 - On a **nullable** field (`name: string | null`) `null` is accepted, and a string must still not be empty.
 

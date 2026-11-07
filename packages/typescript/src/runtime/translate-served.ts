@@ -41,9 +41,39 @@ export function translateServed<T>(
   return { value, texts }
 }
 
+/**
+ * Translates the value of one metadata key (live, as a compiled type holds it — not serialized)
+ * with `t`, by the rules {@link translateServed} applies to serialized metadata, so a client
+ * translating compiled types reads one catalogue with the server: a text key's string (each item
+ * of a `multiple` list; the named fields of a value object, e.g. `message` of `meta.required`) is
+ * replaced by `t(text)` — except a primitive's built-in format message, which is reported by its
+ * code. Returns `value` itself when the key holds no user text or nothing is translated; it is
+ * never changed.
+ *
+ * Expressions are left as they are: their string literals are translated in a served type's
+ * `texts`, and a client translates what an expression returns (by exact match), not its source.
+ *
+ * @example
+ * ```ts
+ * const label = translateUserText('meta.label', 'Street', text => dict[text]) // dict['Street']
+ * ```
+ */
+export function translateUserText(
+  key: string,
+  value: unknown,
+  t: (text: string) => string | undefined
+): unknown {
+  const mode = userTextOf(key)
+  return mode === undefined ? value : walk(value, mode, { t })
+}
+
+/**
+ * `texts` collects the literals of expressions, and `metadata` objects are walked: a served type.
+ * Without it (one key's value, {@link translateUserText}) both are left alone.
+ */
 interface TCtx {
   t: (text: string) => string | undefined
-  texts: Record<string, string>
+  texts?: Record<string, string>
 }
 
 /** What a value is: a `metadata` object, user text (see {@link TUserTextFields}), or other JSON. */
@@ -64,6 +94,10 @@ function walk(value: unknown, mode: TMode, ctx: TCtx): unknown {
     return value
   }
   if (typeof value !== 'object' || value === null) {
+    return value
+  }
+  if (ctx.texts === undefined && typeof mode !== 'object') {
+    // (one key's value, translateUserText: there are no `metadata` objects to look for)
     return value
   }
   return mapEntries(value as Record<string, unknown>, (key, item) =>
@@ -89,13 +123,17 @@ function translate(text: string, ctx: TCtx): string | undefined {
   return typeof out === 'string' ? out : undefined
 }
 
-/** Adds the translated string literals of expression `source` to `ctx.texts`. */
+/** Adds the translated string literals of expression `source` to `ctx.texts` (a served type only). */
 function collectLiterals(source: string, ctx: TCtx): void {
+  const { texts } = ctx
+  if (!texts) {
+    return
+  }
   for (const literal of stringLiterals(source)) {
-    if (!Object.hasOwn(ctx.texts, literal)) {
+    if (!Object.hasOwn(texts, literal)) {
       const translated = translate(literal, ctx)
       if (translated !== undefined && translated !== literal) {
-        ctx.texts[literal] = translated
+        texts[literal] = translated
       }
     }
   }

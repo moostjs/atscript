@@ -77,7 +77,7 @@ Annotations from `.as` files are enforced automatically:
 
 | Annotation                  | Applies to               | Validates                                                                                     |
 | --------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- |
-| `@meta.required`            | string, boolean          | String: at least one non-whitespace character. Boolean: must be `true`                        |
+| `@meta.required`            | string, boolean          | String: at least one non-whitespace character. Boolean: must be `true`; also a missing value  |
 | `@expect.minLength`         | string, array            | Minimum length                                                                                |
 | `@expect.maxLength`         | string, array            | Maximum length                                                                                |
 | `@expect.min`               | number                   | Minimum value                                                                                 |
@@ -129,6 +129,14 @@ A bound of `0` is a real bound: `@expect.min 0` rejects `-1`, `@expect.max 0` re
 A field typed `string.required` or `boolean.required` — directly (`name: string.required`, `agreed?: boolean.required`) or through a type alias (`type Name = string.required`) — carries `@meta.required` again: `''` / whitespace-only strings fail with `Must not be empty`, `false` fails with `Must be checked`, and `buildJsonSchema()` emits `minLength: 1` (with `pattern: "\\S"`, matching the whitespace check; booleans `const: true`). Versions 0.1.79–0.1.103 dropped the annotation from such fields, so they accepted any string or boolean; union members and array elements (`string.required | null`, `string.required[]`) were already checked. A field that references another field (`ownerName: User.name`) still does not inherit it.
 
 **Upgrading:** payloads with an empty string or `false` in these fields now fail validation — fill them, or type the field `string` / `boolean` if empty is legal.
+:::
+
+::: warning `@meta.required` covers a missing value (since 0.2.10)
+A non-optional `@meta.required` field that is missing, or `null` where its type does not accept `null`, fails with code `REQUIRED` (`REQUIRED_CHECKED` for a boolean) and the annotation's message (a bare `@meta.required` uses the field's `@expect.message`, else the default; the same on an optional field holding `null`), the same error as an empty string or `false`. An empty string or `false` always reports the default message (`Must not be empty`, `Must be checked`) unless the annotation has its own text. A union-level annotation (`@meta.required 'Pick one'` on `string | boolean`) reports `REQUIRED` instead of `UNION` for a missing value. Before, such a field failed with `TYPE` (`Expected string, got undefined`, or `@expect.message`), and the `@meta.required` message applied only to an empty value.
+
+What stays the same: fields without `@meta.required` keep `TYPE`; a value of the wrong type (`5` for a string) keeps `TYPE` and its `@expect.message`; an optional field may still be omitted, and partial validation still accepts a missing field. Whether a value passes is unchanged.
+
+**Upgrading:** for fields with `@meta.required`, the error code for a missing value changes from `TYPE` to `REQUIRED` (or `REQUIRED_CHECKED`), with empty `params`. Translation catalogs keyed by code render it with the `REQUIRED` entry; code that matched `TYPE` with `params.actual === 'undefined'` for these fields should match `REQUIRED`. An `@expect.message` repeated only to cover the missing case can go.
 :::
 
 ## Array Uniqueness
@@ -249,7 +257,7 @@ and returns the translated message, or `undefined` to keep the current one.
 import { localizeErrors, messagesTranslator } from '@atscript/typescript/utils'
 
 const de = {
-  MIN_LENGTH: 'Mindestens {min} Zeichen',
+  'MIN_LENGTH': 'Mindestens {min} Zeichen',
   'Choose a valid status': 'Bitte einen gültigen Status wählen',
 }
 
@@ -288,7 +296,7 @@ export interface Account {
 }
 ```
 
-It replaces the message of `TYPE`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_DECIMAL`, `NOT_FINITE`, `DECIMAL_FORMAT`, `LITERAL`, `UNION`, `UNION_DISCRIMINATOR` and `TUPLE_LENGTH` errors at that node. The error keeps its `code` and `params` with `custom: true`. Constraint failures keep their own messages.
+It replaces the message of `TYPE`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_DECIMAL`, `NOT_FINITE`, `DECIMAL_FORMAT`, `LITERAL`, `UNION`, `UNION_DISCRIMINATOR` and `TUPLE_LENGTH` errors at that node. The error keeps its `code` and `params` with `custom: true`. Constraint failures keep their own messages. On a `@meta.required` field, a missing value reports `REQUIRED` with the `@meta.required` message (the `@expect.message` text only when `@meta.required` has none).
 
 ### Discriminated unions
 
@@ -406,6 +414,7 @@ Converts string-transport input (route params, query strings) toward the scalar 
 
 ```typescript
 import { coerceForType } from '@atscript/typescript/utils'
+
 import { KafkaOffset } from './types.as' // @expect.int @expect.min 0 → number
 
 coerceForType(KafkaOffset, '42') // → 42
@@ -422,6 +431,7 @@ Coercion rules:
   3. it has every required property of the member (`partial` lets them be missing).
 
   A member that passes check 1 beats any that fails it, whatever checks 2 and 3 give: `{ a: '5' }` takes `{ a: number; b: string }` over an earlier `{ a: boolean }`. By check 2, `{ y: 'true' }` takes `{ y: boolean }` over an earlier `{ kind: 'a', x: number }`, and a patch `{ good: 'true' }` takes `{ kind: 'dog'; good: boolean }` over an earlier `{ kind: 'cat'; lives: number }`. A patch that both members fit equally (`{ from: '1' }` with no `kind`) takes the first one. A union nested in the union counts as its members, so `(A | B) | C` and `A | B | C` pick alike. Among equally good members, the one an object's [discriminator](/packages/typescript/json-schema#discriminated-unions) names by the literal itself wins, then declared order. So `{ kind: 'range', from: '1' }` takes the `range` member. With `{ v: 1; n: number } | { v: '1'; n: boolean }`, `{ v: '1', n: '1' }` takes the `'1'` member, while `{ v: '1', n: '3' }` takes the `1` member and becomes `{ v: 1, n: 3 }`. When no member takes the value, it is returned untouched for the validator to report
+
 - **objects** — recurses into props when the input is a plain object (returns a new object, never mutates the input)
 - **arrays / tuples** — items coerced individually
 - **string / decimal** — string input is never changed
@@ -440,6 +450,7 @@ Applies the type's [`@normalize.*`](/packages/typescript/annotations-reference#n
 
 ```typescript
 import { normalizeForType } from '@atscript/typescript/utils'
+
 import { Signup } from './signup.as'
 
 const input = normalizeForType(Signup, body) // { email: '  Ann@Example.COM ' } → { email: 'ann@example.com' }

@@ -18,6 +18,7 @@ import {
   WASTE_BEFORE_MEMO,
   getRegex,
   performStrips,
+  isRequired,
   rejectsNullAsRequired,
   stripAgain,
   stripsSince,
@@ -280,14 +281,17 @@ export class Validator<
     return this.fail(code, params, expectMessage(def))
   }
 
-  /** The `@meta.required` error of `def` (custom message or the type's default). */
+  /**
+   * The `@meta.required` error of `def`: its message, else its `@expect.message`, else the code's
+   * default.
+   */
   private required(def: TAtscriptAnnotatedType): false {
     const isBoolean =
       def.type.kind === '' && (def.type as TAtscriptTypeFinal).designType === 'boolean'
     return this.fail(
       isBoolean ? 'REQUIRED_CHECKED' : 'REQUIRED',
       {},
-      messageOf(def.metadata.get('meta.required'))
+      messageOf(def.metadata.get('meta.required')) ?? expectMessage(def)
     )
   }
 
@@ -407,7 +411,27 @@ export class Validator<
         return decided
       }
     }
+    if ((value === undefined || value === null) && isRequired(def)) {
+      return this.missing(def, value)
+    }
     return this.validateAnnotatedType(def, value)
+  }
+
+  /**
+   * A missing value (`undefined`, or `null`) of a `@meta.required` `def`: when `def` rejects it,
+   * the `@meta.required` error replaces the type error the walk reports (the same verdict). A
+   * bare `@meta.required` keeps the `@expect.message` text the type error had.
+   */
+  private missing(def: TAtscriptAnnotatedType, value: undefined | null): boolean {
+    this.stackErrors.push(null)
+    const passed = this.validateAnnotatedType(def, value)
+    this.stackErrors.pop()
+    if (passed) {
+      return true
+    }
+    // (the discarded errors don't count toward the limit)
+    this.limitExceeded = false
+    return this.required(def)
   }
 
   /**

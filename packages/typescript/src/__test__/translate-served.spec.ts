@@ -10,6 +10,7 @@ import {
 import { stringLiterals, translateServed } from '../runtime/translate-served'
 import { registerUserText, userTextOf } from '../runtime/user-text'
 import { VALIDATOR_MESSAGES } from '../runtime/validator-messages'
+import { deepFreeze } from '../test-utils'
 import { tmpBuilder } from './tmp-build'
 
 const load = tmpBuilder('atscript-translate-served-')
@@ -109,16 +110,6 @@ const DE: Record<string, string> = {
 }
 
 const de = (text: string) => DE[text]
-
-function deepFreeze<T>(value: T): T {
-  if (typeof value === 'object' && value !== null) {
-    for (const item of Object.values(value)) {
-      deepFreeze(item)
-    }
-    Object.freeze(value)
-  }
-  return value
-}
 
 interface TNode {
   type: { kind: string; props?: Record<string, TNode>; of?: TNode; id?: string }

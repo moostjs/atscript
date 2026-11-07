@@ -12,6 +12,7 @@ import {
   type TAtscriptTypeObject,
 } from './annotated-type'
 import { detectDiscriminator } from './discriminator'
+import { strictSchema, type TStrictProfile } from './json-schema-strict'
 import { metaEmpty } from './layers'
 import { jsonSchemaPattern } from './stateless-regex'
 import { forAnnotatedType, runWalk, type TWalk } from './traverse'
@@ -39,6 +40,14 @@ export interface TJsonSchemaOptions {
    * `anyOf` of `const` schemas. *(default: `true`)*
    */
   enums?: boolean
+  /**
+   * Targets a strict LLM tool / structured-output schema: `OPENAI_STRICT`, `ANTHROPIC_STRICT` or
+   * a profile of your own (see {@link TStrictProfile}). The schema is built `closed`, then keeps
+   * only the keywords the profile allows (the dropped constraints described in `description`);
+   * a shape the profile can't take throws. The provider does not enforce what was dropped:
+   * validate the model's output with the type's validator. Runtime only (not a plugin option).
+   */
+  strict?: TStrictProfile
 }
 
 /** Annotations written as JSON Schema annotation keywords (`annotations` option). */
@@ -69,6 +78,12 @@ export function buildJsonSchema(
   type: TAtscriptAnnotatedType,
   opts?: TJsonSchemaOptions
 ): TJsonSchema {
+  if (opts?.strict) {
+    return strictSchema(
+      buildJsonSchema(type, { ...opts, strict: undefined, closed: true }),
+      opts.strict
+    )
+  }
   const closed = opts?.closed === true
   const annotations = opts?.annotations !== false
   const enums = opts?.enums !== false

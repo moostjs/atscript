@@ -211,13 +211,17 @@ export function getRegex(pattern: string, flags?: string): RegExp {
   return regex
 }
 
+/** Whether `def` carries `@meta.required`. */
+export function isRequired(def: TAtscriptAnnotatedType): boolean {
+  return !!filledMeta(def.metadata)?.get('meta.required')
+}
+
 /**
  * `true` when `def` (an optional field holding `null`) carries `@meta.required` and its
  * type does not itself accept `null`. Shared by the walk and the fast pre-check.
  */
 export function rejectsNullAsRequired(def: TAtscriptAnnotatedType): boolean {
-  const metadata = filledMeta(def.metadata)
-  return metadata !== undefined && !!metadata.get('meta.required') && !acceptsNull(def)
+  return isRequired(def) && !acceptsNull(def)
 }
 
 export function acceptsNull(def: TAtscriptAnnotatedType): boolean {

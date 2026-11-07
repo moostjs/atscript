@@ -26,6 +26,7 @@ A production build now also loads every generated module once and fails when one
 
 ## 3. Check behaviour changes
 
+- **A missing `@meta.required` field reports `REQUIRED`** (0.2.10, an error-code change in a patch release). A non-optional `@meta.required` field that is missing, or `null` where its type does not accept `null`, fails with code `REQUIRED` (`REQUIRED_CHECKED` for booleans) and the annotation's message instead of `TYPE` (or `UNION`). Update catalogs and code that matched `TYPE` for these fields. See [Built-in Validation Rules](/packages/typescript/validation-reference#built-in-validation-rules).
 - **`unknownProps: 'strip'` deletes keys only when validation passes.** A failed validation, a rejected union branch, or a plugin's `ctx.validateAnnotatedType(...)` call that returns `false` strips nothing. See [`unknownProps`](/packages/typescript/validation-reference#unknownprops).
 - **Raw writes to a type tree need `invalidateCompiledValidators()`** for the interpreted validator and every metadata reader too, not only compiled checks: swapping a node's map (`node.metadata = X`) or editing a stored value in place. Writes through `set` / `delete` / `annotate()` are tracked as before. See [Runtime Metadata](/plugin-development/runtime-metadata#writing-at-runtime).
 - **`.d.ts` type paths** are written as `TAtscriptField<T, "k">` steps (a type-only export of `@atscript/typescript/utils`) instead of `T["k"]`, so a path through a union or an optional property type-checks. See [Type paths](/packages/typescript/code-generation#type-paths).

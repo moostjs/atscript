@@ -85,6 +85,8 @@ export const metaAnnotations: TAnnotationsTree = {
       'Marks a field as required for form validation. ' +
         'For strings: must contain at least one non-whitespace character. ' +
         'For booleans: must be true. ' +
+        'A non-optional field that is missing, or `null` where its type does not accept `null`, ' +
+        'fails the same way (code `REQUIRED`, `REQUIRED_CHECKED` for booleans, and the message). ' +
         'On an optional field (`name?: string`) the field may be omitted, but `null` is rejected. ' +
         'On a nullable field (`string | null`) `null` is accepted and a string must not be empty.',
 
@@ -100,7 +102,8 @@ export const metaAnnotations: TAnnotationsTree = {
         name: 'message',
         optional: true,
         type: 'string',
-        description: 'Optional error message to display if the validation fails.',
+        description:
+          'Optional error message to display if the value is missing, empty or (booleans) not true.',
         userText: true,
       },
     ],

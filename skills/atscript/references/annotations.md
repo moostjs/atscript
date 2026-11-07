@@ -57,7 +57,7 @@ Core ships `@meta.*` (semantic metadata), `@expect.*` (validation constraints ch
 | `@meta.default 'value'`      | `string`  | Default. Strings as-is; other types parsed as JSON. Applies to `prop` / `type`.                                                        |
 | `@meta.example 'value'`      | `string`  | Example for docs/Swagger/UI. Strings as-is; others parsed as JSON. Applies to `prop` / `type`.                                         |
 
-`@meta.required` and `null` (since 0.1.103): optional field (`name?: string`) → omission OK, `null` rejected with the `@meta.required` message; nullable field (`name: string | null`) → `null` OK, a string must be non-empty.
+`@meta.required` and `null` (since 0.1.103): optional field (`name?: string`) → omission OK, `null` rejected with the `@meta.required` message; nullable field (`name: string | null`) → `null` OK, a string must be non-empty. Since 0.2.10 the message (and code `REQUIRED` / `REQUIRED_CHECKED`) also covers a missing value on a non-optional field, and `null` where the type rejects it — instead of `TYPE` / `UNION`.
 
 Composite key:
 

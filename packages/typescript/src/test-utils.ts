@@ -71,6 +71,17 @@ export async function prepareFixtures(options: PrepareFixturesOptions): Promise<
  */
 export class WalkValidator extends Validator {}
 
+/** Freezes `value` and everything it holds (a spec of a function that must not mutate). */
+export function deepFreeze<T>(value: T): T {
+  if (typeof value === 'object' && value !== null) {
+    for (const item of Object.values(value)) {
+      deepFreeze(item)
+    }
+    Object.freeze(value)
+  }
+  return value
+}
+
 /** A seeded random number generator (mulberry32) returning values in `[0, 1)`. */
 export function rng(seed: number): () => number {
   // mulberry32 — the int32 / uint32 coercions are intentional
