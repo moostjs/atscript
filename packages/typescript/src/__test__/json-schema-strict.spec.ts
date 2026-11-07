@@ -301,6 +301,28 @@ describe('buildJsonSchema strict profiles', () => {
     )
   })
 
+  it('an intersection has no strict schema (any profile)', () => {
+    // (the compiler merges intersected interfaces: build the nodes directly)
+    const intersection = defineAnnotatedType('intersection')
+      .item(m.PartPlain)
+      .item(m.PartRequiredNullable).$type
+    const type = defineAnnotatedType('object').prop('both', intersection).$type
+    expect(() => buildJsonSchema(type, { strict: ANTHROPIC_STRICT })).toThrow(
+      'buildJsonSchema (strict: anthropic): an intersection (at both) has no strict schema'
+    )
+    expect(() => buildJsonSchema(type, { strict: OPENAI_STRICT })).toThrow(
+      'buildJsonSchema (strict: openai): an intersection (at both) has no strict schema'
+    )
+  })
+
+  it('several patterns stay an `allOf` of them for Anthropic, the first one for OpenAI', () => {
+    const anthropic = buildJsonSchema(m.Ticket, { strict: ANTHROPIC_STRICT }).properties
+    expect(anthropic.name.allOf).toEqual([{ pattern: '^[a-z]' }, { pattern: '\\S' }])
+    const openai = buildJsonSchema(m.Ticket, { strict: OPENAI_STRICT }).properties
+    expect(openai.name.allOf).toBeUndefined()
+    expect(openai.name.pattern).toBe('^[a-z]')
+  })
+
   it('simplePattern (Anthropic) and decodablePattern (OpenAI)', () => {
     for (const p of ['^[a-z]+\\d{2,5}$', '\\S', '(?:a|b)+', '\\\\b', '(?<n>a)', '[\\b]']) {
       expect(simplePattern(p), p).toBe(true)

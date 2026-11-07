@@ -24,7 +24,7 @@ export interface TStrictProfile {
    * Rewrites the `allOf` the schema builder writes: a `$ref` with notes beside it (a field's
    * title, description, key counts) → the referenced schema inlined with them; several patterns
    * → the first one (the rest dropped) when `allOf` itself is not allowed. Any other `allOf`
-   * the profile does not allow throws.
+   * (an intersection) throws, whatever the profile allows.
    */
   collapseAllOf: boolean
   /** Appends each dropped constraint to the schema's `description`, in plain words. */
@@ -95,8 +95,9 @@ export const OPENAI_STRICT: TStrictProfile = {
  * Anthropic strict tool use / structured outputs: objects closed, an object root (a tool's
  * `input_schema`), no recursion; simple patterns kept (no lookaround, backreferences, word
  * boundaries or large `{n,m}`), `minItems` only `0` / `1`; numeric bounds, string lengths,
- * `maxItems`, `uniqueItems` and key counts dropped. `allOf` is allowed
- * except with a `$ref` (collapsed). Optional properties stay optional.
+ * `maxItems`, `uniqueItems` and key counts dropped. `allOf` is allowed for several patterns
+ * only (a `$ref` with notes is collapsed; an intersection throws). Optional properties stay
+ * optional.
  */
 export const ANTHROPIC_STRICT: TStrictProfile = {
   name: 'anthropic',
@@ -210,6 +211,20 @@ function reachable(from: Iterable<string>, edges: Map<string, Set<string>>): Set
 function recursiveDef(defs: Record<string, TJsonSchema>): string | undefined {
   const edges = edgesOf(defs)
   return [...edges.keys()].find(name => reachable(edges.get(name)!, edges).has(name))
+}
+
+/** Whether `key` is the only key of `item`. */
+function hasOnly(item: TJsonSchema, key: string): boolean {
+  const keys = Object.keys(item)
+  return keys.length === 1 && keys[0] === key
+}
+
+/** An `allOf` the schema builder writes besides an intersection: one `$ref`, or patterns only. */
+function isNoteOrPatterns(allOf: TJsonSchema[]): boolean {
+  return (
+    (allOf.length === 1 && hasOnly(allOf[0], '$ref')) ||
+    allOf.every(item => hasOnly(item, 'pattern'))
+  )
 }
 
 /** `n` `one`(s): `1 item`, `2 items`. */
@@ -408,6 +423,10 @@ export function strictSchema(schema: TJsonSchema, profile: TStrictProfile): TJso
       source = { ...rest, anyOf: oneOf }
     }
     const where = at || 'the root'
+    if (Array.isArray(source.allOf) && !isNoteOrPatterns(source.allOf)) {
+      // (a real intersection: closed, its parts could never both hold)
+      fail(`an intersection (at ${where}) has no strict schema`)
+    }
     if (Array.isArray(source.items)) {
       fail(`a tuple (at ${where}) has no strict schema`)
     }
@@ -507,7 +526,7 @@ export function strictSchema(schema: TJsonSchema, profile: TStrictProfile): TJso
       return s
     }
     const { allOf, ...rest } = s as TJsonSchema & { allOf: TJsonSchema[] }
-    const ref = allOf.length === 1 && Object.keys(allOf[0]).length === 1 ? allOf[0].$ref : undefined
+    const ref = allOf.length === 1 && hasOnly(allOf[0], '$ref') ? allOf[0].$ref : undefined
     if (typeof ref === 'string') {
       // A `$ref` with notes beside it: the entry inlined, with the notes (and key counts).
       const name = refName(ref)
@@ -521,7 +540,7 @@ export function strictSchema(schema: TJsonSchema, profile: TStrictProfile): TJso
       entered.push(name)
       return collapse({ ...target, ...rest }, dropped, entered)
     }
-    if (!allOf.every(item => Object.keys(item).length === 1 && 'pattern' in item)) {
+    if (!allOf.every(item => hasOnly(item, 'pattern'))) {
       return s
     }
     if (profile.keywords.allOf) {
