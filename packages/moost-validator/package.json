@@ -40,8 +40,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@moostjs/event-http": "^0.7.5",
-    "moost": "^0.7.5",
+    "@moostjs/event-http": "^0.7.6",
+    "moost": "^0.7.6",
     "vitest": "4.1.12"
   },
   "peerDependencies": {
