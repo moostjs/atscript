@@ -415,7 +415,8 @@ export const expectAnnotations: TAnnotationsTree = {
     key: new AnnotationSpec({
       description:
         'Marks a **key field** inside an array of objects. Key fields *identify* elements ' +
-        'for lookup and patch operations (`$upsert`, `$update`, `$remove`).\n\n' +
+        'for lookup and patch operations (`$upsert`, `$update`, `$remove`; `$insert` skips an item ' +
+        'whose key is already stored).\n\n' +
         '`@expect.array.key` does **not** enforce uniqueness by itself — ' +
         'it only declares which fields form the element identity. ' +
         'To enforce that no two elements share the same key, also add `@expect.array.uniqueItems` ' +
