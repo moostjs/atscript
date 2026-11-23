@@ -1,3 +1,9 @@
+## [0.2.14](https://github.com/moostjs/atscript/compare/v0.2.13...v0.2.14) (2026-11-23)
+
+
+### Bug Fixes
+
+* **typescript:** errors inside a nullable object or array are reported at their own paths ([483a776](https://github.com/moostjs/atscript/commit/483a7761678376041a5d3dda42bd608a498fda01))
 ## [0.2.13](https://github.com/moostjs/atscript/compare/v0.2.12...v0.2.13) (2026-11-21)
 ## [0.2.12](https://github.com/moostjs/atscript/compare/v0.2.11...v0.2.12) (2026-11-07)
 
