@@ -95,3 +95,25 @@ export interface KeyedNullable {
   @expect.array.uniqueItems
   nested?: KeyedItems | undefined
 }
+
+interface PostalAddress {
+  city: string
+  zip: string
+}
+
+interface Parcel {
+  weight: number
+}
+
+export interface NullableObjects {
+  address: PostalAddress | null
+  list: PostalAddress[] | null
+  name: string | null
+  either?: PostalAddress | Parcel | null
+
+  @expect.message "Pick an address"
+  picked?: PostalAddress | null
+
+  rev?: null | PostalAddress
+  pair?: [string, number] | null
+}

@@ -42,7 +42,10 @@ interface TUnionOutcome {
   path: string
   unknownProps: TValidatorOptions['unknownProps']
   item?: TAtscriptAnnotatedType
-  /** The errors reported (one union error, or the errors of the branch its discriminator picks). */
+  /**
+   * The errors reported (one union error, or the errors of one branch: the one its discriminator
+   * picks, or the non-null branch of a nullable union).
+   */
   errors?: TError[]
   /** The strips the union recorded (`Validator.strips` entries), recorded again on a reuse. */
   strips?: unknown[]
@@ -592,11 +595,12 @@ export class Validator<
     const kept = this.strips.length
     let details: TError[] | undefined
     /**
-     * Where each failed branch's errors start in `details` (by branch index): plain object
-     * values only, the ones a discriminator can report (see `discriminatedErrors`).
+     * Where each failed branch's errors start in `details` (by branch index): object and array
+     * values only, the ones a branch's errors can be reported for (see `discriminatedErrors`,
+     * `nullableErrors`).
      */
     let starts: number[] | undefined
-    const plainObject = typeof value === 'object' && value !== null && !Array.isArray(value)
+    const objectValue = typeof value === 'object' && value !== null
 
     for (const item of items) {
       // Use stackErrors for error isolation only — no depth/path tracking.
@@ -631,7 +635,7 @@ export class Validator<
       if (nested) {
         this.nestedFailures++
       }
-      if (plainObject) {
+      if (objectValue) {
         ;(starts ??= []).push(details?.length ?? 0)
       }
       if (branchErrors) {
@@ -648,7 +652,9 @@ export class Validator<
     // (all of them: an outcome decided once — see `unionMemo` — is one error object wherever it
     // is reported, so details of unions nested in their own branches share their errors)
     const errors =
-      this.discriminatedErrors(def, value, details, starts ?? []) ?? this.unionError(def, details)
+      this.discriminatedErrors(def, value, details, starts ?? []) ??
+      this.nullableErrors(def, value, details, starts ?? []) ??
+      this.unionError(def, details)
     if (path !== undefined) {
       this.decide(def, value, path, kept, undefined, errors)
     }
@@ -700,7 +706,54 @@ export class Validator<
       const at = this.depth > 0 ? `${this.buildPath()}.${disc.property}` : disc.property
       return [this.builtin('UNION_DISCRIMINATOR', params, expectMessage(def), at)]
     }
-    const index = disc.branches[picked][0]
+    return this.branchErrors(details, starts, disc.branches[picked][0])
+  }
+
+  /**
+   * The errors of a nullable union (`T | null`) over a `value` of `T`'s kind (a non-array object
+   * for an object `T`, an array for an array or tuple `T`), reported in place of the union error:
+   * the errors of `T`, the one branch that is not `null` (the `null` branch was never a
+   * candidate). `undefined` (nothing reported) for other unions and values, and when `T` failed
+   * without errors.
+   */
+  private nullableErrors(
+    def: TAtscriptAnnotatedType<TAtscriptTypeComplex>,
+    value: unknown,
+    details: TError[] | undefined,
+    starts: number[]
+  ): TError[] | undefined {
+    if (typeof value !== 'object' || value === null) {
+      return undefined
+    }
+    const items = def.type.items
+    let index = -1
+    for (let i = 0; i < items.length; i++) {
+      const type = items[i].type as TAtscriptTypeFinal
+      if (type.kind === '' && type.designType === 'null') {
+        continue
+      }
+      if (index >= 0) {
+        return undefined
+      }
+      index = i
+    }
+    const kind = items[index]?.type.kind
+    if (Array.isArray(value) ? kind !== 'array' && kind !== 'tuple' : kind !== 'object') {
+      // (a value of another kind: a mismatch of the union itself)
+      return undefined
+    }
+    return this.branchErrors(details, starts, index)
+  }
+
+  /**
+   * Reports the errors of failed branch `index` (its slice of `details`, by `starts`) in place of
+   * the union error; `undefined` (nothing reported) when it failed without errors.
+   */
+  private branchErrors(
+    details: TError[] | undefined,
+    starts: number[],
+    index: number
+  ): TError[] | undefined {
     const errors = details?.slice(starts[index], starts[index + 1] ?? details.length)
     if (errors === undefined || errors.length === 0) {
       // (a branch that failed without errors, a plugin's verdict: the plain union error)

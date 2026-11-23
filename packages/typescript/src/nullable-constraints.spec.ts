@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { tsPlugin } from './plugin'
 import { defineAnnotatedType as $ } from './runtime/annotated-type'
 import { buildJsonSchema, fromJsonSchema } from './runtime/json-schema'
-import { Validator, type TValidatorOptions } from './runtime/validator'
+import { Validator, type TValidatorOptions, type TValidatorPlugin } from './runtime/validator'
 import { prepareFixtures, WalkValidator } from './test-utils'
 
 const rootDir = path.join(__dirname, '..', 'test', 'fixtures')
@@ -16,11 +16,18 @@ let RequiredOptional: any
 let InlinePrimitives: any
 let KeyedNullable: any
 let RequiredPrimitives: any
+let NullableObjects: any
 
 beforeAll(async () => {
   await prepareFixtures({ rootDir, entries: ['nullable-constraints.as'] })
-  ;({ NullableConstraints, RequiredOptional, InlinePrimitives, KeyedNullable, RequiredPrimitives } =
-    await import(path.join(rootDir, 'nullable-constraints.as.js')))
+  ;({
+    NullableConstraints,
+    RequiredOptional,
+    InlinePrimitives,
+    KeyedNullable,
+    RequiredPrimitives,
+    NullableObjects,
+  } = await import(path.join(rootDir, 'nullable-constraints.as.js')))
 })
 
 function validBase(): any {
@@ -184,6 +191,242 @@ describe('union-level constraints on nullable fields', () => {
         check(NullableConstraints, value, opts)
       }
     }
+  })
+})
+
+describe('errors inside a nullable object or array (`T | null`)', () => {
+  const valid = () => ({ address: null, list: null, name: null })
+
+  /** The errors of a failing `value` (the fast-path validator and the walk agree: see `check`). */
+  function errorsOf(value: any, opts?: Partial<TValidatorOptions>) {
+    expect(check(NullableObjects, value, opts)).not.toEqual([])
+    const v = new Validator(NullableObjects, opts)
+    v.validate(structuredClone(value), true)
+    return v.errors
+  }
+
+  it('null and valid values pass', () => {
+    expect(check(NullableObjects, { ...valid(), either: null })).toEqual([])
+    expect(
+      check(NullableObjects, {
+        address: { city: 'A', zip: '1' },
+        list: [{ city: 'B', zip: '2' }],
+        name: 'n',
+        either: { weight: 1 },
+      })
+    ).toEqual([])
+  })
+
+  it('a wrong child type: at the child path with its own code, not UNION at the parent', () => {
+    expect(errorsOf({ ...valid(), address: { city: 'A', zip: 1 } })).toEqual([
+      {
+        path: 'address.zip',
+        message: 'Expected string, got number',
+        code: 'TYPE',
+        params: { expected: 'string', actual: 'number' },
+      },
+    ])
+  })
+
+  it('several child errors: all reported, in order, up to the error limit', () => {
+    const value = { ...valid(), address: { city: 1, zip: 2, extra: true } }
+    expect(errorsOf(value).map(e => [e.path, e.code])).toEqual([
+      ['address.city', 'TYPE'],
+      ['address.zip', 'TYPE'],
+      ['address.extra', 'UNEXPECTED_PROPERTY'],
+    ])
+    expect(errorsOf(value, { errorLimit: 2 }).map(e => e.path)).toEqual([
+      'address.city',
+      'address.zip',
+    ])
+  })
+
+  it("a plugin's own error inside the object: that error, at its path", () => {
+    const plugin: TValidatorPlugin = (ctx, _def, value) => {
+      if (typeof value === 'object' && value !== null && '$inc' in value) {
+        ctx.error('Operators are not allowed here')
+        return false
+      }
+      return undefined
+    }
+    const value = { ...valid(), address: { city: 'A', zip: { $inc: 1 } } }
+    expect(errorsOf(value, { plugins: [plugin] })).toEqual([
+      {
+        path: 'address.zip',
+        message: 'Operators are not allowed here',
+        code: 'CUSTOM',
+        params: {},
+        custom: true,
+      },
+    ])
+  })
+
+  it('the object branch rejected by a plugin without an error: the UNION error', () => {
+    const plugin: TValidatorPlugin = (_ctx, def, value) =>
+      def.type.kind === 'object' && value?.city === 'Nowhere' ? false : undefined
+    const value = { ...valid(), address: { city: 'Nowhere', zip: '1' } }
+    expect(errorsOf(value, { plugins: [plugin] })).toMatchObject([
+      {
+        path: 'address',
+        code: 'UNION',
+        details: [
+          { path: 'address', code: 'TYPE', params: { expected: 'null', actual: 'object' } },
+        ],
+      },
+    ])
+  })
+
+  it('a bad element of a nullable array: at its path', () => {
+    const value = {
+      ...valid(),
+      list: [
+        { city: 'A', zip: '1' },
+        { city: 'B', zip: 2 },
+      ],
+    }
+    expect(errorsOf(value)).toEqual([
+      {
+        path: 'list.1.zip',
+        message: 'Expected string, got number',
+        code: 'TYPE',
+        params: { expected: 'string', actual: 'number' },
+      },
+    ])
+  })
+
+  it('`null` written first (`null | T`): the errors of T, at their paths', () => {
+    expect(errorsOf({ ...valid(), rev: { city: 'A', zip: 1 } })).toEqual([
+      {
+        path: 'rev.zip',
+        message: 'Expected string, got number',
+        code: 'TYPE',
+        params: { expected: 'string', actual: 'number' },
+      },
+    ])
+  })
+
+  it("a nullable tuple: the tuple's errors for an array, the UNION error for an object", () => {
+    expect(errorsOf({ ...valid(), pair: ['a'] })).toEqual([
+      {
+        path: 'pair',
+        message: 'Expected array of length 2',
+        code: 'TUPLE_LENGTH',
+        params: { length: 2 },
+      },
+    ])
+    expect(errorsOf({ ...valid(), pair: ['a', 'b'] })).toEqual([
+      {
+        path: 'pair.1',
+        message: 'Expected number, got string',
+        code: 'TYPE',
+        params: { expected: 'number', actual: 'string' },
+      },
+    ])
+    expect(errorsOf({ ...valid(), pair: { 0: 'a' } })).toMatchObject([
+      { path: 'pair', code: 'UNION', params: { expected: '[tuple(0)], [null(1)]' } },
+    ])
+  })
+
+  it('a primitive value: the UNION error listing the allowed types, as before', () => {
+    expect(errorsOf({ ...valid(), name: 5 })).toEqual([
+      {
+        path: 'name',
+        message: 'Value does not match any of the allowed types: [string(0)], [null(1)]',
+        code: 'UNION',
+        params: { expected: '[string(0)], [null(1)]' },
+        details: [
+          {
+            path: 'name',
+            message: 'Expected string, got number',
+            code: 'TYPE',
+            params: { expected: 'string', actual: 'number' },
+          },
+          {
+            path: 'name',
+            message: 'Expected null, got number',
+            code: 'TYPE',
+            params: { expected: 'null', actual: 'number' },
+          },
+        ],
+      },
+    ])
+  })
+
+  it("two object branches and null: the UNION error with every branch's errors, as before", () => {
+    const [error, ...rest] = errorsOf({ ...valid(), either: { city: 1 } })
+    expect(rest).toEqual([])
+    expect(error).toMatchObject({
+      path: 'either',
+      code: 'UNION',
+      params: { expected: '[object(0)], [object(1)], [null(2)]' },
+    })
+    expect(error.details!.map(e => [e.path, e.code])).toEqual([
+      ['either.city', 'TYPE'],
+      ['either.zip', 'TYPE'],
+      ['either.weight', 'TYPE'],
+      ['either.city', 'UNEXPECTED_PROPERTY'],
+      ['either', 'TYPE'],
+    ])
+  })
+
+  it("a value of another kind than the type's: the UNION error at the field, as before", () => {
+    for (const [field, value, expected] of [
+      ['address', [], '[object(0)], [null(1)]'],
+      ['list', {}, '[array(0)], [null(1)]'],
+      ['name', {}, '[string(0)], [null(1)]'],
+    ] as const) {
+      const errors = errorsOf({ ...valid(), [field]: value })
+      expect(errors).toMatchObject([{ path: field, code: 'UNION', params: { expected } }])
+      expect(errors[0].details).toHaveLength(2)
+    }
+  })
+
+  it('@expect.message: the message of a value of another kind, not of the errors inside', () => {
+    for (const picked of [[], 'x']) {
+      expect(errorsOf({ ...valid(), picked })).toEqual([
+        {
+          path: 'picked',
+          message: 'Pick an address',
+          code: 'UNION',
+          params: { expected: '[object(0)], [null(1)]' },
+          custom: true,
+          details: expect.any(Array),
+        },
+      ])
+    }
+    expect(errorsOf({ ...valid(), picked: { city: 'A', zip: 1 } })).toEqual([
+      {
+        path: 'picked.zip',
+        message: 'Expected string, got number',
+        code: 'TYPE',
+        params: { expected: 'string', actual: 'number' },
+      },
+    ])
+  })
+
+  it('a missing (undefined) nullable object: the UNION error, as before', () => {
+    expect(errorsOf({ list: null, name: null })).toEqual([
+      {
+        path: 'address',
+        message: 'Value does not match any of the allowed types: [object(0)], [null(1)]',
+        code: 'UNION',
+        params: { expected: '[object(0)], [null(1)]' },
+        details: [
+          {
+            path: 'address',
+            message: 'Expected object',
+            code: 'TYPE_OBJECT',
+            params: { actual: 'undefined' },
+          },
+          {
+            path: 'address',
+            message: 'Expected null, got undefined',
+            code: 'TYPE',
+            params: { expected: 'null', actual: 'undefined' },
+          },
+        ],
+      },
+    ])
   })
 })
 

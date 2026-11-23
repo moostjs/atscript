@@ -190,6 +190,8 @@ Error: `"Value does not match any of the allowed types: [string(0)], [number(1)]
 
 **Discriminated unions.** When every object branch has a required literal-typed property of the same name with distinct values (the other branches cannot hold an object: scalars, arrays, tuples) and the value is an object, report through the discriminator instead: the errors of the branch whose literal the value holds, at their own paths; or, when no branch has the value's literal, one error at the discriminator property (code `UNION_DISCRIMINATOR`, the allowed values as a param). Two such properties, an optional one, or a branch that may hold any object, make the union a plain one. Under partial validation at the union's depth, a value without the discriminator gets the plain union error.
 
+**Nullable unions.** When every branch but one is `null` and the value is an object (or an array) like that branch (a non-array object for an object branch, an array for an array or tuple branch), report the errors of that one branch, at their own paths, instead of the aggregate error. When that branch failed without errors (a plugin's bare rejection), emit the aggregate error. Any other value gets the aggregate error.
+
 ::: tip Branch error isolation
 Each branch attempt should be evaluated in its own error scope. If a branch fails, its errors are captured but not committed to the main error list. Only if _all_ branches fail are the captured errors included as `details` in the aggregate error.
 :::
@@ -360,7 +362,7 @@ Accept a configurable maximum number of errors (default: 10). Once exceeded, sto
 
 ### Union Error Aggregation
 
-When a union fails (no branch matches), produce a single top-level error with all branch errors nested in `details`. This lets the consumer see exactly why each branch was rejected.
+When a union fails (no branch matches), produce a single top-level error with all branch errors nested in `details` (a discriminated or nullable union may report one branch's errors instead: see [Unions](#unions)). This lets the consumer see exactly why each branch was rejected.
 
 A union nested in its own branches, with many branches each, rejects a value that fails deep down from every branch of every union above it: written out, its details grow exponentially with the depth. The reference validator decides such a union once per value and path within one `validate()` call, so the time stays proportional to the type and the value, and the result and the errors are the same as deciding it each time. The details are complete (nothing is left out): an outcome decided once is one error object wherever it is reported, so the error tree shares those objects and its memory stays proportional to the work. Walking every error of such a tree (or `JSON.stringify` of it) visits a shared error once per place it appears. Ordinary unions produce no shared errors.
 

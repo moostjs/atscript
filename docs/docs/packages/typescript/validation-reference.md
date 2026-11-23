@@ -296,7 +296,7 @@ export interface Account {
 }
 ```
 
-It replaces the message of `TYPE`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_DECIMAL`, `NOT_FINITE`, `DECIMAL_FORMAT`, `LITERAL`, `UNION`, `UNION_DISCRIMINATOR` and `TUPLE_LENGTH` errors at that node. The error keeps its `code` and `params` with `custom: true`. Constraint failures keep their own messages. On a `@meta.required` field, a missing value reports `REQUIRED` with the `@meta.required` message (the `@expect.message` text only when `@meta.required` has none).
+It replaces the message of `TYPE`, `TYPE_ARRAY`, `TYPE_OBJECT`, `TYPE_DECIMAL`, `NOT_FINITE`, `DECIMAL_FORMAT`, `LITERAL`, `UNION`, `UNION_DISCRIMINATOR` and `TUPLE_LENGTH` errors at that node (errors inside the type a nullable or discriminated union picks keep their own messages). The error keeps its `code` and `params` with `custom: true`. Constraint failures keep their own messages. On a `@meta.required` field, a missing value reports `REQUIRED` with the `@meta.required` message (the `@expect.message` text only when `@meta.required` has none).
 
 ### Discriminated unions
 
@@ -305,7 +305,11 @@ When every object branch of a union has a required literal-typed property of the
 - the discriminator picks a branch → that branch's errors, at their own paths (`pet.lives: Expected maximum 9, got 10`), instead of one union error with every branch's errors;
 - the discriminator matches no branch (or is missing) → one `UNION_DISCRIMINATOR` error at the discriminator (`pet.kind`), `params.allowed` listing the values.
 
-With partial validation at the union's depth (`partial: 'deep'`, or `true` at the top), an object without the discriminator gets the `UNION` error, with every branch's errors in `details`. Other unions (no shared literal property, two such properties, an optional discriminator in a branch, a branch that may hold any object) report the `UNION` error with `details` as before. The same detection drives the JSON Schema `discriminator`.
+With partial validation at the union's depth (`partial: 'deep'`, or `true` at the top), an object without the discriminator gets the `UNION` error, with every branch's errors in `details`. Other unions (no shared literal property, two such properties, an optional discriminator in a branch, a branch that may hold any object) report the `UNION` error with `details` as before, unless they are [nullable](#nullable-objects-and-arrays). The same detection drives the JSON Schema `discriminator`.
+
+### Nullable objects and arrays
+
+When every type of a union but one is `null` (`address: Address | null`, `tags: Tag[] | null`) and the value is an object (or an array) like that type, the errors reported are that type's own, at their own paths and with their own codes (`address.zip: Expected string, got number`, `tags.1.name: …`, a plugin's own error), instead of one `UNION` error at the field. A value of another kind (`5` or `[]` for `address`, `{}` for `name: string | null`), a union with two or more types besides `null`, and an object a plugin rejects without reporting an error still get the `UNION` error with `details` (and the field's `@expect.message`). Constraints on the union itself (`@expect.maxLength` on `tags: string[] | null`) are checked only once a branch passes, so a value failing inside reports the inner errors, not the constraint.
 
 ## Plugins
 
