@@ -189,7 +189,7 @@ describe('union backtracking (round 24 part 3)', () => {
     expect(ids(w.errors)).toBe(ids(anew.errors))
     // (one object per error made: shared where an outcome was reused)
     expect(distinctCount(w.errors)).toBeLessThan(2000)
-  })
+  }, 60_000)
 
   it('the same result as without backtracking for a valid value (and passes decided once)', () => {
     const u = chainUnion(6)

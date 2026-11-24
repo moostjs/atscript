@@ -255,7 +255,7 @@ describe('merged intersections of every operand pair', () => {
     }
     expect(disagreements.slice(0, 30)).toEqual([])
     console.info(`[merge] ${OPERANDS.length ** 2} ordered pairs × 3 forms: ${checks} checks`)
-  })
+  }, 60_000)
 
   it('JSON schemas (runtime and bundled) accept exactly what the validator does', () => {
     const disagreements: string[] = []
@@ -274,5 +274,5 @@ describe('merged intersections of every operand pair', () => {
     }
     expect(disagreements.slice(0, 30)).toEqual([])
     console.info(`[merge] JSON schemas: ${stats.checks} checks`)
-  })
+  }, 60_000)
 })

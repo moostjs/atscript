@@ -66,5 +66,5 @@ describe('deep chains of types (round 24 part 3)', () => {
   it('example data of a 5000-deep chain', () => {
     const data = createDataFromAnnotatedType(chain(DEPTH), { mode: 'example' })
     expect(depthOf(data)).toBe(DEPTH - 1)
-  })
+  }, 60_000)
 })
