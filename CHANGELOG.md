@@ -1,3 +1,9 @@
+## [0.2.16](https://github.com/moostjs/atscript/compare/v0.2.15...v0.2.16) (2026-11-25)
+
+
+### Bug Fixes
+
+* **core:** unreachable-annotate warning names other packages and gives usable advice ([04ee60b](https://github.com/moostjs/atscript/commit/04ee60b05db785ff1b0f27d2763071e6119417d1))
 ## [0.2.15](https://github.com/moostjs/atscript/compare/v0.2.14...v0.2.15) (2026-11-24)
 ## [0.2.14](https://github.com/moostjs/atscript/compare/v0.2.13...v0.2.14) (2026-11-23)
 
