@@ -123,6 +123,26 @@ export class SemanticNode {
     return this
   }
 
+  /**
+   * `define` for a node built from others (a merged prop, a copy of one): a definition
+   * another node declares stays that node's.
+   */
+  carryDefinition(node: SemanticNode) {
+    this.definition = node
+    node.ownerNode ??= this
+    return this
+  }
+
+  /** `saveToken` for a node built from others: a token another node declares stays that node's. */
+  carryToken(token: Token, semantic: TSemanticToken) {
+    if (!this.tokens) {
+      this.tokens = new Map()
+    }
+    token.parentNode ??= this
+    this.tokens.set(semantic, token)
+    return this
+  }
+
   wrap(node: SemanticNode, token: Token) {
     this.define(node)
     this.saveToken(token, 'identifier')

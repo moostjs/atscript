@@ -2053,10 +2053,10 @@ export class AtscriptDoc {
       copiedFrom.set(cloned, prop)
       const idToken = prop.token('identifier')
       if (idToken) {
-        cloned.saveToken(idToken, 'identifier')
+        cloned.carryToken(idToken, 'identifier')
       }
       if (newDef) {
-        cloned.define(newDef)
+        cloned.carryDefinition(newDef)
       }
       // (the copy's entries over the prop: their resets go on applying to the prop's type)
       cloned.annotations =
@@ -2065,7 +2065,7 @@ export class AtscriptDoc {
           : this.mergeNodesAnnotations(prop.annotations, group.own, true)
       const optionalToken = prop.token('optional')
       if (optionalToken) {
-        cloned.saveToken(optionalToken, 'optional')
+        cloned.carryToken(optionalToken, 'optional')
       }
       newProps.push(cloned)
       changed = true
@@ -3713,8 +3713,8 @@ export class AtscriptDoc {
         }
       }
       const prop = new SemanticPropNode()
-      prop.saveToken(l.token('identifier')!, 'identifier')
-      prop.define(def)
+      prop.carryToken(l.token('identifier')!, 'identifier')
+      prop.carryDefinition(def)
       prop.annotations = this.mergeNodesAnnotations(l.annotations, r.annotations)
       keepOptional(prop, l, r)
       declaringDocs.set(prop, declaringDocs.get(l) ?? leftDoc)
@@ -3982,7 +3982,7 @@ const zeroRange = {
 function keepOptional(prop: SemanticPropNode, ...members: SemanticPropNode[]): void {
   const token = members[0]?.token('optional')
   if (token && members.every(m => m.token('optional'))) {
-    prop.saveToken(token, 'optional')
+    prop.carryToken(token, 'optional')
   }
 }
 

@@ -7,7 +7,13 @@ import { AnnotationSpec } from './annotations'
 import { expectAnnotations } from './defaults/expect-annotations'
 import { AtscriptDoc } from './document'
 import type { SemanticAnnotateNode, SemanticGroup, SemanticInterfaceNode } from './parser/nodes'
-import { isAnnotate, isGroup, isPrimitive, type TAnnotationTokens } from './parser/nodes'
+import {
+  isAnnotate,
+  isGroup,
+  isPrimitive,
+  isStructure,
+  type TAnnotationTokens,
+} from './parser/nodes'
 import { SemanticPrimitiveNode } from './parser/nodes/primitive-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
 import { Token } from './parser/token'
@@ -1099,6 +1105,100 @@ describe('document', () => {
     expect(label(['username'])).toBe('Top')
     expect(label(['account', 'active'])).toBe('Nested')
     expect(m.layersAt(m.declOf(doc, 'Child')!, ['account', 'active'])).toEqual([])
+  })
+
+  it('a prop keeps the structure that declares it as its owner when a merge carries it', () => {
+    // (plugins walk prop → structure → interface to find the interface a field is written in:
+    // a merged structure carries the nodes of the props only one side has, and is not their owner)
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Base {
+      id: string
+    }
+
+    export interface Child extends Base {
+      extra: string
+    }
+
+    export interface Grandchild extends Child {
+      more: string
+    }
+
+    type Both = Child & { other: string }
+`)
+    const [base, child, grandchild] = doc.nodes as SemanticInterfaceNode[]
+    const owned = [base, child, grandchild].map(
+      node => [node, [...(node.getDefinition() as SemanticStructureNode).props.values()]] as const
+    )
+    const resolved = doc.resolveInterfaceExtends(grandchild) as SemanticStructureNode
+    expect([...resolved.props.keys()]).toEqual(['id', 'extra', 'more'])
+    doc.mergeIntersection(doc.nodes[3].getDefinition() as SemanticGroup)
+    for (const [node, props] of owned) {
+      for (const prop of props) {
+        expect(prop.ownerNode).toBe(node.getDefinition())
+        expect(prop.ownerNode!.ownerNode).toBe(node)
+      }
+    }
+  })
+
+  it('an annotate alias copy and a merge with it leave the source as it was written', () => {
+    // (a copy carries the props it does not touch, and the tokens and definitions of those it
+    // does: they stay the source's — its fields are found from their tokens and their nested
+    // fields reach the interface)
+    const doc = new AtscriptDoc('file-1.as', { primitives })
+    doc.update(`
+    export interface Source {
+      username: string
+      email?: string
+      address: {
+        city: string
+        zip: string
+      }
+      contact: {
+        phone: string
+      }
+    }
+
+    export annotate Source as Copy {
+      @label 'Name'
+      username
+
+      @label 'Mail'
+      email
+
+      @label 'Home'
+      address
+
+      @label 'Phone'
+      contact.phone
+    }
+
+    type Both = Source & Copy
+`)
+    const source = doc.nodes[0] as SemanticInterfaceNode
+    const struct = source.getDefinition() as SemanticStructureNode
+    const written = (s: SemanticStructureNode): Array<() => void> =>
+      [...s.props.values()].flatMap(prop => {
+        const def = prop.getDefinition()!
+        const tokens = (['identifier', 'optional'] as const).flatMap(t => prop.token(t) ?? [])
+        return [
+          () => expect(prop.ownerNode).toBe(s),
+          () => expect(def.ownerNode).toBe(prop),
+          ...tokens.map(token => () => expect(token.parentNode).toBe(prop)),
+          ...(isStructure(def) ? written(def) : []),
+        ]
+      })
+    const checks = written(struct)
+    expect(checks.length).toBeGreaterThan(20)
+    expect(doc.unwindType('Copy')?.def).toBeDefined()
+    doc.mergeIntersection(doc.nodes[2].getDefinition() as SemanticGroup)
+    expect(struct.ownerNode).toBe(source)
+    for (const check of checks) {
+      check()
+    }
+    // (find-usages of a field starts from its token's prop)
+    const username = struct.props.get('username')!.token('identifier')!
+    expect(doc.usageListFor(username)).toBeDefined()
   })
 })
 

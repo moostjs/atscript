@@ -15,12 +15,13 @@ export class SemanticStructureNode extends SemanticGroup {
   public readonly props = new Map<string, SemanticPropNode>()
 
   /**
-   * Shortcut to set props, used as utility
+   * Shortcut to set props, used as utility. A prop another structure declares keeps that
+   * structure as its owner: a merged or copied structure carries such props by reference.
    */
   public setProps(props: SemanticPropNode[]) {
     this.nodes = props
     for (const prop of props) {
-      prop.ownerNode = this
+      prop.ownerNode ??= this
       this.props.set(prop.id!, prop)
     }
   }
