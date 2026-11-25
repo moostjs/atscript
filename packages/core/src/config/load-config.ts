@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 import fs from 'node:fs'
-import { readdir } from 'node:fs/promises'
+import { readdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -10,6 +10,38 @@ import { rolldown } from 'rolldown'
 
 import { fileUriToPath } from '../parser/utils'
 import type { TAtscriptConfig } from './types'
+
+/** Numbers the bundled copies of this process (see `bundleTsConfig`). */
+let bundleSeq = 0
+
+/** The name of a bundled copy of a `.ts` config (see `bundleTsConfig`): its process id. */
+const BUNDLED_COPY = /^atscript\.config\.[\w-]+\.(\d+)\.\d+\.[cm]js$/u
+
+/** Whether process `pid` is gone (a live process of another user counts as alive). */
+function isGone(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return false
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'ESRCH'
+  }
+}
+
+/**
+ * Removes the bundled copies in `dir` of processes that are gone (killed while they loaded the
+ * config, before they removed their copy); the copies of live processes are theirs.
+ */
+async function removeLeftoverCopies(dir: string) {
+  const names = await readdir(dir).catch(() => [] as string[])
+  await Promise.all(
+    names.map(async name => {
+      const pid = Number(BUNDLED_COPY.exec(name)?.[1])
+      if (pid && pid !== process.pid && isGone(pid)) {
+        await rm(path.join(dir, name), { force: true }).catch(() => {})
+      }
+    })
+  )
+}
 
 async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
   const dirnameVarName = 'injected_original_dirname'
@@ -53,12 +85,15 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
     ],
   })
   const outputDir = path.dirname(configFile)
+  // (a copy of its own for each load: a module that failed is never imported again — a load after
+  // a failure evaluates the config again — and two loads at once do not share a file)
+  const name = `atscript.config.[hash].${process.pid}.${bundleSeq++}`
+  await removeLeftoverCopies(outputDir)
   const result = await bundle.write({
     dir: outputDir,
     format: forceFormat || 'esm',
     sourcemap: 'inline',
-    entryFileNames:
-      forceFormat === 'cjs' ? 'atscript.config.[hash].cjs' : 'atscript.config.[hash].mjs',
+    entryFileNames: forceFormat === 'cjs' ? `${name}.cjs` : `${name}.mjs`,
   })
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
   const fileName = result.output.find(
@@ -119,12 +154,9 @@ export async function loadTsConfig(
 ): Promise<TAtscriptConfig> {
   const file = await bundleTsConfig(configFile, forceFormat)
   try {
+    // (a config that throws while it is evaluated fails the load, like a `.js` one)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(/* @vite-ignore */ pathToFileURL(file).href)).default
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    console.error(`Could not load config file ${configFile}: ${message}`)
-    return {}
   } finally {
     fs.unlink(file, () => {})
   }
@@ -155,6 +187,6 @@ export async function loadConfig(
     }
   } catch (error) {
     console.error(error)
-    throw new Error('Error happened while loading config.')
+    throw new Error('Error happened while loading config.', { cause: error })
   }
 }

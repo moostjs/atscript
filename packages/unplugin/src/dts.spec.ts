@@ -34,16 +34,17 @@ describe('dts bundling of .as re-exports', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
-  it('resolves .as imports to .as.d.ts ids only for declaration importers', () => {
+  it('resolves .as imports to .as.d.ts ids only for declaration importers', async () => {
     const plugin = unpluginFactory(undefined, {} as never)
-    const resolveId = plugin.resolveId as (id: string, importer?: string) => unknown
-    expect(resolveId.call(plugin, './user.as', path.join(dir, 'index.d.ts'))).toBe(
+    // (async: a `.as` import waits for the build's start, see `buildStart`)
+    const resolveId = plugin.resolveId as (id: string, importer?: string) => Promise<unknown>
+    expect(await resolveId.call(plugin, './user.as', path.join(dir, 'index.d.ts'))).toBe(
       path.join(dir, 'user.as.d.ts')
     )
-    expect(resolveId.call(plugin, './user.as', path.join(dir, 'index.d.mts'))).toBe(
+    expect(await resolveId.call(plugin, './user.as', path.join(dir, 'index.d.mts'))).toBe(
       path.join(dir, 'user.as.d.ts')
     )
-    expect(resolveId.call(plugin, './user.as', path.join(dir, 'index.ts'))).toBe(
+    expect(await resolveId.call(plugin, './user.as', path.join(dir, 'index.ts'))).toBe(
       path.join(dir, 'user.as')
     )
   })

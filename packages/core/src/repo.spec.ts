@@ -263,3 +263,77 @@ export interface C {
     expect([line(9, 7), line(10, 7), line(9, 9)]).toEqual([6, 7, 1])
   })
 })
+
+/** A plugin recording its `config` hook (with the `rootDir` it sees), `resolve` and `load`. */
+function recorder(events: string[]) {
+  return {
+    name: 'recorder',
+    config: (config: { rootDir?: string }) => {
+      events.push(`config ${config.rootDir}`)
+      return undefined
+    },
+    resolve: (id: string) => {
+      events.push(`resolve ${path.basename(id)}`)
+      return undefined
+    },
+    load: (id: string) => {
+      events.push(`load ${path.basename(id)}`)
+      return undefined
+    },
+  }
+}
+
+describe('the config hooks of a shared config', () => {
+  it('run once, before the first document is resolved or loaded, with the absolute root', async () => {
+    const root = makeProject({
+      'a.as': 'export interface A { id: string }\n',
+      'b.as': 'export interface B { id: string }\n',
+    })
+    const events: string[] = []
+    // (a relative `rootDir`: resolved against the repo's root)
+    const repo = new AtscriptRepo(root, {
+      rootDir: '.',
+      plugins: [recorder(events)],
+    } as TAtscriptConfigInput)
+
+    // (two documents opened at once: one run of the hooks)
+    await Promise.all([repo.openDocument(uri(root, 'a.as')), repo.openDocument(uri(root, 'b.as'))])
+
+    expect(events[0]).toBe(`config ${root}`)
+    expect(events.filter(e => e.startsWith('config'))).toHaveLength(1)
+    expect(events.slice(1).sort()).toEqual([
+      'load a.as',
+      'load b.as',
+      'resolve a.as',
+      'resolve b.as',
+    ])
+  })
+})
+
+describe('a shared config whose config hook fails', () => {
+  it('runs the hooks again for the next document opened', async () => {
+    const root = makeProject({ 'a.as': 'export interface A { id: string }\n' })
+    let calls = 0
+    const repo = new AtscriptRepo(root, {
+      rootDir: root,
+      plugins: [
+        {
+          name: 'fails-once',
+          config: () => {
+            calls++
+            if (calls === 1) {
+              throw new Error('not ready')
+            }
+            return undefined
+          },
+        },
+      ],
+    } as TAtscriptConfigInput)
+
+    await expect(repo.openDocument(uri(root, 'a.as'))).rejects.toThrow('not ready')
+    const doc = await repo.openDocument(uri(root, 'a.as'))
+
+    expect(doc.exports.has('A')).toBe(true)
+    expect(calls).toBe(2)
+  })
+})

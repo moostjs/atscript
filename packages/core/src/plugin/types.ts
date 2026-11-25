@@ -47,6 +47,20 @@ export interface TAtscriptPlugin {
     config: TAtscriptConfig
   ) => Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
 
+  /**
+   * The start of a build: runs after every plugin's `config`, before any `.as` file is
+   * discovered or read — the place to write `.as` files (and other files) generated from
+   * another source.
+   *
+   * `config` is the final config; its `rootDir` is absolute. Called by `build()` (the `asc` CLI)
+   * and by the bundler plugin (each build, each watch rebuild, the dev server's start), so it may
+   * run several times per process, and several runs may overlap (parallel builds, test projects
+   * sharing a plugin instance): write each file atomically (a temp file renamed over it), and only
+   * when its content changes. The language server never calls it (it reads what a build left on
+   * disk).
+   */
+  buildStart?: (config: TAtscriptConfig & { rootDir: string }) => Promise<void> | void
+
   resolve?: (id: string) => Promise<string | undefined> | string | undefined
 
   load?: (id: string) => Promise<string | undefined> | string | undefined

@@ -8,7 +8,15 @@
 /* eslint-disable no-promise-executor-return */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 
-import type { SemanticNode, Token, SemanticAnnotateNode, TBacktickArgKind } from '@atscript/core'
+import path from 'path'
+
+import type {
+  SemanticNode,
+  Token,
+  SemanticAnnotateNode,
+  TBacktickArgKind,
+  TPluginManagers,
+} from '@atscript/core'
 import {
   AtscriptDoc,
   AtscriptRepo,
@@ -30,7 +38,6 @@ import {
   entryParts,
   PluginManager,
   resolveAtscriptFromPath,
-  resolveConfigFile,
   getQueryScope,
   getDeclaredValue,
   fieldRefTokens,
@@ -690,12 +697,25 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
       return await super.loadPluginManagerFor(id)
     } catch (error) {
       console.error('Failed to load config for', id, error)
-      // Remove failed config from cache so it retries after the user fixes it
-      const configFile = await resolveConfigFile(id, this.root)
-      if (configFile) {
-        this.configFiles.delete(configFile)
-      }
-      const manager = new PluginManager({ rootDir: this.root })
+      const manager = new PluginManager({ rootDir: this.root }, this.root)
+      await manager.getDocConfig()
+      return { manager, dependants: new Set<string>() }
+    }
+  }
+
+  /**
+   * A config file that fails to load (it throws, or imports a package that is not installed or
+   * not built): the built-in config stands in for it, once for all the documents under it, until
+   * the file changes (`onConfigChanged` drops it).
+   */
+  protected async loadConfigFile(configFile: string): Promise<TPluginManagers> {
+    try {
+      return await super.loadConfigFile(configFile)
+    } catch (error) {
+      // oxlint-disable-next-line no-console
+      console.error('Failed to load config', configFile, error)
+      const root = path.dirname(configFile)
+      const manager = new PluginManager({ rootDir: root }, root)
       await manager.getDocConfig()
       return { file: configFile, manager, dependants: new Set<string>() }
     }

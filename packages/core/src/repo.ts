@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import path from 'node:path'
 
-import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
+import type { TAtscriptConfigInput } from './config'
 import { loadConfig, resolveConfigFile } from './config/load-config'
 import { isAnnotateDirective } from './defaults/annotate-annotations'
 import { AtscriptDoc } from './document'
@@ -96,18 +96,19 @@ export class AtscriptRepo {
 
   public sharedPluginManager: TPluginManagers | undefined
 
+  /** The shared plugin manager once its plugins' `config` hooks ran (see `loadPluginManagerFor`). */
+  private sharedPluginManagerReady: Promise<TPluginManagers> | undefined
+
   /**
    * Maps resolved file:// URIs back to bare specifiers (for LSP auto-import).
    */
   public readonly resolvedToBare = new Map<string, string>()
 
   /**
-   * cache for raw content of config files
+   * The plugin manager of each config file (by path), shared by every document under it: its
+   * plugins' `config` hooks run once per load of the file. Dropping an entry loads the file again.
    */
-  protected configFiles = new Map<
-    string,
-    Promise<Partial<TAtscriptConfigInput & TAtscriptConfigOutput>>
-  >()
+  protected configFiles = new Map<string, Promise<TPluginManagers>>()
 
   getSharedPluginManager() {
     return this.sharedPluginManager?.manager
@@ -238,39 +239,47 @@ export class AtscriptRepo {
     return annotations
   }
 
+  /**
+   * The plugin manager for document `id`, its plugins' `config` hooks run (before the document
+   * is resolved or loaded): the shared config's, or that of the config file `id` is under.
+   */
   async loadPluginManagerFor(id: string): Promise<TPluginManagers> {
     if (this.sharedConfig) {
-      if (!this.sharedPluginManager) {
-        this.sharedPluginManager = {
+      if (!this.sharedPluginManagerReady) {
+        const shared: TPluginManagers = {
           manager: new PluginManager(
             this.sharedConfig,
             path.resolve(this.root, this.sharedConfig.rootDir ?? '.')
           ),
           dependants: new Set(),
         }
+        const ready = shared.manager.getDocConfig().then(() => shared)
+        this.sharedPluginManager = shared
+        this.sharedPluginManagerReady = ready
+        // (a failure is not kept: the next call runs the hooks again)
+        ready.catch(() => {
+          if (this.sharedPluginManagerReady === ready) {
+            this.sharedPluginManagerReady = undefined
+          }
+        })
       }
-      return this.sharedPluginManager
+      return this.sharedPluginManagerReady
     }
     const configFile = await resolveConfigFile(id, this.root)
     if (configFile) {
-      if (!this.configFiles.has(configFile)) {
-        const rawConfigPromise = loadConfig(configFile, this.configFormat)
-        this.configFiles.set(configFile, rawConfigPromise)
+      let managers = this.configFiles.get(configFile)
+      if (!managers) {
+        const loading = this.loadConfigFile(configFile)
+        managers = loading
+        this.configFiles.set(configFile, loading)
+        // (a failure is not kept: the next document loads the file again)
+        loading.catch(() => {
+          if (this.configFiles.get(configFile) === loading) {
+            this.configFiles.delete(configFile)
+          }
+        })
       }
-      const rawConfig = await this.configFiles.get(configFile)!
-      if (!rawConfig.rootDir) {
-        rawConfig.rootDir = path.dirname(configFile)
-      }
-      const manager = new PluginManager(
-        rawConfig,
-        path.resolve(path.dirname(configFile), rawConfig.rootDir)
-      )
-      await manager.getDocConfig()
-      return {
-        file: configFile,
-        manager,
-        dependants: new Set(),
-      }
+      return managers
     } else {
       const manager = new PluginManager({ rootDir: process.cwd() }, process.cwd())
       await manager.getDocConfig()
@@ -281,14 +290,41 @@ export class AtscriptRepo {
     }
   }
 
+  /** Loads `configFile` and runs its plugins' `config` hooks (see `configFiles`). */
+  protected async loadConfigFile(configFile: string): Promise<TPluginManagers> {
+    const rawConfig = await loadConfig(configFile, this.configFormat)
+    if (!rawConfig.rootDir) {
+      rawConfig.rootDir = path.dirname(configFile)
+    }
+    const manager = new PluginManager(
+      rawConfig,
+      path.resolve(path.dirname(configFile), rawConfig.rootDir)
+    )
+    await manager.getDocConfig()
+    return {
+      file: configFile,
+      manager,
+      dependants: new Set(),
+    }
+  }
+
   async resolveConfig(id: string): Promise<TPluginManagers> {
     let config = this.configs.get(id)
     if (!config) {
-      config = this.loadPluginManagerFor(id)
-      config.then(c => {
-        c.dependants.add(id)
-      })
-      this.configs.set(id, config)
+      const loading = this.loadPluginManagerFor(id)
+      config = loading
+      loading.then(
+        c => {
+          c.dependants.add(id)
+        },
+        // (a config that fails to load rejects for the caller, and is loaded again next time)
+        () => {
+          if (this.configs.get(id) === loading) {
+            this.configs.delete(id)
+          }
+        }
+      )
+      this.configs.set(id, loading)
     }
     return config
   }

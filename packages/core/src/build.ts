@@ -18,13 +18,18 @@ const WRITE_CONCURRENCY = 32
 
 export async function build(config: Partial<TAtscriptConfigInput>) {
   const rootDir = config.rootDir
-    ? config.rootDir.startsWith('/')
+    ? path.isAbsolute(config.rootDir)
       ? config.rootDir
       : path.join(process.cwd(), config.rootDir)
     : process.cwd()
   config.rootDir = rootDir
 
   const repo = new AtscriptRepo(rootDir, config as TAtscriptConfigInput)
+
+  // The plugins' `config` hooks, then their `buildStart` hooks: before any `.as` file is
+  // discovered (a plugin may write some).
+  const { manager } = await repo.loadPluginManagerFor(`file://${rootDir}`)
+  await manager.buildStart()
 
   // Gather a list of .as file entries from either user-provided `entries` or by globbing.
   const entries: string[] = []

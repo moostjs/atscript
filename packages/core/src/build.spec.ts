@@ -14,8 +14,9 @@ import path from 'path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { AnnotationSpec } from './annotations'
 import { build } from './build'
-import type { TAtscriptConfigOutput } from './config'
+import type { TAtscriptConfig, TAtscriptConfigOutput } from './config'
 import { createAtscriptPlugin } from './plugin'
 
 const dirs: string[] = []
@@ -170,5 +171,128 @@ describe('BuildRepo.write', () => {
     }
     expect(tmpSiblings(path.join(root, 'out'))).toEqual([])
     expect(tmpSiblings(path.join(root, 'out', 'nested'))).toEqual([])
+  })
+})
+
+/** Records the hooks it sees called, in order (`resolve` / `load` / `onDocument` by file name). */
+function recorder(events: string[]) {
+  return createAtscriptPlugin({
+    name: 'recorder',
+    config: () => {
+      events.push('config')
+      return undefined
+    },
+    buildStart: () => {
+      events.push('buildStart')
+    },
+    resolve: id => {
+      events.push(`resolve ${path.basename(id)}`)
+      return undefined
+    },
+    load: id => {
+      events.push(`load ${path.basename(id)}`)
+      return undefined
+    },
+    onDocument: doc => {
+      events.push(`onDocument ${path.basename(doc.id)}`)
+    },
+  })
+}
+
+describe('buildStart', () => {
+  it('lets a plugin write a .as file the build then discovers and compiles', async () => {
+    const root = makeProject({})
+    const generator = createAtscriptPlugin({
+      name: 'generator',
+      buildStart: config => {
+        writeFileSync(
+          path.join(config.rootDir, 'gen.as'),
+          'export interface Gen {\n  id: string\n}\n'
+        )
+      },
+    })
+
+    const builder = await build({
+      rootDir: root,
+      plugins: [generator, emitPlugin(name => ({ fileName: `${name}.out`, content: name }))],
+    })
+
+    expect(builder.getDoc(`file://${path.join(root, 'gen.as')}`)?.exports.has('Gen')).toBe(true)
+    const out = await builder.generate({ format: 'js' } as TAtscriptConfigOutput)
+    expect(out.map(o => o.target)).toEqual([path.join(root, 'gen.as.out')])
+  })
+
+  it('runs after the config hooks, before any document is resolved, loaded or parsed', async () => {
+    const root = makeProject({ 'a.as': 'export interface A { id: string }\n' })
+    const events: string[] = []
+
+    await build({ rootDir: root, plugins: [recorder(events)] })
+
+    expect(events).toEqual(['config', 'buildStart', 'resolve a.as', 'load a.as', 'onDocument a.as'])
+  })
+
+  it('receives the final config: every plugin config hook merged, rootDir absolute', async () => {
+    const root = makeProject({})
+    let seen: TAtscriptConfig | undefined
+    const reader = createAtscriptPlugin({
+      name: 'reader',
+      buildStart: config => {
+        seen = config
+      },
+    })
+    const contributor = createAtscriptPlugin({
+      name: 'contributor',
+      config: () => ({
+        annotations: { gen: { source: new AnnotationSpec({ description: 'generated' }) } },
+      }),
+    })
+
+    // (a relative `rootDir`: resolved against the working directory)
+    await build({ rootDir: path.relative(process.cwd(), root), plugins: [reader, contributor] })
+
+    expect(seen?.rootDir).toBe(root)
+    expect((seen?.annotations?.gen as { source?: unknown } | undefined)?.source).toBeInstanceOf(
+      AnnotationSpec
+    )
+  })
+
+  it('runs the plugins in array order, each awaited', async () => {
+    const root = makeProject({})
+    const events: string[] = []
+    const slow = createAtscriptPlugin({
+      name: 'slow',
+      buildStart: async () => {
+        await new Promise(resolve => {
+          setTimeout(resolve, 20)
+        })
+        events.push('slow')
+      },
+    })
+    const fast = createAtscriptPlugin({
+      name: 'fast',
+      buildStart: () => {
+        events.push('fast')
+      },
+    })
+
+    await build({ rootDir: root, plugins: [slow, fast] })
+
+    expect(events).toEqual(['slow', 'fast'])
+  })
+
+  it('rejects the build when a plugin throws, before any document is opened', async () => {
+    const root = makeProject({ 'a.as': 'export interface A { id: string }\n' })
+    const events: string[] = []
+    const failing = createAtscriptPlugin({
+      name: 'failing',
+      buildStart: () => {
+        throw new Error('cannot generate')
+      },
+    })
+
+    await expect(build({ rootDir: root, plugins: [recorder(events), failing] })).rejects.toThrow(
+      'cannot generate'
+    )
+    expect(events).toEqual(['config', 'buildStart'])
   })
 })

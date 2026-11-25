@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { isAbsolute } from 'node:path'
+import path from 'node:path'
 
 import { defu } from 'defu'
 
@@ -25,7 +25,8 @@ export class PluginManager {
     private readonly root?: string
   ) {}
 
-  private _config!: TAtscriptConfig
+  /** The merged config: the plugins' `config` hooks run once per manager (again after a failure). */
+  private _config?: Promise<TAtscriptConfig & { rootDir: string }>
 
   name = 'plugin-manager'
 
@@ -53,25 +54,57 @@ export class PluginManager {
       }
       this._docConfig.unknownAnnotation = raw?.unknownAnnotation
       this._docConfig.rootDir =
-        this.root ?? (raw?.rootDir && isAbsolute(raw.rootDir) ? raw.rootDir : undefined)
+        this.root ??
+        (this.cfg.rootDir && path.isAbsolute(this.cfg.rootDir) ? this.cfg.rootDir : undefined)
     }
     return this._docConfig
   }
 
-  async config(config: TAtscriptConfig = this.cfg): Promise<TAtscriptConfig> {
+  /**
+   * The config merged with the defaults and every plugin's `config` hook. Its `rootDir` (also the
+   * one the hooks receive) is the project root, absolute: the host's, else the config's `rootDir`
+   * resolved against the working directory (as `build()` resolves a config without a file).
+   */
+  config(config: TAtscriptConfig = this.cfg): Promise<TAtscriptConfig & { rootDir: string }> {
     if (!this._config) {
-      config = defu(config, getDefaultAtscriptConfig())
-      const seen = new Set<string>()
-      for (const plugin of this.plugins) {
-        if (seen.has(plugin.name)) {
-          continue
+      const merging = this.mergeConfig(config)
+      this._config = merging
+      // (a failure is not kept: the next call runs the hooks again)
+      merging.catch(() => {
+        if (this._config === merging) {
+          this._config = undefined
         }
-        seen.add(plugin.name)
-        config = defu(await plugin.config?.(config), config)
-      }
-      this._config = config
+      })
     }
     return this._config
+  }
+
+  private async mergeConfig(config: TAtscriptConfig) {
+    const rootDir = this.root ?? path.resolve(config.rootDir ?? '.')
+    let merged: TAtscriptConfig = { ...defu(config, getDefaultAtscriptConfig()), rootDir }
+    const seen = new Set<string>()
+    for (const plugin of this.plugins) {
+      if (seen.has(plugin.name)) {
+        continue
+      }
+      seen.add(plugin.name)
+      merged = defu(await plugin.config?.(merged), merged)
+    }
+    // (whatever a plugin returned)
+    return { ...merged, rootDir }
+  }
+
+  /**
+   * Starts a build: the plugins' `config` hooks (once per manager), then their `buildStart`
+   * hooks in order, each awaited — before the host discovers or reads any `.as` file.
+   */
+  async buildStart() {
+    const config = await this.config()
+    for (const plugin of this.plugins) {
+      if (plugin.buildStart) {
+        await plugin.buildStart(config)
+      }
+    }
   }
 
   async resolve(id: string) {

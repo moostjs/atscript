@@ -251,7 +251,6 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
   const getRoot = () => explicitRoot ?? detectedRoot ?? process.cwd()
   const strict = opts?.strict ?? true
   let repo: AtscriptRepo
-  let configPromise: Promise<TAtscriptConfig> | undefined
   /** The documents of the `.as` modules loaded, by file. */
   const loaded = new Map<string, AtscriptDoc>()
   /**
@@ -282,15 +281,99 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
   /** The Vite dev server (Vite only). */
   let viteServer: TViteDevServer | undefined
 
-  // Lazy + guarded: only probes for a config when an .as file is actually loaded.
-  // A missing config resolves to an empty config (the `load` hook fills in the
-  // default `ts()` plugin) instead of crashing the host process with an unhandled
-  // rejection. Errors now surface inside `load()`, where the bundler can report them.
-  const getConfig = () =>
-    (configPromise ??= (async () => {
-      const p = await resolveConfigFile(getRoot())
-      return p ? loadConfig(p) : {}
-    })())
+  let repoPromise: Promise<AtscriptRepo> | undefined
+  /**
+   * The repo of the atscript config, loaded once: when the first build starts (see `start`). A
+   * missing config is an empty one (with the default `ts()` plugin). A config that fails to load
+   * rejects the build's start, where the bundler reports it, and is loaded again next time.
+   */
+  const ensureRepo = () => {
+    if (!repoPromise) {
+      const loading = (async () => {
+        const p = await resolveConfigFile(getRoot())
+        const config: TAtscriptConfig = p ? await loadConfig(p) : {}
+        if (!config.plugins) {
+          config.plugins = [ts()]
+        }
+        repo = new AtscriptRepo(getRoot(), config as TAtscriptConfigInput)
+        return repo
+      })()
+      repoPromise = loading
+      loading.catch(() => {
+        if (repoPromise === loading) {
+          repoPromise = undefined
+        }
+      })
+    }
+    return repoPromise
+  }
+
+  /** Runs the config plugins' `config` hooks (once), then their `buildStart` hooks. */
+  const start = async () => {
+    const ready = await ensureRepo()
+    const { manager } = await ready.loadPluginManagerFor(`file://${getRoot()}`)
+    await manager.buildStart()
+  }
+  /**
+   * The start of the current build (see `start`): `resolveId` and `load` wait for it, so no `.as`
+   * module is resolved or read before the config plugins wrote theirs — also in a bundler that
+   * resolves modules while its start hook runs (webpack, Rspack: `make`). Each bundler
+   * `buildStart` replaces it (a rejected one fails that build only).
+   *
+   * (webpack and Rspack call `buildStart` of a watch rebuild only after its `watchChange` calls:
+   * meanwhile the rebuild may resolve and read a generated file against the previous start, before
+   * this start rewrites it — the write then triggers one more rebuild)
+   */
+  let started: Promise<void> | undefined
+  /** {@link started} while it runs (see `resolveId`). */
+  let running: Promise<void> | undefined
+  /** Makes `run` (a `start()`) the current build's start (see `started`). */
+  const begin = (run: Promise<void>) => {
+    started = run
+    running = run
+    const settled = () => {
+      if (running === run) {
+        running = undefined
+      }
+    }
+    run.then(settled, settled)
+    return run
+  }
+  /**
+   * {@link started}; a host that loads modules without starting a build (a Vite server that
+   * neither listens nor runs in middleware mode) starts it at its first `.as` module — again at
+   * the next one after a failure.
+   */
+  const whenStarted = () => {
+    if (!started) {
+      const own = begin(start())
+      own.catch(() => {
+        if (started === own) {
+          started = undefined
+        }
+      })
+    }
+    return started
+  }
+  /** A failed start is reported by `buildStart` and `load`, not by `resolveId`. */
+  const ignore = () => undefined
+
+  /** The id of `.as` import `id` of `importer` (see `resolveId`). */
+  const resolveAs = (id: string, importer: string) => {
+    // Bare specifiers (e.g., 'my-lib/user.as') — let bundler's native resolution handle it.
+    // The package.json exports will resolve to compiled .as.mjs/.as.js.
+    if (!id.startsWith('.') && !id.startsWith('/')) {
+      return null
+    }
+    const resolved = path.join(path.dirname(importer), id)
+    // In the dts graph, serving the JS render would bind the symbol to a JS
+    // chunk and ship it untyped — resolve to a `<file>.as.d.ts` id instead,
+    // which `load` serves via render('dts').
+    if (RE_DTS.test(importer)) {
+      return `${resolved}.d.ts`
+    }
+    return resolved
+  }
 
   /** Records the `.as` files `doc` (loaded from `file`) imports (see `importers`). */
   const recordImports = (file: string, doc: AtscriptDoc) => {
@@ -613,28 +696,27 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
 
     resolveId(id, importer) {
       if (importer && id.endsWith('.as')) {
-        // Bare specifiers (e.g., 'my-lib/user.as') — let bundler's native resolution handle it.
-        // The package.json exports will resolve to compiled .as.mjs/.as.js.
-        if (!id.startsWith('.') && !id.startsWith('/')) {
-          return null
-        }
-        const resolved = path.join(path.dirname(importer), id)
-        // In the dts graph, serving the JS render would bind the symbol to a JS
-        // chunk and ship it untyped — resolve to a `<file>.as.d.ts` id instead,
-        // which `load` serves via render('dts').
-        if (RE_DTS.test(importer)) {
-          return `${resolved}.d.ts`
-        }
-        return resolved
+        // (a generated `.as` file exists once the build started)
+        return whenStarted().then(
+          () => resolveAs(id, importer),
+          () => resolveAs(id, importer)
+        )
       }
+      // (another module a config plugin writes — a generated `.ts` — exists once the start
+      // running finished; no start is begun for it)
+      return running?.then(ignore, ignore)
     },
 
-    buildStart(this: { meta?: { watchMode?: boolean } }) {
+    async buildStart(this: { meta?: { watchMode?: boolean } }) {
       // (Vite reports its command in `configResolved`; Rollup / Rolldown: not watching = a build;
       // the other bundlers do not say — see `loadCheck`)
       if (detects) {
         building ??= this.meta?.watchMode === false
       }
+      // The config's plugins start the build (each build, each watch rebuild): their
+      // `buildStart` hooks may write `.as` files (and others) the bundler resolves next.
+      // (set before any await: the modules this build resolves wait for this start)
+      await begin(start())
     },
 
     async load(id, options?: TLoadOptions) {
@@ -644,13 +726,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
       const isDts = id.endsWith('.as.d.ts')
       const sourceId = isDts ? id.slice(0, -'.d.ts'.length) : id
       if (sourceId.endsWith('.as')) {
-        if (!repo) {
-          const config = await getConfig()
-          if (!config.plugins) {
-            config.plugins = [ts()]
-          }
-          repo = new AtscriptRepo(getRoot(), config as TAtscriptConfigInput)
-        }
+        await whenStarted()
         const code = (await readFile(sourceId, 'utf8')).toString()
         // What its `load` result is derived from (see `changedModules`).
         const recording = isDts ? undefined : recordDocumentReads()
