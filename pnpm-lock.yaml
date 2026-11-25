@@ -156,8 +156,8 @@ importers:
         version: 0.7.9
     devDependencies:
       '@atscript/db':
-        specifier: ^0.1.191
-        version: 0.1.191(@atscript/core@packages+core)(@atscript/typescript@0.2.18)(@uniqu/core@0.2.2)
+        specifier: ^0.1.192
+        version: 0.1.192(@atscript/core@packages+core)(@atscript/typescript@0.2.19)(@uniqu/core@0.2.2)
       '@uniqu/core':
         specifier: ^0.2.2
         version: 0.2.2
@@ -217,18 +217,18 @@ importers:
 
 packages:
 
-  '@atscript/db@0.1.191':
-    resolution: {integrity: sha512-IH0bC9+r4EnCEG80m/xZlhOEuEF5Vi5r5tbozP9HZaHQ8UROgJkPNoCW/vInM4upaL0R6LQshkZLpAEVs+BTmA==}
+  '@atscript/db@0.1.192':
+    resolution: {integrity: sha512-3l3hsmRzwgu9HctdqLovdCu8sew+Jw+8k1W2cPWlT8b3kibwtT9i1GiiEEpeTcD1aWdZjF6OuK+dPJsUNYabkg==}
     peerDependencies:
-      '@atscript/core': ^0.2.18
-      '@atscript/typescript': ^0.2.18
+      '@atscript/core': ^0.2.19
+      '@atscript/typescript': ^0.2.19
       '@uniqu/core': ^0.2.2
 
-  '@atscript/typescript@0.2.18':
-    resolution: {integrity: sha512-MMlNQnejjnDlx0K8D/19GLS37eUaWF78Ug7tN8KL5wunbPXchBkHIlbAK2CUqIOT+OrkyOONSpROQGo7nl2fww==}
+  '@atscript/typescript@0.2.19':
+    resolution: {integrity: sha512-9Zf/gMRSBGWmaUdm1IwF6W212rZ1UPwNYnVk5YGMk/pclzXUA6vt3aE8PJYg1HePukX263AgS4ma8g8K0kM3yQ==}
     hasBin: true
     peerDependencies:
-      '@atscript/core': ^0.2.18
+      '@atscript/core': ^0.2.19
       '@atscript/db': ^0.1.159
     peerDependenciesMeta:
       '@atscript/db':
@@ -3587,19 +3587,19 @@ packages:
 
 snapshots:
 
-  '@atscript/db@0.1.191(@atscript/core@packages+core)(@atscript/typescript@0.2.18)(@uniqu/core@0.2.2)':
+  '@atscript/db@0.1.192(@atscript/core@packages+core)(@atscript/typescript@0.2.19)(@uniqu/core@0.2.2)':
     dependencies:
       '@atscript/core': link:packages/core
-      '@atscript/typescript': 0.2.18(@atscript/core@packages+core)(@atscript/db@0.1.191)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.5)(wooks@0.8.5)
+      '@atscript/typescript': 0.2.19(@atscript/core@packages+core)(@atscript/db@0.1.192)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.5)(wooks@0.8.5)
       '@uniqu/core': 0.2.2
 
-  '@atscript/typescript@0.2.18(@atscript/core@packages+core)(@atscript/db@0.1.191)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.5)(wooks@0.8.5)':
+  '@atscript/typescript@0.2.19(@atscript/core@packages+core)(@atscript/db@0.1.192)(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.5)(wooks@0.8.5)':
     dependencies:
       '@atscript/core': link:packages/core
       '@moostjs/event-cli': 0.7.9(@prostojs/logger@0.4.3)(@prostojs/router@0.3.6)(@wooksjs/event-core@0.8.5)(moost@0.7.9)(wooks@0.8.5)
       moost: 0.7.9
     optionalDependencies:
-      '@atscript/db': 0.1.191(@atscript/core@packages+core)(@atscript/typescript@0.2.18)(@uniqu/core@0.2.2)
+      '@atscript/db': 0.1.192(@atscript/core@packages+core)(@atscript/typescript@0.2.19)(@uniqu/core@0.2.2)
     transitivePeerDependencies:
       - '@prostojs/logger'
       - '@prostojs/router'
