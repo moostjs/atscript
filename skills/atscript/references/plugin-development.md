@@ -4,7 +4,7 @@ Plugins can register primitives, annotations, emit new output formats (another l
 
 ## Contents
 
-- [`TAtscriptPlugin`](#tatscriptplugin) — hooks: `config`, `resolve`, `load`, `onDocument`, `render`, `buildEnd`
+- [`TAtscriptPlugin`](#tatscriptplugin) — hooks: `config`, `buildStart`, `resolve`, `load`, `onDocument`, `render`, `buildEnd`
 - [Packaging](#packaging) — factory + peer deps
 - [New language extension](#new-language-extension) — patterns for Python/Java/Go/…
 - [`AnnotationSpec` and primitive annotations](#annotationspec-and-primitive-annotations)
@@ -26,6 +26,7 @@ A plugin is a plain object: required `name` + optional hooks, each sync or async
 | Hook         | Args → returns                                                          |
 | ------------ | ----------------------------------------------------------------------- |
 | `config`     | `(config: TAtscriptConfig)` → partial config to merge, or `undefined`   |
+| `buildStart` | `(config)` (final config, `rootDir` absolute) → void                    |
 | `resolve`    | `(id: string)` → resolved stable ID, or `undefined` to fall through     |
 | `load`       | `(id: string)` → source text, or `undefined` to fall through            |
 | `onDocument` | `(doc: AtscriptDoc)` → void                                             |
@@ -36,7 +37,7 @@ Plugins run in the order they appear in `plugins: [...]`. Per-hook usage below.
 
 ### `config(config)`
 
-Called once on `PluginManager` init. Returns partial config (or `undefined`); merged via `defu`.
+Called once per loaded config (the editor: once per load of each `atscript.config.*`), before any document is resolved or loaded. `config.rootDir` is absolute (since 0.2.19). Returns partial config (or `undefined`); merged via `defu`.
 
 Use to register:
 - Primitives ([primitives.md](primitives.md))
@@ -51,6 +52,18 @@ config(config) {
   }
 }
 ```
+
+### `buildStart(config)`
+
+Since 0.2.19. Write `.as` files generated from another source (OpenAPI document, DB schema, protobuf) here — real files, so users can import and open them.
+
+| # | Rule |
+| - | ---- |
+| 1 | Runs after every plugin's `config`, before any `.as` file is globbed or read; `config` is final, `config.rootDir` absolute — resolve option paths against it. |
+| 2 | Called by `build()` / `asc` (once per build) and `unplugin-atscript` (every build, every watch rebuild, dev server start). The editor **never** calls it: after changing the source schema, run `asc` once. |
+| 3 | May run several times per process, and runs may overlap (parallel builds, test projects sharing a plugin instance) → idempotent; write each file atomically (temp file + rename) and only when its content changes (a rewrite of an unchanged file re-triggers a watching bundler forever). |
+| 4 | Array order, each awaited; a throw fails the build. Keep it cheap (skip when the source is unchanged). |
+| 5 | Do not generate in the plugin factory: it runs whenever the config is evaluated (editor, every tool), has no resolved root, and a throw there fails the config load. |
 
 ### `resolve(id)` / `load(id)`
 
@@ -103,7 +116,7 @@ New language formats should use a unique name (`'py'`, `'sql'`, `'openapi'`).
 
 ### `buildEnd(output, format, repo)`
 
-Once per format after all docs rendered. Argument order: `output` (the `TOutput[]` produced by every plugin's `render`), `format`, `repo`. Returns `Promise<void> | void`.
+Once per format after all docs rendered — `build()` / `asc` only (the bundler and the editor never call it). Argument order: `output` (the `TOutput[]` produced by every plugin's `render`), `format`, `repo`. Returns `Promise<void> | void`.
 
 Use for:
 
@@ -198,7 +211,7 @@ Nullable targets in a `validate` hook: `nonNullishMembers(def, doc)` (since 0.1.
 ## Testing a plugin
 
 - **Unit** — exercise `render()` with fabricated `AtscriptDoc` instances.
-- **Integration** — `build()` from `@atscript/core` with an in-memory config + virtual `load()` returning `.as` strings. Compare outputs to snapshots.
+- **Integration** — `build()` from `@atscript/core` with an in-memory config + virtual `load()` returning `.as` strings. Compare outputs to snapshots. A `buildStart` generator: `build({ rootDir: emptyTmpDir, plugins: [gen()] })` compiles what it wrote.
 - **End-to-end** — `prepareFixtures()` from `@atscript/typescript/test-utils` to compile real `.as` and dynamic-import.
 
 ## See also

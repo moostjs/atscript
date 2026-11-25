@@ -4,7 +4,7 @@ Once your plugin is built and tested, you need to integrate it with the develope
 
 ## Three Entry Points
 
-Code generation flows through the same `build()` → `generate()` → `write()` pipeline regardless of how it's triggered:
+Each entry point loads your plugin from `atscript.config.ts` and renders documents through it, but each drives the hooks its own way — the CLI runs a full build, the bundler renders the modules it imports, the editor renders the file you save:
 
 | Entry Point                | Trigger                      | Formats                                                 |
 | -------------------------- | ---------------------------- | ------------------------------------------------------- |
@@ -12,7 +12,7 @@ Code generation flows through the same `build()` → `generate()` → `write()` 
 | **Build tools** (unplugin) | File change during build/dev | `'js'` for the imported module                          |
 | **VSCode extension**       | File save                    | `DEFAULT_FORMAT`                                        |
 
-All three discover your plugin through `atscript.config.ts` and call `render(doc, format)` on every registered plugin.
+All three call `render(doc, format)` on every registered plugin. Which of them call `buildStart()` and `buildEnd()` is listed in the [Summary](#summary).
 
 ## The `DEFAULT_FORMAT` Constant
 
@@ -114,18 +114,19 @@ export default defineConfig({
 
 ### How It Works
 
-1. When your bundler encounters an `import { User } from './user.as'`, the unplugin intercepts it
-2. It loads the Atscript config (including your plugin) and parses the `.as` file
+1. When a build starts (every build, every watch rebuild, the dev server's start), the unplugin loads the Atscript config (including your plugin) and calls every plugin's `buildStart()`; the modules the bundler resolves meanwhile wait until it finished
+2. When your bundler encounters an `import { User } from './user.as'`, the unplugin intercepts it and parses the `.as` file
 3. It calls `render(doc, 'js')` to generate JavaScript output
 4. The first generated JS module is passed to the bundler as the imported module content
 
 Your plugin still participates automatically:
 
 - if it contributes primitives or annotations in `config()`, those affect parsing and generation during the build
+- if it writes `.as` files (or other modules) in `buildStart()`, the bundler finds them when it resolves the imports
 - if it transforms the document in `onDocument()`, those changes affect later rendering
 - if it produces the primary `js` module output, that output can be used by the bundler
 
-Build-tool integration is not the right place for arbitrary extra files. If your plugin needs sidecar artifacts, generate them through the CLI or another explicit format instead of relying on the bundler import path.
+Build-tool integration is not the right place for extra files rendered from `.as` documents: the bundler keeps only the first module `render()` returns. If your plugin renders sidecar artifacts, generate them through the CLI or another explicit format instead of relying on the bundler import path. Files a plugin writes before the build, in `buildStart()`, are not affected.
 
 ### Supported Bundlers
 
@@ -235,14 +236,16 @@ npx asc -f myformat
 
 ## Summary
 
-| Feature                  | CLI                | Build Tools         | VSCode    |
-| ------------------------ | ------------------ | ------------------- | --------- |
-| `DEFAULT_FORMAT`         | When no `-f` flag  | No                  | On save   |
-| Custom formats           | Any (`-f` flag)    | `'js'` only         | No        |
-| Primitives & annotations | Active             | Active              | Active    |
-| Diagnostics              | Via `--noEmit`     | On error            | Real-time |
-| File watching            | Via external tools | Built-in (HMR)      | On save   |
-| Output writing           | Automatic          | In-memory (bundled) | Automatic |
+| Feature                  | CLI                | Build Tools                                     | VSCode                                                  |
+| ------------------------ | ------------------ | ----------------------------------------------- | ------------------------------------------------------- |
+| `DEFAULT_FORMAT`         | When no `-f` flag  | No                                              | On save                                                 |
+| Custom formats           | Any (`-f` flag)    | `'js'` only                                     | No                                                      |
+| Primitives & annotations | Active             | Active                                          | Active                                                  |
+| Diagnostics              | Via `--noEmit`     | On error                                        | Real-time                                               |
+| File watching            | Via external tools | Built-in (HMR)                                  | On save                                                 |
+| Output writing           | Automatic          | In-memory (bundled)                             | Automatic                                               |
+| `buildStart()`           | Every build        | Every build, watch rebuild and dev server start | Never — run a build after changing a generator's source |
+| `buildEnd()`             | Every build        | Never                                           | Never                                                   |
 
 Your plugin's primitives and annotations work everywhere — the editor provides IntelliSense and validation regardless of which formats your plugin generates. Code generation is triggered differently depending on the tool, but the `render()` hook works identically in all cases.
 

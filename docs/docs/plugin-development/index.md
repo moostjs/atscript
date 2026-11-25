@@ -27,21 +27,22 @@ If you are building your first plugin, read these in order:
 3. [Building a Code Generator](/plugin-development/code-generation)
 4. [Testing Plugins](/plugin-development/testing-plugins)
 5. [VSCode & Build Integration](/plugin-development/tooling-integration)
-   :::
+:::
 
 Keep [Plugin Architecture](/plugin-development/architecture) and [Plugin Hooks Reference](/plugin-development/plugin-hooks) for later, when you need the deeper model.
 
 ## What Plugins Can Do
 
-| Capability                       | Hook           | Example                                     |
-| -------------------------------- | -------------- | ------------------------------------------- |
-| Add semantic types (primitives)  | `config()`     | `geo.latitude`, `color.hex`                 |
-| Define annotation specs          | `config()`     | `@api.endpoint`, `@store.collection`        |
-| Remap or virtualize module paths | `resolve()`    | Path aliases, virtual modules               |
-| Provide virtual file content     | `load()`       | Synthetic `.as` modules                     |
-| Post-process parsed documents    | `onDocument()` | Inject virtual props, run custom checks     |
-| Generate output files            | `render()`     | `.d.ts`, `.js`, `.py`, `.json` — any format |
-| Aggregate across all documents   | `buildEnd()`   | Global type declarations, indexes           |
+| Capability                          | Hook           | Example                                     |
+| ----------------------------------- | -------------- | ------------------------------------------- |
+| Add semantic types (primitives)     | `config()`     | `geo.latitude`, `color.hex`                 |
+| Define annotation specs             | `config()`     | `@api.endpoint`, `@store.collection`        |
+| Generate `.as` files before a build | `buildStart()` | `.as` models from an OpenAPI document       |
+| Remap or virtualize module paths    | `resolve()`    | Path aliases, virtual modules               |
+| Provide virtual file content        | `load()`       | Synthetic `.as` modules                     |
+| Post-process parsed documents       | `onDocument()` | Inject virtual props, run custom checks     |
+| Generate output files               | `render()`     | `.d.ts`, `.js`, `.py`, `.json` — any format |
+| Aggregate across all documents      | `buildEnd()`   | Global type declarations, indexes           |
 
 ## Choose The Smallest Plugin Shape
 
@@ -99,6 +100,7 @@ Add the plugin to your `atscript.config.ts`:
 ```typescript
 import { defineConfig } from '@atscript/core'
 import { tsPlugin } from '@atscript/typescript'
+
 import { apiPlugin } from './plugins/api-plugin'
 
 export default defineConfig({
@@ -118,6 +120,7 @@ interface TAtscriptPlugin {
   config?(
     config: TAtscriptConfig
   ): Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
+  buildStart?(config: TAtscriptConfig & { rootDir: string }): Promise<void> | void
   resolve?(id: string): Promise<string | undefined> | string | undefined
   load?(id: string): Promise<string | undefined> | string | undefined
   onDocument?(doc: AtscriptDoc): Promise<void> | void
@@ -138,6 +141,7 @@ All hooks except `name` are optional. In practice:
 - start with `config()` for annotations and primitives
 - add `render()` when you need generated output
 - add `buildEnd()` only when you need cross-file aggregation
+- add `buildStart()` only when your plugin writes `.as` files generated from another source
 
 You usually do not need `resolve()`, `load()`, or `onDocument()` for a first plugin.
 

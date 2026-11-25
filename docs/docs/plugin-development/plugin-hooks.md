@@ -1,12 +1,13 @@
 # Plugin Hooks Reference
 
-This page documents all six hooks in the `TAtscriptPlugin` interface — their signatures, when they fire, execution semantics, and practical examples.
+This page documents all seven hooks in the `TAtscriptPlugin` interface — their signatures, when they fire, execution semantics, and practical examples.
 
 ## Hook Summary
 
 | Hook                             | When                    | Return                         | Execution                            |
 | -------------------------------- | ----------------------- | ------------------------------ | ------------------------------------ |
 | `config(config)`                 | At startup (once)       | `TAtscriptConfig \| undefined` | Sequential, merged with `defu`       |
+| `buildStart(config)`             | Before discovery        | `void`                         | Sequential, all plugins called       |
 | `resolve(id)`                    | Opening a document      | `string \| undefined`          | Sequential, last non-undefined wins  |
 | `load(id)`                       | Loading source content  | `string \| undefined`          | Sequential, first non-undefined wins |
 | `onDocument(doc)`                | After parsing           | `void`                         | Sequential, all plugins called       |
@@ -23,9 +24,9 @@ config?(
 ): Promise<TAtscriptConfig | undefined> | TAtscriptConfig | undefined
 ```
 
-Called once during `PluginManager` initialization, before any documents are opened. This is where you register primitives, annotations, and config options.
+Called once per loaded config, before any document is resolved, loaded or parsed. This is where you register primitives, annotations, and config options.
 
-**Execution**: Plugins are called sequentially in array order. Each plugin receives the accumulated config. Return values are merged using `defu` (deep defaults — the first defined value wins).
+**Execution**: Plugins are called sequentially in array order. Each plugin receives the accumulated config; its `rootDir` is absolute (since 0.2.19). Return values are merged using `defu` (deep defaults — the first defined value wins).
 
 **Example — Register primitives and annotations:**
 
@@ -66,6 +67,67 @@ config() {
     unknownAnnotation: 'warn',  // 'error' | 'warn' | 'allow'
   }
 }
+```
+
+## buildStart()
+
+```typescript
+buildStart?(config: TAtscriptConfig & { rootDir: string }): Promise<void> | void
+```
+
+Called at the start of a build, after every plugin's `config()` and before any `.as` file is discovered or read (since 0.2.19). This is where a plugin writes `.as` files generated from another source — an OpenAPI document, a database schema, protobuf definitions. The build then compiles them like any other `.as` file, and your users can open and import them.
+
+**Parameters**: `config` is the final config, with every plugin's `config()` merged and `rootDir` absolute. Resolve the paths of your own options against `config.rootDir`.
+
+**Execution**: Plugins are called sequentially in array order, each awaited. An error thrown (or a rejected promise) fails the build.
+
+**Who calls it**:
+
+| Host                          | When                                                                                                                              |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `asc` CLI and `build()`       | Once per build, before the `.as` files are collected                                                                              |
+| Bundler (`unplugin-atscript`) | At the start of every build and watch rebuild, and when the dev server starts — before the first `.as` module is resolved or read |
+| VSCode extension              | Never                                                                                                                             |
+
+**Rules for a generator**:
+
+- **Be idempotent and write a file only when its content changes.** The hook runs again on every build and watch rebuild. A file you rewrite makes a watching bundler rebuild once more; when that run writes nothing, the rebuilds stop. Rewriting an unchanged file every time never stops.
+- **Write atomically.** Runs can overlap: a bundler building several outputs at once, or several test projects in one process sharing the plugin instance. Write each file to a temp file and rename it over the target, so no run reads a half-written file.
+- **Keep it cheap.** It runs before every build and dev server start. Skip the work when the source did not change since the last run (compare its modification time, for example).
+- **Run a build after changing the source.** The editor does not run the hook: it reads the `.as` files a build left on disk. After you change the source schema, run `asc` (or restart the dev server) once; the editor and a running dev server pick up the rewritten `.as` files.
+
+**Example — Generate `.as` files from a schema document:**
+
+```typescript
+import { readFileSync, renameSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
+
+import { createAtscriptPlugin } from '@atscript/core'
+
+let seq = 0
+
+/** Writes `content` to `file` unless it already holds it — atomically: a temp file renamed over it. */
+function writeIfChanged(file: string, content: string) {
+  let old: string | undefined
+  try {
+    old = readFileSync(file, 'utf8')
+  } catch {}
+  if (old !== content) {
+    const tmp = `${file}.${process.pid}.${seq++}.tmp`
+    writeFileSync(tmp, content)
+    renameSync(tmp, file)
+  }
+}
+
+export const schemaPlugin = (options: { source: string; output: string }) =>
+  createAtscriptPlugin({
+    name: 'schema',
+    buildStart(config) {
+      const source = readFileSync(path.resolve(config.rootDir, options.source), 'utf8')
+      // (`schemaToAtscript`: your converter from the schema document to `.as` text)
+      writeIfChanged(path.resolve(config.rootDir, options.output), schemaToAtscript(source))
+    },
+  })
 ```
 
 ## resolve()
@@ -291,6 +353,8 @@ export default defineConfig({
 ```
 
 **For `config()`**: Plugin A's return merges first. Since `defu` uses "first defined wins", Plugin A's values take priority over Plugin B's for the same key. Built-in defaults merge last.
+
+**For `buildStart()`**: Called after every plugin's `config()`, in array order, each awaited — Plugin B starts after Plugin A's hook finished, so a plugin can read files an earlier one wrote.
 
 **For `resolve()`**: All plugins are called; the last non-undefined return wins. So Plugin C's result takes priority if all three return a value.
 

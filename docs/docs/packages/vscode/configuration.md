@@ -37,4 +37,4 @@ Without a config file, the extension uses the default set of annotations and pri
 
 The extension watches for changes to `atscript.config.*` files. When you modify your config, the language server reloads automatically — no need to restart VSCode.
 
-If a config file fails to load (syntax error, missing dependency, etc.), the extension falls back to defaults and will retry when the file is fixed.
+If a config file fails to load (syntax error, missing dependency, etc.), the extension logs the error once and falls back to defaults until the config file changes or the editor restarts. After installing or building a missing dependency, run **"Atscript: Restart Language Server"** (or save the config file).

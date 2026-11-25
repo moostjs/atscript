@@ -34,8 +34,10 @@ The standard test pattern creates a build from fixture files and verifies the ou
 
 ```typescript
 import path from 'path'
+
 import { build, AnnotationSpec } from '@atscript/core'
 import { describe, expect, it } from 'vitest'
+
 import { myPlugin } from './plugin'
 
 const wd = path.join(path.dirname(import.meta.url.slice(7)), '..')
@@ -156,6 +158,7 @@ export interface Location {
 
 ```typescript
 import { build } from '@atscript/core'
+
 import { myPlugin } from './plugin'
 
 it('should expose geo.latitude / geo.longitude', async () => {
@@ -344,6 +347,39 @@ it('should generate index file via buildEnd', async () => {
   expect(indexFile!.content).toContain('post')
 })
 ```
+
+## Testing buildStart Generation
+
+`build()` runs every plugin's `buildStart()` before it collects the `.as` files, so a generator plugin is tested by building an empty directory: the files it writes are compiled like any other.
+
+```typescript
+import { mkdtempSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
+import path from 'path'
+
+import { build } from '@atscript/core'
+import { expect, it } from 'vitest'
+
+import { schemaPlugin } from './plugin'
+import { schema } from './test/fixtures/schema'
+
+it('should compile the .as files generated from a schema', async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'schema-plugin-'))
+  writeFileSync(path.join(dir, 'api.json'), JSON.stringify(schema))
+
+  const repo = await build({
+    rootDir: dir,
+    plugins: [schemaPlugin({ source: 'api.json', output: 'api.as' })],
+  })
+
+  const doc = repo.getDoc(`file://${path.join(dir, 'api.as')}`)
+  expect(doc?.exports.has('User')).toBe(true)
+  const diagnostics = await repo.diagnostics()
+  expect(diagnostics.get(doc!.id)).toEqual([])
+})
+```
+
+Build the same directory twice to check that the second run leaves the generated files untouched (same modification time): a watching bundler rebuilds whenever one changes.
 
 ## Next Steps
 

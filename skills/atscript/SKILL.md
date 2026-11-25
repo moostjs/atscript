@@ -137,6 +137,6 @@ npx skills add moostjs/atscript-ui   # UI layer
 | Moost integration | [moost-validator.md](references/moost-validator.md)       | Moost pipes (validation + param/query coercion), error transform (`errors` body, was `_body`) |
 | i18n              | [i18n.md](references/i18n.md)                             | Translating `.as` texts per locale: message ids, `translateServed`, `translateUserText` (compiled client types), `$i18n` on served types, `messagesTranslator` on the client, `userText: 'expression'` literals |
 | VSCode            | [vscode.md](references/vscode.md)                         | Extension, LSP features, config autodiscovery                                               |
-| Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd                                        |
+| Plugin authoring  | [plugin-development.md](references/plugin-development.md) | `TAtscriptPlugin`, `AnnotationSpec`, render/buildEnd, `buildStart` (generate `.as` files)    |
 
 Full docs: https://atscript.dev.

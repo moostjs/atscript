@@ -146,8 +146,8 @@ Everything else (primitives, annotations, plugins, `include`/`exclude`) lives in
 
 ## How It Works
 
-1. **Config Discovery** — the plugin finds your `atscript.config.*` by searching upward from the project root (Vite's `root`, the `root` option, or the working directory)
-2. **Plugin Execution** — runs the plugins defined in your configuration
+1. **Config Discovery** — the plugin finds your `atscript.config.*` by searching upward from the project root (Vite's `root`, the `root` option, or the working directory), and loads it when a build starts: every build and watch rebuild, the dev server's start, a test run's start. A config that fails to load stops the build there.
+2. **Plugin Execution** — runs the plugins defined in your configuration: their [`buildStart()`](/plugin-development/plugin-hooks#buildstart) hooks before any `.as` file is resolved, then the rest for each imported `.as`
 3. **Runtime JS** — for each imported `.as` it emits the runtime metadata module (the same output as `asc -f js`)
 4. **Import Resolution** — lets you import `.as` files directly in TypeScript/JavaScript
 

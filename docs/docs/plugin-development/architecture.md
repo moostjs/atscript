@@ -18,7 +18,7 @@ Every `.as` file passes through these stages:
     → Parser pipes (syntax analysis)
       → SemanticNode tree (resolved types)
         → AtscriptDoc (queryable document)
-          → Plugin hooks (config, onDocument, render, buildEnd)
+          → Plugin hooks (config, buildStart, onDocument, render, buildEnd)
             → Output files (.d.ts, .js, .py, etc.)
 ```
 
@@ -39,9 +39,9 @@ That is enough to build annotation plugins, primitive plugins, and many generato
 
 Plugin authors mainly work with two classes from `@atscript/core`:
 
-| Class          | Where you see it                          | Role                                                                                                  |
-| -------------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `AtscriptDoc`  | `onDocument(doc)`, `render(doc, format)`  | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods. |
+| Class          | Where you see it                           | Role                                                                                                  |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `AtscriptDoc`  | `onDocument(doc)`, `render(doc, format)`   | A single parsed `.as` file. Contains the node tree, annotations, imports, and provides query methods. |
 | `SemanticNode` | Returned from doc queries (`doc.nodes`, …) | Base class for all AST nodes. Subclasses represent interfaces, types, props, refs, etc.               |
 
 The `buildEnd(output, format, repo)` hook also receives an `AtscriptRepo` — useful for cross-document queries (`repo.getUsedAnnotations()`, `repo.getPrimitivesTags()`) — but you do not construct or own it directly.
@@ -116,7 +116,7 @@ Hooks fire in this order during a build:
 
 ### 1. `config()` — At Startup
 
-Called once when the `PluginManager` initializes. Each plugin returns primitives and annotations to merge into the shared config. Results are merged using `defu` (deep defaults — the first plugin to define a key wins).
+Called once per loaded config, before any document is resolved or loaded. Each plugin returns primitives and annotations to merge into the shared config. Results are merged using `defu` (deep defaults — the first plugin to define a key wins).
 
 ```
 Default config (built-in primitives + @expect.* + @meta.* + @emit.*)
@@ -125,25 +125,29 @@ Default config (built-in primitives + @expect.* + @meta.* + @emit.*)
       = Final merged config
 ```
 
-### 2. `resolve(id)` — When Opening a Document
+### 2. `buildStart(config)` — Before Discovery
+
+Called at the start of a build (the `asc` CLI, `build()`, and every build of the bundler plugin), with the final config, before any `.as` file is discovered or read. Use this to write `.as` files generated from another source. The VSCode extension does not call it. See [buildStart()](/plugin-development/plugin-hooks#buildstart).
+
+### 3. `resolve(id)` — When Opening a Document
 
 Called for each document ID. Plugins can remap paths (e.g., virtual modules, aliases). All plugins are called; the last non-`undefined` return wins.
 
-### 3. `load(id)` — When Loading Source Content
+### 4. `load(id)` — When Loading Source Content
 
 Called to provide file content. The first plugin to return a string wins. If no plugin provides content, the file is read from disk.
 
-### 4. `onDocument(doc)` — After Parsing
+### 5. `onDocument(doc)` — After Parsing
 
 Called after a document is parsed and its AST is built. All plugins receive the call in sequence. Use this to inject virtual properties, run custom validation, or transform the AST.
 
-### 5. `render(doc, format)` — During Code Generation
+### 6. `render(doc, format)` — During Code Generation
 
 Called once per document per format. Each plugin checks the format string and returns output files (or nothing). All plugins contribute — their outputs are concatenated.
 
-### 6. `buildEnd(output, format, repo)` — After All Documents
+### 7. `buildEnd(output, format, repo)` — After All Documents
 
-Called once after all documents have been rendered. Use this for cross-document aggregation like generating global type declarations or index files.
+Called once after all documents have been rendered, by the `asc` CLI and `build()`. Use this for cross-document aggregation like generating global type declarations or index files.
 
 ## Config Merging
 
@@ -216,7 +220,7 @@ const annotations = doc.evalAnnotationsForNode(propNode)
 // Returns: TAnnotationTokens[] | undefined
 // Each entry has { name, token, args } — args is Token[]
 for (const ann of annotations || []) {
-  ann.name        // e.g. 'meta.label'
+  ann.name // e.g. 'meta.label'
   ann.args[0]?.text // first argument as raw text
 }
 ```
