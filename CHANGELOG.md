@@ -1,3 +1,9 @@
+## [0.2.17](https://github.com/moostjs/atscript/compare/v0.2.16...v0.2.17) (2026-11-25)
+
+
+### Bug Fixes
+
+* **core:** accept an operator before the first member of a union or intersection ([38244a8](https://github.com/moostjs/atscript/commit/38244a87a48ae01f3a642b3c2d098b9950f1c30b))
 ## [0.2.16](https://github.com/moostjs/atscript/compare/v0.2.15...v0.2.16) (2026-11-25)
 
 
