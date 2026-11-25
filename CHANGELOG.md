@@ -1,3 +1,9 @@
+## [0.2.18](https://github.com/moostjs/atscript/compare/v0.2.17...v0.2.18) (2026-11-25)
+
+
+### Bug Fixes
+
+* **core:** fields keep their declaring structure as owner through merges and copies ([6def064](https://github.com/moostjs/atscript/commit/6def0647545e91c4a6f7010581922aabbb729d88))
 ## [0.2.17](https://github.com/moostjs/atscript/compare/v0.2.16...v0.2.17) (2026-11-25)
 
 
