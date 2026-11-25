@@ -1,3 +1,9 @@
+## [0.2.19](https://github.com/moostjs/atscript/compare/v0.2.18...v0.2.19) (2026-11-25)
+
+
+### Features
+
+* **core:** buildStart plugin hook; hooks get an absolute rootDir; a failing config fails the build ([0f44f6c](https://github.com/moostjs/atscript/commit/0f44f6c382728f59841cc53e4547c9f8aa71ff04))
 ## [0.2.18](https://github.com/moostjs/atscript/compare/v0.2.17...v0.2.18) (2026-11-25)
 
 
