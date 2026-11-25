@@ -221,6 +221,7 @@ export function definition(pipes: Array<TPipe | (() => TPipe)>) {
         return true
       }
       const resolvedPipes = pipes.map(p => (typeof p === 'function' ? p() : p))
+      skipLeadingOperator(fork, opts)
       const node = runPipesOnce(resolvedPipes, fork)
       if (node) {
         fork.accepted()
@@ -247,9 +248,14 @@ export function definition(pipes: Array<TPipe | (() => TPipe)>) {
                 break
               }
             }
+            const isComma = fork.$.text === ','
             fork.accepted()
             fork.move()
             fork.skip(opts.skip)
+            if (isComma) {
+              // each tuple element is a definition of its own
+              skipLeadingOperator(fork, opts)
+            }
           } else {
             // finished
             if (fork.$) {
@@ -308,6 +314,37 @@ export function definition(pipes: Array<TPipe | (() => TPipe)>) {
       opts.debug = true
       return this
     },
+  }
+}
+
+const LEADING_OPERATORS: TPunctuation[] = ['|', '&']
+
+/**
+ * Step over one `|` or `&` written before the first member of a union or
+ * intersection (a formatting style: one member per line, each starting with the
+ * operator). It carries no meaning. An operator that no member follows (the end
+ * of the block, or more punctuation) is left in place, so it is reported as
+ * unexpected and the rest of the block parses as before.
+ */
+function skipLeadingOperator(
+  ni: NodeIterator,
+  opts: { sep: TPunctuation[]; skip: TPunctuation[] }
+) {
+  const text = LEADING_OPERATORS.filter(op => opts.sep.includes(op))
+  if (text.length === 0) {
+    return
+  }
+  const ahead = ni.fork().skip(opts.skip)
+  if (!ahead.satisfies({ node: 'punctuation', text })) {
+    return
+  }
+  // a member starts with an identifier, a literal or a block, never with punctuation
+  const member = ahead.next(opts.skip).$
+  if (member && member.type !== 'punctuation') {
+    ni.unfork(ahead)
+    ni.accepted()
+    ni.move()
+    ni.skip(opts.skip)
   }
 }
 

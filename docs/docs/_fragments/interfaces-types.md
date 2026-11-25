@@ -47,6 +47,17 @@ export type ID = string | number
 
 Like interfaces, exported type aliases also exist at runtime and can be validated.
 
+A long union or intersection can be written one member per line. The operator may end a line or start one, and one operator may come before the first member (since 0.2.17), as in TypeScript:
+
+```atscript
+export type Status =
+    | 'pending'
+    | 'success'
+    | 'error'
+```
+
+The same form works for a property, inside parentheses and for each tuple element.
+
 ## Common Property Patterns
 
 ### Optional Properties

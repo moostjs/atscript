@@ -80,6 +80,14 @@ export type Role = 'admin' | 'editor' | 'viewer'
 export type Project = { id: string.uuid; name: string } & WithAudit
 ```
 
+Multi-line: the operator may end or start a line; one `|` / `&` before the first member is allowed (0.2.17+; earlier it was a parse error), also on a prop, in `( … )` and per tuple element:
+
+```atscript
+type S =
+    | 'a'
+    | 'b'
+```
+
 `|`, `&` as in TS (`&` binds tighter; the `.d.ts` keeps the parentheses of `(A | null) & (B | null)`). **Guarantee:** `L & R` accepts exactly what `L` and `R` both accept (interpreted and compiled), except the annotation merge below, the `never` shapes and pattern props (merged into one list: a key passes if ANY merged pattern accepts its value — `A {[*]: string} & C {[/^n_/]: number}` accepts `{n_1: 'a'}`); a key is unknown only when no member declares it; `p?: L & R` also passes `undefined` / `null`.
 
 **Merges (`A & B`, `extends A, B`) — the compiler writes the final structure; the runtime merges nothing:**

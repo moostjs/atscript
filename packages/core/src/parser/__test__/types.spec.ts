@@ -56,6 +56,80 @@ describe('types', () => {
 
     expect(result.messages).toHaveLength(0)
   })
+  describe('an operator before the first member', () => {
+    // Why: one member per line, each line starting with the operator, is the
+    // common way to write a long union. The first operator is formatting only,
+    // so the tree must equal the tree of the same type written on one line.
+    const same = (multiLine: string, oneLine: string) => {
+      const result = parseAtscript(multiLine)
+      expect(result.messages).toHaveLength(0)
+      expect(result.toString()).toBe(parseAtscript(oneLine).toString())
+    }
+
+    it('a union with a leading "|"', () => {
+      same(`type T =\n  | 'a'\n  | 'b'\n  | 'c'\n`, `type T = 'a' | 'b' | 'c'`)
+      same(`type T = | 'a' | 'b'`, `type T = 'a' | 'b'`)
+    })
+
+    it('an intersection with a leading "&"', () => {
+      same(`type T =\n  & A\n  & B\n`, `type T = A & B`)
+    })
+
+    it('one member', () => {
+      same(`type T =\n  | 'a'\n`, `type T = 'a'`)
+    })
+
+    it('keeps the priority of "&" over "|"', () => {
+      same(`type T =\n  | A & B\n  | C\n`, `type T = A & B | C`)
+    })
+
+    it('a comment line between the members', () => {
+      same(`type T =\n  // first\n  | 'a'\n  // second\n  | 'b'\n`, `type T = 'a' | 'b'`)
+    })
+
+    it('a property, followed by another property', () => {
+      same(
+        `interface I {\n  s:\n    | 'a'\n    | 'b'\n  n?:\n    | A\n    | B\n  z: C\n}`,
+        `interface I {\n  s: 'a' | 'b'\n  n?: A | B\n  z: C\n}`
+      )
+    })
+
+    it('inside a group', () => {
+      same(`type T = (\n  | 'a'\n  | 'b'\n)[]`, `type T = ('a' | 'b')[]`)
+    })
+
+    it('each tuple element', () => {
+      same(`type T = [\n  | 'a'\n  | 'b',\n  | A\n  | B\n]`, `type T = ['a' | 'b', A | B]`)
+    })
+
+    it('an operator with nothing after it is an error at the operator', () => {
+      for (const [src, character] of [
+        [`type T = |`, 9],
+        [`type T = | | 'a'`, 9],
+        [`type T = |;`, 9],
+        [`type T = ( | )`, 11],
+      ] as const) {
+        const { messages } = parseAtscript(src)
+        expect(messages.length).toBeGreaterThan(0)
+        expect(messages.map(m => m.range.start.character)).toContain(character)
+      }
+    })
+
+    it('an operator without a member does not hide the next property', () => {
+      const result = parseAtscript(`interface I {\n  s: | ; n: A\n}`)
+      expect(result.messages.map(m => m.range.start)).toEqual([{ line: 1, character: 5 }])
+      expect(result.toString()).toContain('● [prop] "n": [ref] "A"')
+    })
+
+    it('an import list takes no operator', () => {
+      expect(parseAtscript(`import { | A } from './x'`).messages.length).toBeGreaterThan(0)
+    })
+
+    it('a tuple does not take a leading ","', () => {
+      expect(parseAtscript(`type T = [, 'a']`).messages.length).toBeGreaterThan(0)
+    })
+  })
+
   it('type simple array', () => {
     const result = parseAtscript(`type TypeName = string[]`)
     expect(result.toString()).toMatchInlineSnapshot(
