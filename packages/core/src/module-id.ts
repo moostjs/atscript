@@ -6,15 +6,17 @@ import { type AtscriptDoc, documentsEpoch } from './document'
 import { fileUriToPath } from './parser/utils'
 
 /**
- * The package of each project root (see {@link moduleId}), by its absolute path, with the
- * `package.json` files read for it and their modification times (`-1`: absent) — read again
- * once one of them changed (a package renamed, a manifest added or removed), checked once per
- * documents' epoch (`checked`).
+ * The package of each project root (see {@link moduleId}) and file directory (see
+ * {@link packageOfFile}), by its absolute path, with the `package.json` files read for it and
+ * their modification times (`-1`: absent) — read again once one of them changed (a package
+ * renamed, a manifest added or removed), checked once per documents' epoch (`checked`).
  */
 const packages = new Map<
   string,
   {
     scope: string
+    /** the package's `name` (`undefined`: no named `package.json` above the root) */
+    name: string | undefined
     dir: string
     manifests: Array<{ file: string; mtime: number }>
     checked: number
@@ -33,13 +35,7 @@ const packages = new Map<
 export function moduleId(doc: AtscriptDoc): string {
   const file = fileUriToPath(doc.id)
   const root = path.resolve(doc.config.rootDir ?? path.dirname(file))
-  const epoch = documentsEpoch()
-  let pkg = packages.get(root)
-  if (!pkg || (pkg.checked !== epoch && pkg.manifests.some(m => mtimeOf(m.file) !== m.mtime))) {
-    pkg = { ...packageOf(root), checked: epoch }
-    packages.set(root, pkg)
-  }
-  pkg.checked = epoch
+  const pkg = packageAt(root)
   const known = ids.get(doc)
   if (known?.uri === doc.id && known.root === root && known.pkg === pkg) {
     return known.id
@@ -52,7 +48,35 @@ export function moduleId(doc: AtscriptDoc): string {
 /** {@link moduleId} by document: valid for its URI, root and package entry. */
 const ids = new WeakMap<AtscriptDoc, { uri: string; root: string; pkg: object; id: string }>()
 
-/** The package of project root `root` (see {@link moduleId}). */
+/**
+ * The package holding the file at path `file`: the name and directory of the nearest
+ * `package.json` with a `name` above it, and the file's path in it (`src/a.as`) — `undefined`
+ * without one.
+ */
+export function packageOfFile(
+  file: string
+): { name: string; dir: string; path: string } | undefined {
+  const abs = path.resolve(file)
+  const pkg = packageAt(path.dirname(abs))
+  if (pkg.name === undefined) {
+    return undefined
+  }
+  return { name: pkg.name, dir: pkg.dir, path: path.relative(pkg.dir, abs).replaceAll('\\', '/') }
+}
+
+/** {@link packageOf} directory `root`, cached until one of the manifests it read changes. */
+function packageAt(root: string) {
+  const epoch = documentsEpoch()
+  let pkg = packages.get(root)
+  if (!pkg || (pkg.checked !== epoch && pkg.manifests.some(m => mtimeOf(m.file) !== m.mtime))) {
+    pkg = { ...packageOf(root), checked: epoch }
+    packages.set(root, pkg)
+  }
+  pkg.checked = epoch
+  return pkg
+}
+
+/** The package of directory `root` (a project root, see {@link moduleId}). */
 function packageOf(root: string) {
   const manifests: Array<{ file: string; mtime: number }> = []
   let unnamed: string | undefined
@@ -62,7 +86,7 @@ function packageOf(root: string) {
     manifests.push({ file, mtime })
     const name = mtime >= 0 ? packageName(file) : undefined
     if (name) {
-      return { scope: name, dir, manifests }
+      return { scope: name, name, dir, manifests }
     }
     if (mtime >= 0) {
       unnamed ??= dir
@@ -74,7 +98,7 @@ function packageOf(root: string) {
   const base = unnamed ?? root
   const relative = path.relative(base, root).replaceAll('\\', '/')
   const scope = `#${createHash('sha256').update(relative).digest('hex').slice(0, 12)}`
-  return { scope, dir: root, manifests }
+  return { scope, name: undefined, dir: root, manifests }
 }
 
 /** The modification time of `file` (`-1`: it does not exist). */

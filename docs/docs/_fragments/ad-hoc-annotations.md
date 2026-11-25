@@ -417,10 +417,11 @@ export annotate User as AdminUser {
 
 ### When blocks apply
 
-A block applies when its module is loaded. Two consequences:
+A block applies when its module is loaded. Three consequences:
 
 - **Load annotate modules before their types are first used.** A path override (`annotate Client { home.city }`) from a module loaded later, for example through a lazy `import()`, is not seen by merges and readers that already read the type. Import the modules holding your blocks at startup, from the files declaring or using the types.
 - **A block in a file the app never imports does not apply.** The compiler warns when a block of another file's type may be missed — neither the file declaring the type nor every file using it imports the block's file, directly or not: `"User" (declared in ./user.as) is used by ./api.as without importing this file (directly or not): this annotate applies only in builds including this file …`. Import the block's file from the type's file, or from every file using the type.
+- **Files of another package cannot import your block.** When the type and the files using it belong to another package — a dependency, or a linked workspace package — the warning names those files by package (`@scope/lib/src/user.as`) and says they cannot import this file (since 0.2.16). A type your own package declares is covered by the previous point: import the block's file from the type's file. That package's own build never includes your block, and at runtime the block reaches those files only if its module is loaded before they first use the type. To change the type only for your own code, annotate a type of your own instead: `interface AppUser extends User {}` with `annotate AppUser { … }`, or `annotate User as AppUser { … }`.
 
 In development, the Vite plugin reloads the page in full when a module with blocks changes, so the blocks apply to fresh types (see [Build Setup](/packages/typescript/build-setup#how-it-works)).
 

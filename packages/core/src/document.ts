@@ -16,7 +16,7 @@ import {
   resolveFieldPathArgSegments,
   resolveFieldRefsAt,
 } from './lsp/field-refs'
-import { moduleId } from './module-id'
+import { moduleId, packageOfFile } from './module-id'
 import { IdRegistry } from './parser/id-registry'
 import { NodeIterator } from './parser/iterator'
 import type { SemanticNode, TAnnotationTokens } from './parser/nodes'
@@ -52,7 +52,7 @@ import { parseBacktickArg } from './parser/pipes/expr.pipe'
 import { Token } from './parser/token'
 import type { TMessages } from './parser/types'
 import { TSeverity } from './parser/types'
-import { getRelPath, resolveAtscriptFromPath } from './parser/utils'
+import { fileUriToPath, getRelPath, resolveAtscriptFromPath } from './parser/utils'
 import type { PluginManager } from './plugin/plugin-manager'
 import type { TAtscriptPlugin, TAtscriptRenderFormat, TAtscriptRenderOptions } from './plugin/types'
 import type { TStructError, TStructExpr, TStructLayer, TStructSlot } from './structure'
@@ -2976,18 +2976,13 @@ export class AtscriptDoc {
   }
 
   /**
-   * Errors for references to a type another document does not export, in definitions inlined
-   * from that document (`extends`, an intersection member, `annotate … as …`): the generated
-   * code of this document would have to import it from there. Checks what codegen emits (see
-   * {@link emittedRefs}).
-   */
-  /**
    * Warnings for the mutating `annotate` blocks of this document whose target another document
    * declares, when the block is not reachable: the declaring document does not import this one
    * (directly or not), and a document using the target does not either. A block is part of its
    * target's definition, built into whatever uses the target in the same build — a build of a
    * document using it without this one (another entry, the target's package built on its own)
-   * would not have it.
+   * would not have it. When the target and documents using it belong to another package (see
+   * `packageOfFile`), those documents cannot import this one: they get a warning of their own.
    */
   private unreachableBlockMessages(): TMessages {
     const messages: TMessages = []
@@ -3000,6 +2995,26 @@ export class AtscriptDoc {
         known.set(d, hit)
       }
       return hit
+    }
+    // (where each document sits, seen from this one: each found once)
+    let own: { dir: string } | undefined
+    let ownFound = false
+    const places = new Map<AtscriptDoc, { other: boolean; path: string }>()
+    const placeOf = (d: AtscriptDoc) => {
+      let place = places.get(d)
+      if (!place) {
+        if (!ownFound) {
+          own = packageOfDoc(this)
+          ownFound = true
+        }
+        const pkg = this.id.startsWith('file://') ? packageOfDoc(d) : undefined
+        place =
+          pkg && pkg.dir !== own?.dir
+            ? { other: true, path: `${pkg.name}/${pkg.path}` }
+            : { other: false, path: relDocPath(this.id, d.id) }
+        places.set(d, place)
+      }
+      return place
     }
     for (const node of this.nodes) {
       if (!isAnnotate(node) || !node.isMutating) {
@@ -3014,13 +3029,30 @@ export class AtscriptDoc {
       const missing = [...target.documentsUsing(owner.node)].filter(
         d => d !== this && !importsThis(d)
       )
-      if (missing.length > 0) {
-        const token = node.token('target')!
-        const users = missing.map(d => relDocPath(this.id, d.id)).sort()
+      if (missing.length === 0) {
+        continue
+      }
+      const range = node.token('target')!.range
+      const name = owner.node.id
+      const declared = placeOf(target)
+      // (a type of another package: the files of that package cannot import this one — the
+      // declaring file of this package can, whoever uses the type)
+      const users = missing.map(placeOf)
+      const local = users.filter(u => !(declared.other && u.other))
+      const other = users.filter(u => declared.other && u.other)
+      if (local.length > 0) {
+        const from = declared.other ? '' : `${declared.path} or from `
         messages.push({
           severity: 2,
-          message: `"${owner.node.id}" (declared in ${relDocPath(this.id, target.id)}) is used by ${users.join(', ')} without importing this file (directly or not): this annotate applies only in builds including this file — import it from ${relDocPath(this.id, target.id)} or from the files using "${owner.node.id}"`,
-          range: token.range,
+          message: `"${name}" (declared in ${declared.path}) is used by ${pathList(local)} without importing this file (directly or not): this annotate applies only in builds including this file — import it from ${from}the files using "${name}"`,
+          range,
+        })
+      }
+      if (other.length > 0) {
+        messages.push({
+          severity: 2,
+          message: `"${name}" (declared in ${declared.path}) is used by files of other packages (${pathList(other)}), which cannot import this file: their packages' own builds never include this annotate, and at runtime it applies to those files only if this file is loaded before they first use "${name}" — to change only your own types, annotate a type of your own (interface X extends ${name}, or annotate ${name} as X)`,
+          range,
         })
       }
     }
@@ -3977,6 +4009,19 @@ function createSyntheticRef(name: string): SemanticRefNode {
     ref.addChain(token(part))
   }
   return ref
+}
+
+/** The `path`s of `items`, sorted, comma-separated. */
+function pathList(items: Array<{ path: string }>): string {
+  return items
+    .map(u => u.path)
+    .sort()
+    .join(', ')
+}
+
+/** The package of file document `doc` (see `packageOfFile`); `undefined` for any other document. */
+function packageOfDoc(doc: AtscriptDoc) {
+  return doc.id.startsWith('file://') ? packageOfFile(fileUriToPath(doc.id)) : undefined
 }
 
 /** `to`'s path relative to `from` (`./b.as`), or its id when not a file. */
