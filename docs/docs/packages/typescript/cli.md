@@ -18,6 +18,8 @@ npx asc [options]
 | `--skipDiag`            | Skip diagnostics, always emit files — the only way to emit while errors are present                                                                                |
 | `--help`                | Display help                                                                                                                                                       |
 
+The config's [`rootDir`](/packages/typescript/configuration#options) is relative to the config file's directory, so `asc` builds the same files from any subfolder of the project, and with `-c`. Without a config file, `asc` builds the working directory.
+
 ## Examples
 
 ```bash

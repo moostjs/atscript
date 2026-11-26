@@ -32,7 +32,7 @@ In `package.json`:
 
 | Flag           | Shape                         | Effect                                                                                                                                  |
 | -------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `-c <path>`    | path                          | Use a specific config. Default: walk up from CWD.                                                                                       |
+| `-c <path>`    | path                          | Use a specific config (relative to CWD, or absolute). Default: walk up from CWD. The config's `rootDir` is relative to the config file. |
 | `-f <format>`  | `dts` / `js` / plugin-defined | Output format. Omit → `DEFAULT_FORMAT` (each plugin emits its primary output; TS plugin emits `.d.ts`). Pass `-f js` for runtime `.js`. |
 | `--noEmit`     | flag                          | Parse + diagnose, write nothing. Exit code mirrors diagnostic severity. Use in CI.                                                      |
 | `--skipDiag`   | flag                          | Skip diagnostics, always emit.                                                                                                          |

@@ -127,7 +127,7 @@ The plugin takes the same options on every bundler entry:
 | Option   | Type      | Default             | Effect                                                                                 |
 | -------- | --------- | ------------------- | -------------------------------------------------------------------------------------- |
 | `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
-| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
+| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from (searching upward). Absolute, or relative to the cwd. Not the `rootDir`: see below. |
 | `compileValidators` | `boolean \| 'ssr'` | from `atscript.config` | Overrides [`compileValidators`](/packages/typescript/configuration#compilevalidators) for the modules this plugin compiles. `'ssr'` compiles only Vite's server (SSR) build. See [Compiled Validators](/packages/typescript/compiled-validators#per-build-override-in-unplugin-atscript). |
 | `loadCheck` | `boolean` | auto | The build's load check (see [Import cycles](#import-cycles-need-native-es-modules)): `true` checks every build of this plugin, `false` none. Unset: one-shot Vite, Rollup and Rolldown builds check; watch builds (`vite build --watch`, `rollup -w`, `rolldown --watch`), the dev server and HMR do not; esbuild, webpack, Rspack and Farm do not (they do not report a build apart from a watch). |
 
@@ -139,6 +139,8 @@ atscript({ loadCheck: true }) // esbuild / webpack / Rspack / Farm production bu
 ```
 
 Vite fills `root` in itself (from `configResolved`), so you only need it on the other bundlers — and only when the working directory is not the project root. A wrong root means the config is never found: plugin-provided annotations (`@db.*`, `@ui.*`, …) then show up as "Unknown annotation" errors.
+
+`root` and the config's [`rootDir`](/packages/typescript/configuration#options) are separate: `root` is where the plugin starts looking for `atscript.config.*`, and `rootDir` is relative to the config file's directory (a config without `rootDir` uses that directory), as with `asc` and the editor. `rootDir` does not choose which files the plugin compiles (it compiles the `.as` files the app imports): it is the project root the config's plugins receive (for example where a [`buildStart()`](/plugin-development/plugin-hooks#buildstart) hook writes its files) and the root of the [module ids](/packages/typescript/ad-hoc-annotations#two-blocks-setting-the-same-annotation) that order `annotate` blocks. A Vite app in `apps/web` that picks up a config at the repo root with `rootDir: 'models'` hands its plugins `<repo>/models`, not `apps/web/models`. Without a config file, `root` is the project root.
 
 With `strict: false`, a `.as` file that fails to compile yields an empty module (`module.exports = {}`), so anything importing it will likely break at runtime — keep `strict: true` for normal builds.
 

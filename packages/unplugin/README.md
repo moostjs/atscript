@@ -44,12 +44,14 @@ Also available: `unplugin-atscript/esbuild`, `unplugin-atscript/rolldown`, `unpl
 
 Same options on every bundler entry:
 
-| Option   | Type      | Default             | Effect                                                                                 |
-| -------- | --------- | ------------------- | -------------------------------------------------------------------------------------- |
-| `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building. |
-| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from. Absolute, or relative to the cwd.    |
+| Option   | Type      | Default             | Effect                                                                                                 |
+| -------- | --------- | ------------------- | ------------------------------------------------------------------------------------------------------ |
+| `strict` | `boolean` | `true`              | Fail the build on parse/diagnostic **errors**. `false` = log errors but keep building.                 |
+| `root`   | `string`  | bundler root or cwd | Directory `atscript.config.*` is discovered from (searching upward). Absolute, or relative to the cwd. |
 
 Vite picks the root up automatically (from `configResolved`); other bundlers need `root` when the working directory is not the project root.
+
+`root` is not the config's `rootDir`: a relative `rootDir` is relative to the config file's directory, and a config without one uses that directory — the same folder `asc` and the editor use. Without a config file, `root` is the project root.
 
 ## Features
 

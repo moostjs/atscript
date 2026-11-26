@@ -8,14 +8,14 @@ Atscript uses a configuration file to control parsing, validation, and code gene
 
 Create `atscript.config.js` in your project root. Supported formats:
 
-- `atscript.config.js` - CommonJS
+- `atscript.config.js` - JavaScript, ESM or CommonJS as Node loads it (the `type` of your `package.json`)
 - `atscript.config.mjs` - ESM module
-- `atscript.config.cjs` - Explicit CommonJS
+- `atscript.config.cjs` - CommonJS
 - `atscript.config.ts` - TypeScript (bundled with rolldown)
 - `atscript.config.mts` - TypeScript ESM
 - `atscript.config.cts` - TypeScript CommonJS
 
-When multiple formats coexist in the same directory, TypeScript variants (`.ts` / `.mts` / `.cts`) take precedence over JavaScript variants.
+A TypeScript config is bundled with rolldown when it is loaded (with the local files it imports; packages are imported as usual); a JavaScript one is imported as it is. When several config files exist in the same directory, the first one in the order above is used (JavaScript variants before TypeScript ones).
 
 ## defineConfig Helper
 
@@ -36,12 +36,14 @@ export default defineConfig({
 #### `rootDir`
 
 - **Type:** `string`
-- **Default:** Config file's directory (or `process.cwd()` if no config file)
-- **Description:** Root directory containing `.as` files
+- **Default:** Config file's directory
+- **Description:** Root directory containing `.as` files. A relative path is relative to the config file's directory — the same folder for the CLI (run from any subfolder), the bundler plugin and the editor. `include`, `exclude`, `entries` and `outDir` are relative to `rootDir`.
 
 ```javascript
-rootDir: 'src' // Look for .as files in src/
+rootDir: 'src' // Look for .as files in src/ next to the config file
 ```
+
+Without a config file, the project root is the CLI's working directory, or the bundler plugin's root (Vite's `root`, or the plugin's `root` option).
 
 #### `entries`
 
@@ -212,18 +214,23 @@ Looks for the nearest config file starting from the `.as` file location:
 
 ### Build Tools (unplugin-atscript)
 
-Similar lookup strategy:
+Starts from the bundler's root (Vite's `root`, the plugin's `root` option, or the working directory) and searches upward through parent directories. See [Build Setup](/packages/typescript/build-setup#options).
 
-1. Start from the `.as` file location
-2. Search upward through parent directories
-3. Stop at current working directory (cwd)
+### CLI
 
-This allows for monorepo setups where different packages can have their own Atscript configurations.
+Starts from the working directory and searches upward, unless `-c <path>` names the config file.
+
+The editor finds a config per `.as` file, so monorepo packages can have their own Atscript configurations. Wherever the config is found, its `rootDir` is relative to the config file.
 
 ## Loading Priority
 
-When multiple config formats exist in the same directory:
+When several config files exist in the same directory, the first one in this order is used:
 
-1. `atscript.config.ts` / `atscript.config.mts`
-2. `atscript.config.js` / `atscript.config.mjs`
-3. Default configuration if no file found
+1. `atscript.config.js`
+2. `atscript.config.mjs`
+3. `atscript.config.cjs`
+4. `atscript.config.ts`
+5. `atscript.config.mts`
+6. `atscript.config.cts`
+
+Without any config file, the default configuration is used.

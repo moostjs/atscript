@@ -70,7 +70,7 @@ Since 0.2.19. Write `.as` files generated from another source (OpenAPI document,
 - `resolve(id)` — import specifier → absolute URI / stable ID. Return `undefined` to fall through to default resolution.
 - `load(id)` — source text for a resolved ID. Use for virtual `.as` (schema registry, DB, …).
 
-Document IDs typically `file:///absolute/path.as`. Non-file IDs need `resolve` to return a stable string.
+Document IDs of files are file URLs, `pathToFileURL(absPath).href`, in every host (since 0.2.21; a space, `%`, `#`, non-ASCII percent-encoded). Path from an ID: `fileUriToPath(doc.id)` (`@atscript/core`), never `slice(7)`. Non-file IDs need `resolve` to return a stable string.
 
 ### `onDocument(doc)`
 

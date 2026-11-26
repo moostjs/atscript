@@ -1,5 +1,20 @@
+import { readFileSync } from 'node:fs'
+
 import { defineConfig } from 'vitepress'
 import llmstxtPlugin from 'vitepress-plugin-llmstxt'
+
+/** The shared snippets the pages include (`<!--@include: ../../_fragments/x.md-->`). */
+const FRAGMENTS = new URL('../_fragments/', import.meta.url)
+
+/**
+ * `content` (a page's markdown source, as the llms files are built from) with its fragment
+ * includes replaced by the fragments, as the rendered page shows them.
+ */
+const inlineFragments = (content: string) =>
+  content.replace(
+    /<!--@include:\s*(?:\.\.\/)*_fragments\/([\w.-]+\.md)\s*-->/gu,
+    (_, file: string) => readFileSync(new URL(file, FRAGMENTS), 'utf8').trim()
+  )
 
 const atscriptGrammar = {
   name: 'atscript',
@@ -289,11 +304,17 @@ export default defineConfig({
   lang: 'en-US',
   lastUpdated: true,
   cleanUrls: true,
+  // (shared snippets, included by the pages: not pages of their own)
+  srcExclude: ['_fragments/**'],
 
   vite: {
     plugins: [
       llmstxtPlugin({
         hostname: 'atscript.dev',
+        // (it lists the markdown files itself: the fragments excluded as in `srcExclude`, their
+        // content inlined where the pages include them)
+        ignore: ['**/_fragments/**'],
+        transform: ({ page }) => ({ ...page, content: inlineFragments(page.content) }),
       }),
     ],
   },

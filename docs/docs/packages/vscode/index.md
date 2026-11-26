@@ -25,7 +25,7 @@ The extension provides syntax highlighting out of the box. For IntelliSense, dia
 | **Hover Information**       | Inline documentation for annotations and type references                         |
 | **Signature Help**          | Annotation argument signatures as you type                                       |
 | **Auto `.d.ts` Generation** | Generates TypeScript declarations on save                                        |
-| **Config Watching**         | Automatically reloads when `atscript.config.*` files change                      |
+| **Config Watching**         | Reloads when an `atscript.config.*` file is edited, created or deleted           |
 
 ## Requirements
 

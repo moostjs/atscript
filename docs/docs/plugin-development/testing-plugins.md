@@ -356,6 +356,7 @@ it('should generate index file via buildEnd', async () => {
 import { mkdtempSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 import { build } from '@atscript/core'
 import { expect, it } from 'vitest'
@@ -372,7 +373,8 @@ it('should compile the .as files generated from a schema', async () => {
     plugins: [schemaPlugin({ source: 'api.json', output: 'api.as' })],
   })
 
-  const doc = repo.getDoc(`file://${path.join(dir, 'api.as')}`)
+  // (a document's id: the file's URL)
+  const doc = repo.getDoc(pathToFileURL(path.join(dir, 'api.as')).href)
   expect(doc?.exports.has('User')).toBe(true)
   const diagnostics = await repo.diagnostics()
   expect(diagnostics.get(doc!.id)).toEqual([])

@@ -39,10 +39,13 @@ Extension ships `configurationDefaults` that enable file-nesting for `.as` / `.a
 
 ## Config discovery
 
-Server walks up from each open `.as` toward workspace root for `atscript.config.{ts,mts,cts,js,mjs,cjs}`. Found configs reload on change (or change of any imported file).
+Server walks up from each open `.as` toward workspace root for `atscript.config.{js,mjs,cjs,ts,mts,cts}` (JS variants first per dir). Watched, any format, no restart (since 0.2.21):
 
-- Malformed config → diagnostic on the offending file; server does not crash; default config used until fixed.
-- `atscript.config.*` changes trigger re-analyze of open documents.
+- Edited → reloaded fresh. TS configs bundle their relative imports (re-read with it; saving only an imported file does not reload). A module a JS config (`.js`/`.mjs`/`.cjs`) imports by relative path is loaded once → restart the server after editing it.
+- Created nearer a `.as` → takes over for files under its folder. Deleted → next config up (or defaults).
+- Affected files + files importing them are re-checked.
+- Malformed config → error logged once; server does not crash; default config used until the file changes.
+- Packages the config imports load once per server → after rebuilding a plugin package, restart the server.
 
 ## LSP architecture
 
@@ -65,9 +68,9 @@ If neither resolves, the extension shows a warning ("`@atscript/core` not found 
 ## Troubleshooting
 
 - **Highlighting works but no diagnostics / completions** — server failed to start. Open _Output → Atscript Language Server_.
-- **Completions missing for a new plugin annotation** — run _Atscript: Restart Language Server_.
+- **Completions missing for a new plugin annotation** — save the config; if the plugin is a package you just rebuilt, run _Atscript: Restart Language Server_.
 - **`atscript.d.ts` not regenerating** — run `npx asc -f dts`, or save any `.as` to trigger the built-in on-save build.
-- **Wrong config picked up in a monorepo** — server walks up from the open `.as`. Place `atscript.config.*` at the package root, or open the package as the workspace folder; then restart the server.
+- **Wrong config picked up in a monorepo** — server walks up from the open `.as`. Place `atscript.config.*` at the package root (picked up without a restart).
 
 ## See also
 

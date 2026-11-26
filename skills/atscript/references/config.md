@@ -18,13 +18,13 @@ export default defineConfig({
 })
 ```
 
-TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before load — imports, `__dirname`, and top-level await all work.
+TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before each load (packages stay external) — imports, `__dirname`, and top-level await all work, and an edit of the file or a local module it imports is seen by the next load. JS configs (`.js` / `.mjs` / `.cjs`) load as Node loads them, the file itself fresh on each load; the modules they import stay cached by Node (a local one is read once per process).
 
 ## Fields
 
 | Field         | Type                                | Notes                                                                                                |
 | ------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `rootDir`     | `string`                            | Base dir; `include`/`exclude` resolve against it. Default: CWD.                                      |
+| `rootDir`     | `string`                            | Base dir; `include`/`exclude`/`entries`/`outDir` resolve against it. Relative = relative to the config file's dir (CLI from any subfolder, bundler, editor alike; since 0.2.21). Default: the config file's dir; no config file → CLI cwd / bundler `root`. |
 | `include`     | `string[]`                          | Globs of `.as` to parse. Default: `['**/*.as']`.                                                     |
 | `exclude`     | `string[]`                          | Globs to skip. Default: `['node_modules']`.                                                          |
 | `entries`     | `string[]`                          | Explicit entry files (relative to `rootDir`) — replaces glob discovery. Used by `prepareFixtures()`. |

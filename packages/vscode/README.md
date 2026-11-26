@@ -32,7 +32,7 @@ First-class editor support for Atscript (`.as`) files in Visual Studio Code. Pow
 - **Find references** — locate all usages of a type or interface
 - **Signature help** — annotation argument signatures
 - **Auto-generate `.d.ts`** — builds type declarations on save
-- **Config watching** — reloads on `atscript.config.*` changes
+- **Config watching** — reloads when an `atscript.config.*` file (any format) is edited, created or deleted
 
 ## Documentation
 

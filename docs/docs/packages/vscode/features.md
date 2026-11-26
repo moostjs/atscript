@@ -110,4 +110,4 @@ Every time you save an `.as` file, the extension automatically generates the cor
 
 ## Config Watching
 
-The extension watches for changes to `atscript.config.*` files (`.js`, `.ts`, `.mjs`, `.mts`, `.cjs`, `.cts`). When a config file changes, the language server automatically reloads to pick up new annotations, primitives, and plugins.
+The extension watches `atscript.config.*` files (`.js`, `.ts`, `.mjs`, `.mts`, `.cjs`, `.cts`). When a config file is edited, created or deleted, the language server reloads it and re-checks the affected `.as` files to pick up new annotations, primitives, and plugins. See [Config Reloading](/packages/vscode/configuration#config-reloading).

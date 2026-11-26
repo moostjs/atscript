@@ -58,7 +58,7 @@ module.exports = {
 
 That is the entire surface. Atscript config (primitives, annotations, plugins) lives in `atscript.config.*`, auto-discovered by walking up from the root. The unplugin is a thin bridge between the bundler and the atscript pipeline; per-file `include`/`exclude` is delegated to the bundler's own resolution (only `*.as` is intercepted).
 
-**Root:** Vite sets it itself (`configResolved` → `config.root`); an explicit `root` option always wins. Other bundlers fall back to `process.cwd()` — pass `root` when the working directory is not the project root (monorepo `pnpm -C`, editor-launched builds, a root that sits next to rather than above the config).
+**Root:** Vite sets it itself (`configResolved` → `config.root`); an explicit `root` option always wins. Other bundlers fall back to `process.cwd()` — pass `root` when the working directory is not the project root (monorepo `pnpm -C`, editor-launched builds, a root that sits next to rather than above the config). `root` only decides where the config is discovered from: the config's `rootDir` is relative to the config file (missing = its dir), never to `root` (since 0.2.21). No config file → `root` is the project root.
 
 ## Vite: automatic `optimizeDeps` prebundling
 

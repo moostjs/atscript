@@ -29,7 +29,7 @@ VSCode extension providing syntax highlighting, LSP with go-to-definition, compl
 - **Signature help**: Annotation argument signatures. Triggers: `,` and space.
 - **Diagnostics**: Real-time errors and unused-token hints.
 - **Auto-generate `.d.ts`**: On save, builds `.as.d.ts` via `BuildRepo`.
-- **Config watching**: Reloads on `atscript.config.*` changes.
+- **Config watching**: Reloads on `atscript.config.*` edits, creations and deletions (the documents under the changed config's folder re-resolve their config).
 
 ## LSP Architecture
 
