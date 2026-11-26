@@ -1,3 +1,9 @@
+## [0.2.21](https://github.com/moostjs/atscript/compare/v0.2.20...v0.2.21) (2026-11-26)
+
+
+### Bug Fixes
+
+* rootDir resolves against the config file in every host; editor reloads configs; one document-ID form for every host ([a0dd7d3](https://github.com/moostjs/atscript/commit/a0dd7d33654884876f74b0430fbe50d8ea183730))
 ## [0.2.20](https://github.com/moostjs/atscript/compare/v0.2.19...v0.2.20) (2026-11-26)
 ## [0.2.19](https://github.com/moostjs/atscript/compare/v0.2.18...v0.2.19) (2026-11-25)
 
