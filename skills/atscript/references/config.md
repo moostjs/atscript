@@ -18,7 +18,7 @@ export default defineConfig({
 })
 ```
 
-TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before each load (packages stay external) — imports, `__dirname`, and top-level await all work, and an edit of the file or a local module it imports is seen by the next load. JS configs (`.js` / `.mjs` / `.cjs`) load as Node loads them, the file itself fresh on each load; the modules they import stay cached by Node (a local one is read once per process).
+TS configs (`.ts` / `.mts` / `.cts`) are bundled with rolldown before each load (packages stay external) — imports, `__dirname`, and top-level await all work, and an edit of the file or a local module it imports is seen by the next load. The bundled copy is written to `node_modules/.atscript-temp/` (the nearest `node_modules`; beside the config when there is none) and removed after the load (since 0.2.22). JS configs (`.js` / `.mjs` / `.cjs`) load as Node loads them, the file itself fresh on each load; the modules they import stay cached by Node (a local one is read once per process).
 
 ## Fields
 

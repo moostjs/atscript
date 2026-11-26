@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
+import { existsSync } from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -44,8 +45,25 @@ async function removeLeftoverCopies(dir: string) {
 }
 
 /**
- * Bundles `configFile` with the local modules it imports into a copy of its own beside it: the
- * path of the copy. Packages stay external.
+ * The folder of the bundled copies of a config in `configDir`: `.atscript-temp` in the nearest
+ * `node_modules` (packages resolve from there as from `configDir`; linters, formatters and git skip
+ * it, so a copy left by a killed load stays out of sight), else `configDir`.
+ */
+function copiesDir(configDir: string): string {
+  for (let dir = configDir; ; dir = path.dirname(dir)) {
+    const nodeModules = path.join(dir, 'node_modules')
+    if (existsSync(nodeModules)) {
+      return path.join(nodeModules, '.atscript-temp')
+    }
+    if (path.dirname(dir) === dir) {
+      return configDir
+    }
+  }
+}
+
+/**
+ * Bundles `configFile` with the local modules it imports into a copy of its own (see
+ * `copiesDir`): the path of the copy. Packages stay external.
  */
 async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
   const dirnameVarName = 'injected_original_dirname'
@@ -88,11 +106,16 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
       },
     ],
   })
-  const outputDir = path.dirname(configFile)
+  const configDir = path.dirname(configFile)
+  const outputDir = copiesDir(configDir)
   // (a copy of its own for each load: a module that failed is never imported again — a load after
   // a failure evaluates the config again — and two loads at once do not share a file)
   const name = `atscript.config.[hash].${process.pid}.${bundleSeq++}`
   await removeLeftoverCopies(outputDir)
+  if (outputDir !== configDir) {
+    // (copies left beside the config before 0.2.22)
+    await removeLeftoverCopies(configDir)
+  }
   const result = await bundle
     .write({
       dir: outputDir,
@@ -100,7 +123,7 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
       sourcemap: 'inline',
       entryFileNames: forceFormat === 'cjs' ? `${name}.cjs` : `${name}.mjs`,
       // (one file, removed after the load: a local module imported with `import()` is inlined
-      // instead of written beside the config as a chunk of its own)
+      // instead of written as a chunk of its own)
       codeSplitting: false,
     })
     // (a long-running host, the editor, bundles the config again for each load)
@@ -170,7 +193,7 @@ export async function loadTsConfig(
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(/* @vite-ignore */ pathToFileURL(file).href)).default
   } finally {
-    // (removed before the load returns: nothing is left beside the config)
+    // (removed before the load returns: nothing is left behind)
     await rm(file, { force: true }).catch(() => {})
   }
 }

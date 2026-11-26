@@ -81,7 +81,7 @@ import {
 
 const CHECKS_DELAY = 100
 
-/** An `atscript.config.*` file (not the bundled copies a load writes beside it). */
+/** An `atscript.config.*` file (not the bundled copies a load of a `.ts` one writes). */
 const CONFIG_FILE_RE = /\/atscript\.config\.[mc]?[jt]s$/u
 
 /** Whether `p` is `dir` or a path under it. */

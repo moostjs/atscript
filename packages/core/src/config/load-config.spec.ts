@@ -82,26 +82,32 @@ describe('loadConfig', () => {
     })
   }
 
-  it('removes the bundled copies a process that is gone left beside the config, only those', async () => {
+  it('removes the bundled copies a process that is gone left in node_modules and beside the config, only those', async () => {
     const file = configFile('atscript.config.ts', "export default { format: 'dts' }\n")
     const dir = path.dirname(file)
+    const temp = path.join(dir, 'node_modules', '.atscript-temp')
+    mkdirSync(temp, { recursive: true })
     const gone = spawnSync(process.execPath, ['-e', '']).pid
     expect(() => process.kill(gone, 0)).toThrow()
-    const leftovers = [`atscript.config.Ab-1_c.${gone}.0.mjs`, `atscript.config.Xy2.${gone}.3.cjs`]
+    const leftovers = [
+      path.join(temp, `atscript.config.Ab-1_c.${gone}.0.mjs`),
+      // (beside the config: left by a version before 0.2.22)
+      path.join(dir, `atscript.config.Xy2.${gone}.3.cjs`),
+    ]
     const kept = [
       `atscript.config.Ab-1_c.${process.pid}.999.mjs`,
       'atscript.config.mts',
       'atscript.config.Ab-1_c.mjs',
       `other.config.Ab.${gone}.0.mjs`,
-    ]
+    ].map(name => path.join(dir, name))
     for (const name of [...leftovers, ...kept]) {
-      writeFileSync(path.join(dir, name), 'export default {}\n')
+      writeFileSync(name, 'export default {}\n')
     }
 
     await expect(loadConfig(file)).resolves.toEqual({ format: 'dts', rootDir: dir })
 
-    expect(leftovers.filter(name => existsSync(path.join(dir, name)))).toEqual([])
-    expect(kept.filter(name => existsSync(path.join(dir, name)))).toEqual(kept)
+    expect(leftovers.filter(name => existsSync(name))).toEqual([])
+    expect(kept.filter(name => existsSync(name))).toEqual(kept)
   })
 
   it('rejects a .ts config importing a package that is not installed', async () => {
@@ -245,6 +251,31 @@ describe('loadConfig', () => {
 
       expect(await config.models?.()).toEqual(['M'])
       expect(readdirSync(dir).sort()).toEqual(['atscript.config.ts', 'models.mjs'])
+    })
+
+    it('bundles a .ts config into the nearest node_modules: packages resolve, nothing beside it', async () => {
+      const dir = tmpDir()
+      const pkg = path.join(dir, 'node_modules', 'atscript-test-pkg')
+      mkdirSync(pkg, { recursive: true })
+      writeFileSync(path.join(pkg, 'package.json'), '{ "type": "module", "main": "index.js" }\n')
+      writeFileSync(path.join(pkg, 'index.js'), "export const format = 'dts'\n")
+      const file = path.join(dir, 'atscript.config.ts')
+      // (the folders as the config sees them while it is evaluated)
+      writeFileSync(
+        file,
+        "import { readdirSync } from 'node:fs'\nimport { format } from 'atscript-test-pkg'\n" +
+          'const copies = readdirSync(import.meta.dirname + "/node_modules/.atscript-temp")\n' +
+          'export default { format, copies, beside: readdirSync(import.meta.dirname).sort() }\n'
+      )
+
+      await expect(loadConfig(file)).resolves.toEqual({
+        format: 'dts',
+        copies: [expect.stringMatching(/^atscript\.config\..+\.mjs$/u)],
+        beside: ['atscript.config.ts', 'node_modules'],
+        rootDir: dir,
+      })
+
+      expect(readdirSync(path.join(dir, 'node_modules', '.atscript-temp'))).toEqual([])
     })
 
     for (const name of ['atscript.config.js', 'atscript.config.mjs', 'atscript.config.cjs']) {
