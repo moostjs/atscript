@@ -1,3 +1,9 @@
+## [0.2.23](https://github.com/moostjs/atscript/compare/v0.2.22...v0.2.23) (2026-11-26)
+
+
+### Bug Fixes
+
+* **core:** go-to-definition on a field-path string argument of an annotate block entry ([c68d045](https://github.com/moostjs/atscript/commit/c68d045a7b23574c729cb79a0b9d6fbd5965189e))
 ## [0.2.22](https://github.com/moostjs/atscript/compare/v0.2.21...v0.2.22) (2026-11-26)
 
 
