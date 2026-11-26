@@ -26,11 +26,23 @@
   "type": "module",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "nav": [
+        "dist/nav.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs"
+    },
+    "./nav": {
+      "types": "./dist/nav.d.ts",
+      "import": "./dist/nav.mjs",
+      "require": "./dist/nav.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -47,5 +59,13 @@
   "devDependencies": {
     "@types/node": "^22.20.1",
     "vitest": "4.1.12"
-  }
+  },
+  "build": [
+    {
+      "entries": [
+        "src/index.ts",
+        "src/nav.ts"
+      ]
+    }
+  ]
 }

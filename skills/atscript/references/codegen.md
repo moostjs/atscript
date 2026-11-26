@@ -54,6 +54,8 @@ For `export type X = …` aliases: `export type X = …` plus a `declare namespa
 
 DB entities (`@db.table` / `@db.view` / `@db.view.for`) also get `static __flat` / `__ownProps` — dot-path → type maps the DB layer uses for filters, `$select`, `$sort` (`FlatOf<T>` / `OwnPropsOf<T>` in `@atscript/typescript/utils` read them): intermediate paths `never`, `@db.json` fields `string`, and since 0.1.93 optional entries `<type> | null` (`"address.zip"?: string | null` — the DB layer treats optional as nullable in filters; instance props stay `zip?: string`).
 
+Nav props (`@db.rel.to` / `.from` / `.via`, and since 0.2.22 `.store`: a relation resolved by the store, an adapter that reads the related rows itself, without foreign keys) are left out of `__ownProps` and listed in `static __navProps` (name → declared type, for `$with`). The list: `NAV_PROP_ANNOTATIONS` from `@atscript/core`, or from `@atscript/core/nav` in run-time/browser code (no compiler loaded).
+
 The JSDoc blocks in generated `.d.ts` are produced by codegen (entity name + `@see` source link, deprecation notices); source `.as` comments are **not** preserved in output.
 
 ## `.js` shape

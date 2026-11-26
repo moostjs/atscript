@@ -21,12 +21,12 @@ export interface TDtsFlatEntry {
 }
 
 /**
- * The `static __flat` (or `__ownProps`) block of `.d.ts` text: its paths with their TS types
- * (`undefined`: no such block).
+ * The `static __flat` (or `__ownProps`, `__navProps`) block of `.d.ts` text: its paths with their
+ * TS types (`undefined`: no such block).
  */
 export function flatBlock(
   text: string,
-  block: '__flat' | '__ownProps' = '__flat'
+  block: '__flat' | '__ownProps' | '__navProps' = '__flat'
 ): Map<string, TDtsFlatEntry> | undefined {
   const lines = text.split('\n')
   const at = lines.findIndex(l => l.trim() === `static ${block}: {`)

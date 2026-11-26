@@ -35,8 +35,12 @@ async function dts(source: string): Promise<string> {
   return out.content
 }
 
-/** The `__flat` (or `__ownProps`) block of class `name` in `.d.ts` `text`, as `"path"?: type`. */
-function block(text: string, name: string, which: '__flat' | '__ownProps' = '__flat') {
+/** The `__flat` (or `__ownProps`, `__navProps`) block of class `name` in `.d.ts` `text`, as `"path"?: type`. */
+function block(
+  text: string,
+  name: string,
+  which: '__flat' | '__ownProps' | '__navProps' = '__flat'
+) {
   const start = text.indexOf(`declare class ${name} `)
   const end = text.indexOf('\n}', start)
   const map = flatBlock(text.slice(start, end), which)
@@ -192,6 +196,32 @@ describe('.d.ts __flat / __ownProps', () => {
       'author.name?: string | null',
     ])
     expect(block(text, 'Post', '__ownProps')).toEqual(['id: string'])
+  })
+
+  it('a @db.rel.store field is a nav prop: in __navProps and __flat, not in __ownProps', async () => {
+    const text = await dts(`
+      @db.table 'authors'
+      export interface Author { id: string, name: string }
+      @db.table 'posts'
+      export interface Post {
+        id: string
+        @db.rel.store
+        author?: Author
+        @db.rel.store
+        reviewers: Author[]
+      }
+    `)
+    expect(block(text, 'Post')).toEqual([
+      'id: string',
+      'author?: never',
+      'author.id?: string | null',
+      'author.name?: string | null',
+      'reviewers: never',
+      'reviewers.id: string',
+      'reviewers.name: string',
+    ])
+    expect(block(text, 'Post', '__ownProps')).toEqual(['id: string'])
+    expect(block(text, 'Post', '__navProps')).toEqual(['author?: Author', 'reviewers: Author[]'])
   })
 
   it('a recursion is cut where the runtime flatten cuts it (intermediate)', async () => {

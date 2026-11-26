@@ -1,4 +1,5 @@
 import type { AtscriptDoc, TUnwound, TUnwoundField } from './document'
+import { NAV_PROP_ANNOTATIONS } from './nav'
 import {
   isArray,
   isGroup,
@@ -12,8 +13,7 @@ import type { SemanticPropNode } from './parser/nodes/prop-node'
 import type { SemanticNode } from './parser/nodes/semantic-node'
 import type { SemanticStructureNode } from './parser/nodes/structure-node'
 
-/** Annotations that make a prop a navigation property (a relation, not a stored field). */
-export const NAV_PROP_ANNOTATIONS = ['db.rel.to', 'db.rel.from', 'db.rel.via'] as const
+export { NAV_PROP_ANNOTATIONS } from './nav'
 
 export function hasNavPropAnnotation(prop: SemanticPropNode): boolean {
   if (!prop.annotations) {
