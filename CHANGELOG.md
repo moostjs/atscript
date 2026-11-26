@@ -1,3 +1,14 @@
+## [0.2.22](https://github.com/moostjs/atscript/compare/v0.2.21...v0.2.22) (2026-11-26)
+
+
+### Bug Fixes
+
+* **core:** bundled .ts config copies go into node_modules/.atscript-temp ([867d0c7](https://github.com/moostjs/atscript/commit/867d0c7f0974b03496ada02e26a1b5b55318f50b))
+
+
+### Features
+
+* **core:** db.rel.store navigation kind and the @atscript/core/nav subpath ([9842e9c](https://github.com/moostjs/atscript/commit/9842e9cbf0d73f13c7a181761813c868841a1bca))
 ## [0.2.21](https://github.com/moostjs/atscript/compare/v0.2.20...v0.2.21) (2026-11-26)
 
 
