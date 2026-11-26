@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
-import fs from 'node:fs'
 import { readdir, rm } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -43,6 +43,10 @@ async function removeLeftoverCopies(dir: string) {
   )
 }
 
+/**
+ * Bundles `configFile` with the local modules it imports into a copy of its own beside it: the
+ * path of the copy. Packages stay external.
+ */
 async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): Promise<string> {
   const dirnameVarName = 'injected_original_dirname'
   const filenameVarName = 'injected_original_filename'
@@ -89,12 +93,18 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
   // a failure evaluates the config again — and two loads at once do not share a file)
   const name = `atscript.config.[hash].${process.pid}.${bundleSeq++}`
   await removeLeftoverCopies(outputDir)
-  const result = await bundle.write({
-    dir: outputDir,
-    format: forceFormat || 'esm',
-    sourcemap: 'inline',
-    entryFileNames: forceFormat === 'cjs' ? `${name}.cjs` : `${name}.mjs`,
-  })
+  const result = await bundle
+    .write({
+      dir: outputDir,
+      format: forceFormat || 'esm',
+      sourcemap: 'inline',
+      entryFileNames: forceFormat === 'cjs' ? `${name}.cjs` : `${name}.mjs`,
+      // (one file, removed after the load: a local module imported with `import()` is inlined
+      // instead of written beside the config as a chunk of its own)
+      codeSplitting: false,
+    })
+    // (a long-running host, the editor, bundles the config again for each load)
+    .finally(() => bundle.close())
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
   const fileName = result.output.find(
     (chunk): chunk is OutputChunk => chunk.type === 'chunk' && chunk.isEntry
@@ -104,87 +114,114 @@ async function bundleTsConfig(configFile: string, forceFormat?: 'cjs' | 'esm'): 
 
 const SUPPORTED_JS_CONFIG_FORMATS = ['.js', '.mjs', '.cjs']
 const SUPPORTED_TS_CONFIG_FORMATS = ['.ts', '.mts', '.cts']
+/** The config file extensions, in the order a directory is searched for them. */
 const SUPPORTED_CONFIG_FORMATS = [...SUPPORTED_JS_CONFIG_FORMATS, ...SUPPORTED_TS_CONFIG_FORMATS]
 
 const DEFAULT_CONFIG_BASE = 'atscript.config'
 
 /**
- * Resolves nearest config file
+ * The nearest config file of document `docUri` (or of a folder): the first `atscript.config.*`
+ * walking up from its folder, as a filesystem path, until the folder `root` (when given, checked
+ * too) or the filesystem root. Both may be paths or `file://` URIs (percent-encoded, as an editor
+ * sends them). A folder that cannot be read has no config.
  */
 export async function resolveConfigFile(
   docUri: string,
-  _root?: string
+  root?: string
 ): Promise<string | undefined> {
-  const startDir = docUri.endsWith('.as') ? path.dirname(docUri) : docUri
-  const root = _root || startDir
-  let currentDir = startDir
-
-  const rootId = `file://${root}`
-
+  const start = path.resolve(fileUriToPath(docUri))
+  const stop = root ? path.resolve(fileUriToPath(root)) : undefined
+  let dir = start.endsWith('.as') ? path.dirname(start) : start
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition, no-constant-condition
   while (true) {
-    const candidate = await findConfigFileName(currentDir)
+    const candidate = await findConfigFileName(dir)
     if (candidate) {
-      return path.join(currentDir, candidate).replace(/^file:/, '')
+      return path.join(dir, candidate)
     }
-    // Stop if we've hit workspace root or actual filesystem root
-    const parentDir = path.dirname(currentDir)
-    if (currentDir === rootId || parentDir === currentDir) {
-      break
+    const parent = path.dirname(dir)
+    if (dir === stop || parent === dir) {
+      return undefined
     }
-    currentDir = parentDir
+    dir = parent
   }
-
-  return undefined
 }
 
-async function findConfigFileName(d: string): Promise<string | undefined> {
-  const filesInWorkingDirectory = new Set(await readdir(fileUriToPath(d)))
+async function findConfigFileName(dir: string): Promise<string | undefined> {
+  const names = new Set(await readdir(dir).catch(() => [] as string[]))
   for (const extension of SUPPORTED_CONFIG_FORMATS) {
     const fileName = `${DEFAULT_CONFIG_BASE}${extension}`
-    if (filesInWorkingDirectory.has(fileName)) {
+    if (names.has(fileName)) {
       return fileName
     }
   }
 }
 
+/**
+ * Loads `.ts` config `configFile` from a bundled copy of its own (see `bundleTsConfig`), removed
+ * after the import: each load evaluates the file and the local modules it imports as they are now.
+ */
 export async function loadTsConfig(
   configFile: string,
   forceFormat?: 'cjs' | 'esm'
 ): Promise<TAtscriptConfig> {
   const file = await bundleTsConfig(configFile, forceFormat)
   try {
-    // (a config that throws while it is evaluated fails the load, like a `.js` one)
+    // (a config that throws while it is evaluated fails the load)
     // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
     return (await import(/* @vite-ignore */ pathToFileURL(file).href)).default
   } finally {
-    fs.unlink(file, () => {})
+    // (removed before the load returns: nothing is left beside the config)
+    await rm(file, { force: true }).catch(() => {})
   }
 }
 
+/** Numbers the imports of `.js` configs of this process (see `importJsConfig`). */
+let importSeq = 0
+
+/**
+ * Imports `.js` / `.mjs` / `.cjs` config `file` as Node loads it, evaluated again on each call:
+ * under a URL of its own (Node caches an ES module by URL) and out of the CommonJS cache (keyed by
+ * file name). The modules it imports stay cached: a local one is read once per process.
+ */
+async function importJsConfig(file: string): Promise<TAtscriptConfig> {
+  const require = createRequire(file)
+  delete require.cache[require.resolve(file)]
+  const url = `${pathToFileURL(file).href}?atscript-load=${importSeq++}`
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, unicorn/no-await-expression-member, @typescript-eslint/no-unsafe-return
+  return (await import(/* @vite-ignore */ url)).default
+}
+
+/**
+ * Loads the config file `configPath`, fresh on every call: a `.js` one imported as Node loads it
+ * (see `importJsConfig`), a `.ts` one bundled (see `loadTsConfig`). Its `rootDir` is absolute: a
+ * relative one resolved against the file's directory, a missing one that directory — the same
+ * project root for every host.
+ */
 export async function loadConfig(
   configPath: string,
   forceFormat?: 'cjs' | 'esm'
-): Promise<TAtscriptConfig> {
+): Promise<TAtscriptConfig & { rootDir: string }> {
   if (!configPath) {
     throw new Error('loadConfig: no config path provided (resolveConfigFile returned undefined).')
   }
-  const ext = path.extname(configPath)
+  const file = path.resolve(configPath)
+  const ext = path.extname(file)
   try {
-    if (SUPPORTED_JS_CONFIG_FORMATS.includes(ext)) {
-      return forceFormat
-        ? await loadTsConfig(path.resolve(configPath), forceFormat)
-        : (await import(/* @vite-ignore */ pathToFileURL(configPath).href)).default
-    } else if (SUPPORTED_TS_CONFIG_FORMATS.includes(ext)) {
-      const rawConfigPath = path.resolve(configPath)
-      return await loadTsConfig(rawConfigPath, forceFormat)
-    } else {
+    if (!SUPPORTED_CONFIG_FORMATS.includes(ext)) {
       throw new Error(
         `Unsupported config format. Expected: \`${SUPPORTED_CONFIG_FORMATS.join(
           ','
         )}\` but got \`${ext}\``
       )
     }
+    const config =
+      SUPPORTED_JS_CONFIG_FORMATS.includes(ext) && !forceFormat
+        ? await importJsConfig(file)
+        : await loadTsConfig(file, forceFormat)
+    if (!config || typeof config !== 'object') {
+      throw new TypeError(`${file} has no default export of a config object`)
+    }
+    return { ...config, rootDir: path.resolve(path.dirname(file), config.rootDir ?? '.') }
   } catch (error) {
     console.error(error)
     throw new Error('Error happened while loading config.', { cause: error })

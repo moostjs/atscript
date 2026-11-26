@@ -109,6 +109,7 @@
       "external": [
         "fs",
         "path",
+        "url",
         "vscode",
         "child_process"
       ],
@@ -122,6 +123,7 @@
       "external": [
         "fs",
         "path",
+        "url",
         "@atscript/core"
       ],
       "dts": false

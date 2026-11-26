@@ -1,5 +1,5 @@
 import path from 'path'
-import { URL } from 'url'
+import { URL, fileURLToPath, pathToFileURL } from 'url'
 
 import { isBareSpecifier, withoutAsExtension } from '../resolve-bare'
 
@@ -23,17 +23,36 @@ export function resolveAtscriptFromPath(written: string, id: string) {
     const from = withoutAsExtension(written)
     resolved = isBareSpecifier(from)
       ? `bare:${from}.as`
-      : `file://${path.join(fileUriToPath(id).split('/').slice(0, -1).join('/'), from)}.as`
+      : pathToFileUri(`${path.join(path.dirname(fileUriToPath(id)), from)}.as`)
     byFrom.set(written, resolved)
   }
   return resolved
 }
 
-// LSP clients (VSCode) percent-encode `@`/`+` etc. in URIs, but on-disk paths
-// are unencoded — decode before any fs access. Non-`file://` ids pass through.
+/**
+ * The id of the document of the file at `filePath`: its `file:` URL, percent-encoded as
+ * `pathToFileURL` writes it. Every host builds a file's id this way (the editor's client sends its
+ * URIs in this form too), so a file has one id: an ordinary path (`@` and `+` included) is
+ * `file://` and the path, byte for byte; a space, a non-ASCII character, `%`, `#`, `?`, `~`,
+ * brackets and the like are encoded. A relative path (not a file's) is `file://` and the path.
+ */
+export function pathToFileUri(filePath: string): string {
+  return path.isAbsolute(filePath) ? pathToFileURL(filePath).href : `file://${filePath}`
+}
+
+/**
+ * The filesystem path of document id `id` (see {@link pathToFileUri}): a `file:` URL decoded, as
+ * `fileURLToPath` reads it. Any other id passes through. A `file://` id that is not a file URL (a
+ * relative path, a raw `#` or `?`) is the rest of it, percent-decoded.
+ */
 export function fileUriToPath(id: string): string {
   if (!id.startsWith('file://')) {
     return id
+  }
+  if (!/[?#]/u.test(id)) {
+    try {
+      return fileURLToPath(id)
+    } catch {}
   }
   const raw = id.slice(7)
   try {
@@ -43,13 +62,16 @@ export function fileUriToPath(id: string): string {
   }
 }
 
+/** The path of `toUri` relative to `fromUri`'s folder, without its extension (`./b`, `../x/b`). */
 export function getRelPath(fromUri: string, toUri: string): string {
-  // Convert URIs to file paths (remove "file://" scheme)
-  const fromPath = new URL(fromUri).pathname
-  const toPath = new URL(toUri).pathname
+  // (a file's decoded path: written into generated code and messages as it is on disk)
+  const pathOf = (uri: string) =>
+    uri.startsWith('file://') ? fileUriToPath(uri) : new URL(uri).pathname
+  const fromPath = pathOf(fromUri)
+  const toPath = pathOf(toUri)
 
-  // Compute the relative path
-  const relPath = path.relative(path.dirname(fromPath), toPath)
+  // Compute the relative path (with `/`: an import path)
+  const relPath = path.relative(path.dirname(fromPath), toPath).split(path.sep).join('/')
 
   // Remove the file extension
   const { dir, name } = path.parse(relPath)

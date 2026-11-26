@@ -12,7 +12,7 @@ import { isAnnotate } from './parser/nodes'
 import type { SemanticPrimitiveNode } from './parser/nodes'
 import type { Token } from './parser/token'
 import type { TMessages } from './parser/types'
-import { fileUriToPath, resolveAtscriptFromPath } from './parser/utils'
+import { fileUriToPath, pathToFileUri, resolveAtscriptFromPath } from './parser/utils'
 import { PluginManager } from './plugin/plugin-manager'
 import { isBareId, resolveBareSpecifier } from './resolve-bare'
 
@@ -247,6 +247,8 @@ export class AtscriptRepo {
     if (this.sharedConfig) {
       if (!this.sharedPluginManagerReady) {
         const shared: TPluginManagers = {
+          // (the `rootDir` of a config loaded from a file is absolute, see `loadConfig`: a
+          // relative one is relative to the host's root only for a config without a file)
           manager: new PluginManager(
             this.sharedConfig,
             path.resolve(this.root, this.sharedConfig.rootDir ?? '.')
@@ -292,14 +294,9 @@ export class AtscriptRepo {
 
   /** Loads `configFile` and runs its plugins' `config` hooks (see `configFiles`). */
   protected async loadConfigFile(configFile: string): Promise<TPluginManagers> {
+    // (its `rootDir` absolute: resolved against the file's directory, see `loadConfig`)
     const rawConfig = await loadConfig(configFile, this.configFormat)
-    if (!rawConfig.rootDir) {
-      rawConfig.rootDir = path.dirname(configFile)
-    }
-    const manager = new PluginManager(
-      rawConfig,
-      path.resolve(path.dirname(configFile), rawConfig.rootDir)
-    )
+    const manager = new PluginManager(rawConfig, rawConfig.rootDir)
     await manager.getDocConfig()
     return {
       file: configFile,
@@ -439,7 +436,7 @@ export class AtscriptRepo {
 
     // Resolve bare specifier placeholders (bare:xxx.as) to actual file:// URIs
     if (isBareId(forId)) {
-      const fromDir = fileUriToPath(atscript.id).split('/').slice(0, -1).join('/')
+      const fromDir = path.dirname(fileUriToPath(atscript.id))
       const resolved = await resolveBareSpecifier(from.text, fromDir)
       if (!resolved) {
         report([
@@ -451,7 +448,7 @@ export class AtscriptRepo {
         ])
         return
       }
-      const resolvedUri = `file://${resolved}`
+      const resolvedUri = pathToFileUri(resolved)
       atscript.resolvedImports.set(forId, resolvedUri)
       atscript.rekeyImport(forId, resolvedUri)
       this.resolvedToBare.set(resolvedUri, from.text)

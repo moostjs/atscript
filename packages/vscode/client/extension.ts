@@ -7,6 +7,8 @@ import { Uri, workspace, window, commands } from 'vscode'
 import type { LanguageClientOptions, ServerOptions } from 'vscode-languageclient/node'
 import { LanguageClient, TransportKind } from 'vscode-languageclient/node'
 
+import { protocolUri } from './uri'
+
 let client: LanguageClient | undefined
 let retryTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -112,6 +114,8 @@ export function activate(context: ExtensionContext) {
 
     const clientOptions: LanguageClientOptions = {
       documentSelector: [{ scheme: 'file', language: 'atscript' }],
+      // (one id per file: the server's own, see `protocolUri`)
+      uriConverters: { code2Protocol: protocolUri, protocol2Code: value => Uri.parse(value) },
       synchronize: {
         fileEvents: [
           workspace.createFileSystemWatcher('**/*.as'),
@@ -129,12 +133,12 @@ export function activate(context: ExtensionContext) {
     client.start()
 
     workspace
-      .findFiles('**/*.as', '**/{node_modules,dist,build,out,cdk.out,.cdk.staging,coverage,.next,.nuxt,.turbo,.cache}/**')
+      .findFiles(
+        '**/*.as',
+        '**/{node_modules,dist,build,out,cdk.out,.cdk.staging,coverage,.next,.nuxt,.turbo,.cache}/**'
+      )
       .then(files => {
-        client!.sendNotification(
-          'workspace/files',
-          files.map(file => file.toString())
-        )
+        client!.sendNotification('workspace/files', files.map(protocolUri))
       })
 
     context.subscriptions.push(client)

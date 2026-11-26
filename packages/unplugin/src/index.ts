@@ -1,12 +1,12 @@
 import { readFile } from 'fs/promises'
 import { createRequire } from 'module'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 import type { AtscriptDoc, TAtscriptConfig, TAtscriptConfigInput } from '@atscript/core'
 import {
   AtscriptRepo,
   blockTargetDocuments,
-  fileUriToPath,
   hasMutatingAnnotates,
   loadConfig,
   recordDocumentReads,
@@ -21,6 +21,8 @@ import {
 import type { UnpluginBuildContext, UnpluginFactory } from 'unplugin'
 import { createUnplugin } from 'unplugin'
 
+import { moduleFile } from './module-file'
+
 export interface atscriptPluginOptions {
   /**
    * When strict: true, atscript will throw an error if any document is not valid.
@@ -29,8 +31,10 @@ export interface atscriptPluginOptions {
   strict?: boolean
 
   /**
-   * The directory `atscript.config.*` is discovered from and `.as` files are
-   * resolved against. Absolute, or relative to `process.cwd()`.
+   * The directory `atscript.config.*` is discovered from (walking up). Absolute,
+   * or relative to `process.cwd()`. The config's `rootDir` is relative to the
+   * config file's directory (a missing one is that directory), not to `root`;
+   * without a config file, `root` is the project root.
    *
    * Defaults to the bundler's root (Vite: `config.root`, picked up automatically
    * in `configResolved`) or `process.cwd()`.
@@ -133,7 +137,7 @@ function addTransitiveWatchFiles(
       continue
     }
     visited.add(dep)
-    ctx.addWatchFile(fileUriToPath(dep.id))
+    ctx.addWatchFile(moduleFile(dep.id))
     addTransitiveWatchFiles(ctx, dep, visited)
   }
 }
@@ -229,7 +233,7 @@ function annotatedModules(doc: AtscriptDoc | undefined): Set<string> {
   const out = new Set<string>()
   for (const target of doc ? blockTargetDocuments(doc) : []) {
     if (target.id.startsWith('file://')) {
-      out.add(fileUriToPath(target.id))
+      out.add(moduleFile(target.id))
     }
   }
   return out
@@ -284,7 +288,8 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
   let repoPromise: Promise<AtscriptRepo> | undefined
   /**
    * The repo of the atscript config, loaded once: when the first build starts (see `start`). A
-   * missing config is an empty one (with the default `ts()` plugin). A config that fails to load
+   * missing config is an empty one (with the default `ts()` plugin), its project root the root; a
+   * config file's `rootDir` is relative to the file (see `loadConfig`). A config that fails to load
    * rejects the build's start, where the bundler reports it, and is loaded again next time.
    */
   const ensureRepo = () => {
@@ -311,7 +316,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
   /** Runs the config plugins' `config` hooks (once), then their `buildStart` hooks. */
   const start = async () => {
     const ready = await ensureRepo()
-    const { manager } = await ready.loadPluginManagerFor(`file://${getRoot()}`)
+    const { manager } = await ready.loadPluginManagerFor(pathToFileURL(getRoot()).href)
     await manager.buildStart()
   }
   /**
@@ -383,7 +388,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     const files = new Set<string>()
     for (const id of doc.imports.keys()) {
       if (id.startsWith('file://')) {
-        files.add(fileUriToPath(id))
+        files.add(moduleFile(id))
       }
     }
     for (const imported of files) {
@@ -451,7 +456,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     const files = new Set<string>()
     const add = (doc: AtscriptDoc | undefined) => {
       for (const d of doc?.transitive('dependants') ?? []) {
-        files.add(fileUriToPath(d.id))
+        files.add(moduleFile(d.id))
       }
     }
     add(loaded.get(id))
@@ -466,7 +471,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     const files = dependantsOf(id)
     // (and those that read it without importing it: a block's warning lists the documents
     // using its target, see `recordDocumentReads`)
-    const uri = `file://${id}`
+    const uri = pathToFileURL(id).href
     for (const [file, ids] of reads) {
       if (ids.has(uri)) {
         files.add(file)
@@ -509,7 +514,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
     text: string,
     candidates: Set<string>
   ): Promise<Set<string>> => {
-    const changedFile = fileUriToPath(uri)
+    const changedFile = moduleFile(uri)
     const before = served.get(changedFile)
     const beforeImports = before ? importLines(before.values()) : undefined
     const checked = new Set<string>()
@@ -724,7 +729,8 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
       // declaration is rendered fresh from the `.as` source, so it never depends
       // on (possibly stale) asc-emitted artifacts on disk.
       const isDts = id.endsWith('.as.d.ts')
-      const sourceId = isDts ? id.slice(0, -'.d.ts'.length) : id
+      // (keyed as the documents' files are, see `moduleFile`)
+      const sourceId = moduleFile(isDts ? id.slice(0, -'.d.ts'.length) : id)
       if (sourceId.endsWith('.as')) {
         await whenStarted()
         const code = (await readFile(sourceId, 'utf8')).toString()
@@ -734,7 +740,7 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
         let result: { error?: string; code: string } | undefined
         let format = 'js'
         try {
-          doc = await repo.openDocument(`file://${sourceId}`, code)
+          doc = await repo.openDocument(pathToFileURL(sourceId).href, code)
           await repo.checkDoc(doc)
           if (!isDts) {
             const compile = opts?.compileValidators
@@ -810,11 +816,13 @@ export const unpluginFactory: UnpluginFactory<atscriptPluginOptions | undefined>
      * In Vite, the modules whose generated code depends on the file are
      * re-transformed too (see below and `hotUpdate`).
      */
-    async watchChange(id, change?: { event: 'create' | 'update' | 'delete' }) {
-      if (!repo || !id.endsWith('.as')) {
+    async watchChange(changed, change?: { event: 'create' | 'update' | 'delete' }) {
+      if (!repo || !changed.endsWith('.as')) {
         return
       }
-      const uri = `file://${id}`
+      // (keyed as the documents' files are, see `moduleFile`)
+      const id = moduleFile(changed)
+      const uri = pathToFileURL(id).href
       // The generated code of the modules importing it (directly or not, also through an import
       // that did not resolve: a deleted file created again) may be stale too: they inline its
       // definitions, and those of its import cycle queue their statements together. Vite would

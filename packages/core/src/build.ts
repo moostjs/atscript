@@ -6,6 +6,7 @@ import { glob } from 'glob' // or any other glob library
 import type { TAtscriptConfigInput, TAtscriptConfigOutput } from './config'
 import type { AtscriptDoc } from './document'
 import type { TMessages } from './parser/types'
+import { pathToFileUri } from './parser/utils'
 import type { TOutputWithSource } from './plugin'
 import { AtscriptRepo } from './repo'
 
@@ -17,6 +18,8 @@ export interface TOutput extends TOutputWithSource {
 const WRITE_CONCURRENCY = 32
 
 export async function build(config: Partial<TAtscriptConfigInput>) {
+  // (a config loaded from a file has an absolute `rootDir`, see `loadConfig`; a relative one is
+  // relative to the working directory only in a config without a file)
   const rootDir = config.rootDir
     ? path.isAbsolute(config.rootDir)
       ? config.rootDir
@@ -28,7 +31,7 @@ export async function build(config: Partial<TAtscriptConfigInput>) {
 
   // The plugins' `config` hooks, then their `buildStart` hooks: before any `.as` file is
   // discovered (a plugin may write some).
-  const { manager } = await repo.loadPluginManagerFor(`file://${rootDir}`)
+  const { manager } = await repo.loadPluginManagerFor(pathToFileUri(rootDir))
   await manager.buildStart()
 
   // Gather a list of .as file entries from either user-provided `entries` or by globbing.
@@ -56,7 +59,7 @@ export async function build(config: Partial<TAtscriptConfigInput>) {
   // Open each document
   const documents: Array<AtscriptDoc | undefined> = []
   for (const entry of entries) {
-    documents.push(await repo.openDocument(`file://${entry}`))
+    documents.push(await repo.openDocument(pathToFileUri(entry)))
   }
 
   const docs = documents.filter(Boolean) as AtscriptDoc[]
@@ -102,8 +105,8 @@ export class BuildRepo {
 
     // Fill `target` for each output file
     for (const outFile of outFiles) {
-      // Convert URI-like `id` to a normal file path
-      const docPath = outFile.source.replace(/^file:\/\//, '')
+      // (a path: `PluginManager.render` sets it)
+      const docPath = outFile.source
       if (config.outDir) {
         const rel = path.relative(this.rootDir, docPath)
         const relDir = path.dirname(rel)

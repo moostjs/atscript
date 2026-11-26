@@ -5,6 +5,8 @@
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/strict-boolean-expressions */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
+import { basename } from 'path'
+
 import { ANNOTATE_RESET, isBacktickArgType, resolveAnnotation } from './annotations'
 import type { AnnotationSpec } from './annotations'
 import type { TAnnotationsTree } from './config'
@@ -521,8 +523,9 @@ export class AtscriptDoc {
     this.registry = new IdRegistry(Array.from(config.primitives?.keys() || []))
   }
 
+  /** The file name of the document (`user.as`): of its path, decoded (see `fileUriToPath`). */
   get name() {
-    return this.id.split('/').pop()
+    return basename(fileUriToPath(this.id))
   }
 
   public readonly registry: IdRegistry
@@ -2598,7 +2601,7 @@ export class AtscriptDoc {
     const n = m.range.start.line + 1
     let out =
       `\n${sc}${banner} ${m.message}${c.reset}` +
-      `\nin ${c.blue}${this.id}:${n}:${m.range.start.character + 1}${c.reset}`
+      `\nin ${c.blue}${readableId(this.id)}:${n}:${m.range.start.character + 1}${c.reset}`
 
     if (addSourceLinses) {
       const lines = this.text.split('\n')
@@ -4022,6 +4025,15 @@ function pathList(items: Array<{ path: string }>): string {
 /** The package of file document `doc` (see `packageOfFile`); `undefined` for any other document. */
 function packageOfDoc(doc: AtscriptDoc) {
   return doc.id.startsWith('file://') ? packageOfFile(fileUriToPath(doc.id)) : undefined
+}
+
+/** Document id `id` as messages print it: percent-decoded (`file:///…/my models/a.as`). */
+function readableId(id: string): string {
+  try {
+    return decodeURI(id)
+  } catch {
+    return id
+  }
 }
 
 /** `to`'s path relative to `from` (`./b.as`), or its id when not a file. */

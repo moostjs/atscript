@@ -9,6 +9,7 @@
 
 import fs from 'fs'
 import path from 'path'
+import { pathToFileURL } from 'url'
 
 import { fileUriToPath, getRelPath } from '@atscript/core'
 
@@ -91,14 +92,14 @@ export async function getItnFileCompletions(
       if (entry.isDirectory()) {
         // Append slash so user can continue navigating deeper
         return {
-          path: getRelPath(uri, `file://${path.join(dir, entry.name)}`),
+          path: getRelPath(uri, pathToFileURL(path.join(dir, entry.name)).href),
           isDirectory: true,
         }
       } else if (entry.isFile() && entry.name.endsWith('.as')) {
         // Remove the .as extension
         const fileNoExt = path.join(dir, entry.name).slice(0, -4)
         return {
-          path: getRelPath(uri, `file://${fileNoExt}`),
+          path: getRelPath(uri, pathToFileURL(fileNoExt).href),
           isDirectory: false,
         }
       }

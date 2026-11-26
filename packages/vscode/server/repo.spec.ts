@@ -1330,11 +1330,12 @@ describe('watched .as file changes', () => {
     expect(connection.sendDiagnostics).toHaveBeenCalledWith({ uri: bUri, diagnostics: [] })
   })
 
-  it('leaves a file that is open in the editor alone', async () => {
+  it('leaves a file that is open in the editor alone (its importers are checked again)', async () => {
     const { repo } = importerRepo([aUri, bUri])
     await repo.onAsFileChanged(bUri)
     expect((repo as any).atscripts.has(bUri)).toBe(true)
-    expect((repo as any).revalidateQueue).toEqual([])
+    expect((repo as any).changeQueue).toEqual([])
+    expect((repo as any).revalidateQueue).toEqual([aUri])
   })
 
   it('checks a file the repo never opened (created), and no other', async () => {

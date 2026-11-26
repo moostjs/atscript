@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import Module from 'node:module'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -23,6 +23,7 @@ interface TViteHooks {
 }
 
 interface TPlugin {
+  buildStart: () => Promise<void>
   load: (id: string) => Promise<unknown>
   vite: TViteHooks
 }
@@ -115,6 +116,59 @@ describe('root resolution', () => {
     const plugin = makePlugin()
     await expect(runLoad(plugin, asFile)).rejects.toThrow(/Unknown annotation/i)
   })
+})
+
+/** The `rootDir` the config plugins' `config` hook received, by project (see below). */
+const seen = () =>
+  (globalThis as { __atscriptRootDirs?: Record<string, string> }).__atscriptRootDirs
+
+describe('a config file above the root: its rootDir is relative to the config file', () => {
+  const dirs: string[] = []
+
+  afterAll(() => {
+    for (const dir of dirs) {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  /** A project whose config (`rootDir` when given) sits above the bundler root `app`. */
+  function project(rootDir?: string): string {
+    const dir = mkdtempSync(path.join(tmpdir(), 'unplugin-atscript-parent-'))
+    dirs.push(dir)
+    mkdirSync(path.join(dir, 'app'))
+    writeFileSync(
+      path.join(dir, 'atscript.config.mjs'),
+      `export default {
+  ${rootDir ? `rootDir: ${JSON.stringify(rootDir)},` : ''}
+  plugins: [{ name: 'spy', config(config) { (globalThis.__atscriptRootDirs ??= {})[${JSON.stringify(dir)}] = config.rootDir } }],
+}
+`
+    )
+    return dir
+  }
+
+  for (const [label, rootDir, expected] of [
+    ['a relative one', 'src', (dir: string) => path.join(dir, 'src')],
+    ['a missing one: the config file’s folder', undefined, (dir: string) => dir],
+  ] as const) {
+    it(`${label} (the root option)`, async () => {
+      const dir = project(rootDir)
+
+      await makePlugin({ root: path.join(dir, 'app') }).buildStart.call({})
+
+      expect(seen()?.[dir]).toBe(expected(dir))
+    })
+
+    it(`${label} (Vite's root)`, async () => {
+      const dir = project(rootDir)
+      const plugin = makePlugin()
+      plugin.vite.configResolved({ root: path.join(dir, 'app') })
+
+      await plugin.buildStart.call({})
+
+      expect(seen()?.[dir]).toBe(expected(dir))
+    })
+  }
 })
 
 describe('vite optimizeDeps prebundling', () => {

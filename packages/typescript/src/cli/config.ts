@@ -6,13 +6,19 @@ import { DEFAULT_FORMAT, loadConfig, resolveConfigFile } from '@atscript/core'
 
 import { tsPlugin } from '../plugin'
 
+/**
+ * The config of an `asc` run: the file `configFile` (relative to the working directory), else the
+ * nearest `atscript.config.*` walking up from the working directory, else the built-in one. A
+ * config file's `rootDir` is absolute, resolved against the file's directory (see `loadConfig`);
+ * the built-in config has none (`build()` then builds the working directory).
+ */
 export async function getConfig(
   configFile: string | undefined,
   logger: { log: (...args: unknown[]) => void; error: (...args: unknown[]) => void }
 ): Promise<TAtscriptConfig> {
   const root = process.cwd()
   if (configFile) {
-    const c = path.join(root, configFile)
+    const c = path.resolve(root, configFile)
     if (!existsSync(c)) {
       logger.error(
         `Config file ${__DYE_UNDERSCORE__}${configFile}${__DYE_UNDERSCORE_OFF__} not found`

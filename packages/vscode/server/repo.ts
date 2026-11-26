@@ -38,6 +38,7 @@ import {
   entryParts,
   PluginManager,
   resolveAtscriptFromPath,
+  resolveConfigFile,
   getQueryScope,
   getDeclaredValue,
   fieldRefTokens,
@@ -79,6 +80,15 @@ import {
 } from './utils'
 
 const CHECKS_DELAY = 100
+
+/** An `atscript.config.*` file (not the bundled copies a load writes beside it). */
+const CONFIG_FILE_RE = /\/atscript\.config\.[mc]?[jt]s$/u
+
+/** Whether `p` is `dir` or a path under it. */
+function isWithin(dir: string, p: string): boolean {
+  const rel = path.relative(dir, p)
+  return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel)
+}
 
 const IGNORED_DIR_RE =
   /\/(?:node_modules|dist|build|out|cdk\.out|\.cdk\.staging|coverage|\.next|\.nuxt|\.turbo|\.cache)\//u
@@ -130,8 +140,8 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
 
     connection.onDidChangeWatchedFiles(async params => {
       for (const change of params.changes) {
-        if (/atscript\.config\.[mc]?[tj]s$/.test(change.uri)) {
-          this.onConfigChanged(change.uri)
+        if (CONFIG_FILE_RE.test(change.uri)) {
+          await this.onConfigChanged(change.uri)
         } else if (change.uri.endsWith('.as')) {
           await this.onAsFileChanged(change.uri, change.type === FileChangeType.Deleted)
         }
@@ -721,17 +731,39 @@ export class VscodeAtscriptRepo extends AtscriptRepo {
     }
   }
 
-  async onConfigChanged(_configFile: string) {
-    const configFile = fileUriToPath(_configFile)
+  /**
+   * A config file created, changed or deleted (`uri`): the documents whose config it was, or whose
+   * nearest config it is now (see `resolveConfigFile`), drop their config, and the file's loaded
+   * config is dropped (loaded again, fresh, by the next document under it). They are opened and
+   * checked again with the new one, and so are the documents importing them, directly or not.
+   */
+  async onConfigChanged(uri: string) {
+    const configFile = fileUriToPath(uri)
+    const dir = path.dirname(configFile)
     console.log(`Reloading config: ${configFile}`)
     this.configFiles.delete(configFile)
     for (const [id, cache] of Array.from(this.configs.entries())) {
-      const { file } = await cache
-      if (file === configFile) {
-        this.configs.delete(id)
-        this.closeDocument(id)
-        this.addToRevalidateQueue(id)
+      // (a config is the nearest of documents under its folder only)
+      if (!isWithin(dir, fileUriToPath(id))) {
+        continue
       }
+      const managers = await cache.catch(() => undefined)
+      const file = managers?.file
+      if (file !== configFile && (await resolveConfigFile(id, this.root)) === file) {
+        continue
+      }
+      if (this.configs.get(id) !== cache) {
+        continue
+      }
+      this.configs.delete(id)
+      managers?.dependants.delete(id)
+      const doc = await this.atscripts.get(id)?.catch(() => undefined)
+      if (doc) {
+        // (they read its types, parsed with the new config once it is opened again)
+        this.revalidateDependants(doc)
+      }
+      this.closeDocument(id)
+      this.addToRevalidateQueue(id)
     }
   }
 
