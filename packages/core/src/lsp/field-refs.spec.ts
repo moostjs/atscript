@@ -453,6 +453,21 @@ interface Report {
       expect(cityDef?.originSelectionRange.start).toEqual(posOf(doc, `'address.city'`, 9))
     })
 
+    it('jumps from a field-path string in an annotate block entry', () => {
+      const doc = createDoc(
+        `${body}\nannotate Report {\n  @test.field 'amount'\n  total\n}\n`,
+        annotations
+      )
+      const arg = posOf(doc, `@test.field 'amount'\n  total`, 14)
+      const def = doc.getToDefinitionAt(arg.line, arg.character)?.[0]
+      expect(def?.targetSelectionRange.start).toEqual(posOf(doc, 'amount: number'))
+      // the entry name still resolves through the annotated interface
+      const entry = posOf(doc, `'amount'\n  total`, 11)
+      expect(
+        doc.getToDefinitionAt(entry.line, entry.character)?.[0].targetSelectionRange.start
+      ).toEqual(posOf(doc, 'total: number'))
+    })
+
     it('leaves unresolved paths and hook-less string args unchanged', () => {
       const doc = createDoc(body, annotations)
       const missing = posOf(doc, `'missing'`, 2)

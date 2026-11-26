@@ -2371,9 +2371,10 @@ export class AtscriptDoc {
       if (declared) {
         return this.definitionLink(token, { uri: declared.doc.id, range: declared.token.range })
       }
-      // Annotate entry refs resolve through the target interface
+      // Annotate entry refs resolve through the target interface (an annotation argument of the
+      // entry — its parent node is the entry too — falls through to the field refs below)
       const annotateBlock = this.annotateBlockAt(line, character)
-      if (annotateBlock && isRef(token.parentNode)) {
+      if (annotateBlock && isRef(token.parentNode) && !token.annotationRef) {
         const targetName = annotateBlock.targetName
         const entryRef = token.parentNode
         // Build chain: [entryId, ...chainUpToToken] for chains, or [tokenText] for identifiers
