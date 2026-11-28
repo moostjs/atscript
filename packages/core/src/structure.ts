@@ -18,7 +18,7 @@
  * give it shells at every prefix of L.
  */
 import type { AtscriptDoc } from './document'
-import { isDbEntityNode } from './flatten'
+import { hasNavPropAnnotation, isDbEntityNode } from './flatten'
 import { moduleId } from './module-id'
 import { SemanticGroup } from './parser/nodes'
 import type {
@@ -4329,7 +4329,9 @@ export class StructureModel {
    * `__flat` flatten them) whose structure reaches a web of mutually recursive merges — a
    * recursion cycle through two or more distinct hidden merge classes. A node is the type the
    * readers' cut keys it by (a shell is the def it shells); its successors are its fields', array
-   * elements' and union branches' types. A self-recursive merge alone is no web.
+   * elements' and union branches' types — not a nav prop's (`@db.rel.*`: the flatten stops at
+   * it; a target that is a db entity is checked as its own). A self-recursive merge alone is no
+   * web.
    */
   flatWebs(): TStructDecl[] {
     return (this.flatWebsMemo ??= this.findFlatWebs())
@@ -4355,9 +4357,9 @@ export class StructureModel {
         const t = byKey.get(k)!
         const next = new Set<string>()
         for (const name of t.names?.() ?? []) {
-          const r = t.slot(name)?.def
-          if (r) {
-            next.add(cutDef(r).key)
+          const slot = t.slot(name)
+          if (slot?.def && !this.slotProps(slot).some(hasNavPropAnnotation)) {
+            next.add(cutDef(slot.def).key)
           }
         }
         for (let i = 0; i < (t.size ?? 0); i++) {

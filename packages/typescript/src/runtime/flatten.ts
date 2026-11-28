@@ -38,6 +38,14 @@ export interface TFlattenOptions {
    * By default phantom types are included.
    */
   excludePhantomTypes?: boolean
+
+  /**
+   * Whether the flatten stops at field `path` (of `type`, the field's own definition): the field
+   * is listed and `onField` runs for it, its sub-paths are not. Asked once per field (not for
+   * the root, nor again for the items of a union at the field's path). For example, the `.d.ts`
+   * of a DB table stops at its navigation properties.
+   */
+  stopAt?: (path: string, type: TAtscriptAnnotatedType) => boolean
 }
 
 type TPath = TCutPath | undefined
@@ -54,8 +62,8 @@ type TPath = TCutPath | undefined
  * Arrays are recursed into (their element types are flattened with the same prefix). Unions,
  * tuples and intersections are recursed into (each item contributes to the same path, merging
  * via synthetic union types when paths collide). A recursive type is listed where it is reached
- * again, not expanded (the readers' recursion cut, see `cut.ts`). `onField` runs for a path once
- * its sub-paths are flattened.
+ * again, not expanded (the readers' recursion cut, see `cut.ts`); so is a field `stopAt` stops
+ * at. `onField` runs for a path once its sub-paths are flattened.
  *
  * @param type - The root annotated type (must be an object type).
  * @param options - Optional hooks for domain-specific processing.
@@ -108,7 +116,8 @@ export function flattenAnnotatedType(
     for (let i = entries.length - 1; i >= 0; i--) {
       const [key, value] = entries[i]
       if (!(skipPhantom && isPhantomType(value))) {
-        tasks.push(() => flattenType(value, prefix ? `${prefix}.${key}` : key, inComplex, path))
+        const name = prefix ? `${prefix}.${key}` : key
+        tasks.push(() => flattenType(value, name, inComplex, path, options?.stopAt?.(name, value)))
       }
     }
   }
@@ -144,14 +153,17 @@ export function flattenAnnotatedType(
     }
   }
 
-  /** Flattens `def` at `prefix`, below `path`. */
+  /** Flattens `def` at `prefix`, below `path`; `stop`: its own entry only (see `stopAt`). */
+  // oxlint-disable-next-line max-params
   function flattenType(
     def: TAtscriptAnnotatedType,
     prefix: string,
     inComplexTypeOrArray: boolean,
-    path: TPath
+    path: TPath,
+    stop = false
   ) {
-    const below = enterCut(path, def)
+    // (a field stopped at is not entered: listed as its kind lists it, a recursion or not)
+    const below = stop ? path : enterCut(path, def)
     if (below === false) {
       // (a recursion: listed, not expanded)
       addFieldToFlatMap(prefix, def)
@@ -162,7 +174,9 @@ export function flattenAnnotatedType(
       case 'object': {
         addFieldToFlatMap(prefix, def)
         tasks.push(() => fieldDone(prefix, def))
-        props(def, prefix, inComplexTypeOrArray, below)
+        if (!stop) {
+          props(def, prefix, inComplexTypeOrArray, below)
+        }
         break
       }
       case 'array': {
@@ -180,7 +194,7 @@ export function flattenAnnotatedType(
         }
         addFieldToFlatMap(prefix, typeArray)
         tasks.push(() => fieldDone(prefix, def))
-        if (!isAnnotatedTypeOfPrimitive(typeArray.type.of)) {
+        if (!stop && !isAnnotatedTypeOfPrimitive(typeArray.type.of)) {
           const of = typeArray.type.of
           tasks.push(() => flattenArray(of, prefix, below))
         }
@@ -199,10 +213,12 @@ export function flattenAnnotatedType(
           }
           fieldDone(prefix, def)
         })
-        const items = (def.type as TAtscriptTypeComplex).items
-        for (let i = items.length - 1; i >= 0; i--) {
-          const item = items[i]
-          tasks.push(() => flattenType(item, prefix, true, below))
+        if (!stop) {
+          const items = (def.type as TAtscriptTypeComplex).items
+          for (let i = items.length - 1; i >= 0; i--) {
+            const item = items[i]
+            tasks.push(() => flattenType(item, prefix, true, below))
+          }
         }
         break
       }

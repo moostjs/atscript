@@ -312,3 +312,75 @@ describe('flattenAnnotatedType cycle guard (path-local ancestors)', () => {
     expect(flatMap.has('user.friend.friend')).toBe(false)
   })
 })
+
+describe('flattenAnnotatedType stopAt', () => {
+  it('stops at an object field: listed, onField runs for it, nothing below', () => {
+    const type = buildObject()
+    const fields: string[] = []
+    const flatMap = flattenAnnotatedType(type, {
+      stopAt: path => path === 'address',
+      onField: path => fields.push(path),
+    })
+    expect(flatMap.get('address')).toBe(type.type.props.get('address'))
+    expect(flatMap.has('address.street')).toBe(false)
+    expect(flatMap.has('address.city')).toBe(false)
+    expect(fields).toContain('address')
+    expect(fields.filter(f => f.startsWith('address.'))).toEqual([])
+    // (the other fields are flattened as without it)
+    expect(flatMap.has('items.label')).toBe(true)
+  })
+
+  it('stops at an array field: its entry (top-level array tag included), not its elements', () => {
+    const flatMap = flattenAnnotatedType(buildObject(), {
+      stopAt: path => path === 'items',
+      topLevelArrayTag: 'test.__topLevelArray',
+    })
+    const items = flatMap.get('items')!
+    expect(items.type.kind).toBe('array')
+    expect(items.metadata.get('test.__topLevelArray' as any)).toBe(true)
+    expect(flatMap.has('items.label')).toBe(false)
+    expect(flatMap.has('items.count')).toBe(false)
+  })
+
+  it('stops at a union field: the union itself, not its items or their paths', () => {
+    const type = buildObject()
+    const fields: string[] = []
+    const flatMap = flattenAnnotatedType(type, {
+      stopAt: path => path === 'complexField',
+      onField: path => fields.push(path),
+    })
+    const field = flatMap.get('complexField') as TAtscriptAnnotatedType & { __flat_union?: true }
+    expect(field).toBe(type.type.props.get('complexField'))
+    expect(field.__flat_union).toBeUndefined()
+    expect(flatMap.has('complexField.a')).toBe(false)
+    expect(flatMap.has('complexField.b')).toBe(false)
+    expect(fields.filter(f => f.startsWith('complexField'))).toEqual(['complexField'])
+  })
+
+  it('is asked once per field, with its own definition, in order; never for the root', () => {
+    const type = buildObject()
+    const asked: Array<[string, TAtscriptAnnotatedType]> = []
+    flattenAnnotatedType(type, {
+      stopAt: (path, t) => {
+        asked.push([path, t])
+        return false
+      },
+    })
+    // (not for the union's items at `complexField`; each branch's `a` is a field of its own)
+    expect(asked.map(([p]) => p)).toEqual([
+      'name',
+      'address',
+      'address.street',
+      'address.city',
+      'tags',
+      'items',
+      'items.label',
+      'items.count',
+      'complexField',
+      'complexField.a',
+      'complexField.a',
+      'complexField.b',
+    ])
+    expect(asked[1][1]).toBe(type.type.props.get('address'))
+  })
+})

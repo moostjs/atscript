@@ -318,6 +318,9 @@ interface TFlattenOptions {
 
   /** When true, phantom-typed properties are skipped. Included by default. */
   excludePhantomTypes?: boolean
+
+  /** Whether to stop at a field: it is listed, its sub-paths are not. */
+  stopAt?: (path: string, type: TAtscriptAnnotatedType) => boolean
 }
 ```
 
@@ -337,6 +340,17 @@ const flatMap = flattenAnnotatedType(collectionType, {
 **`topLevelArrayTag`** marks array fields that are direct properties of the root object (not arrays nested inside other arrays or unions). This is useful for systems like MongoDB that treat top-level arrays differently.
 
 **`excludePhantomTypes`** controls whether [phantom](/packages/typescript/primitives#phantom) properties appear in the result. By default phantom types are included — form builders may want to render them as non-data UI elements (links, headings). Set to `true` when only data-bearing fields matter (e.g. database schemas).
+
+**`stopAt`** (since 0.2.24) ends the walk at a field: the field is listed and `onField` runs for it, but nothing below it is. It is asked once per field with the field's own type (its metadata included), never for the root. The generated `.d.ts` of a database table uses it to stop at navigation properties:
+
+```typescript
+import { NAV_PROP_ANNOTATIONS } from '@atscript/core/nav'
+
+const flatMap = flattenAnnotatedType(Post, {
+  // `author` (a `@db.rel.to` field) is listed, `author.name` is not
+  stopAt: (_path, type) => NAV_PROP_ANNOTATIONS.some(name => type.metadata.has(name)),
+})
+```
 
 ## Type Guards
 

@@ -74,7 +74,7 @@ export type PrimaryKeyOf<T> = T extends { __pk: infer PK } ? PK : unknown
 
 /**
  * Extracts the own-props flat map from an Atscript annotated type.
- * `__ownProps` contains only table-owned fields (no navigation property descendants).
+ * `__ownProps` contains only table-owned fields (no navigation properties).
  * Falls back to `FlatOf<T>` for types generated before this feature was added.
  */
 export type OwnPropsOf<T> = T extends { __ownProps: infer O } ? O : FlatOf<T>

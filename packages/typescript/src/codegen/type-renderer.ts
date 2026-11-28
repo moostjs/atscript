@@ -427,8 +427,10 @@ export class TypeRenderer extends BaseRenderer {
    *
    * The paths are the runtime flatten's (`flattenAnnotatedType`, as the db layer flattens the
    * table) of the type's class in the build-time realm (see `realm.ts`); their TS types are the
-   * types written at them (see `flatDefinitions`). A type whose module fails to evaluate in the
-   * realm has neither (a comment in the output says so).
+   * types written at them (see `flatDefinitions`). The flatten stops at nav props: a nav prop is
+   * listed, its target's paths are not (they are the target table's, and the db layer refuses
+   * paths below a nav prop). A type whose module fails to evaluate in the realm has neither (a
+   * comment in the output says so).
    */
   private renderFlatMaps(node: SemanticInterfaceNode) {
     let flat: Map<string, TAtscriptAnnotatedType>
@@ -439,7 +441,10 @@ export class TypeRenderer extends BaseRenderer {
         // (its statements never ran: an import cycle they wait on each other in)
         throw new Error(`${node.id} not built`)
       }
-      flat = realm.rt.flattenAnnotatedType(type, { excludePhantomTypes: true })
+      flat = realm.rt.flattenAnnotatedType(type, {
+        excludePhantomTypes: true,
+        stopAt: (_, t) => navProp(t),
+      })
     } catch {
       // (its module does not evaluate — error diagnostics — or the class is not
       // built: no runtime paths)
@@ -447,18 +452,19 @@ export class TypeRenderer extends BaseRenderer {
       return
     }
     const defs = flatDefinitions(this.doc, node)
-    this.renderFlatMap('__flat', flat, defs)
-    this.renderFlatMap('__ownProps', flat, defs, {
-      ownProps: true,
-      leadingNewline: true,
-      trailingNewline: true,
-    })
+    const paths = flatPaths(flat)
+    this.renderFlatMap('__flat', paths, defs)
+    this.renderFlatMap(
+      '__ownProps',
+      paths.filter(([, type]) => !navProp(type)),
+      defs,
+      { leadingNewline: true, trailingNewline: true }
+    )
   }
 
   /**
-   * Shared renderer for flat-map static properties (`__flat`, `__ownProps`): the paths of `flat`
-   * (the runtime flatten) except the root and the sub-paths of `@db.json` fields (and, with
-   * `ownProps`, nav props and their sub-paths).
+   * Shared renderer for flat-map static properties (`__flat`, `__ownProps`): the `paths` given
+   * (see {@link flatPaths}), with whether each is optional.
    *
    * Special rendering rules:
    * - **Intermediate paths** (structures, arrays of complex elements, unions of complex
@@ -471,17 +477,10 @@ export class TypeRenderer extends BaseRenderer {
    */
   private renderFlatMap(
     propName: string,
-    flat: Map<string, TAtscriptAnnotatedType>,
+    paths: TFlatPath[],
     defs: ReturnType<typeof flatDefinitions>,
-    opts?: { ownProps?: boolean; leadingNewline?: boolean; trailingNewline?: boolean }
+    opts?: { leadingNewline?: boolean; trailingNewline?: boolean }
   ) {
-    const paths: Array<[string, TAtscriptAnnotatedType, boolean]> = []
-    for (const [path, type] of flat) {
-      const optional = path ? flatPathOptional(flat, path, type, !!opts?.ownProps) : undefined
-      if (optional !== undefined) {
-        paths.push([path, type, optional])
-      }
-    }
     if (paths.length === 0) {
       return
     }
@@ -768,26 +767,42 @@ function navProp(type: TAtscriptAnnotatedType): boolean {
   return NAV_PROP_ANNOTATIONS.some(name => metadata.has(name))
 }
 
+/** A path of a flat map: the path, its flattened type, whether it is optional. */
+type TFlatPath = [path: string, type: TAtscriptAnnotatedType, optional: boolean]
+
+/**
+ * The paths of runtime flatten `flat` (stopped at nav props) a flat map lists: all but the root
+ * and the sub-paths of `@db.json` fields.
+ */
+function flatPaths(flat: Map<string, TAtscriptAnnotatedType>): TFlatPath[] {
+  const paths: TFlatPath[] = []
+  for (const [path, type] of flat) {
+    const optional = path ? flatPathOptional(flat, path, type) : undefined
+    if (optional !== undefined) {
+      paths.push([path, type, optional])
+    }
+  }
+  return paths
+}
+
 /**
  * Whether `path` (of `type`) of runtime flatten `flat` is optional (it or a path it is in is, see
- * {@link optionalPath}); `undefined` when it is not listed: below a `@db.json` field, or with
- * `ownProps` a nav prop or below one.
+ * {@link optionalPath}); `undefined` when it is not listed: below a `@db.json` field.
  */
 function flatPathOptional(
   flat: Map<string, TAtscriptAnnotatedType>,
   path: string,
-  type: TAtscriptAnnotatedType,
-  ownProps: boolean
+  type: TAtscriptAnnotatedType
 ): boolean | undefined {
   let optional = false
   for (let dot = path.indexOf('.'); dot >= 0; dot = path.indexOf('.', dot + 1)) {
     const above = flat.get(path.slice(0, dot))
-    if (above && (dbJson(above) || (ownProps && navProp(above)))) {
+    if (above && dbJson(above)) {
       return undefined
     }
     optional ||= !!above && optionalPath(above)
   }
-  return ownProps && navProp(type) ? undefined : optional || optionalPath(type)
+  return optional || optionalPath(type)
 }
 
 /**

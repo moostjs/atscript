@@ -179,23 +179,95 @@ describe('.d.ts __flat / __ownProps', () => {
     ])
   })
 
-  it('nav props are in __flat, not in __ownProps', async () => {
+  it('a nav prop is listed in __flat, nothing below it (TO, FROM, `| null`); not in __ownProps', async () => {
     const text = await dts(`
-      export interface Author { id: string, name: string }
+      @db.table 'authors'
+      export interface Author {
+        id: string
+        name: string
+        @db.rel.from
+        posts: Post[]
+      }
       @db.table 'posts'
       export interface Post {
         id: string
         @db.rel.to
         author?: Author
+        @db.rel.to
+        editor: Author | null
+        @db.rel.from
+        comments: Comment[]
+      }
+      @db.table 'comments'
+      export interface Comment {
+        id: string
+        @db.rel.to
+        post?: Post
       }
     `)
     expect(block(text, 'Post')).toEqual([
       'id: string',
       'author?: never',
-      'author.id?: string | null',
-      'author.name?: string | null',
+      'editor: Author | null',
+      'comments: never',
     ])
     expect(block(text, 'Post', '__ownProps')).toEqual(['id: string'])
+    expect(block(text, 'Author')).toEqual(['id: string', 'name: string', 'posts: never'])
+    expect(block(text, 'Comment')).toEqual(['id: string', 'post?: never'])
+  })
+
+  it('a nav prop in a union branch: the flatten stops there too', async () => {
+    const text = await dts(`
+      @db.table 'authors'
+      export interface Author { id: string, name: string }
+      @db.table 'posts'
+      export interface Post {
+        id: string
+        by: {
+          @db.rel.to
+          author: Author
+        } | { name: string }
+      }
+    `)
+    expect(block(text, 'Post')).toEqual([
+      'id: string',
+      'by: never',
+      'by.author: never',
+      'by.name: string',
+    ])
+    expect(block(text, 'Post', '__ownProps')).toEqual([
+      'id: string',
+      'by: never',
+      'by.name: string',
+    ])
+  })
+
+  it('a mesh of tables linked by nav props: each __flat is its own paths and nav keys', async () => {
+    // (0.2.23 and before: the paths of every table reachable through nav props, transitively —
+    // exponential in the nav graph, a crash of the writer from about 40 such tables)
+    const n = 16
+    let source = ''
+    for (let i = 0; i < n; i++) {
+      source += `@db.table 't${i}'
+        export interface T${i} {
+          id: string
+          name?: string
+          info: { note: string }
+          @db.rel.to
+          next?: T${(i + 1) % n}
+          @db.rel.from
+          kids: T${(i + 3) % n}[]
+          @db.rel.via
+          peers?: T${(i + 5) % n}[]
+        }
+      `
+    }
+    const text = await dts(source)
+    const own = ['id: string', 'name?: string | null', 'info: never', 'info.note: string']
+    for (let i = 0; i < n; i++) {
+      expect(block(text, `T${i}`)).toEqual([...own, 'next?: never', 'kids: never', 'peers?: never'])
+      expect(block(text, `T${i}`, '__ownProps')).toEqual(own)
+    }
   })
 
   it('a @db.rel.store field is a nav prop: in __navProps and __flat, not in __ownProps', async () => {
@@ -211,15 +283,7 @@ describe('.d.ts __flat / __ownProps', () => {
         reviewers: Author[]
       }
     `)
-    expect(block(text, 'Post')).toEqual([
-      'id: string',
-      'author?: never',
-      'author.id?: string | null',
-      'author.name?: string | null',
-      'reviewers: never',
-      'reviewers.id: string',
-      'reviewers.name: string',
-    ])
+    expect(block(text, 'Post')).toEqual(['id: string', 'author?: never', 'reviewers: never'])
     expect(block(text, 'Post', '__ownProps')).toEqual(['id: string'])
     expect(block(text, 'Post', '__navProps')).toEqual(['author?: Author', 'reviewers: Author[]'])
   })

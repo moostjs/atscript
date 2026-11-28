@@ -548,6 +548,17 @@ export type R = A & { next?: R }
   })
 })
 
+/** A web of mutually recursive merges over `T0..T{n-1}` and `M0..M{n-1}`. */
+function mergeWeb(n = 3): string {
+  let source = ''
+  for (let i = 0; i < n; i++) {
+    const [j, k] = [(i + 1) % n, (i + 2) % n]
+    source += `export interface T${i} { v${i}?: string; a?: T${j} & T${k}; l?: T${j} & M${i} }\n`
+    source += `export interface M${i} { m${i}?: string; n?: T${i} & M${j} }\n`
+  }
+  return source
+}
+
 describe('StructureModel: flattening webs of recursive merges (MODEL §14 P5-1)', () => {
   /** The db entities of `source` whose flattening reaches a web (a cycle through ≥ 2 merges). */
   async function webs(files: Record<string, string>): Promise<string[]> {
@@ -572,13 +583,7 @@ export interface H { a?: A; m?: A & B; c: C[] }
   })
 
   it('mutually recursive merges (round 21 R-F, round 22) are an error where a db entity reaches them', async () => {
-    const n = 3
-    let source = ''
-    for (let i = 0; i < n; i++) {
-      const [j, k] = [(i + 1) % n, (i + 2) % n]
-      source += `export interface T${i} { v${i}?: string; a?: T${j} & T${k}; l?: T${j} & M${i} }\n`
-      source += `export interface M${i} { m${i}?: string; n?: T${i} & M${j} }\n`
-    }
+    let source = mergeWeb()
     source += `@db.table 'root'\nexport interface Root { r?: T0 & T1 }\n`
     source += `@db.table 'leaf'\nexport interface Leaf { s?: string; t?: T0 }\n`
     source += `@db.table 'plain'\nexport interface Plain { s?: string }\n`
@@ -596,6 +601,14 @@ export interface Root { r0?: T0 & M0 }
 `,
       })
     ).toEqual(['Root'])
+  })
+
+  it('a nav prop is not followed: a table referencing one with a web is no error, that one is', async () => {
+    let source = mergeWeb()
+    source += `@db.table 'root'\nexport interface Root { id: string; r?: T0 & T1 }\n`
+    source += `@db.table 'posts'\nexport interface Post {\n  id: string\n  @db.rel.to\n  root?: Root\n  @db.rel.from\n  roots: Root[]\n  @db.rel.to\n  t?: T0\n}\n`
+    source += `@db.table 'leaf'\nexport interface Leaf { s?: string; t?: T0 }\n`
+    expect(await webs({ 'a.as': source })).toEqual(['Root', 'Leaf'])
   })
 
   it('a merged prop typed by another merge that leads back (round 24 FLK); a merge of merges (big4)', async () => {

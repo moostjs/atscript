@@ -113,7 +113,7 @@ type S =
 | `a type cannot be an operand of its own merge; recurse through a field instead` | `type X = A & X`, or a cycle of named merges (`type Y = Z & A`, `type Z = Y & A`) | `interface X extends A { next?: X }` |
 | `union members are not supported in recursive merges; split with named types` | a merge ON a recursion cycle merges a prop several members declare with a union among them (`Tagged { next?: (Card \| Note) & Tagged }` with `Card.next`, `Note.next`) | move the recursive prop out of the union members (`(CardFields \| NoteFields) & Tagged`). Top-level `(N \| D) & C` and ordinary merges inside a recursive merge are fine |
 | `merge too complex: split it with named types` | > 200 distinct merged types in one module, or union members distributing into > 16,384 branch combinations | name intermediate merges / the parts |
-| `flattening this type reaches mutually recursive merges; split it with named types` | a `@db.table` / `@db.view` whose flattening reaches a cycle through ≥ 2 different unnamed merges (`author?: Author & Extra`, `latest?: Post & Extra`) | name the merges (`type AuthorX = Author & Extra`); self-recursive merges and validate-only types are fine |
+| `flattening this type reaches mutually recursive merges; split it with named types` | a `@db.table` / `@db.view` whose flattening reaches a cycle through ≥ 2 different unnamed merges (`author?: Author & Extra`, `latest?: Post & Extra`; navigation properties `@db.rel.*` are not followed) | name the merges (`type AuthorX = Author & Extra`); self-recursive merges and validate-only types are fine |
 
 Discriminated unions (members share a literal-valued prop) are auto-detected by `buildJsonSchema` and exposed via `detectDiscriminator()`.
 

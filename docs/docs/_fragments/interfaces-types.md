@@ -390,7 +390,7 @@ export interface Feed { // Error: flattening this type reaches mutually recursiv
 }
 ```
 
-Name the merges (`type AuthorX = Author & Extra`, `type PostX = Post & Extra`, and `author?: AuthorX`, `latest?: PostX`), or drop the merge from the cycle. A merge that recurses only into itself (`next?: A & B` inside `A`) is fine, and types that are only validated (not db tables) are not affected.
+Name the merges (`type AuthorX = Author & Extra`, `type PostX = Post & Extra`, and `author?: AuthorX`, `latest?: PostX`), or drop the merge from the cycle. A merge that recurses only into itself (`next?: A & B` inside `A`) is fine, and types that are only validated (not db tables) are not affected. The check does not follow navigation properties (`@db.rel.*`): a related table is checked as a table of its own.
 
 ## Practical Example
 
