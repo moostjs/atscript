@@ -1,3 +1,9 @@
+## [0.2.24](https://github.com/moostjs/atscript/compare/v0.2.23...v0.2.24) (2026-11-28)
+
+
+### Bug Fixes
+
+* **typescript,core:** a DB entity's flatten stops at navigation properties (new flattenAnnotatedType stopAt option); __flat no longer lists the target's paths ([9590cce](https://github.com/moostjs/atscript/commit/9590ccea5387f054532fe883baed2c0ca8827c39))
 ## [0.2.23](https://github.com/moostjs/atscript/compare/v0.2.22...v0.2.23) (2026-11-26)
 
 
